@@ -1333,29 +1333,45 @@ from paddlenlp import Taskflow
 ```python
 >>> from paddlenlp import Taskflow
 # 默认模型为 pai-painter-painting-base-zh
->>> text2imagegen = Taskflow("text2image_generation", model="pai-painter-painting-base-zh")
+>>> text_to_image = Taskflow("text_to_image")
 # 单条输入
->>> images = text2imagegen("风阁水帘今在眼，且来先看早梅红")
-# [<PIL.Image.Image image mode=RGB size=1024x256>]
->>> images[0].save("figure.png")
+>>> images = text_to_image("风阁水帘今在眼，且来先看早梅红")
+# [<PIL.Image.Image image mode=RGB size=2048x256>]
+>>> images[0].save("painting-figure.png")
 # 多条输入
->>> images = text2imagegen(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
-# [<PIL.Image.Image image mode=RGB size=1024x256>,
-#  <PIL.Image.Image image mode=RGB size=1024x256>]
+>>> images = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
+# [<PIL.Image.Image image mode=RGB size=2048x256>,
+#  <PIL.Image.Image image mode=RGB size=2048x256>]
 >>> for i, image in enumerate(images):
->>>     image.save(f"figure_{i}.png")
+>>>     image.save(f"painting-figure_{i}.png")
+# pai-painter-commercial-base-zh模型
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
+# 多条输入
+>>> images = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
+>>> for i, image in enumerate(images):
+>>>     image.save(f"commercial-figure_{i}.png")
+# dalle-mini模型
+>>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
+# 多条输入
+>>> images = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
+>>> for i, image in enumerate(images):
+>>>     image.save(f"dalle-mini-figure_{i}.png")
 ```
+
+#### 图片生成效果展示
+<p align="center">
+ <img src="https://user-images.githubusercontent.com/50394665/183386146-9b265304-7294-46fa-896f-1dd90f44ba31.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386193-7a463852-f5f7-49e9-b3b0-3d8f4a9b2576.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386229-68374a39-6e14-4565-b2c6-cc547a729135.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386237-b0243ec5-09fe-47cc-9010-bd9b97fda862.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183387833-0f9ef786-ea62-40e1-a48c-28680d418142.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183387861-c4029b6c-f2e9-46d0-988f-6989f11a607d.png" align="middle">
+<p align="center">
 
 #### 可配置参数说明
 * `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `temperature`：解码参数temperature，默认为1.0。
-* `top_k`：解码参数top_k，默认为32。
-* `top_p`：解码参数top_p，默认为1.0。
-* `conditional_scale`：dalle-mini模型使用的参数，可参考[推特](https://twitter.com/RiversHaveWings/status/1478093658716966912)，默认为10.0。
-* `num_return_images`：返回图片的数量，默认为4，即4张图片水平拼接形成一张长图。
-* `use_faster`：是否使用faster_generation，默认为False，目前支持faster_generation的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh"]`。
-* `use_fp16_decoding`：是否使用fp16加速解码过程，默认为False，只有当use_faster为True的时候才有效。
+* `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
 
 </div></details>
 

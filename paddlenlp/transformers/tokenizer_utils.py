@@ -1423,14 +1423,117 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             return text
 
 
+class BpeEncoder(object):
+    """BpeEncoder"""
+
+    def __init__(self, encoder_json_file, vocab_bpe_file, errors='replace'):
+        """
+        Constructs a BpeEncoder.
+
+        Args:
+            encoder_json_file (`str`): The path to bpe encode json file.
+            vocab_bpe_file (`str`): The path to bpe vocab file.
+        """
+        self.encoder = self.__get_encoder(encoder_json_file)
+        self.decoder = {v: k for k, v in self.encoder.items()}
+        self.errors = errors  # how to handle errors in decoding
+        self.byte_encoder = bytes_to_unicode()
+        self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
+        self.bpe_ranks = self.__get_bpe_ranks(vocab_bpe_file)
+        self.cache = {}
+        re = try_import("regex")
+        self.pat = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
+
+    def __get_encoder(self, encoder_json_file):
+        with open(encoder_json_file, 'r') as f:
+            encoder = json.load(f)
+        return encoder
+
+    def __get_bpe_ranks(self, vocab_bpe_file):
+        with open(vocab_bpe_file, 'r', encoding="utf-8") as f:
+            bpe_data = f.read()
+        bpe_merges = [
+            tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
+        ]
+        bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
+        return bpe_ranks
+
+    def bpe(self, token):
+        """
+        bpe
+        """
+        if token in self.cache:
+            return self.cache[token]
+        word = tuple(token)
+        pairs = get_pairs(word)
+
+        if not pairs:
+            return token
+
+        while True:
+            bigram = min(
+                pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            if bigram not in self.bpe_ranks:
+                break
+            first, second = bigram
+            new_word = []
+            i = 0
+            while i < len(word):
+                try:
+                    j = word.index(first, i)
+                    new_word.extend(word[i:j])
+                    i = j
+                except:
+                    new_word.extend(word[i:])
+                    break
+
+                if word[i] == first and i < len(word) - 1 and word[i +
+                                                                   1] == second:
+                    new_word.append(first + second)
+                    i += 2
+                else:
+                    new_word.append(word[i])
+                    i += 1
+            new_word = tuple(new_word)
+            word = new_word
+            if len(word) == 1:
+                break
+            else:
+                pairs = get_pairs(word)
+        word = ' '.join(word)
+        self.cache[token] = word
+        return word
+
+    def encode(self, text):
+        """
+        encode
+        """
+        bpe_tokens = []
+        re = try_import("regex")
+        for token in re.findall(self.pat, text):
+            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
+            bpe_tokens.extend(self.encoder[bpe_token]
+                              for bpe_token in self.bpe(token).split(' '))
+        return bpe_tokens
+
+    def decode(self, tokens):
+        """
+        decode
+        """
+        text = ''.join([self.decoder[token] for token in tokens])
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
+        return text
+
+
 class BPETokenizer(PretrainedTokenizer):
     """
     The base class for all bpe tokenizers. It mainly provides common tokenize
     methods for bpe type tokenizer. 
     
     Args:
-        vocab_file (str): 
-            file path of the vocabulary.
         encoder_json_path (str, optional):
             file path of the id to vocab.
         vocab_bpe_path (str, optional):
@@ -1453,241 +1556,151 @@ class BPETokenizer(PretrainedTokenizer):
 
     """
 
-    class Encoder(object):
-
-        def __init__(self,
-                     encoder,
-                     bpe_merges,
-                     errors='replace',
-                     special_tokens=["[SEP]", "[p]", "[q]", "[/q]"]):
-            self.encoder = encoder
-            self.decoder = {v: k for k, v in self.encoder.items()}
-            self.errors = errors  # how to handle errors in decoding
-            self.byte_encoder = self._bytes_to_unicode()
-            self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
-            self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
-            self.cache = {}
-            self.re = try_import("regex")
-            self.special_tokens = special_tokens
-
-            # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
-            self.pat = self.re.compile(
-                r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-            )
-
-        @lru_cache()
-        def _bytes_to_unicode(self):
-            """
-            Returns list of utf-8 byte and a corresponding list of unicode strings.
-            The reversible bpe codes work on unicode strings.
-            This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
-            When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-            This is a signficant percentage of your normal, say, 32K bpe vocab.
-            To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
-            And avoids mapping to whitespace/control characters the bpe code barfs on.
-            """
-
-            bs = (list(range(ord("!"),
-                             ord("~") + 1)) +
-                  list(range(ord("¡"),
-                             ord("¬") + 1)) +
-                  list(range(ord("®"),
-                             ord("ÿ") + 1)))
-            cs = bs[:]
-
-            n = 0
-            for b in range(2**8):
-                if b not in bs:
-                    bs.append(b)
-                    cs.append(2**8 + n)
-                    n += 1
-
-            cs = [chr(n) for n in cs]
-
-            ddict = dict(zip(bs, cs))
-            return dict(zip(bs, cs))
-
-        def _get_pairs(self, word):
-            """Return set of symbol pairs in a word.
-            Word is represented as tuple of symbols (symbols being variable-length strings).
-            """
-            pairs = set()
-            prev_char = word[0]
-            for char in word[1:]:
-                pairs.add((prev_char, char))
-                prev_char = char
-            return pairs
-
-        def bpe(self, token):
-            if token in self.cache:
-                return self.cache[token]
-            word = tuple(token)
-            pairs = self._get_pairs(word)
-
-            if not pairs:
-                return token
-
-            while True:
-                bigram = min(
-                    pairs,
-                    key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
-                if bigram not in self.bpe_ranks:
-                    break
-                first, second = bigram
-                new_word = []
-                i = 0
-                while i < len(word):
-                    try:
-                        j = word.index(first, i)
-                        new_word.extend(word[i:j])
-                        i = j
-                    except:
-                        new_word.extend(word[i:])
-                        break
-
-                    if word[i] == first and i < len(word) - 1 and word[
-                            i + 1] == second:
-                        new_word.append(first + second)
-                        i += 2
-                    else:
-                        new_word.append(word[i])
-                        i += 1
-                new_word = tuple(new_word)
-                word = new_word
-                if len(word) == 1:
-                    break
-                else:
-                    pairs = self._get_pairs(word)
-            word = ' '.join(word)
-            self.cache[token] = word
-
-            return word
-
-        def tokenize(self, text):
-            tokens = text.split(' ')
-            sub_tokens = []
-            for token_i, token in enumerate(tokens):
-                if self.is_special_token(token):
-                    if token_i == 0:
-                        sub_tokens.extend([token])
-                    else:
-                        sub_tokens.extend([" " + token])
-                else:
-                    if token_i == 0:
-                        sub_tokens.extend(self.re.findall(self.pat, token))
-                    else:
-                        sub_tokens.extend(self.re.findall(
-                            self.pat, " " + token))
-            return sub_tokens
-
-        def tokenize_old(self, text):
-            return self.re.findall(self.pat, text)
-
-        def is_special_token(self, tok):
-            if isinstance(tok, int):
-                return False
-            res = False
-            for t in self.special_tokens:
-                # if tok.find(t) != -1:
-                if tok.strip() == t:
-                    res = True
-                    break
-            return res
-
-        def tokenize_bpe(self, token):
-
-            if self.is_special_token(token):
-                return [token.strip()]  # remove space for convert_to_ids
-            else:
-
-                token = ''.join(self.byte_encoder[b]
-                                for b in token.encode('utf-8'))
-                return [
-                    self.encoder[bpe_token]
-                    for bpe_token in self.bpe(token).split(' ')
-                ]
-
-        def encode(self, text):
-            bpe_tokens = []
-            for token in self.tokenize(text):
-                bpe_tokens.extend(self.tokenize_bpe(token))
-            return bpe_tokens
-
-        def decode(self, tokens):
-            pre_token_i = 0
-            texts = []
-            for token_i, token in enumerate(tokens):
-                if self.is_special_token(token):
-                    # proprecess tokens before token_i
-                    if token_i - pre_token_i > 0:
-                        text = ''.join([
-                            self.decoder[int(tok)]
-                            for tok in tokens[pre_token_i:token_i]
-                        ])
-                        text = bytearray([self.byte_decoder[c] for c in text
-                                          ]).decode('utf-8', errors=self.errors)
-                        texts.append(text)
-                    # texts.append(token)
-                    if token_i == 0:
-                        texts.append(
-                            token
-                        )  # in the beginning, there is no space before special tokens
-                    else:
-                        texts.extend(
-                            [" ", token]
-                        )  # in middle sentence, there must be a space before special tokens
-                    pre_token_i = token_i + 1
-
-            if pre_token_i < len(tokens):
-                text = ''.join(
-                    [self.decoder[int(tok)] for tok in tokens[pre_token_i:]])
-                text = bytearray([self.byte_decoder[c]
-                                  for c in text]).decode('utf-8',
-                                                         errors=self.errors)
-                texts.append(text)
-
-            return ''.join(texts)
-
     def __init__(self,
-                 vocab_file,
                  encoder_json_path="./configs/encoder.json",
                  vocab_bpe_path="./configs/vocab.bpe",
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
-        self.vocab = self.load_vocabulary(vocab_file,
-                                          unk_token=unk_token,
-                                          sep_token=sep_token,
-                                          cls_token=cls_token,
-                                          mask_token=mask_token)
+                 mask_token="[MASK]",
+                 **kwargs):
+        if not kwargs.get("vocab_file", None):
+            logger.warning(
+                'Deprecated: <vocab_file> field will depreacted after version<2.3.8>'
+            )
+
         self.encoder_json_path = encoder_json_path
         self.vocab_bpe_path = vocab_bpe_path
-        self.encoder = self._get_encoder(encoder_json_path, vocab_bpe_path)
+        self.encoder = BPEEncoder(encoder_json_path, vocab_bpe_path)
         self.nltk = try_import('nltk')
 
-    def _tokenize(self, text, is_sentencepiece=True):
-        text = convert_to_unicode(text)
-        text = " ".join(text.split())  # remove duplicate whitespace
-        if is_sentencepiece:
-            sents = self.nltk.tokenize.sent_tokenize(text)
-            bpe_ids = sum([self.encoder.encode(sent) for sent in sents], [])
+    @property
+    def vocab_size(self):
+        r"""
+        Return the size of vocabulary.
+
+        Returns:
+            int: the size of vocabulary.
+        """
+
+        return len(self.vocab)
+
+    def _tokenize(self, text):
+        r"""
+        End-to-end tokenization for Skep models.
+
+        Args:
+            text (str): The text to be tokenized.
+
+        Returns:
+            list: A list of string representing converted tokens.
+        """
+        split_tokens = []
+        for token in self.encoder.encode(text):
+            split_tokens.append(str(token))
+
+        return split_tokens
+
+    def num_special_tokens_to_add(self, pair=False):
+        r"""
+        Returns the number of added tokens when encoding a sequence with special tokens.
+
+        Args:
+            pair (bool, optional):
+                Returns the number of added tokens in the case of a sequence
+                pair if set to True, returns the number of added tokens in the case of a single sequence if set to False.
+                Defaults to False.
+
+        Returns:
+            int: Number of tokens added to sequences
+        """
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        r"""
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
+        adding special tokens.
+
+        A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
+
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
+
+        A skep_roberta_large_en sequence has the following format:
+
+        - single sequence:      ``[CLS] X [SEP]``
+        - pair of sequences:        ``[CLS] A [SEP] [SEP] B [SEP]``
+
+        Args:
+            token_ids_0 (List[int]):
+                List of IDs to which the special tokens will be added.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs.
+                Defaults to `None`.
+
+        Returns:
+            list[int]: List of input_id with the appropriate special tokens.
+        """
+        if token_ids_1 is None:
+            return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
+        _cls = [self.cls_token_id]
+        _sep = [self.sep_token_id]
+        return _cls + token_ids_0 + _sep + token_ids_1 + _sep
+
+    def create_token_type_ids_from_sequences(self,
+                                             token_ids_0,
+                                             token_ids_1=None):
+        r"""
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
+
+        A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence pair mask has the following format:
+        ::
+
+            0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1
+            | first sequence    | second sequence |
+
+        If `token_ids_1` is `None`, this method only returns the first portion of the mask (0s).
+
+        note: There is no need token type ids for skep_roberta_large_ch model.
+
+        Args:
+            token_ids_0 (List[int]):
+                List of IDs.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. 
+                Defaults to `None`.
+
+        Returns:
+            List[int]: List of token_type_id according to the given sequence(s).
+        """
+        if self.need_token_type_id:
+            _sep = [self.sep_token_id]
+            _cls = [self.cls_token_id]
+            if token_ids_1 is None:
+                return len(_cls + token_ids_0 + _sep) * [0]
+            return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
+                                                              _sep) * [1]
         else:
-            bpe_ids = self.encoder.encode(text)
-        tokens = [str(bpe_id) for bpe_id in bpe_ids]
-        return tokens
+            # For model skep-roberta-large-en, token type ids is no need.
+            return None
 
-    def _get_encoder(self, encoder_json_path, vocab_bpe_path):
-        with open(encoder_json_path, 'r') as f:
-            encoder = json.load(f)
-        with open(vocab_bpe_path, 'r', encoding='utf-8') as f:
-            bpe_data = f.read()
-        bpe_merges = [
-            tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
-        ]
+    def save_resources(self, save_directory):
+        """
+        Save tokenizer related resources to files under `save_directory`.
 
-        return self.Encoder(
-            encoder=encoder,
-            bpe_merges=bpe_merges,
-        )
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+        for name, file_name in self.resource_files_names.items():
+            save_path = os.path.join(save_directory, file_name)
+            source_file = getattr(self, name, None)
+            if not source_file:
+                continue
+
+            if os.path.abspath(source_file) != os.path.abspath(save_path):
+                shutil.copyfile(source_file, save_path)

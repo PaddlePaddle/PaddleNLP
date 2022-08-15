@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
+from typing import Optional
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.tensor.tensor import Tensor
 
 from ..attention_utils import _convert_param_attr_to_list
 from .. import PretrainedModel, register_base_model
@@ -217,7 +220,7 @@ class ErnieDocEncoderLayer(nn.Layer):
         if not rel_pos_params_sharing:
             r_w_bias, r_r_bias, r_t_bias = \
                 list(map(lambda x: self.create_parameter(
-                    shape=[n_head * d_key], dtype="float32"),
+                    shape=[n_head * d_key]),
                     ["r_w_bias", "r_r_bias", "r_t_bias"]))
 
         weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
@@ -396,21 +399,23 @@ class ErnieDocEmbeddings(nn.Layer):
     def forward(self, input_ids, token_type_ids, position_ids):
         # input_embeddings: [B, T, H]
         input_embeddings = self.word_emb(input_ids.squeeze(-1))
-        # position_embeddings: [B, 2 * T + M, H]
         position_embeddings = self.pos_emb(position_ids.squeeze(-1))
 
         batch_size = input_ids.shape[0]
         token_type_ids = paddle.concat([
-            paddle.zeros(shape=[batch_size, self.memory_len, 1], dtype="int64")
-            + token_type_ids[0, 0, 0], token_type_ids
+            paddle.zeros(shape=[batch_size, self.memory_len, 1],
+                         dtype=token_type_ids.dtype) + token_type_ids[0, 0, 0],
+            token_type_ids
         ],
                                        axis=1)
         token_type_ids.stop_gradient = True
         # token_type_embeddings: [B, M + T, H]
         token_type_embeddings = self.token_type_emb(token_type_ids.squeeze(-1))
         embs = [input_embeddings, position_embeddings, token_type_embeddings]
+
         for i in range(len(embs)):
             embs[i] = self.dropouts[i](self.norms[i](embs[i]))
+
         return embs
 
 
@@ -517,7 +522,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         if rel_pos_params_sharing:
             r_w_bias, r_r_bias, r_t_bias = \
                 list(map(lambda x: self.create_parameter(
-                    shape=[num_attention_heads * d_key], dtype="float32"),
+                    shape=[num_attention_heads * d_key]),
                     ["r_w_bias", "r_r_bias", "r_t_bias"]))
         d_key = hidden_size // num_attention_heads
         d_value = hidden_size // num_attention_heads
@@ -567,8 +572,23 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         n_head_self_attn_mask.stop_gradient = True
         return n_head_self_attn_mask
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def check_dim(self, tensor: Tensor) -> Tensor:
+        if paddle.is_tensor(tensor) and len(paddle.shape(tensor)) == 2:
+            tensor = tensor.unsqueeze(axis=-1)
+        return tensor
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_emb
+
+    def set_input_embeddings(self, embedding: nn.Embedding) -> None:
+        self.embeddings.word_emb = embedding
+
+    def forward(self,
+                input_ids: Tensor,
+                memories: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attn_mask: Optional[Tensor] = None):
         r"""
         The ErnieDocModel forward method, overrides the `__call__()` special method.
 
@@ -632,11 +652,11 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 from paddlenlp.transformers import ErnieDocModel
                 from paddlenlp.transformers import ErnieDocTokenizer
                 
-                def get_related_pos(insts, seq_len, memory_len=128):
+                def get_related_pos(input_ids, seq_len, memory_len=128):
                     beg = seq_len + seq_len + memory_len
                     r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
-                                list(range(0, seq_len)) for i in range(len(insts))]
-                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                                list(range(0, seq_len)) for i in range(len(input_ids))]
+                    return np.array(r_position).astype('int64').reshape([len(input_ids), beg, 1])
                     
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocModel.from_pretrained('ernie-doc-base-zh')
@@ -659,14 +679,39 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 new_mem = outputs[2]
 
         """
+        input_ids = self.check_dim(input_ids)
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids)
+
+        if position_ids is None:
+            batch_size, seq_len, _ = input_ids.shape
+            position_ids = self.get_related_pos(batch_size, seq_len)
+
+        if attn_mask is None:
+            attn_mask = paddle.ones_like(input_ids,
+                                         dtype=paddle.get_default_dtype())
+
+        # unsequeeze
+        token_type_ids = self.check_dim(token_type_ids)
+        position_ids = self.check_dim(position_ids)
+
         input_embeddings, position_embeddings, token_embeddings = \
             self.embeddings(input_ids, token_type_ids, position_ids)
 
         batch_size = input_embeddings.shape[0]
+
+        if memories is None:
+            memories = [
+                paddle.zeros_like(input_embeddings,
+                                  dtype=paddle.get_default_dtype())
+                for _ in range(self.config['memory_len'])
+            ]
+
         # [B, N, T, M + T]
         n_head_self_attn_mask = self._create_n_head_attn_mask(
             attn_mask, batch_size)
         # memories contains n_layer memory whose shape is [B, M, H]
+
         encoder_output, new_mem = self.encoder(enc_input=input_embeddings,
                                                memories=memories,
                                                rel_pos=position_embeddings,
@@ -674,6 +719,21 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                                                attn_mask=n_head_self_attn_mask)
         pooled_output = self.pooler(encoder_output)
         return encoder_output, pooled_output, new_mem
+
+    def get_related_pos(self, batch_size: int, seq_len: int) -> Tensor:
+        """get related position ids
+
+        Args:
+            batch_size (int): the batch size of input data
+            seq_len (int): the sequence length
+
+        Returns:
+            Tensor: the tensor of related position id
+        """
+        beg = seq_len + seq_len + self.config['memory_len']
+        r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
+                    list(range(0, seq_len)) for i in range(batch_size)]
+        return paddle.to_tensor(r_position).reshape([batch_size, beg, 1])
 
 
 class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
@@ -698,8 +758,12 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self,
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attn_mask: Optional[Tensor] = None,
+                memories: Optional[Tensor] = None):
         r"""
         The ErnieDocForSequenceClassification forward method, overrides the `__call__()` special method.
 
@@ -736,19 +800,19 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import ErnieDocForSequenceClassification
                 from paddlenlp.transformers import ErnieDocTokenizer
-                
-                def get_related_pos(insts, seq_len, memory_len=128):
+
+                def get_related_pos(input_ids, seq_len, memory_len=128):
                     beg = seq_len + seq_len + memory_len
                     r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
-                                list(range(0, seq_len)) for i in range(len(insts))]
-                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
-                    
+                                list(range(0, seq_len)) for i in range(len(input_ids))]
+                    return np.array(r_position).astype('int64').reshape([len(input_ids), beg, 1])
+
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForSequenceClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
 
                 inputs = tokenizer("欢迎使用百度飞桨！")
                 inputs = {k:paddle.to_tensor([v + [0] * (128-len(v))]).unsqueeze(-1) for (k, v) in inputs.items()}
-                
+
                 memories = [paddle.zeros([1, 128, 768], dtype="float32") for _ in range(12)]
                 position_ids = paddle.to_tensor(get_related_pos(inputs['input_ids'], 128, 128))
                 attn_mask = paddle.ones([1, 128, 1])
@@ -763,6 +827,16 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
+        if memories is None:
+            batch_size, seq_len = input_ids.shape
+            memories = [
+                paddle.zeros(shape=[
+                    batch_size, seq_len, self.ernie_doc.config['hidden_size']
+                ],
+                             dtype=paddle.get_default_dtype())
+                for _ in range(self.ernie_doc.config['num_hidden_layers'])
+            ]
+
         _, pooled_output, mem = self.ernie_doc(input_ids, memories,
                                                token_type_ids, position_ids,
                                                attn_mask)
@@ -794,8 +868,14 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                                 num_classes)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attn_mask: Optional[Tensor] = None,
+        memories: Optional[Tensor] = None,
+    ):
         r"""
         The ErnieDocForTokenClassification forward method, overrides the `__call__()` special method.
 
@@ -834,11 +914,11 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 from paddlenlp.transformers import ErnieDocForTokenClassification
                 from paddlenlp.transformers import ErnieDocTokenizer
                 
-                def get_related_pos(insts, seq_len, memory_len=128):
+                def get_related_pos(input_ids, seq_len, memory_len=128):
                     beg = seq_len + seq_len + memory_len
                     r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
-                                list(range(0, seq_len)) for i in range(len(insts))]
-                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                                list(range(0, seq_len)) for i in range(len(input_ids))]
+                    return np.array(r_position).astype('int64').reshape([len(input_ids), beg, 1])
                     
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForTokenClassification.from_pretrained('ernie-doc-base-zh', num_classes=2)
@@ -888,8 +968,14 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attn_mask: Optional[Tensor] = None,
+        memories: Optional[Tensor] = None,
+    ):
         r"""
         The ErnieDocForQuestionAnswering forward method, overrides the `__call__()` special method.
 
@@ -931,11 +1017,11 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 from paddlenlp.transformers import ErnieDocForQuestionAnswering
                 from paddlenlp.transformers import ErnieDocTokenizer
                 
-                def get_related_pos(insts, seq_len, memory_len=128):
+                def get_related_pos(input_ids, seq_len, memory_len=128):
                     beg = seq_len + seq_len + memory_len
                     r_position = [list(range(beg - 1, seq_len - 1, -1)) + \
-                                list(range(0, seq_len)) for i in range(len(insts))]
-                    return np.array(r_position).astype('int64').reshape([len(insts), beg, 1])
+                                list(range(0, seq_len)) for i in range(len(input_ids))]
+                    return np.array(r_position).astype('int64').reshape([len(input_ids), beg, 1])
                     
                 tokenizer = ErnieDocTokenizer.from_pretrained('ernie-doc-base-zh')
                 model = ErnieDocForQuestionAnswering.from_pretrained('ernie-doc-base-zh')
@@ -958,6 +1044,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 mem = outputs[2]
 
         """
+        batch_size = input_ids.shape[0]
         sequence_output, _, mem = self.ernie_doc(input_ids, memories,
                                                  token_type_ids, position_ids,
                                                  attn_mask)
