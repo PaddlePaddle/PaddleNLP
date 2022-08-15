@@ -33,7 +33,7 @@ class ErnieEncoder(ErniePretrainedModel):
     def init_weights(self, layer):
         """ Initialization hook """
         if isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-5
+            layer._epsilon = 1e-12
 
     def forward(self,
                 input_ids,
@@ -75,7 +75,7 @@ class ErnieDualEncoder(nn.Layer):
     """
 
     def __init__(self,
-                 query_model_name_or_path,
+                 query_model_name_or_path=None,
                  title_model_name_or_path=None,
                  share_parameters=False,
                  dropout=None,
@@ -84,13 +84,16 @@ class ErnieDualEncoder(nn.Layer):
         super().__init__()
         self.query_ernie, self.title_ernie = None, None
         self.use_cross_batch = use_cross_batch
-        self.query_ernie = ErnieEncoder.from_pretrained(
-            query_model_name_or_path)
+        if query_model_name_or_path is not None:
+            self.query_ernie = ErnieEncoder.from_pretrained(
+                query_model_name_or_path)
         if share_parameters:
             self.title_ernie = self.query_ernie
         elif title_model_name_or_path is not None:
             self.title_ernie = ErnieEncoder.from_pretrained(
                 title_model_name_or_path)
+        assert (self.query_ernie is not None) or (self.title_ernie is not None), \
+            "At least one of query_ernie and title_ernie should not be None"
 
     def get_semantic_embedding(self, data_loader):
         self.eval()

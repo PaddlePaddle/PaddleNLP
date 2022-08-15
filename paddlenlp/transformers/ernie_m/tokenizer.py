@@ -16,7 +16,9 @@ import os
 
 import sentencepiece as spm
 import unicodedata
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
+from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .. import PretrainedTokenizer
 
 __all__ = ['ErnieMTokenizer']
@@ -81,6 +83,8 @@ class ErnieMTokenizer(PretrainedTokenizer):
         }
     }
     max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
+    # Ernie-M model doesn't have token_type embedding.
+    model_input_names: List[str] = ["input_ids"]
 
     def __init__(self,
                  vocab_file,
@@ -115,31 +119,56 @@ class ErnieMTokenizer(PretrainedTokenizer):
             self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
 
     def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 add_special_tokens: bool = False,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=True,
-                 return_token_type_ids=False,
-                 return_attention_mask=True,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False,
-                 max_length=None):
-        if max_length is None:
-            max_length = max_seq_len
+                 text: Union[str, List[str], List[List[str]]],
+                 text_pair: Optional[Union[str, List[str],
+                                           List[List[str]]]] = None,
+                 max_length: Optional[int] = None,
+                 stride: int = 0,
+                 is_split_into_words: bool = False,
+                 padding: Union[bool, str, PaddingStrategy] = False,
+                 truncation: Union[bool, str, TruncationStrategy] = False,
+                 return_position_ids: bool = False,
+                 return_token_type_ids: bool = False,
+                 return_attention_mask: bool = False,
+                 return_length: bool = False,
+                 return_overflowing_tokens: bool = False,
+                 return_special_tokens_mask: bool = False,
+                 return_dict: bool = True,
+                 return_offsets_mapping: bool = False,
+                 add_special_tokens: bool = True,
+                 pad_to_multiple_of: Optional[int] = None,
+                 return_tensors: Optional[Union[str, TensorType]] = None,
+                 verbose: bool = True,
+                 **kwargs):
         return super(ErnieMTokenizer, self).__call__(
-            text, text_pair, max_length, stride, is_split_into_words,
-            pad_to_max_seq_len, truncation_strategy, return_position_ids,
-            return_token_type_ids, return_attention_mask, return_length,
-            return_overflowing_tokens, return_special_tokens_mask)
+            text=text,
+            text_pair=text_pair,
+            max_length=max_length,
+            stride=stride,
+            is_split_into_words=is_split_into_words,
+            padding=padding,
+            truncation=truncation,
+            return_position_ids=return_position_ids,
+            # Ernie-M model doesn't have token_type embedding.
+            # So set "return_token_type_ids" to False.
+            return_token_type_ids=False,
+            return_attention_mask=return_attention_mask,
+            return_length=return_length,
+            return_overflowing_tokens=return_overflowing_tokens,
+            return_special_tokens_mask=return_special_tokens_mask,
+            return_dict=return_dict,
+            return_offsets_mapping=return_offsets_mapping,
+            add_special_tokens=add_special_tokens,
+            pad_to_multiple_of=pad_to_multiple_of,
+            return_tensors=return_tensors,
+            verbose=verbose,
+            **kwargs)
 
     def get_offset_mapping(self, text):
-        split_tokens = self._tokenize(text)
+        if text is None:
+            return None
+
+        split_tokens = self.tokenize(text)
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
@@ -154,6 +183,10 @@ class ErnieMTokenizer(PretrainedTokenizer):
             char_mapping.extend([i] * len(ch))
 
         text, token_mapping, offset = normalized_text, [], 0
+        # the source of text is not processed by `do_lower_case`
+        if self.do_lower_case:
+            text = text.lower()
+
         for token in split_tokens:
             if token[:1] == '▁':
                 token = token[1:]
@@ -220,8 +253,18 @@ class ErnieMTokenizer(PretrainedTokenizer):
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
-        out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
-        return out_string
+        current_sub_tokens = []
+        out_string = ""
+        for token in tokens:
+            # make sure that special tokens are not decoded using sentencepiece model
+            if token in self.all_special_tokens:
+                out_string += (self.sp_model.decode_pieces(current_sub_tokens) +
+                               token + " ")
+                current_sub_tokens = []
+            else:
+                current_sub_tokens.append(token)
+        out_string += self.sp_model.decode_pieces(current_sub_tokens)
+        return out_string.strip()
 
     def convert_ids_to_string(self, ids):
         """
@@ -316,6 +359,31 @@ class ErnieMTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def create_token_type_ids_from_sequences(
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        """
+        Create the token type IDs corresponding to the sequences passed. [What are token type
+        IDs?](../glossary#token-type-ids)
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            token_ids_0 (`List[int]`): The first tokenized sequence.
+            token_ids_1 (`List[int]`, *optional*): The second tokenized sequence.
+
+        Returns:
+            `List[int]`: The token type ids.
+        """
+        # called when `add_special_tokens` is True, so align with `build_inputs_with_special_tokens` method
+        if token_ids_1 is None:
+            # [CLS] X [SEP]
+            return (len(token_ids_0) + 2) * [0]
+
+        # [CLS] A [SEP] [SEP] B [SEP]
+        return [0] * (len(token_ids_0) + 1) + [1] * (len(token_ids_1) + 3)
 
     def is_ch_char(self, char):
         """

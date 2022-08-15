@@ -267,6 +267,22 @@ class TinyBertModel(TinyBertPretrainedModel):
         self.fit_dense = nn.Linear(hidden_size, fit_size)
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        """get input embedding of TinyBert Pretrained Model
+
+        Returns:
+            nn.Embedding: the input embedding of tiny bert
+        """
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding) -> None:
+        """set the input embedding with the new embedding value
+
+        Args:
+            embedding (nn.Embedding): the new embedding value
+        """
+        self.embeddings.word_embeddings = embedding
+
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r'''
         The TinyBertModel forward method, overrides the `__call__()` special method.
@@ -351,7 +367,7 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
     def __init__(self, tinybert):
         super(TinyBertForPretraining, self).__init__()
-        self.tinybert = tinybert
+        self.tinybert: TinyBertModel = tinybert
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):

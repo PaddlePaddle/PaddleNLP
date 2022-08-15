@@ -986,8 +986,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                #TODO aligns with HuggingFace here in breaking change
-                return self.convert_tokens_to_ids(text)
+                if is_split_into_words:
+                    tokens = list(
+                        itertools.chain(*(
+                            self.tokenize(t, is_split_into_words=True, **kwargs)
+                            for t in text)))
+                    return self.convert_tokens_to_ids(tokens)
+                else:
+                    return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1065,8 +1071,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                #TODO aligns with HuggingFace here in breaking change
-                return self.convert_tokens_to_ids(text)
+                if is_split_into_words:
+                    tokens = list(
+                        itertools.chain(*(
+                            self.tokenize(t, is_split_into_words=True, **kwargs)
+                            for t in text)))
+                    return self.convert_tokens_to_ids(tokens)
+                else:
+                    return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1363,7 +1375,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if token in self.all_special_tokens:
                 token = token.lower() if hasattr(
                     self, "do_lower_case") and self.do_lower_case else token
-            start = text[offset:].index(token) + offset
+            # The greek letter "sigma" has 2 forms of lowercase, σ and ς respectively.
+            # When used as a final letter of a word, the final form (ς) is used. Otherwise, the form (σ) is used.
+            # https://latin.stackexchange.com/questions/6168/how-and-when-did-we-get-two-forms-of-sigma
+            if "σ" in token or "ς" in token:
+                start = text[offset:].replace("ς", "σ").index(
+                    token.replace("ς", "σ")) + offset
+            else:
+                start = text[offset:].index(token) + offset
 
             end = start + len(token)
 

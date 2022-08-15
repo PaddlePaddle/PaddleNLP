@@ -34,16 +34,24 @@ def preprocess_examples(examples, mode='train'):
     """
     if mode == 'test':
         return examples
-    new_examples = []
-    for example in examples:
-        conversation = example['conversation']
+    new_examples = {}
+    goal = []
+    knowledge = []
+    history = []
+    response = []
+
+    conv = examples['conversation']
+    for index, conversation in enumerate(conv):
         for i in range(0, len(conversation), 2):
-            new_examples.append({
-                'goal': example['goal'],
-                'knowledge': example['knowledge'],
-                'history': conversation[:i],
-                'response': conversation[i]
-            })
+            goal.append(examples['goal'][index])
+            knowledge.append(examples['knowledge'][index])
+            history.append(conversation[:i])
+            response.append(conversation[i])
+    new_examples["goal"] = goal
+    new_examples["knowledge"] = knowledge
+    new_examples["history"] = history
+    new_examples["response"] = response
+
     return new_examples
 
 
@@ -145,7 +153,14 @@ def create_data_loader(dataset, tokenizer, args, mode):
                           max_response_len=args.max_response_len,
                           max_knowledge_len=args.max_knowledge_len,
                           mode=mode)
-    dataset = dataset.map(trans_func1, batched=True).map(trans_func2, lazy=True)
+    remove_columns = None
+    if mode in ["train", "dev"]:
+        remove_columns = ["id", "conversation"]
+
+    dataset = dataset.map(trans_func1,
+                          batched=True,
+                          batch_size=None,
+                          remove_columns=remove_columns).map(trans_func2)
     if mode == 'train':
         batch_sampler = DistributedBatchSampler(dataset,
                                                 batch_size=args.batch_size,
