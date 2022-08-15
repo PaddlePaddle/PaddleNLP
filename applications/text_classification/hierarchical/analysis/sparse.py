@@ -32,82 +32,28 @@ from paddlenlp.utils.log import logger
 from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
 from trustai.interpretation import FeatureSimilarityModel
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument('--device',
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--dataset_dir",
-                    required=True,
-                    type=str,
-                    help="The dataset directory should include train.txt,"
-                    "dev.txt and test.txt files.")
-parser.add_argument(
-    "--aug_strategy",
-    choices=["duplicate", "substitute", "insert", "delete", "swap"],
-    default='substitute',
-    help="Select data augmentation strategy")
-parser.add_argument("--annotate",
-                    action='store_true',
-                    help="Select unlabeled data for annotation")
-parser.add_argument("--params_path",
-                    default="../checkpoint/",
-                    type=str,
-                    help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length",
-                    default=128,
-                    type=int,
-                    help="The maximum total input sequence length after "
-                    "tokenization. Sequences longer than this will be "
-                    "truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size",
-                    default=16,
-                    type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument("--seed",
-                    type=int,
-                    default=3,
-                    help="random seed for initialization")
-parser.add_argument("--rationale_num",
-                    type=int,
-                    default=3,
-                    help="Number of rationales per example.")
-parser.add_argument("--sparse_num",
-                    type=int,
-                    default=100,
-                    help="Number of sparse data.")
-parser.add_argument("--valid_threshold",
-                    type=float,
-                    default="0.7",
-                    help="The threshold to select valid data.")
-parser.add_argument("--valid_num",
-                    type=int,
-                    default=100,
-                    help="Number of valid data.")
-parser.add_argument("--train_file",
-                    type=str,
-                    default="train.txt",
-                    help="Train dataset file name")
-parser.add_argument("--dev_file",
-                    type=str,
-                    default="dev.txt",
-                    help="Dev dataset file name")
-parser.add_argument("--label_file",
-                    type=str,
-                    default="label.txt",
-                    help="Label file name")
-parser.add_argument("--unlabeled_file",
-                    type=str,
-                    default="data.txt",
-                    help="Unlabeled data filename")
-parser.add_argument("--sparse_file",
-                    type=str,
-                    default="sparse.txt",
-                    help="Sparse data file name.")
-parser.add_argument("--valid_file",
-                    type=str,
-                    default="valid.txt",
-                    help="Valid data file name.")
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--dataset_dir", required=True, type=str, help="The dataset directory should include train.txt,dev.txt and test.txt files.")
+parser.add_argument("--aug_strategy", choices=["duplicate", "substitute", "insert", "delete", "swap"], default='substitute', help="Select data augmentation strategy")
+parser.add_argument("--annotate", action='store_true', help="Select unlabeled data for annotation")
+parser.add_argument("--params_path", default="../checkpoint/", type=str, help="The path to model parameters to be loaded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--seed", type=int, default=3, help="random seed for initialization")
+parser.add_argument("--rationale_num", type=int, default=3, help="Number of rationales per example.")
+parser.add_argument("--sparse_num", type=int, default=100, help="Number of sparse data.")
+parser.add_argument("--valid_threshold", type=float, default="0.7", help="The threshold to select valid data.")
+parser.add_argument("--valid_num", type=int, default=100, help="Number of valid data.")
+parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
+parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
+parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
+parser.add_argument("--unlabeled_file", type=str, default="data.txt", help="Unlabeled data filename")
+parser.add_argument("--sparse_file", type=str, default="sparse.txt", help="Sparse data file name.")
+parser.add_argument("--valid_file", type=str, default="valid.txt", help="Valid data file name.")
 args = parser.parse_args()
+# yapf: enable
 
 
 def set_seed(seed):

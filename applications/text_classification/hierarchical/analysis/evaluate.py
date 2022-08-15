@@ -27,47 +27,19 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.utils.log import logger
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument('--device',
-                    default="gpu",
-                    help="Select which device to evaluate"
-                    "model, defaults to gpu.")
-parser.add_argument("--dataset_dir",
-                    required=True,
-                    type=str,
-                    help="Local dataset directory should include"
-                    "train.txt, dev.txt and label.txt")
-parser.add_argument("--params_path",
-                    default="../checkpoint/",
-                    type=str,
-                    help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length",
-                    default=128,
-                    type=int,
-                    help="The maximum total input sequence length"
-                    "after tokenization. Sequences longer than this "
-                    "will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size",
-                    default=32,
-                    type=int,
-                    help="Batch size per GPU/CPU for evaluation.")
-parser.add_argument("--train_file",
-                    type=str,
-                    default="train.txt",
-                    help="Train dataset file name")
-parser.add_argument("--dev_file",
-                    type=str,
-                    default="dev.txt",
-                    help="Dev dataset file name")
-parser.add_argument("--label_file",
-                    type=str,
-                    default="label.txt",
-                    help="Label file name")
-parser.add_argument("--bad_case_path",
-                    type=str,
-                    default="./bad_case.txt",
-                    help="Bad case saving file path")
+parser.add_argument('--device', default="gpu", help="Select which device to evaluate model, defaults to gpu.")
+parser.add_argument("--dataset_dir", required=True, type=str, help="Local dataset directory should include train.txt, dev.txt and label.txt")
+parser.add_argument("--params_path", default="../checkpoint/", type=str, help="The path to model parameters to be loaded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for evaluation.")
+parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
+parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
+parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
+parser.add_argument("--bad_case_path", type=str, default="./bad_case.txt", help="Bad case saving file path")
 args = parser.parse_args()
+# yapf: enable
 
 
 def preprocess_function(examples,

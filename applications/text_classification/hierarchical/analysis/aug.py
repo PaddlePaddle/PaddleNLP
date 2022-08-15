@@ -16,37 +16,17 @@ import os
 import argparse
 from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--train_path",
-                    type=str,
-                    default="../data/train.txt",
-                    help="Train dataset file name")
-parser.add_argument("--aug_path",
-                    type=str,
-                    default="../data/aug.txt",
-                    help="Aug dataset file name")
-parser.add_argument("--aug_strategy",
-                    choices=["mix", "substitute", "insert", "delete", "swap"],
-                    default='substitute',
-                    help="Select data augmentation strategy")
-parser.add_argument("--aug_type",
-                    choices=["synonym", "homonym", "mlm"],
-                    default='synonym',
-                    help="Select data augmentation type"
-                    "for substitute and insert")
-parser.add_argument("--create_n",
-                    type=int,
-                    default=2,
-                    help="Number of augmented sequences.")
-parser.add_argument("--aug_percent",
-                    type=float,
-                    default=0.1,
-                    help="Percentage of augmented words in sequences.")
-parser.add_argument('--device',
-                    default="gpu",
-                    help="Select which device to do data augmentation"
-                    " strategy, defaults to gpu.")
+parser.add_argument("--train_path", type=str, default="../data/train.txt", help="Train dataset file name")
+parser.add_argument("--aug_path", type=str, default="../data/aug.txt", help="Aug dataset file name")
+parser.add_argument("--aug_strategy", choices=["mix", "substitute", "insert", "delete", "swap"], default='substitute', help="Select data augmentation strategy")
+parser.add_argument("--aug_type", choices=["synonym", "homonym", "mlm"], default='synonym', help="Select data augmentation type for substitute and insert")
+parser.add_argument("--create_n", type=int, default=2, help="Number of augmented sequences.")
+parser.add_argument("--aug_percent", type=float, default=0.1, help="Percentage of augmented words in sequences.")
+parser.add_argument('--device', default="gpu", help="Select which device to do data augmentation strategy, defaults to gpu.")
 args = parser.parse_args()
+# yapf: enable
 
 
 def aug():

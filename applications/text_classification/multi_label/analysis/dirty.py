@@ -32,53 +32,21 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 from paddlenlp.utils.log import logger
 from trustai.interpretation import RepresenterPointModel
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset_dir",
-                    required=True,
-                    type=str,
-                    help="The dataset directory.")
-parser.add_argument("--max_seq_length",
-                    default=128,
-                    type=int,
-                    help="The maximum total input sequence length after"
-                    "tokenization. Sequences longer than this will be"
-                    "truncated, sequences shorter will be padded.")
-parser.add_argument("--params_path",
-                    default="../checkpoint/",
-                    type=str,
-                    help="The path to model parameters to be loaded.")
-parser.add_argument('--device',
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--batch_size",
-                    default=16,
-                    type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument("--seed",
-                    type=int,
-                    default=3,
-                    help="random seed for initialization")
-parser.add_argument("--dirty_num",
-                    type=int,
-                    default=100,
-                    help="Number of dirty data. default:50")
-parser.add_argument("--dirty_file",
-                    type=str,
-                    default="train_dirty.txt",
-                    help="Path to save dirty data.")
-parser.add_argument("--rest_file",
-                    type=str,
-                    default="train_dirty_rest.txt",
-                    help="The path of rest data.")
-parser.add_argument("--train_file",
-                    type=str,
-                    default="train.txt",
-                    help="Train dataset file name")
-parser.add_argument("--dirty_threshold",
-                    type=float,
-                    default="0",
-                    help="The threshold to select dirty data.")
+parser.add_argument("--dataset_dir", required=True, type=str, help="The dataset directory.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--params_path", default="../checkpoint/", type=str, help="The path to model parameters to be loaded.")
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--seed", type=int, default=3, help="random seed for initialization")
+parser.add_argument("--dirty_num", type=int, default=100, help="Number of dirty data. default:50")
+parser.add_argument("--dirty_file", type=str, default="train_dirty.txt", help="Path to save dirty data.")
+parser.add_argument("--rest_file", type=str, default="train_dirty_rest.txt", help="The path of rest data.")
+parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
+parser.add_argument("--dirty_threshold", type=float, default="0", help="The threshold to select dirty data.")
 args = parser.parse_args()
+# yapf: enable
 
 
 def set_seed(seed):

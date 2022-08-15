@@ -25,55 +25,19 @@ import numpy as np
 import paddle
 from paddlenlp.utils.log import logger
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-
-parser.add_argument("--doccano_file",
-                    default="doccano.jsonl",
-                    type=str,
-                    help="The doccano file exported from doccano platform.")
-parser.add_argument("--save_dir",
-                    default="./data",
-                    type=str,
-                    help="The path of data that you wanna save.")
-parser.add_argument("--splits",
-                    default=[0.8, 0.2],
-                    type=float,
-                    nargs="*",
-                    help="The ratio of samples in datasets. "
-                    "[0.8, 0.2] means 80% samples "
-                    "used for training, 20% for evaluation.")
-parser.add_argument("--task_type",
-                    choices=['multi_class', 'multi_label', 'hierarchical'],
-                    default="multi_label",
-                    type=str,
-                    help="Select task type, multi_class for"
-                    "multi classification task, multi_label"
-                    "for multi label classification task and"
-                    "hierarchical for hierarchical classification,"
-                    "defaults to multi_label.")
-parser.add_argument("--is_shuffle",
-                    default=True,
-                    type=bool,
-                    help="Whether to shuffle the labeled"
-                    "dataset, defaults to True.")
-parser.add_argument("--seed",
-                    type=int,
-                    default=3,
-                    help="Random seed for initialization")
-parser.add_argument("--separator",
-                    type=str,
-                    default="##",
-                    help="Separator for hierarchical classification")
-parser.add_argument(
-    "--valid",
-    action='store_true',
-    help="Whether annotate valid data(extracted from sparse strategy)")
-parser.add_argument(
-    "--dirty",
-    action='store_true',
-    help=
-    "Whether annotate dirty data(extracted from dirty data cleaning strategy)")
+parser.add_argument("--doccano_file", default="doccano.jsonl", type=str, help="The doccano file exported from doccano platform.")
+parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
+parser.add_argument("--splits", default=[0.8, 0.2], type=float, nargs="*", help="The ratio of samples in datasets. [0.8, 0.2] means 80% samples used for training, 20% for evaluation.")
+parser.add_argument("--task_type", choices=['multi_class', 'multi_label', 'hierarchical'], default="multi_label", type=str, help="Select task type, multi_class for multi classification task, multi_label for multi label classification task and hierarchical for hierarchical classification, defaults to multi_label.")
+parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
+parser.add_argument("--seed", type=int, default=3, help="Random seed for initialization")
+parser.add_argument("--separator", type=str, default="##", help="Separator for hierarchical classification")
+parser.add_argument("--valid", action='store_true', help="Whether annotate valid data(extracted from sparse strategy)")
+parser.add_argument("--dirty", action='store_true', help="Whether annotate dirty data(extracted from dirty data cleaning strategy)")
 args = parser.parse_args()
+# yapf: enable
 
 
 def set_seed(seed):
