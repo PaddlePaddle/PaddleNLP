@@ -117,19 +117,18 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "\u0120lowest",
             "\u0120newer",
             "\u0120wider",
+            "<unk>",
             "<|endoftext|>",
         ]
         # save vocab file
         self.vocab_file = os.path.join(self.tmpdirname, 'vocab.txt')
         with open(self.vocab_file, 'w', encoding='utf-8') as f:
             # f.write('\n'.join(vocab))
-            f.write('\n'.join(vocab +
-                              ["[PAD]", "[CLS]", "[SEP]", "[UNK]", "[MASK]"]))
+            f.write('\n'.join(vocab + ["[PAD]", "[CLS]", "[SEP]", "[MASK]"]))
 
         # save bpe related files
         self.bpe_json_file = os.path.join(self.tmpdirname, 'encoder.json')
         self.bpe_vocab_file = os.path.join(self.tmpdirname, 'merges.txt')
-        self.special_tokens_map = {"unk_token": "<unk>"}
         shutil.copyfile(get_tests_dir("fixtures/bpe.en/vocab.json"),
                         self.bpe_json_file)
 
@@ -142,6 +141,7 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             bpe_vocab_file=self.bpe_vocab_file,
             bpe_json_file=self.bpe_json_file,
             use_bpe_encoder=self.use_bpe_encoder,
+            unk_token='<unk>',
             **kwargs)
         return tokenizer
 

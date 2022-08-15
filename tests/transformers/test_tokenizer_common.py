@@ -761,7 +761,7 @@ class TokenizerTesterMixin:
                 self.assertEqual(all_size_3, all_size_2 + len(new_toks_2))
 
                 tokens = tokenizer.encode(
-                    ">>>>|||<||<<|<< aaaaa bbbbbb low cccccccccdddddddd <<<<<|||>|>>>>|> l",
+                    ">>>>|||<||<<|<< aaaaabbbbbb low cccccccccdddddddd <<<<<|||>|>>>>|> l",
                     return_token_type_ids=None,
                     add_special_tokens=False)['input_ids']
 
