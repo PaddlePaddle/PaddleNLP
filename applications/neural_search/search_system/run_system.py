@@ -16,7 +16,7 @@ from config import collection_name, partition_tag, embedding_name
 
 def recall_result(list_data):
     client = PipelineClient()
-    client.connect(['127.0.0.1:8082'])
+    client.connect(['127.0.0.1:8080'])
     feed = {}
     for i, item in enumerate(list_data):
         feed[str(i)] = item
