@@ -116,16 +116,30 @@ def do_train(args):
                 optimizer.step()
                 optimizer.clear_grad()
 
-            train_batch_cost = time.time() - batch_start
-            reader_cost_avg.record(train_reader_cost)
-            batch_cost_avg.record(train_batch_cost)
-            batch_ips_avg.record(train_batch_cost, sample_per_cards)
-
             if args.profiler_options is not None:
                 profiler.add_profiler_step(args.profiler_options)
 
+            if args.max_steps and step_id == args.max_steps:
+                if args.save_model and rank == 0:
+                    model_dir = args.save_model
+                    if not os.path.exists(model_dir):
+                        os.makedirs(model_dir)
+                    paddle.save(model.state_dict(),
+                                os.path.join(model_dir, "model.pdparams"))
+                    paddle.save(optimizer.state_dict(),
+                                os.path.join(model_dir, "model.pdopt"))
+                return
+
+            if args.lr_scheduler is not None and not args.scheduler_update_by_epoch:
+                lr.step()
+
             if step_id % args.logging_steps == 0:
                 total_avg_loss = loss.numpy()
+
+                train_batch_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
+                batch_cost_avg.record(train_batch_cost)
+                batch_ips_avg.record(train_batch_cost, sample_per_cards)
 
                 benchmark_model.logger(
                     args,
@@ -141,22 +155,16 @@ def do_train(args):
                 reader_cost_avg.reset()
                 batch_cost_avg.reset()
                 batch_ips_avg.reset()
+            else:
+                train_batch_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
+                batch_cost_avg.record(train_batch_cost)
+                batch_ips_avg.record(train_batch_cost, sample_per_cards)
 
-            if args.max_steps and step_id == args.max_steps:
-                if args.save_model and rank == 0:
-                    model_dir = args.save_model
-                    if not os.path.exists(model_dir):
-                        os.makedirs(model_dir)
-                    paddle.save(model.state_dict(),
-                                os.path.join(model_dir, "model.pdparams"))
-                    paddle.save(optimizer.state_dict(),
-                                os.path.join(model_dir, "model.pdopt"))
-                return
+            batch_start = time.time()
+
             batch_id += 1
             step_id += 1
-            if args.lr_scheduler is not None and not args.scheduler_update_by_epoch:
-                lr.step()
-            batch_start = time.time()
 
         if args.lr_scheduler is not None and args.scheduler_update_by_epoch:
             lr.step()

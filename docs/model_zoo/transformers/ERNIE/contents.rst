@@ -52,5 +52,25 @@ ERNIE模型汇总
 |                                                                                  |              | 12-heads, 18M parameters.                                                        |
 |                                                                                  |              | Trained on Chinese text.                                                         |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``rocketqa-base-cross-encoder``                                                   | Chinese      | 12-layer, 768-hidden,                                                            |
+|                                                                                  |              | 12-heads, 118M parameters.                                                       |
+|                                                                                  |              | Trained on DuReader retrieval text.                                              |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``rocketqa-medium-cross-encoder``                                                 | Chinese      | 6-layer, 768-hidden,                                                             |
+|                                                                                  |              | 12-heads, 75M parameters.                                                        |
+|                                                                                  |              | Trained on DuReader retrieval text.                                              |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``rocketqa-mini-cross-encoder``                                                   | Chinese      | 6-layer, 384-hidden,                                                             |
+|                                                                                  |              | 12-heads, 27M parameters.                                                        |
+|                                                                                  |              | Trained on DuReader retrieval text.                                              |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``rocketqa-micro-cross-encoder``                                                  | Chinese      | 4-layer, 384-hidden,                                                             |
+|                                                                                  |              | 12-heads, 23M parameters.                                                        |
+|                                                                                  |              | Trained on DuReader retrieval text.                                              |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``rocketqa-nano-cross-encoder``                                                   | Chinese      | 4-layer, 312-hidden,                                                             |
+|                                                                                  |              | 12-heads, 18M parameters.                                                        |
+|                                                                                  |              | Trained on DuReader retrieval text.                                              |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
 .. _zhui/ernie-1.0-cluecorpussmall: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall
