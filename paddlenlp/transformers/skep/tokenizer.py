@@ -605,3 +605,15 @@ class SkepTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self) -> Dict[str, int]:
+        """
+        Returns the vocabulary as a dictionary of token to index.
+
+        `tokenizer.get_vocab()[token]` is equivalent to `tokenizer.convert_tokens_to_ids(token)` when `token` is in the
+        vocab.
+
+        Returns:
+            `Dict[str, int]`: The vocabulary.
+        """
+        return self.vocab.token_to_idx
