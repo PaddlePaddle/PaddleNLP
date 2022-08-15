@@ -278,7 +278,7 @@ class ManualVerbalizer(Verbalizer):
             label_words = defaultdict(list)
             for line in fp:
                 data = line.strip().split(delimiter)
-                word = data[1] if len(data) > 1 else data[0]
+                word = data[1] if len(data) > 1 else data[0].split("##")[-1]
                 label_words[data[0]].append(word)
         return cls(tokenizer,
                    labels=set(label_words.keys()),

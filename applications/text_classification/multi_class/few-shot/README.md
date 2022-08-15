@@ -76,21 +76,39 @@ data/
 
 #### 数据格式
 
-对于训练/验证/测试数据集文件，每行数据表示一条样本，包括文本和标签两部分，由tab符`\t`分隔。例如
+对于训练/验证/测试数据集文件，每行数据表示一条样本，包括文本和标签两部分，由tab符`\t`分隔。格式如下
+```text
+<文本>'\t'<标签>
+<文本>'\t'<标签>
+...
+```
+例如，
 ```
 文登区这些公路及危桥将进入封闭施工，请注意绕行！ news_car
 普洱茶要如何醒茶？ news_culture
 ...
 ```
 
-对于待预测数据文件，每行包含一条待预测样本，无标签。例如
+对于待预测数据文件，每行包含一条待预测样本，无标签。格式如下
+```text
+<文本>
+<文本>
+...
+```
+例如，
 ```
 互联网时代如何保护个人信息
 清秋暮雨读柳词：忍把浮名，换了浅斟低唱丨周末读诗
 ...
 ```
 
-对于分类标签集文件，存储了数据集中所有的标签集合，每行为一个标签名。如果需要自定义标签映射用于分类器初始化，则每行需要包括标签名和相应的映射词，由`==`分隔。例如
+对于分类标签集文件，存储了数据集中所有的标签集合，每行为一个标签名。如果需要自定义标签映射用于分类器初始化，则每行需要包括标签名和相应的映射词，由`==`分隔。格式如下
+```text
+<标签>'=='<映射词>
+<标签>'=='<映射词>
+...
+```
+例如，对于新闻分类数据集，原标签`news_car`可被映射为中文`汽车`等等。
 ```
 news_car'=='汽车
 news_culture'=='文化
@@ -107,14 +125,14 @@ export CUDA_VISIBLE_DEVICES=0
 python train.py \
 --data_dir ./data \
 --output_dir ./checkpoints/ \
---prompt "这句话说的是" \
+--prompt "这条新闻标题的主题是" \
 --max_seq_length 128  \
 --learning_rate 3e-5 \
 --ppt_learning_rate 3e-4 \
 --do_train \
 --do_eval \
---max_steps 200 \
---eval_steps 10 \
+--max_steps 1000 \
+--eval_steps 100 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
@@ -129,14 +147,14 @@ unset CUDA_VISIBLE_DEVICES
 python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --data_dir ./data \
 --output_dir ./checkpoints/ \
---prompt "这句话说的是" \
+--prompt "这条新闻标题的主题是" \
 --max_seq_length 128  \
 --learning_rate 3e-5 \
 --ppt_learning_rate 3e-4 \
 --do_train \
 --do_eval \
---max_steps 200 \
---eval_steps 10 \
+--max_steps 1000 \
+--eval_steps 100 \
 --logging_steps 10 \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
