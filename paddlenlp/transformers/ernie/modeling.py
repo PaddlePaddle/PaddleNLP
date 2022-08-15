@@ -499,6 +499,154 @@ class ErniePretrainedModel(PretrainedModel):
             "use_task_id": True,
             "vocab_size": 40000
         },
+        "rocketqa-zh-base-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-base-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-medium-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-medium-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-mini-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-mini-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-micro-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-micro-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-nano-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-nano-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -546,6 +694,26 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
             "ernie-3.0-nano-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
+            "rocketqa-zh-base-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-query-encoder.pdparams",
+            "rocketqa-zh-base-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-para-encoder.pdparams",
+            "rocketqa-zh-medium-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-medium-query-encoder.pdparams",
+            "rocketqa-zh-medium-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-medium-para-encoder.pdparams",
+            "rocketqa-zh-mini-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-mini-query-encoder.pdparams",
+            "rocketqa-zh-mini-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-mini-para-encoder.pdparams",
+            "rocketqa-zh-micro-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-micro-query-encoder.pdparams",
+            "rocketqa-zh-micro-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-micro-para-encoder.pdparams",
+            "rocketqa-zh-nano-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-nano-query-encoder.pdparams",
+            "rocketqa-zh-nano-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-nano-para-encoder.pdparams",
             "rocketqa-base-cross-encoder":
             "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-base-cross-encoder.pdparams",
             "rocketqa-medium-cross-encoder":
