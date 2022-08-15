@@ -25,7 +25,7 @@ from ..model_outputs import (
     QuestionAnsweringModelOutput,
     MultipleChoiceModelOutput,
     MaskedLMOutput,
-    CausalLMOutputWithPast,
+    CausalLMOutputWithCrossAttentions,
 )
 from paddle.common_ops_import import convert_dtype
 
