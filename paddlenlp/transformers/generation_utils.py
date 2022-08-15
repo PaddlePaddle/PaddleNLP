@@ -526,30 +526,6 @@ class GenerationMixin(object):
 
         return logits
 
-    def get_decoder_start_token_id(self,
-                                   decoder_start_token_id=None,
-                                   bos_token_id=None):
-        decoder_start_token_id = (decoder_start_token_id
-                                  if decoder_start_token_id is not None else
-                                  self.config.decoder_start_token_id)
-        bos_token_id = bos_token_id if bos_token_id is not None else self.config.bos_token_id
-
-        if decoder_start_token_id is not None:
-            return decoder_start_token_id
-        elif (hasattr(self.config, "decoder")
-              and hasattr(self.config.decoder, "decoder_start_token_id")
-              and self.config.decoder.decoder_start_token_id is not None):
-            return self.config.decoder.decoder_start_token_id
-        elif bos_token_id is not None:
-            return bos_token_id
-        elif (hasattr(self.config, "decoder")
-              and hasattr(self.config.decoder, "bos_token_id")
-              and self.config.decoder.bos_token_id is not None):
-            return self.config.decoder.bos_token_id
-        raise ValueError(
-            "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
-        )
-
     def prepare_faster_entry(self, kwargs):
         return False
 

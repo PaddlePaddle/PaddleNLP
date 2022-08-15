@@ -67,11 +67,6 @@ class ModelTesterMixin:
     def test_save_load(self):
         config, input_ids, token_type_ids, input_mask = self.model_tester.prepare_config_and_inputs(
         )
-        inputs_dict = {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "attention_mask": input_mask,
-        }
         for model_class in self.all_model_classes:
             if model_class == self.base_model_class:
                 model = model_class(**config)

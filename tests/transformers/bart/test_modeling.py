@@ -21,10 +21,10 @@ import unittest
 
 import timeout_decorator  # noqa
 
-from util import slow
+from tests.testing_utils import slow
 
-from ...test_generation_utils import GenerationTesterMixin
-from ...test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
 
 import paddle
 
@@ -36,7 +36,7 @@ from paddlenlp.transformers import (
     BartModel,
     BartTokenizer,
 )
-from paddlenlp.transformers import BartDecoder, BartEncoder, shift_tokens_right
+from paddlenlp.transformers.bart.modeling import BartDecoder, BartEncoder, shift_tokens_right
 
 
 def prepare_bart_inputs_dict(
@@ -108,7 +108,6 @@ class BartModelTester:
         # forcing a certain token to be generated, sets all other tokens to -inf
         # if however the token to be generated is already at -inf then it can lead token
         # `nan` values and thus break generation
-        self.forced_bos_token_id = None
         self.forced_eos_token_id = None
 
     def prepare_config_and_inputs(self):
@@ -130,8 +129,8 @@ class BartModelTester:
         return {
             "vocab_size": self.vocab_size,
             "d_model": self.hidden_size,
-            "encoder_layers": self.num_hidden_layers,
-            "decoder_layers": self.num_hidden_layers,
+            "num_encoder_layers": self.num_hidden_layers,
+            "num_decoder_layers": self.num_hidden_layers,
             "encoder_attention_heads": self.num_attention_heads,
             "decoder_attention_heads": self.num_attention_heads,
             "encoder_ffn_dim": self.intermediate_size,
@@ -142,7 +141,6 @@ class BartModelTester:
             "eos_token_id": self.eos_token_id,
             "bos_token_id": self.bos_token_id,
             "pad_token_id": self.pad_token_id,
-            "forced_bos_token_id": self.forced_bos_token_id,
             "forced_eos_token_id": self.forced_eos_token_id,
         }
 
@@ -152,24 +150,27 @@ class BartModelTester:
 
     def create_and_check_decoder_model_past_large_inputs(
             self, config, inputs_dict):
-        model = BartModel(**config).get_decoder().eval()
+        model = BartModel(**config).get_decoder()
+        model.eval()
         input_ids = inputs_dict["input_ids"]
         attention_mask = inputs_dict["attention_mask"]
 
         # first forward pass
-        output = model(input_ids, attention_mask=attention_mask, use_cache=True)
+        output = model(input_ids,
+                       decoder_attention_mask=attention_mask,
+                       cache=True)
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"])
         next_attn_mask = ids_tensor((self.batch_size, 3), 2)
 
         # append to next input_ids and
-        next_input_ids = paddle.concat([input_ids, next_tokens], dim=-1)
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([attention_mask, next_attn_mask],
-                                            dim=-1)
+                                            axis=-1)
 
         output_from_no_past = model(next_input_ids,
-                                    attention_mask=next_attention_mask)
+                                    decoder_attention_mask=next_attention_mask)
 
         # select random slice
         random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
@@ -184,12 +185,11 @@ class BartModelTester:
 
         # test that outputs are equal for slice
         self.parent.assertTrue(
-            torch.allclose(output_from_past_slice,
-                           output_from_no_past_slice,
-                           atol=1e-3))
+            paddle.allclose(output_from_past_slice,
+                            output_from_no_past_slice,
+                            atol=1e-3))
 
 
-@require_torch
 class BartHeadTests(unittest.TestCase):
     vocab_size = 99
 
@@ -217,8 +217,8 @@ class BartHeadTests(unittest.TestCase):
         config = {
             "vocab_size": self.vocab_size,
             "d_model": 24,
-            "encoder_layers": 2,
-            "decoder_layers": 2,
+            "num_encoder_layers": 2,
+            "num_decoder_layers": 2,
             "encoder_attention_heads": 2,
             "decoder_attention_heads": 2,
             "encoder_ffn_dim": 32,
@@ -232,23 +232,18 @@ class BartHeadTests(unittest.TestCase):
 
     def test_sequence_classification_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        labels = _long_tensor([2] * batch_size)
-        model = BartForSequenceClassification(**config)
-        outputs = model(input_ids=input_ids,
-                        decoder_input_ids=input_ids,
-                        labels=labels)
-        expected_shape = [batch_size, config["num_labels"]]
+        bart_model = BartModel(**config)
+        num_labels = 2
+        model = BartForSequenceClassification(bart_model, num_labels=num_labels)
+        outputs = model(input_ids=input_ids, decoder_input_ids=input_ids)
+        expected_shape = [batch_size, num_labels]
         self.assertEqual(outputs.shape, expected_shape)
 
     def test_question_answering_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        sequence_labels = ids_tensor([batch_size], 2)
-        model = BartForQuestionAnswering(**config)
-        start_logits, end_logits = model(
-            input_ids=input_ids,
-            start_positions=sequence_labels,
-            end_positions=sequence_labels,
-        )
+        bart_model = BartModel(**config)
+        model = BartForQuestionAnswering(bart_model)
+        start_logits, end_logits = model(input_ids=input_ids)
 
         self.assertEqual(start_logits.shape, input_ids.shape)
         self.assertEqual(end_logits.shape, input_ids.shape)
@@ -256,35 +251,34 @@ class BartHeadTests(unittest.TestCase):
     @timeout_decorator.timeout(1)
     def test_lm_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        lm_labels = ids_tensor([batch_size, input_ids.shape[1]],
-                               self.vocab_size)
-        lm_model = BartForConditionalGeneration(**config)
-        outputs = lm_model(input_ids=input_ids, labels=lm_labels)
-        expected_shape = [batch_size, input_ids.shape[1], config.vocab_size]
+        bart_model = BartModel(**config)
+        lm_model = BartForConditionalGeneration(bart_model)
+        outputs = lm_model(input_ids=input_ids)
+        expected_shape = [batch_size, input_ids.shape[1], config["vocab_size"]]
         self.assertEqual(outputs.shape, expected_shape)
 
     def test_lm_uneven_forward(self):
         config = {
             "vocab_size": self.vocab_size,
             "d_model": 14,
-            "encoder_layers": 2,
-            "decoder_layers": 2,
+            "num_encoder_layers": 2,
+            "num_decoder_layers": 2,
             "encoder_attention_heads": 2,
             "decoder_attention_heads": 2,
             "encoder_ffn_dim": 8,
             "decoder_ffn_dim": 8,
             "max_position_embeddings": 48,
         }
-        lm_model = BartForConditionalGeneration(**config)
+        bart_model = BartModel(**config)
+        lm_model = BartForConditionalGeneration(bart_model)
         context = paddle.to_tensor(
             [[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]],
             dtype="int64")
         summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]],
                                    dtype="int64")
-        outputs = lm_model(input_ids=context,
-                           decoder_input_ids=summary,
-                           labels=summary)
-        expected_shape = [*summary.shape, config["vocab_size"]]
+        outputs = lm_model(input_ids=context, decoder_input_ids=summary)
+        expected_shape = summary.shape
+        expected_shape.append(config["vocab_size"])
         self.assertEqual(outputs.shape, expected_shape)
 
     def test_generate_beam_search(self):
@@ -292,8 +286,8 @@ class BartHeadTests(unittest.TestCase):
         config = {
             "vocab_size": self.vocab_size,
             "d_model": 24,
-            "encoder_layers": 2,
-            "decoder_layers": 2,
+            "num_encoder_layers": 2,
+            "num_decoder_layers": 2,
             "encoder_attention_heads": 2,
             "decoder_attention_heads": 2,
             "encoder_ffn_dim": 32,
@@ -303,7 +297,8 @@ class BartHeadTests(unittest.TestCase):
             "pad_token_id": 1,
             "bos_token_id": 0,
         }
-        lm_model = BartForConditionalGeneration(**config)
+        bart_model = BartModel(**config)
+        lm_model = BartForConditionalGeneration(bart_model)
         lm_model.eval()
 
         max_length = 5
@@ -313,19 +308,19 @@ class BartHeadTests(unittest.TestCase):
             num_return_sequences=1,
             max_length=max_length,
             top_k=4,
-        )
-        self.assertEqual(generated_ids.shape, (input_ids.shape[0], max_length))
+        )[0]
+        self.assertEqual(generated_ids.shape, [input_ids.shape[0], max_length])
 
     def test_shift_tokens_right(self):
         input_ids = paddle.to_tensor(
             [[71, 82, 18, 33, 2, 1, 1], [68, 34, 26, 58, 30, 82, 2]],
             dtype="int64")
-        shifted = shift_tokens_right(input_ids, 1, 2)
-        n_pad_before = input_ids.eq(1).float().sum()
-        n_pad_after = shifted.eq(1).float().sum()
+        shifted = shift_tokens_right(input_ids, 2)
+        n_pad_before = paddle.equal(input_ids, 1).sum().numpy()
+        n_pad_after = paddle.equal(shifted, 1).sum().numpy()
         self.assertEqual(shifted.shape, input_ids.shape)
         self.assertEqual(n_pad_after, n_pad_before - 1)
-        self.assertTrue(torch.eq(shifted[:, 0], 2).all())
+        self.assertTrue(paddle.equal(shifted[:, 0], 2).all())
 
     @slow
     def test_tokenization(self):
@@ -342,10 +337,14 @@ class BartHeadTests(unittest.TestCase):
 
 
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
-    all_model_classes = ((BartModel, BartForConditionalGeneration,
-                          BartForSequenceClassification,
-                          BartForQuestionAnswering))
-    all_generative_model_classes = (BartForConditionalGeneration)
+    all_model_classes = (BartModel, BartForConditionalGeneration,
+                         BartForSequenceClassification,
+                         BartForQuestionAnswering)
+    # all_pretrained_model = [BartModel]
+    # all_pretrained_model_name = ["bart"]
+    all_generative_model_classes = {
+        BartForConditionalGeneration: (BartModel, "bart")
+    }
     is_encoder_decoder = True
     fx_compatible = True
     test_pruning = False
@@ -359,11 +358,27 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_decoder_model_past_large_inputs(
             *config_and_inputs)
 
-    def test_encoder_decoder_model_standalone(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs_for_common(
+    def get_decoder_start_token_id(self,
+                                   model,
+                                   decoder_start_token_id=None,
+                                   bos_token_id=None):
+        decoder_start_token_id = (decoder_start_token_id
+                                  if decoder_start_token_id is not None else
+                                  model.bart.config["decoder_start_token_id"])
+        bos_token_id = bos_token_id if bos_token_id is not None else model.bart.config[
+            "bos_token_id"]
+
+        if decoder_start_token_id is not None:
+            return decoder_start_token_id
+        elif model.bart.config["decoder_start_token_id"] is not None:
+            return model.bart.config["decoder.decoder_start_token_id"]
+        elif bos_token_id is not None:
+            return bos_token_id
+        elif model.bart.config["bos_token_id"] is not None:
+            return model.bart.config["bos_token_id"]
+        raise ValueError(
+            "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
         )
-        self.model_tester.check_encoder_decoder_model_standalone(
-            *config_and_inputs)
 
 
 def assert_tensors_close(a, b, atol=1e-12, prefix=""):
@@ -371,11 +386,11 @@ def assert_tensors_close(a, b, atol=1e-12, prefix=""):
     if a is None and b is None:
         return True
     try:
-        if torch.allclose(a, b, atol=atol):
+        if paddle.allclose(a, b, atol=atol):
             return True
         raise
     except Exception:
-        pct_different = (torch.gt((a - b).abs(), atol)).float().mean().item()
+        pct_different = (paddle.gt((a - b).abs(), atol)).float().mean().item()
         if a.numel() > 100:
             msg = f"tensor values are {pct_different:.1%} percent different."
         else:
@@ -583,13 +598,13 @@ class FastIntegrationTests(unittest.TestCase):
 
 class BartModelIntegrationTests(unittest.TestCase):
 
-    @cached_property
     def default_tokenizer(self):
         return BartTokenizer.from_pretrained("bart-large")
 
     @slow
     def test_inference_no_head(self):
-        model = BartModel.from_pretrained("bart-large").eval()
+        model = BartModel.from_pretrained("bart-large")
+        model.eval()
         input_ids = _long_tensor(
             [[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]])
 
