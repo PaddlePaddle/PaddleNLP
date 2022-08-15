@@ -14,69 +14,45 @@
 
 import os
 import sys
-import yaml
 from functools import partial
-import distutils.util
-import os.path as osp
-from typing import Optional
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-import paddlenlp
-from paddlenlp.data import DataCollatorWithPadding
 
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    TrainingArguments,
-    Trainer,
-)
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.trainer import PdArgumentParser, CompressionArguments, Trainer
 from paddlenlp.trainer import EvalPrediction, get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForQuestionAnswering,
-)
-from compress_trainer import CompressConfig, PTQConfig
+from paddlenlp.transformers import AutoTokenizer, AutoModelForQuestionAnswering
 from paddlenlp.utils.log import logger
 from datasets import load_metric, load_dataset
 
 sys.path.append("../ernie-1.0/finetune")
-from question_answering import (
-    QuestionAnsweringTrainer,
-    CrossEntropyLossForSQuAD,
-    prepare_train_features,
-    prepare_validation_features,
-)
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from question_answering import QuestionAnsweringTrainer, CrossEntropyLossForSQuAD, prepare_train_features, prepare_validation_features
+from utils import ALL_DATASETS, DataArguments, ModelArguments
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        (ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
+    )
 
-    paddle.set_device(training_args.device)
+    paddle.set_device(compression_args.device)
     data_args.dataset = data_args.dataset.strip()
 
     if data_args.dataset in ALL_DATASETS:
         # if you custom you hyper-parameters in yaml config, it will overwrite all args.
         config = ALL_DATASETS[data_args.dataset]
-        for args in (model_args, data_args, training_args):
+        for args in (model_args, data_args, compression_args):
             for arg in vars(args):
                 if arg in config.keys():
                     setattr(args, arg, config[arg])
 
-        training_args.per_device_train_batch_size = config["batch_size"]
-        training_args.per_device_eval_batch_size = config["batch_size"]
+        compression_args.per_device_train_batch_size = config["batch_size"]
+        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
+    compression_args.print_config(model_args, "Model")
+    compression_args.print_config(data_args, "Data")
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
@@ -102,7 +78,7 @@ def main():
 
     train_dataset = raw_datasets["train"]
     # Create train feature from dataset
-    with training_args.main_process_first(
+    with compression_args.main_process_first(
             desc="train dataset map pre-processing"):
         # Dataset pre-process
         train_dataset = train_dataset.map(
@@ -115,7 +91,7 @@ def main():
             desc="Running tokenizer on train dataset",
         )
     eval_examples = raw_datasets["validation"]
-    with training_args.main_process_first(
+    with compression_args.main_process_first(
             desc="evaluate dataset map pre-processing"):
         eval_dataset = eval_examples.map(
             partial(prepare_validation_features,
@@ -151,7 +127,7 @@ def main():
 
     trainer = QuestionAnsweringTrainer(
         model=model,
-        args=training_args,
+        args=compression_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         eval_examples=eval_examples,
@@ -159,17 +135,12 @@ def main():
         post_process_function=post_processing_function,
         tokenizer=tokenizer)
 
-    output_dir = os.path.join(model_args.model_name_or_path, "compress")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    if not os.path.exists(compression_args.output_dir):
+        os.makedirs(compression_args.output_dir)
 
-    prune = True
-    compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]))
-    trainer.compress(output_dir,
-                     pruning=prune,
-                     quantization=True,
-                     compress_config=compress_config)
+    compression_args.print_config()
+
+    trainer.compress()
 
 
 if __name__ == "__main__":

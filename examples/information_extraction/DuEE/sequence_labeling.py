@@ -27,7 +27,7 @@ import paddle
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelTokenClassification, AutoTokenizer
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
 from paddlenlp.metrics import ChunkEvaluator
 from utils import read_by_lines, write_by_lines, load_dict
 

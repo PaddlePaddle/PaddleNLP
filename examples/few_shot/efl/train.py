@@ -28,6 +28,7 @@ import paddlenlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from data import create_dataloader, convert_example, processor_dict
 from evaluate import do_evaluate

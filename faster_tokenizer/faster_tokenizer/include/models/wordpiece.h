@@ -21,7 +21,7 @@ namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
 
-struct WordPiece : public Model {
+struct FASTERTOKENIZER_DECL WordPiece : public Model {
   WordPiece();
   WordPiece(const core::Vocab& vocab,
             const std::string& unk_token = "[UNK]",

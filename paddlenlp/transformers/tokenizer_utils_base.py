@@ -2196,11 +2196,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
                 "or `List[List[str]]` (batch of pretokenized examples).")
 
-        if not _is_valid_text_input(text):
-            raise ValueError(
-                "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
-                "or `List[List[str]]` (batch of pretokenized examples).")
-
         if text_pair is not None and not _is_valid_text_input(text_pair):
             raise ValueError(
                 "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "

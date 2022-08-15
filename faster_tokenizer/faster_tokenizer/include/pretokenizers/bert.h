@@ -16,12 +16,13 @@ limitations under the License. */
 
 #include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct BertPreTokenizer : public PreTokenizer {
+struct FASTERTOKENIZER_DECL BertPreTokenizer : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   friend void to_json(nlohmann::json& j,
                       const BertPreTokenizer& bert_pre_tokenizer);
