@@ -2834,7 +2834,7 @@ class InferGptJDecoding(nn.Layer):
         if self.use_fp16_decoding and attention_mask.dtype == paddle.float32:
             attention_mask = paddle.cast(attention_mask, dtype="float16")
 
-        output_ids = infer_gptj_decoding(
+        output_ids, = infer_gptj_decoding(
             input=[input_ids],
             attn_mask=[attention_mask],
             mem_seq_len=[mem_seq_len],

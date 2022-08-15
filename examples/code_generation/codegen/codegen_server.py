@@ -20,11 +20,10 @@ class DefaultConfig:
     min_length = 0
     max_length = 16
     decode_strategy = "sampling"
-    use_fp16_decoding = True
-    decoding_lib = "/home/gongenlei/faster_gptj/paddlenlp/ops/build/lib/libdecoding_op"
-    use_faster = True
-    default_dtype = "float16" if use_fp16_decoding else "float32"
     load_state_as_np = True
+    use_faster = True
+    use_fp16_decoding = True
+    default_dtype = "float16" if use_faster and use_fp16_decoding else "float32"
 
 
 class Input(BaseModel):
@@ -76,7 +75,9 @@ async def gen(item: Input):
 
     start_time = time.time()
     logger.info("Start generating code")
-    tokenized = tokenizer([item['prompt']], return_tensors='pd')
+    tokenized = tokenizer([item['prompt']],
+                          truncation=True,
+                          return_tensors='pd')
     output, _ = model.generate(
         tokenized["input_ids"],
         max_length=16,
@@ -86,9 +87,7 @@ async def gen(item: Input):
         repetition_penalty=repetition_penalty,
         temperature=temperature,
         use_faster=generate_config.use_faster,
-        use_fp16_decoding=generate_config.use_fp16_decoding,
-        decoding_lib=generate_config.decoding_lib,
-    )
+        use_fp16_decoding=generate_config.use_fp16_decoding)
     logger.info("Finish generating code")
     end_time = time.time()
     logger.info(f"Time cost: {end_time - start_time}")
