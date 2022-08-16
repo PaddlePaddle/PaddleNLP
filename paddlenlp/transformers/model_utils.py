@@ -153,7 +153,7 @@ class PretrainedModel(Layer, GenerationMixin):
             return base_model.get_input_embeddings()
         else:
             raise NotImplementedError(
-                f'model of {type(base_model)} has not implemented the `get_input_embedding`'
+                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
                 ' or `set_input_embedding` method')
 
     def set_input_embeddings(self, value):
@@ -162,7 +162,7 @@ class PretrainedModel(Layer, GenerationMixin):
             return base_model.set_input_embeddings(value)
         else:
             raise NotImplementedError(
-                f'model of {type(base_model)} has not implemented the `get_input_embedding`'
+                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
                 ' or `set_input_embedding` method')
 
     def get_output_embeddings(self):

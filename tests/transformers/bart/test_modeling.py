@@ -150,27 +150,52 @@ class BartModelTester:
 
     def create_and_check_decoder_model_past_large_inputs(
             self, config, inputs_dict):
-        model = BartModel(**config).get_decoder()
-        model.eval()
-        input_ids = inputs_dict["input_ids"]
-        attention_mask = inputs_dict["attention_mask"]
+        encoder = BartModel(**config).get_encoder()
+        decoder = BartModel(**config).get_decoder()
 
-        # first forward pass
-        output = model(input_ids,
-                       decoder_attention_mask=attention_mask,
-                       cache=True)
+        encoder.eval()
+        decoder.eval()
+
+        input_ids = inputs_dict["input_ids"]
+        decoder_input_ids = paddle.zeros_like(
+            input_ids[:, :1],
+            dtype="int64") + BartModel(**config).decoder_start_token_id
+
+        attention_mask = inputs_dict["attention_mask"]
+        decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1],
+                                              dtype=paddle.get_default_dtype())
+
+        encoder_output = encoder(input_ids, attention_mask)
+        origin_cache = decoder.decoder.gen_cache(encoder_output)
+        outputs = decoder(decoder_input_ids,
+                          decoder_attention_mask,
+                          encoder_output,
+                          attention_mask,
+                          cache=origin_cache)
+
+        output, cache = outputs
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"])
-        next_attn_mask = ids_tensor((self.batch_size, 3), 2)
+        next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3],
+                                      dtype=paddle.get_default_dtype())
 
         # append to next input_ids and
-        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
-        next_attention_mask = paddle.concat([attention_mask, next_attn_mask],
-                                            axis=-1)
+        next_input_ids = paddle.concat([decoder_input_ids, next_tokens],
+                                       axis=-1)
+        next_attention_mask = paddle.concat(
+            [decoder_attention_mask, next_attn_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids,
-                                    decoder_attention_mask=next_attention_mask)
+        output_from_no_past, _ = decoder(next_input_ids,
+                                         next_attention_mask,
+                                         encoder_output,
+                                         attention_mask,
+                                         cache=origin_cache)
+        output_from_past, _ = decoder(next_tokens,
+                                      next_attention_mask,
+                                      encoder_output,
+                                      attention_mask,
+                                      cache=cache)
 
         # select random slice
         random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
@@ -337,11 +362,11 @@ class BartHeadTests(unittest.TestCase):
 
 
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
+    base_model_class = BartModel
+
     all_model_classes = (BartModel, BartForConditionalGeneration,
                          BartForSequenceClassification,
                          BartForQuestionAnswering)
-    # all_pretrained_model = [BartModel]
-    # all_pretrained_model_name = ["bart"]
     all_generative_model_classes = {
         BartForConditionalGeneration: (BartModel, "bart")
     }
@@ -357,28 +382,6 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_decoder_model_past_large_inputs(
             *config_and_inputs)
-
-    def get_decoder_start_token_id(self,
-                                   model,
-                                   decoder_start_token_id=None,
-                                   bos_token_id=None):
-        decoder_start_token_id = (decoder_start_token_id
-                                  if decoder_start_token_id is not None else
-                                  model.bart.config["decoder_start_token_id"])
-        bos_token_id = bos_token_id if bos_token_id is not None else model.bart.config[
-            "bos_token_id"]
-
-        if decoder_start_token_id is not None:
-            return decoder_start_token_id
-        elif model.bart.config["decoder_start_token_id"] is not None:
-            return model.bart.config["decoder.decoder_start_token_id"]
-        elif bos_token_id is not None:
-            return bos_token_id
-        elif model.bart.config["bos_token_id"] is not None:
-            return model.bart.config["bos_token_id"]
-        raise ValueError(
-            "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
-        )
 
 
 def assert_tensors_close(a, b, atol=1e-12, prefix=""):
@@ -613,7 +616,7 @@ class BartModelIntegrationTests(unittest.TestCase):
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         with paddle.no_grad():
             output = model(input_ids=input_ids, attention_mask=attention_mask)
-        expected_shape = torch.Size((1, 11, 1024))
+        expected_shape = [1, 11, 1024]
         self.assertEqual(output.shape, expected_shape)
 
     @slow

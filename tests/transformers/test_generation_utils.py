@@ -57,14 +57,6 @@ class GenerationTesterMixin:
     input_name = "input_ids"
     is_encoder_decoder = False
 
-    @classmethod
-    def get_decoder_start_token_id(self,
-                                   model,
-                                   decoder_start_token_id=None,
-                                   bos_token_id=None):
-        raise NotImplementedError(
-            "get_decoder_start_token_id is NOT implemented. ")
-
     def _get_input_ids_and_config(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
         )
@@ -165,12 +157,15 @@ class GenerationTesterMixin:
         return beam_kwargs, beam_scorer
 
     @staticmethod
-    def _get_encoder_outputs(model,
-                             input_ids,
-                             attention_mask,
-                             output_attentions=None,
-                             output_hidden_states=None,
-                             num_interleave=1):
+    def _get_encoder_outputs(
+        model,
+        input_ids,
+        attention_mask,
+        output_attentions=None,
+        output_hidden_states=None,
+        num_interleave=1,
+        pretrained_model_name=None,
+    ):
         model.eval()
         encoder = model.get_encoder()
         encoder_outputs = encoder(
@@ -180,8 +175,10 @@ class GenerationTesterMixin:
         encoder_outputs = encoder_outputs.repeat_interleave(num_interleave,
                                                             axis=0)
 
-        input_ids = cls.get_decoder_start_token_id(model)
-        attention_mask = None
+        input_ids = paddle.zeros_like(
+            input_ids[:, :1], dtype="int64") + model.get_decoder_start_token_id(
+                pretrained_model_name=pretrained_model_name)
+        # attention_mask = None
         return encoder_outputs, input_ids, attention_mask
 
     def _greedy_generate(
@@ -192,7 +189,6 @@ class GenerationTesterMixin:
         max_length,
         pretrained_model_name,
     ):
-        model.eval()
         if self.is_encoder_decoder:
             max_length = 4
         logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
@@ -223,13 +219,14 @@ class GenerationTesterMixin:
                 model,
                 input_ids,
                 attention_mask,
+                pretrained_model_name=pretrained_model_name,
             )
-            kwargs["encoder_outputs"] = encoder_outputs
+            kwargs["encoder_output"] = encoder_outputs
 
         with paddle.no_grad():
             output_greedy = model.greedy_search(
                 input_ids,
-                max_length=max_length,
+                max_length=max_length + 1,
                 attention_mask=attention_mask,
                 logits_processors=logits_processor,
                 pad_token_id=getattr(
@@ -250,13 +247,8 @@ class GenerationTesterMixin:
         logits_processors,
         logits_warper,
         process_kwargs,
+        pretrained_model_name,
     ):
-        random.seed(128)
-        np.random.seed(128)
-        paddle.seed(128)
-
-        model.eval()
-
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -264,6 +256,7 @@ class GenerationTesterMixin:
                 decode_strategy='sampling',
                 num_return_sequences=num_return_sequences,
                 attention_mask=attention_mask,
+                top_k=1,
                 **process_kwargs,
             )
 
@@ -274,9 +267,12 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask,
                 num_interleave=num_return_sequences,
+                pretrained_model_name=pretrained_model_name,
             )
-            kwargs["encoder_outputs"] = encoder_outputs
+            kwargs["encoder_output"] = encoder_outputs
             input_ids_clone = input_ids_clone.repeat_interleave(
+                num_return_sequences, axis=0)
+            attention_mask_clone = attention_mask_clone.repeat_interleave(
                 num_return_sequences, axis=0)
         else:
             attention_mask_clone = attention_mask.repeat_interleave(
@@ -284,16 +280,21 @@ class GenerationTesterMixin:
             input_ids_clone = input_ids.repeat_interleave(num_return_sequences,
                                                           axis=0)
 
-        # prevent flaky generation test failures
-        # logits_processors.append(InfNanRemoveLogitsProcessor())
-
         with paddle.no_grad():
             output_sample = model.sample(
                 input_ids_clone,
                 attention_mask=attention_mask_clone,
-                max_length=max_length,
+                max_length=max_length +
+                1 if self.is_encoder_decoder else max_length +
+                input_ids.shape[0],
                 logits_processors=logits_processors,
-                **process_kwargs**kwargs,
+                pad_token_id=getattr(
+                    model, pretrained_model_name).config["pad_token_id"],
+                eos_token_id=getattr(
+                    model, pretrained_model_name).config["eos_token_id"],
+                top_k=1,
+                **process_kwargs,
+                **kwargs,
             )
         return output_sample, output_generate
 
@@ -309,7 +310,6 @@ class GenerationTesterMixin:
         logits_process_kwargs,
         pretrained_model_name,
     ):
-        model.eval()
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -328,9 +328,12 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask,
                 num_interleave=beam_scorer.num_beams,
+                pretrained_model_name=pretrained_model_name,
             )
-            kwargs["encoder_outputs"] = encoder_outputs
+            kwargs["encoder_output"] = encoder_outputs
             input_ids_clone = input_ids_clone.repeat_interleave(
+                beam_scorer.num_beams, axis=0)
+            attention_mask_clone = attention_mask_clone.repeat_interleave(
                 beam_scorer.num_beams, axis=0)
         else:
             attention_mask_clone = attention_mask.repeat_interleave(
@@ -338,14 +341,17 @@ class GenerationTesterMixin:
             input_ids_clone = input_ids.repeat_interleave(beam_scorer.num_beams,
                                                           axis=0)
 
+        kwargs["use_cache"] = True
+
         with paddle.no_grad():
             output_beam_search = model.beam_search(
                 input_ids_clone,
                 beam_scorer,
-                max_length=max_length,
+                max_length=max_length + 1,
                 attention_mask=attention_mask_clone,
                 logits_processors=logits_processor,
-                diversity_rate=logits_process_kwargs["diversity_rate"],
+                diversity_rate=getattr(logits_process_kwargs, "diversity_rate",
+                                       0.0),
                 pad_token_id=getattr(
                     model, pretrained_model_name).config["pad_token_id"],
                 eos_token_id=getattr(
@@ -385,9 +391,12 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask,
                 num_interleave=beam_scorer.num_beams,
+                pretrained_model_name=pretrained_model_name,
             )
-            kwargs["encoder_outputs"] = encoder_outputs
+            kwargs["encoder_output"] = encoder_outputs
             input_ids_clone = input_ids_clone.repeat_interleave(
+                beam_scorer.num_beams, axis=0)
+            attention_mask_clone = attention_mask_clone.repeat_interleave(
                 beam_scorer.num_beams, axis=0)
         else:
             attention_mask_clone = attention_mask.repeat_interleave(
@@ -395,11 +404,13 @@ class GenerationTesterMixin:
             input_ids_clone = input_ids.repeat_interleave(beam_scorer.num_beams,
                                                           axis=0)
 
+        kwargs["use_cache"] = True
+
         with paddle.no_grad():
             output_group_beam_search = model.group_beam_search(
                 input_ids_clone,
                 beam_scorer,
-                max_length=max_length,
+                max_length=max_length + 1,
                 attention_mask=attention_mask_clone,
                 logits_processors=logits_processor,
                 pad_token_id=getattr(
@@ -421,16 +432,22 @@ class GenerationTesterMixin:
                 model_class][1]
             model = model_class(pretrained_model)
             model.eval()
+
             output_greedy, output_generate = self._greedy_generate(
                 model=model,
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 max_length=max_length,
                 pretrained_model_name=pretrained_model_name)
-            self.assertListEqual(output_greedy.tolist(),
-                                 output_generate.tolist())
+
+            self.assertListEqual(output_greedy[0].tolist(),
+                                 output_generate[0].tolist())
 
     def test_sample_generate(self):
+        random.seed(128)
+        np.random.seed(128)
+        paddle.seed(128)
+
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
             )
@@ -466,9 +483,10 @@ class GenerationTesterMixin:
                 logits_processors=logits_processor,
                 logits_warper=logits_warper,
                 process_kwargs=process_kwargs,
+                pretrained_model_name=pretrained_model_name,
             )
-            self.assertListEqual(output_sample.tolist(),
-                                 output_generate.tolist())
+            self.assertListEqual(output_sample[0].tolist(),
+                                 output_generate[0].tolist())
 
             # check `generate()` and `sample()` yield equal results for `num_return_sequences`
             output_sample, output_generate = self._sample_generate(
@@ -480,9 +498,10 @@ class GenerationTesterMixin:
                 logits_processors=logits_processor,
                 logits_warper=logits_warper,
                 process_kwargs=process_kwargs,
+                pretrained_model_name=pretrained_model_name,
             )
-            self.assertListEqual(output_sample.tolist(),
-                                 output_generate.tolist())
+            self.assertListEqual(output_sample[0].tolist(),
+                                 output_generate[0].tolist())
 
     def test_beam_search_generate(self):
         for model_class in self.all_generative_model_classes.keys():
@@ -501,6 +520,7 @@ class GenerationTesterMixin:
                 model_class][1]
             model = model_class(pretrained_model)
             model.eval()
+
             if self.is_encoder_decoder:
                 max_length = 4
 
@@ -511,7 +531,9 @@ class GenerationTesterMixin:
                 max_length,
             )
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
-                input_ids.shape[0], max_length)
+                input_ids.shape[0],
+                max_length + 1 if self.is_encoder_decoder else max_length +
+                input_ids.shape[-1])
 
             # check `generate()` and `beam_search()` are equal
             output_generate, output_beam_search = self._beam_search_generate(
@@ -526,8 +548,8 @@ class GenerationTesterMixin:
                 pretrained_model_name=pretrained_model_name,
             )
 
-            self.assertListEqual(output_generate.tolist(),
-                                 output_beam_search.tolist())
+            self.assertListEqual(output_generate[0].tolist(),
+                                 output_beam_search[0].tolist())
 
             # check `generate()` and `beam_search()` are equal for `num_return_sequences`
             num_return_sequences = 2
@@ -535,7 +557,8 @@ class GenerationTesterMixin:
                 max_length = 4
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
                 input_ids.shape[0],
-                max_length,
+                max_length + 1 if self.is_encoder_decoder else max_length +
+                input_ids.shape[-1],
                 num_return_sequences=num_return_sequences)
 
             output_generate, output_beam_search = self._beam_search_generate(
@@ -549,8 +572,8 @@ class GenerationTesterMixin:
                 logits_processor=logits_processor,
                 pretrained_model_name=pretrained_model_name,
             )
-            self.assertListEqual(output_generate.tolist(),
-                                 output_beam_search.tolist())
+            self.assertListEqual(output_generate[0].tolist(),
+                                 output_beam_search[0].tolist())
 
     def test_generate_without_input_ids(self):
         config, _, _, max_length = self._get_input_ids_and_config()
@@ -591,6 +614,7 @@ class GenerationTesterMixin:
                 model_class][1]
             model = model_class(pretrained_model)
             model.eval()
+
             if self.is_encoder_decoder:
                 max_length = 4
 
@@ -604,7 +628,9 @@ class GenerationTesterMixin:
 
             # check `generate()` and `group_beam_search()` are equal
             beam_kwargs, beam_scorer = self._get_diverse_beam_scorer_and_kwargs(
-                input_ids.shape[0], max_length)
+                input_ids.shape[0],
+                max_length + 1 if self.is_encoder_decoder else max_length +
+                input_ids.shape[-1])
             output_generate, output_group_beam_search = self._group_beam_search_generate(
                 model=model,
                 input_ids=input_ids,
@@ -616,8 +642,8 @@ class GenerationTesterMixin:
                 logits_process_kwargs=logits_process_kwargs,
                 pretrained_model_name=pretrained_model_name,
             )
-            self.assertListEqual(output_generate.tolist(),
-                                 output_group_beam_search.tolist())
+            self.assertListEqual(output_generate[0].tolist(),
+                                 output_group_beam_search[0].tolist())
 
             # check `generate()` and `group_beam_search()` are equal for `num_return_sequences`
             num_return_sequences = 2
@@ -625,7 +651,8 @@ class GenerationTesterMixin:
                 max_length = 4
             beam_kwargs, beam_scorer = self._get_diverse_beam_scorer_and_kwargs(
                 input_ids.shape[0],
-                max_length,
+                max_length + 1 if self.is_encoder_decoder else max_length +
+                input_ids.shape[-1],
                 num_return_sequences=num_return_sequences)
             output_generate, output_group_beam_search = self._group_beam_search_generate(
                 model=model,
@@ -634,12 +661,12 @@ class GenerationTesterMixin:
                 max_length=max_length,
                 beam_scorer=beam_scorer,
                 beam_kwargs=beam_kwargs,
-                logits_processors=logits_processor,
+                logits_processor=logits_processor,
                 logits_process_kwargs=logits_process_kwargs,
                 pretrained_model_name=pretrained_model_name,
             )
-            self.assertListEqual(output_generate.tolist(),
-                                 output_group_beam_search.tolist())
+            self.assertListEqual(output_generate[0].tolist(),
+                                 output_group_beam_search[0].tolist())
 
     def _check_sequence_inside_sequence(self, tensor_1, tensor_2):
         # check if tensor_1 inside tensor_2 or tensor_2 inside tensor_1.

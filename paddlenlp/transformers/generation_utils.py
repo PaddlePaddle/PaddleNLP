@@ -514,6 +514,38 @@ class GenerationMixin(object):
 
         return decoder_input_ids
 
+    def get_decoder_start_token_id(self,
+                                   decoder_start_token_id=None,
+                                   bos_token_id=None,
+                                   pretrained_model_name=None):
+        if type(pretrained_model_name) is not type(""):
+            raise ValueError(
+                "The parameter pretrained_model_name should be str. but recieved {}"
+                .format(type(pretrained_model_name)))
+
+        decoder_start_token_id = (
+            decoder_start_token_id
+            if decoder_start_token_id is not None else getattr(
+                self, pretrained_model_name).config["decoder_start_token_id"])
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self, pretrained_model_name).config["bos_token_id"]
+
+        if decoder_start_token_id is not None:
+            return decoder_start_token_id
+        elif getattr(self, pretrained_model_name
+                     ).config["decoder_start_token_id"] is not None:
+            return getattr(
+                self,
+                pretrained_model_name).config["decoder.decoder_start_token_id"]
+        elif bos_token_id is not None:
+            return bos_token_id
+        elif getattr(self,
+                     pretrained_model_name).config["bos_token_id"] is not None:
+            return getattr(self, pretrained_model_name).config["bos_token_id"]
+        raise ValueError(
+            "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
+        )
+
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         # Implement in subclasses for custom behavior to prepare inputs in the
         # generate method.
