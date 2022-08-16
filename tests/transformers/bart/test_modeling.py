@@ -112,13 +112,17 @@ class BartModelTester:
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
-                               self.vocab_size)
+                               self.vocab_size,
+                               dtype="int64")
         input_ids = paddle.clip(
-            ids_tensor([self.batch_size, self.seq_length], self.vocab_size), 3)
+            ids_tensor([self.batch_size, self.seq_length],
+                       self.vocab_size,
+                       dtype="int64"), 3)
         input_ids[:, -1] = self.eos_token_id  # Eos Token
 
         decoder_input_ids = ids_tensor([self.batch_size, self.seq_length],
-                                       self.vocab_size)
+                                       self.vocab_size,
+                                       dtype="int64")
 
         config = self.get_config()
         inputs_dict = prepare_bart_inputs_dict(config, input_ids,
@@ -176,7 +180,9 @@ class BartModelTester:
         output, cache = outputs
 
         # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"])
+        next_tokens = ids_tensor((self.batch_size, 3),
+                                 config["vocab_size"],
+                                 dtype="int64")
         next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3],
                                       dtype=paddle.get_default_dtype())
 
@@ -198,7 +204,9 @@ class BartModelTester:
                                       cache=cache)
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
+        random_slice_idx = ids_tensor((1, ),
+                                      output_from_past.shape[-1],
+                                      dtype="int64").item()
         output_from_no_past_slice = output_from_no_past[:, -3:,
                                                         random_slice_idx].detach(
                                                         )

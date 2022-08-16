@@ -129,6 +129,13 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             eol_token='\u2583',
             **kwargs  # The token of newline.
     ):
+        super(GPTChineseTokenizer, self).__init__(max_len=max_len,
+                                                  unk_token=unk_token,
+                                                  bos_token=bos_token,
+                                                  eos_token=eos_token,
+                                                  eol_token=eol_token,
+                                                  **kwargs)
+
         self._model_file = model_file
         self.eol_token = eol_token
         if not os.path.isfile(model_file):
@@ -369,6 +376,14 @@ class GPTTokenizer(PretrainedTokenizer):
             eol_token='\u010a',
             **kwargs  # The token of newline.
     ):
+        super(GPTTokenizer, self).__init__(errors=errors,
+                                           max_len=max_len,
+                                           pad_token=pad_token,
+                                           eos_token=eos_token,
+                                           unk_token=unk_token,
+                                           eol_token=eol_token,
+                                           **kwargs)
+
         pad_token = AddedToken(pad_token,
                                lstrip=False, rstrip=False) if isinstance(
                                    pad_token, str) else pad_token
@@ -538,3 +553,6 @@ class GPTTokenizer(PretrainedTokenizer):
         text = bytearray([self.byte_decoder[c]
                           for c in text]).decode('utf-8', errors=self.errors)
         return text
+
+    def get_vocab(self):
+        return dict(self.encoder, **self.added_tokens_encoder)
