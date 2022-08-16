@@ -7,6 +7,7 @@ option(WITH_PYTHON      "Compile PaddlePaddle with python interpreter"  ON)
 add_definitions(-DFASTERTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set (PUBLIC_DEPEND_LIBS "")
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING
@@ -98,6 +99,7 @@ endforeach()
 
 ELSE(WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
+set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
 # For OpenMP
