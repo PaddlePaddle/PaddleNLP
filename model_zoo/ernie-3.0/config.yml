@@ -16,11 +16,6 @@ DefaultArgs:
     do_train: True
     save_steps: 100
     max_answer_length: 50
-    strategy: "dynabert+ptq"
-    algo_list: ["hist", "mse"]
-    batch_num_list: [1]
-    batch_size_list: [4, 8, 16]
-    width_mult_list: [0.75]
 # Datasets which used for sequence classfication
 SequenceClassification:
     clue afqmc: 

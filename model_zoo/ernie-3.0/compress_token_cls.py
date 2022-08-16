@@ -148,9 +148,6 @@ def main():
                       eval_dataset=eval_dataset,
                       tokenizer=tokenizer)
 
-    if not os.path.exists(compression_args.output_dir):
-        os.makedirs(compression_args.output_dir)
-
     compression_args.print_config()
 
     trainer.compress()
