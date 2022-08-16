@@ -506,7 +506,6 @@ class ErnieTokenizer(PretrainedTokenizer):
         r"""
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
-
         Args:
             token_ids_0 (List[int]): 
                 List of ids of the first sequence.
@@ -516,7 +515,6 @@ class ErnieTokenizer(PretrainedTokenizer):
             already_has_special_tokens (str, optional): 
                 Whether or not the token list is already formatted with special tokens for the model. 
                 Defaults to `False`.
-
         Returns:
             List[int]: 
                 The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
