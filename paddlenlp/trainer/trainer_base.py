@@ -67,6 +67,7 @@ from .trainer_utils import (
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
     get_scheduler,
+    IterableDatasetShard,
 )
 from .trainer_callback import (
     CallbackHandler,
@@ -725,6 +726,25 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset,
                                                         description="training")
 
+        if isinstance(train_dataset, paddle.io.IterableDataset):
+            if self.args.world_size > 1:
+                train_dataset = IterableDatasetShard(
+                    train_dataset,
+                    batch_size=self.args.per_device_train_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                train_dataset,
+                batch_size=self.args.per_device_eval_batch_size *
+                self.args.world_size,  # TODO: check this
+                collate_fn=self.
+                data_collator,  # _get_collator_with_removed_columns
+                num_workers=self.args.dataloader_num_workers,
+            )
+
         train_sampler = self._get_train_sampler()
 
         return DataLoader(
@@ -738,7 +758,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
-                batch_size=self.args.eval_batch_size,
+                batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
             )
@@ -747,7 +767,7 @@ class Trainer:
                 eval_dataset,
                 num_replicas=self.args.world_size,
                 rank=self.args.process_index,
-                batch_size=self.args.eval_batch_size,
+                batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
             )
@@ -773,6 +793,24 @@ class Trainer:
                                                   datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset,
                                                        description="evaluation")
+        if isinstance(eval_dataset, paddle.io.IterableDataset):
+            if self.args.world_size > 1:
+                eval_dataset = IterableDatasetShard(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                eval_dataset,
+                batch_size=self.args.per_device_eval_batch_size *
+                self.args.world_size,  # TODO: check this
+                collate_fn=self.
+                data_collator,  # _get_collator_with_removed_columns
+                num_workers=self.args.dataloader_num_workers,
+            )
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
@@ -798,6 +836,24 @@ class Trainer:
                                                   datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset,
                                                        description="test")
+        if isinstance(test_dataset, paddle.io.IterableDataset):
+            if self.args.world_size > 1:
+                test_dataset = IterableDatasetShard(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                test_dataset,
+                batch_size=self.args.per_device_eval_batch_size *
+                self.world_size,
+                collate_fn=self.
+                data_collator,  # _get_collator_with_removed_columns
+                num_workers=self.args.dataloader_num_workers,
+            )
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
@@ -1372,7 +1428,7 @@ class Trainer:
                         dataloader._batch_sampler, NlpDistributedBatchSampler):
                 consumed_samples = (
                     (self.state.global_step) // args.eval_steps
-                ) * max_eval_iters * args.eval_batch_size * args.world_size
+                ) * max_eval_iters * args.per_device_eval_batch_size * args.world_size
                 dataloader._batch_sampler.set_epoch(
                     consumed_samples=consumed_samples)
 
@@ -1514,7 +1570,7 @@ class Trainer:
                            description="Prediction",
                            ignore_keys=ignore_keys,
                            metric_key_prefix=metric_key_prefix)
-        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        total_batch_size = self.args.per_device_eval_batch_size * self.args.world_size
         output.metrics.update(
             speed_metrics(
                 metric_key_prefix,
