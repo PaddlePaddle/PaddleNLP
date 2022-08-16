@@ -42,6 +42,8 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
+
 
 
 ## QuickStart
@@ -1372,6 +1374,42 @@ from paddlenlp import Taskflow
 * `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
+
+</div></details>
+
+### 文本摘要
+<details><summary>&emsp; 通过UNIMO-Text模型来生成摘要 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 Salesforce/codegen-350M-mono
+>>> Summarizer = Taskflow("text_summarization")
+# 单条输入
+>>> Summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+['\n    print("Hello World")']
+# 多条输入
+>>> Summarizer([
+  "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
+  "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+  ])
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为unimo-text-1.0，支持的模型支持的模型有["unimo-text-1.0", ]。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `output_scores`：是否要输出解码得分，请默认为False。
+* `max_length`：生成代码的最大长度，默认为128。
+* `min_length`：生成代码的最小长度，默认为0。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
+* `temperature`：解码参数temperature，默认为0.6。
+* `top_k`：解码参数top_k，默认为5。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：beam_search解码的beam size，默认为4。
+* `length_penalty`：解码长度控制值，默认为1.0。
+* `num_return_sequences`：解码返回对序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1.1。
 
 </div></details>
 

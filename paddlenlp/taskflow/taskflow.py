@@ -38,6 +38,7 @@ from .dialogue import DialogueTask
 from .information_extraction import UIETask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask
+from .text_summarization import TextSummarizationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -195,6 +196,18 @@ TASKS = {
         },
         "default": {
             "model": "simbert-base-chinese"
+        }
+    },
+    'text_summarization': {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-unimo-text-1.0",
+                "task_priority_path": "unimo-text-1.0",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0"
         }
     },
     "word_segmentation": {
