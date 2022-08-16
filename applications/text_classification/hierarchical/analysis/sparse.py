@@ -44,14 +44,14 @@ parser.add_argument("--batch_size", default=16, type=int, help="Batch size per G
 parser.add_argument("--seed", type=int, default=3, help="random seed for initialization")
 parser.add_argument("--rationale_num", type=int, default=3, help="Number of rationales per example.")
 parser.add_argument("--sparse_num", type=int, default=100, help="Number of sparse data.")
-parser.add_argument("--valid_threshold", type=float, default="0.7", help="The threshold to select valid data.")
-parser.add_argument("--valid_num", type=int, default=100, help="Number of valid data.")
+parser.add_argument("--support_threshold", type=float, default="0.7", help="The threshold to select support data.")
+parser.add_argument("--support_num", type=int, default=100, help="Number of support data.")
 parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
 parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
 parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
 parser.add_argument("--unlabeled_file", type=str, default="data.txt", help="Unlabeled data filename")
 parser.add_argument("--sparse_file", type=str, default="sparse.txt", help="Sparse data file name.")
-parser.add_argument("--valid_file", type=str, default="valid.txt", help="Valid data file name.")
+parser.add_argument("--support_file", type=str, default="support.txt", help="support data file name.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -126,7 +126,12 @@ def find_sparse_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if os.path.exists(args.params_path):
+    if os.path.exists(os.path.join(
+            args.params_path, "model_state.pdparams")) and os.path.exists(
+                os.path.join(args.params_path,
+                             "model_config.json")) and os.path.exists(
+                                 os.path.join(args.params_path,
+                                              "tokenizer_config.json")):
         model = AutoModelForSequenceClassification.from_pretrained(
             args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
@@ -192,43 +197,48 @@ def find_sparse_data():
     return os.path.join(args.dataset_dir, args.sparse_file)
 
 
-def get_valid_data(analysis_result, valid_num, valid_threshold=0.7):
+def get_support_data(analysis_result, support_num, support_threshold=0.7):
     """
-    get valid data
+    get support data
     """
     ret_idxs = []
     ret_scores = []
     rationale_idx = 0
     try:
-        while len(ret_idxs) < valid_num:
+        while len(ret_idxs) < support_num:
             for n in range(len(analysis_result)):
                 score = analysis_result[n].pos_scores[rationale_idx]
-                if score > valid_threshold:
+                if score > support_threshold:
                     idx = analysis_result[n].pos_indexes[rationale_idx]
                     if idx not in ret_idxs:
                         ret_idxs.append(idx)
                         ret_scores.append(score)
-                    if len(ret_idxs) >= valid_num:
+                    if len(ret_idxs) >= support_num:
                         break
 
             rationale_idx += 1
     except IndexError:
         logger.error(
-            f"The index is out of range, please reduce valid_num or increase valid_threshold. Got {len(ret_idxs)} now."
+            f"The index is out of range, please reduce support_num or increase support_threshold. Got {len(ret_idxs)} now."
         )
 
     return ret_idxs, ret_scores
 
 
-def find_valid_data():
+def find_support_data():
     """
-    Find valid data (which supports sparse data) from candidate dataset
+    Find support data (which supports sparse data) from candidate dataset
     """
     set_seed(args.seed)
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if os.path.exists(args.params_path):
+    if os.path.exists(os.path.join(
+            args.params_path, "model_state.pdparams")) and os.path.exists(
+                os.path.join(args.params_path,
+                             "model_config.json")) and os.path.exists(
+                                 os.path.join(args.params_path,
+                                              "tokenizer_config.json")):
         model = AutoModelForSequenceClassification.from_pretrained(
             args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
@@ -242,7 +252,7 @@ def find_valid_data():
         candidate_path = os.path.join(args.dataset_dir, args.train_file)
 
     sparse_path = os.path.join(args.dataset_dir, args.sparse_file)
-    valid_path = os.path.join(args.dataset_dir, args.valid_file)
+    support_path = os.path.join(args.dataset_dir, args.support_file)
     candidate_ds = load_dataset(read_local_dataset,
                                 path=candidate_path,
                                 lazy=False)
@@ -277,13 +287,14 @@ def find_valid_data():
     for batch in sparse_data_loader:
         analysis_result += feature_sim(batch, sample_num=-1)
 
-    valid_indexs, valid_scores = get_valid_data(analysis_result, args.valid_num,
-                                                args.valid_threshold)
+    support_indexs, support_scores = get_support_data(analysis_result,
+                                                      args.support_num,
+                                                      args.support_threshold)
 
-    # Save the valid data
+    # Save the support data
     if args.annotate or args.aug_strategy == "duplicate":
-        with open(valid_path, 'w') as f:
-            for idx in list(valid_indexs):
+        with open(support_path, 'w') as f:
+            for idx in list(support_indexs):
                 data = candidate_ds.data[idx]
                 if 'label' in data:
                     f.write(data['text'] + '\t' + data['label'] + '\n')
@@ -306,18 +317,18 @@ def find_valid_data():
         elif args.aug_strategy == "swap":
             aug = WordSwap(create_n=create_n, aug_percent=aug_percent)
 
-        with open(valid_path, 'w') as f:
-            for idx in list(valid_indexs):
+        with open(support_path, 'w') as f:
+            for idx in list(support_indexs):
                 data = candidate_ds.data[idx]
                 augs = aug.augment(data['text'])
                 for a in augs:
                     f.write(a + '\t' + data['label'] + '\n')
         f.close()
-    logger.info("Valid data saved in {}".format(valid_path))
-    logger.info("Valid average scores: {:.4f}".format(
-        float(sum(valid_scores)) / len(valid_scores)))
+    logger.info("support data saved in {}".format(support_path))
+    logger.info("support average scores: {:.4f}".format(
+        float(sum(support_scores)) / len(support_scores)))
 
 
 if __name__ == "__main__":
     find_sparse_data()
-    find_valid_data()
+    find_support_data()

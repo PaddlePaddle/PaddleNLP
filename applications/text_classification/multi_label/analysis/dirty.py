@@ -117,7 +117,12 @@ def run():
     set_seed(args.seed)
     paddle.set_device(args.device)
     # Define model & tokenizer
-    if os.path.exists(args.params_path):
+    if os.path.exists(os.path.join(
+            args.params_path, "model_state.pdparams")) and os.path.exists(
+                os.path.join(args.params_path,
+                             "model_config.json")) and os.path.exists(
+                                 os.path.join(args.params_path,
+                                              "tokenizer_config.json")):
         model = AutoModelForSequenceClassification.from_pretrained(
             args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)

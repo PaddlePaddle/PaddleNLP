@@ -14,6 +14,7 @@
 
 import os
 import argparse
+import paddle
 from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
 
 # yapf: disable
@@ -33,7 +34,6 @@ def aug():
     """Do data augmentation"""
     if args.aug_strategy in ["mix", "substitute", "insert"
                              ] and args.aug_strategy == "mlm":
-        import paddle
         paddle.set_device(args.device)
 
     if args.aug_strategy in ["substitute", "insert", "delete", "swap"]:
@@ -56,7 +56,7 @@ def aug():
                                                 encoding='utf-8') as f2:
             for line in f1:
                 s, l = line.strip().split('\t')
-                # f2.write(s + '\t' + l + '\n')
+
                 augs = aug.augment(s)
                 for a in augs:
                     f2.write(a + '\t' + l + '\n')
@@ -77,7 +77,7 @@ def aug():
                                                 encoding='utf-8') as f2:
             for line in f1:
                 s, l = line.strip().split('\t')
-                # f2.write(s + '\t' + l + '\n')
+
                 for i in range(args.create_n):
                     i = count % len(aug)
                     augs = aug[i].augment(s)

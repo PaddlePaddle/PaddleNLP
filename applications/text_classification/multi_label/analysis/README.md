@@ -3,20 +3,24 @@
 **目录**
    * [analysis模块介绍](#analysis模块介绍)
    * [模型评估](#模型评估)
-   * [稀疏数据增强方案](#稀疏数据增强方案)
+   * [稀疏数据筛选方案](#稀疏数据筛选方案)
    * [脏数据清洗方案](#脏数据清洗方案)
-   * [数据增强方案](#数据增强策略方案)
+   * [数据增强策略方案](#数据增强策略方案)
 
 ## analysis模块介绍
 
-analysis模块提供了**模型评估**脚本对每个类别分别进行评估，帮助开发者分析模型表现，同时基于可信AI工具集和数据增强API提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化方案帮助提升模型效果。
+analysis模块提供了**模型评估**脚本对整体分类情况和每个类别分别进行评估，并打印预测错误样本，帮助开发者分析模型表现找到训练和预测数据中存在的问题问题。同时基于[可信AI工具集](https://github.com/PaddlePaddle/TrustAI)和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化方案从多角度帮助开发者提升模型效果。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/63761690/184790352-7f91da02-aadd-48fe-9130-8323a89c6a43.jpg" width="600">
+</div>
 
 以下是本项目主要代码结构及说明：
 
 ```text
 analysis/
 ├── evaluate.py # 评估脚本
-├── sparse.py # 稀疏数据增强脚本
+├── sparse.py # 稀疏数据筛选脚本
 ├── dirty.py # 脏数据清洗脚本
 ├── aug.py # 数据增强脚本
 └── README.md # 多标签训练评估与模型优化指南
@@ -80,20 +84,20 @@ Prediction    Label    Text
 ...
 ```
 
-## 稀疏数据增强方案
+## 稀疏数据筛选方案
 
-稀疏数据指缺乏足够训练数据支持导致低置信度的待预测数据，简单来说，由于模型在训练过程中没有学习到足够与待预测样本相似的数据，模型难以正确预测样本所属类别。本项目中稀疏数据筛选基于TrustAI（可信AI）工具集，利用基于特征相似度的实例级证据分析方法，抽取开发集中样本的正影响训练证据，并计算正影响证据平均分（通常为得分前三的正影响训练证据均分）。分数较低的样本表明其训练证据不足，在训练集中较为稀疏，实验表明模型在这些样本上表现也相对较差。更多细节详见[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[实例级证据分析](https://github.com/PaddlePaddle/TrustAI/blob/main/trustai/interpretation/example_level/README.md)。
+稀疏数据指缺乏足够训练数据支持导致低置信度的待预测数据，简单来说，由于模型在训练过程中没有学习到足够与待预测样本相似的数据，模型难以正确预测样本所属类别。本项目中稀疏数据筛选基于TrustAI（可信AI）工具集，利用基于特征相似度的实例级证据分析方法，抽取开发集中样本的支持训练证据，并计算支持证据平均分（通常为得分前三的支持训练证据均分）。分数较低的样本表明其训练证据不足，在训练集中较为稀疏，实验表明模型在这些样本上表现也相对较差。更多细节详见[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[实例级证据分析](https://github.com/PaddlePaddle/TrustAI/blob/main/trustai/interpretation/example_level/README.md)。
 
-稀疏数据增强旨在开发集中挖掘缺乏训练证据支持的稀疏数据，通常可以采用数据增强或有效数据标注的两种低成本方式，提升模型预测效果。
+稀疏数据筛选旨在开发集中挖掘缺乏训练证据支持的稀疏数据，通常可以采用**数据增强**或**少量数据标注**的两种低成本方式，提升模型预测效果。
 
 **安装TrustAI**
 ```shell
-pip install trustai
+pip install trustai==0.1.4
 ```
 
 ### 稀疏数据识别--数据增强
 
-这里我们将介绍稀疏数据识别--数据增强流程，首先使用数据增强脚本挖掘开发集中的稀疏数据，然后筛选对稀疏数据有有效正影响的训练数据进行数据增强，然后将得到的数据增强后的有效正影响数据加入到训练集中进行训练。
+这里我们将介绍稀疏数据识别--数据增强流程，首先使用数据增强脚本挖掘开发集中的稀疏数据，然后筛选训练集中对稀疏数据的支持数据进行数据增强，然后将得到的数据增强后的支持数据加入到训练集中进行训练。
 
 现在我们进行稀疏数据识别--数据增强，得到新增训练数据：
 
@@ -106,7 +110,7 @@ python sparse.py \
     --params_path "../checkpoint/" \
     --batch_size 16 \
     --sparse_num 100 \
-    --valid_num 100
+    --support_num 100
 ```
 
 默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
@@ -120,26 +124,26 @@ python sparse.py \
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `seed`：随机种子，默认为3。
-* `rationale_num`：计算样本置信度时正影响训练证据数量，默认为3。
+* `rationale_num`：计算样本置信度时支持训练证据数量，默认为3。
 * `sparse_num`：筛选稀疏数据数量，建议为开发集的10%~20%，默认为100。
-* `valid_num`：筛选有效数据用于训练数量，建议为训练集的10%~20%，默认为100。
-* `valid_threshold`：筛选有效数据用于训练的阈值，只选择正影响证据分数大于阈值作为有效数据，默认为0.7。
+* `support_num`：用于数据增强的支持数据数量，建议为训练集的10%~20%，默认为100。
+* `support_threshold`：支持数据的阈值，只选择支持证据分数大于阈值作为支持数据，默认为0.7。
 * `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
 * `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 * `sparse_file`：保存在本地数据集路径中稀疏数据文件名；默认为"sparse.txt"。
-* `valid_file`：保存在本地数据集路径中有效正影响训练数据文件名；默认为"valid.txt"。
+* `support_file`：保存在本地数据集路径中支持训练数据文件名；默认为"support.txt"。
 
-将得到增强有效正影响训练数据`valid.txt`与训练集数据`train.txt`合并得到新的训练集`train_sparse_aug.txt`重新进行训练：
+将得到增强支持数据`support.txt`与训练集数据`train.txt`合并得到新的训练集`train_sparse_aug.txt`重新进行训练：
 
 ```shell
-cat ../data/train.txt ../data/valid.txt > ../data/train_sparse_aug.txt
+cat ../data/train.txt ../data/support.txt > ../data/train_sparse_aug.txt
 ```
 
 
 ### 稀疏数据识别--数据标注
 
-这里我们将介绍稀疏数据识别--数据标注流程，首先使用数据增强脚本挖掘开发集中的稀疏数据，然后筛选对稀疏数据有有效正影响的未标注数据，然后将得到有效数据进行标注后加入到训练集中进行训练。
+这里我们将介绍稀疏数据识别--数据标注流程，首先使用数据增强脚本挖掘开发集中的稀疏数据，然后筛选对稀疏数据支持的未标注数据，然后将得到支持数据进行标注后加入到训练集中进行训练。
 
 现在我们进行稀疏数据识别--数据标注，得到待标注数据：
 
@@ -152,7 +156,7 @@ python sparse.py \
     --params_path "../checkpoint/" \
     --batch_size 16 \
     --sparse_num 100 \
-    --valid_num 100 \
+    --support_num 100 \
     --unlabeled_file "data.txt"
 ```
 
@@ -167,23 +171,22 @@ python sparse.py \
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `seed`：随机种子，默认为3。
-* `rationale_num`：计算样本置信度时正影响训练证据数量，默认为3。
+* `rationale_num`：计算样本置信度时支持训练证据数量，默认为3。
 * `sparse_num`：筛选稀疏数据数量，建议为开发集的10%~20%，默认为100。
-* `valid_num`：筛选有效数据用于训练数量，建议为训练集的10%~20%，默认为100。
-* `valid_threshold`：筛选有效数据用于训练的阈值，只选择正影响证据分数大于阈值作为有效数据，默认为0.7。
+* `support_num`：用于数据增强的支持数据数量，建议为训练集的10%~20%，默认为100。
+* `support_threshold`：支持数据的阈值，只选择支持证据分数大于阈值作为支持数据，默认为0.7。
 * `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
 * `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 * `unlabeled_file`：本地数据集中未标注数据文件名；默认为"data.txt"。
 * `sparse_file`：保存在本地数据集路径中稀疏数据文件名；默认为"sparse.txt"。
-* `valid_file`：保存在本地数据集路径中有效正影响待标注件名；默认为"valid.txt"。
+* `support_file`：保存在本地数据集路径中支持训练数据文件名；默认为"support.txt"。
 
-我们将筛选出的有效数据`valid.txt`进行标注，可以使用标注工具帮助更快标注，详情请参考[文本分类任务doccano数据标注使用指南](../../doccano.md)进行文本分类数据标注。然后将已标注数据`valid.txt`与训练集数据`train.txt`合并得到新的训练集`train_sparse_annotate.txt`重新进行训练：
+我们将筛选出的支持数据`support.txt`进行标注，可以使用标注工具帮助更快标注，详情请参考[文本分类任务doccano数据标注使用指南](../../doccano.md)进行文本分类数据标注。然后将已标注数据`support.txt`与训练集数据`train.txt`合并得到新的训练集`train_sparse_annotate.txt`重新进行训练：
 
 ```shell
-cat ../data/train.txt ../data/valid.txt > ../data/train_sparse_annotate.txt
+cat ../data/train.txt ../data/support.txt > ../data/train_sparse_annotate.txt
 ```
-
 
 ## 脏数据清洗方案
 
@@ -191,7 +194,7 @@ cat ../data/train.txt ../data/valid.txt > ../data/train_sparse_annotate.txt
 
 **安装TrustAI**
 ```shell
-pip install trustai
+pip install trustai==0.1.4
 ```
 
 现在我们进行脏数据识别，脏数据保存在`"train_dirty.txt"`,剩余训练数据保存在`"train_dirty_rest.txt"`：
@@ -231,7 +234,7 @@ cat ../data/train_dirty_rest.txt ../data/train_dirty.txt > ../data/train_clean.t
 ```
 
 
-## 数据增强方案
+## 数据增强策略方案
 
 在数据量较少或某些类别样本量较少时，也可以通过数据增强策略的方式，生成更多的训练数据，提升模型效果。
 

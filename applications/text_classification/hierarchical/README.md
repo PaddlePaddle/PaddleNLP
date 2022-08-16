@@ -177,9 +177,26 @@ tar -zxvf baidu_extract_2020.tar.gz
 mv baidu_extract_2020 data
 ```
 
-使用CPU训练
+使用CPU/GPU训练：
 ```shell
 python train.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --save_dir "./checkpoint" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --learning_rate 3e-5 \
+    --epochs 100 \
+    --logging_steps 5 \
+    --train_file "train.txt"
+```
+默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
+如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
+```shell
+python -m paddle.distributed.launch --nproc_per_node=8 --backend='gloo' train.py \
     --device "cpu" \
     --dataset_dir "data" \
     --save_dir "./checkpoint" \
@@ -193,7 +210,7 @@ python train.py \
     --train_file "train.txt"
 ```
 
-使用GPU单卡/多卡训练
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练：
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
