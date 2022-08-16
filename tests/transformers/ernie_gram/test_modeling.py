@@ -24,10 +24,9 @@ from paddlenlp.transformers import (ErnieGramModel, ErnieGramPretrainedModel,
                                     ErnieGramForTokenClassification,
                                     ErnieGramForQuestionAnswering)
 
-from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
-                                                     random_attention_mask,
-                                                     ModelTesterMixin)
-from tests.testing_utils import slow
+from ..test_modeling_common import (ids_tensor, floats_tensor,
+                                    random_attention_mask, ModelTesterMixin)
+from ...testing_utils import slow
 
 
 @dataclass
@@ -220,7 +219,7 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
 
 class ErnieGramModelIntegrationTest(unittest.TestCase):
 
-    # @slow
+    @slow
     def test_inference_no_attention(self):
         model = ErnieGramModel.from_pretrained("ernie-gram-zh")
         model.eval()
@@ -238,7 +237,7 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
-    # @slow
+    @slow
     def test_inference_with_attention(self):
         model = ErnieGramModel.from_pretrained(
             "ernie-gram-zh-finetuned-dureader-robust")
