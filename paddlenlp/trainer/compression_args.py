@@ -70,7 +70,7 @@ class CompressionArguments(TrainingArguments):
         "activations and weights. 'avg' gets the average value among the max " \
         "values for activations. 'hist' gets the value of 'hist_percent' " \
         "quantile as the threshold. 'mse' gets the value which makes the " \
-        "quantization mse loss minimal. Defaults to ['hist']."
+        "quantization mse loss minimal."
     }, )
 
     batch_num_list: Optional[List[int]] = field(
@@ -85,7 +85,7 @@ class CompressionArguments(TrainingArguments):
         default=None,
         metadata={
             "help":
-            "List of batch_size. 'batch_size' is the batch of data loader"
+            "List of batch_size. 'batch_size' is the batch of data loader."
         },
     )
     weight_quantize_type: Optional[str] = field(
@@ -114,7 +114,7 @@ class CompressionArguments(TrainingArguments):
             "https://arxiv.org/abs/1810.05723. Default is False."
         },
     )
-    infer_model_path: Optional[str] = field(
+    input_infer_model_path: Optional[str] = field(
         default=None,
         metadata={
             "help":
@@ -132,9 +132,14 @@ class CompressionArguments(TrainingArguments):
         compression_arg_name = [
             'width_mult_list', 'batch_num_list', 'bias_correction',
             'round_type', 'algo_list', 'batch_size_list', 'strategy',
-            'weight_quantize_type', 'infer_model_path'
+            'weight_quantize_type', 'input_infer_model_path'
         ]
-
+        default_arg_dict = {
+            "width_mult_list": [0.75],
+            'batch_size_list': [1],
+            'algo_list': ['mse', 'KL'],
+            'batch_num_list': [4, 8, 16]
+        }
         logger.info("=" * 60)
         if args is None:
             args = self
@@ -146,7 +151,7 @@ class CompressionArguments(TrainingArguments):
             "'dynabert' and 'ptq'. `width_mult_list` is needed in " \
             "`dynabert`, and `algo_list`, `batch_num_list`, `batch_size_list`," \
             " `round_type`, `bias_correction`, `weight_quantize_type`, " \
-            "`infer_model_path` are needed in 'ptq'. "
+            "`input_infer_model_path` are needed in 'ptq'. "
             )
         logger.info('{:30}:{}'.format("paddle commit id",
                                       paddle.version.commit))
@@ -156,6 +161,9 @@ class CompressionArguments(TrainingArguments):
                 continue
             if arg[:2] != "__":  #don't print double underscore methods
                 v = getattr(args, arg)
+                if v is None and arg in default_arg_dict:
+                    v = default_arg_dict[arg]
+                    setattr(args, arg, v)
                 if not isinstance(v, types.MethodType):
                     logger.info('{:30}:{}'.format(arg, v))
 
