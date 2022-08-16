@@ -89,86 +89,6 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
                              ["ah", "\u535A", "\u63A8", "zz"])
 
-    def test_basic_tokenizer_lower(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab, do_lower_case=True)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHeLLo!how  \n Are yoU?  "),
-                             ["hello", "!", "how", "are", "you", "?"])
-        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["hello"])
-
-    def test_basic_tokenizer_lower_strip_accents_false(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab,
-                                        do_lower_case=True,
-                                        strip_accents=False)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
-                             ["hällo", "!", "how", "are", "you", "?"])
-        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["h\u00E9llo"])
-
-    def test_basic_tokenizer_lower_strip_accents_true(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab, do_lower_case=True)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
-                             ["hallo", "!", "how", "are", "you", "?"])
-        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["hello"])
-
-    def test_basic_tokenizer_lower_strip_accents_default(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab, do_lower_case=True)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
-                             ["hallo", "!", "how", "are", "you", "?"])
-        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["hello"])
-
-    def test_basic_tokenizer_no_lower(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab, do_lower_case=False)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHeLLo!how  \n Are yoU?  "),
-                             ["HeLLo", "!", "how", "Are", "yoU", "?"])
-
-    def test_basic_tokenizer_no_lower_strip_accents_false(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab,
-                                        do_lower_case=False,
-                                        strip_accents=False)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
-                             ["HäLLo", "!", "how", "Are", "yoU", "?"])
-
-    def test_basic_tokenizer_no_lower_strip_accents_true(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab,
-                                        do_lower_case=False,
-                                        strip_accents=True)
-
-        self.assertListEqual(tokenizer.tokenize(" \tHäLLo!how  \n Are yoU?  "),
-                             ["HaLLo", "!", "how", "Are", "yoU", "?"])
-
-    def test_basic_tokenizer_respects_never_split_tokens(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab,
-                                        do_lower_case=False,
-                                        never_split=["[UNK]"])
-
-        self.assertListEqual(
-            tokenizer.tokenize(" \tHeLLo!how  \n Are yoU? [UNK]"),
-            ["HeLLo", "!", "how", "Are", "yoU", "?", "[UNK]"])
-
-    def test_wordpiece_tokenizer(self):
-        vocab_tokens = [
-            "[UNK]", "[CLS]", "[SEP]", "want", "##want", "##ed", "wa", "un",
-            "runn", "##ing"
-        ]
-
-        vocab = {}
-        for (i, token) in enumerate(vocab_tokens):
-            vocab[token] = i
-        tokenizer = WordpieceTokenizer(vocab=vocab, unk_token="[UNK]")
-
-        self.assertListEqual(tokenizer.tokenize(""), [])
-
-        self.assertListEqual(tokenizer.tokenize("unwanted running"),
-                             ["un", "##want", "##ed", "runn", "##ing"])
-
-        self.assertListEqual(tokenizer.tokenize("unwantedX running"),
-                             ["[UNK]", "runn", "##ing"])
-
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
@@ -177,7 +97,7 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
             [["[UNK]"], [], ["[UNK]"]])
 
-    # @slow
+    @slow
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained(
             "roformer-chinese-small")
