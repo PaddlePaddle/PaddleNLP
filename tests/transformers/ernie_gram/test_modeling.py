@@ -210,6 +210,7 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
+    @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 ErnieGramPretrainedModel.pretrained_init_configuration)[:1]:
@@ -219,8 +220,9 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
 
 class ErnieGramModelIntegrationTest(unittest.TestCase):
 
+    # @slow
     def test_inference_no_attention(self):
-        model = ErnieGramModel.from_pretrained("ernie-m-base")
+        model = ErnieGramModel.from_pretrained("ernie-gram-zh")
         model.eval()
         input_ids = paddle.to_tensor(
             [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
@@ -230,14 +232,16 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[-0.02920425, -0.00768885, -0.10219190],
-              [-0.10798159, 0.02311476, -0.17285497],
-              [0.05675533, 0.01330730, -0.06826267]]])
+            [[[-0.43569842, -1.50805628, -2.24448967],
+              [-0.12123521, -1.35024536, -1.76512492],
+              [-0.14853711, -1.13618660, -2.87098265]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
+    # @slow
     def test_inference_with_attention(self):
-        model = ErnieGramModel.from_pretrained("ernie-m-base")
+        model = ErnieGramModel.from_pretrained(
+            "ernie-gram-zh-finetuned-dureader-robust")
         model.eval()
         input_ids = paddle.to_tensor(
             [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
@@ -248,9 +252,9 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[-0.02920425, -0.00768885, -0.10219190],
-              [-0.10798159, 0.02311476, -0.17285497],
-              [0.05675533, 0.01330730, -0.06826267]]])
+            [[[0.37543082, -2.94639230, -2.04799986],
+              [0.14168003, -2.02873731, -2.34919119],
+              [0.70280838, -2.40280604, -1.93488157]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
