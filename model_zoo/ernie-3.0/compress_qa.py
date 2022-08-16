@@ -135,9 +135,6 @@ def main():
         post_process_function=post_processing_function,
         tokenizer=tokenizer)
 
-    if not os.path.exists(compression_args.output_dir):
-        os.makedirs(compression_args.output_dir)
-
     compression_args.print_config()
 
     trainer.compress()
