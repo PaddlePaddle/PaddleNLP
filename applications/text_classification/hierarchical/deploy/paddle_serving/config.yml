@@ -38,7 +38,7 @@ op:
             model_config: serving_server
 
             #Fetch结果列表，以client_config中fetch_var的alias_name为准
-            fetch_list: ["linear_147.tmp_1"]
+            fetch_list: ["linear_75.tmp_1"]
             
             # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
             device_type: 1
