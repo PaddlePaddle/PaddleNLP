@@ -17,12 +17,13 @@ limitations under the License. */
 
 #include "nlohmann/json.hpp"
 #include "pretokenizers/pretokenizer.h"
+#include "utils/utils.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct SequencePreTokenizer : public PreTokenizer {
+struct FASTERTOKENIZER_DECL SequencePreTokenizer : public PreTokenizer {
   SequencePreTokenizer() = default;
   SequencePreTokenizer(const SequencePreTokenizer&) = default;
   SequencePreTokenizer(const std::vector<PreTokenizer*>& pretokenizers);
