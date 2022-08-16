@@ -61,13 +61,12 @@ class ErnieGramTestModelConfig:
 class ErnieGramTestConfig(ErnieGramTestModelConfig):
     """all of ErnieGram Test configuration
     
-    TODO(wj-Mcat): can be intialized with `from_pretrained` style, and it's fixed at current
     """
     batch_size: int = 2
     seq_length: int = 7
 
     is_training: bool = False
-    use_position_ids: bool = True
+    use_token_type_ids: bool = True
     use_attention_mask: bool = True
 
     # used for sequence classification
@@ -97,30 +96,30 @@ class ErnieGramModelTester:
             attention_mask = random_attention_mask(
                 [config.batch_size, config.seq_length])
 
-        position_ids = None
-        if config.use_position_ids:
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=1)
-            position_ids = seq_length - ones
+        token_type_ids = None
+        if config.use_token_type_ids:
+            token_type_ids = paddle.zeros_like(input_ids)
 
-        return config.model_kwargs, input_ids, position_ids, attention_mask
+        return config.model_kwargs, input_ids, token_type_ids, attention_mask
 
     def prepare_config_and_inputs_for_common(self):
-        config, input_ids, position_ids, attention_mask = self.prepare_config_and_inputs(
+        config, input_ids, token_type_ids, attention_mask = self.prepare_config_and_inputs(
         )
         inputs_dict = {
             "input_ids": input_ids,
-            "position_ids": position_ids,
+            "token_type_ids": token_type_ids,
             "attention_mask": attention_mask,
         }
         return config, inputs_dict
 
     def create_and_check_model(self, config: Dict[str, Any], input_ids: Tensor,
-                               position_ids: Tensor, attention_mask: Tensor):
+                               token_type_ids: Tensor, attention_mask: Tensor):
         model = ErnieGramModel(**config)
         model.eval()
 
-        result = model(input_ids, position_ids, attention_mask)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       attention_mask=attention_mask)
         self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.hidden_size
@@ -130,21 +129,25 @@ class ErnieGramModelTester:
 
     def create_and_check_for_sequence_classification(self, config,
                                                      input_ids: Tensor,
-                                                     position_ids: Tensor,
+                                                     token_type_ids: Tensor,
                                                      attention_mask: Tensor):
         model = ErnieGramForSequenceClassification(
             ErnieGramModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result = model(input_ids, position_ids, attention_mask)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       attention_mask=attention_mask)
         self.parent.assertEqual(
             result.shape, [self.config.batch_size, self.config.num_classes])
 
     def create_and_check_for_question_answering(self, config, input_ids: Tensor,
-                                                position_ids: Tensor,
+                                                token_type_ids: Tensor,
                                                 attention_mask: Tensor):
         model = ErnieGramForQuestionAnswering(ErnieGramModel(**config))
         model.eval()
-        result = model(input_ids, position_ids, attention_mask)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       attention_mask=attention_mask)
         self.parent.assertEqual(result.shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.num_classes
@@ -152,12 +155,14 @@ class ErnieGramModelTester:
 
     def create_and_check_for_token_classification(self, config,
                                                   input_ids: Tensor,
-                                                  position_ids: Tensor,
+                                                  token_type_ids: Tensor,
                                                   attention_mask: Tensor):
         model = ErnieGramForTokenClassification(
             ErnieGramModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result = model(input_ids, position_ids, attention_mask)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       attention_mask=attention_mask)
         self.parent.assertEqual(result.shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.num_classes

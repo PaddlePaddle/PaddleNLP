@@ -72,31 +72,6 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
                              [9, 6, 7, 12, 10, 11])
 
-    def test_chinese(self):
-        tokenizer = ErnieGramTokenizer()
-
-        self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
-                             ["ah", "\u535A", "\u63A8", "zz"])
-
-    def test_wordpiece_tokenizer(self):
-        vocab_tokens = [
-            "[UNK]", "[CLS]", "[SEP]", "want", "##want", "##ed", "wa", "un",
-            "runn", "##ing"
-        ]
-
-        vocab = {}
-        for (i, token) in enumerate(vocab_tokens):
-            vocab[token] = i
-        tokenizer = WordpieceTokenizer(vocab=vocab, unk_token="[UNK]")
-
-        self.assertListEqual(tokenizer.tokenize(""), [])
-
-        self.assertListEqual(tokenizer.tokenize("unwanted running"),
-                             ["un", "##want", "##ed", "runn", "##ing"])
-
-        self.assertListEqual(tokenizer.tokenize("unwantedX running"),
-                             ["[UNK]", "runn", "##ing"])
-
     def test_offsets_mapping(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
@@ -144,33 +119,6 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     sum(tokens_with_offsets["special_tokens_mask"]),
                     added_tokens)
 
-    def test_is_whitespace(self):
-        self.assertTrue(_is_whitespace(" "))
-        self.assertTrue(_is_whitespace("\t"))
-        self.assertTrue(_is_whitespace("\r"))
-        self.assertTrue(_is_whitespace("\n"))
-        self.assertTrue(_is_whitespace("\u00A0"))
-
-        self.assertFalse(_is_whitespace("A"))
-        self.assertFalse(_is_whitespace("-"))
-
-    def test_is_control(self):
-        self.assertTrue(_is_control("\u0005"))
-
-        self.assertFalse(_is_control("A"))
-        self.assertFalse(_is_control(" "))
-        self.assertFalse(_is_control("\t"))
-        self.assertFalse(_is_control("\r"))
-
-    def test_is_punctuation(self):
-        self.assertTrue(_is_punctuation("-"))
-        self.assertTrue(_is_punctuation("$"))
-        self.assertTrue(_is_punctuation("`"))
-        self.assertTrue(_is_punctuation("."))
-
-        self.assertFalse(_is_punctuation("A"))
-        self.assertFalse(_is_punctuation(" "))
-
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
@@ -206,7 +154,7 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 tokenizer = self.tokenizer_class.from_pretrained(
                     pretrained_name, **kwargs)
 
-                sentence = f"北京的首都 {tokenizer.mask_token} 是北京"
+                sentence = f"中国的首都 {tokenizer.mask_token} 是北京"
                 tokens = tokenizer.encode(
                     sentence,
                     return_attention_mask=False,
@@ -217,8 +165,8 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
                 expected_results = [
                     ((0, 0), tokenizer.cls_token),
-                    ((0, 1), "北"),
-                    ((1, 2), "京"),
+                    ((0, 1), "中"),
+                    ((1, 2), "国"),
                     ((2, 3), "的"),
                     ((3, 4), "首"),
                     ((4, 5), "都"),
