@@ -2750,6 +2750,7 @@ class InferGptJDecoding(nn.Layer):
         logger.info("Converting model weights, it will cost a few seconds.....")
         permutation = None
         if transpose_qkv:
+            # GPTJ is different with CodeGen in attention project layer.
             local_dim = self.model.transformer.config['n_embd'] // 4
             base_permutation = [0, 3, 6, 9, 2, 5, 8, 11, 1, 4, 7, 10]
             permutation = paddle.concat([
