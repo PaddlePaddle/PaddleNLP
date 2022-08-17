@@ -47,18 +47,45 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return ErnieMTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
-        input_text = "UNwanted, running"
-        output_text = "unwanted, running"
+        input_text = "this is a test"
+        output_text = "this is a test"
         return input_text, output_text
 
-    def test_full_tokenizer(self):
-        tokenizer = self.get_tokenizer()
+    def test_convert_token_and_id(self):
+        """Test ``_convert_token_to_id`` and ``_convert_id_to_token``."""
+        token = "<unk>"
+        token_id = 0
 
-        tokens = tokenizer.tokenize("UNwanted, running")
-        self.assertListEqual(tokens,
-                             ['▁un', 'w', 'ant', 'ed', ',', '▁r', 'un', 'ning'])
+        self.assertEqual(self.get_tokenizer()._convert_token_to_id(token),
+                         token_id)
+        self.assertEqual(self.get_tokenizer()._convert_id_to_token(token_id),
+                         token)
+
+    def test_full_tokenizer(self):
+        tokenizer = ErnieMTokenizer.from_pretrained(self.tmpdirname)
+
+        tokens = tokenizer.tokenize("This is a test")
+        self.assertListEqual(tokens, ['▁this', '▁is', '▁a', '▁t', 'est'])
+
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [245, 946, 191, 15, 953, 83, 197, 745])
+                             [119, 97, 5, 3, 263])
+
+        tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
+        self.assertListEqual(tokens, [
+            'i', '▁was', '▁b', 'or', 'n', '▁in', '9', '2', '0', '0', '0', ',',
+            '▁and', '▁this', '▁is', '▁f', 'al', 's', 'é', '.'
+        ])
+        ids = tokenizer.convert_tokens_to_ids(tokens)
+        self.assertListEqual(ids, [
+            937, 52, 12, 27, 936, 39, 0, 998, 992, 992, 992, 953, 32, 119, 97,
+            20, 81, 939, 0, 951
+        ])
+
+        back_tokens = tokenizer.convert_ids_to_tokens(ids)
+        self.assertListEqual(back_tokens, [
+            'i', '▁was', '▁b', 'or', 'n', '▁in', '<unk>', '2', '0', '0', '0',
+            ',', '▁and', '▁this', '▁is', '▁f', 'al', 's', '<unk>', '.'
+        ])
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
