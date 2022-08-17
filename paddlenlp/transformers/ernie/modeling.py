@@ -83,10 +83,10 @@ class ErnieEmbeddings(nn.Layer):
                 inputs_embeds=None,
                 past_key_values_length=None):
         if input_ids is not None:
-            input_shape = input_ids.shape
+            input_shape = paddle.shape(input_ids)
             input_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = inputs_embeds.shape[:-1]
+            input_shape = paddle.shape(inputs_embeds)[:-1]
             input_embeddings = inputs_embeds
 
         if position_ids is None:
@@ -948,9 +948,9 @@ class ErnieModel(ErniePretrainedModel):
                 "You cannot specify both input_ids and inputs_embeds at the same time."
             )
         elif input_ids is not None:
-            input_shape = input_ids.shape
+            input_shape = paddle.shape(input_ids)
         elif inputs_embeds is not None:
-            input_shape = inputs_embeds.shape[:-1]
+            input_shape = paddle.shape(inputs_embeds)[:-1]
         else:
             raise ValueError(
                 "You have to specify either input_ids or inputs_embeds")
@@ -1554,7 +1554,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 masked_lm_loss = loss_fct(
                     prediction_scores.reshape(
-                        (-1, prediction_scores.shape[-1])),
+                        (-1, paddle.shape(prediction_scores)[-1])),
                     labels.reshape((-1, )))
                 next_sentence_loss = loss_fct(
                     seq_relationship_score.reshape((-1, 2)),
@@ -1743,7 +1743,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             loss_fct = paddle.nn.CrossEntropyLoss(
             )  # -100 index = padding token
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
+                prediction_scores.reshape(
+                    (-1, paddle.shape(prediction_scores)[-1])),
                 labels.reshape((-1, )))
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
