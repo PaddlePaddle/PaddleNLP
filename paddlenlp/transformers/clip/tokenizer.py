@@ -124,17 +124,24 @@ class CLIPTokenizer(GPTTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "openai/clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/openai/clip-vit-base-patch32/vocab.json",
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/vocab.json",
+            "openai/disco-diffusion-clip-vit-base-patch32":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/vocab.json",
         },
         "merges_file": {
             "openai/clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/openai/clip-vit-base-patch32/merges.txt",
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/merges.txt",
+            "openai/disco-diffusion-clip-vit-base-patch32":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/merges.txt",
         }
     }
     pretrained_init_configuration = {
         "openai/clip-vit-base-patch32": {
             "max_len": 77
-        }
+        },
+        "openai/disco-diffusion-clip-vit-base-patch32": {
+            "max_len": 77
+        },
     }
 
     def __init__(self,
@@ -332,3 +339,33 @@ class CLIPTokenizer(GPTTokenizer):
                                     errors=self.errors).replace("</w>",
                                                                 " ").strip()
         return text
+
+    def __call__(
+            self,
+            text,
+            text_pair=None,
+            max_length=None,
+            stride=0,
+            is_split_into_words=False,
+            padding=False,
+            truncation=False,
+            return_position_ids=False,
+            return_token_type_ids=False,  # don't return token_type_ids 
+            return_attention_mask=True,  # return attention_mask 
+            return_length=False,
+            return_overflowing_tokens=False,
+            return_special_tokens_mask=False,
+            return_dict=True,
+            return_offsets_mapping=False,
+            add_special_tokens=True,
+            pad_to_multiple_of=None,
+            return_tensors=None,
+            verbose: bool = True,
+            **kwargs):
+        return super().__call__(
+            text, text_pair, max_length, stride, is_split_into_words, padding,
+            truncation, return_position_ids, return_token_type_ids,
+            return_attention_mask, return_length, return_overflowing_tokens,
+            return_special_tokens_mask, return_dict, return_offsets_mapping,
+            add_special_tokens, pad_to_multiple_of, return_tensors, verbose,
+            **kwargs)
