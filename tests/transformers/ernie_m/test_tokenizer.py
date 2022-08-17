@@ -26,15 +26,14 @@ from paddlenlp.transformers.tokenizer_utils import _is_whitespace, _is_control, 
 from ...testing_utils import slow, get_tests_dir
 from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
-EN_SENTENCEPIECE = get_tests_dir("fixtures/sentencepiece.en.bpe.model")
-EN_VOCAB = get_tests_dir("fixtures/en.bpe.vocab.txt")
+EN_SENTENCEPIECE = get_tests_dir("fixtures/test_sentencepiece_bpe.model")
+EN_VOCAB = get_tests_dir("fixtures/test_sentencepiece_bpe.vocab.txt")
 
 
 class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieMTokenizer
     space_between_special_tokens = True
-    test_seq2seq = True
 
     def setUp(self):
         super().setUp()
@@ -49,18 +48,17 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def get_input_output_texts(self, tokenizer):
         input_text = "UNwanted, running"
-        output_text = "unwanted,running"
+        output_text = "unwanted, running"
         return input_text, output_text
 
     def test_full_tokenizer(self):
         tokenizer = self.get_tokenizer()
 
-        tokens = tokenizer.tokenize("UNwanted,running")
-        self.assertListEqual(
-            tokens,
-            ['un', 'wa', 'nt', 'e', 'd', ',', 'r', 'un', 'n', 'i', 'n', 'g'])
+        tokens = tokenizer.tokenize("UNwanted, running")
+        self.assertListEqual(tokens,
+                             ['▁un', 'w', 'ant', 'ed', ',', '▁r', 'un', 'ning'])
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [9, 5, 8, 23, 35, 27, 38, 9, 13, 37, 13, 36])
+                             [245, 946, 191, 15, 953, 83, 197, 745])
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
@@ -68,7 +66,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
         self.assertListEqual(
             [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
-            [['t', 'e', 's', 't'], ['\xad'], ['t', 'e', 's', 't']])
+            [['▁t', 'est'], ['\xad'], ['▁t', 'est']])
 
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("ernie-m-base")

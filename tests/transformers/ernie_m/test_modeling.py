@@ -37,12 +37,12 @@ class ErnieMTestModelConfig:
     attention_probs_dropout_prob: float = 0.1
     hidden_act: str = "gelu"
     hidden_dropout_prob: float = 0.1
-    hidden_size: int = 768
+    hidden_size: int = 48
     initializer_range: float = 0.02
-    max_position_embeddings: int = 514
-    num_attention_heads: int = 12
-    num_hidden_layers: int = 12
-    vocab_size: int = 250002
+    max_position_embeddings: int = 20
+    num_attention_heads: int = 16
+    num_hidden_layers: int = 3
+    vocab_size: int = 100
     pad_token_id: int = 1
 
     @property
