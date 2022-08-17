@@ -236,6 +236,7 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_multiple_choice(
             *config_and_inputs)
 
+    @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 ErnieMPretrainedModel.pretrained_init_configuration)[:1]:
@@ -245,6 +246,7 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
 
 class ErnieMModelIntegrationTest(unittest.TestCase):
 
+    @slow
     def test_inference_no_attention(self):
         model = ErnieMModel.from_pretrained("ernie-m-base")
         model.eval()
@@ -262,6 +264,7 @@ class ErnieMModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
+    @slow
     def test_inference_with_attention(self):
         model = ErnieMModel.from_pretrained("ernie-m-base")
         model.eval()
