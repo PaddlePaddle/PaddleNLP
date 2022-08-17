@@ -419,9 +419,4 @@ class RoFormerTokenizer(PretrainedTokenizer):
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
-        vocab.update(self.added_tokens_encoder)
-        return vocab
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)

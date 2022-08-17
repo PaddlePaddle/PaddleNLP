@@ -30,7 +30,6 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = RoFormerTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
-    test_seq2seq = True
 
     def setUp(self):
         self.from_pretrained_kwargs = {"do_lower_case": False}
