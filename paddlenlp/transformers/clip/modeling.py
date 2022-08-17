@@ -97,6 +97,8 @@ class CLIPPreTrainedModel(PretrainedModel):
             # vision
             "image_resolution": 224,
             "vision_layers": 12,
+            "vision_heads": 12,
+            "vision_mlp_radio": 4,
             "vision_embed_dim": 768,
             "vision_patch_size": 32,
             "vision_hidden_act": "quick_gelu",
@@ -117,6 +119,8 @@ class CLIPPreTrainedModel(PretrainedModel):
             # vision
             "image_resolution": 224,
             "vision_layers": 12,
+            "vision_heads": 12,
+            "vision_mlp_radio": 4,
             "vision_embed_dim": 768,
             "vision_patch_size": 32,
             "vision_hidden_act": "quick_gelu",
@@ -273,6 +277,7 @@ class VisionTransformer(CLIPPreTrainedModel):
                  layers: int,
                  heads: int,
                  activation: str,
+                 mlp_ratio: int,
                  normalize_before: bool = True):
         super().__init__()
         self.input_resolution = input_resolution
@@ -293,7 +298,7 @@ class VisionTransformer(CLIPPreTrainedModel):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=width,
             nhead=heads,
-            dim_feedforward=width * 4,
+            dim_feedforward=width * mlp_ratio,
             normalize_before=normalize_before,
             dropout=0,
             activation=activation,
@@ -452,12 +457,18 @@ class CLIPModel(CLIPPreTrainedModel):
         vision_layers (int, optional):
             Number of hidden layers in the vision model.
             Defaults to `12`.
+        vision_heads (int, optional):
+            Number of attention heads for each attention layer in the vision attention.
+            Defaults to `12`.
         vision_embed_dim (int, optional):
             Dimensionality of the embedding layer and encoder layers in vision model.
             Defaults to `768`.
         vision_patch_size(int, optional):
             The size (resolution) of each patch.
             Defaults to `32`.
+        vision_mlp_ratio(int, optional):
+            The ratio between dim_feedforward and vision_hidden_dim. `radio = dim_feedforward/vision_hidden_dim`
+            Defaults to `4`.
         vision_hidden_act (str, optional):
             The non-linear activation function of the ffn layer in the vision model.
             ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
@@ -472,7 +483,7 @@ class CLIPModel(CLIPPreTrainedModel):
             Dimensionality of the embedding layer and encoder layers in text model.
             Defaults to `768`.
         text_heads (int, optional):
-            Number of attention heads for each attention layer in the attention.
+            Number of attention heads for each attention layer in the text attention.
             Defaults to `8`.
         text_layers (int, optional):
             Number of hidden layers in the text model.
@@ -501,8 +512,10 @@ class CLIPModel(CLIPPreTrainedModel):
             # vision
             image_resolution: int = 224,
             vision_layers: int = 12,
+            vision_heads: int = 12,
             vision_embed_dim: int = 768,
             vision_patch_size: int = 32,
+            vision_mlp_ratio: int = 4,
             vision_hidden_act: str = "quick_gelu",
             # text
             max_text_length: int = 77,
@@ -525,13 +538,13 @@ class CLIPModel(CLIPPreTrainedModel):
         self.vision_layers = vision_layers
         self.text_layers = text_layers
 
-        vision_heads = vision_embed_dim // 64
         self.vision_model = VisionTransformer(input_resolution=image_resolution,
                                               patch_size=vision_patch_size,
                                               width=vision_embed_dim,
                                               layers=vision_layers,
                                               heads=vision_heads,
                                               activation=vision_hidden_act,
+                                              mlp_ratio=vision_mlp_ratio,
                                               normalize_before=True)
         self.vision_projection = paddle.create_parameter(
             (vision_embed_dim, projection_dim), paddle.get_default_dtype())
