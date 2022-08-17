@@ -1469,17 +1469,17 @@ void masked_multihead_attention_(const Masked_multihead_attention_params<T> &par
       mmha_launch_kernel<T, 128, 128>(params, stream);
       break;
     case 160:
-        mmha_launch_kernel<T, 160, 256>(params, stream);
-        break;
+      mmha_launch_kernel<T, 160, 256>(params, stream);
+      break;
     case 192:
-        mmha_launch_kernel<T, 192, 256>(params, stream);
-        break;
+      mmha_launch_kernel<T, 192, 256>(params, stream);
+      break;
     case 224:
-        mmha_launch_kernel<T, 224, 256>(params, stream);
-        break;
+      mmha_launch_kernel<T, 224, 256>(params, stream);
+      break;
     case 256: // GPTJ/CodeGen
-        mmha_launch_kernel<T, 256, 256>(params, stream);
-        break;
+      mmha_launch_kernel<T, 256, 256>(params, stream);
+      break;
     default:
       // assert(false);
       throw std::runtime_error("Unsupported model size.");

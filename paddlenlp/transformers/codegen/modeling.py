@@ -555,10 +555,6 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
             raise AttributeError(
                 "'forced_bos_token_id != None' is not supported yet in the faster version"
             )
-        if kwargs['min_length'] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
         self._faster_entry = FasterCodeGen(
             self,
             decoding_lib=decoding_lib,
