@@ -2676,18 +2676,13 @@ def convert_gptj_params(faster_model,
             if permutation is not None:
                 qkv = layer.attn.qkv_proj.weight.transpose([1, 0])
                 qkv = qkv[permutation].transpose([1, 0])
-                # Value and key are reversed, so can't return qkv
-                query, value, key = paddle.split(qkv, 3, axis=-1)
                 if fuse_qkv == 2:
-                    query = query.numpy()
-                    key = key.numpy()
-                    value = value.numpy()
+                    qkv = qkv.numpy()
                     del layer.attn.qkv_proj.weight
                     setattr(layer.attn.qkv_proj, "weight", dummy_tensor)
-                    w = paddle.to_tensor(
-                        np.concatenate([query, key, value], axis=-1))
+                    w = paddle.to_tensor(qkv)
                 else:
-                    w = paddle.concat([query, key, value], axis=-1)
+                    w = qkv
             else:
                 w = _convert_qkv(layer.attn.q_proj,
                                  layer.attn.k_proj,
@@ -2756,7 +2751,7 @@ class InferGptJDecoding(nn.Layer):
         permutation = None
         if transpose_qkv:
             local_dim = self.model.transformer.config['n_embd'] // 4
-            base_permutation = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11]
+            base_permutation = [0, 3, 6, 9, 2, 5, 8, 11, 1, 4, 7, 10]
             permutation = paddle.concat([
                 paddle.arange(i * local_dim, (i + 1) * local_dim)
                 for i in base_permutation
