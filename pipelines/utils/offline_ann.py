@@ -33,7 +33,7 @@ parser.add_argument('--port',
                     help='port of elastic search')
 
 parser.add_argument("--embedding_dim",
-                    default=384,
+                    default=312,
                     type=int,
                     help="The embedding_dim of index")
 
