@@ -37,4 +37,12 @@ class GPTJTokenizer(GPTTokenizer):
                  unk_token='<|endoftext|>',
                  eol_token='\u010a',
                  **kwargs):
-        super().__init__(vocab_file, merges_file)
+        super().__init__(vocab_file=vocab_file,
+                         merges_file=merges_file,
+                         errors=errors,
+                         max_len=max_len,
+                         pad_token=pad_token,
+                         eos_token=eos_token,
+                         unk_token=unk_token,
+                         eol_token=eol_token,
+                         **kwargs)

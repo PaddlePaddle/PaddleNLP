@@ -247,7 +247,7 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
         f.write(content)
 
 
-# @file_lock(os.path.join(PPNLP_HOME, "load_ext.lock"))
+@file_lock(os.path.join(PPNLP_HOME, "load_ext.lock"))
 def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     # TODO(guosheng): Need better way to resolve unsupported such as CPU. Currently,
     # raise NotImplementedError and skip `_jit_compile`. Otherwise, `_jit_compile`

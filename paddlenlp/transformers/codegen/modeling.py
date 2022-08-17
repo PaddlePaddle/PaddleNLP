@@ -291,7 +291,7 @@ class CodeGenPreTrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(
                     layer.weight,
-                    paddle.Tensor) and paddle.get_default_dtype == "float32":
+                    paddle.Tensor) and paddle.get_default_dtype() == "float32":
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,

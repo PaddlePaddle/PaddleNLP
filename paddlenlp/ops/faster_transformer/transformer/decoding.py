@@ -2583,7 +2583,8 @@ def convert_gptj_params(faster_model,
                         model,
                         fuse_qkv=1,
                         use_fp16=False,
-                        restore_data=False):
+                        restore_data=False,
+                        permutation=None):
     r"""
     Convert parameters included in Transformer layer  from original models 
     to the format of faster models.
@@ -2666,19 +2667,28 @@ def convert_gptj_params(faster_model,
         for i, layer in enumerate(module):
             if not ft_para_conf.is_load(i, num_layer):
                 continue
-            # fuse_qkv: 0 for nofuse, 1 for fuse,
-            # 2 for fuse and delete the unfused
-            if fuse_qkv == 0:
-                params["slf_q_weight"].append((layer.attn.q_proj, "weight", 1))
-                params["slf_k_weight"].append((layer.attn.k_proj, "weight", 1))
-                params["slf_v_weight"].append((layer.attn.v_proj, "weight", 1))
+            # TODO(guosheng): Tensor with size 0 might be failed in
+            # paddle develop, thus use tensor with size 1 instead
+            # temporarily. Besides, we use 2D tensor since jit log
+            # requires that on linear weight. While size 0 seems all
+            # right in jit.to_static/jit.save.
+            dummy_tensor = paddle.zeros([1, 1])
+            if permutation is not None:
+                qkv = layer.attn.qkv_proj.weight.transpose([1, 0])
+                qkv = qkv[permutation].transpose([1, 0])
+                # Value and key are reversed, so can't return qkv
+                query, value, key = paddle.split(qkv, 3, axis=-1)
+                if fuse_qkv == 2:
+                    query = query.numpy()
+                    key = key.numpy()
+                    value = value.numpy()
+                    del layer.attn.qkv_proj.weight
+                    setattr(layer.attn.qkv_proj, "weight", dummy_tensor)
+                    w = paddle.to_tensor(
+                        np.concatenate([query, key, value], axis=-1))
+                else:
+                    w = paddle.concat([query, key, value], axis=-1)
             else:
-                # TODO(guosheng): Tensor with size 0 might be failed in
-                # paddle develop, thus use tensor with size 1 instead
-                # temporarily. Besides, we use 2D tensor since jit log
-                # requires that on linear weight. While size 0 seems all
-                # right in jit.to_static/jit.save.
-                dummy_tensor = paddle.zeros([1, 1])
                 w = _convert_qkv(layer.attn.q_proj,
                                  layer.attn.k_proj,
                                  layer.attn.v_proj,
@@ -2686,25 +2696,16 @@ def convert_gptj_params(faster_model,
                                  use_numpy=fuse_qkv == 2,
                                  del_param=fuse_qkv == 2,
                                  dummy_tensor=dummy_tensor)
-                params["slf_q_weight"].append((w, False))
-                # NOTE: Use `params["slf_q_weight"][-1]` rather than `w`,
-                # since the appended tensor might be a new transfered tensor.
-                # Besides, to allow convert_params be called more than once,
-                # we find a attr name not existing to avoid overwriting the
-                # existing attr.
-                attr = "slf_q_weight_" + str(i)
-                while hasattr(faster_model, attr):
-                    attr += "_"
-                setattr(faster_model, attr, params["slf_q_weight"][-1])
-                for key in [
-                        f"slf_{m}_{n}" for m in ("k", "v") for n in ("weight", )
-                ]:
-                    params[key].append(
-                        (dummy_tensor, True if key.endswith("bias") else False))
-                    attr = key + "_" + str(i)
-                    while hasattr(faster_model, attr):
-                        attr += "_"
-                    setattr(faster_model, attr, params[key][-1])
+            params["slf_q_weight"].append((w, False))
+            # NOTE: Use `params["slf_q_weight"][-1]` rather than `w`,
+            # since the appended tensor might be a new transfered tensor.
+            # Besides, to allow convert_params be called more than once,
+            # we find a attr name not existing to avoid overwriting the
+            # existing attr.
+            attr = "slf_q_weight_" + str(i)
+            while hasattr(faster_model, attr):
+                attr += "_"
+            setattr(faster_model, attr, params["slf_q_weight"][-1])
 
             params["slf_out_weight"].append((layer.attn.out_proj, "weight", 0))
             params["slf_ln_weight"].append((layer.ln_1, "weight"))
@@ -2752,13 +2753,21 @@ class InferGptJDecoding(nn.Layer):
         self.num_layer = self.model.transformer.config['n_layer']
         self.rotary_embedding_dim = self.model.transformer.config['rotary_dim']
         logger.info("Converting model weights, it will cost a few seconds.....")
+        permutation = None
         if transpose_qkv:
-            self.transpose(model, self.model.transformer.config['n_embd'])
+            local_dim = self.model.transformer.config['n_embd'] // 4
+            base_permutation = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11]
+            permutation = paddle.concat([
+                paddle.arange(i * local_dim, (i + 1) * local_dim)
+                for i in base_permutation
+            ])
         params = convert_gptj_params(self,
                                      model.transformer.h,
                                      fuse_qkv=2,
                                      use_fp16=use_fp16_decoding,
-                                     restore_data=True)
+                                     restore_data=True,
+                                     permutation=permutation)
+
         params["word_emb"].append((self.model.transformer.wte, "weight"))
         params["decoder_ln_weight"].append(
             (self.model.transformer.ln_f, "weight"))
@@ -2771,38 +2780,6 @@ class InferGptJDecoding(nn.Layer):
         for k, v in params.items():
             setattr(self, k, v)
         logger.info("Already converted model weights.")
-
-    def transpose(self, model, n_embd):
-        local_dim = n_embd // 4
-        base_permutation = [0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11]
-        permutation = paddle.concat([
-            paddle.arange(i * local_dim, (i + 1) * local_dim)
-            for i in base_permutation
-        ])
-
-        for layer in model.transformer.h:
-            qkv_proj = layer.attn.qkv_proj.weight.transpose([1, 0])
-            new_qkv_proj = qkv_proj[permutation]
-            sections = qkv_proj.shape[0] // n_embd
-            query, value, key = paddle.split(new_qkv_proj.transpose([1, 0]),
-                                             sections,
-                                             axis=-1)
-            weight_attr = paddle.ParamAttr(
-                initializer=nn.initializer.Assign(query))
-            layer.attn.q_proj = nn.Linear(*query.shape,
-                                          weight_attr=weight_attr,
-                                          bias_attr=False)
-            weight_attr = paddle.ParamAttr(
-                initializer=nn.initializer.Assign(key))
-            layer.attn.k_proj = nn.Linear(*key.shape,
-                                          weight_attr=weight_attr,
-                                          bias_attr=False)
-            weight_attr = paddle.ParamAttr(
-                initializer=nn.initializer.Assign(value))
-            layer.attn.v_proj = nn.Linear(*value.shape,
-                                          weight_attr=weight_attr,
-                                          bias_attr=False)
-            delattr(layer.attn, "qkv_proj")
 
     def forward(self,
                 input_ids,
