@@ -37,7 +37,7 @@ usage = r"""
            text_summarization = Taskflow("text_summarization")
            text_summarization("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
            '''
-           ['\n    print("Hello world")']
+           
            '''
          """
 
@@ -60,6 +60,7 @@ class TextSummarizationTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+        paddle.set_device(kwargs.get("device", 'gpu'))
         self._batch_size = kwargs.get("batch_size", 1)
         self._output_scores = kwargs.get("output_scores", False)
         self._construct_tokenizer(model)
@@ -74,8 +75,9 @@ class TextSummarizationTask(Task):
         self._num_beams = kwargs.get("num_beams", 4)
         self._length_penalty = kwargs.get("length_penalty", 1.0)
         self._num_return_sequences = kwargs.get("num_return_sequences", 1)
-        self._repetition_penalty = kwargs.get("repetition_penalty", 1.1)
+        self._repetition_penalty = kwargs.get("repetition_penalty", 1)
         self._use_faster = kwargs.get("use_faster", False)
+        self._use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
 
     def _construct_model(self, model):
         """
@@ -205,9 +207,10 @@ class TextSummarizationTask(Task):
                 length_penalty=self._length_penalty,
                 num_return_sequences=self._num_return_sequences,
                 repetition_penalty=self._repetition_penalty,
-                use_faster=self._use_faster,
                 bos_token_id=self._tokenizer.cls_token_id,
-                eos_token_id=self._tokenizer.mask_token_id)
+                eos_token_id=self._tokenizer.mask_token_id,
+                use_faster=self._use_faster,
+                use_fp16_decoding=self._use_fp16_decoding)
             all_ids.extend(ids)
             all_scores.extend(scores)
         inputs['ids'] = all_ids

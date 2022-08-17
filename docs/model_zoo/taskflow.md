@@ -1399,6 +1399,7 @@ from paddlenlp import Taskflow
 #### 可配置参数说明
 * `model`：可选模型，默认为unimo-text-1.0，支持的模型支持的模型有["unimo-text-1.0", ]。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `device`：运行设备，默认为"gpu"。
 * `output_scores`：是否要输出解码得分，请默认为False。
 * `max_length`：生成代码的最大长度，默认为128。
 * `min_length`：生成代码的最小长度，默认为0。
@@ -1408,8 +1409,10 @@ from paddlenlp import Taskflow
 * `top_p`：解码参数top_p，默认为1.0。
 * `num_beams`：beam_search解码的beam size，默认为4。
 * `length_penalty`：解码长度控制值，默认为1.0。
-* `num_return_sequences`：解码返回对序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
-* `repetition_penalty`：解码重复惩罚值，默认为1.1。
+* `num_return_sequences`：解码返回序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1。
+* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为True。
 
 </div></details>
 
