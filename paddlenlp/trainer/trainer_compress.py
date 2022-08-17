@@ -406,8 +406,6 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 tic_train = time.time()
 
             if global_step % self.args.save_steps == 0:
-                # tic_eval = time.time()
-                # logger.info("eval done total: %s s" % (time.time() - tic_eval))
                 for idx, width_mult in enumerate(self.args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)
@@ -556,14 +554,39 @@ def auto_model_forward(self,
                        position_ids=None,
                        attention_mask=[None, None],
                        task_type_ids=None,
+                       past_key_values=None,
+                       inputs_embeds=None,
+                       use_cache=None,
                        output_hidden_states=False,
                        output_attentions=False,
                        return_dict=False):
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
+
+    if input_ids is not None and inputs_embeds is not None:
+        raise ValueError(
+            "You cannot specify both input_ids and inputs_embeds at the same time."
+        )
+    elif input_ids is not None:
+        input_shape = input_ids.shape
+    elif inputs_embeds is not None:
+        input_shape = inputs_embeds.shape[:-1]
+    else:
+        raise ValueError(
+            "You have to specify either input_ids or inputs_embeds")
+
+    past_key_values_length = None
+    if past_key_values is not None:
+        past_key_values_length = past_key_values[0][0].shape[2]
+
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
+        if past_key_values is not None:
+            batch_size = past_key_values[0][0].shape[0]
+            past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length],
+                                     dtype=attention_mask.dtype)
+            attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
     elif isinstance(attention_mask, paddle.Tensor) and attention_mask.ndim == 2:
         attention_mask = paddle.unsqueeze(attention_mask,
                                           axis=[1, 2]).astype(wtype)
@@ -571,17 +594,27 @@ def auto_model_forward(self,
     elif attention_mask[0] is None:
         attention_mask[0] = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
+
     if "use_task_id" in self.config:
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids,
-                                           task_type_ids=task_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            task_type_ids=task_type_ids,
+            inputs_embeds=inputs_embeds,
+            past_key_values_length=past_key_values_length)
     else:
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
+            past_key_values_length=past_key_values_length)
+
+    self.encoder._use_cache = use_cache  # To be consistent with HF
     encoder_outputs = self.encoder(embedding_output,
                                    src_mask=attention_mask,
+                                   cache=past_key_values,
                                    output_attentions=output_attentions,
                                    output_hidden_states=output_hidden_states,
                                    return_dict=return_dict)
@@ -594,6 +627,7 @@ def auto_model_forward(self,
         pooled_output = self.pooler(sequence_output)
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
+
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
