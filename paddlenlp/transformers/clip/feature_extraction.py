@@ -49,9 +49,9 @@ class CLIPFeatureExtractor(ImageFeatureExtractionMixin):
             Desired output size when applying center-cropping. Only has an effect if `do_center_crop` is set to `True`.
         do_normalize (`bool`, *optional*, defaults to `True`):
             Whether or not to normalize the input with `image_mean` and `image_std`.
-        image_mean (`List[int]`, defaults to `[0.485, 0.456, 0.406]`):
+        image_mean (`List[int]`, defaults to `[0.48145466, 0.4578275, 0.40821073]`):
             The sequence of means for each channel, to be used when normalizing images.
-        image_std (`List[int]`, defaults to `[0.229, 0.224, 0.225]`):
+        image_std (`List[int]`, defaults to `[0.26862954, 0.26130258, 0.27577711]`):
             The sequence of standard deviations for each channel, to be used when normalizing images.
         convert_rgb (`bool`, defaults to `True`):
             Whether or not to convert `PIL.Image.Image` into `RGB` format
