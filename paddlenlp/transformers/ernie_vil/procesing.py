@@ -13,25 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Image/Text processor class for ErnieViL2
+Image/Text processor class for ErnieViL
 """
 
 from ..tokenizer_utils_base import BatchEncoding
-from .tokenizer import ErnieViL2Tokenizer
-from .feature_extraction import ErnieViL2FeatureExtractor
+from .tokenizer import ErnieViLTokenizer
+from .feature_extraction import ErnieViLFeatureExtractor
 
-__all__ = ["ErnieViL2Processor"]
+__all__ = ["ErnieViLProcessor"]
 
 
-class ErnieViL2Processor(object):
+class ErnieViLProcessor(object):
     r"""
-    Constructs a ErnieViL2 processor which wraps a ErnieViL2 feature extractor and a ErnieViL2 tokenizer into a single processor.
-    [`ErnieViL2Processor`] offers all the functionalities of [`ErnieViL2FeatureExtractor`] and [`ErnieViL2Tokenizer`]. See the
-    [`ErnieViL2Processor.__call__`] and [`ErnieViL2Processor.decode`] for more information.
+    Constructs a ErnieViL processor which wraps a ErnieViL feature extractor and a ErnieViL tokenizer into a single processor.
+    [`ErnieViLProcessor`] offers all the functionalities of [`ErnieViLFeatureExtractor`] and [`ErnieViLTokenizer`]. See the
+    [`ErnieViLProcessor.__call__`] and [`ErnieViLProcessor.decode`] for more information.
     Args:
-        feature_extractor ([`ErnieViL2FeatureExtractor`]):
+        feature_extractor ([`ErnieViLFeatureExtractor`]):
             The feature extractor is a required input.
-        tokenizer ([`ErnieViL2Tokenizer`]):
+        tokenizer ([`ErnieViLTokenizer`]):
             The tokenizer is a required input.
     """
 
@@ -43,9 +43,9 @@ class ErnieViL2Processor(object):
     def __call__(self, text=None, images=None, return_tensors=None, **kwargs):
         """
         Main method to prepare for the model one or several sequences(s) and image(s). This method forwards the `text`
-        and `kwargs` arguments to ErnieViL2Tokenizer's [`ErnieViL2Tokenizer.__call__`] if `text` is not `None` to encode
+        and `kwargs` arguments to ErnieViLTokenizer's [`ErnieViLTokenizer.__call__`] if `text` is not `None` to encode
         the text. To prepare the image(s), this method forwards the `images` and `kwrags` arguments to
-        ErnieViL2FeatureExtractor's [`ErnieViL2FeatureExtractor.__call__`] if `images` is not `None`. Please refer to the
+        ErnieViLFeatureExtractor's [`ErnieViLFeatureExtractor.__call__`] if `images` is not `None`. Please refer to the
         doctsring of the above two methods for more information.
         Args:
             text (`str`, `List[str]`, `List[List[str]]`):
@@ -94,14 +94,14 @@ class ErnieViL2Processor(object):
 
     def batch_decode(self, *args, **kwargs):
         """
-        This method forwards all its arguments to ErnieViL2Tokenizer's [`~PreTrainedTokenizer.batch_decode`]. Please
+        This method forwards all its arguments to ErnieViLTokenizer's [`~PreTrainedTokenizer.batch_decode`]. Please
         refer to the docstring of this method for more information.
         """
         return self.tokenizer.batch_decode(*args, **kwargs)
 
     def decode(self, *args, **kwargs):
         """
-        This method forwards all its arguments to ErnieViL2Tokenizer's [`~PreTrainedTokenizer.decode`]. Please refer to
+        This method forwards all its arguments to ErnieViLTokenizer's [`~PreTrainedTokenizer.decode`]. Please refer to
         the docstring of this method for more information.
         """
         return self.tokenizer.decode(*args, **kwargs)
@@ -109,9 +109,9 @@ class ErnieViL2Processor(object):
     # TODO junnyu find a better way from_pretrained and save_pretrained
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        tokenizer = ErnieViL2Tokenizer.from_pretrained(
+        tokenizer = ErnieViLTokenizer.from_pretrained(
             pretrained_model_name_or_path, *args, **kwargs)
-        feature_extractor = ErnieViL2FeatureExtractor()
+        feature_extractor = ErnieViLFeatureExtractor()
         return cls(feature_extractor, tokenizer)
 
     def save_pretrained(self, save_directory, filename_prefix=None, **kwargs):

@@ -27,9 +27,9 @@ from ..guided_diffusion_utils.diffusion_utils import DiffusionMixin
 from ..guided_diffusion_utils.model_diffusion import create_gaussian_diffusion, create_unet_model, create_secondary_model
 
 __all__ = [
-    'ErnieViL2PModel',
-    'ErnieViL2PreTrainedModel',
-    'ErnieViL2ForImageGeneration',
+    'ErnieViLModel',
+    'ErnieViLPreTrainedModel',
+    'ErnieViLForImageGeneration',
 ]
 
 
@@ -44,7 +44,7 @@ INF = float("-inf")  # -1e4 -1e9
 
 
 @dataclass
-class ErnieViL2Output(ModelOutput):
+class ErnieViLOutput(ModelOutput):
     """
     Args:
         loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `return_loss` is `True`):
@@ -80,9 +80,9 @@ class ErnieViL2Output(ModelOutput):
             for k in self.keys())
 
 
-class ErnieViL2PreTrainedModel(PretrainedModel):
+class ErnieViLPreTrainedModel(PretrainedModel):
     """
-    An abstract class for pretrained ErnieViL2 models. It provides ErnieViL2 related
+    An abstract class for pretrained ErnieViL models. It provides ErnieViL related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
@@ -91,7 +91,34 @@ class ErnieViL2PreTrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
-        "ernie_vit_b_16x": {
+        "ernie_vil-2.0-base-zh": {
+            "image_resolution": 224,
+            "vision_layers": 12,
+            "vision_heads": 12,
+            "vision_embed_dim": 768,
+            "vision_patch_size": 16,
+            "vision_mlp_ratio": 4,
+            "vision_hidden_act": "quick_gelu",
+            "vision_epsilon": 1e-6,
+            "vocab_size": 40000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "max_position_embeddings": 2048,
+            "type_vocab_size": 4,
+            "task_type_vocab_size": 3,
+            "hidden_act": "gelu",
+            "task_id": 0,
+            "use_task_id": False,
+            "use_token_type_id": False,
+            "text_epsilon": 1e-5,
+            "initializer_range": 0.02,
+            "pad_token_id": 0
+        },
+        "disco_diffusion_ernie_vil-2.0-base-zh": {
             "image_resolution": 224,
             "vision_layers": 12,
             "vision_heads": 12,
@@ -120,8 +147,15 @@ class ErnieViL2PreTrainedModel(PretrainedModel):
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {"model_state": {"ernie_vit_b_16x": {}}}
-    base_model_prefix = "ernie_vil2"
+    pretrained_resource_files_map = {
+        "model_state": {
+            "ernie_vil-2.0-base-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/ernie_vil-2.0-base-zh/model_state.pdparams",
+            "disco_diffusion_ernie_vil-2.0-base-zh":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/disco_diffusion_ernie_vil-2.0-base-zh/model_state.pdparams",
+        }
+    }
+    base_model_prefix = "ernie_vil"
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -131,7 +165,7 @@ class ErnieViL2PreTrainedModel(PretrainedModel):
                 if isinstance(sub_layer, nn.LayerNorm):
                     sub_layer._epsilon = self.vision_epsilon if hasattr(
                         self, "vision_epsilon"
-                    ) else self.ernie_vil2.config["vision_epsilon"]
+                    ) else self.ernie_vil.config["vision_epsilon"]
 
         elif isinstance(layer, ErnieModel):
             # find nn.LayerNorm
@@ -139,7 +173,7 @@ class ErnieViL2PreTrainedModel(PretrainedModel):
                 if isinstance(sub_layer, nn.LayerNorm):
                     sub_layer._epsilon = self.text_epsilon if hasattr(
                         self, "text_epsilon"
-                    ) else self.ernie_vil22.config["text_epsilon"]
+                    ) else self.ernie_vil.config["text_epsilon"]
                 elif isinstance(layer, (nn.Linear, nn.Embedding)):
                     if isinstance(layer.weight, paddle.Tensor):
                         layer.weight.set_value(
@@ -147,14 +181,14 @@ class ErnieViL2PreTrainedModel(PretrainedModel):
                                 mean=0.0,
                                 std=self.initializer_range if hasattr(
                                     self, "initializer_range") else
-                                self.ernie_vil22.config["initializer_range"],
+                                self.ernie_vil.config["initializer_range"],
                                 shape=layer.weight.shape))
 
 
 @register_base_model
-class ErnieViL2Model(ErnieViL2PreTrainedModel):
+class ErnieViLModel(ErnieViLPreTrainedModel):
     r"""
-    The bare ErnieViL2 Model outputting logits_per_image and logits_per_text.
+    The bare ErnieViL Model outputting logits_per_image and logits_per_text.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
@@ -168,7 +202,7 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
             Number of hidden layers in the vision model.
             Defaults to `12`.
         vision_heads (int, optional):
-            Number of attention heads for each attention layer in the VisionTransformer.
+            Number of attention heads for each attention layer in the vision model.
             Defaults to `12`.
         vision_embed_dim (int, optional):
             Dimensionality of the embedding layer and encoder layers in vision model.
@@ -298,7 +332,7 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
             use_task_id=use_task_id,
             use_token_type_id=use_token_type_id)
 
-        self.temperature_b = self.create_parameter(
+        self.temperature = self.create_parameter(
             shape=(1, ),
             default_initializer=nn.initializer.Constant(2.65926),
             dtype=paddle.get_default_dtype())
@@ -320,10 +354,10 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
         
                 import requests
                 from PIL import Image
-                from paddlenlp.transformers import ErnieViL2Processor, ErnieViL2Model
+                from paddlenlp.transformers import ErnieViLProcessor, ErnieViLModel
                 
-                model = ErnieViL2Model.from_pretrained("openai/clip-vit-base-patch32")
-                processor = ErnieViL2Processor.from_pretrained("openai/clip-vit-base-patch32")
+                model = ErnieViLModel.from_pretrained("ernie_vil-2.0-base-zh")
+                processor = ErnieViLProcessor.from_pretrained("ernie_vil-2.0-base-zh")
                 
                 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
                 image = Image.open(requests.get(url, stream=True).raw)
@@ -358,10 +392,10 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
         Example:
             .. code-block::
 
-                from paddlenlp.transformers import ErnieViL2Model, ErnieViL2Tokenizer
+                from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
                 
-                model = ErnieViL2Model.from_pretrained("openai/clip-vit-base-patch32")
-                tokenizer = ErnieViL2Tokenizer.from_pretrained("openai/clip-vit-base-patch32")
+                model = ErnieViLModel.from_pretrained("ernie_vil-2.0-base-zh")
+                tokenizer = ErnieViLTokenizer.from_pretrained("ernie_vil-2.0-base-zh")
                 
                 inputs = tokenizer(["一只猫的照片", "一条狗的照片"], padding=True, return_tensors="pd")
                 text_features = model.get_text_features(**inputs)
@@ -391,7 +425,7 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
                 output_hidden_states=False,
                 return_dict=False):
         r'''
-        The ErnieViL2Model forward method, overrides the `__call__()` special method.
+        The ErnieViLModel forward method, overrides the `__call__()` special method.
         
         Args:
             input_ids (Tensor):
@@ -435,12 +469,12 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
                 Whether to return the attentions tensors of all attention layers.
                 Defaults to `False`.
             return_dict (bool, optional):
-                Whether to return a :class:`ErnieViL2Output` object. If `False`, the output
+                Whether to return a :class:`ErnieViLOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `False`.
                                  
         Returns:
-            An instance of :class:`ErnieViL2Output` if `return_dict=True`. Otherwise it returns a tuple of tensors 
-            corresponding to ordered and not None (depending on the input arguments) fields of :class:`ErnieViL2Output`.
+            An instance of :class:`ErnieViLOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors 
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`ErnieViLOutput`.
             
         Example:
             .. code-block::
@@ -448,10 +482,10 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
                 import requests
                 import paddle.nn.functional as F
                 from PIL import Image
-                from paddlenlp.transformers import ErnieViL2Model, ErnieViL2Processor
+                from paddlenlp.transformers import ErnieViLModel, ErnieViLProcessor
                 
-                processor = ErnieViL2Processor.from_pretrained('openai/clip-vit-base-patch32')
-                model = ErnieViL2Model.from_pretrained('openai/clip-vit-base-patch32')
+                processor = ErnieViLProcessor.from_pretrained('ernie_vil-2.0-base-zh')
+                model = ErnieViLModel.from_pretrained('ernie_vil-2.0-base-zh')
                 
                 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
                 image = Image.open(requests.get(url, stream=True).raw)
@@ -501,15 +535,15 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
             text_embeds = paddle.concat(x=feature_list_txt, axis=0)
 
         # cosine similarity as logits
-        logit_scale = self.temperature_b.exp()
+        logit_scale = self.temperature.exp()
 
         logits_per_text = paddle.matmul(text_embeds * logit_scale,
                                         image_embeds,
                                         transpose_y=True)
         logits_per_image = logits_per_text.t()
 
-        # clip temperature_b
-        self.temperature_b.clip(-100.0, 100.0)
+        # clip temperature
+        self.temperature.clip(-100.0, 100.0)
 
         loss = None
 
@@ -521,7 +555,7 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
                       image_embeds, text_outputs, vision_outputs)
             return ((loss, ) + output) if loss is not None else output
 
-        return ErnieViL2Output(
+        return ErnieViLOutput(
             loss=loss,
             logits_per_image=logits_per_image,
             logits_per_text=logits_per_text,
@@ -532,17 +566,17 @@ class ErnieViL2Model(ErnieViL2PreTrainedModel):
         )
 
 
-class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
+class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
     r"""
-    ErnieViL2Model with diffusion model on top.
+    ErnieViLModel with diffusion model on top.
     Args:
-        ernie_vil2 (:class:`ErnieViL2Model`):
-            An instance of ErnieViL2Model.
+        ernie_vil (:class:`ErnieViLModel`):
+            An instance of ErnieViLModel.
     """
 
-    def __init__(self, ernie_vil2):
+    def __init__(self, ernie_vil):
         super().__init__()
-        self.ernie_vil2 = ernie_vil2
+        self.ernie_vil = ernie_vil
         self.unet_model = create_unet_model(
             image_size=512,
             num_channels=256,
@@ -572,7 +606,7 @@ class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
         attention_mask=None,
         position_ids=None,
         init_image=None,
-        output_dir='disco_diffusion_ernie_vil2_vitb16/',
+        output_dir='disco_diffusion_ernie_vil-2.0-base-zh/',
         width_height=[1280, 768],
         skip_steps=10,
         steps=250,
@@ -600,15 +634,15 @@ class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
         clip_denoised=False,
     ):
         r"""
-        The ErnieViL2ForImageGeneration generate method.
+        The ErnieViLForImageGeneration generate method.
         
         Args:
             input_ids (Tensor):
-                See :class:`ErnieViL2Model`.
+                See :class:`ErnieViLModel`.
             attention_mask (Tensor, optional):
-                See :class:`ErnieViL2Model`.
+                See :class:`ErnieViLModel`.
             position_ids (Tensor, optional):
-                See :class:`ErnieViL2Model`.
+                See :class:`ErnieViLModel`.
             init_image (Path, optional): 
                 Recall that in the image sequence above, the first image shown is just noise.  If an init_image 
                 is provided, diffusion will replace the noise with the init_image as its starting state.  To use 
@@ -618,10 +652,10 @@ class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
                 Default to `None`.
             output_dir (Path, optional):
                 Output directory.
-                Default to `disco_diffusion_ernie_vil2_vitb16/`.
+                Default to `disco_diffusion_ernie_vil-2.0-base-zh/`.
             width_height (List[int, int], optional): 
                 Desired final image size, in pixels. You can have a square, wide, or tall image, but each edge 
-                length should be set to a multiple of 64px, and a minimum of 512px on the default ErnieViL2 model setting.  
+                length should be set to a multiple of 64px, and a minimum of 512px on the default ErnieViL model setting.  
                 If you forget to use multiples of 64px in your dimensions, DD will adjust the dimensions of your 
                 image to make it so.
                 Default to `[1280, 768]`.
@@ -634,7 +668,7 @@ class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
                 skipped without affecting the final image. You can experiment with this as a way to cut render times.
                 If you skip too many steps, however, the remaining noise may not be high enough to generate new content, 
                 and thus may not have time left to finish an image satisfactorily.Also, depending on your other settings, 
-                you may need to skip steps to prevent ErnieViL2 from overshooting your goal, resulting in blown out colors 
+                you may need to skip steps to prevent ErnieViL from overshooting your goal, resulting in blown out colors 
                 (hyper saturated, solid white, or solid black regions) or otherwise poor image quality.  Consider that 
                 the denoising process is at its strongest in the early steps, so skipping steps can sometimes mitigate 
                 other problems.Lastly, if using an init_image, you will need to skip ~50% of the diffusion steps to retain 
@@ -662,12 +696,12 @@ class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
                 with some details.
                 Default to `1`.
             init_scale (int, optional): 
-                This controls how strongly ErnieViL2 will try to match the init_image provided.  This is balanced against the 
+                This controls how strongly ErnieViL will try to match the init_image provided.  This is balanced against the 
                 clip_guidance_scale (CGS) above.  Too much init scale, and the image won't change much during diffusion. 
                 Too much CGS and the init image will be lost.
                 Default to `1000`.
             clip_guidance_scale (int, optional): 
-                CGS is one of the most important parameters you will use. It tells DD how strongly you want ErnieViL2 to move 
+                CGS is one of the most important parameters you will use. It tells DD how strongly you want ErnieViL to move 
                 toward your prompt each timestep.  Higher is generally better, but if CGS is too strong it will overshoot 
                 the goal and distort the image. So a happy medium is needed, and it takes experience to learn how to adjust 
                 CGS. Note that this parameter generally scales with image dimensions. In other words, if you increase your 
@@ -787,12 +821,12 @@ class ErnieViL2ForImageGeneration(ErnieViL2PreTrainedModel, DiffusionMixin):
         Example:
             .. code-block::
             
-            from paddlenlp.transformers import ErnieViL2ForImageGeneration, ErnieViL2Tokenizer
+            from paddlenlp.transformers import ErnieViLForImageGeneration, ErnieViLTokenizer
 
             # Initialize the model and tokenizer
-            model_name_or_path = 'openai/disco-diffusion-clip-vit-base-patch32'
-            model = ErnieViL2ForImageGeneration.from_pretrained(model_name_or_path)
-            tokenizer = ErnieViL2Tokenizer.from_pretrained(model_name_or_path)
+            model_name_or_path = 'disco_diffusion_ernie_vil-2.0-base-zh'
+            model = ErnieViLForImageGeneration.from_pretrained(model_name_or_path)
+            tokenizer = ErnieViLTokenizer.from_pretrained(model_name_or_path)
             model.eval()
 
             # Prepare the model inputs.

@@ -121,9 +121,9 @@ from .artist.modeling import *
 from .artist.tokenizer import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
-from .ernie_vil2.modeling import *
-from .ernie_vil2.tokenizer import *
-from .ernie_vil2.procesing import *
+from .ernie_vil.modeling import *
+from .ernie_vil.tokenizer import *
+from .ernie_vil.procesing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_faster_tokenizer_available

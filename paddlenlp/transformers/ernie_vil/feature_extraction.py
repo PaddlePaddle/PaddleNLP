@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Feature extractor class for ErnieViL2."""
+"""Feature extractor class for ErnieViL."""
 
 from typing import List, Optional, Union
 
@@ -25,12 +25,12 @@ from ..feature_extraction_utils import BatchFeature
 from ..tokenizer_utils_base import TensorType
 from ..image_utils import ImageFeatureExtractionMixin
 
-__all__ = ["ErnieViL2FeatureExtractor"]
+__all__ = ["ErnieViLFeatureExtractor"]
 
 
-class ErnieViL2FeatureExtractor(ImageFeatureExtractionMixin):
+class ErnieViLFeatureExtractor(ImageFeatureExtractionMixin):
     r"""
-    Constructs a ErnieViL2 feature extractor.
+    Constructs a ErnieViL feature extractor.
     This feature extractor inherits from [`ImageFeatureExtractionMixin`] which contains most of the main methods. Users
     should refer to this superclass for more information regarding those methods.
     Args:
