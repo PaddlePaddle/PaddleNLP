@@ -83,10 +83,10 @@ class ErnieEmbeddings(nn.Layer):
                 inputs_embeds=None,
                 past_key_values_length=None):
         if input_ids is not None:
-            input_shape = input_ids.shape
+            input_shape = paddle.shape(input_ids)
             input_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = inputs_embeds.shape[:-1]
+            input_shape = paddle.shape(inputs_embeds)[:-1]
             input_embeddings = inputs_embeds
 
         if position_ids is None:
