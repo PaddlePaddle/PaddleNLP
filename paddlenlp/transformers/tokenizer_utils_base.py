@@ -2797,7 +2797,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             text_pair = kwargs.pop('text_pair')
 
             token_offset_mapping = self.get_offset_mapping(text)
-            token_pair_offset_mapping = self.get_offset_mapping(text_pair)
+            token_pair_offset_mapping = self.get_offset_mapping(
+                text_pair) if text_pair is not None else None
             if max_length and total_len > max_length:
                 token_offset_mapping, token_pair_offset_mapping, _ = self.truncate_sequences(
                     token_offset_mapping,
