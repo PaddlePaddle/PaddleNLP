@@ -37,7 +37,6 @@ from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
 from .information_extraction import UIETask
 from .code_generation import CodeGenerationTask
-from .semantic_matching import SemanticMatchingTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -192,6 +191,10 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-simbert-base-chinese"
             },
+            "rocketqa-zh-dureader-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'rocketqa-zh-dureader-cross-encoder',
+            },
         },
         "default": {
             "model": "simbert-base-chinese"
@@ -318,17 +321,6 @@ TASKS = {
         },
         "default": {
             "model": "Salesforce/codegen-350M-mono",
-        }
-    },
-    'semantic_matching': {
-        "models": {
-            "rocketqa-zh-dureader-cross-encoder": {
-                "task_class": SemanticMatchingTask,
-                "task_flag": 'semantic_matching-cross-encoder',
-            }
-        },
-        "default": {
-            "model": "rocketqa-zh-dureader-cross-encoder"
         }
     }
 }

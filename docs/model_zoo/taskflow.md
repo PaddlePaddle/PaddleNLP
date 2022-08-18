@@ -35,14 +35,12 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [信息抽取](#信息抽取)           | `Taskflow("information_extraction")`| ✅        | ✅        | ✅        | ✅         | ✅          | 适配多场景的开放域通用信息抽取工具                     |
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`     | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
-| [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百度知道2200万对相似句组训练                       |
+| [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果|
 | [情感倾向分析](#情感倾向分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 基于情感知识增强预训练模型SKEP达到业界SOTA             |
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
-| [语义匹配](#语义匹配)          | `Taskflow("semantic_matching")`        | ✅        | ✅        | ✅        |            |            | RocketQA排序模型 |
-
 
 ## QuickStart
 
@@ -1156,23 +1154,23 @@ from paddlenlp import Taskflow
 </div></details>
 
 ### 文本相似度
-<details><summary>&emsp;基于百度知道2200万对相似句组训练SimBERT达到前沿文本相似效果</summary><div>
+<details><summary>&emsp;基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果</summary><div>
 
 #### 单条输入
 
 ```python
 >>> from paddlenlp import Taskflow
->>> similarity = Taskflow("text_similarity")
+>>> similarity = Taskflow("text_similarity",model="rocketqa-zh-dureader-cross-encoder")
 >>> similarity([["春天适合种什么花？", "春天适合种什么菜？"]])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.8340253}]
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866087343543768}]
 ```
 
 #### 批量样本输入，平均速度更快
 
 ```python
 >>> from paddlenlp import Taskflow
->>> similarity([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"]])
-[{'text1': '光眼睛大就好看吗', 'text2': '眼睛好看吗？', 'similarity': 0.74502707}, {'text1': '小蝌蚪找妈妈怎么样', 'text2': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
+>>> text_similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866101313382387}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'scores': 0.7051035761833191}]
 ```
 
 #### 可配置参数说明
@@ -1323,32 +1321,6 @@ from paddlenlp import Taskflow
 * `length_penalty`：解码长度控制值，默认为1.0。
 * `repetition_penalty`：解码重复惩罚值，默认为1.1。
 * `output_scores`：是否要输出解码得分，请默认为False。
-</div></details>
-
-### 文本语义相似度
-<details><summary>&emsp;基于业界领先的RocketQA中文排序模型的语义相似度计算</summary><div>
-
-#### 单条输入
-
-```python
->>> from paddlenlp import Taskflow
->>> semantic_match = Taskflow("semantic_matching", model="rocketqa-zh-dureader-cross-encoder")
->>> similarity([["春天适合种什么花？", "春天适合种什么菜？"]])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866087343543768}]
-```
-
-#### 批量样本输入，平均速度更快
-
-```python
->>> from paddlenlp import Taskflow
->>> semantic_match([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866101313382387}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'scores': 0.7051035761833191}]
-```
-
-#### 可配置参数说明
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `max_seq_len`：最大序列长度，默认为384。
-* `task_path`：自定义任务路径，默认为None。
 </div></details>
 
 ## PART Ⅱ &emsp; 定制化训练
