@@ -27,20 +27,24 @@ from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece.model")
 
 
-class XLNetTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
-
+class XLNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = XLNetTokenizer
+    from_pretrained_vocab_key = "vocab_file"
     test_sentencepiece = True
-    from_pretrained_vocab_key = "sentencepiece_model_file"
+    test_sentencepiece_ignore_case = False
     test_offsets = False
 
     def setUp(self):
         super().setUp()
 
         # We have a SentencePiece fixture for testing
-        tokenizer = XLNetTokenizer(SAMPLE_VOCAB, keep_accents=True)
-        tokenizer.sanitize_special_tokens()
+        tokenizer = XLNetTokenizer(SAMPLE_VOCAB)
         tokenizer.save_pretrained(self.tmpdirname)
+
+    def get_input_output_texts(self, tokenizer):
+        input_text = "this is a test"
+        output_text = "this is a test"
+        return input_text, output_text
 
     def test_convert_token_and_id(self):
         """Test ``_convert_token_to_id`` and ``_convert_id_to_token``."""
@@ -61,7 +65,7 @@ class XLNetTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertEqual(len(vocab_keys), 1_006)
 
     def test_vocab_size(self):
-        self.assertEqual(self.get_tokenizer().vocab_size, 1_000)
+        self.assertEqual(self.get_tokenizer().vocab_size, 1000)
 
     def test_full_tokenizer(self):
         tokenizer = XLNetTokenizer(SAMPLE_VOCAB, keep_accents=True)
@@ -198,9 +202,10 @@ class XLNetTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def test_sequence_builders(self):
         tokenizer = XLNetTokenizer.from_pretrained("xlnet-base-cased")
 
-        text = tokenizer.encode("sequence builders", add_special_tokens=False)
+        text = tokenizer.encode("sequence builders",
+                                add_special_tokens=False)["input_ids"]
         text_2 = tokenizer.encode("multi-sequence build",
-                                  add_special_tokens=False)
+                                  add_special_tokens=False)["input_ids"]
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
