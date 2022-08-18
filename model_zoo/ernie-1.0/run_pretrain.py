@@ -387,7 +387,7 @@ def do_train(args):
         model = model_class(base_class(**model_config))
     else:
         logger.warning(
-            f"Your model it continue training from {args.model_name_or_path}")
+            f"Your model is continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             args.model_name_or_path,
             hidden_dropout_prob=args.hidden_dropout_prob,
@@ -666,6 +666,11 @@ def do_train(args):
                     model, paddle.DataParallel) else model
 
                 tokenizer.save_pretrained(output_dir)
+                # added token is not need for downstream finetune tasks.
+                added_token_path = os.path.join(output_dir, "added_tokens.json")
+                if os.path.exists(added_token_path):
+                    os.remove(added_token_path)
+
                 model_to_save.save_model_config(output_dir)
                 model_dict = model_to_save.state_dict()
                 if scaler is not None:

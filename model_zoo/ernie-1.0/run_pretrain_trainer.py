@@ -400,7 +400,7 @@ def main():
         # model_config["enable_recompute"] = args.use_recompute
     else:
         logger.warning(
-            f"Your model it continue training from {args.model_name_or_path}")
+            f"Your model is continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             hidden_dropout_prob=model_args.hidden_dropout_prob,
