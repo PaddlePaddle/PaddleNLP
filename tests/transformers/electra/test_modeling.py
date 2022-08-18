@@ -276,6 +276,7 @@ class ElectraModelTester:
 
 
 class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
+    test_resize_embeddings = False
     base_model_class = ElectraModel
     all_model_classes = (
         ElectraModel,
