@@ -115,6 +115,9 @@ class BartTokenizer(GPTTokenizer):
                  mask_token="<mask>",
                  **kwargs):
 
+        super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
+                                            max_len, pad_token, eos_token)
+
         bos_token = AddedToken(bos_token,
                                lstrip=False, rstrip=False) if isinstance(
                                    bos_token, str) else bos_token
@@ -146,9 +149,6 @@ class BartTokenizer(GPTTokenizer):
                                                 unk_token=unk_token,
                                                 pad_token=pad_token,
                                                 mask_token=mask_token)
-
-        super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
-                                            max_len, pad_token, eos_token)
 
     def _bpe_encode(self, text):
         bpe_tokens = []
