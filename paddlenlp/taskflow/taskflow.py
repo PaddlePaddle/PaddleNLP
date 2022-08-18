@@ -195,6 +195,10 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": 'rocketqa-zh-dureader-cross-encoder',
             },
+            "rocketqa-base-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'rocketqa-base-cross-encoder',
+            },
         },
         "default": {
             "model": "simbert-base-chinese"
