@@ -178,7 +178,7 @@ class ElectraModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ElectraForPreTraining(ElectraModel(**config))
+        model = ElectraForPretraining(ElectraModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
