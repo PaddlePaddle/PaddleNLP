@@ -47,8 +47,8 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return ErnieMTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
-        input_text = "this is a test"
-        output_text = "this is a test"
+        input_text = "This is a test"
+        output_text = "This is a test"
         return input_text, output_text
 
     def test_convert_token_and_id(self):
@@ -65,25 +65,25 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         tokenizer = ErnieMTokenizer.from_pretrained(self.tmpdirname)
 
         tokens = tokenizer.tokenize("This is a test")
-        self.assertListEqual(tokens, ['▁this', '▁is', '▁a', '▁t', 'est'])
+        self.assertListEqual(tokens, ['▁This', '▁is', '▁a', '▁t', 'est'])
 
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [119, 97, 5, 3, 263])
+                             [474, 97, 5, 3, 263])
 
         tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
         self.assertListEqual(tokens, [
-            'i', '▁was', '▁b', 'or', 'n', '▁in', '9', '2', '0', '0', '0', ',',
+            '▁I', '▁was', '▁b', 'or', 'n', '▁in', '9', '2', '0', '0', '0', ',',
             '▁and', '▁this', '▁is', '▁f', 'al', 's', 'é', '.'
         ])
         ids = tokenizer.convert_tokens_to_ids(tokens)
         self.assertListEqual(ids, [
-            937, 52, 12, 27, 936, 39, 0, 998, 992, 992, 992, 953, 32, 119, 97,
+            16, 52, 12, 27, 936, 39, 0, 998, 992, 992, 992, 953, 32, 119, 97,
             20, 81, 939, 0, 951
         ])
 
         back_tokens = tokenizer.convert_ids_to_tokens(ids)
         self.assertListEqual(back_tokens, [
-            'i', '▁was', '▁b', 'or', 'n', '▁in', '<unk>', '2', '0', '0', '0',
+            '▁I', '▁was', '▁b', 'or', 'n', '▁in', '<unk>', '2', '0', '0', '0',
             ',', '▁and', '▁this', '▁is', '▁f', 'al', 's', '<unk>', '.'
         ])
 
@@ -93,7 +93,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
         self.assertListEqual(
             [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
-            [['▁t', 'est'], ['\xad'], ['▁t', 'est']])
+            [['▁T', 'est'], ['\xad'], ['▁t', 'est']])
 
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("ernie-m-base")

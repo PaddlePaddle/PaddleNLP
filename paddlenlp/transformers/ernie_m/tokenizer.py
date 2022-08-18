@@ -76,10 +76,10 @@ class ErnieMTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-m-base": {
-            "do_lower_case": True
+            "do_lower_case": False
         },
         "ernie-m-large": {
-            "do_lower_case": True
+            "do_lower_case": False
         }
     }
     max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
@@ -89,7 +89,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
     def __init__(self,
                  vocab_file,
                  sentencepiece_model_file,
-                 do_lower_case=True,
+                 do_lower_case=False,
                  encoding="utf8",
                  unk_token="[UNK]",
                  sep_token="[SEP]",
@@ -118,52 +118,6 @@ class ErnieMTokenizer(PretrainedTokenizer):
                 continue
             self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
 
-    def __call__(self,
-                 text: Union[str, List[str], List[List[str]]],
-                 text_pair: Optional[Union[str, List[str],
-                                           List[List[str]]]] = None,
-                 max_length: Optional[int] = None,
-                 stride: int = 0,
-                 is_split_into_words: bool = False,
-                 padding: Union[bool, str, PaddingStrategy] = False,
-                 truncation: Union[bool, str, TruncationStrategy] = False,
-                 return_position_ids: bool = False,
-                 return_token_type_ids: bool = False,
-                 return_attention_mask: bool = False,
-                 return_length: bool = False,
-                 return_overflowing_tokens: bool = False,
-                 return_special_tokens_mask: bool = False,
-                 return_dict: bool = True,
-                 return_offsets_mapping: bool = False,
-                 add_special_tokens: bool = True,
-                 pad_to_multiple_of: Optional[int] = None,
-                 return_tensors: Optional[Union[str, TensorType]] = None,
-                 verbose: bool = True,
-                 **kwargs):
-        return super(ErnieMTokenizer, self).__call__(
-            text=text,
-            text_pair=text_pair,
-            max_length=max_length,
-            stride=stride,
-            is_split_into_words=is_split_into_words,
-            padding=padding,
-            truncation=truncation,
-            return_position_ids=return_position_ids,
-            # Ernie-M model doesn't have token_type embedding.
-            # So set "return_token_type_ids" to False.
-            return_token_type_ids=False,
-            return_attention_mask=return_attention_mask,
-            return_length=return_length,
-            return_overflowing_tokens=return_overflowing_tokens,
-            return_special_tokens_mask=return_special_tokens_mask,
-            return_dict=return_dict,
-            return_offsets_mapping=return_offsets_mapping,
-            add_special_tokens=add_special_tokens,
-            pad_to_multiple_of=pad_to_multiple_of,
-            return_tensors=return_tensors,
-            verbose=verbose,
-            **kwargs)
-
     def get_offset_mapping(self, text):
         if text is None:
             return None
@@ -183,9 +137,6 @@ class ErnieMTokenizer(PretrainedTokenizer):
             char_mapping.extend([i] * len(ch))
 
         text, token_mapping, offset = normalized_text, [], 0
-        # the source of text is not processed by `do_lower_case`
-        if self.do_lower_case:
-            text = text.lower()
 
         for token in split_tokens:
             if token[:1] == '▁':
