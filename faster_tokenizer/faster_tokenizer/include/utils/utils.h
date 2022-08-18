@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
+
+#include <stdlib.h>
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -32,6 +34,16 @@ limitations under the License. */
 #define IS_BIG_ENDIAN
 #endif
 #endif
+
+#if defined(_WIN32)
+#ifdef FASTERTOKENIZER_LIB
+#define FASTERTOKENIZER_DECL __declspec(dllexport)
+#else
+#define FASTERTOKENIZER_DECL __declspec(dllimport)
+#endif  // FASTERTOKENIZER_LIB
+#else
+#define FASTERTOKENIZER_DECL __attribute__((visibility("default")))
+#endif  // _WIN32
 
 namespace paddlenlp {
 namespace faster_tokenizer {

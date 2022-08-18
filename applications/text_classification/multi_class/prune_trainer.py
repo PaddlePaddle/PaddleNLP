@@ -98,8 +98,8 @@ def _dynabert(self, model, output_dir, dynabert_config):
                                               dynabert_config.width_mult)
 
     args = self.args
+    args.num_train_epochs = int(args.num_train_epochs)
     args.num_training_steps = len(train_dataloader) * args.num_train_epochs
-    args.num_train_epochs = args.num_train_epochs
 
     self.create_optimizer_and_scheduler(
         num_training_steps=args.num_training_steps)
