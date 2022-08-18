@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,14 +20,26 @@ import numpy as np
 import paddle
 from paddlenlp.transformers import CodeGenTokenizer, CodeGenForCausalLM
 
+import pynvml
+
+pynvml.nvmlInit()
+
+
+def query_by_id(gpu_id=2):
+    handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_id)
+    meminfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    return meminfo.used // 1024 // 1024
+
 
 def perf_pd(args):
+    start_mem = query_by_id()
     place = "gpu"
     place = paddle.set_device(place)
     tokenizer = CodeGenTokenizer.from_pretrained(args.model_name_or_path)
     model = CodeGenForCausalLM.from_pretrained(args.model_name_or_path,
                                                load_state_as_np=True)
     model.eval()
+    load_mem = query_by_id()
 
     input_ids_np = [
         np.random.choice(list(tokenizer.decoder.keys())[:-1], args.input_len)
@@ -51,20 +63,23 @@ def perf_pd(args):
                                        top_p=1.,
                                        use_faster=args.use_faster,
                                        use_fp16_decoding=args.use_fp16_decoding)
+            generate_mem = query_by_id()
         paddle.device.cuda.synchronize(place)
         pd_cost = (time.perf_counter() - start) / (num_loop -
                                                    num_loop // 2) * 1000
-    return pd_cost
+    return pd_cost, load_mem - start_mem, generate_mem - start_mem
 
 
 def perf_hf(args):
     import torch
     from transformers import CodeGenTokenizer as hf_tokenizer, CodeGenForCausalLM as hf_codegen
+    start_mem = query_by_id()
     device = torch.device("cuda")
     tokenizer = hf_tokenizer.from_pretrained(args.model_name_or_path)
     model = hf_codegen.from_pretrained(args.model_name_or_path)
     model.to(device)
     model.eval()
+    load_mem = query_by_id()
 
     input_ids_np = [
         np.random.choice(list(tokenizer.decoder.keys()), args.input_len)
@@ -86,10 +101,11 @@ def perf_hf(args):
                 min_length=args.generate_len + input_ids.shape[-1],
                 top_k=10,
                 top_p=1.)
+            generate_mem = query_by_id()
         torch.cuda.synchronize()
         hf_cost = (time.perf_counter() - start) / (num_loop -
                                                    num_loop // 2) * 1000
-    return hf_cost
+    return hf_cost, load_mem - start_mem, generate_mem - start_mem
 
 
 def parse_args():
@@ -134,22 +150,25 @@ def do_predict(args):
     try:
         if args.perf_typle == 'pd':
             args.use_faster = False
-            cost = perf_pd(args)
+            cost, load_mem, generate_mem = perf_pd(args)
         elif args.perf_typle == 'pd_faster_fp32':
             args.use_faster = True
             args.use_fp16_decoding = False
-            cost = perf_pd(args)
+            cost, load_mem, generate_mem = perf_pd(args)
         elif args.perf_typle == 'pd_faster_fp16':
             args.use_faster = True
             args.use_fp16_decoding = True
             paddle.set_default_dtype('float16')
-            cost = perf_pd(args)
+            cost, load_mem, generate_mem = perf_pd(args)
         else:
-            cost = perf_hf(args)
+            cost, load_mem, generate_mem = perf_hf(args)
         pprint(args)
-        print(f'CodeGenPerfResult: cost_time: {cost}ms, args:{args}\n')
+        print(
+            f'CodeGenPerfResult: cost_time: {cost}ms, load_mem: {load_mem}MB, generate_mem:{generate_mem}MB, args:{args}\n'
+        )
     except Exception as e:
-        print(f'CodeGenPerfResult: ERROR:{e}, args:{args}\n')
+        pprint(args)
+        print(f'CodeGenPerfResult: ERROR: {e}, args:{args}\n')
 
 
 if __name__ == "__main__":
