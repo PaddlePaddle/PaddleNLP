@@ -14,6 +14,7 @@
 
 from abc import abstractmethod
 import os
+import re
 import json
 
 import paddle
@@ -23,7 +24,10 @@ from .prompt_utils import InputExample, InputFeatures
 from .prompt_tokenizer import MLMPromptTokenizer
 from ..utils.log import logger
 
-__all__ = ["Template", "ManualTemplate", "SoftTemplate", "AutoTemplate"]
+__all__ = [
+    "Template", "ManualTemplate", "SoftTemplate", "AutoTemplate",
+    "PrefixTemplate"
+]
 
 TEMPLATE_FILE = "template.json"
 
@@ -284,7 +288,6 @@ class SoftTemplate(Template):
 
     @prompt_encoder.setter
     def prompt_encoder(self, prompt_encoder):
-        self._prompt_encoder = prompt_encoder
 
         if prompt_encoder is None:
             return None
@@ -294,23 +297,25 @@ class SoftTemplate(Template):
                 f"Encoder has already set as {self._prompt_encoder}, change " +
                 "`prompt_encoder` will reset parameters.")
 
+        self._prompt_encoder = prompt_encoder
+
         if self.encoder_hidden_size is None:
             hidden_size = self.embedding_size
         else:
             hidden_size = self.encoder_hidden_size
         if prompt_encoder == 'lstm':
-            self.lstm_head = nn.LSTM(input_size=hidden_size,
-                                     hidden_size=self.embedding_size,
+            self.lstm_head = nn.LSTM(input_size=self.embedding_size,
+                                     hidden_size=hidden_size,
                                      num_layers=2,
                                      direction='bidirect',
                                      time_major=False)
             self.mlp_head = nn.Sequential(
-                nn.Linear(2 * self.embedding_size, self.embedding_size),
-                nn.ReLU(), nn.Linear(self.embedding_size, self.embedding_size))
+                nn.Linear(2 * hidden_size, hidden_size), nn.ReLU(),
+                nn.Linear(hidden_size, self.embedding_size))
         elif prompt_encoder == 'mlp':
             self.mlp_head = nn.Sequential(
-                nn.Linear(hidden_size, self.embedding_size), nn.ReLU(),
-                nn.Linear(self.embedding_size, self.embedding_size))
+                nn.Linear(self.embedding_size, hidden_size), nn.ReLU(),
+                nn.Linear(hidden_size, self.embedding_size))
             if hasattr(self, "lstm_head"):
                 delattr(self, "lstm_head")
         else:
@@ -430,18 +435,13 @@ class SoftTemplate(Template):
         """
         if self.num_soft_token == 0 or self.token_embeddings is None:
             return None
-        if self.encoder_hidden_size is not None:
-            self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
-                                                self.encoder_hidden_size)
-        else:
-            self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
-                                                self.embedding_size)
+        self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
+                                            self.embedding_size)
 
-            weight = self.soft_embeddings.weight.clone().detach()
-            for soft_id, word_id in self.soft2word_init.items():
-                weight[soft_id] = self.token_embeddings(
-                    paddle.to_tensor(word_id))
-            self.soft_embeddings.weight.set_value(weight)
+        weight = self.soft_embeddings.weight.clone().detach()
+        for soft_id, word_id in self.soft2word_init.items():
+            weight[soft_id] = self.token_embeddings(paddle.to_tensor(word_id))
+        self.soft_embeddings.weight.set_value(weight)
 
     def process_batch(self, batch):
         word_embeds = self.token_embeddings(batch["input_ids"])
@@ -460,6 +460,115 @@ class SoftTemplate(Template):
                 (batch["soft_token_ids"] > 0).unsqueeze(-1), soft_embeds,
                 word_embeds)
             batch["inputs_embeds"] = inputs_embeds
+        return batch
+
+
+class PrefixTemplate(SoftTemplate):
+
+    def __init__(self,
+                 tokenizer,
+                 max_seq_length,
+                 model=None,
+                 template=None,
+                 prompt_encoder=None,
+                 encoder_hidden_size=None):
+        self.n_layer, self.n_heads = self._get_config(model)
+        super().__init__(tokenizer=tokenizer,
+                         max_seq_length=max_seq_length,
+                         model=model,
+                         template=template,
+                         prompt_encoder=prompt_encoder,
+                         encoder_hidden_size=encoder_hidden_size)
+        self.dropout = nn.Dropout(p=0.1)
+
+    def _process_template(self):
+        super()._process_template()
+        self._check_prefix_template(self._template)
+
+    @staticmethod
+    def _get_config(model):
+        names = [n for n, p in model.named_parameters() if "layers" in n]
+        pattern = re.compile(r".*?\.(\d+)\..*?")
+        indices = []
+        for name in names:
+            result = pattern.match(name)
+            if result is not None:
+                indices.append(int(result.group(1)))
+        num_layer = max(indices) + 1
+        layer_names = names[0].split(".")[:-2]
+        layer = model
+        for name in layer_names:
+            layer = getattr(layer, name)
+        num_heads = layer.num_heads
+
+        return num_layer, num_heads
+
+    @staticmethod
+    def _check_prefix_template(template):
+        is_prefix = True
+        is_soft = False
+        for part in template:
+            if "soft" in part and not is_prefix:
+                raise ValueError(
+                    "Soft tokens should prefix other tokens in PrefixTemplate,"
+                    f" but get {template}.")
+            if "soft" in part:
+                is_soft = True
+            else:
+                is_prefix = False
+        if not is_soft:
+            raise ValueError("There should be soft tokens in PrefixTemplate, "
+                             f"but get {template}.")
+        return True
+
+    @property
+    def prompt_encoder(self):
+        return self._prompt_encoder
+
+    @prompt_encoder.setter
+    def prompt_encoder(self, prompt_encoder):
+        if prompt_encoder is None:
+            return None
+
+        if getattr(self, "_prompt_encoder", None) is not None:
+            logger.warning(
+                f"Encoder {self._prompt_encoder} is reset as {prompt_encoder}.")
+        self._prompt_encoder = prompt_encoder
+        hidden_size = self.encoder_hidden_size
+        if hidden_size is None:
+            hidden_size = self.embedding_size
+        if prompt_encoder == "mlp":
+            self.mlp_head = nn.Sequential(
+                nn.Linear(self.embedding_size, hidden_size), nn.Tanh(),
+                nn.Linear(hidden_size, self.embedding_size * self.n_layer * 2))
+        else:
+            raise ValueError(
+                f"Unsupported soft token encoder: {prompt_encoder}.")
+
+    def process_batch(self, batch):
+        word_embeds = self.token_embeddings(batch["input_ids"])
+        batch["input_ids"] = None
+
+        batch_size, _ = batch["soft_token_ids"].shape
+        soft_token_ids = paddle.masked_select(batch["soft_token_ids"],
+                                              batch["soft_token_ids"] > 0)
+        soft_token_ids = soft_token_ids.reshape([batch_size, -1])
+        _, soft_len = soft_token_ids.shape
+
+        batch["inputs_embeds"] = word_embeds[:, soft_len:, :]
+
+        soft_embeds = self.soft_embeddings(soft_token_ids)
+        soft_embeds = self.mlp_head(soft_embeds)
+        soft_embeds = soft_embeds.reshape([
+            batch_size, soft_len, self.n_layer * 2, self.n_heads,
+            self.embedding_size // self.n_heads
+        ])
+        soft_embeds = self.dropout(soft_embeds)
+        soft_embeds = paddle.transpose(soft_embeds, perm=[2, 0, 3, 1, 4])
+        soft_embeds = paddle.split(soft_embeds, num_or_sections=self.n_layer)
+        soft_embeds = [paddle.split(emb, 2) for emb in soft_embeds]
+        soft_embeds = [[x.squeeze(0) for x in emb] for emb in soft_embeds]
+        batch["past_key_values"] = tuple([tuple(emb) for emb in soft_embeds])
         return batch
 
 

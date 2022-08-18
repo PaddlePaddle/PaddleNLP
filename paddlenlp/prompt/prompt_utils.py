@@ -78,11 +78,11 @@ class InputFeatures(dict):
     """
     input_keys = [
         'input_ids', 'attention_mask', 'token_type_ids', 'inputs_embeds', 'uid',
-        'labels', 'mask_ids', 'soft_token_ids'
+        'labels', 'mask_ids', 'soft_token_ids', 'past_key_values'
     ]
     tensorable = [
         'input_ids', 'attention_mask', 'token_type_ids', 'inputs_embeds',
-        'labels', 'mask_ids', 'soft_token_ids'
+        'labels', 'mask_ids', 'soft_token_ids', 'past_key_values'
     ]
 
     def __init__(self,
@@ -93,7 +93,8 @@ class InputFeatures(dict):
                  mask_ids=None,
                  labels=None,
                  uid=None,
-                 soft_token_ids=None):
+                 soft_token_ids=None,
+                 past_key_values=None):
         self.input_ids = input_ids
         self.attention_mask = attention_mask
         self.token_type_ids = token_type_ids
@@ -102,6 +103,7 @@ class InputFeatures(dict):
         self.mask_ids = mask_ids
         self.uid = uid
         self.soft_token_ids = soft_token_ids
+        self.past_key_values = past_key_values
 
     @classmethod
     def add_keys(cls, *args):

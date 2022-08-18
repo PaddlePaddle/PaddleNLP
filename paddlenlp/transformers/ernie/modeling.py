@@ -1676,7 +1676,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=False,
+                past_key_values=None):
         r"""
 
         Args:
@@ -1703,6 +1704,13 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.
@@ -1732,6 +1740,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                              position_ids=position_ids,
                              attention_mask=attention_mask,
                              inputs_embeds=inputs_embeds,
+                             past_key_values=past_key_values,
                              output_attentions=output_attentions,
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)
