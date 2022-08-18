@@ -387,14 +387,20 @@ def main():
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
 
-    if model_args.model_name_or_path in pretrained_models_list:
+    if model_args.model_name_or_path in pretrained_models_list and not args.continue_training:
+        logger.warning(
+            f"Your model {args.model_name_or_path} is training from scratch !!!"
+        )
         model_config = model_class.pretrained_init_configuration[
             model_args.model_name_or_path]
         model_config["hidden_dropout_prob"] = model_args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = model_args.attention_probs_dropout_prob
         model = model_class(base_class(**model_config))
+        # model_config["enable_recompute"] = args.use_recompute
     else:
+        logger.warning(
+            f"Your model it continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             hidden_dropout_prob=model_args.hidden_dropout_prob,

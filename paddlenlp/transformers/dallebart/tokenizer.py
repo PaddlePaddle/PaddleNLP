@@ -490,27 +490,28 @@ class DalleBartTokenizer(GPTTokenizer):
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
 
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_length=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 padding=False,
-                 truncation=False,
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=False,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False,
-                 return_dict=True,
-                 return_offsets_mapping=False,
-                 add_special_tokens=True,
-                 pad_to_multiple_of=None,
-                 return_tensors=None,
-                 verbose: bool = True,
-                 **kwargs):
+    def __call__(
+            self,
+            text,
+            text_pair=None,
+            max_length=64,  # default
+            stride=0,
+            is_split_into_words=False,
+            padding="max_length",  # default
+            truncation=True,  # default
+            return_position_ids=False,
+            return_token_type_ids=False,  # don't return token_type_ids 
+            return_attention_mask=True,  # default
+            return_length=False,
+            return_overflowing_tokens=False,
+            return_special_tokens_mask=False,
+            return_dict=True,
+            return_offsets_mapping=False,
+            add_special_tokens=True,
+            pad_to_multiple_of=None,
+            return_tensors=None,
+            verbose: bool = True,
+            **kwargs):
         if self.normalize_text:
             is_batched = isinstance(text, (list, tuple))
             if is_batched:

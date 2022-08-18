@@ -19,9 +19,24 @@ import numpy as np
 from collections import OrderedDict
 from dataclasses import fields, dataclass
 from typing import Any, List, Tuple, Optional
-from paddle.nn.layer.transformer import _convert_attention_mask
+from paddle.nn.layer.transformer import _convert_attention_mask, MultiHeadAttention
+from paddle.distributed.fleet.utils import recompute
 
 from .utils import adapt_stale_fwd_patch
+
+
+def layer_init_wrapper(func):
+
+    @functools.wraps(func)
+    def _impl(self, *args, **kwargs):
+        enable_recompute = kwargs.pop("enable_recompute", False)
+        func(self, *args, **kwargs)
+        if paddle.in_dynamic_mode():
+            self.enable_recompute = enable_recompute
+        else:
+            self.enable_recompute = False
+
+    return _impl
 
 
 def _transformer_encoder_layer_fwd(self,
@@ -60,6 +75,46 @@ def _transformer_encoder_layer_fwd(self,
         (src, ) + outputs[::-1])  # hidden_states, cache, attentions
 
 
+def _transformer_decoder_fwd(self,
+                             tgt,
+                             memory,
+                             tgt_mask=None,
+                             memory_mask=None,
+                             cache=None):
+    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+    memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+
+    output = tgt
+    new_caches = []
+    for i, mod in enumerate(self.layers):
+        if cache is None:
+            if self.enable_recompute:
+                output = recompute(mod,
+                                   output,
+                                   memory,
+                                   tgt_mask,
+                                   memory_mask,
+                                   cache=None)
+            else:
+                output = mod(output,
+                             memory,
+                             tgt_mask=tgt_mask,
+                             memory_mask=memory_mask,
+                             cache=None)
+        else:
+            output, new_cache = mod(output,
+                                    memory,
+                                    tgt_mask=tgt_mask,
+                                    memory_mask=memory_mask,
+                                    cache=cache[i])
+            new_caches.append(new_cache)
+
+    if self.norm is not None:
+        output = self.norm(output)
+
+    return output if cache is None else (output, new_caches)
+
+
 def _transformer_encoder_fwd(self,
                              src,
                              src_mask=None,
@@ -70,15 +125,34 @@ def _transformer_encoder_fwd(self,
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
-    new_caches = [] if cache is not None else None
+    # To get cache from None when use_cache is True, which is compatible with HF
+    # while HF requires decoder. The implementation here uses cache update in the
+    # MultiHeadAttention not so efficiently, and maybe optimize it later.
+    if cache is None and getattr(self, "_use_cache", False):
+        cache = [tuple(self.layers[0].gen_cache(src))] * len(self.layers)
+    # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
+    # to True when cache is not None.
+    new_caches = [] if cache is not None and getattr(self, "_use_cache",
+                                                     True) else None
     all_attentions = [] if output_attentions else None
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
-        layer_outputs = mod(output,
-                            src_mask=src_mask,
-                            cache=None if cache is None else cache[i],
-                            output_attentions=output_attentions)
+        if self.enable_recompute:
+            # Note: recompute do not support pass as **kwargs yet.
+            layer_outputs = recompute(
+                mod, output, src_mask, None if cache is None else
+                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+                MultiHeadAttention.Cache(*cache[i]), output_attentions)
+        else:
+            layer_outputs = mod(
+                output,
+                src_mask=src_mask,
+                cache=None if cache is None else
+                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+                MultiHeadAttention.Cache(*cache[i]),
+                output_attentions=output_attentions)
+
         if isinstance(layer_outputs, tuple):
             output = layer_outputs[0]
             outputs = layer_outputs[1:]
@@ -90,8 +164,9 @@ def _transformer_encoder_fwd(self,
             all_hidden_states.append(output)
         if output_attentions:
             all_attentions.append(outputs[-1])
-        if cache is not None:
-            new_caches.append(outputs[0])
+        if new_caches is not None:
+            new_caches.append(outputs[0] if isinstance(
+                cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
 
     if self.norm is not None:
         output = self.norm(output)
@@ -122,6 +197,12 @@ def _transformer_encoder_fwd(self,
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
+paddle.nn.TransformerDecoder.forward = _transformer_decoder_fwd
+
+_encoder_init = paddle.nn.TransformerEncoder.__init__
+_decoder_init = paddle.nn.TransformerDecoder.__init__
+paddle.nn.TransformerEncoder.__init__ = layer_init_wrapper(_encoder_init)
+paddle.nn.TransformerDecoder.__init__ = layer_init_wrapper(_decoder_init)
 
 
 def _get_wrap_setattr(cls):
@@ -139,6 +220,9 @@ paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
 paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
     paddle.nn.TransformerEncoder.__setattr__)(_get_wrap_setattr(
         paddle.nn.TransformerEncoder))
+paddle.nn.TransformerDecoder.__setattr__ = functools.wraps(
+    paddle.nn.TransformerDecoder.__setattr__)(_get_wrap_setattr(
+        paddle.nn.TransformerDecoder))
 
 
 def is_tensor(x):
@@ -503,3 +587,47 @@ class MaskedLMOutput(ModelOutput):
     logits: paddle.Tensor = None
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class CausalLMOutputWithCrossAttentions(ModelOutput):
+    """
+    Base class for causal language model (or autoregressive) outputs.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Language modeling loss (for next-token prediction).
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+        cross_attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Cross attentions weights after the attention softmax, used to compute the weighted average in the
+            cross-attention heads.
+        past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `paddle.Tensor` tuples of length `config.n_layers`, with each tuple containing the cached key,
+            value states of the self-attention and the cross-attention layers if model is used in encoder-decoder
+            setting. Only relevant if `config.is_decoder = True`.
+
+            Contains pre-computed hidden-states (key and values in the attention blocks) that can be used (see
+            `past_key_values` input) to speed up sequential decoding.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+    cross_attentions: Optional[Tuple[paddle.Tensor]] = None

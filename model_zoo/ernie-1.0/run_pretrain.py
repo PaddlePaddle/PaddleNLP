@@ -27,6 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
+from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
 
@@ -373,20 +374,25 @@ def do_train(args):
                 consumed_samples = step_config["consumed_samples"]
                 global_step = step_config["global_step"]
 
-    if args.model_name_or_path in pretrained_models_list:
+    if args.model_name_or_path in pretrained_models_list and not args.continue_training:
+        logger.warning(
+            f"Your model {args.model_name_or_path} is training from scratch !!!"
+        )
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+        model_config["enable_recompute"] = args.use_recompute
         model = model_class(base_class(**model_config))
     else:
+        logger.warning(
+            f"Your model it continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             args.model_name_or_path,
             hidden_dropout_prob=args.hidden_dropout_prob,
-            attention_probs_dropout_prob=args.attention_probs_dropout_prob)
-
-    # criterion = criterion_class(with_nsp_loss=args.binary_head)
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+            enable_recompute=args.use_recompute)
 
     criterion = criterion_class(with_nsp_loss=args.binary_head)
 
@@ -526,45 +532,52 @@ def do_train(args):
             input_ids, segment_ids, input_mask, masked_lm_positions, \
             masked_lm_labels, next_sentence_labels = batch
 
-            with paddle.amp.auto_cast(args.use_amp,
-                                      custom_white_list=[
-                                          'softmax',
-                                          'layer_norm',
-                                          'gelu',
-                                      ],
-                                      custom_black_list=[
-                                          "c_softmax_with_cross_entropy",
-                                      ],
-                                      level=args.fp16_opt_level):
+            with model.no_sync():
+                with paddle.amp.auto_cast(args.use_amp,
+                                          custom_white_list=[
+                                              'softmax',
+                                              'layer_norm',
+                                              'gelu',
+                                          ],
+                                          custom_black_list=[
+                                              "c_softmax_with_cross_entropy",
+                                          ],
+                                          level=args.fp16_opt_level):
 
-                # Create the model for the ernie pretrain
-                if args.binary_head:
-                    prediction_scores, seq_relationship_score = model(
-                        input_ids=input_ids,
-                        token_type_ids=segment_ids,
-                        position_ids=None,
-                        attention_mask=input_mask,
-                        masked_positions=masked_lm_positions)
-                    lm_loss, sop_loss = criterion(prediction_scores,
-                                                  seq_relationship_score,
-                                                  masked_lm_labels,
-                                                  next_sentence_labels)
-                    loss = lm_loss + sop_loss
+                    # Create the model for the ernie pretrain
+                    if args.binary_head:
+                        prediction_scores, seq_relationship_score = model(
+                            input_ids=input_ids,
+                            token_type_ids=segment_ids,
+                            position_ids=None,
+                            attention_mask=input_mask,
+                            masked_positions=masked_lm_positions)
+                        lm_loss, sop_loss = criterion(prediction_scores,
+                                                      seq_relationship_score,
+                                                      masked_lm_labels,
+                                                      next_sentence_labels)
+                        loss = lm_loss + sop_loss
+                    else:
+                        prediction_scores = model(
+                            input_ids=input_ids,
+                            token_type_ids=segment_ids,
+                            position_ids=None,
+                            attention_mask=input_mask,
+                            masked_positions=masked_lm_positions)
+
+                        loss = criterion(prediction_scores, None,
+                                         masked_lm_labels)
+
+                if args.use_amp:
+                    scaler.scale(loss).backward()
                 else:
-                    prediction_scores = model(
-                        input_ids=input_ids,
-                        token_type_ids=segment_ids,
-                        position_ids=None,
-                        attention_mask=input_mask,
-                        masked_positions=masked_lm_positions)
+                    loss.backward()
 
-                    loss = criterion(prediction_scores, None, masked_lm_labels)
+            fused_allreduce_gradients(list(model.parameters()), None)
 
             if args.use_amp:
-                scaler.scale(loss).backward()
                 scaler.minimize(optimizer, loss)
             else:
-                loss.backward()
                 optimizer.step()
 
             optimizer.clear_grad()
