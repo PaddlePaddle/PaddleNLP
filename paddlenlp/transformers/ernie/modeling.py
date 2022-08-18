@@ -53,8 +53,7 @@ class ErnieEmbeddings(nn.Layer):
                  weight_attr=None,
                  task_type_vocab_size=3,
                  task_id=0,
-                 use_task_id=False,
-                 use_token_type_id=True):
+                 use_task_id=False):
         super(ErnieEmbeddings, self).__init__()
 
         self.word_embeddings = nn.Embedding(vocab_size,
@@ -64,8 +63,8 @@ class ErnieEmbeddings(nn.Layer):
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size,
                                                 weight_attr=weight_attr)
-        self.use_token_type_id = use_token_type_id
-        if self.use_token_type_id:
+        self.type_vocab_size = type_vocab_size
+        if self.type_vocab_size > 0:
             self.token_type_embeddings = nn.Embedding(type_vocab_size,
                                                       hidden_size,
                                                       weight_attr=weight_attr)
@@ -105,7 +104,7 @@ class ErnieEmbeddings(nn.Layer):
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = input_embeddings + position_embeddings
 
-        if self.use_token_type_id:
+        if self.type_vocab_size > 0:
             if token_type_ids is None:
                 token_type_ids = paddle.zeros(input_shape, dtype="int64")
             token_type_embeddings = self.token_type_embeddings(token_type_ids)
@@ -832,7 +831,6 @@ class ErnieModel(ErniePretrainedModel):
                  task_type_vocab_size=3,
                  task_id=0,
                  use_task_id=False,
-                 use_token_type_id=True,
                  enable_recompute=False):
         super(ErnieModel, self).__init__()
         self.pad_token_id = pad_token_id
@@ -840,10 +838,12 @@ class ErnieModel(ErniePretrainedModel):
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(
                 mean=0.0, std=self.initializer_range))
-        self.embeddings = ErnieEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id, weight_attr,
-            task_type_vocab_size, task_id, use_task_id, use_token_type_id)
+        self.embeddings = ErnieEmbeddings(vocab_size, hidden_size,
+                                          hidden_dropout_prob,
+                                          max_position_embeddings,
+                                          type_vocab_size, pad_token_id,
+                                          weight_attr, task_type_vocab_size,
+                                          task_id, use_task_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
