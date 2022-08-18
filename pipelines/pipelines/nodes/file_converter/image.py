@@ -18,6 +18,7 @@ from typing import List, Optional, Dict, Any, Union
 import logging
 import subprocess
 from pathlib import Path
+import paddle
 from paddleocr import PaddleOCR
 try:
     from PIL.PpmImagePlugin import PpmImageFile
@@ -57,7 +58,11 @@ class ImageToTextConverter(BaseConverter):
         # save init parameters to enable export of component config as YAML
         self.set_config(remove_numeric_tables=remove_numeric_tables,
                         valid_languages=valid_languages)
-        self.recognize = PaddleOCR(use_angle_cls=True, lang='ch')
+        use_gpu = True if 'gpu' in paddle.device.get_device() else False
+        self.recognize = PaddleOCR(use_angle_cls=True,
+                                   lang='ch',
+                                   use_gpu=use_gpu)
+
         super().__init__(remove_numeric_tables=remove_numeric_tables,
                          valid_languages=valid_languages)
 
