@@ -21,8 +21,11 @@ from paddlenlp.transformers.roformer.tokenizer import (JiebaBasicTokenizer,
                                                        RoFormerTokenizer,
                                                        WordpieceTokenizer)
 
-from ...testing_utils import slow
-from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+# from ...testing_utils import slow
+# from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+
+from tests.testing_utils import slow, get_tests_dir
+from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
 class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
@@ -59,15 +62,6 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
 
-        self.vocab = Vocab.from_dict(
-            {token: index
-             for index, token in enumerate(vocab_tokens)},
-            unk_token='[UNK]',
-            pad_token='[PAD]',
-            bos_token='[CLS]',
-            eos_token='[SEP]',
-        )
-
     def get_input_output_texts(self, tokenizer):
         input_text = "UNwant\u00E9d,running"
         output_text = "unwanted, running"
@@ -83,10 +77,14 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                              [9, 6, 7, 12, 10, 11])
 
     def test_chinese(self):
-        tokenizer = JiebaBasicTokenizer(self.vocab)
+        tokenizer = RoFormerTokenizer.from_pretrained(list(
+            RoFormerTokenizer.pretrained_init_configuration.keys())[0],
+                                                      use_jieba=True)
+        # test jieba tokenizer in rofromer
+        jieba_tokenizer = tokenizer.basic_tokenizer
 
-        self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
-                             ["ah", "\u535A", "\u63A8", "zz"])
+        self.assertListEqual(jieba_tokenizer.tokenize("ah\u535A\u63A8zz"),
+                             ["ah", "博", "推", "zz"])
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
