@@ -154,6 +154,8 @@ xpack.security.enabled: false
 3. 检查确保 ES 服务启动成功
 ```bash
 curl http://localhost:9200/_aliases?pretty=true
+# 打印几条数据
+curl http://localhost:9200/dureader_robust_query_encoder/_search
 ```
 备注：ES 服务默认开启端口为 9200
 
@@ -186,7 +188,7 @@ sh scripts/run_search_server.sh
 启动后可以使用curl命令验证是否成功运行：
 
 ```
-curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "亚马逊河流的介绍","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
 
 ```
 #### 3.4.4 启动 WebUI
