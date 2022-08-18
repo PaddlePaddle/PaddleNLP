@@ -1163,7 +1163,7 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 >>> similarity = Taskflow("text_similarity",model="rocketqa-zh-dureader-cross-encoder")
 >>> similarity([["春天适合种什么花？", "春天适合种什么菜？"]])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866087343543768}]
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}]
 ```
 
 #### 批量样本输入，平均速度更快
@@ -1171,7 +1171,7 @@ from paddlenlp import Taskflow
 ```python
 >>> from paddlenlp import Taskflow
 >>> text_similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'scores': 0.004866101313382387}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'scores': 0.7051035761833191}]
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.7050786018371582}]
 ```
 
 #### 可配置参数说明

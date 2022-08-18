@@ -194,15 +194,16 @@ TASKS = {
             },
             "rocketqa-zh-dureader-cross-encoder": {
                 "task_class": TextSimilarityTask,
-                "task_flag": 'rocketqa-zh-dureader-cross-encoder',
+                "task_flag":
+                'text_similarity-rocketqa-zh-dureader-cross-encoder',
             },
-            "rocketqa-base-cross-encoder": {
+            "rocketqa-mini-cross-encoder": {
                 "task_class": TextSimilarityTask,
-                "task_flag": 'rocketqa-base-cross-encoder',
+                "task_flag": 'text_similarity-rocketqa-mini-cross-encoder',
             },
         },
         "default": {
-            "model": "simbert-base-chinese"
+            "model": "rocketqa-zh-dureader-cross-encoder"
         }
     },
     "word_segmentation": {
