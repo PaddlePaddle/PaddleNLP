@@ -1,0 +1,319 @@
+# 自动文本摘要
+
+**目录**
+- [自动文本摘要](#自动文本摘要)
+  - [简介](#简介)
+    - [基于预训练语言模型的文本摘要](#基于预训练语言模型的文本摘要)
+  - [效果展示](#效果展示)
+  - [开箱即用](#开箱即用)
+    - [支持单条、批量预测](#支持单条批量预测)
+    - [可配置参数说明](#可配置参数说明)
+  - [训练定制](#训练定制)
+    - [文本摘要应用定制训练全流程介绍](#文本摘要应用定制训练全流程介绍)
+    - [环境依赖](#环境依赖)
+    - [代码结构说明](#代码结构说明)
+    - [数据准备](#数据准备)
+      - [数据加载](#数据加载)
+      - [从本地文件创建数据集](#从本地文件创建数据集)
+    - [模型训练](#模型训练)
+    - [模型预测](#模型预测)
+    - [模型推理部署](#模型推理部署)
+      - [FasterTransformer加速及模型静态图导出](#fastertransformer加速及模型静态图导出)
+      - [模型部署](#模型部署)
+  - [References](#references)
+
+
+## 简介
+自动文摘的目标是自动地将输入文本转换成简短摘要,为用户提供简明扼要的内容描述，是缓解文本信息过载的一个重要手段。
+自动文摘也是自然语言生成领域中的一个重要任务，有很多应用场景，如新闻摘要、论文摘要、财报摘要、传记摘要、专利摘要、对话摘要、评论摘要、观点摘要、电影摘要、文章标题生成、商品名生成、自动报告生成、搜索结果预览等。
+
+本项目是基于预训练语言模型UNIMO-Text的文本摘要，具有以下优势：
+- 效果领先
+- 高性能。本项目基于FasterTransformer进行推理加速，能够提供更高性能的推理体验。
+- 开箱即用。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
+- 全流程打通。本项目提供了全面的定制训练流程，从数据准备、模型训练预测，到模型推理部署，一应俱全。
+
+### 基于预训练语言模型的文本摘要
+
+基于预训练语言模型（Pretrained Language Models, PLMs）范式的自动文本摘要是目前最常用、效果最好(SOTA)的方式。
+预训练模型是在超大规模的语料采用无监督（unsupervised）或者弱监督（weak-supervised）的方式进行预训练，能够学习如何准确地理解自然语言并以自然语言的形式流畅表达，这两项都是完成文本摘要任务的重要能力。
+
+PaddleNLP提供了方便易用的接口，可指定模型名或模型参数文件路径通过from_pretrained()方法加载不同网络结构的预训练模型，且相应预训练模型权重下载速度快速、稳定。
+Transformer预训练模型汇总包含了如 ERNIE、BERT、T5、UNIMO等40多个主流预训练模型，500多个模型权重。下面以中文unimo-text-1.0模型为例，演示如何加载预训练模型和分词器：
+```
+from paddlenlp.transformers import  UNIMOLMHeadModel, UNIMOTokenizer
+model_name = "unimo-text-1.0"
+model = UNIMOLMHeadModel.from_pretrained(model_name)
+tokenizer = UNIMOTokenizer.from_pretrained(model_name)
+```
+
+## 效果展示
+
+## 开箱即用
+PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，一键预测。
+### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 xxxx
+>>> Summarizer = Taskflow("text_summarization")
+# 单条输入
+>>> Summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+xxxx
+# 多条输入
+>>> Summarizer([
+  "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
+  "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+  ])
+xxxx
+```
+
+### 可配置参数说明
+* `model`：可选模型，默认为unimo-text-1.0，支持的模型支持的模型有["unimo-text-1.0", ]。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `output_scores`：是否要输出解码得分，请默认为False。
+* `max_length`：生成代码的最大长度，默认为128。
+* `min_length`：生成代码的最小长度，默认为0。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
+* `temperature`：解码参数temperature，默认为0.6。
+* `top_k`：解码参数top_k，默认为5。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：beam_search解码的beam size，默认为4。
+* `length_penalty`：解码长度控制值，默认为1.0。
+* `num_return_sequences`：解码返回对序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1.1。
+
+
+## 训练定制
+### 文本摘要应用定制训练全流程介绍
+接下来，我们将按数据准备、训练、预测、推理部署对文本摘要应用的全流程进行介绍。
+1. **数据准备**
+- 如果没有已标注的数据集，我们推荐[doccano](https://github.com/doccano/doccano)数据标注工具。
+如果已有标注好的本地数据集，我们需要根据将数据集整理为文档要求的格式，请参考[从本地文件创建数据集](#从本地文件创建数据集)。
+
+2. **模型训练**
+
+- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"unimo-text-1.0"模型，unimo-text-1.0还支持large模型，详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)，可以根据任务和设备需求进行选择。
+
+3. **模型预测**
+
+- 训练结束后，我们可以加载保存的最佳模型进行模型测试，打印模型预测结果。
+
+4. **模型推理部署**
+
+- 模型部署需要将保存的最佳模型参数（动态图）导出成静态图参数，用于后续的推理部署。
+
+- 文本摘要应用提供了基于Paddle Serving的本地部署predictor，并且支持在GPU设备使用Faster Generation进行加速。
+
+- 文本摘要应用提供了基于Paddle Serving的服务端部署方案。
+
+### 环境依赖
+
+### 代码结构说明
+
+以下是本项目主要代码结构及说明：
+
+```text
+text_summarization/
+├── checkpoint # 动态图模型参数目录
+├── deploy # 部署
+│   ├── paddle_inference # PaddleInference高性能推理部署
+│   │   ├── inference_unimo_text.py # 推理部署脚本
+│   │   └── README.md # 说明文档
+│   └── paddle_serving
+│       ├── config.yml # 配置文件
+│       ├── export_checkpoint_client # 客户端模型文件和配置文件目录
+│       ├── export_checkpoint_server # 服务器模型文件和配置文件目录
+│       ├── pipeline_client.py # 客户端程序
+│       ├── pipeline_service.py # 服务器程序
+│       └── README.md # 说明文档
+├── export_checkpoint # 静态图模型参数目录
+├── export_model.py # 动态图参数导出静态图参数脚本
+├── train.py # 训练评估脚本
+├── utils.py # 工具函数脚本
+└── README.md # 说明文档
+```
+
+### 数据准备
+
+#### 数据加载
+#### 从本地文件创建数据集
+
+在许多情况，我们需要使用本地数据集来训练我们的文本摘要模型，本项目支持使用固定格式本地数据集文件进行训练。
+如果没有已标注的数据集，我们推荐[doccano](https://github.com/doccano/doccano)数据标注工具。
+
+本地数据集目录结构如下：
+
+```text
+data/
+├── train.json # 训练数据集文件
+├── dev.json # 开发数据集文件
+└── test.json # 可选，待预测数据文件
+```
+本地数据集文件格式如下：
+- train.json/dev.json/test.json 文件格式：
+```text
+{
+  "context": <context>,
+  "answer": <context_text>,
+  "question": <question_text>,
+}
+...
+```
+- train.txt/dev.txt/test.txt 文件样例：
+```text
+{
+  "context": "欠条是永久有效的,未约定还款期限的借款合同纠纷,诉讼时效自债权人主张债权之日起计算,时效为2年。 根据《中华人民共和国民法通则》第一百三十五条:向人民法院请求保护民事权利的诉讼时效期间为二年,法律另有规定的除外。 第一百三十七条:诉讼时效期间从知道或者应当知道权利被侵害时起计算。但是,从权利被侵害之日起超过二十年的,人民法院不予保护。有特殊情况的,人民法院可以延长诉讼时效期间。 第六十二条第(四)项:履行期限不明确的,债务人可以随时履行,债权人也可以随时要求履行,但应当给对方必要的准备时间。",
+  "answer": "永久有效",
+  "question": "欠条的有效期是多久"
+}
+...
+```
+
+更多数据集读取格式详见[数据集加载](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#)和[自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
+
+
+### 模型训练
+运行如下命令即可在样例训练集上进行finetune，并在样例验证集上进行验证。
+
+```shell
+# GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "0" --log_dir ./log run_gen.py \
+    --dataset_name=dureader_qg \
+    --model_name_or_path=unimo-text-1.0 \
+    --save_dir=./unimo/checkpoints \
+    --logging_steps=100 \
+    --save_steps=100000 \
+    --epochs=6 \
+    --batch_size=16 \
+    --learning_rate=5e-5 \
+    --warmup_propotion=0.02 \
+    --weight_decay=0.01 \
+    --max_seq_len=512 \
+    --max_target_len=30 \
+    --do_train \
+    --do_predict \
+    --device=gpu
+```
+使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
+
+关键参数释义如下：
+- `gpus` 指示了训练所用的GPU卡号。
+- `dataset_name` 数据集名称。
+- `train_file` 本地训练数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
+- `predict_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型（详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)），或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+
+   | PaddleNLP提供的预训练模型        |
+   |---------------------------------|
+   | unimo-text-1.0      |
+   | unimo-text-1.0-large |
+
+- `save_dir` 表示模型的保存路径。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `seed` 表示随机数生成器的种子。
+- `epochs` 表示训练轮数。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
+- `warmup_propotion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例，最早的使用可以参考[这篇论文](https://arxiv.org/pdf/1706.02677.pdf)。
+- `max_seq_len` 模型输入序列的最大长度。
+- `max_target_len` 模型训练时标签的最大长度。
+- `min_dec_len` 模型生成序列的最小长度。
+- `max_dec_len` 模型生成序列的最大长度。
+- `do_train` 是否进行训练。
+- `do_predict` 是否进行预测，在验证集上会自动评估。
+- `device` 表示使用的设备，从gpu和cpu中选择。
+
+更多参数详情和参数的默认值请参考`args.py`。
+
+程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。
+如：
+```text
+./checkpoints/
+├── model_8000
+│   ├── model_config.json
+│   ├── model_state.pdparams
+│   ├── tokenizer_config.json
+│   └── vocab.txt
+└── ...
+```
+
+**NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
+
+
+### 模型预测
+
+运行下方脚本可以使用训练好的模型进行预测。
+
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python run_gen.py \
+    --dataset_name=dureader_qg \
+    --model_name_or_path=your_model_path \
+    --logging_steps=100 \
+    --batch_size=16 \
+    --max_seq_len=512 \
+    --max_target_len=30 \
+    --do_predict \
+    --max_dec_len=20 \
+    --min_dec_len=3 \
+    --device=gpu
+```
+
+程序运行结束后会将预测结果保存在`output_path`中。
+
+
+Finetuned baseline的模型在xxx任务验证集上有如下结果(指标为BLEU-4)：
+
+|       model_name        | xxxx |
+| :-----------------------------: | :---: |
+|   finetuned unimo-text-1.0    | xxxx |
+
+### 模型推理部署
+
+#### FasterTransformer加速及模型静态图导出
+
+使用动态图训练结束之后，可以通过[静态图导出脚本](export_model_unimo_text.py)实现基于FasterTransformer的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
+
+```shell
+python export_model.py \
+    --model_name_or_path ./checkpoint \
+    --inference_model_dir ./export_checkpoint \
+    --max_out_len 64 \
+    --use_fp16_decoding
+```
+关键参数释义如下：
+
+* `model_name_or_path`：动态图训练保存的参数路径；默认为"./checkpoint"。
+* `inference_model_dir`：静态图图保存的参数路径；默认为"./export_checkpoint"。
+* `max_out_len`：最大输出长度。
+* `use_fp16_decoding`:是否使用fp16解码进行预测。
+
+执行命令后将会自动导出模型到指定的 `export_checkpoint` 中，保存模型文件结构如下所示：
+
+```text
+export/
+├── unimo_text.pdiparams
+├── unimo_text.pdiparams.info
+└── unimo_text.pdmodel
+```
+
+#### 模型部署
+飞桨提供多种不同场景的部署方案，请根据实际情况进行选择：
+|部署方案|特色|场景|硬件|
+|-|-|-|-|
+|Paddle Inference<br>服务端／云端|通用性|模型算法复杂<br>硬件高性能|X86 CPU<br>NVIDIA 全系列 GPU<br>龙芯／飞腾等国产CPU<br>昆仑／昇腾／海光DCU等AI加速芯片
+|Paddle Lite<br>移动端／边缘端|轻量化|模型小<br>硬件杂、资源少、功耗低|Arm CPU<br>Arm／高通／苹果GPU<br>昆仑／昇腾／麒麟／瑞芯微／颖脉／寒武纪／比特大陆等AI加速硬件
+|Paddle Serving<br>服务化|高并发|大流量、高并发、低延时、高吞吐<br>资源弹性调控应对服务流量变化<br>支持模型组合、加密、热更新等|X86/Arm CPU<br>NVIDIA GPU<br>昆仑／昇腾等
+|Paddle.js<br>网页前端|浏览器推理|Chrome、Safari、Firefox 等浏览器<br>Node.js<br>小程序|
+|Paddle20NNX<br>开源开放|开放兼容|第三方推理框架<br>长尾硬件支持|地平线旭日X3<br>鲲云星空X3<br>全志R329<br>其它国产芯片
+
+文本摘要应用已打通多种场景部署方案，点击链接获取具体的使用教程。
+- [Paddle Inference 推理 (Python)](./deploy/paddle_inference/README.md)
+- [Paddle Serving 服务化部署（Python）](./deploy/paddle_serving/README.md)
+
+## References
+Li, Wei, et al. "Unimo: Towards unified-modal understanding and generation via cross-modal contrastive learning." arXiv preprint arXiv:2012.15409 (2020).
