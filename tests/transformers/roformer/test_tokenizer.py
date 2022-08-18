@@ -21,11 +21,8 @@ from paddlenlp.transformers.roformer.tokenizer import (JiebaBasicTokenizer,
                                                        RoFormerTokenizer,
                                                        WordpieceTokenizer)
 
-# from ...testing_utils import slow
-# from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
-
-from tests.testing_utils import slow, get_tests_dir
-from tests.transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+from ...testing_utils import slow
+from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
 class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
