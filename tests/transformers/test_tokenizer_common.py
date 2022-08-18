@@ -1874,8 +1874,6 @@ class TokenizerTesterMixin:
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 vocab = tokenizer.get_vocab()
-                # vocab = dict(tokenizer.vocab._token_to_idx,
-                #              **tokenizer.added_tokens_encoder)
                 for word, ind in vocab.items():
                     if word == tokenizer.unk_token:
                         continue
