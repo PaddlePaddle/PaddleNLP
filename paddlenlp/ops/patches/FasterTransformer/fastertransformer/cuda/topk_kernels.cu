@@ -30,8 +30,8 @@ __global__ void ker_curand_setup(curandState_t* state,
   // Parallel
   if (threadIdx.x + blockIdx.x * blockDim.x < size)
     curand_init(seed,
-                blockIdx.x * blockDim.x + threadIdx.x,
-                seed,
+                0,
+                0,
                 &state[blockIdx.x * blockDim.x + threadIdx.x]);
 }
 
