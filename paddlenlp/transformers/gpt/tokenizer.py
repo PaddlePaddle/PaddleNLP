@@ -129,12 +129,6 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             eol_token='\u2583',
             **kwargs  # The token of newline.
     ):
-        super(GPTChineseTokenizer, self).__init__(max_len=max_len,
-                                                  unk_token=unk_token,
-                                                  bos_token=bos_token,
-                                                  eos_token=eos_token,
-                                                  eol_token=eol_token,
-                                                  **kwargs)
 
         self._model_file = model_file
         self.eol_token = eol_token

@@ -524,18 +524,17 @@ class GenerationMixin(object):
                 .format(type(pretrained_model_name)))
 
         decoder_start_token_id = (
-            decoder_start_token_id
-            if decoder_start_token_id is not None else getattr(
-                getattr(self, pretrained_model_name).config,
+            decoder_start_token_id if decoder_start_token_id is not None else
+            getattr(self, pretrained_model_name).config.get(
                 "decoder_start_token_id", None))
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(
             self, pretrained_model_name).config["bos_token_id"]
 
         if decoder_start_token_id is not None:
             return decoder_start_token_id
-        elif getattr(
-                getattr(self, pretrained_model_name).config,
-                "decoder_start_token_id", None) is not None:
+        elif getattr(self,
+                     pretrained_model_name).config.get("decoder_start_token_id",
+                                                       None) is not None:
             return getattr(
                 self, pretrained_model_name).config["decoder_start_token_id"]
         elif bos_token_id is not None:

@@ -167,23 +167,6 @@ class BartTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
-        if "max_len" in kwargs and "model_max_length" in kwargs:
-            kwargs["max_len"] = kwargs["model_max_length"]
-        elif "max_len" in kwargs:
-            kwargs["model_max_length"] = kwargs["max_len"]
-
-        super(BartTokenizer, self).__init__(errors=errors,
-                                            bos_token=bos_token,
-                                            eos_token=eos_token,
-                                            cls_token=cls_token,
-                                            sep_token=sep_token,
-                                            unk_token=unk_token,
-                                            pad_token=pad_token,
-                                            mask_token=mask_token,
-                                            **kwargs)
-
-        super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
-                                            max_len, pad_token, eos_token)
 
         bos_token = AddedToken(bos_token,
                                lstrip=False, rstrip=False) if isinstance(
