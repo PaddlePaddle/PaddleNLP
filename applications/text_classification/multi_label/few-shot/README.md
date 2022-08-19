@@ -195,7 +195,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 
 在模型训练时开启`--do_predict`，训练结束后直接进行预测，也可以在训练结束后，通过运行以下命令加载模型参数进行预测：
 ```
-python train.py --do_predict --data_dir ./data --output_dir ./predict_ckpt --resume_from_checkpoint ./ckpt/ --max_seq_length 128
+python train.py --do_predict --data_dir ./data --output_dir ./predict_ckpt --resume_from_checkpoint ./checkpoints/ --max_seq_length 128
 ```
 
 可配置参数说明：
@@ -213,7 +213,7 @@ python train.py --do_predict --data_dir ./data --output_dir ./predict_ckpt --res
 
 在训练结束后，需要将动态图模型导出为静态图参数用于部署推理。可以在模型训练时开启`--do_export`在训练结束后直接导出，也可以运行以下命令加载并导出训练后的模型参数，默认导出到在`output_dir`指定的目录下。
 ```
-python train.py --do_export --data_dir ./data --output_dir ./export_ckpt --resume_from_checkpoint ./ckpt/
+python train.py --do_export --data_dir ./data --output_dir ./export_ckpt --resume_from_checkpoint ./checkpoints/
 ```
 
 可配置参数说明：
@@ -227,28 +227,32 @@ python train.py --do_export --data_dir ./data --output_dir ./export_ckpt --resum
 
 模型转换与ONNXRuntime预测部署依赖Paddle2ONNX和ONNXRuntime，Paddle2ONNX支持将Paddle静态图模型转化为ONNX模型格式，算子目前稳定支持导出ONNX Opset 7~15，更多细节可参考：[Paddle2ONNX](https://github.com/PaddlePaddle/Paddle2ONNX)。
 
+ONNXRuntime推理部署需要安装以下依赖：
+```shell
+pip install psutil
+pip install paddle2onnx==1.0.0rc3
+```
+
 如果基于GPU部署，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
 ```shell
-pip install paddle2onnx==1.0.0rc3
 python -m pip install onnxruntime-gpu onnx onnxconverter-common
 ```
 
 如果基于CPU部署，请使用如下命令安装所需依赖:
 ```shell
-pip install paddle2onnx==1.0.0rc3
 python -m pip install onnxruntime
 ```
 
 #### CPU端推理样例
 
 ```
-python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_size 32 --device cpu
+python infer.py --model_path_prefix checkpoints/export/model --data_dir ./data --batch_size 32 --device cpu
 ```
 
 #### GPU端推理样例
 
 ```
-python infer.py --model_path_prefix ckpt/export/model --data_dir ./data --batch_size 32 --device gpu --device_id 0
+python infer.py --model_path_prefix checkpoints/export/model --data_dir ./data --batch_size 32 --device gpu --device_id 0
 ```
 
 可配置参数说明：
