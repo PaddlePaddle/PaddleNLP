@@ -145,11 +145,11 @@ class InputFeatures(dict):
         content = {}
         for key, value in self.items():
             if isinstance(value, paddle.Tensor):
-                value = value.numpy()
+                value = value.numpy().tolist()
             elif isinstance(value, paddle.static.Variable):
                 value = value.to_string(True)
             content[key] = value
-        return str(json.dumps(content) + "\n")
+        return str(json.dumps(content))
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -167,6 +167,29 @@ class InputFeatures(dict):
                 "brings unexpected results.".format(key))
         self.add_keys(key)
         setattr(self, key, value)
+
+    def __eq__(self, other):
+        if not isinstance(other, InputFeatures):
+            return False
+        if self.keys() != other.keys():
+            return False
+        for key in self.keys():
+            value = getattr(self, key)
+            other_value = getattr(other, key)
+            if type(value) != type(other_value):
+                return False
+            if isinstance(value, paddle.Tensor):
+                value = value.numpy()
+                other_value = other_value.numpy()
+            if isinstance(value, list):
+                value = np.array(value)
+                other_value = np.array(other_value)
+            if not (value == other_value).all():
+                return False
+        return True
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
     @classmethod
     def collate_fn(cls, batch):
