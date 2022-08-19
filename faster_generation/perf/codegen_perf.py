@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -59,8 +59,8 @@ def perf_pd(args):
                                        max_length=args.generate_len,
                                        min_length=args.generate_len,
                                        decode_strategy="sampling",
-                                       top_k=10,
-                                       top_p=1.,
+                                       top_k=args.top_k,
+                                       top_p=args.top_p,
                                        use_faster=args.use_faster,
                                        use_fp16_decoding=args.use_fp16_decoding)
             generate_mem = query_by_id()
@@ -99,8 +99,8 @@ def perf_hf(args):
                 do_sample=True,
                 max_length=args.generate_len + input_ids.shape[-1],
                 min_length=args.generate_len + input_ids.shape[-1],
-                top_k=10,
-                top_p=1.)
+                top_k=args.top_k,
+                top_p=args.top_p)
             generate_mem = query_by_id()
         torch.cuda.synchronize()
         hf_cost = (time.perf_counter() - start) / (num_loop -
@@ -111,19 +111,33 @@ def perf_hf(args):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--perf_typle",
+        "--perf_type",
         default="pd",
         type=str,
         choices=['pd', 'pd_faster_fp32', 'pd_faster_fp16', 'hf'],
         help="The type of perf.  ")
+    parser.add_argument("--model_name_or_path",
+                        default="Salesforce/codegen-350M-mono",
+                        type=str,
+                        choices=[
+                            'Salesforce/codegen-350M-mono',
+                            'Salesforce/codegen-2B-mono',
+                            'Salesforce/codegen-6B-mono',
+                            'Salesforce/codegen-16B-mono'
+                        ],
+                        help="The model name to specify the bart to use.  ")
     parser.add_argument(
-        "--model_name_or_path",
-        default="Salesforce/codegen-350M-mono",
-        type=str,
-        choices=['Salesforce/codegen-350M-mono', 'Salesforce/codegen-2B-mono'],
-        help="The model name to specify the bart to use.  ")
+        "--top_k",
+        default=4,
+        type=int,
+        help="The number of candidate to procedure topk sampling. ")
+    parser.add_argument(
+        "--top_p",
+        default=1.0,
+        type=float,
+        help="The probability threshold to procedure topp sampling. ")
     parser.add_argument("--batch_size",
-                        default=4,
+                        default=1,
                         type=int,
                         help="The size of input batch. ")
     parser.add_argument("--input_len",
@@ -148,14 +162,14 @@ def parse_args():
 
 def do_predict(args):
     try:
-        if args.perf_typle == 'pd':
+        if args.perf_type == 'pd':
             args.use_faster = False
             cost, load_mem, generate_mem = perf_pd(args)
-        elif args.perf_typle == 'pd_faster_fp32':
+        elif args.perf_type == 'pd_faster_fp32':
             args.use_faster = True
             args.use_fp16_decoding = False
             cost, load_mem, generate_mem = perf_pd(args)
-        elif args.perf_typle == 'pd_faster_fp16':
+        elif args.perf_type == 'pd_faster_fp16':
             args.use_faster = True
             args.use_fp16_decoding = True
             paddle.set_default_dtype('float16')
@@ -164,7 +178,7 @@ def do_predict(args):
             cost, load_mem, generate_mem = perf_hf(args)
         pprint(args)
         print(
-            f'CodeGenPerfResult: cost_time: {cost}ms, load_mem: {load_mem}MB, generate_mem:{generate_mem}MB, args:{args}\n'
+            f'CodeGenPerfResult: cost_time: {cost} ms, load_mem: {load_mem} MB, generate_mem:{generate_mem} MB, args:{args}\n'
         )
     except Exception as e:
         pprint(args)
