@@ -59,7 +59,8 @@ parser.add_argument('--model_name',
                         "ernie-3.0-xbase-zh", "ernie-3.0-base-zh",
                         "ernie-3.0-medium-zh", "ernie-3.0-micro-zh",
                         "ernie-3.0-mini-zh", "ernie-3.0-nano-zh",
-                        "ernie-2.0-base-en", "ernie-2.0-large-en"
+                        "ernie-2.0-base-en", "ernie-2.0-large-en",
+                        "ernie-1.0-large-zh-cw"
                     ],
                     default="ernie-3.0-medium-zh",
                     help="Select model to train, defaults "
