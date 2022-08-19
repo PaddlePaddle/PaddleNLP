@@ -17,15 +17,17 @@ import sys
 import functools
 
 import paddle
-
+import paddle.nn.functional as F
+from paddleslim.nas.ofa import OFA
+from paddlenlp.utils.log import logger
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
 from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
-from paddlenlp.utils.log import logger
 from dataclasses import dataclass, field
 
 from utils import preprocess_function, read_local_dataset
+from metric import MetricReport
 
 
 # yapf: disable
@@ -50,6 +52,28 @@ class ModelArguments:
     params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
     width_mult: str = field(default='2/3',metadata={"help": "The reserved ratio for q, k, v, and ffn weight widths."})
 # yapf: enable
+
+
+@paddle.no_grad()
+def dynabert_evaluate(model, data_loader):
+    metric = MetricReport()
+    model.eval()
+    metric.reset()
+    for batch in data_loader:
+        logits = model(batch['input_ids'],
+                       batch['token_type_ids'],
+                       attention_mask=[None, None])
+        # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
+        if isinstance(model, OFA):
+            logits = logits[0]
+        probs = F.sigmoid(logits)
+        metric.update(probs, batch['labels'])
+
+    micro_f1_score, macro_f1_score = metric.accumulate()
+    logger.info("micro f1 score: %.5f, macro f1 score: %.5f" %
+                (micro_f1_score, macro_f1_score))
+    model.train()
+    return macro_f1_score
 
 
 def main():
@@ -107,7 +131,7 @@ def main():
 
     compression_args.print_config()
 
-    trainer.compress()
+    trainer.compress(custom_dynabert_evaluate=dynabert_evaluate)
 
 
 if __name__ == "__main__":

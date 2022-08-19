@@ -385,7 +385,7 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
-  * `width_mult`：裁剪宽度保留的比例，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，默认是 '2/3'。
+  * `width_mult`：裁剪宽度（multi head）保留的比例，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是 '2/3'。
 
 以上参数都可通过 `python prune.py --dataset_dir xx --params_dir xx` 的方式传入）
 
@@ -412,6 +412,7 @@ prune/
 
 4. 导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
+5. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
 ### 裁剪效果
 本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在KUAKE-QIC任务的表现，测试配置如下：
