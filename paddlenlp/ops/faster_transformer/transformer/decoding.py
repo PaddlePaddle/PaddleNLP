@@ -43,7 +43,8 @@ def run_custom(op_name,
                outputs_dtype=None):
     ret = []
 
-    if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
+    if getattr(paddle.fluid.framework, "_in_eager_mode_", False) and getattr(
+            paddle.fluid.framework, "_dygraph_tracer_", None) is not None:
         ctx = core.CustomOpKernelContext()
 
         for ins in inputs_var:
