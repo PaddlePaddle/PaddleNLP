@@ -430,7 +430,7 @@ class ModelTesterMixin:
 
     def test_resize_tokens_embeddings(self):
         (
-            original_config,
+            config,
             inputs_dict,
         ) = self.model_tester.prepare_config_and_inputs_for_common()
         if not self.test_resize_embeddings:
@@ -444,6 +444,7 @@ class ModelTesterMixin:
 
             model_vocab_size = config["vocab_size"]
             # Retrieve the embeddings and clone theme
+
             model_embed = model.resize_token_embeddings(model_vocab_size)
             cloned_embeddings = model_embed.weight.clone()
 

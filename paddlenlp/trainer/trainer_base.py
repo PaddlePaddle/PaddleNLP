@@ -327,6 +327,29 @@ class Trainer:
             # release memory
             del state_dict
 
+    @staticmethod
+    def init_num_steps(args, num_samples_per_epoch):
+        args.total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+
+        num_update_steps_per_epoch = num_samples_per_epoch // args.train_batch_size + int(
+            num_samples_per_epoch % args.train_batch_size > 0)
+        num_update_steps_per_epoch //= args.gradient_accumulation_steps
+        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+
+        if args.max_steps > 0:
+            args.num_training_steps = args.max_steps
+            args.num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
+                args.max_steps % num_update_steps_per_epoch > 0)
+            args.num_train_samples = args.max_steps * args.total_train_batch_size
+        else:
+            args.num_training_steps = num_update_steps_per_epoch * args.num_train_epochs
+            args.num_train_epochs = math.ceil(args.num_train_epochs)
+            args.num_train_samples = num_samples_per_epoch * args.num_train_epochs
+
+        if args.warmup_steps <= 0:
+            args.warmup_steps = int(args.warmup_ratio * args.num_training_steps)
+        return args
+
     def train(
         self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
@@ -379,21 +402,7 @@ class Trainer:
 
         self.state = TrainerState()
 
-        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
-
-        num_update_steps_per_epoch = len(
-            train_dataloader) // args.gradient_accumulation_steps
-        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-
-        if args.max_steps > 0:
-            args.num_training_steps = args.max_steps
-            num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
-                args.max_steps % num_update_steps_per_epoch > 0)
-            num_train_samples = args.max_steps * total_train_batch_size
-        else:
-            args.num_training_steps = num_update_steps_per_epoch * args.num_train_epochs
-            num_train_epochs = math.ceil(args.num_train_epochs)
-            num_train_samples = len(self.train_dataset) * args.num_train_epochs
+        args = self.init_num_steps(args, len(self.train_dataset))
 
         if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
             if args.num_training_steps // args.eval_steps < args.minimum_eval_times:
@@ -413,18 +422,18 @@ class Trainer:
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
-        logger.info(f"  Num Epochs = {num_train_epochs}")
+        logger.info(f"  Num Epochs = {args.num_train_epochs}")
         logger.info(
             f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
         )
         logger.info(
-            f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}"
+            f"  Total train batch size (w. parallel, distributed & accumulation) = {args.total_train_batch_size}"
         )
         logger.info(
             f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
         )
         logger.info(f"  Total optimization steps = {args.num_training_steps}")
-        logger.info(f"  Total num train samples = {num_train_samples}")
+        logger.info(f"  Total num train samples = {args.num_train_samples}")
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -485,7 +494,7 @@ class Trainer:
         self.callback_handler.train_dataloader = train_dataloader
 
         self.state.max_steps = int(args.num_training_steps)
-        self.state.num_train_epochs = num_train_epochs
+        self.state.num_train_epochs = args.num_train_epochs
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
@@ -496,7 +505,7 @@ class Trainer:
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
-        for epoch in range(epochs_trained, num_train_epochs):
+        for epoch in range(epochs_trained, args.num_train_epochs):
             if isinstance(train_dataloader,
                           paddle.io.DataLoader) and isinstance(
                               train_dataloader.batch_sampler,
@@ -624,7 +633,7 @@ class Trainer:
 
         metrics = speed_metrics("train",
                                 start_time,
-                                num_samples=num_train_samples,
+                                num_samples=args.num_train_samples,
                                 num_steps=self.state.max_steps)
 
         metrics["train_loss"] = train_loss

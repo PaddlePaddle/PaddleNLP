@@ -43,11 +43,11 @@
 ## 社区交流
 
 - 微信扫描二维码并填写问卷之后，加入交流群领取福利
-  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接。
+  - 与众多社区开发者以及官方团队深度交流。
   - 10G重磅NLP学习大礼包！
 
   <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
+  <img src="https://user-images.githubusercontent.com/11793384/184784832-bb97930f-a738-4480-99be-517aeb65afac.png" width="150" height="150" />
   </div>
 
 ## 特性

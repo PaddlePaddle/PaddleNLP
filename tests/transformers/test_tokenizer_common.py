@@ -32,7 +32,7 @@ from paddlenlp.transformers import (AlbertTokenizer, AutoTokenizer,
                                     BertTokenizer, PretrainedTokenizer)
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
-from tests.testing_utils import get_tests_dir, slow
+from ..testing_utils import get_tests_dir, slow
 
 sys.path.append(str(Path(__file__).parent.parent / "utils"))
 
@@ -68,10 +68,10 @@ class TokenizerTesterMixin:
 
     # set to True to test a sentencepiece tokenizer
     test_sentencepiece = False
-
     # set to True to ignore casing when testing a sentencepiece tokenizer
     # test_sentencepiece must also be set to True
     test_sentencepiece_ignore_case = False
+    test_offsets = True
 
     def setUp(self) -> None:
 
@@ -193,7 +193,9 @@ class TokenizerTesterMixin:
         for tokenizer_class in tokenizer_classes:
             tokenizer = tokenizer_class.from_pretrained(model_name)
 
-            encoding = tokenizer(sequences, padding=padding)
+            encoding = tokenizer(sequences,
+                                 padding=padding,
+                                 return_attention_mask=True)
             decoded_sequences = [
                 tokenizer.decode(seq, skip_special_tokens=True, **decode_kwargs)
                 for seq in encoding["input_ids"]
@@ -2526,6 +2528,9 @@ class TokenizerTesterMixin:
                 self.assertEqual(len(tokenizer), vocab_size + 8)
 
     def test_offsets_mapping(self):
+        if not self.test_offsets:
+            return
+
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
                     f"{tokenizer.__class__.__name__} ({pretrained_name})"):
@@ -2613,7 +2618,6 @@ class TokenizerTesterMixin:
                     "an_additional_special_token",
                     tokenizer_without_change_in_init.additional_special_tokens)
 
-                # self.assertIn("an_additional_special_token", tokenizer_without_change_in_init.get_vocab())
                 self.assertIn("an_additional_special_token",
                               tokenizer_without_change_in_init.get_vocab())
                 self.assertEqual(

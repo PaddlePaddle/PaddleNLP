@@ -182,6 +182,9 @@ class BartTokenizer(PretrainedTokenizer):
                                             mask_token=mask_token,
                                             **kwargs)
 
+        super(BartTokenizer, self).__init__(vocab_file, merges_file, errors,
+                                            max_len, pad_token, eos_token)
+
         bos_token = AddedToken(bos_token,
                                lstrip=False, rstrip=False) if isinstance(
                                    bos_token, str) else bos_token
