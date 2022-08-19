@@ -256,10 +256,7 @@ class TextSimilarityTask(Task):
                     self.input_handles[0].copy_from_cpu(input_ids)
                     self.input_handles[1].copy_from_cpu(segment_ids)
                     self.predictor.run()
-                    # scores = self._model.matching(input_ids=input_ids,
-                    #                             token_type_ids=segment_ids)
                     scores = self.output_handle[0].copy_to_cpu().tolist()
-                    # print(scores)
                     results.extend(scores)
         else:
             with static_mode_guard():
