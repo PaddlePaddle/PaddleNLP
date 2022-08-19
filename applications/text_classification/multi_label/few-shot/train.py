@@ -21,7 +21,7 @@ import paddle.nn.functional as F
 from paddle.static import InputSpec
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback
 from paddlenlp.prompt import (
     AutoTemplate,
     SoftVerbalizer,
@@ -107,6 +107,12 @@ def main():
             "macro_f1_score": macro_f1_score
         }
 
+    # Deine the early-stopping callback.
+    callbacks = [
+        EarlyStoppingCallback(early_stopping_patience=4,
+                              early_stopping_threshold=0.)
+    ]
+
     # Initialize the trainer.
     trainer = PromptTrainer(model=prompt_model,
                             tokenizer=tokenizer,
@@ -114,6 +120,7 @@ def main():
                             criterion=criterion,
                             train_dataset=train_ds,
                             eval_dataset=dev_ds,
+                            callbacks=callbacks,
                             compute_metrics=compute_metrics)
 
     # Training.

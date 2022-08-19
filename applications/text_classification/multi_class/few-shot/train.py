@@ -20,7 +20,7 @@ from paddle.static import InputSpec
 from paddle.metric import Accuracy
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback
 from paddlenlp.prompt import (
     AutoTemplate,
     SoftVerbalizer,
@@ -101,6 +101,12 @@ def main():
         acc = metric.accumulate()
         return {'accuracy': acc}
 
+    # Deine the early-stopping callback.
+    callbacks = [
+        EarlyStoppingCallback(early_stopping_patience=4,
+                              early_stopping_threshold=0.)
+    ]
+
     # Initialize the trainer.
     trainer = PromptTrainer(model=prompt_model,
                             tokenizer=tokenizer,
@@ -108,6 +114,7 @@ def main():
                             criterion=criterion,
                             train_dataset=train_ds,
                             eval_dataset=dev_ds,
+                            callbacks=callbacks,
                             compute_metrics=compute_metrics)
 
     # Traininig.
@@ -133,7 +140,7 @@ def main():
         ]
         export_path = os.path.join(training_args.output_dir, 'export')
         trainer.export_model(export_path,
-                             input_spec=input_sepc,
+                             input_spec=input_spec,
                              export_type=model_args.export_type)
 
 
