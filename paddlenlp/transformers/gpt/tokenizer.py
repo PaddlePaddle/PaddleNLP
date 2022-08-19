@@ -371,13 +371,6 @@ class GPTTokenizer(PretrainedTokenizer):
             add_prefix_space=False,
             **kwargs  # The token of newline.
     ):
-        super(GPTTokenizer, self).__init__(errors=errors,
-                                           max_len=max_len,
-                                           pad_token=pad_token,
-                                           eos_token=eos_token,
-                                           unk_token=unk_token,
-                                           eol_token=eol_token,
-                                           **kwargs)
 
         pad_token = AddedToken(pad_token,
                                lstrip=False, rstrip=False) if isinstance(
