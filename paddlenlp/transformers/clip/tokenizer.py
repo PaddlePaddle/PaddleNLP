@@ -109,7 +109,7 @@ class CLIPTokenizer(GPTTokenizer):
             from paddlenlp.transformers import AutoTokenizer
 
             tokenizer = AutoTokenizer.from_pretrained('openai/clip-vit-base-patch32')
-            print(tokenizer('He was a puppeteer', return_token_type_ids=False))
+            print(tokenizer('He was a puppeteer'))
 
             '''
             {'input_ids': [49406, 797, 739, 320, 7116, 38820, 528, 49407]}
@@ -127,12 +127,32 @@ class CLIPTokenizer(GPTTokenizer):
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/vocab.json",
             "openai/disco-diffusion-clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/vocab.json",
+            # rn50
+            "openai/clip-rn50":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/vocab.json",
+            "openai/disco-diffusion-clip-rn50":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn50/vocab.json",
+            # rn101
+            "openai/clip-rn101":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/vocab.json",
+            "openai/disco-diffusion-clip-rn101":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/vocab.json",
         },
         "merges_file": {
             "openai/clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/merges.txt",
             "openai/disco-diffusion-clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/merges.txt",
+            # rn50
+            "openai/clip-rn50":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/merges.txt",
+            "openai/disco-diffusion-clip-rn50":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn50/merges.txt",
+            # rn101
+            "openai/clip-rn101":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/merges.txt",
+            "openai/disco-diffusion-clip-rn101":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/merges.txt",
         }
     }
     pretrained_init_configuration = {
@@ -140,6 +160,18 @@ class CLIPTokenizer(GPTTokenizer):
             "max_len": 77
         },
         "openai/disco-diffusion-clip-vit-base-patch32": {
+            "max_len": 77
+        },
+        "openai/clip-rn50": {
+            "max_len": 77
+        },
+        "openai/disco-diffusion-clip-rn50": {
+            "max_len": 77
+        },
+        "openai/clip-rn101": {
+            "max_len": 77
+        },
+        "openai/disco-diffusion-clip-rn101": {
             "max_len": 77
         },
     }
@@ -351,7 +383,7 @@ class CLIPTokenizer(GPTTokenizer):
             truncation=False,
             return_position_ids=False,
             return_token_type_ids=False,  # don't return token_type_ids 
-            return_attention_mask=True,  # return attention_mask 
+            return_attention_mask=False,
             return_length=False,
             return_overflowing_tokens=False,
             return_special_tokens_mask=False,

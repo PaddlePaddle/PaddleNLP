@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple, Optional
+from typing import Any, Tuple, Optional, Union
 
 import paddle
 import paddle.nn as nn
@@ -31,6 +31,7 @@ __all__ = [
     'CLIPPreTrainedModel',
     'CLIPModel',
     'CLIPForImageGeneration',
+    'ModifiedResNet',
 ]
 
 
@@ -81,6 +82,219 @@ def clip_loss(similarity):
     caption_loss = contrastive_loss(similarity)
     image_loss = contrastive_loss(similarity.t())
     return (caption_loss + image_loss) / 2.0
+
+
+class ModifiedResNet(nn.Layer):
+    """
+    A ResNet class that is similar to torchvision's but contains the following changes:
+    - There are now 3 "stem" convolutions as opposed to 1, with an average pool instead of a max pool.
+    - Performs anti-aliasing strided convolutions, where an avgpool is prepended to convolutions with stride > 1
+    - The final pooling layer is a QKV attention instead of an average pool
+    """
+
+    def __init__(self,
+                 layers,
+                 output_dim,
+                 heads,
+                 input_resolution=224,
+                 width=64):
+        super().__init__()
+        self.output_dim = output_dim
+        self.input_resolution = input_resolution
+
+        # the 3-layer stem
+        self.conv1 = nn.Conv2D(3,
+                               width // 2,
+                               kernel_size=3,
+                               stride=2,
+                               padding=1,
+                               bias_attr=False)
+        self.bn1 = nn.BatchNorm2D(width // 2)
+        self.conv2 = nn.Conv2D(width // 2,
+                               width // 2,
+                               kernel_size=3,
+                               padding=1,
+                               bias_attr=False)
+        self.bn2 = nn.BatchNorm2D(width // 2)
+        self.conv3 = nn.Conv2D(width // 2,
+                               width,
+                               kernel_size=3,
+                               padding=1,
+                               bias_attr=False)
+        self.bn3 = nn.BatchNorm2D(width)
+        self.avgpool = nn.AvgPool2D(2)
+        self.relu = nn.ReLU()
+
+        # residual layers
+        self._inplanes = width  # this is a *mutable* variable used during construction
+        self.layer1 = self._make_layer(width, layers[0])
+        self.layer2 = self._make_layer(width * 2, layers[1], stride=2)
+        self.layer3 = self._make_layer(width * 4, layers[2], stride=2)
+        self.layer4 = self._make_layer(width * 8, layers[3], stride=2)
+
+        embed_dim = width * 32  # the ResNet feature dimension
+        self.attnpool = AttentionPool2d(input_resolution // 32, embed_dim,
+                                        heads, output_dim)
+
+    def _make_layer(self, planes, blocks, stride=1):
+        layers = [Bottleneck(self._inplanes, planes, stride)]
+
+        self._inplanes = planes * Bottleneck.expansion
+        for _ in range(1, blocks):
+            layers.append(Bottleneck(self._inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+
+        def stem(x):
+            for conv, bn in [(self.conv1, self.bn1), (self.conv2, self.bn2),
+                             (self.conv3, self.bn3)]:
+                x = self.relu(bn(conv(x)))
+            x = self.avgpool(x)
+            return x
+
+        x = stem(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        x = self.attnpool(x)
+
+        return x
+
+
+def multi_head_attention_forward(x: paddle.Tensor,
+                                 num_heads: int,
+                                 q_proj: nn.Linear,
+                                 k_proj: nn.Linear,
+                                 v_proj: nn.Linear,
+                                 c_proj: nn.Linear,
+                                 attn_mask: Optional[paddle.Tensor] = None):
+    max_len, batch_size, emb_dim = x.shape
+    head_dim = emb_dim // num_heads
+    scaling = float(head_dim)**-0.5
+    q = q_proj(x)  # L, N, E
+    k = k_proj(x)  # L, N, E
+    v = v_proj(x)  # L, N, E
+
+    v = v.reshape((-1, batch_size * num_heads, head_dim)).transpose((1, 0, 2))
+    k = k.reshape((-1, batch_size * num_heads, head_dim)).transpose((1, 0, 2))
+    q = q.reshape((-1, batch_size * num_heads, head_dim)).transpose((1, 0, 2))
+
+    q = q * scaling
+    qk = paddle.matmul(q, k, transpose_y=True)
+    if attn_mask is not None:
+        if attn_mask.ndim == 2:
+            attn_mask.unsqueeze_(0)
+        assert attn_mask.shape[0] == 1 and attn_mask.shape[
+            1] == max_len and attn_mask.shape[2] == max_len
+        qk += attn_mask
+
+    qk = F.softmax(qk, axis=-1)
+    atten = paddle.bmm(qk, v)
+    atten = atten.transpose((1, 0, 2))
+    atten = atten.reshape((max_len, batch_size, emb_dim))
+    atten = c_proj(atten)
+    return atten
+
+
+class Identity(nn.Layer):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x
+
+
+class Bottleneck(nn.Layer):
+    expansion = 4
+
+    def __init__(self, inplanes, planes, stride=1):
+        super().__init__()
+
+        # all conv layers have stride 1. an avgpool is performed after the second convolution when stride > 1
+        self.conv1 = nn.Conv2D(inplanes, planes, 1, bias_attr=False)
+        self.bn1 = nn.BatchNorm2D(planes)
+
+        self.conv2 = nn.Conv2D(planes, planes, 3, padding=1, bias_attr=False)
+        self.bn2 = nn.BatchNorm2D(planes)
+
+        self.avgpool = nn.AvgPool2D(stride) if stride > 1 else Identity()
+
+        self.conv3 = nn.Conv2D(planes,
+                               planes * self.expansion,
+                               1,
+                               bias_attr=False)
+        self.bn3 = nn.BatchNorm2D(planes * self.expansion)
+
+        self.relu = nn.ReLU()
+        self.downsample = None
+        self.stride = stride
+
+        if stride > 1 or inplanes != planes * Bottleneck.expansion:
+            self.downsample = nn.Sequential(
+                ("-1", nn.AvgPool2D(stride)),
+                ("0",
+                 nn.Conv2D(inplanes,
+                           planes * self.expansion,
+                           1,
+                           stride=1,
+                           bias_attr=False)),
+                ("1", nn.BatchNorm2D(planes * self.expansion)))
+
+    def forward(self, x):
+        identity = x
+
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn2(self.conv2(out)))
+        out = self.avgpool(out)
+        out = self.bn3(self.conv3(out))
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+        return out
+
+
+class AttentionPool2d(nn.Layer):
+
+    def __init__(self,
+                 spacial_dim: int,
+                 embed_dim: int,
+                 num_heads: int,
+                 output_dim: int = None):
+        super().__init__()
+
+        self.positional_embedding = paddle.create_parameter(
+            (spacial_dim**2 + 1, embed_dim), dtype=paddle.get_default_dtype())
+
+        self.q_proj = nn.Linear(embed_dim, embed_dim, bias_attr=True)
+        self.k_proj = nn.Linear(embed_dim, embed_dim, bias_attr=True)
+        self.v_proj = nn.Linear(embed_dim, embed_dim, bias_attr=True)
+        self.c_proj = nn.Linear(embed_dim,
+                                output_dim or embed_dim,
+                                bias_attr=True)
+        self.num_heads = num_heads
+
+        self.head_dim = embed_dim // num_heads
+        assert self.head_dim * num_heads == embed_dim, "embed_dim must be divisible by num_heads"
+
+    def forward(self, x):
+
+        x = x.reshape(
+            (x.shape[0], x.shape[1], x.shape[2] * x.shape[3])).transpose(
+                (2, 0, 1))  # NCHW -> (HW)NC
+        x = paddle.concat([x.mean(axis=0, keepdim=True), x], axis=0)
+        x = x + paddle.unsqueeze(self.positional_embedding, 1)
+        out = multi_head_attention_forward(x, self.num_heads, self.q_proj,
+                                           self.k_proj, self.v_proj,
+                                           self.c_proj)
+
+        return out[0]
 
 
 class CLIPPreTrainedModel(PretrainedModel):
@@ -136,6 +350,48 @@ class CLIPPreTrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "logit_scale_init_value": 2.6592
         },
+        "openai/clip-rn50": {
+            # vision
+            "image_resolution": 224,
+            "vision_layers": [3, 4, 6, 3],
+            "vision_heads": 32,
+            "vision_mlp_ratio": None,  # do not use
+            "vision_embed_dim": 64,  # vision width
+            "vision_patch_size": None,  # do not use
+            "vision_hidden_act": None,  # do not use
+            # text
+            "max_text_length": 77,
+            "vocab_size": 49408,
+            "text_embed_dim": 512,
+            "text_heads": 8,
+            "text_layers": 12,
+            "text_hidden_act": "quick_gelu",
+            # others
+            "projection_dim": 1024,
+            "initializer_range": 0.02,
+            "logit_scale_init_value": 2.6592
+        },
+        "openai/clip-rn101": {
+            # vision
+            "image_resolution": 224,
+            "vision_layers": [3, 4, 23, 3],
+            "vision_heads": 32,
+            "vision_mlp_ratio": None,  # do not use
+            "vision_embed_dim": 64,  # vision width
+            "vision_patch_size": None,  # do not use
+            "vision_hidden_act": None,  # do not use
+            # text
+            "max_text_length": 77,
+            "vocab_size": 49408,
+            "text_embed_dim": 512,
+            "text_heads": 8,
+            "text_layers": 12,
+            "text_hidden_act": "quick_gelu",
+            # others
+            "projection_dim": 512,
+            "initializer_range": 0.02,
+            "logit_scale_init_value": 2.6592
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -145,6 +401,16 @@ class CLIPPreTrainedModel(PretrainedModel):
             # for image dd generation
             "openai/disco-diffusion-clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/model_state.pdparams",
+            "openai/clip-rn50":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/model_state.pdparams",
+            # for image dd generation
+            "openai/disco-diffusion-clip-rn50":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn50/model_state.pdparams",
+            "openai/clip-rn101":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/model_state.pdparams",
+            # for image dd generation
+            "openai/disco-diffusion-clip-rn101":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/model_state.pdparams",
         }
     }
     base_model_prefix = "clip"
@@ -378,7 +644,7 @@ class TextTransformer(CLIPPreTrainedModel):
                                                  transformer_width)
         self.ln_final = nn.LayerNorm(transformer_width)
 
-        self.register_buffer("attention_mask",
+        self.register_buffer("causal_mask",
                              paddle.triu(paddle.ones(
                                  (1, 1, context_length, context_length)) * INF,
                                          diagonal=1),
@@ -398,7 +664,7 @@ class TextTransformer(CLIPPreTrainedModel):
         if position_ids is None:
             position_ids = self.position_ids[:, :seqlen]
 
-        causal_mask = self.attention_mask[:, :, :seqlen, :seqlen]
+        causal_mask = self.causal_mask[:, :, :seqlen, :seqlen]
         if attention_mask is not None:
             if attention_mask.ndim == 2:
                 attention_mask = attention_mask[:, None, None, :]
@@ -511,7 +777,7 @@ class CLIPModel(CLIPPreTrainedModel):
             self,
             # vision
             image_resolution: int = 224,
-            vision_layers: int = 12,
+            vision_layers: Union[Tuple[int, int, int, int], int] = 12,
             vision_heads: int = 12,
             vision_embed_dim: int = 768,
             vision_patch_size: int = 32,
@@ -538,16 +804,29 @@ class CLIPModel(CLIPPreTrainedModel):
         self.vision_layers = vision_layers
         self.text_layers = text_layers
 
-        self.vision_model = VisionTransformer(input_resolution=image_resolution,
-                                              patch_size=vision_patch_size,
-                                              width=vision_embed_dim,
-                                              layers=vision_layers,
-                                              heads=vision_heads,
-                                              activation=vision_hidden_act,
-                                              mlp_ratio=vision_mlp_ratio,
-                                              normalize_before=True)
-        self.vision_projection = paddle.create_parameter(
-            (vision_embed_dim, projection_dim), paddle.get_default_dtype())
+        if isinstance(vision_layers, (tuple, list)):
+            if vision_heads is None:
+                vision_heads = vision_embed_dim * 32 // 64
+            self.vision_model = ModifiedResNet(
+                layers=vision_layers,
+                output_dim=projection_dim,
+                heads=vision_heads,
+                input_resolution=image_resolution,
+                width=vision_embed_dim)
+        else:
+            if vision_heads is None:
+                vision_heads = vision_embed_dim // 64
+            self.vision_model = VisionTransformer(
+                input_resolution=image_resolution,
+                patch_size=vision_patch_size,
+                width=vision_embed_dim,
+                layers=vision_layers,
+                heads=vision_heads,
+                activation=vision_hidden_act,
+                mlp_ratio=vision_mlp_ratio,
+                normalize_before=True)
+            self.vision_projection = paddle.create_parameter(
+                (vision_embed_dim, projection_dim), paddle.get_default_dtype())
 
         self.text_model = TextTransformer(context_length=max_text_length,
                                           transformer_width=text_embed_dim,
@@ -592,14 +871,18 @@ class CLIPModel(CLIPPreTrainedModel):
                 image_features = model.get_image_features(**inputs)
                 
         """
-        vision_outputs = self.vision_model(
-            pixel_values,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
-        pooled_output = vision_outputs[1]
-        image_features = paddle.matmul(pooled_output, self.vision_projection)
-        return image_features
+        if isinstance(self.vision_model, ModifiedResNet):
+            return self.vision_model(pixel_values)
+        else:
+            vision_outputs = self.vision_model(
+                pixel_values,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict)
+            pooled_output = vision_outputs[1]
+            image_features = paddle.matmul(pooled_output,
+                                           self.vision_projection)
+            return image_features
 
     def get_text_features(
         self,
@@ -709,13 +992,18 @@ class CLIPModel(CLIPPreTrainedModel):
                 probs = F.softmax(logits_per_image, axis=1)  # we can take the softmax to get the label probabilities
 
         '''
-
-        vision_outputs = self.vision_model(
-            pixel_values=pixel_values,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
+        if isinstance(self.vision_model, ModifiedResNet):
+            vision_outputs = None
+            image_embeds = self.vision_model(pixel_values)
+        else:
+            vision_outputs = self.vision_model(
+                pixel_values=pixel_values,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+            image_embeds = paddle.matmul(vision_outputs[1],
+                                         self.vision_projection)
 
         text_outputs = self.text_model(
             input_ids=input_ids,
@@ -725,7 +1013,6 @@ class CLIPModel(CLIPPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        image_embeds = paddle.matmul(vision_outputs[1], self.vision_projection)
         text_embeds = paddle.matmul(text_outputs[1], self.text_projection)
 
         # normalized features
@@ -801,13 +1088,13 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
         init_image=None,
         output_dir='disco_diffusion_clip_vitb32_out/',
         width_height=[1280, 768],
-        skip_steps=10,
+        skip_steps=0,
         steps=250,
         cut_ic_pow=1,
         init_scale=1000,
         clip_guidance_scale=5000,
         tv_scale=0,
-        range_scale=150,
+        range_scale=0,
         sat_scale=0,
         cutn_batches=4,
         perlin_init=False,
@@ -912,7 +1199,7 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
                 Optional, set to zero to turn off.  Used for adjustment of color contrast.  Lower range_scale will increase 
                 contrast. Very low numbers create a reduced color palette, resulting in more vibrant or poster-like images. 
                 Higher range_scale will reduce contrast, for more muted images.
-                Default to `150`.
+                Default to `0`.
             sat_scale (int, optional): 
                 Saturation scale. Optional, set to zero to turn off.  If used, sat_scale will help mitigate oversaturation. 
                 If your image is too saturated, increase sat_scale to reduce the saturation.
@@ -1022,11 +1309,19 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
             tokenizer = CLIPTokenizer.from_pretrained(model_name_or_path)
             model.eval()
 
-            # Prepare the model inputs.
-            prompts = "A beautiful painting of a singular lighthouse, shining its light across a tumultuous sea of blood by greg rutkowski and thomas kinkade, Trending on artstation."
-            tokenized_inputs = tokenizer(prompts, return_tensors="pd")
-
+            # Prepare the text_prompt.
+            text_prompt = "A beautiful painting of a singular lighthouse, shining its light across a tumultuous sea of blood by greg rutkowski and thomas kinkade, Trending on artstation."
+            # Style and artist can be specified
+            style = None
+            artist = None
+            text_prompt = model.preprocess_text_prompt(text_prompt)
+            
+            # CLIP's pad_token_id is 0 and padding to max length 77. 
+            raw_pad_token_id = tokenizer.pad_token_id
+            tokenizer.pad_token_id = 0
+            tokenized_inputs = tokenizer(text_prompt, return_tensors="pd", padding="max_length", max_length=77)
             images = model.generate(**tokenized_inputs)
+            
             # return List[PIL.Image]
             images[0].save("figure.png")
                 
@@ -1039,10 +1334,14 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
             predict_xstart=False,
             rescale_timesteps=False,
         )
-        images_list = super().diffusion_generate(
+        # get get_text_features
+        target_text_embeds = self.get_text_features(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            position_ids=position_ids,
+            position_ids=position_ids)
+
+        images_list = super().diffusion_generate(
+            target_text_embeds=target_text_embeds,
             clamp_grad=clamp_grad,
             clamp_max=clamp_max,
             clip_denoised=clip_denoised,
@@ -1073,6 +1372,14 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
             batch_name=batch_name)
 
         return images_list
+
+    def preprocess_text_prompt(self, text_prompt, style=None, artist=None):
+        text_prompt = text_prompt.rstrip(',.，。')
+        if style is not None:
+            text_prompt += ",{}".format(style)
+        if artist is not None:
+            text_prompt += ",{},trending on artstation".format(artist)
+        return text_prompt
 
     def __getattr__(self, name):
         try:

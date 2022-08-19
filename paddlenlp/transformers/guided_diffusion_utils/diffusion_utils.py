@@ -1,5 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+'''
+This code is rewritten by Paddle based on Jina-ai/discoart.
+https://github.com/jina-ai/discoart/blob/main/discoart/runner.py
+'''
 import paddle
 import gc
 import random
@@ -41,18 +43,16 @@ def set_seed(seed):
 class DiffusionMixin(object):
 
     def diffusion_generate(self,
-                           input_ids,
-                           attention_mask=None,
-                           position_ids=None,
+                           target_text_embeds,
                            init_image=None,
                            output_dir='outputs/',
                            width_height=[1280, 768],
-                           skip_steps=10,
+                           skip_steps=0,
                            cut_ic_pow=1,
                            init_scale=1000,
                            clip_guidance_scale=5000,
                            tv_scale=0,
-                           range_scale=150,
+                           range_scale=0,
                            sat_scale=0,
                            cutn_batches=4,
                            perlin_init=False,
@@ -76,22 +76,6 @@ class DiffusionMixin(object):
         The DiffusionMixin diffusion_generate method.
         
         Args:
-            input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide it.
-                Its data type should be `int64` and it has a shape of [text_batch_size, sequence_length].
-            attention_mask (Tensor, optional):
-                Mask used in multi-head attention (TextTransformer) to avoid performing attention on to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                Defaults to `None`, which means nothing needed to be prevented attention to.
-            position_ids(Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings (TextTransformer). Selected in 
-                the range ``[0, max_text_length - 1]``.
-                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             init_image (Path, optional): 
                 Recall that in the image sequence above, the first image shown is just noise.  If an init_image 
                 is provided, diffusion will replace the noise with the init_image as its starting state.  To use 
@@ -125,7 +109,7 @@ class DiffusionMixin(object):
                 skip_steps up or down for creative reasons.  With low skip_steps you can get a result "inspired by" 
                 the init_image which will retain the colors and rough layout and shapes but look quite different. 
                 With high skip_steps you can preserve most of the init_image contents and just do fine tuning of the texture.
-                Default to `10`.
+                Default to `0`.
             steps: 
                 When creating an image, the denoising curve is subdivided into steps for processing. Each step (or iteration) 
                 involves the AI looking at subsets of the image called 'cuts' and calculating the 'direction' the image 
@@ -165,10 +149,10 @@ class DiffusionMixin(object):
                 See https://en.wikipedia.org/wiki/Total_variation_denoising
                 Default to `0`.
             range_scale (int, optional): 
-                Optional, set to zero to turn off.  Used for adjustment of color contrast.  Lower range_scale will increase 
+                Optional, set to zero to turn off.  Used for adjustment of color contrast. Lower range_scale will increase 
                 contrast. Very low numbers create a reduced color palette, resulting in more vibrant or poster-like images. 
                 Higher range_scale will reduce contrast, for more muted images.
-                Default to `150`.
+                Default to `0`.
             sat_scale (int, optional): 
                 Saturation scale. Optional, set to zero to turn off.  If used, sat_scale will help mitigate oversaturation. 
                 If your image is too saturated, increase sat_scale to reduce the saturation.
@@ -279,10 +263,6 @@ class DiffusionMixin(object):
         if seed is not None:
             set_seed(seed)
 
-        target_embeds = self.get_text_features(input_ids=input_ids,
-                                               attention_mask=attention_mask,
-                                               position_ids=position_ids)
-
         init = None
         if init_image:
             d = Image.open(init_image)
@@ -329,7 +309,8 @@ class DiffusionMixin(object):
                     self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t],
                     dtype='float32')
                 cosine_t = alpha_sigma_to_t(alpha, sigma)
-                cosine_t = paddle.tile(paddle.to_tensor(cosine_t.detach()), [n])
+                cosine_t = paddle.tile(
+                    paddle.to_tensor(cosine_t.detach().cpu().numpy()), [n])
                 cosine_t.stop_gradient = False
                 out = self.secondary_model(x, cosine_t).pred
                 fac = self.diffusion.sqrt_one_minus_alphas_cumprod[cur_t]
@@ -372,11 +353,11 @@ class DiffusionMixin(object):
                     cuts(
                         x_in.add(paddle.to_tensor(1.0)).divide(
                             paddle.to_tensor(2.0))))
-                image_embeds = (self.get_image_features(clip_in))
+                image_embeds = self.get_image_features(clip_in)
 
                 dists = spherical_dist_loss(
                     image_embeds.unsqueeze(1),
-                    target_embeds.unsqueeze(0),
+                    target_text_embeds.unsqueeze(0),
                 )
 
                 dists = dists.reshape([
@@ -385,8 +366,9 @@ class DiffusionMixin(object):
                     -1,
                 ])
                 losses = dists.sum(2).mean(0)
-                x_in_grad += (paddle.grad(losses.sum() * clip_guidance_scale,
-                                          x_in)[0])
+                x_in_grad += (
+                    paddle.grad(losses.sum() * clip_guidance_scale, x_in)[0] /
+                    cutn_batches)
             tv_losses = tv_loss(x_in)
             range_losses = range_loss(x_in)
             sat_losses = paddle.abs(x_in - x_in.clip(min=-1, max=1)).mean()

@@ -210,7 +210,7 @@ class ImageFeatureExtractionMixin:
     def resize(self,
                image,
                size,
-               resample=Image.Resampling.BILINEAR,
+               resample=Image.BILINEAR,
                default_to_square=True,
                max_size=None):
         """
@@ -224,8 +224,8 @@ class ImageFeatureExtractionMixin:
                 If `size` is an int and `default_to_square` is `True`, then image will be resized to (size, size). If
                 `size` is an int and `default_to_square` is `False`, then smaller edge of the image will be matched to
                 this number. i.e, if height > width, then image will be rescaled to (size * height / width, size).
-            resample (`int`, *optional*, defaults to `Image.Resampling.BILINEAR`):
-                The filter to user for Image.Resampling.
+            resample (`int`, *optional*, defaults to `PIL.Image.BILINEAR`):
+                The filter to user for resampling.
             default_to_square (`bool`, *optional*, defaults to `True`):
                 How to convert `size` when it is a single int. If set to `True`, the `size` will be converted to a
                 square (`size`,`size`). If set to `False`, will replicate
@@ -376,7 +376,7 @@ class ImageFeatureExtractionMixin:
     def rotate(self,
                image,
                angle,
-               resample=Image.Resampling.NEAREST,
+               resample=Image.NEAREST,
                expand=0,
                center=None,
                translate=None,
