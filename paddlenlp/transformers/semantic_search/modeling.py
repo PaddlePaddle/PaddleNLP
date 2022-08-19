@@ -268,9 +268,10 @@ class ErnieCrossEncoder(nn.Layer):
                               position_ids=position_ids,
                               attention_mask=attention_mask,
                               return_prob_distributation=True)
-        accuracy = paddle.metric.accuracy(input=probs, label=labels)
-        loss = F.cross_entropy(input=logits, label=labels)
-
-        outputs = {"loss": loss, "accuracy": accuracy}
-
-        return outputs
+        if (labels is not None):
+            accuracy = paddle.metric.accuracy(input=probs, label=labels)
+            loss = F.cross_entropy(input=probs, label=labels)
+            outputs = {"loss": loss, "accuracy": accuracy}
+            return outputs
+        else:
+            return probs[:, 1]

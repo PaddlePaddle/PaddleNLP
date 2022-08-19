@@ -61,12 +61,74 @@ class TextSimilarityTask(Task):
                 "1254bbd7598457a9dad0afcb2e24b70c"
             ],
         },
+        "rocketqa-zh-dureader-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-zh-dureader-cross-encoder/model_state.pdparams",
+                "88bc3e1a64992a1bdfe4044ecba13bc7"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-zh-dureader-cross-encoder/model_config.json",
+                "b69083c2895e8f68e1a10467b384daab"
+            ],
+        },
+        "rocketqa-base-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-base-cross-encoder/model_state.pdparams",
+                "6d845a492a2695e62f2be79f8017be92"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-base-cross-encoder/model_config.json",
+                "18ce260ede18bc3cb28dcb2e7df23b1a"
+            ],
+        },
+        "rocketqa-medium-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-medium-cross-encoder/model_state.pdparams",
+                "4b929f4fc11a1df8f59fdf2784e23fa7"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-medium-cross-encoder/model_config.json",
+                "10997db96bc86e29cd113e1bf58989d7"
+            ],
+        },
+        "rocketqa-mini-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-mini-cross-encoder/model_state.pdparams",
+                "c411111df990132fb88c070d8b8cf3f7"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-mini-cross-encoder/model_config.json",
+                "271e6d779acbe8e8acdd596b1c835546"
+            ],
+        },
+        "rocketqa-micro-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-micro-cross-encoder/model_state.pdparams",
+                "3d643ff7d6029c8ceab5653680167dc0"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-micro-cross-encoder/model_config.json",
+                "b32d1a932d8c367fab2a6216459dd0a7"
+            ],
+        },
+        "rocketqa-nano-cross-encoder": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-nano-cross-encoder/model_state.pdparams",
+                "4c1d36e5e94f5af09f665fc7ad0be140"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/text_similarity/rocketqa-nano-cross-encoder/model_config.json",
+                "dcff14cd671e1064be2c5d63734098bb"
+            ],
+        },
     }
 
     def __init__(self, task, model, batch_size=1, max_seq_len=384, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        if ('rocketqa' not in model):
-            self._check_task_files()
+        self._static_mode = True
+        self._check_task_files()
+        self._get_inference_model()
+        if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
@@ -84,7 +146,7 @@ class TextSimilarityTask(Task):
             paddle.static.InputSpec(shape=[None, None],
                                     dtype="int64",
                                     name='input_ids'),
-            paddle.static.InputSpec(shape=[None],
+            paddle.static.InputSpec(shape=[None, None],
                                     dtype="int64",
                                     name='token_type_ids'),
         ]
@@ -188,13 +250,17 @@ class TextSimilarityTask(Task):
         """
         results = []
         if ("rocketqa" in self.model_name):
-            for batch in inputs['data_loader']:
-                input_ids, segment_ids = self._batchify_fn(batch)
-                input_ids = paddle.to_tensor(input_ids, dtype='int64')
-                segment_ids = paddle.to_tensor(segment_ids, dtype='int64')
-                scores = self._model.matching(input_ids=input_ids,
-                                              token_type_ids=segment_ids)
-                results.extend(scores.numpy().tolist())
+            with static_mode_guard():
+                for batch in inputs['data_loader']:
+                    input_ids, segment_ids = self._batchify_fn(batch)
+                    self.input_handles[0].copy_from_cpu(input_ids)
+                    self.input_handles[1].copy_from_cpu(segment_ids)
+                    self.predictor.run()
+                    # scores = self._model.matching(input_ids=input_ids,
+                    #                             token_type_ids=segment_ids)
+                    scores = self.output_handle[0].copy_to_cpu().tolist()
+                    # print(scores)
+                    results.extend(scores)
         else:
             with static_mode_guard():
                 for batch in inputs['data_loader']:
