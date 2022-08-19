@@ -2674,15 +2674,12 @@ def convert_gptj_params(faster_model,
             # right in jit.to_static/jit.save.
             dummy_tensor = paddle.zeros([1, 1])
             if permutation is not None:
-                qkv = layer.attn.qkv_proj.weight.transpose([1, 0])
-                qkv = qkv[permutation].transpose([1, 0])
+                qkv = layer.attn.qkv_proj.weight.numpy()
+                qkv = qkv[:, permutation]
                 if fuse_qkv == 2:
-                    qkv = qkv.numpy()
                     del layer.attn.qkv_proj.weight
                     setattr(layer.attn.qkv_proj, "weight", dummy_tensor)
-                    w = paddle.to_tensor(qkv)
-                else:
-                    w = qkv
+                w = paddle.to_tensor(qkv)
             else:
                 w = _convert_qkv(layer.attn.q_proj,
                                  layer.attn.k_proj,
@@ -2753,8 +2750,8 @@ class InferGptJDecoding(nn.Layer):
             # GPTJ is different with CodeGen in attention project layer.
             local_dim = self.model.transformer.config['n_embd'] // 4
             base_permutation = [0, 3, 6, 9, 2, 5, 8, 11, 1, 4, 7, 10]
-            permutation = paddle.concat([
-                paddle.arange(i * local_dim, (i + 1) * local_dim)
+            permutation = np.concatenate([
+                np.arange(i * local_dim, (i + 1) * local_dim)
                 for i in base_permutation
             ])
         params = convert_gptj_params(self,
