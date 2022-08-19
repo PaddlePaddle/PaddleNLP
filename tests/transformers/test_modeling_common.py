@@ -430,7 +430,7 @@ class ModelTesterMixin:
 
     def test_resize_tokens_embeddings(self):
         (
-            config,
+            original_config,
             inputs_dict,
         ) = self.model_tester.prepare_config_and_inputs_for_common()
         if not self.test_resize_embeddings:
