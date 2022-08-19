@@ -73,11 +73,11 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 - Input Length: 60
 - Output Length: 20
 <p align="left">
-  <img src="https://user-images.githubusercontent.com/24390500/185611444-df2bec75-6cec-4c86-afd6-3049faae6288.png" width="800" height ="400" />
+  <img src="https://user-images.githubusercontent.com/24390500/185611444-df2bec75-6cec-4c86-afd6-3049faae6288.png" width="800" height ="350" />
 </p>
 
 <p align="left">
-  <img src="https://user-images.githubusercontent.com/24390500/185611812-2c93dd94-9cd0-4c5c-926a-232b673c2056.png" width="800" height ="400" />
+  <img src="https://user-images.githubusercontent.com/24390500/185611812-2c93dd94-9cd0-4c5c-926a-232b673c2056.png" width="800" height ="350" />
 </p>
 
 更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf)
