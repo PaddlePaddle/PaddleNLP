@@ -36,6 +36,8 @@ from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
 from .information_extraction import UIETask
+from .code_generation import CodeGenerationTask
+from .text_to_image import TextToImageGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -226,6 +228,26 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-base"
             },
+            "uie-medium": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-medium"
+            },
+            "uie-mini": {
+                "task_class": UIETask,
+                "hidden_size": 384,
+                "task_flag": "information_extraction-uie-mini"
+            },
+            "uie-micro": {
+                "task_class": UIETask,
+                "hidden_size": 384,
+                "task_flag": "information_extraction-uie-micro"
+            },
+            "uie-nano": {
+                "task_class": UIETask,
+                "hidden_size": 312,
+                "task_flag": "information_extraction-uie-nano"
+            },
             "uie-tiny": {
                 "task_class": UIETask,
                 "hidden_size": 768,
@@ -236,12 +258,111 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-medical-base"
             },
+            "uie-base-en": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-base-en"
+            },
         },
         "default": {
             "model": "uie-base"
         }
+    },
+    "code_generation": {
+        "models": {
+            "Salesforce/codegen-350M-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-mono',
+                "task_priority_path": "Salesforce/codegen-350M-mono",
+            },
+            "Salesforce/codegen-2B-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-mono',
+                "task_priority_path": "Salesforce/codegen-2B-mono",
+            },
+            "Salesforce/codegen-6B-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-mono',
+                "task_priority_path": "Salesforce/codegen-6B-mono",
+            },
+            "Salesforce/codegen-350M-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-nl',
+                "task_priority_path": "Salesforce/codegen-350M-nl",
+            },
+            "Salesforce/codegen-2B-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-nl',
+                "task_priority_path": "Salesforce/codegen-2B-nl",
+            },
+            "Salesforce/codegen-6B-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-nl',
+                "task_priority_path": "Salesforce/codegen-6B-nl",
+            },
+            "Salesforce/codegen-350M-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-multi',
+                "task_priority_path": "Salesforce/codegen-350M-multi",
+            },
+            "Salesforce/codegen-2B-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-multi',
+                "task_priority_path": "Salesforce/codegen-2B-multi",
+            },
+            "Salesforce/codegen-6B-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-multi',
+                "task_priority_path": "Salesforce/codegen-6B-multi",
+            },
+        },
+        "default": {
+            "model": "Salesforce/codegen-350M-mono",
+        },
+    },
+    "text_to_image": {
+        "models": {
+            "dalle-mini": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mini",
+                "task_priority_path": "dalle-mini",
+            },
+            "dalle-mega-v16": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega-v16",
+                "task_priority_path": "dalle-mega-v16",
+            },
+            "dalle-mega": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega",
+                "task_priority_path": "dalle-mega",
+            },
+            "pai-painter-painting-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-painting-base-zh",
+                "task_priority_path": "pai-painter-painting-base-zh",
+            },
+            "pai-painter-scenery-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-scenery-base-zh",
+                "task_priority_path": "pai-painter-scenery-base-zh",
+            },
+            "pai-painter-commercial-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-commercial-base-zh",
+                "task_priority_path": "pai-painter-commercial-base-zh",
+            },
+        },
+        "default": {
+            "model": "pai-painter-painting-base-zh",
+        }
     }
 }
+
+support_schema_list = [
+    "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
+    "uie-medical-base", "uie-base-en", "wordtag"
+]
 
 
 class Taskflow(object):
@@ -276,7 +397,7 @@ class Taskflow(object):
 
         if self.model is not None:
             assert self.model in set(TASKS[task][tag].keys(
-            )), "The {} name:{} is not in task:[{}]".format(tag, model, task)
+            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
         else:
             self.model = TASKS[task]['default'][ind_tag]
 
@@ -347,7 +468,5 @@ class Taskflow(object):
                 print("[Bot]:%s" % robot)
 
     def set_schema(self, schema):
-        assert self.task_instance.model in [
-            "uie-base", "uie-tiny", "uie-medical-base"
-        ], 'This method can only used for the task with uie model.'
+        assert self.task_instance.model in support_schema_list, 'This method can only be used by the task with the model of uie or wordtag.'
         self.task_instance.set_schema(schema)

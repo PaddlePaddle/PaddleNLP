@@ -17,11 +17,13 @@ limitations under the License. */
 #include <unordered_map>
 #include "core/encoding.h"
 #include "core/tokenizer.h"
+#include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tokenizers_impl {
 
-struct ErnieFasterTokenizer : public core::Tokenizer {
+struct FASTERTOKENIZER_DECL ErnieFasterTokenizer : public core::Tokenizer {
   ErnieFasterTokenizer(const std::string& vocab_path,
                        const std::string& unk_token = "[UNK]",
                        const std::string& sep_token = "[SEP]",
@@ -33,7 +35,7 @@ struct ErnieFasterTokenizer : public core::Tokenizer {
                        bool strip_accents = true,
                        bool lowercase = true,
                        const std::string& wordpieces_prefix = "##",
-                       uint max_sequence_len = 0);
+                       uint32_t max_sequence_len = 0);
 
   ErnieFasterTokenizer(const core::Vocab& vocab,
                        const std::string& unk_token = "[UNK]",
@@ -46,7 +48,7 @@ struct ErnieFasterTokenizer : public core::Tokenizer {
                        bool strip_accents = true,
                        bool lowercase = true,
                        const std::string& wordpieces_prefix = "##",
-                       uint max_sequence_len = 0);
+                       uint32_t max_sequence_len = 0);
 
 private:
   void Init(const core::Vocab& vocab,
@@ -60,8 +62,9 @@ private:
             bool strip_accents = true,
             bool lowercase = true,
             const std::string& wordpieces_prefix = "##",
-            uint max_sequence_len = 0);
+            uint32_t max_sequence_len = 0);
 };
 
-}  // tokenizers_impl
-}  // tokenizers
+}  // namespace faster_tokenizer_impl
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

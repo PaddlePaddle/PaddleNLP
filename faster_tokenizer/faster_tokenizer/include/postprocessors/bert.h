@@ -16,25 +16,28 @@ limitations under the License. */
 
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
+#include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace postprocessors {
 
-struct BertPostProcessor : public PostProcessor {
-  BertPostProcessor(const std::pair<std::string, uint>& sep,
-                    const std::pair<std::string, uint>& cls);
+struct FASTERTOKENIZER_DECL BertPostProcessor : public PostProcessor {
+  BertPostProcessor(const std::pair<std::string, uint32_t>& sep,
+                    const std::pair<std::string, uint32_t>& cls);
   BertPostProcessor();
   virtual size_t AddedTokensNum(bool is_pair) const override;
   virtual void operator()(core::Encoding* encoding,
                           core::Encoding* pair_encoding,
                           bool add_special_tokens,
                           core::Encoding* result_encoding) const override;
-  std::pair<std::string, uint> sep_;
-  std::pair<std::string, uint> cls_;
+  std::pair<std::string, uint32_t> sep_;
+  std::pair<std::string, uint32_t> cls_;
   friend void to_json(nlohmann::json& j,
                       const BertPostProcessor& bert_postprocessor);
   friend void from_json(const nlohmann::json& j,
                         BertPostProcessor& bert_postprocessor);
 };
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

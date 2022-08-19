@@ -367,6 +367,7 @@ class GPTTokenizer(PretrainedTokenizer):
             eos_token='<|endoftext|>',
             unk_token='<|endoftext|>',
             eol_token='\u010a',
+            add_prefix_space=False,
             **kwargs  # The token of newline.
     ):
         pad_token = AddedToken(pad_token,
@@ -389,7 +390,9 @@ class GPTTokenizer(PretrainedTokenizer):
         self.num_command_tokens = 2
         self.num_type_tokens = 2
 
-        self.encoder = json.load(open(vocab_file))
+        with open(vocab_file, 'r', encoding='utf-8') as f:
+            self.encoder = json.load(f)
+
         self.decoder = {v: k for k, v in self.encoder.items()}
 
         self.num_tokens = len(self.encoder)
@@ -397,10 +400,15 @@ class GPTTokenizer(PretrainedTokenizer):
         self.errors = errors  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
-        bpe_data = open(merges_file, encoding='utf-8').read().split('\n')[1:-1]
+
+        with open(merges_file, encoding='utf-8') as f:
+            bpe_data = f.read().split('\n')[1:-1]
+
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
+        self.add_prefix_space = add_prefix_space
+
         re = try_import("regex")
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
@@ -519,5 +527,26 @@ class GPTTokenizer(PretrainedTokenizer):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
+            source_path = getattr(self, "_%s" % name)
+
             save_path = os.path.join(save_directory, file_name)
-            shutil.copyfile(getattr(self, "_%s" % name), save_path)
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)
+
+    def convert_tokens_to_string(self, tokens):
+        """
+        Converts a sequence of tokens (string) in a single string.
+        """
+        text = "".join(tokens)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode('utf-8', errors=self.errors)
+        return text
+
+    def prepare_for_tokenization(self,
+                                 text,
+                                 is_split_into_words=False,
+                                 **kwargs):
+        add_prefix_space = kwargs.pop("add_prefix_space", self.add_prefix_space)
+        if is_split_into_words or add_prefix_space:
+            text = " " + text
+        return (text, kwargs)

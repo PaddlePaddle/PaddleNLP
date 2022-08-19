@@ -274,13 +274,17 @@ def create_pretrained_dataset(
 ):
 
     if local_rank == 0:
-        start_time = time.time()
-        print('> compiling dataset index builder ...')
-        from data_tools.dataset_utils import compile_helper
-        compile_helper()
-        print('>>> done with dataset index builder. Compilation time: {:.3f} '
-              'seconds'.format(time.time() - start_time),
-              flush=True)
+        try:
+            import data_tools.helpers as helpers
+        except Exception as e:
+            start_time = time.time()
+            print('> compiling dataset index builder ...')
+            from data_tools.dataset_utils import compile_helper
+            compile_helper()
+            print(
+                '>>> done with dataset index builder. Compilation time: {:.3f} '
+                'seconds'.format(time.time() - start_time),
+                flush=True)
 
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -359,7 +363,7 @@ def create_pretrained_dataset(
                     yield tuple(
                         [np.expand_dims(np.array(x), axis=0) for x in data])
 
-            data_loader = paddle.fluid.io.DataLoader.from_generator(
+            data_loader = paddle.io.DataLoader.from_generator(
                 feed_list=data_holders, capacity=70, iterable=False)
             data_loader.set_batch_generator(data_gen, places)
         else:

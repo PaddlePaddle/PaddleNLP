@@ -1620,7 +1620,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
 
     """
 
-    def __init__(self, albert, num_labels):
+    def __init__(self, albert, num_labels=2):
         super(AlbertForQuestionAnswering, self).__init__()
         self.num_labels = num_labels
         self.transformer = albert
@@ -1717,7 +1717,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         logits = self.qa_outputs(sequence_output)
 
         start_logits, end_logits = paddle.split(logits,
-                                                num_or_sections=1,
+                                                num_or_sections=2,
                                                 axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
         end_logits = start_logits.squeeze(axis=-1)

@@ -21,11 +21,13 @@ limitations under the License. */
 #include "core/base.h"
 #include "core/encoding.h"
 #include "normalizers/normalizer.h"
+#include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pretokenizers {
 
-struct StringSplit {
+struct FASTERTOKENIZER_DECL StringSplit {
   normalizers::NormalizedString normalized_;
   std::vector<core::Token> tokens_;
   StringSplit(normalizers::NormalizedString&& normalized)
@@ -38,7 +40,7 @@ struct StringSplit {
   StringSplit() = default;
   StringSplit(const StringSplit& other) = default;
   StringSplit(StringSplit&& other)
-      : tokens_(std::move(tokens_)),
+      : tokens_(std::move(other.tokens_)),
         normalized_(std::move(other.normalized_)) {}
 
   StringSplit& operator=(const StringSplit& other) = default;
@@ -49,7 +51,7 @@ struct StringSplit {
   }
 };
 
-class PreTokenizedString {
+class FASTERTOKENIZER_DECL PreTokenizedString {
 public:
   PreTokenizedString() = default;
   PreTokenizedString(const std::string& original);
@@ -64,13 +66,13 @@ public:
   // For wordpiece, bpe ......
   void Tokenize(std::function<std::vector<core::Token>(
                     normalizers::NormalizedString*)> tokenize_fn);
-  bool TransformToEncoding(const std::vector<uint>& word_idx,
-                           uint type_id,
+  bool TransformToEncoding(const std::vector<uint32_t>& word_idx,
+                           uint32_t type_id,
                            core::OffsetType offset_type,
                            core::Encoding* encodings) const;
   template <typename Convertor>
-  bool TransformToEncodingUseConvertor(const std::vector<uint>& word_idx,
-                                       uint type_id,
+  bool TransformToEncodingUseConvertor(const std::vector<uint32_t>& word_idx,
+                                       uint32_t type_id,
                                        core::Encoding* encodings) const;
   size_t GetSplitsSize() const;
   StringSplit GetSplit(int idx) const;
@@ -82,22 +84,24 @@ private:
   std::vector<StringSplit> splits_;
 };
 
-struct PreTokenizer {
+struct FASTERTOKENIZER_DECL PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const = 0;
 };
 
-struct OffsetConverter {
+struct FASTERTOKENIZER_DECL OffsetConverter {
   OffsetConverter(const std::string&) {}
   virtual bool convert(const core::Offset&, core::Offset*) const {
     return true;
   }
 };
 
-struct BytesToCharOffsetConverter : public OffsetConverter {
+struct FASTERTOKENIZER_DECL BytesToCharOffsetConverter
+    : public OffsetConverter {
   std::vector<size_t> offset_map_;
   BytesToCharOffsetConverter(const std::string&);
   virtual bool convert(const core::Offset&, core::Offset*) const;
 };
 
-}  // pretokenizers
-}  // tokenizers
+}  // namespace pretokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

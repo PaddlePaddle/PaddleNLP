@@ -431,7 +431,11 @@ sh deploy.sh
 
 [0.5649663209915161, 0.03284594044089317]
 ```
+## FAQ
 
+#### SimCSE模型怎么部署？
+
++ SimCSE使用的模型跟 In-batch Negatives 训练出来的模型网络结构是一样的，使用 In-batch Negatives 的部署流程即可，参考[In-batch Negatives](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/recall/in_batch_negative/deploy/python)
 
 ## Reference
 [1] Gao, Tianyu, Xingcheng Yao, and Danqi Chen. “SimCSE: Simple Contrastive Learning of Sentence Embeddings.” ArXiv:2104.08821 [Cs], April 18, 2021. http://arxiv.org/abs/2104.08821.

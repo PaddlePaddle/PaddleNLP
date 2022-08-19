@@ -17,21 +17,23 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 #include "core/base.h"
+#include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace models {
 
-struct Model {
-  virtual std::vector<core::Token> Tokenize(
-      const std::string& tokens) const = 0;
-  virtual bool TokenToId(const std::string& token, uint* id) const = 0;
-  virtual bool IdToToken(uint id, std::string* token) const = 0;
+struct FASTERTOKENIZER_DECL Model {
+  virtual std::vector<core::Token> Tokenize(const std::string& tokens) = 0;
+  virtual bool TokenToId(const std::string& token, uint32_t* id) const = 0;
+  virtual bool IdToToken(uint32_t id, std::string* token) const = 0;
   virtual core::Vocab GetVocab() const = 0;
   virtual size_t GetVocabSize() const = 0;
   // Return the saved voacb path
-  virtual std::string Save(const std::string& folder,
-                           const std::string& filename_prefix) const = 0;
+  virtual std::vector<std::string> Save(
+      const std::string& folder, const std::string& filename_prefix) const = 0;
 };
 
-}  // model
-}  // tokenizers
+}  // namespace model
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

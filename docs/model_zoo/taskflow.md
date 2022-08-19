@@ -40,14 +40,16 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
+| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
+| [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 
 
 ## QuickStart
 
 **环境依赖**
   - python >= 3.6
-  - paddlepaddle >= 2.2.0
-  - paddlenlp >= 2.2.5
+  - paddlepaddle >= 2.3.0
+  - paddlenlp >= 2.3.4
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -203,7 +205,7 @@ from paddlenlp import Taskflow
 #### 支持两种模式
 
 ```python
-# 精确模式（默认），基于百度解语，内置66种词性及专名类别标签
+# 精确模式（默认），基于百度解语，内置91种词性及专名类别标签
 >>> from paddlenlp import Taskflow
 >>> ner = Taskflow("ner")
 >>> ner("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
@@ -232,23 +234,131 @@ from paddlenlp import Taskflow
 
 - 精确模式采用的标签集合
 
-包含66种词性及专名类别标签，标签集合如下表：
+包含91种词性及专名类别标签，标签集合如下表：
 
 <table>
-
-<tr><th colspan='6'>WordTag标签集合
-<tr><td>人物类_实体<td>物体类<td>生物类_动物<td>医学术语类<td>链接地址<td>肯定词
-<tr><td>人物类_概念<td>物体类_兵器<td>品牌名<td>术语类_生物体<td>个性特征<td>否定词
-<tr><td>作品类_实体<td>物体类_化学物质<td>场所类<td>疾病损伤类<td>感官特征<td>数量词
-<tr><td>作品类_概念<td>其他角色类<td>场所类_交通场所<td>疾病损伤类_植物病虫害<td>场景事件<td>叹词
-<tr><td>组织机构类<td>文化类<td>位置方位<td>宇宙类<td>介词<td>拟声词
-<tr><td>组织机构类_企事业单位<td>文化类_语言文字<td>世界地区类<td>事件类<td>介词_方位介词<td>修饰词
-<tr><td>组织机构类_医疗卫生机构<td>文化类_奖项赛事活动<td>饮食类<td>时间类<td>助词<td>外语单词
-<tr><td>组织机构类_国家机关<td>文化类_制度政策协议<td>饮食类_菜品<td>时间类_特殊日<td>代词<td>英语单词
-<tr><td>组织机构类_体育组织机构<td>文化类_姓氏与人名<td>饮食类_饮品<td>术语类<td>连词<td>汉语拼音
-<tr><td>组织机构类_教育组织机构<td>生物类<td>药物类<td>术语类_符号指标类<td>副词<td>词汇用语
-<tr><td>组织机构类_军事组织机构<td>生物类_植物<td>药物类_中药<td>信息资料<td>疑问词<td>w(标点)
-
+    <thead>
+        <th colspan='7'>WordTag标签集合</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>人物类_实体</td>
+            <td>组织机构类_军事组织机构_概念</td>
+            <td>文化类_制度政策协议</td>
+            <td>位置方位</td>
+            <td>术语类_医药学术语</td>
+            <td>信息资料_性别</td>
+            <td>否定词</td>
+        </tr>
+        <tr>
+            <td>人物类_概念</td>
+            <td>组织机构类_医疗卫生机构</td>
+            <td>文化类_姓氏与人名</td>
+            <td>世界地区类</td>
+            <td>术语类_生物体</td>
+            <td>链接地址</td>
+            <td>数量词</td>
+        </tr>
+        <tr>
+            <td>作品类_实体</td>
+            <td>组织机构类_医疗卫生机构_概念</td>
+            <td>生物类</td>
+            <td>世界地区类_国家</td>
+            <td>疾病损伤类</td>
+            <td>个性特征</td>
+            <td>数量词_序数词</td>
+        </tr>
+        <tr>
+            <td>作品类_概念</td>
+            <td>组织机构类_教育组织机构</td>
+            <td>生物类_植物</td>
+            <td>世界地区类_区划概念</td>
+            <td>疾病损伤类_植物病虫害</td>
+            <td>感官特征</td>
+            <td>数量词_单位数量词</td>
+        </tr>
+        <tr>
+            <td>组织机构类</td>
+            <td>组织机构类_教育组织机构_概念</td>
+            <td>生物类_动物</td>
+            <td>世界地区类_地理概念</td>
+            <td>宇宙类</td>
+            <td>场景事件</td>
+            <td>叹词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_概念</td>
+            <td>物体类</td>
+            <td>品牌名</td>
+            <td>饮食类</td>
+            <td>事件类</td>
+            <td>介词</td>
+            <td>拟声词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位</td>
+            <td>物体类_概念</td>
+            <td>品牌名_品牌类型</td>
+            <td>饮食类_菜品</td>
+            <td>时间类</td>
+            <td>介词_方位介词</td>
+            <td>修饰词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位_概念</td>
+            <td>物体类_兵器</td>
+            <td>场所类</td>
+            <td>饮食类_饮品</td>
+            <td>时间类_特殊日</td>
+            <td>助词</td>
+            <td>修饰词_性质</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关</td>
+            <td>物体类_化学物质</td>
+            <td>场所类_概念</td>
+            <td>药物类</td>
+            <td>时间类_朝代</td>
+            <td>代词</td>
+            <td>修饰词_类型</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关_概念</td>
+            <td>其他角色类</td>
+            <td>场所类_交通场所</td>
+            <td>药物类_中药</td>
+            <td>时间类_具体时间</td>
+            <td>连词</td>
+            <td>修饰词_化</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构</td>
+            <td>文化类</td>
+            <td>场所类_交通场所_概念</td>
+            <td>术语类</td>
+            <td>时间类_时长</td>
+            <td>副词</td>
+            <td>外语单词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构_概念</td>
+            <td>文化类_语言文字</td>
+            <td>场所类_网上场所</td>
+            <td>术语类_术语类型</td>
+            <td>词汇用语</td>
+            <td>疑问词</td>
+            <td>汉语拼音</td>
+        </tr>
+        <tr>
+            <td>组织机构类_军事组织机构</td>
+            <td>文化类_奖项赛事活动</td>
+            <td>场所类_网上场所_概念</td>
+            <td>术语类_符号指标类</td>
+            <td>信息资料</td>
+            <td>肯定词</td>
+            <td>w（标点）</td>
+        </tr>
+    </tbody>
 </table>
 
 - 快速模式采用的标签集合
@@ -402,277 +512,379 @@ from paddlenlp import Taskflow
 
 开放域信息抽取是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。
 
-#### 支持多场景信息抽取任务
-
-- 命名实体识别
+#### 实体抽取
 
   命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
 
-  例如抽取的目标实体类型是"时间"、"选手"和"赛事名称", schema构造如下：
+  - 例如抽取的目标实体类型是"时间"、"选手"和"赛事名称", schema构造如下：
 
-  ```text
-  ['时间', '选手', '赛事名称']
-  ```
+    ```text
+    ['时间', '选手', '赛事名称']
+    ```
 
-  预测：
+    调用示例：
 
-  ```python
-  >>> from pprint import pprint
-  >>> from paddlenlp import Taskflow
+    ```python
+    >>> from pprint import pprint
+    >>> from paddlenlp import Taskflow
 
-  >>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
-  >>> ie = Taskflow('information_extraction', schema=schema)
-  >>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")) # Better print results using pprint
-  [{'时间': [{'end': 6,
-            'probability': 0.9857378532924486,
-            'start': 0,
-            'text': '2月8日上午'}],
-    '赛事名称': [{'end': 23,
-              'probability': 0.8503089953268272,
-              'start': 6,
-              'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
-    '选手': [{'end': 31,
-            'probability': 0.8981548639781138,
-            'start': 28,
-            'text': '谷爱凌'}]}]
-  ```
+    >>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
+    >>> ie = Taskflow('information_extraction', schema=schema)
+    >>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")) # Better print results using pprint
+    [{'时间': [{'end': 6,
+              'probability': 0.9857378532924486,
+              'start': 0,
+              'text': '2月8日上午'}],
+      '赛事名称': [{'end': 23,
+                'probability': 0.8503089953268272,
+                'start': 6,
+                'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+      '选手': [{'end': 31,
+              'probability': 0.8981548639781138,
+              'start': 28,
+              'text': '谷爱凌'}]}]
+    ```
 
-  例如抽取的目标实体类型是"肿瘤的大小"、"肿瘤的个数"、"肝癌级别"和"脉管内癌栓分级", schema构造如下：
+  - 例如抽取的目标实体类型是"肿瘤的大小"、"肿瘤的个数"、"肝癌级别"和"脉管内癌栓分级", schema构造如下：
 
-  ```text
-  ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
-  ```
+    ```text
+    ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+    ```
 
-  在上例中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
+    在上例中我们已经实例化了一个`Taskflow`对象，这里可以通过`set_schema`方法重置抽取目标。
 
-  预测：
+    调用示例：
 
-  ```python
-  >>> schema = ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
-  >>> ie.set_schema(schema)
-  >>> pprint(ie("（右肝肿瘤）肝细胞性肝癌（II-III级，梁索型和假腺管型），肿瘤包膜不完整，紧邻肝被膜，侵及周围肝组织，未见脉管内癌栓（MVI分级：M0级）及卫星子灶形成。（肿物1个，大小4.2×4.0×2.8cm）。"))
-  [{'肝癌级别': [{'end': 20,
-              'probability': 0.9243267447402701,
-              'start': 13,
-              'text': 'II-III级'}],
-    '肿瘤的个数': [{'end': 84,
-              'probability': 0.7538413804059623,
-              'start': 82,
-              'text': '1个'}],
-    '肿瘤的大小': [{'end': 100,
-              'probability': 0.8341128043459491,
-              'start': 87,
-              'text': '4.2×4.0×2.8cm'}],
-    '脉管内癌栓分级': [{'end': 70,
-                'probability': 0.9083292325934664,
-                'start': 67,
-                'text': 'M0级'}]}]
-  ```
+    ```python
+    >>> schema = ['肿瘤的大小', '肿瘤的个数', '肝癌级别', '脉管内癌栓分级']
+    >>> ie.set_schema(schema)
+    >>> pprint(ie("（右肝肿瘤）肝细胞性肝癌（II-III级，梁索型和假腺管型），肿瘤包膜不完整，紧邻肝被膜，侵及周围肝组织，未见脉管内癌栓（MVI分级：M0级）及卫星子灶形成。（肿物1个，大小4.2×4.0×2.8cm）。"))
+    [{'肝癌级别': [{'end': 20,
+                'probability': 0.9243267447402701,
+                'start': 13,
+                'text': 'II-III级'}],
+      '肿瘤的个数': [{'end': 84,
+                'probability': 0.7538413804059623,
+                'start': 82,
+                'text': '1个'}],
+      '肿瘤的大小': [{'end': 100,
+                'probability': 0.8341128043459491,
+                'start': 87,
+                'text': '4.2×4.0×2.8cm'}],
+      '脉管内癌栓分级': [{'end': 70,
+                  'probability': 0.9083292325934664,
+                  'start': 67,
+                  'text': 'M0级'}]}]
+    ```
 
-- 关系抽取
+  - 例如抽取的目标实体类型是"person"和"organization"，schema构造如下：
+
+    ```text
+    ['person', 'organization']
+    ```
+
+    英文模型调用示例：
+
+    ```python
+    >>> from pprint import pprint
+    >>> from paddlenlp import Taskflow
+    >>> schema = ['Person', 'Organization']
+    >>> ie_en = Taskflow('information_extraction', schema=schema, model='uie-base-en')
+    >>> pprint(ie_en('In 1997, Steve was excited to become the CEO of Apple.'))
+    [{'Organization': [{'end': 53,
+                        'probability': 0.9985840259877357,
+                        'start': 48,
+                        'text': 'Apple'}],
+      'Person': [{'end': 14,
+                  'probability': 0.999631971804547,
+                  'start': 9,
+                  'text': 'Steve'}]}]
+    ```
+
+#### 关系抽取
 
   关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
 
-  例如以"竞赛名称"作为抽取主体，抽取关系类型为"主办方"、"承办方"和"已举办次数", schema构造如下：
+  - 例如以"竞赛名称"作为抽取主体，抽取关系类型为"主办方"、"承办方"和"已举办次数", schema构造如下：
 
-  ```text
-  {
-    '竞赛名称': [
-      '主办方',
-      '承办方',
-      '已举办次数'
-    ]
-  }
-  ```
+    ```text
+    {
+      '竞赛名称': [
+        '主办方',
+        '承办方',
+        '已举办次数'
+      ]
+    }
+    ```
 
-  预测：
+    调用示例：
 
-  ```python
-  >>> schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for relation extraction
-  >>> ie.set_schema(schema) # Reset schema
-  >>> pprint(ie('2022语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
-  [{'竞赛名称': [{'end': 13,
-              'probability': 0.7825402622754041,
-              'relations': {'主办方': [{'end': 22,
-                                    'probability': 0.8421710521379353,
-                                    'start': 14,
-                                    'text': '中国中文信息学会'},
-                                    {'end': 30,
-                                    'probability': 0.7580801847701935,
-                                    'start': 23,
-                                    'text': '中国计算机学会'}],
-                            '已举办次数': [{'end': 82,
-                                      'probability': 0.4671295049136148,
-                                      'start': 80,
-                                      'text': '4届'}],
-                            '承办方': [{'end': 39,
-                                    'probability': 0.8292706618236352,
-                                    'start': 35,
-                                    'text': '百度公司'},
-                                    {'end': 72,
-                                    'probability': 0.6193477885474685,
-                                    'start': 56,
-                                    'text': '中国计算机学会自然语言处理专委会'},
-                                    {'end': 55,
-                                    'probability': 0.7000497331473241,
-                                    'start': 40,
-                                    'text': '中国中文信息学会评测工作委员会'}]},
-              'start': 0,
-              'text': '2022语言与智能技术竞赛'}]}]
-  ```
+    ```python
+    >>> schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for relation extraction
+    >>> ie.set_schema(schema) # Reset schema
+    >>> pprint(ie('2022语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
+    [{'竞赛名称': [{'end': 13,
+                'probability': 0.7825402622754041,
+                'relations': {'主办方': [{'end': 22,
+                                      'probability': 0.8421710521379353,
+                                      'start': 14,
+                                      'text': '中国中文信息学会'},
+                                      {'end': 30,
+                                      'probability': 0.7580801847701935,
+                                      'start': 23,
+                                      'text': '中国计算机学会'}],
+                              '已举办次数': [{'end': 82,
+                                        'probability': 0.4671295049136148,
+                                        'start': 80,
+                                        'text': '4届'}],
+                              '承办方': [{'end': 39,
+                                      'probability': 0.8292706618236352,
+                                      'start': 35,
+                                      'text': '百度公司'},
+                                      {'end': 72,
+                                      'probability': 0.6193477885474685,
+                                      'start': 56,
+                                      'text': '中国计算机学会自然语言处理专委会'},
+                                      {'end': 55,
+                                      'probability': 0.7000497331473241,
+                                      'start': 40,
+                                      'text': '中国中文信息学会评测工作委员会'}]},
+                'start': 0,
+                'text': '2022语言与智能技术竞赛'}]}]
+    ```
 
-- 事件抽取
+  - 例如以"person"作为抽取主体，抽取关系类型为"Company"和"Position", schema构造如下：
 
-  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词和事件要素，组合为相应的结构化信息。
+    ```text
+    {
+      'Person': [
+        'Company',
+        'Position'
+      ]
+    }
+    ```
 
-  例如抽取的目标是"地震"事件的"地震强度"、"时间"、"震中位置"和"震源深度"这些信息，schema构造如下：
+    英文模型调用示例：
 
-  ```text
-  {
-    '地震触发词': [
-      '地震强度',
-      '时间',
-      '震中位置',
-      '震源深度'
-    ]
-  }
-  ```
+    ```python
+    >>> schema = [{'Person': ['Company', 'Position']}]
+    >>> ie_en.set_schema(schema)
+    >>> ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+    [{'Person': [{'end': 14,
+                  'probability': 0.999631971804547,
+                  'relations': {'Company': [{'end': 53,
+                                            'probability': 0.9960158209451642,
+                                            'start': 48,
+                                            'text': 'Apple'}],
+                                'Position': [{'end': 44,
+                                              'probability': 0.8871063806420736,
+                                              'start': 41,
+                                              'text': 'CEO'}]},
+                  'start': 9,
+                  'text': 'Steve'}]}]
+    ```
 
-  触发词的格式统一为`XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
+#### 事件抽取
 
-  预测：
+  事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词(Trigger)和事件论元(Argument)，组合为相应的事件结构化信息。
 
-  ```python
-  >>> schema = {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']} # Define the schema for event extraction
-  >>> ie.set_schema(schema) # Reset schema
-  >>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
-  [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
-  ```
+  - 例如抽取的目标是"地震"事件的"地震强度"、"时间"、"震中位置"和"震源深度"这些信息，schema构造如下：
 
-- 评论观点抽取
+    ```text
+    {
+      '地震触发词': [
+        '地震强度',
+        '时间',
+        '震中位置',
+        '震源深度'
+      ]
+    }
+    ```
+
+    触发词的格式统一为`触发词`或``XX触发词`，`XX`表示具体事件类型，上例中的事件类型是`地震`，则对应触发词为`地震触发词`。
+
+    调用示例：
+
+    ```python
+    >>> schema = {'地震触发词': ['地震强度', '时间', '震中位置', '震源深度']} # Define the schema for event extraction
+    >>> ie.set_schema(schema) # Reset schema
+    >>> ie('中国地震台网正式测定：5月16日06时08分在云南临沧市凤庆县(北纬24.34度，东经99.98度)发生3.5级地震，震源深度10千米。')
+    [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
+    ```
+
+  - 英文模型**暂不支持事件抽取**
+
+#### 评论观点抽取
 
   评论观点抽取，是指抽取文本中包含的评价维度、观点词。
 
-  例如抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下：
+  - 例如抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下：
 
-  ```text
-  {
-    '评价维度': [
-      '观点词',
-      '情感倾向[正向，负向]'
-    ]
-  }
-  ```
-
-  预测：
-
-  ```python
-  >>> schema = {'评价维度': ['观点词', '情感倾向[正向，负向]']} # Define the schema for opinion extraction
-  >>> ie.set_schema(schema) # Reset schema
-  >>> pprint(ie("店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队")) # Better print results using pprint
-  [{'评价维度': [{'end': 20,
-              'probability': 0.9817040258681473,
-              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9966142505350533,
-                                            'text': '正向'}],
-                            '观点词': [{'end': 22,
-                                    'probability': 0.957396472711558,
-                                    'start': 21,
-                                    'text': '高'}]},
-              'start': 17,
-              'text': '性价比'},
-            {'end': 2,
-              'probability': 0.9696849569741168,
-              'relations': {'情感倾向[正向，负向]': [{'probability': 0.9982153274927796,
-                                            'text': '正向'}],
-                            '观点词': [{'end': 4,
-                                    'probability': 0.9945318044652538,
-                                    'start': 2,
-                                    'text': '干净'}]},
-              'start': 0,
-              'text': '店面'}]}]
-  ```
-
-- 情感倾向分类
-
-  句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
-
-  ```text
-  '情感倾向[正向，负向]'
-  ```
-
-  预测：
-
-  ```python
-  >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
-  >>> ie.set_schema(schema) # Reset schema
-  >>> ie('这个产品用起来真的很流畅，我非常喜欢')
-  [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
-  ```
-
-- 跨任务抽取
-
-  例如在法律场景同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
-
-  ```text
-  [
-    "法院",
+    ```text
     {
-        "原告": "委托代理人"
-    },
-    {
-        "被告": "委托代理人"
+      '评价维度': [
+        '观点词',
+        '情感倾向[正向，负向]'
+      ]
     }
-  ]
-  ```
+    ```
 
-  预测：
+    调用示例：
 
-  ```python
-  >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
-  >>> ie.set_schema(schema)
-  >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。")) # Better print results using pprint
-  [{'原告': [{'end': 37,
-            'probability': 0.9949814024296764,
-            'relations': {'委托代理人': [{'end': 46,
-                                    'probability': 0.7956844697990384,
-                                    'start': 44,
-                                    'text': '李四'}]},
-            'start': 35,
-            'text': '张三'}],
-    '法院': [{'end': 10,
-            'probability': 0.9221074192336651,
-            'start': 0,
-            'text': '北京市海淀区人民法院'}],
-    '被告': [{'end': 67,
-            'probability': 0.8437349536631089,
-            'relations': {'委托代理人': [{'end': 92,
-                                    'probability': 0.7267121388225029,
-                                    'start': 90,
-                                    'text': '赵六'}]},
-            'start': 64,
-            'text': 'B公司'}]}]
-  ```
+    ```python
+    >>> schema = {'评价维度': ['观点词', '情感倾向[正向，负向]']} # Define the schema for opinion extraction
+    >>> ie.set_schema(schema) # Reset schema
+    >>> pprint(ie("店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队")) # Better print results using pprint
+    [{'评价维度': [{'end': 20,
+                'probability': 0.9817040258681473,
+                'relations': {'情感倾向[正向，负向]': [{'probability': 0.9966142505350533,
+                                              'text': '正向'}],
+                              '观点词': [{'end': 22,
+                                      'probability': 0.957396472711558,
+                                      'start': 21,
+                                      'text': '高'}]},
+                'start': 17,
+                'text': '性价比'},
+              {'end': 2,
+                'probability': 0.9696849569741168,
+                'relations': {'情感倾向[正向，负向]': [{'probability': 0.9982153274927796,
+                                              'text': '正向'}],
+                              '观点词': [{'end': 4,
+                                      'probability': 0.9945318044652538,
+                                      'start': 2,
+                                      'text': '干净'}]},
+                'start': 0,
+                'text': '店面'}]}]
+    ```
 
+  - 英文模型schema构造如下：
 
-#### 多模型选择，满足精度、速度要求
+    ```text
+    {
+      'Aspect': [
+        'Opinion',
+        'Sentiment classification [negative, positive]'
+      ]
+    }
+    ```
 
-- 模型选择
+    英文模型调用示例：
 
-  | 模型 |  结构  |
-  | :---: | :--------: |
-  | `uie-tiny`| 6-layers, 768-hidden, 12-heads |
-  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads |
-  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads |
+    ```python
+    >>> schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+    >>> ie_en.set_schema(schema)
+    >>> ie_en("overall i 'm happy with my toy.")
+    [{'Comment object': [{'end': 30,
+                          'probability': 0.9774399346859042,
+                          'relations': {'Opinion': [{'end': 18,
+                                                    'probability': 0.6168918705033555,
+                                                    'start': 13,
+                                                    'text': 'happy'}],
+                                        'Sentiment classification [negative, positive]': [{'probability': 0.9999556545777182,
+                                                                                          'text': 'positive'}]},
+                          'start': 24,
+                          'text': 'my toy'}]}]
+    ```
 
-- 使用`UIE-Tiny`进行预测
+#### 情感分类
+
+  - 句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下：
+
+    ```text
+    '情感倾向[正向，负向]'
+    ```
+
+    调用示例：
+
+    ```python
+    >>> schema = '情感倾向[正向，负向]' # Define the schema for sentence-level sentiment classification
+    >>> ie.set_schema(schema) # Reset schema
+    >>> ie('这个产品用起来真的很流畅，我非常喜欢')
+    [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9988661643929895}]}]
+    ```
+
+    英文模型schema构造如下：
+
+    ```text
+    '情感倾向[正向，负向]'
+    ```
+
+    英文模型调用示例：
+
+    ```python
+    >>> schema = [{'Person': ['Company', 'Position']}]
+    >>> ie_en.set_schema(schema)
+    >>> ie_en('I am sorry but this is the worst film I have ever seen in my life.')
+    [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
+    ```
+
+#### 跨任务抽取
+
+  - 例如在法律场景同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造：
+
+    ```text
+    [
+      "法院",
+      {
+          "原告": "委托代理人"
+      },
+      {
+          "被告": "委托代理人"
+      }
+    ]
+    ```
+
+    调用示例：
+
+    ```python
+    >>> schema = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
+    >>> ie.set_schema(schema)
+    >>> pprint(ie("北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。")) # Better print results using pprint
+    [{'原告': [{'end': 37,
+              'probability': 0.9949814024296764,
+              'relations': {'委托代理人': [{'end': 46,
+                                      'probability': 0.7956844697990384,
+                                      'start': 44,
+                                      'text': '李四'}]},
+              'start': 35,
+              'text': '张三'}],
+      '法院': [{'end': 10,
+              'probability': 0.9221074192336651,
+              'start': 0,
+              'text': '北京市海淀区人民法院'}],
+      '被告': [{'end': 67,
+              'probability': 0.8437349536631089,
+              'relations': {'委托代理人': [{'end': 92,
+                                      'probability': 0.7267121388225029,
+                                      'start': 90,
+                                      'text': '赵六'}]},
+              'start': 64,
+              'text': 'B公司'}]}]
+    ```
+
+#### 模型选择
+
+- 多模型选择，满足精度、速度要求
+
+  | 模型 |  结构  | 语言 |
+  | :---: | :--------: | :--------: |
+  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads | 中文 |
+  | `uie-base-en` | 12-layers, 768-hidden, 12-heads | 英文 |
+  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `uie-medium`| 6-layers, 768-hidden, 12-heads | 中文 |
+  | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
+  | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
+  | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
+
+- `uie-nano`调用示例
 
   ```python
   >>> from paddlenlp import Taskflow
 
   >>> schema = ['时间', '选手', '赛事名称']
-  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-tiny")
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-nano")
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
-  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.9492842181233527}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.7277186614493836}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.8751028059367947}]}]
+  [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.6513581678349247}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.9819330659468051}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.4908131110420939}]}]
   ```
 
 #### 定制训练
@@ -684,16 +896,19 @@ from paddlenlp import Taskflow
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-tiny<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
-<tr><td>uie-base<td>46.43<td>70.92<td>71.83<td>85.72<td>78.33<td>81.86
+<tr><td>uie-base (12L768H)<td><b>46.43</b><td><b>70.92</b><td><b>71.83</b><td><b>85.72</b><td><b>78.33</b><td><b>81.86</b>
+<tr><td>uie-medium (6L768H)<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
+<tr><td>uie-mini (6L384H)<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
+<tr><td>uie-micro (4L384H)<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
+<tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 </table>
 
-0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-tiny`，`uie-base`和`uie-medical-base`。
-* `schema`：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`, `uie-medical-base`, `uie-base-en`。
+* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖(主要是**确保安装onnxruntime-gpu**)。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
@@ -717,24 +932,180 @@ from paddlenlp import Taskflow
 * `user_dict`：用户自定义词典文件，默认为None。
 
 
-知识挖掘-词类知识标注任务共包含66种词性及专名类别标签，标签集合如下表：
+知识挖掘-词类知识标注任务共包含91种词性及专名类别标签，标签集合如下表：
 
 <table>
-
-<tr><th colspan='6'>WordTag标签集合
-<tr><td>人物类_实体<td>物体类<td>生物类_动物<td>医学术语类<td>链接地址<td>肯定词
-<tr><td>人物类_概念<td>物体类_兵器<td>品牌名<td>术语类_生物体<td>个性特征<td>否定词
-<tr><td>作品类_实体<td>物体类_化学物质<td>场所类<td>疾病损伤类<td>感官特征<td>数量词
-<tr><td>作品类_概念<td>其他角色类<td>场所类_交通场所<td>疾病损伤类_植物病虫害<td>场景事件<td>叹词
-<tr><td>组织机构类<td>文化类<td>位置方位<td>宇宙类<td>介词<td>拟声词
-<tr><td>组织机构类_企事业单位<td>文化类_语言文字<td>世界地区类<td>事件类<td>介词_方位介词<td>修饰词
-<tr><td>组织机构类_医疗卫生机构<td>文化类_奖项赛事活动<td>饮食类<td>时间类<td>助词<td>外语单词
-<tr><td>组织机构类_国家机关<td>文化类_制度政策协议<td>饮食类_菜品<td>时间类_特殊日<td>代词<td>英语单词
-<tr><td>组织机构类_体育组织机构<td>文化类_姓氏与人名<td>饮食类_饮品<td>术语类<td>连词<td>汉语拼音
-<tr><td>组织机构类_教育组织机构<td>生物类<td>药物类<td>术语类_符号指标类<td>副词<td>词汇用语
-<tr><td>组织机构类_军事组织机构<td>生物类_植物<td>药物类_中药<td>信息资料<td>疑问词<td>w(标点)
-
+    <thead>
+        <th colspan='7'>WordTag标签集合</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>人物类_实体</td>
+            <td>组织机构类_军事组织机构_概念</td>
+            <td>文化类_制度政策协议</td>
+            <td>位置方位</td>
+            <td>术语类_医药学术语</td>
+            <td>信息资料_性别</td>
+            <td>否定词</td>
+        </tr>
+        <tr>
+            <td>人物类_概念</td>
+            <td>组织机构类_医疗卫生机构</td>
+            <td>文化类_姓氏与人名</td>
+            <td>世界地区类</td>
+            <td>术语类_生物体</td>
+            <td>链接地址</td>
+            <td>数量词</td>
+        </tr>
+        <tr>
+            <td>作品类_实体</td>
+            <td>组织机构类_医疗卫生机构_概念</td>
+            <td>生物类</td>
+            <td>世界地区类_国家</td>
+            <td>疾病损伤类</td>
+            <td>个性特征</td>
+            <td>数量词_序数词</td>
+        </tr>
+        <tr>
+            <td>作品类_概念</td>
+            <td>组织机构类_教育组织机构</td>
+            <td>生物类_植物</td>
+            <td>世界地区类_区划概念</td>
+            <td>疾病损伤类_植物病虫害</td>
+            <td>感官特征</td>
+            <td>数量词_单位数量词</td>
+        </tr>
+        <tr>
+            <td>组织机构类</td>
+            <td>组织机构类_教育组织机构_概念</td>
+            <td>生物类_动物</td>
+            <td>世界地区类_地理概念</td>
+            <td>宇宙类</td>
+            <td>场景事件</td>
+            <td>叹词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_概念</td>
+            <td>物体类</td>
+            <td>品牌名</td>
+            <td>饮食类</td>
+            <td>事件类</td>
+            <td>介词</td>
+            <td>拟声词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位</td>
+            <td>物体类_概念</td>
+            <td>品牌名_品牌类型</td>
+            <td>饮食类_菜品</td>
+            <td>时间类</td>
+            <td>介词_方位介词</td>
+            <td>修饰词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_企事业单位_概念</td>
+            <td>物体类_兵器</td>
+            <td>场所类</td>
+            <td>饮食类_饮品</td>
+            <td>时间类_特殊日</td>
+            <td>助词</td>
+            <td>修饰词_性质</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关</td>
+            <td>物体类_化学物质</td>
+            <td>场所类_概念</td>
+            <td>药物类</td>
+            <td>时间类_朝代</td>
+            <td>代词</td>
+            <td>修饰词_类型</td>
+        </tr>
+        <tr>
+            <td>组织机构类_国家机关_概念</td>
+            <td>其他角色类</td>
+            <td>场所类_交通场所</td>
+            <td>药物类_中药</td>
+            <td>时间类_具体时间</td>
+            <td>连词</td>
+            <td>修饰词_化</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构</td>
+            <td>文化类</td>
+            <td>场所类_交通场所_概念</td>
+            <td>术语类</td>
+            <td>时间类_时长</td>
+            <td>副词</td>
+            <td>外语单词</td>
+        </tr>
+        <tr>
+            <td>组织机构类_体育组织机构_概念</td>
+            <td>文化类_语言文字</td>
+            <td>场所类_网上场所</td>
+            <td>术语类_术语类型</td>
+            <td>词汇用语</td>
+            <td>疑问词</td>
+            <td>汉语拼音</td>
+        </tr>
+        <tr>
+            <td>组织机构类_军事组织机构</td>
+            <td>文化类_奖项赛事活动</td>
+            <td>场所类_网上场所_概念</td>
+            <td>术语类_符号指标类</td>
+            <td>信息资料</td>
+            <td>肯定词</td>
+            <td>w（标点）</td>
+        </tr>
+    </tbody>
 </table>
+
+#### 知识模板信息抽取
+```python
+>>> from paddlenlp import Taskflow
+>>> wordtag_ie = Taskflow("knowledge_mining", with_ie=True)
+>>> wordtag_ie('《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。')
+[[{'text': '《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 5, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 6, 'wordtag_label': '肯定词', 'length': 1}, {'item': '一首', 'offset': 7, 'wordtag_label': '数量词_单位数量词', 'length': 2}, {'item': '由', 'offset': 9, 'wordtag_label': '介词', 'length': 1}, {'item': '王杰', 'offset': 10, 'wordtag_label': '人物类_实体', 'length': 2}, {'item': '作词', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2}, {'item': '、', 'offset': 14, 'wordtag_label': 'w', 'length': 1}, {'item': '作曲', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '并', 'offset': 17, 'wordtag_label': '连词', 'length': 1}, {'item': '演唱', 'offset': 18, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 20, 'wordtag_label': '助词', 'length': 1}, {'item': '歌曲', 'offset': 21, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 23, 'wordtag_label': 'w', 'length': 1}, {'item': '收录', 'offset': 24, 'wordtag_label': '场景事件', 'length': 2}, {'item': '在', 'offset': 26, 'wordtag_label': '介词', 'length': 1}, {'item': '专辑', 'offset': 27, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '同名', 'offset': 29, 'wordtag_label': '场景事件', 'length': 2}, {'item': '《', 'offset': 31, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 32, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 36, 'wordtag_label': 'w', 'length': 1}, {'item': '中', 'offset': 37, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '，', 'offset': 38, 'wordtag_label': 'w', 'length': 1}, {'item': '由', 'offset': 39, 'wordtag_label': '介词', 'length': 1}, {'item': '波丽佳音', 'offset': 40, 'wordtag_label': '人物类_实体', 'length': 4}, {'item': '唱片', 'offset': 44, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '于', 'offset': 46, 'wordtag_label': '介词', 'length': 1}, {'item': '1996年08月31日', 'offset': 47, 'wordtag_label': '时间类_具体时间', 'length': 11}, {'item': '发行', 'offset': 58, 'wordtag_label': '场景事件', 'length': 2}, {'item': '。', 'offset': 60, 'wordtag_label': 'w', 'length': 1}]}], [[{'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '创作', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}], 'GROUP': '创作者', 'SRC': 'HTG', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '歌曲', 'offset': 21, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '收录', 'TRIG': [{'item': '收录', 'offset': 24}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '收录于', 'SRC': 'HGT', 'TRIG': [{'item': '收录', 'offset': 24}]}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '王杰', 'type': '人物类_实体', 'offset': 10}], 'GROUP': '创作者', 'TRIG': [{'item': '专辑', 'offset': 27}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '王杰', 'type': '人物类_实体', 'offset': 10}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '创作', 'SRC': 'HGT', 'TRIG': [{'item': '专辑', 'offset': 27}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 32}, 'TAIL_ROLE': [{'item': '唱片', 'offset': 44, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}]]]
+
+```
+
+**自定义抽取的schema**
+
+``` python
+>>> from pprint import pprint
+>>> schema = [
+     {
+        "head_role": "作品类_实体", #头实体词类
+        "group": "创作者", #关系名
+        "tail_role": [
+            {
+                "main": [
+                    "人物类_实体" #尾实体词类
+                ],
+                "support": [] #相关词类，可作为该关系的补充，不可作为尾实体独立存在
+            }
+        ],
+        "trig_word": [
+            "作词", #触发词，对于没有触发词，而是由头尾实体直接触发的关系，可为null
+        ],
+        "trig_type": "trigger", #trigger表明由触发词触发，tail表明为尾实体触发
+        "reverse": False, #是否为反向配置，即尾实体实际是头，头实体实际是尾
+        "trig_direction": "B", #触发P的方向，表示在自然表达中，尾实体在触发词的哪一边，L为左，R为右，B为双向都有可能，默认为B
+        "rel_group": "创作" #对应的反关系，即头尾实体对调后，对应的关系，用于逻辑推断
+    }]
+>>> wordtag_ie.set_schema(schema)
+>>> pprint(wordtag_ie('《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。')[1])
+[[{'GROUP': '创作',
+   'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'},
+   'SRC': 'REVERSE',
+   'TAIL_ROLE': [{'item': '忘了所有', 'offset': 1, 'type': '作品类_实体'}],
+   'TRIG': [{'item': '作词', 'offset': 12}]},
+  {'GROUP': '创作者',
+   'HEAD_ROLE': {'item': '忘了所有', 'offset': 1, 'type': '作品类_实体'},
+   'SRC': 'HTG',
+   'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}],
+   'TRIG': [{'item': '作词', 'offset': 12}]}]]
+```
+具体的WordTag-IE信息抽取的功能可以见[WordTag-IE具体介绍](../../examples/text_to_knowledge/wordtag-ie/README.md) .
 
 
 #### 名词短语标注
@@ -922,6 +1293,87 @@ from paddlenlp import Taskflow
 * `max_turn`：任务能记忆的对话轮数，当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。
   </div></details>
 
+### 代码生成
+<details><summary>&emsp; 通过CodeGen模型来生成代码 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 Salesforce/codegen-350M-mono
+>>> codegen = Taskflow("code_generation", model="Salesforce/codegen-2B-mono")
+# 单条输入
+>>> codegen("def hello_world():")
+['\n    print("Hello World")']
+# 多条输入
+>>> codegen(["Get the length of array", "def hello_world():"])
+['\n    n = len(a)\n\n    #', '\n    print("Hello World!")']
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为Salesforce/codegen-350M-mono，支持的模型参考[CodeGen文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen/README.md)。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_length`：生成代码的最大长度，默认为128。
+* `min_length`：生成代码的最小长度，默认为0。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
+* `temperature`：解码参数temperature，默认为0.6。
+* `top_k`：解码参数top_k，默认为5。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：beam_search解码的beam size，默认为4。
+* `length_penalty`：解码长度控制值，默认为1.0。
+* `repetition_penalty`：解码重复惩罚值，默认为1.1。
+* `output_scores`：是否要输出解码得分，请默认为False。
+</div></details>
+
+### 文图生成
+<details><summary>&emsp; 通过文图生成模型来生成图片 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 pai-painter-painting-base-zh
+>>> text_to_image = Taskflow("text_to_image")
+# 单条输入
+>>> images = text_to_image("风阁水帘今在眼，且来先看早梅红")
+# [<PIL.Image.Image image mode=RGB size=2048x256>]
+>>> images[0].save("painting-figure.png")
+# 多条输入
+>>> images = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
+# [<PIL.Image.Image image mode=RGB size=2048x256>,
+#  <PIL.Image.Image image mode=RGB size=2048x256>]
+>>> for i, image in enumerate(images):
+>>>     image.save(f"painting-figure_{i}.png")
+# pai-painter-commercial-base-zh模型
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
+# 多条输入
+>>> images = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
+>>> for i, image in enumerate(images):
+>>>     image.save(f"commercial-figure_{i}.png")
+# dalle-mini模型
+>>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
+# 多条输入
+>>> images = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
+>>> for i, image in enumerate(images):
+>>>     image.save(f"dalle-mini-figure_{i}.png")
+```
+
+#### 图片生成效果展示
+<p align="center">
+ <img src="https://user-images.githubusercontent.com/50394665/183386146-9b265304-7294-46fa-896f-1dd90f44ba31.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386193-7a463852-f5f7-49e9-b3b0-3d8f4a9b2576.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386229-68374a39-6e14-4565-b2c6-cc547a729135.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386237-b0243ec5-09fe-47cc-9010-bd9b97fda862.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183387833-0f9ef786-ea62-40e1-a48c-28680d418142.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183387861-c4029b6c-f2e9-46d0-988f-6989f11a607d.png" align="middle">
+<p align="center">
+
+#### 可配置参数说明
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
+
+</div></details>
 
 ## PART Ⅱ &emsp; 定制化训练
 

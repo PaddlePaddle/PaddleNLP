@@ -18,7 +18,8 @@ limitations under the License. */
 #include "gtest/gtest.h"
 #include "pretokenizers/whitespace.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tests {
 
 TEST(pretokenizers, whitespace) {
@@ -26,7 +27,7 @@ TEST(pretokenizers, whitespace) {
   std::vector<std::string> expected_outputs = {
       "I", "am", "good", "at", "sport."};
   pretokenizers::PreTokenizedString whitespace_input(input);
-  pretokenizers::Whitespace()(&whitespace_input);
+  pretokenizers::WhitespacePreTokenizer()(&whitespace_input);
   ASSERT_EQ(expected_outputs.size(), whitespace_input.GetSplitsSize());
   for (int i = 0; i < expected_outputs.size(); ++i) {
     ASSERT_EQ(whitespace_input.GetSplit(i).normalized_.GetStr(),
@@ -35,4 +36,5 @@ TEST(pretokenizers, whitespace) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

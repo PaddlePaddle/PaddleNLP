@@ -447,6 +447,9 @@ class SkepTokenizer(PretrainedTokenizer):
         """
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            source_file = getattr(self, name)
-            if source_file is not None:
+            source_file = getattr(self, name, None)
+            if not source_file:
+                continue
+
+            if os.path.abspath(source_file) != os.path.abspath(save_path):
                 shutil.copyfile(source_file, save_path)

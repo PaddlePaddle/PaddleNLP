@@ -33,7 +33,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import Mcc, PearsonAndSpearman
 from paddlenlp.utils.log import logger
 
-from paddle.fluid.contrib import sparsity
+from paddle.static import sparsity
 
 METRIC_CLASSES = {
     "cola": Mcc,

@@ -27,12 +27,11 @@ import contextlib
 import paddle
 import paddle.nn as nn
 
-from datasets import load_dataset
-
 from paddlenlp.data import Stack, Dict, Pad, Tuple
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
 from paddlenlp.utils.log import logger
+from datasets import load_dataset
 
 
 def parse_args():
@@ -389,10 +388,11 @@ def run(args):
                                (time.time() - tic_train)))
                         tic_train = time.time()
                 if global_step >= num_training_steps:
-                    logger.info("best_result: %.2f" % (best_acc * 100))
-                    return
+                    break
+            if global_step > num_training_steps:
+                break
             tic_eval = time.time()
-            acc = evaluation(model, loss_fct, dev_data_loader, metric)
+            acc = evaluate(model, loss_fct, dev_data_loader, metric)
             logger.info("eval acc: %.5f, eval done total : %s s" %
                         (acc, time.time() - tic_eval))
             if paddle.distributed.get_rank() == 0 and acc > best_acc:
@@ -404,7 +404,8 @@ def run(args):
                         os.makedirs(args.output_dir)
                     model_to_save.save_pretrained(args.output_dir)
                     tokenizer.save_pretrained(args.output_dir)
-
+            if global_step >= num_training_steps:
+                break
         logger.info("best_result: %.2f" % (best_acc * 100))
 
     if args.do_predict:
