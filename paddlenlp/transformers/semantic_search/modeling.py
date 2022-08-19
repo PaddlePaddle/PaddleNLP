@@ -27,7 +27,8 @@ class ErnieEncoder(ErniePretrainedModel):
         super(ErnieEncoder, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(768, num_classes)
+        self.classifier = nn.Linear(self.ernie.config["hidden_size"],
+                                    num_classes)
         self.apply(self.init_weights)
 
     def init_weights(self, layer):

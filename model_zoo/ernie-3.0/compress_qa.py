@@ -39,17 +39,6 @@ def main():
     paddle.set_device(compression_args.device)
     data_args.dataset = data_args.dataset.strip()
 
-    if data_args.dataset in ALL_DATASETS:
-        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
-        config = ALL_DATASETS[data_args.dataset]
-        for args in (model_args, data_args, compression_args):
-            for arg in vars(args):
-                if arg in config.keys():
-                    setattr(args, arg, config[arg])
-
-        compression_args.per_device_train_batch_size = config["batch_size"]
-        compression_args.per_device_eval_batch_size = config["batch_size"]
-
     # Log model and data config
     compression_args.print_config(model_args, "Model")
     compression_args.print_config(data_args, "Data")
@@ -134,9 +123,6 @@ def main():
         data_collator=data_collator,
         post_process_function=post_processing_function,
         tokenizer=tokenizer)
-
-    if not os.path.exists(compression_args.output_dir):
-        os.makedirs(compression_args.output_dir)
 
     compression_args.print_config()
 

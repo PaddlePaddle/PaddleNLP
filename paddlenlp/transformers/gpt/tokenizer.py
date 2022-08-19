@@ -367,6 +367,7 @@ class GPTTokenizer(PretrainedTokenizer):
             eos_token='<|endoftext|>',
             unk_token='<|endoftext|>',
             eol_token='\u010a',
+            add_prefix_space=False,
             **kwargs  # The token of newline.
     ):
         pad_token = AddedToken(pad_token,
@@ -406,6 +407,8 @@ class GPTTokenizer(PretrainedTokenizer):
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
+        self.add_prefix_space = add_prefix_space
+
         re = try_import("regex")
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
@@ -538,3 +541,12 @@ class GPTTokenizer(PretrainedTokenizer):
         text = bytearray([self.byte_decoder[c]
                           for c in text]).decode('utf-8', errors=self.errors)
         return text
+
+    def prepare_for_tokenization(self,
+                                 text,
+                                 is_split_into_words=False,
+                                 **kwargs):
+        add_prefix_space = kwargs.pop("add_prefix_space", self.add_prefix_space)
+        if is_split_into_words or add_prefix_space:
+            text = " " + text
+        return (text, kwargs)

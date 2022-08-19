@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from milvus import MetricType, IndexType
-
-MILVUS_HOST = '10.21.226.173'
-MILVUS_PORT = 8530
-
-collection_param = {
-    'dimension': 256,
-    'index_file_size': 256,
-    'metric_type': MetricType.L2
-}
-
-index_type = IndexType.IVF_FLAT
-index_param = {'nlist': 1000}
-
-top_k = 50
-search_param = {'nprobe': 20}
+from .template import *
+from .verbalizer import *
+from .prompt_args import *
+from .prompt_trainer import *
+from .prompt_tokenizer import *
+from .prompt_utils import *

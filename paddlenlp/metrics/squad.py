@@ -19,6 +19,8 @@ import string
 import json
 import numpy as np
 
+from ..utils.log import logger
+
 
 def compute_prediction(examples,
                        features,
@@ -307,7 +309,7 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
             # For unanswerable questions, only correct answer is empty string
             gold_answers = ['']
         if qid not in preds:
-            print('Missing prediction for %s' % qid)
+            logger.info('Missing prediction for %s' % qid)
             continue
         a_pred = preds[qid]
         # Take max over all gold answers
@@ -433,7 +435,6 @@ def squad_evaluate(examples,
         merge_eval(out_eval, no_ans_eval, 'NoAns')
         find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs,
                              qid_to_has_ans)
-
-    print(json.dumps(out_eval, indent=2))
+    logger.info(json.dumps(out_eval, indent=2))
 
     return out_eval
