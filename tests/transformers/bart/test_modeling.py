@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Testing suite for the PyTorch BART model. """
 
 import copy
 import tempfile
@@ -630,8 +629,8 @@ class BartModelIntegrationTests(unittest.TestCase):
     @slow
     def test_cnn_summarization_same_as_fairseq(self):
         model = BartForConditionalGeneration.from_pretrained(
-            "facebook/bart-large").eval()
-        tok = BartTokenizer.from_pretrained("facebook/bart-large")
+            "bart-large").eval()
+        tok = BartTokenizer.from_pretrained("bart-large")
 
         FRANCE_ARTICLE = (  # @noq
             " Marseille, France (CNN)The French prosecutor leading an investigation into the crash of Germanwings"
