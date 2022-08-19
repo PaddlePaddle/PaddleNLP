@@ -150,6 +150,7 @@ class XLNetTokenizer(PretrainedTokenizer):
         mask_token = AddedToken(mask_token,
                                 lstrip=True, rstrip=False) if isinstance(
                                     mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
 
         self._pad_token_type_id = 3
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
