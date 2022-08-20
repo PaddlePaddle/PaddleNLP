@@ -14,6 +14,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
 ```
+【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 ### 1.2 数据说明
 问答知识库数据是我们爬取了百度百科上对国内重点城市的百科介绍文档。我们将所有文档中的非结构化文本数据抽取出来， 按照段落切分后作为问答系统知识库的数据，一共包含 365 个城市的百科介绍文档、切分后共 1318 个段落。
 

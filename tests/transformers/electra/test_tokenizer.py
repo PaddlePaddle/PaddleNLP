@@ -16,22 +16,16 @@
 import os
 import unittest
 
-from paddlenlp.transformers.bert.tokenizer import (
-    BasicTokenizer,
-    BertTokenizer,
-    WordpieceTokenizer,
-    _is_control,
-    _is_punctuation,
-    _is_whitespace,
-)
-
+from paddlenlp.transformers.electra.tokenizer import ElectraTokenizer
+from paddlenlp.transformers.bert.tokenizer import (BasicTokenizer,
+                                                   WordpieceTokenizer)
 from ...testing_utils import slow
-from ...transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 
-class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
+class ElectraTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
-    tokenizer_class = BertTokenizer
+    tokenizer_class = ElectraTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
@@ -58,7 +52,8 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         ]
 
         self.vocab_file = os.path.join(
-            self.tmpdirname, BertTokenizer.resource_files_names["vocab_file"])
+            self.tmpdirname,
+            ElectraTokenizer.resource_files_names["vocab_file"])
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
 
@@ -154,33 +149,6 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokenizer.tokenize("unwantedX running"),
                              ["[UNK]", "runn", "##ing"])
 
-    def test_is_whitespace(self):
-        self.assertTrue(_is_whitespace(" "))
-        self.assertTrue(_is_whitespace("\t"))
-        self.assertTrue(_is_whitespace("\r"))
-        self.assertTrue(_is_whitespace("\n"))
-        self.assertTrue(_is_whitespace("\u00A0"))
-
-        self.assertFalse(_is_whitespace("A"))
-        self.assertFalse(_is_whitespace("-"))
-
-    def test_is_control(self):
-        self.assertTrue(_is_control("\u0005"))
-
-        self.assertFalse(_is_control("A"))
-        self.assertFalse(_is_control(" "))
-        self.assertFalse(_is_control("\t"))
-        self.assertFalse(_is_control("\r"))
-
-    def test_is_punctuation(self):
-        self.assertTrue(_is_punctuation("-"))
-        self.assertTrue(_is_punctuation("$"))
-        self.assertTrue(_is_punctuation("`"))
-        self.assertTrue(_is_punctuation("."))
-
-        self.assertFalse(_is_punctuation("A"))
-        self.assertFalse(_is_punctuation(" "))
-
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
@@ -191,7 +159,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     @slow
     def test_sequence_builders(self):
-        tokenizer = self.tokenizer_class.from_pretrained("bert-base-uncased")
+        tokenizer = self.tokenizer_class.from_pretrained("electra-small")
 
         text = tokenizer.encode("sequence builders",
                                 return_token_type_ids=None,
@@ -280,19 +248,3 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 # it is expected that each Chinese character is not preceded by "##"
                 self.assertListEqual(tokens_without_spe_char_p,
                                      list_of_commun_chinese_char)
-
-                # not yet supported in bert tokenizer
-                '''
-                kwargs["tokenize_chinese_chars"] = False
-                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-
-                ids_without_spe_char_p = tokenizer.encode(text_with_chinese_char, return_token_type_ids=None,add_special_tokens=False)["input_ids"]
-
-                tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(ids_without_spe_char_p)
-
-                # it is expected that only the first Chinese character is not preceded by "##".
-                expected_tokens = [
-                    f"##{token}" if idx != 0 else token for idx, token in enumerate(list_of_commun_chinese_char)
-                ]
-                self.assertListEqual(tokens_without_spe_char_p, expected_tokens)
-                '''
