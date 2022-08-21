@@ -128,8 +128,7 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             [["[UNK]"], [], ["[UNK]"]])
 
     def test_sequence_builders(self):
-        tokenizer = self.tokenizer_class.from_pretrained(
-            "skep_ernie_1.0_large_ch")
+        tokenizer = self.tokenizer_class.from_pretrained("ernie-gram-zh")
 
         text = tokenizer.encode("sequence builders",
                                 return_token_type_ids=None,
