@@ -278,6 +278,47 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "ernie-1.0": 513,
+        "ernie-1.0-base-zh": 513,
+        "ernie-1.0-large-zh-cw": 512,
+        "ernie-tiny": 600,
+        "ernie-2.0-base-zh": 513,
+        "ernie-2.0-large-zh": 512,
+        "ernie-2.0-base-en": 512,
+        "ernie-2.0-base-en-finetuned-squad": 512,
+        "ernie-2.0-large-en": 512,
+        "ernie-gen-base-en": 1024,
+        "ernie-gen-large-en": 1024,
+        "ernie-gen-large-en-430g": 1024,
+        "rocketqa-zh-dureader-query-encoder": 513,
+        "rocketqa-zh-dureader-para-encoder": 513,
+        "rocketqa-v1-marco-query-encoder": 512,
+        "rocketqa-v1-marco-para-encoder": 512,
+        "rocketqa-zh-dureader-cross-encoder": 513,
+        "rocketqa-v1-marco-cross-encoder": 512,
+        "ernie-3.0-base-zh": 2048,
+        "ernie-3.0-xbase-zh": 2048,
+        "ernie-3.0-medium-zh": 2048,
+        "ernie-3.0-mini-zh": 2048,
+        "ernie-3.0-micro-zh": 2048,
+        "ernie-3.0-nano-zh": 2048,
+        "rocketqa-zh-base-query-encoder": 2048,
+        "rocketqa-zh-base-para-encoder": 2048,
+        "rocketqa-zh-medium-query-encoder": 2048,
+        "rocketqa-zh-medium-para-encoder": 2048,
+        "rocketqa-zh-mini-query-encoder": 2048,
+        "rocketqa-zh-mini-para-encoder": 2048,
+        "rocketqa-zh-micro-query-encoder": 2048,
+        "rocketqa-zh-micro-para-encoder": 2048,
+        "rocketqa-zh-nano-query-encoder": 2048,
+        "rocketqa-zh-nano-para-encoder": 2048,
+        "rocketqa-base-cross-encoder": 2048,
+        "rocketqa-medium-cross-encoder": 2048,
+        "rocketqa-mini-cross-encoder": 2048,
+        "rocketqa-micro-cross-encoder": 2048,
+        "rocketqa-nano-cross-encoder": 2048,
+    }
 
     def __init__(self,
                  vocab_file,
@@ -310,6 +351,9 @@ class ErnieTokenizer(PretrainedTokenizer):
             int: The size of vocabulary.
         """
         return len(self.vocab)
+
+    def get_vocab(self):
+        return dict(self.vocab._token_to_idx, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         r"""
