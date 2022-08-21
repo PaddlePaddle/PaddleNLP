@@ -52,7 +52,7 @@ def pipelines_version():
     """
     Get the pipelines version from the REST API
     """
-    url = f"{API_ENDPOINT}/{STATUS}"
+    url = f"{API_ENDPOINT}/{HS_VERSION}"
     return requests.get(url, timeout=0.1).json()["hs_version"]
 
 
