@@ -16,20 +16,60 @@
 from typing import Dict, Optional, Any, List
 
 import logging
+import os
+import uuid
+from io import BytesIO
 from pathlib import Path
+import hashlib
 import docx
+from docx.document import Document
+from docx.text.paragraph import Paragraph
+from docx.parts.image import ImagePart
+from docx.oxml.shape import CT_Picture
+from PIL import Image
 
 from pipelines.nodes.file_converter import BaseConverter
+
+FILE_UPLOAD_PATH = os.getenv(
+    "FILE_UPLOAD_PATH", str((Path(__file__).parent / "file-upload").absolute()))
 
 logger = logging.getLogger(__name__)
 
 
 class DocxToTextConverter(BaseConverter):
 
+    def __init__(
+        self,
+        remove_numeric_tables: bool = False,
+        valid_languages: Optional[List[str]] = None,
+    ):
+        """
+        :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
+                                      The tabular structures in documents might be noise for the reader model if it
+                                      does not have table parsing capability for finding answers. However, tables
+                                      may also have long strings that could possible candidate for searching answers.
+                                      The rows containing strings are thus retained in this option.
+        :param valid_languages: validate languages from a list of languages specified in the ISO 639-1
+                                (https://en.wikipedia.org/wiki/ISO_639-1) format.
+                                This option can be used to add test for encoding errors. If the extracted text is
+                                not one of the valid languages, then it might likely be encoding error resulting
+                                in garbled text.
+        """
+
+        # save init parameters to enable export of component config as YAML
+        self.set_config(remove_numeric_tables=remove_numeric_tables,
+                        valid_languages=valid_languages)
+
+        self.remove_numeric_tables = remove_numeric_tables
+        self.valid_languages = valid_languages
+
+        self.desc_path = 'parse_files'
+        os.makedirs(self.desc_path, exist_ok=True)
+
     def convert(
         self,
         file_path: Path,
-        meta: Optional[Dict[str, str]] = None,
+        meta: Optional[Dict[str, Any]] = None,
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
         encoding: Optional[str] = None,
@@ -67,9 +107,67 @@ class DocxToTextConverter(BaseConverter):
             )
 
         file = docx.Document(file_path)  # Creating word reader object.
-        paragraphs = [para.text for para in file.paragraphs]
         documents = []
-        for page in paragraphs:
-            document = {"content": page, "content_type": "text", "meta": meta}
-            documents.append(document)
+        text_dict = {}
+        # breakpoint()
+        for i in range(len(file.paragraphs)):
+            paragraph = file.paragraphs[i]
+            if (paragraph.text):
+                if bool(text_dict):
+                    # meta['images']=text_dict['images']
+                    meta_data = {}
+                    meta_data['name'] = meta['name']
+                    meta_data['images'] = text_dict['images']
+                    document = {
+                        "content": text_dict['text'],
+                        "content_type": "text",
+                        "meta": meta_data
+                    }
+                    documents.append(document)
+
+                text = paragraph.text
+                text_dict = {'text': text, 'images': []}
+            else:
+                image_list = self.get_picture(file, paragraph)
+                if (image_list is None):
+                    continue
+                for i, image in enumerate(image_list):
+                    if image:
+                        # 后缀
+                        ext = image.ext
+                        # 二进制内容
+                        blob = image.blob
+                        # 显示图片
+                        # image_path = Path(
+                        # FILE_UPLOAD_PATH) / f"{uuid.uuid4().hex}_{i}_{ext}"
+                        md5hash = hashlib.md5(blob)
+                        md5_name = md5hash.hexdigest()
+                        image_name = '{}_{}.{}'.format(md5_name, i, ext)
+                        image_path = os.path.join(self.desc_path, image_name)
+                        Image.open(BytesIO(blob)).save(image_path)
+                        text_dict['images'].append(image_name)
+        # breakpoint()
+        # paragraphs = [para.text for para in file.paragraphs]
+        # breakpoint()
+        # documents = []
+        # for page in paragraphs:
+        #     document = {"content": page, "content_type": "text", "meta": meta}
+        #     documents.append(document)
         return documents
+
+    def get_picture(self, document: Document, paragraph: Paragraph):
+        """
+        document 为文档对象
+        paragraph 为内嵌图片的段落对象，比如第1段内
+        """
+        result_list = []
+        img_list = paragraph._element.xpath('.//pic:pic')
+        if len(img_list) == 0 or not img_list:
+            return
+        for i in range(len(img_list)):
+            img: CT_Picture = img_list[i]
+            embed = img.xpath('.//a:blip/@r:embed')[0]
+            related_part: ImagePart = document.part.related_parts[embed]
+            image: Image = related_part.image
+            result_list.append(image)
+        return result_list
