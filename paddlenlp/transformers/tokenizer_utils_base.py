@@ -2017,8 +2017,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                  padding: Union[bool, str, PaddingStrategy] = False,
                  truncation: Union[bool, str, TruncationStrategy] = False,
                  return_position_ids: bool = False,
-                 return_token_type_ids: bool = True,
-                 return_attention_mask: bool = False,
+                 return_token_type_ids: Optional[bool] = None,
+                 return_attention_mask: Optional[bool] = None,
                  return_length: bool = False,
                  return_overflowing_tokens: bool = False,
                  return_special_tokens_mask: bool = False,
@@ -2361,29 +2361,33 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             **kwargs) -> BatchEncoding:
         raise NotImplementedError
 
-    def batch_encode(self,
-                     batch_text_or_text_pairs: Union[
-                         List[TextInput], List[TextInputPair],
-                         List[PreTokenizedInput], List[PreTokenizedInputPair],
-                         List[EncodedInput], List[EncodedInputPair], ],
-                     max_length=None,
-                     stride: int = 0,
-                     is_split_into_words: bool = False,
-                     padding: Union[bool, str, PaddingStrategy] = False,
-                     truncation: Union[bool, str, TruncationStrategy] = False,
-                     return_position_ids=False,
-                     return_token_type_ids=True,
-                     return_attention_mask=False,
-                     return_length=False,
-                     return_overflowing_tokens=False,
-                     return_special_tokens_mask=False,
-                     return_dict=True,
-                     return_offsets_mapping=False,
-                     add_special_tokens=True,
-                     pad_to_multiple_of: Optional[int] = None,
-                     return_tensors: Optional[Union[str, TensorType]] = None,
-                     verbose: bool = True,
-                     **kwargs) -> BatchEncoding:
+    def batch_encode(
+            self,
+            batch_text_or_text_pairs: Union[List[TextInput],
+                                            List[TextInputPair],
+                                            List[PreTokenizedInput],
+                                            List[PreTokenizedInputPair],
+                                            List[EncodedInput],
+                                            List[EncodedInputPair], ],
+            max_length=None,
+            stride: int = 0,
+            is_split_into_words: bool = False,
+            padding: Union[bool, str, PaddingStrategy] = False,
+            truncation: Union[bool, str, TruncationStrategy] = False,
+            return_position_ids=False,
+            # TODO(wj-mcat): keep align with `encode` method
+            return_token_type_ids=None,
+            return_attention_mask=None,
+            return_length=False,
+            return_overflowing_tokens=False,
+            return_special_tokens_mask=False,
+            return_dict=True,
+            return_offsets_mapping=False,
+            add_special_tokens=True,
+            pad_to_multiple_of: Optional[int] = None,
+            return_tensors: Optional[Union[str, TensorType]] = None,
+            verbose: bool = True,
+            **kwargs) -> BatchEncoding:
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
@@ -2793,7 +2797,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             text_pair = kwargs.pop('text_pair')
 
             token_offset_mapping = self.get_offset_mapping(text)
-            token_pair_offset_mapping = self.get_offset_mapping(text_pair)
+            token_pair_offset_mapping = self.get_offset_mapping(
+                text_pair) if text_pair is not None else None
             if max_length and total_len > max_length:
                 token_offset_mapping, token_pair_offset_mapping, _ = self.truncate_sequences(
                     token_offset_mapping,

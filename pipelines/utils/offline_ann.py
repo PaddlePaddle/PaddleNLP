@@ -32,6 +32,21 @@ parser.add_argument('--port',
                     default="9200",
                     help='port of elastic search')
 
+parser.add_argument("--embedding_dim",
+                    default=312,
+                    type=int,
+                    help="The embedding_dim of index")
+
+parser.add_argument("--query_embedding_model",
+                    default="rocketqa-zh-nano-query-encoder",
+                    type=str,
+                    help="The query_embedding_model path")
+
+parser.add_argument("--passage_embedding_model",
+                    default="rocketqa-zh-nano-para-encoder",
+                    type=str,
+                    help="The passage_embedding_model path")
+
 parser.add_argument(
     '--delete_index',
     action='store_true',
@@ -44,11 +59,13 @@ def offline_ann(index_name, doc_dir):
 
     launch_es()
 
-    document_store = ElasticsearchDocumentStore(host=args.host,
-                                                port=args.port,
-                                                username="",
-                                                password="",
-                                                index=index_name)
+    document_store = ElasticsearchDocumentStore(
+        host=args.host,
+        port=args.port,
+        username="",
+        password="",
+        embedding_dim=args.embedding_dim,
+        index=index_name)
     # 将每篇文档按照段落进行切分
     dicts = convert_files_to_dicts(dir_path=doc_dir,
                                    split_paragraphs=True,
@@ -62,8 +79,8 @@ def offline_ann(index_name, doc_dir):
     ### 语义索引模型
     retriever = DensePassageRetriever(
         document_store=document_store,
-        query_embedding_model="rocketqa-zh-dureader-query-encoder",
-        passage_embedding_model="rocketqa-zh-dureader-query-encoder",
+        query_embedding_model=args.query_embedding_model,
+        passage_embedding_model=args.passage_embedding_model,
         max_seq_len_query=64,
         max_seq_len_passage=256,
         batch_size=16,
@@ -76,11 +93,13 @@ def offline_ann(index_name, doc_dir):
 
 
 def delete_data(index_name):
-    document_store = ElasticsearchDocumentStore(host=args.host,
-                                                port=args.port,
-                                                username="",
-                                                password="",
-                                                index=index_name)
+    document_store = ElasticsearchDocumentStore(
+        host=args.host,
+        port=args.port,
+        username="",
+        password="",
+        embedding_dim=args.embedding_dim,
+        index=index_name)
 
     document_store.delete_index(index_name)
     print('Delete an existing elasticsearch index {} Done.'.format(index_name))
