@@ -17,7 +17,6 @@ from typing import Dict, Optional, Any, List
 
 import logging
 import os
-import uuid
 from io import BytesIO
 from pathlib import Path
 import hashlib
@@ -29,9 +28,6 @@ from docx.oxml.shape import CT_Picture
 from PIL import Image
 
 from pipelines.nodes.file_converter import BaseConverter
-
-FILE_UPLOAD_PATH = os.getenv(
-    "FILE_UPLOAD_PATH", str((Path(__file__).parent / "file-upload").absolute()))
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +105,10 @@ class DocxToTextConverter(BaseConverter):
         file = docx.Document(file_path)  # Creating word reader object.
         documents = []
         text_dict = {}
-        # breakpoint()
         for i in range(len(file.paragraphs)):
             paragraph = file.paragraphs[i]
             if (paragraph.text):
                 if bool(text_dict):
-                    # meta['images']=text_dict['images']
                     meta_data = {}
                     meta_data['name'] = meta['name']
                     meta_data['images'] = text_dict['images']
@@ -128,37 +122,28 @@ class DocxToTextConverter(BaseConverter):
                 text = paragraph.text
                 text_dict = {'text': text, 'images': []}
             else:
-                image_list = self.get_picture(file, paragraph)
+                image_list = self.get_image(file, paragraph)
                 if (image_list is None):
                     continue
                 for i, image in enumerate(image_list):
                     if image:
-                        # 后缀
+                        # file extension
                         ext = image.ext
-                        # 二进制内容
+                        # file content
                         blob = image.blob
-                        # 显示图片
-                        # image_path = Path(
-                        # FILE_UPLOAD_PATH) / f"{uuid.uuid4().hex}_{i}_{ext}"
+                        # save images
                         md5hash = hashlib.md5(blob)
                         md5_name = md5hash.hexdigest()
                         image_name = '{}_{}.{}'.format(md5_name, i, ext)
                         image_path = os.path.join(self.desc_path, image_name)
                         Image.open(BytesIO(blob)).save(image_path)
                         text_dict['images'].append(image_name)
-        # breakpoint()
-        # paragraphs = [para.text for para in file.paragraphs]
-        # breakpoint()
-        # documents = []
-        # for page in paragraphs:
-        #     document = {"content": page, "content_type": "text", "meta": meta}
-        #     documents.append(document)
         return documents
 
-    def get_picture(self, document: Document, paragraph: Paragraph):
+    def get_image(self, document: Document, paragraph: Paragraph):
         """
-        document 为文档对象
-        paragraph 为内嵌图片的段落对象，比如第1段内
+        document file objects
+        paragraph image paragraph
         """
         result_list = []
         img_list = paragraph._element.xpath('.//pic:pic')
