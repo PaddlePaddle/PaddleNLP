@@ -57,6 +57,8 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
 ```
+【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
+
 ### 3.2 数据说明
 语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
@@ -183,7 +185,7 @@ python rest_api/application.py 8891
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh scripts/run_search_server.sh
+sh examples/semantic-search/run_search_server.sh
 ```
 启动后可以使用curl命令验证是否成功运行：
 
@@ -201,7 +203,7 @@ python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh scripts/run_search_web.sh
+sh examples/semantic-search/run_search_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。

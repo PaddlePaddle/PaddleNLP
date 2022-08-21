@@ -1615,7 +1615,7 @@ class InferOptDecoding(nn.Layer):
             setattr(self, k, v)
 
         # check the dtype of embedding
-        dtype = paddle.float16 if use_fp16_decoding else paddle.float32
+        dtype = "float16" if use_fp16_decoding else "float32"
         self.word_emb = transfer_param(self.word_emb,
                                        dtype=dtype,
                                        is_bias=False,
