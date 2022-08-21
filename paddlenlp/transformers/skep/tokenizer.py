@@ -616,4 +616,4 @@ class SkepTokenizer(PretrainedTokenizer):
         Returns:
             `Dict[str, int]`: The vocabulary.
         """
-        return self.vocab.token_to_idx
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
