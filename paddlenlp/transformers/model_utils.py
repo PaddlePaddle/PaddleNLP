@@ -229,8 +229,11 @@ class PretrainedModel(Layer, GenerationMixin):
         # From built-in pretrained models
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
-                resource_files[file_id] = map_list[
-                    pretrained_model_name_or_path]
+                if pretrained_model_name_or_path not in map_list:
+                    resource_files[file_id] = None
+                else:
+                    resource_files[file_id] = map_list[
+                        pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
                 cls.pretrained_init_configuration[pretrained_model_name_or_path]
             )
@@ -364,6 +367,12 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
+        if weight_path is None:
+            logger.warning(
+                "No model weight found for %s, return with random initialization !!!"
+                % pretrained_model_name_or_path)
+            return model
+
         assert weight_path.endswith(
             ".pdparams"), "suffix of weight must be .pdparams"
 
