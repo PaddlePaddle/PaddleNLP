@@ -56,6 +56,10 @@ ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WW
 用户可以根据自己的需求，灵活修改mask方式。具体可以参考修改`data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
 用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
 
+下面是使用CLUECorpusSmall 14G文本进行预训练的流程：
+<details>
+<summary><b>CLUECorpusSmall 数据集预训练</b></summary>
+
 ### 数据准备
 数据下载部分请参考[data_tools]目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
 
@@ -182,6 +186,146 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 注:
 - `ERNIE-1.0 Base`官方预训练参数，采用的训练配置是batch_size=1024、steps=100w，
 - `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
+</details>
+
+
+### ERNIE-CW 预训练流程
+
+PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布ERNIE-CW项目。让用户可以从零开始构建你的预训练模型。
+
+ERNIE-CW项目，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
+并训练发布开源最优的模型参数。
+
+数据下载，词表制作，数据转化部分，请参见[此处](./scripts/README.md)。
+接下来我们主要介绍训练流程部分的特性
+
+
+训练结构：
+- 支持SOP损失，灵活可配置。
+训练方式：
+- 同时支持动态图和静态图训练
+
+**训练速度方面**，我们支持了如下策略，加速计算过程，减小显存占用，扩大batch_size：
+
+- **多卡多机训练**：
+    - 基于飞桨Fleet分布式API，用户可以十分方便的通过数据并行的方法，将训练扩展到多机多卡。
+- **混合精度训练**：
+    - 部分算子使用FP16计算kernel，加速计算过程。支持AMP混合精度O1，和Pure FP16全FP训练策略O2。
+- **梯度累积训练**：
+    - 用户可以指定梯度累积的步数，在梯度累积的step中，减少多卡之间梯度的通信，减少更新的次数，可以扩大训练的batch_size.
+- **重计算训练**：
+    -  通过重新计算前向的方式，减少前向网络中间变量的存储，可以显著减少显存占用，
+
+
+**训练体验方面**，我们针对训练数据流、重启、可视化等方面做了针对性优化提升
+
+数据流
+- **多机扩展**
+    - 用户可以将数据放置到 NFS 服务器上，多机同时挂载数据即可。训练数据与计算资源分离。
+- **多数据混合**
+    - 训练数据集支持多个文件，即插即用，设置权重，传入参数即可data_dir="1.0  dateset_a  2.0 dataset_b"
+- **稳定可复现**
+    - MLM任务具有一定随机性，需要随机mask数据。本数据流通过固定每一个step数据的随机种子，实验数据流稳定可复现。
+- **快加载**
+    - 数据文件使用mmap读取，加载数百GB文件几乎不耗时。
+
+其他：
+- **断点重启**
+    - 用户可以单独设置，checkpoints steps 参数可设置较小，重启训练默认加载最新checkpoint。
+    - 断点数据自动恢复，学习率等参数也自动恢复。
+- **可视化日志记录**
+    - 日志展示为全局loss，波动小。
+    - 记录混合精度，loss_scaling等信息，方便用户debug。
+    - 对模型结构，配置参数，paddle版本信息进行记录，方便复现环境
+
+**训练效果方面**，我们release了base、large两个模型。均取得了较好的预训练效果。
+
+**ERNIE 3.0-Base-zh-CW** 模型：
+
+- 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-3.0-base-zh-cw`，用户加载即可使用。
+使用CLUE benchmark 对最优超参数进行GradSearch搜索：
+
+Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
+-- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
+Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
+ERNIE 3.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |	58.02 |	60.87 |	83.56 | 78.61 |	89.14 |	84.00 |  72.26/90.40 |	84.73 |	77.15 |
+ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |	58.53 |	61.72 |	83.07 |	78.81 |	84.21 |	82.77 | 68.22/88.71	| 82.78	| 73.19
+ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |	58.91 |	62.25 |	81.68 |	76.58 |	85.20 |	82.77 | 67.32/87.83 | 82.47 | 69.68
+
+**ERNIE 1.0-Large-zh-CW** 模型：
+- 除了base模型外，我们还训练了放出了large模型。此模型参数采用的是词表与ernie-1.0相同，因此命名为`ernie-1.0-large-zh-cw`。
+使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失：
+
+Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
+-- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
+Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
+ERNIE 1.0-Large-zh-CW | 24L1024H | 79.03 | 75.97 |	59.65 |	62.91 |	85.09 |	81.73||	93.09 |	84.53 | 74.22/91.88 | 88.57 | 84.54
+ERNIE 3.0-Xbase-zh| 20L1024H | 78.71 | 76.85 |	59.89 |	62.41 |	84.76 |	82.51 |	89.80 |	84.47 |	75.49/92.67 | 86.36 | 84.59
+RoBERTa-wwm-ext-large | 24L1024H | 76.61 |	76.00 |	59.33 |	62.02 |	83.88 |	78.81 |	90.79 |	83.67 |	70.58/89.82 |	85.72 |	75.26
+
+
+
+<details>
+<summary><b>训练脚本如下</b></summary>
+
+训练脚本如下
+```shell
+set -x
+
+# cd PaddleNLP/model_zoo/ernie-1.0
+export PYTHONPATH=$PYTHONPATH:../../
+
+export FLAGS_call_stack_level=2
+# export NCCL_SOCKET_IFNAME=xgbe0
+export FLAGS_gemm_use_half_precision_compute_type=False
+export FLAGS_enable_eager_mode=1
+unset CUDA_VISIBLE_DEVICES
+
+trainer_id=${PADDLE_TRAINER_ID:-"0"}
+task_name="0809-ernie-3.0-base-cw-dp16-gb1024"
+
+base_nfs="/path/to/your/nfs/mount/point"
+base_dir="${base_nfs}/ernie-cw/output/${task_name}"
+data_dir="5.0 ${base_nfs}/clue_oscar/clue_corpus_oscar_0630 7.0 ${base_nfs}/clue_train/clue_corpus_train_0629 12.0 ${base_nfs}/wudao_200g/wudao_200g_0703"
+vocab_dir="${base_nfs}/"
+
+python3 -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "${base_dir}/log_${trainer_id}" \
+    run_pretrain.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-3.0-base-zh" \
+    --tokenizer_name_or_path "${vocab_dir}" \
+    --input_dir "${data_dir}" \
+    --output_dir "${base_dir}" \
+    --fp16_opt_level "O1" \
+    --max_seq_len 512 \
+    --binary_head true \
+    --micro_batch_size 64 \
+    --sharding_degree 1\
+    --dp_degree 16 \
+    --use_sharding false \
+    --use_amp true \
+    --use_recompute false \
+    --max_lr 0.0001 \
+    --min_lr 0.00001 \
+    --max_steps 4000000 \
+    --save_steps 100000 \
+    --checkpoint_steps 5000 \
+    --decay_steps 3900000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.01 \
+    --grad_clip 1.0 \
+    --logging_freq 20 \
+    --num_workers 3 \
+    --eval_freq 1000 \
+    --device "gpu"\
+    --share_folder true \
+    --hidden_dropout_prob 0.1 \
+    --attention_probs_dropout_prob 0.1 \
+    --seed 1234 \
+```
+</details>
 
 ### 预训练模型贡献
 PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。

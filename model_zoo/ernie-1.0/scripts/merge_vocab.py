@@ -31,48 +31,49 @@ bt = BasicTokenizer()
 normalize_chars = lambda x: "".join(bt.tokenize(x))
 
 
+# 20902 个中文全字符
 def chinese_char():
     return set([chr(x) for x in range(0x4E00, 0x9FA5 + 1)])
 
 
+# 日文 或 谚文字母
 def jk_vocab(c):
     c = ord(c)
     return (c >= 0x3040 and c<= 0x33FF) or \
               (c>= 0x1100 and c<=0x11FF)   #  谚文字母
 
 
+# 特殊 TOKEN
 def add_special_token():
     return ["[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"]
 
 
 char_dict = pickle.load(open("char_dict.pickle", "rb"))
-cjk_vocab = chinese_char()
-
+chinese_vocab = chinese_char()
 final_vocab = set()
-
-# Not in use char
-# final_vocab.add(" ")
-# final_vocab.add("\n")
-
 other_char = []
 
 
 def add_vocab(char, f):
     if re_sep_eng.match(char):
+        # Delete <pad> tokens in eng.vocab
         return
-    # add eng vocab and specical token
+
+    # Add eng vocab and specical token
     if re_eng.match(char) or re_sep.match(char):
         if char not in final_vocab:
             final_vocab.add(char)
             f.write(f"{char}\n")
         return
-    # add japanese and Korean char
-    if len(char) > 1 and char.startswith("##") and cjk_vocab(char[2]):
+
+    # Add chinese char
+    if len(char) > 1 and char.startswith("##") and chinese_vocab(char[2]):
         if char not in final_vocab:
             final_vocab.add(char)
             f.write(f"{char}\n")
         return
 
+    # Normalize char， 部分字符 nioe
     char = normalize_chars(char)
     for i, k in enumerate(char):
         if _is_whitespace(k) or _is_control(k):
@@ -84,6 +85,7 @@ def add_vocab(char, f):
             final_vocab.add(k)
             f.write(f"{k}\n")
             if jk_vocab(k):
+                # add "##" for japanese and korean char
                 add_vocab("##" + k, f)
 
 
@@ -92,48 +94,43 @@ with open("vocab.txt", "w") as f:
         add_vocab(x, f)
 
     res = sorted(char_dict.items(), key=lambda x: -x[1])
-    # Add cjk by freq
+
+    # Add chinse char by freq
     for x in res:
         k, v = x
         k = normalize_chars(k)
-        if k in cjk_vocab:
+        if k in chinese_vocab:
             add_vocab(k, f)
-            cjk_vocab.remove(k)
-    # if cjk not in freq add it
-    cjk_vocab = sorted(cjk_vocab)
-    while len(cjk_vocab) > 0:
-        k = cjk_vocab.pop()
+            chinese_vocab.remove(k)
+
+    # If chinse char not in freq add it
+    chinese_vocab = sorted(chinese_vocab)
+    while len(chinese_vocab) > 0:
+        k = chinese_vocab.pop()
         if k not in final_vocab:
             f.write(f"{k}\n")
             final_vocab.add(k)
+
+    # And english vocab part
     with open("eng.vocab") as ec:
         line = ec.readline()
         while line:
             k, v = line.strip().split()
             if "▁" in k:
+                # remove "▁" in eng vocab
                 k = k[1:]
             elif re_sep_eng.match(k):
                 pass
             else:
+                # add "##" for eng vocab
                 k = "##" + k
 
             add_vocab(k, f)
             line = ec.readline()
+
+    # Add additional tokens in corpus
+    # such as japanese and korean char and other symbols
     for x in res:
         k, v = x
         if v >= 200:
             add_vocab(k, f)
-
-    # addition = []
-    # for x in res:
-    #     oldk,v = x
-    #     k = normalize_chars(oldk)
-    #     for c in k:
-    #         if c not in final_vocab and  v >= 200:
-    #             addition.append(c)
-    #             final_vocab.add(c)
-    # for k in sorted(addition):
-    #     f.write(f"{k}\n")
-
-# for k in sorted(other_char, key= lambda x:ord(x)):
-#     print(k)

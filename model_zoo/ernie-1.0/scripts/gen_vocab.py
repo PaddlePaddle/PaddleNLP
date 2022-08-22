@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import sentencepiece as spm
 
+input_path = sys.argv[1]
+print("Generate vocabulary file for corpus:  ", input_path)
+
 spm.SentencePieceTrainer.train(
-    input='../wikitext/wiki.all.raw',
+    input=input_path,
     model_prefix='eng',
     vocab_size=17000,
     model_type="BPE",

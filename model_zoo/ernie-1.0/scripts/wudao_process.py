@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-input_path = "WuDaoCorpus2.0_base_200G/"
-
 import json
 import re
 import argparse
@@ -37,6 +35,7 @@ def get_args():
                         help='Number of worker processes to launch')
     parser.add_argument('--output_path',
                         type=str,
+                        default="./tmp",
                         help='Path to save the output json files.')
     parser.add_argument('--log_interval',
                         type=int,
@@ -88,8 +87,8 @@ special_chars = ['\n', '。', '?', '？', ' ', ';', '；', '！', '!']
 split_chars = ['。', '?', '？', ';', '；', '!', '！']
 
 
-def text_to_text(path):
-    out_name = "./tmp/" + path[-20:]
+def text_to_text(output_path, path):
+    out_name = os.path.join(output_path, path[-20:])
     print("Loading %s" % path)
     with open(path, "r") as f:
         try:
@@ -113,13 +112,15 @@ def text_to_text(path):
             count += 1
             text = js["content"]
             data_len += len(text.encode("utf-8"))
-            # make special char only once, because of those token will be treat as sentence spliter.
+            # make special char only once,
+            # because of those token will be treat as sentence spliter.
+            # 此处为断句逻辑
             for char in special_chars:
                 text = re.sub('[' + char + ']+[ ]*', char, text)
-            # space will be treat as comma, WARM, not in eng
-            # text = text.replace(" ", "，")
             for char in split_chars:
                 text = text.replace(char, char + "\n")
+
+            # 此处为分词逻辑
             final = ""
             for line in text.split("\n"):
                 if len(line) == 0:
@@ -127,8 +128,6 @@ def text_to_text(path):
                 words = seg_func(line)
                 final += " ".join(words) + "\n"
             f.write(final + "\n")
-            # if count % 100 == 0:
-            #     print("speed: ", data_len/1024/(time.time() - s))
 
     return data_len, None
 
@@ -152,7 +151,12 @@ def main():
     total_bytes_processed = 0
     print("Time to startup:", startup_end - startup_start)
 
-    encoded_files = pool.imap(text_to_text, file_paths, 1)
+    if not os.path.exists(args.output_path):
+        os.makedirs(args.output_path)
+
+    trans_func = partial(text_to_text, output_path=args.output_path)
+
+    encoded_files = pool.imap(trans_func, file_paths, 1)
 
     out_paths = []
     for i, (bytes_processed, out_path) in enumerate(encoded_files, start=1):
