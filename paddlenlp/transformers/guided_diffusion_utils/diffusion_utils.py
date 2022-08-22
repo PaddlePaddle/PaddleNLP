@@ -30,6 +30,7 @@ from .make_cutouts import MakeCutoutsDango
 from .sec_diff import alpha_sigma_to_t
 from .transforms import Normalize
 from .perlin_noises import create_perlin_noise, regen_perlin
+import random
 
 __all__ = ["DiffusionMixin"]
 
@@ -260,8 +261,8 @@ class DiffusionMixin(object):
         cut_innercut = eval(cut_innercut)
         cut_icgray_p = eval(cut_icgray_p)
 
-        if seed is not None:
-            set_seed(seed)
+        seed = seed or random.randint(0, 2**32)
+        set_seed(seed)
 
         init = None
         if init_image:
