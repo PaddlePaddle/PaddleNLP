@@ -76,7 +76,7 @@ def semantic_search_tutorial():
         use_gpu=use_gpu)
 
     ### Pipeline
-    from pipelines.pipelines import SemanticSearchPipeline
+    from pipelines import SemanticSearchPipeline
     pipe = SemanticSearchPipeline(retriever, ranker)
 
     prediction = pipe.run(query="亚马逊河流的介绍",

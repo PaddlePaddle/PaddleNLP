@@ -8,6 +8,8 @@
 
 #### 1.1 CompressionArguments 参数介绍
 
+CompressionArguments 中的参数一部分是压缩所使用的参数，另一部分继承自 TrainingArguments，用于设置压缩训练时的超参数。
+
 **公共参数**
 
 公共参数中的参数和具体的压缩策略无关。
@@ -40,7 +42,56 @@
 --num_train_epochs
                         裁剪训练所需要的 epochs 数。默认是 3.0；
 
+--max_steps
+                        如果设置为正数，则表示要执行的训练步骤总数。
+                        覆盖 `num_train_epochs`。默认为 -1；
+
+--logging_steps
+                        两个日志之间的更新步骤数。默认为 500；
+
+--save_steps
+                        评估模型的步数。默认为 500；
+
+--optim
+                        裁剪训练使用的优化器名称，默认为adamw，默认为 'adamw'；
+
+--learning_rate
+                        裁剪训练使用优化器的初始学习率，默认为 5e-05；
+
+--weight_decay
+                        除了所有 bias 和 LayerNorm 权重之外，应用于所有层裁剪训练时的权重衰减数值。默认为 0.0；
+
+--adam_beta1
+                        裁剪训练使用 AdamW 的优化器时的 beta1 超参数。默认为 0.9；
+
+--adam_beta2
+                        裁剪训练使用 AdamW 优化器时的 beta2 超参数。默认为 0.999；
+
+--adam_epsilon
+                        裁剪训练使用 AdamW 优化器时的 epsilon 超参数。默认为 1e-8；
+
+--max_grad_norm
+                        最大梯度范数（用于梯度裁剪）。默认为 1.0；
+
+--lr_scheduler_type
+                        要使用的学习率调度策略。默认为 'linear'；
+
+--warmup_ratio
+                        用于从 0 到 `learning_rate` 的线性 warmup 的总训练步骤的比例。默认为 0.0；
+
+--warmup_steps
+                        用于从 0 到 `learning_rate` 的线性 warmup 的步数。覆盖warmup_ratio 参数。默认是 0；
+
+--seed
+                        设置的随机种子。为确保多次运行的可复现性。默认为 42；
+--device
+                        运行的设备名称。支持 cpu/gpu，默认为 'gpu'；
+
+--remove_unused_columns
+                        是否去除 Dataset 中不用的字段数据。默认是 True；
+
 ```
+
 
 
 **PTQ 量化参数**
@@ -205,15 +256,35 @@ trainer.compress(custom_dynabert_evaluate=evaluate_seq_cls,
 本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 [ernie-3.0](../model_zoo/ernie-3.0/) 目录下的 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py` 脚本，启动方式如下：
 
 ```shell
-# --model_name_or_path 参数传入的是微调后得到的模型所在目录，压缩后的模型也会在该目录下
 # 分类任务
-python compress_seq_cls.py --dataset "clue tnews"  --model_name_or_path best_models/TNEWS  --output_dir ./
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+python compress_seq_cls.py \
+    --dataset "clue tnews"  \
+    --model_name_or_path best_models/TNEWS  \
+    --output_dir ./
 
 # 序列标注任务
-python compress_token_cls.py --dataset "msra_ner"  --model_name_or_path best_models/MSRA_NER --output_dir ./
+python compress_token_cls.py \
+    --dataset "msra_ner"  \
+    --model_name_or_path best_models/MSRA_NER \
+    --output_dir ./ \
+    --max_seq_length 128 \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --learning_rate 0.00005 \
+    --remove_unused_columns False \
+    --num_train_epochs 3
 
 # 阅读理解任务
-python compress_seq_cls.py --dataset "clue cmrc2018"  --model_name_or_path best_models/CMRC2018  --output_dir ./
-```
+python compress_qa.py \
+    --dataset "clue cmrc2018" \
+    --model_name_or_path best_models/CMRC2018  \
+    --output_dir ./ \
+    --max_seq_length 512 \
+    --learning_rate 0.00003 \
+    --num_train_epochs 8 \
+    --per_device_train_batch_size 24 \
+    --per_device_eval_batch_size 24 \
+    --max_answer_length 50 \
 
-由于 ernie-3.0 目录下支持了多个任务，参数均配置在同级目录下的 `config.yaml` 文件中，所以上方启动方式代码中不含压缩所需要的参数。
+```
