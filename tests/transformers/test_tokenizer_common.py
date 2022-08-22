@@ -54,6 +54,10 @@ def filter_non_english(_, pretrained_name: str):
     return not any([lang in pretrained_name for lang in NON_ENGLISH_TAGS])
 
 
+def filter_roberta_detectors(_, pretrained_name: str):
+    return "detector" not in pretrained_name
+
+
 class TokenizerTesterMixin:
 
     tokenizer_class = None
@@ -501,8 +505,6 @@ class TokenizerTesterMixin:
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
                 after_vocab = after_tokenizer.get_vocab()
-                # after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                #                    **after_tokenizer.added_tokens_encoder)
                 self.assertListEqual(before_tokens["input_ids"],
                                      after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
