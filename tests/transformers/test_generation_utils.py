@@ -164,7 +164,6 @@ class GenerationTesterMixin:
         output_attentions=None,
         output_hidden_states=None,
         num_interleave=1,
-        pretrained_model_name=None,
     ):
         model.eval()
         encoder = model.get_encoder()
@@ -176,8 +175,8 @@ class GenerationTesterMixin:
                                                             axis=0)
 
         input_ids = paddle.zeros_like(
-            input_ids[:, :1], dtype="int64") + model.get_decoder_start_token_id(
-                pretrained_model_name=pretrained_model_name)
+            input_ids[:, :1],
+            dtype="int64") + model.get_decoder_start_token_id()
         # attention_mask = None
         return encoder_outputs, input_ids, attention_mask
 
@@ -187,18 +186,17 @@ class GenerationTesterMixin:
         input_ids,
         attention_mask,
         max_length,
-        pretrained_model_name,
     ):
         if self.is_encoder_decoder:
             max_length = 4
         logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-            eos_token_id=getattr(model,
-                                 pretrained_model_name).config["eos_token_id"],
+            eos_token_id=getattr(
+                model, model.base_model_prefix).config["eos_token_id"],
             forced_bos_token_id=getattr(
-                getattr(model, pretrained_model_name).config,
+                getattr(model, model.base_model_prefix).config,
                 "forced_bos_token_id", None),
             forced_eos_token_id=getattr(
-                getattr(model, pretrained_model_name).config,
+                getattr(model, model.base_model_prefix).config,
                 "forced_eos_token_id", None),
             max_length=max_length,
         )
@@ -219,7 +217,6 @@ class GenerationTesterMixin:
                 model,
                 input_ids,
                 attention_mask,
-                pretrained_model_name=pretrained_model_name,
             )
             kwargs["encoder_output"] = encoder_outputs
 
@@ -230,9 +227,9 @@ class GenerationTesterMixin:
                 attention_mask=attention_mask,
                 logits_processors=logits_processor,
                 pad_token_id=getattr(
-                    model, pretrained_model_name).config["pad_token_id"],
+                    model, model.base_model_prefix).config["pad_token_id"],
                 eos_token_id=getattr(
-                    model, pretrained_model_name).config["eos_token_id"],
+                    model, model.base_model_prefix).config["eos_token_id"],
                 **kwargs,
             )
         return output_greedy, output_generate
@@ -247,7 +244,6 @@ class GenerationTesterMixin:
         logits_processors,
         logits_warper,
         process_kwargs,
-        pretrained_model_name,
     ):
         with paddle.no_grad():
             output_generate = model.generate(
@@ -267,7 +263,6 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask,
                 num_interleave=num_return_sequences,
-                pretrained_model_name=pretrained_model_name,
             )
             kwargs["encoder_output"] = encoder_outputs
             input_ids_clone = input_ids_clone.repeat_interleave(
@@ -289,9 +284,9 @@ class GenerationTesterMixin:
                 input_ids.shape[0],
                 logits_processors=logits_processors,
                 pad_token_id=getattr(
-                    model, pretrained_model_name).config["pad_token_id"],
+                    model, model.base_model_prefix).config["pad_token_id"],
                 eos_token_id=getattr(
-                    model, pretrained_model_name).config["eos_token_id"],
+                    model, model.base_model_prefix).config["eos_token_id"],
                 top_k=1,
                 **process_kwargs,
                 **kwargs,
@@ -308,7 +303,6 @@ class GenerationTesterMixin:
         beam_kwargs,
         logits_processor,
         logits_process_kwargs,
-        pretrained_model_name,
     ):
         with paddle.no_grad():
             output_generate = model.generate(
@@ -328,7 +322,6 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask,
                 num_interleave=beam_scorer.num_beams,
-                pretrained_model_name=pretrained_model_name,
             )
             kwargs["encoder_output"] = encoder_outputs
             input_ids_clone = input_ids_clone.repeat_interleave(
@@ -353,9 +346,9 @@ class GenerationTesterMixin:
                 diversity_rate=getattr(logits_process_kwargs, "diversity_rate",
                                        0.0),
                 pad_token_id=getattr(
-                    model, pretrained_model_name).config["pad_token_id"],
+                    model, model.base_model_prefix).config["pad_token_id"],
                 eos_token_id=getattr(
-                    model, pretrained_model_name).config["eos_token_id"],
+                    model, model.base_model_prefix).config["eos_token_id"],
                 **kwargs,
             )
         return output_generate, output_beam_search
@@ -370,7 +363,6 @@ class GenerationTesterMixin:
         beam_kwargs,
         logits_processor,
         logits_process_kwargs,
-        pretrained_model_name,
     ):
         model.eval()
         with paddle.no_grad():
@@ -391,7 +383,6 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask,
                 num_interleave=beam_scorer.num_beams,
-                pretrained_model_name=pretrained_model_name,
             )
             kwargs["encoder_output"] = encoder_outputs
             input_ids_clone = input_ids_clone.repeat_interleave(
@@ -414,9 +405,9 @@ class GenerationTesterMixin:
                 attention_mask=attention_mask_clone,
                 logits_processors=logits_processor,
                 pad_token_id=getattr(
-                    model, pretrained_model_name).config["pad_token_id"],
+                    model, model.base_model_prefix).config["pad_token_id"],
                 eos_token_id=getattr(
-                    model, pretrained_model_name).config["eos_token_id"],
+                    model, model.base_model_prefix).config["eos_token_id"],
                 **kwargs,
             )
         return output_generate, output_group_beam_search
@@ -428,8 +419,6 @@ class GenerationTesterMixin:
             )
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
-            pretrained_model_name = self.all_generative_model_classes[
-                model_class][1]
             model = model_class(pretrained_model)
             model.eval()
 
@@ -437,8 +426,7 @@ class GenerationTesterMixin:
                 model=model,
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                max_length=max_length,
-                pretrained_model_name=pretrained_model_name)
+                max_length=max_length)
 
             self.assertListEqual(output_greedy[0].tolist(),
                                  output_generate[0].tolist())
@@ -453,8 +441,6 @@ class GenerationTesterMixin:
             )
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
-            pretrained_model_name = self.all_generative_model_classes[
-                model_class][1]
             model = model_class(pretrained_model)
             model.eval()
 
@@ -462,12 +448,12 @@ class GenerationTesterMixin:
                 max_length = 4
 
             process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-                getattr(model, pretrained_model_name).config["eos_token_id"],
+                getattr(model, model.base_model_prefix).config["eos_token_id"],
                 forced_bos_token_id=getattr(
-                    getattr(model, pretrained_model_name).config,
+                    getattr(model, model.base_model_prefix).config,
                     "forced_bos_token_id", None),
                 forced_eos_token_id=getattr(
-                    getattr(model, pretrained_model_name).config,
+                    getattr(model, model.base_model_prefix).config,
                     "forced_eos_token_id", None),
                 max_length=max_length,
             )
@@ -483,7 +469,6 @@ class GenerationTesterMixin:
                 logits_processors=logits_processor,
                 logits_warper=logits_warper,
                 process_kwargs=process_kwargs,
-                pretrained_model_name=pretrained_model_name,
             )
             self.assertListEqual(output_sample[0].tolist(),
                                  output_generate[0].tolist())
@@ -498,7 +483,6 @@ class GenerationTesterMixin:
                 logits_processors=logits_processor,
                 logits_warper=logits_warper,
                 process_kwargs=process_kwargs,
-                pretrained_model_name=pretrained_model_name,
             )
             self.assertListEqual(output_sample[0].tolist(),
                                  output_generate[0].tolist())
@@ -516,8 +500,6 @@ class GenerationTesterMixin:
 
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
-            pretrained_model_name = self.all_generative_model_classes[
-                model_class][1]
             model = model_class(pretrained_model)
             model.eval()
 
@@ -545,7 +527,6 @@ class GenerationTesterMixin:
                 beam_kwargs=beam_kwargs,
                 logits_process_kwargs=logits_process_kwargs,
                 logits_processor=logits_processor,
-                pretrained_model_name=pretrained_model_name,
             )
 
             self.assertListEqual(output_generate[0].tolist(),
@@ -570,7 +551,6 @@ class GenerationTesterMixin:
                 beam_kwargs=beam_kwargs,
                 logits_process_kwargs=logits_process_kwargs,
                 logits_processor=logits_processor,
-                pretrained_model_name=pretrained_model_name,
             )
             self.assertListEqual(output_generate[0].tolist(),
                                  output_beam_search[0].tolist())
@@ -585,8 +565,6 @@ class GenerationTesterMixin:
         for model_class in self.all_generative_model_classes.keys():
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
-            pretrained_model_name = self.all_generative_model_classes[
-                model_class][1]
             model = model_class(pretrained_model)
             model.eval()
 
@@ -610,8 +588,6 @@ class GenerationTesterMixin:
 
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
-            pretrained_model_name = self.all_generative_model_classes[
-                model_class][1]
             model = model_class(pretrained_model)
             model.eval()
 
@@ -640,7 +616,6 @@ class GenerationTesterMixin:
                 beam_kwargs=beam_kwargs,
                 logits_processor=logits_processor,
                 logits_process_kwargs=logits_process_kwargs,
-                pretrained_model_name=pretrained_model_name,
             )
             self.assertListEqual(output_generate[0].tolist(),
                                  output_group_beam_search[0].tolist())
@@ -663,7 +638,6 @@ class GenerationTesterMixin:
                 beam_kwargs=beam_kwargs,
                 logits_processor=logits_processor,
                 logits_process_kwargs=logits_process_kwargs,
-                pretrained_model_name=pretrained_model_name,
             )
             self.assertListEqual(output_generate[0].tolist(),
                                  output_group_beam_search[0].tolist())
