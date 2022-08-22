@@ -18,8 +18,6 @@ import copy
 import tempfile
 import unittest
 
-import timeout_decorator  # noqa
-
 from tests.testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
@@ -281,7 +279,6 @@ class BartHeadTests(unittest.TestCase):
         self.assertEqual(start_logits.shape, input_ids.shape)
         self.assertEqual(end_logits.shape, input_ids.shape)
 
-    @timeout_decorator.timeout(1)
     def test_lm_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
         bart_model = BartModel(**config)
