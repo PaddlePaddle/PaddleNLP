@@ -78,10 +78,12 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             RoFormerTokenizer.pretrained_init_configuration.keys())[0],
                                                       use_jieba=True)
         # test jieba tokenizer in rofromer
-        jieba_tokenizer = tokenizer.basic_tokenizer
 
-        self.assertListEqual(jieba_tokenizer.tokenize("ah\u535A\u63A8zz"),
-                             ["ah", "博", "推", "zz"])
+        tokens = tokenizer.tokenize("ah\u535A\u63A8zz")
+        self.assertListEqual(tokens, ["ah", "博", "推", 'z', '##z'])
+
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
+                             [5829, 713, 2093, 167, 48585])
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
