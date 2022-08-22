@@ -18,6 +18,7 @@ import paddle
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
+
 from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
 
