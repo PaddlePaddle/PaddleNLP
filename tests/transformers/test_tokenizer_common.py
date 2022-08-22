@@ -69,6 +69,8 @@ class TokenizerTesterMixin:
     test_sentencepiece_ignore_case = False
     test_offsets = True
 
+    only_english_character: bool = True
+
     def setUp(self) -> None:
 
         tokenizers_list = [(
@@ -105,7 +107,11 @@ class TokenizerTesterMixin:
                            min_length=5) -> Tuple[str, list]:
         toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False))
                 for i in range(len(tokenizer))]
-        toks = list(filter(lambda t: re.match(r"^[ a-zA-Z]+$", t[1]), toks))
+
+        # filter the english only character
+        if self.only_english_character:
+            toks = list(filter(lambda t: re.match(r"^[ a-zA-Z]+$", t[1]), toks))
+
         toks = list(
             filter(
                 lambda t: [t[0]] == tokenizer.encode(
@@ -2372,6 +2378,7 @@ class TokenizerTesterMixin:
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
                     f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+
                 tokenizer = self.tokenizer_class.from_pretrained(
                     pretrained_name, **kwargs)
 
