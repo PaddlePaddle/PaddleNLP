@@ -36,35 +36,6 @@ class ErnieDocBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-        vocab = [
-            "l",
-            "o",
-            "w",
-            "e",
-            "r",
-            "s",
-            "t",
-            "i",
-            "d",
-            "n",
-            "\u0120",
-            "\u0120l",
-            "\u0120n",
-            "\u0120lo",
-            "\u0120low",
-            "er",
-            "\u0120lowest",
-            "\u0120newer",
-            "\u0120wider",
-            "<unk>",
-            "<|endoftext|>",
-        ]
-        # save vocab file
-        self.vocab_file = os.path.join(self.tmpdirname, 'vocab.txt')
-        with open(self.vocab_file, 'w', encoding='utf-8') as f:
-            # f.write('\n'.join(vocab))
-            f.write('\n'.join(vocab + ["[PAD]", "[CLS]", "[SEP]", "[MASK]"]))
-
         # save bpe related files
         self.bpe_json_file = os.path.join(self.tmpdirname, 'encoder.json')
         self.bpe_vocab_file = os.path.join(self.tmpdirname, 'vocab.bpe')
@@ -75,13 +46,9 @@ class ErnieDocBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                         self.bpe_vocab_file)
 
     def get_tokenizer(self, **kwargs):
-        tokenizer = self.tokenizer_class.from_pretrained(
-            self.tmpdirname,
-            vocab_bpe_path=self.bpe_vocab_file,
-            encoder_json_path=self.bpe_json_file,
-            unk_token='<unk>',
-            **kwargs)
-        return tokenizer
+        return self.tokenizer_class.from_pretrained(self.tmpdirname,
+                                                    unk_token='<|endoftext|>',
+                                                    **kwargs)
 
     def get_input_output_texts(self, tokenizer):
         input_text = " lower"
@@ -94,7 +61,7 @@ class ErnieDocBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                            max_length=20,
                            min_length=5) -> Tuple[str, list]:
         toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False))
-                for i in range(len(tokenizer.bpe_tokenizer.encoder))]
+                for i in range(len(tokenizer.encoder.encoder))]
         toks = list(
             filter(
                 lambda t: [t[0]] == tokenizer.encode(
@@ -164,12 +131,6 @@ class ErnieDocBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 self.assertNotEqual(len(tokens_2), 0)
                 text_2 = tokenizer.decode(ids)
                 self.assertIsInstance(text_2, str)
-
-    def test_chinese(self):
-        tokenizer = BasicTokenizer()
-
-        self.assertListEqual(tokenizer.tokenize("ah\u535A\u63A8zz"),
-                             ["ah", "\u535A", "\u63A8", "zz"])
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()

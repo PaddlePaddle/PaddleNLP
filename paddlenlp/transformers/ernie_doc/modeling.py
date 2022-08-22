@@ -17,7 +17,7 @@ from typing import Optional
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.tensor.tensor import Tensor
+from paddle import Tensor
 
 from ..attention_utils import _convert_param_attr_to_list
 from .. import PretrainedModel, register_base_model

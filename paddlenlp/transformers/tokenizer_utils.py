@@ -1652,14 +1652,14 @@ class BPETokenizer(PretrainedTokenizer):
     }
 
     def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 do_lower_case: bool = True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
+                 vocab_file: str,
+                 merges_file: str,
+                 do_lower_case: bool = False,
+                 unk_token: str = "[UNK]",
+                 sep_token: str = "[SEP]",
+                 pad_token: str = "[PAD]",
+                 cls_token: str = "[CLS]",
+                 mask_token: str = "[MASK]",
                  **kwargs):
         self.vocab_file = vocab_file
         self.merges_file = merges_file

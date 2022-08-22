@@ -230,7 +230,7 @@ class ErnieDocModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_question_answering(
             *config_and_inputs)
 
-    # @slow
+    @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 ErnieDocPretrainedModel.pretrained_init_configuration)[:1]:
@@ -244,7 +244,7 @@ class ErnieDocModelTest(ModelTesterMixin, unittest.TestCase):
 
 class ErnieDocModelIntegrationTest(unittest.TestCase):
 
-    # @slow
+    @slow
     def test_inference_no_attention(self):
         model = ErnieDocModel.from_pretrained("ernie-doc-base-en")
         model.eval()
@@ -262,13 +262,14 @@ class ErnieDocModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
-    # @slow
+    @slow
     def test_inference_with_attention(self):
         model = ErnieDocModel.from_pretrained("ernie-doc-base-en")
         model.eval()
         input_ids = paddle.to_tensor(
             [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attn_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        attn_mask = paddle.ones(shape=[1, model.memory_len, 1])
+
         with paddle.no_grad():
             output = model(input_ids, attn_mask=attn_mask)[0]
         expected_shape = [1, 11, 1024]
