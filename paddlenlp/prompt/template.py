@@ -512,7 +512,6 @@ class AutoTemplate(object):
 
         if 'mask' not in template_keys:
             template.append({'add_prefix_space': ' ', 'mask': None})
-            template.append({'add_prefix_space': '', 'hard': '。'})
 
         if 'soft' in template_keys:
             return SoftTemplate(tokenizer=tokenizer,
