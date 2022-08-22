@@ -17,7 +17,6 @@ import os
 from functools import lru_cache
 
 import json
-import jieba
 import shutil
 from paddle.utils import try_import
 from .. import PretrainedTokenizer, AddedToken
