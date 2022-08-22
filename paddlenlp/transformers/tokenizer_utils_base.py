@@ -2008,22 +2008,23 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return padding_strategy, truncation_strategy, max_length, kwargs
 
     def __call__(self,
-                 text,
-                 text_pair=None,
+                 text: Union[str, List[str], List[List[str]]],
+                 text_pair: Optional[Union[str, List[str],
+                                           List[List[str]]]] = None,
                  max_length: Optional[int] = None,
-                 stride=0,
-                 is_split_into_words=False,
+                 stride: int = 0,
+                 is_split_into_words: bool = False,
                  padding: Union[bool, str, PaddingStrategy] = False,
                  truncation: Union[bool, str, TruncationStrategy] = False,
-                 return_position_ids=False,
-                 return_token_type_ids=True,
-                 return_attention_mask=False,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False,
-                 return_dict=True,
-                 return_offsets_mapping=False,
-                 add_special_tokens=True,
+                 return_position_ids: bool = False,
+                 return_token_type_ids: Optional[bool] = None,
+                 return_attention_mask: Optional[bool] = None,
+                 return_length: bool = False,
+                 return_overflowing_tokens: bool = False,
+                 return_special_tokens_mask: bool = False,
+                 return_dict: bool = True,
+                 return_offsets_mapping: bool = False,
+                 add_special_tokens: bool = True,
                  pad_to_multiple_of: Optional[int] = None,
                  return_tensors: Optional[Union[str, TensorType]] = None,
                  verbose: bool = True,
@@ -2195,11 +2196,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
                 "or `List[List[str]]` (batch of pretokenized examples).")
 
-        if not _is_valid_text_input(text):
-            raise ValueError(
-                "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
-                "or `List[List[str]]` (batch of pretokenized examples).")
-
         if text_pair is not None and not _is_valid_text_input(text_pair):
             raise ValueError(
                 "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
@@ -2268,22 +2264,22 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     def encode(self,
                text,
                text_pair=None,
-               max_length=None,
-               stride: int = 0,
-               is_split_into_words: bool = False,
+               add_special_tokens=True,
                padding: Union[bool, str, PaddingStrategy] = False,
                truncation: Union[bool, str, TruncationStrategy] = False,
-               return_position_ids=False,
-               return_token_type_ids=True,
-               return_attention_mask=False,
-               return_length=False,
-               return_overflowing_tokens=False,
-               return_special_tokens_mask=False,
-               return_offsets_mapping=False,
-               add_special_tokens=True,
+               max_length: Optional[int] = None,
+               stride: int = 0,
+               is_split_into_words: bool = False,
                pad_to_multiple_of: Optional[int] = None,
                return_tensors: Optional[Union[str, TensorType]] = None,
+               return_token_type_ids: Optional[bool] = None,
+               return_attention_mask: Optional[bool] = None,
+               return_overflowing_tokens: bool = False,
+               return_special_tokens_mask: bool = False,
+               return_offsets_mapping: bool = False,
+               return_length: bool = False,
                verbose: bool = True,
+               return_position_ids=False,
                **kwargs) -> BatchEncoding:
         """
         Tokenize and prepare for the model a sequence or a pair of sequences.
@@ -2365,29 +2361,33 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             **kwargs) -> BatchEncoding:
         raise NotImplementedError
 
-    def batch_encode(self,
-                     batch_text_or_text_pairs: Union[
-                         List[TextInput], List[TextInputPair],
-                         List[PreTokenizedInput], List[PreTokenizedInputPair],
-                         List[EncodedInput], List[EncodedInputPair], ],
-                     max_length=None,
-                     stride: int = 0,
-                     is_split_into_words: bool = False,
-                     padding: Union[bool, str, PaddingStrategy] = False,
-                     truncation: Union[bool, str, TruncationStrategy] = False,
-                     return_position_ids=False,
-                     return_token_type_ids=True,
-                     return_attention_mask=False,
-                     return_length=False,
-                     return_overflowing_tokens=False,
-                     return_special_tokens_mask=False,
-                     return_dict=True,
-                     return_offsets_mapping=False,
-                     add_special_tokens=True,
-                     pad_to_multiple_of: Optional[int] = None,
-                     return_tensors: Optional[Union[str, TensorType]] = None,
-                     verbose: bool = True,
-                     **kwargs) -> BatchEncoding:
+    def batch_encode(
+            self,
+            batch_text_or_text_pairs: Union[List[TextInput],
+                                            List[TextInputPair],
+                                            List[PreTokenizedInput],
+                                            List[PreTokenizedInputPair],
+                                            List[EncodedInput],
+                                            List[EncodedInputPair], ],
+            max_length=None,
+            stride: int = 0,
+            is_split_into_words: bool = False,
+            padding: Union[bool, str, PaddingStrategy] = False,
+            truncation: Union[bool, str, TruncationStrategy] = False,
+            return_position_ids=False,
+            # TODO(wj-mcat): keep align with `encode` method
+            return_token_type_ids=None,
+            return_attention_mask=None,
+            return_length=False,
+            return_overflowing_tokens=False,
+            return_special_tokens_mask=False,
+            return_dict=True,
+            return_offsets_mapping=False,
+            add_special_tokens=True,
+            pad_to_multiple_of: Optional[int] = None,
+            return_tensors: Optional[Union[str, TensorType]] = None,
+            verbose: bool = True,
+            **kwargs) -> BatchEncoding:
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
@@ -2797,7 +2797,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             text_pair = kwargs.pop('text_pair')
 
             token_offset_mapping = self.get_offset_mapping(text)
-            token_pair_offset_mapping = self.get_offset_mapping(text_pair)
+            token_pair_offset_mapping = self.get_offset_mapping(
+                text_pair) if text_pair is not None else None
             if max_length and total_len > max_length:
                 token_offset_mapping, token_pair_offset_mapping, _ = self.truncate_sequences(
                     token_offset_mapping,
@@ -3220,7 +3221,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if not self.deprecation_warnings.get(
                     "sequence-length-is-longer-than-the-specified-maximum",
                     False):
-                warnings.warn(
+                logger.warning(
                     "Token indices sequence length is longer than the specified maximum sequence length "
                     f"for this model ({len(ids)} > {self.model_max_length}). Running this sequence through the model "
                     "will result in indexing errors")

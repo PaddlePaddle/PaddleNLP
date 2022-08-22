@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import numpy as np
 import paddle
 from ..datasets import load_dataset
@@ -63,6 +64,28 @@ usage = r"""
             '''
             [{'情感倾向[正向，负向]': [{'text': '正向', 'probability': 0.9990024058203417}]}]
             '''
+
+            # English Model
+            schema = [{'Person': ['Company', 'Position']}]
+            ie_en = Taskflow('information_extraction', schema=schema, model='uie-base-en')
+            ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+            '''
+            [{'Person': [{'text': 'Steve', 'start': 9, 'end': 14, 'probability': 0.999631971804547, 'relations': {'Company': [{'text': 'Apple', 'start': 48, 'end': 53, 'probability': 0.9960158209451642}], 'Position': [{'text': 'CEO', 'start': 41, 'end': 44, 'probability': 0.8871063806420736}]}}]}]
+            '''
+
+            schema = ['Sentiment classification [negative, positive]']
+            ie_en.set_schema(schema)
+            ie_en('I am sorry but this is the worst film I have ever seen in my life.')
+            '''
+            [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
+            '''
+
+            schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+            ie_en.set_schema(schema)
+            ie_en("overall i 'm happy with my toy.")
+            '''
+            
+            '''
          """
 
 
@@ -75,11 +98,6 @@ class UIETask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    encoding_model_map = {
-        "uie-base": "ernie-3.0-base-zh",
-        "uie-tiny": "ernie-3.0-medium-zh",
-        "uie-medical-base": "ernie-3.0-base-zh"
-    }
     resource_files_names = {
         "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
@@ -87,10 +105,11 @@ class UIETask(Task):
         "special_tokens_map": "special_tokens_map.json",
         "tokenizer_config": "tokenizer_config.json"
     }
+    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
     resource_files_urls = {
         "uie-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v0.1/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
                 "aeca0ed2ccf003f4e9c6160363327c9b"
             ],
             "model_config": [
@@ -110,6 +129,95 @@ class UIETask(Task):
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
+        "uie-medium": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
+                "15874e4e76d05bc6de64cc69717f172e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
+                "6f1ee399398d4f218450fbbf5f212b15"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        "uie-mini": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
+                "f7b493aae84be3c107a6b4ada660ce2e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
+                "9229ce0a9d599de4602c97324747682f"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        "uie-micro": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
+                "80baf49c7f853ab31ac67802104f3f15"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
+                "07ef444420c3ab474f9270a1027f6da5"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        "uie-nano": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
+                "ba934463c5cd801f46571f2588543700"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
+                "e3a9842edf8329ccdd0cf6039cf0a8f8"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
+        # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
         "uie-tiny": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
@@ -120,15 +228,15 @@ class UIETask(Task):
                 "6f1ee399398d4f218450fbbf5f212b15"
             ],
             "vocab_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
                 "1c1c1f4fd93c5bed3b4eebec4de976a8"
             ],
             "special_tokens_map": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
                 "8b3fb1023167bb4ab9d70708eb05f6ec"
             ],
             "tokenizer_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
@@ -153,23 +261,43 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
-        }
+        },
+        "uie-base-en": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.0/model_state.pdparams",
+                "d12e03c2bfe2824c876883b4b836d79d"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
+                "2ca9fe0eea8ff9418725d1a24fcf5c36"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
+                "64800d5d8528ce344256daf115d4965e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/tokenizer_config.json",
+                "59acb0ce78e79180a2491dfd8382b28c"
+            ]
+        },
     }
 
     def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._schema_tree = None
         self.set_schema(schema)
-        if model not in self.encoding_model_map.keys():
-            raise ValueError(
-                "Model should be one of uie-base, uie-tiny and uie-medical-base"
-            )
-        self._encoding_model = self.encoding_model_map[model]
         self._check_task_files()
         self._construct_tokenizer()
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
+        self._is_en = False if model not in [
+            "uie-base-en",
+        ] else True
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._batch_size = self.kwargs[
@@ -434,9 +562,21 @@ class UIETask(Task):
                         input_map[cnt] = []
                     else:
                         for p in pre:
+                            if self._is_en:
+                                if re.search(r'\[.*?\]$', node.name):
+                                    prompt_prefix = node.name[:node.name.find(
+                                        "[", 1)].strip()
+                                    cls_options = re.search(
+                                        r'\[.*?\]$', node.name).group()
+                                    # Sentiment classification of xxx [positive, negative]
+                                    prompt = prompt_prefix + p + " " + cls_options
+                                else:
+                                    prompt = node.name + p
+                            else:
+                                prompt = p + node.name
                             examples.append({
                                 "text": one_data,
-                                "prompt": dbc2sbc(p + node.name)
+                                "prompt": dbc2sbc(prompt)
                             })
                         input_map[cnt] = [i + idx for i in range(len(pre))]
                         idx += len(pre)
@@ -491,7 +631,11 @@ class UIETask(Task):
             for k, v in input_map.items():
                 for idx in v:
                     for i in range(len(result_list[idx])):
-                        prefix[k].append(result_list[idx][i]["text"] + "的")
+                        if self._is_en:
+                            prefix[k].append(" of " +
+                                             result_list[idx][i]["text"])
+                        else:
+                            prefix[k].append(result_list[idx][i]["text"] + "的")
 
             for child in node.children:
                 child.prefix = prefix

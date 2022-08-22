@@ -22,18 +22,20 @@ limitations under the License. */
 #include "glog/logging.h"
 #include "nlohmann/json.hpp"
 #include "postprocessors/postprocessor.h"
+#include "utils/utils.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace postprocessors {
 
-enum SequenceType { SEQ_A, SEQ_B };
+enum FASTERTOKENIZER_DECL SequenceType { SEQ_A, SEQ_B };
 NLOHMANN_JSON_SERIALIZE_ENUM(SequenceType,
                              {
                                  {SEQ_A, "A"}, {SEQ_B, "B"},
                              });
 // The template indicate `${Id} : ${TypeId}`
-using TemplateSequence = std::pair<SequenceType, uint>;
-using TemplateSpecialToken = std::pair<std::string, uint>;
+using TemplateSequence = std::pair<SequenceType, uint32_t>;
+using TemplateSpecialToken = std::pair<std::string, uint32_t>;
 
 using TemplatePiece = boost::variant<TemplateSequence, TemplateSpecialToken>;
 void to_json(nlohmann::json& j, const TemplatePiece& template_piece);
@@ -41,20 +43,20 @@ void from_json(const nlohmann::json& j, TemplatePiece& template_piece);
 
 void ParseIdFromString(const std::string& template_id_string,
                        TemplatePiece* template_piece);
-void SetTypeId(uint type_id, TemplatePiece* template_piece);
+void SetTypeId(uint32_t type_id, TemplatePiece* template_piece);
 void GetTemplatePieceFromString(const std::string& template_string,
                                 TemplatePiece* template_piece);
 
-struct SpecialToken {
+struct FASTERTOKENIZER_DECL SpecialToken {
   std::string id_;
-  std::vector<uint> ids_;
+  std::vector<uint32_t> ids_;
   std::vector<std::string> tokens_;
   SpecialToken() = default;
   SpecialToken(const std::string& id,
-               const std::vector<uint>& ids,
+               const std::vector<uint32_t>& ids,
                const std::vector<std::string>& tokens)
       : id_(id), ids_(ids), tokens_(tokens) {}
-  SpecialToken(const std::string& token, uint id) {
+  SpecialToken(const std::string& token, uint32_t id) {
     id_ = token;
     ids_.push_back(id);
     tokens_.push_back(token);
@@ -63,7 +65,7 @@ struct SpecialToken {
   friend void from_json(const nlohmann::json& j, SpecialToken& special_token);
 };
 
-struct Template {
+struct FASTERTOKENIZER_DECL Template {
   std::vector<TemplatePiece> pieces_;
   Template() = default;
   explicit Template(const std::string& template_str) {
@@ -129,7 +131,7 @@ private:
   friend void from_json(const nlohmann::json& j, Template& template_);
 };
 
-struct SpecialTokensMap {
+struct FASTERTOKENIZER_DECL SpecialTokensMap {
   std::unordered_map<std::string, SpecialToken> tokens_map_;
   SpecialTokensMap() = default;
   explicit SpecialTokensMap(const std::vector<SpecialToken>& special_tokens) {
@@ -145,7 +147,7 @@ struct SpecialTokensMap {
   friend void from_json(const nlohmann::json& j, SpecialTokensMap& tokens_map);
 };
 
-struct TemplatePostProcessor : public PostProcessor {
+struct FASTERTOKENIZER_DECL TemplatePostProcessor : public PostProcessor {
   TemplatePostProcessor();
   TemplatePostProcessor(const Template&,
                         const Template&,
@@ -184,5 +186,6 @@ struct TemplatePostProcessor : public PostProcessor {
   SpecialTokensMap special_tokens_map_;
 };
 
-}  // postprocessors
-}  // tokenizers
+}  // namespace postprocessors
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

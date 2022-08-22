@@ -2,9 +2,9 @@ import time
 import argparse
 
 import paddle
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.metrics import BLEU, Distinct
+from datasets import load_dataset
 
 from utils import print_args, set_seed, create_data_loader, select_response
 
@@ -76,7 +76,7 @@ def infer(args):
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(
         args.model_name_or_path)
 
-    test_ds = load_dataset('duconv', splits='test_1')
+    test_ds = load_dataset('duconv', split='test_1')
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 

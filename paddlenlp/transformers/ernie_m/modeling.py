@@ -19,7 +19,8 @@ from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'ErnieMModel', 'ErnieMPretrainedModel', 'ErnieMForSequenceClassification',
-    'ErnieMForTokenClassification', 'ErnieMForQuestionAnswering'
+    'ErnieMForTokenClassification', 'ErnieMForQuestionAnswering',
+    'ErnieMForMultipleChoice'
 ]
 
 
@@ -266,8 +267,8 @@ class ErnieMModel(ErnieMPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import ErnieMModel, ErnieMTokenizer
 
-                tokenizer = ErnieMModel.from_pretrained('ernie-m-base')
-                model = ErnieMTokenizer.from_pretrained('ernie-m-base')
+                tokenizer = ErnieMTokenizer.from_pretrained('ernie-m-base')
+                model = ErnieMModel.from_pretrained('ernie-m-base')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -323,8 +324,6 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
-                See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             attention_mask (Tensor, optional):
@@ -378,8 +377,6 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
@@ -455,8 +452,6 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.

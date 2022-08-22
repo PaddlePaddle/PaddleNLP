@@ -170,10 +170,12 @@ class TransformerEncoderLayerWithRotary(nn.TransformerEncoderLayer):
                          attn_dropout=attn_dropout,
                          act_dropout=act_dropout,
                          normalize_before=normalize_before)
-        self.self_attn = MultiHeadAttentionWithRotary(d_model,
-                                                      nhead,
-                                                      dropout=attn_dropout,
-                                                      rotary_value=rotary_value)
+        self.self_attn = MultiHeadAttentionWithRotary(
+            d_model,
+            nhead,
+            dropout=attn_dropout,
+            rotary_value=rotary_value,
+            max_position_embeddings=max_position_embeddings)
         self._config.update({
             "rotary_value": rotary_value,
             "max_position_embeddings": max_position_embeddings
@@ -668,6 +670,12 @@ class RoFormerModel(RoFormerPretrainedModel):
             return encoder_outputs, pooled_output
         else:
             return sequence_output, pooled_output
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
 
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):

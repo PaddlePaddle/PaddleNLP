@@ -12,14 +12,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include <Python.h>
-
 #include "normalizers/normalizers.h"
+#include <Python.h>
 #include "pybind/normalizers.h"
 
 namespace py = pybind11;
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace pybind {
 
 class PyNormalizer : public normalizers::Normalizer {
@@ -140,6 +140,16 @@ public:
       normalizers::NormalizedString* mut_str) const override {
     PYBIND11_OVERLOAD_NAME(
         void, LowercaseNormalizer, "__call__", operator(), mut_str);
+  }
+};
+
+class PyPrecompiledNormalizer : public normalizers::PrecompiledNormalizer {
+public:
+  using PrecompiledNormalizer::PrecompiledNormalizer;
+  virtual void operator()(
+      normalizers::NormalizedString* mut_str) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, PrecompiledNormalizer, "__call__", operator(), mut_str);
   }
 };
 
@@ -346,9 +356,9 @@ void BindNormalizers(pybind11::module* m) {
   py::class_<normalizers::SequenceNormalizer, PySequenceNormalizer>(
       submodule, "SequenceNormalizer")
       .def(
-          "__init__",
-          [](normalizers::SequenceNormalizer& self, const py::list& py_list) {
+          py::init([](const py::list& py_list) {
             normalizers::Normalizer* normalizer_ptr;
+            std::vector<normalizers::Normalizer*> normalizers;
             for (py::handle py_normalizer : py_list) {
               if (pybind11::type::of(py_normalizer)
                       .is(py::type::of<normalizers::LowercaseNormalizer>())) {
@@ -398,10 +408,26 @@ void BindNormalizers(pybind11::module* m) {
                                  normalizers::StripNormalizer>())) {
                 normalizer_ptr =
                     py_normalizer.cast<normalizers::StripNormalizer*>();
+              } else if (pybind11::type::of(py_normalizer)
+                             .is(py::type::of<
+                                 normalizers::PrecompiledNormalizer>())) {
+                normalizer_ptr =
+                    py_normalizer.cast<normalizers::PrecompiledNormalizer*>();
+              } else {
+                throw py::value_error(
+                    "Type of normalizers should be one of "
+                    "`LowercaseNormalizer`,"
+                    " `BertNormalizer`, `NFCNormalizer`, `NFKCNormalizer`, "
+                    "`NFDNormalizer`,"
+                    " `NFKDNormalizer`, `NmtNormalizer`, `ReplaceNormalizer`, "
+                    "`SequenceNormalizer`,"
+                    " `StripAccentsNormalizer`, `StripNormalizer`, "
+                    "`PrecompiledNormalizer`");
               }
-              self.AppendNormalizer(normalizer_ptr);
+              normalizers.push_back(normalizer_ptr);
             }
-          },
+            return normalizers::SequenceNormalizer(normalizers);
+          }),
           py::arg("normalizers"))
       .def("normalize_str",
            [](const normalizers::SequenceNormalizer& self,
@@ -416,7 +442,21 @@ void BindNormalizers(pybind11::module* m) {
         nlohmann::json j = self;
         return j.dump();
       });
+  py::class_<normalizers::PrecompiledNormalizer, PyPrecompiledNormalizer>(
+      submodule, "PrecompiledNormalizer")
+      .def(py::init<>())
+      .def(py::init<const std::string&>(), py::arg("precompiled_charsmap"))
+      .def("normalize_str",
+           [](const normalizers::PrecompiledNormalizer& self,
+              const std::string& str) {
+             normalizers::NormalizedString normalized(str);
+             self(&normalized);
+             return normalized.GetStr();
+           },
+           py::arg("sequence"))
+      .def("__call__", &normalizers::PrecompiledNormalizer::operator());
 }
 
-}  // pybind
-}  // tokenizers
+}  // namespace pybind
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

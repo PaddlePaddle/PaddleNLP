@@ -123,7 +123,7 @@ class LayoutXLMEmbeddings(Layer):
                                             padding_idx=0)
         self.position_embeddings = nn.Embedding(
             config["max_position_embeddings"], config["hidden_size"])
-        # gry add for layoutxlm
+
         self.x_position_embeddings = nn.Embedding(
             config["max_2d_position_embeddings"], config["coordinate_size"])
         self.y_position_embeddings = nn.Embedding(
@@ -132,7 +132,7 @@ class LayoutXLMEmbeddings(Layer):
             config["max_2d_position_embeddings"], config["coordinate_size"])
         self.w_position_embeddings = nn.Embedding(
             config["max_2d_position_embeddings"], config["coordinate_size"])
-        # end of gry add for layoutxlm
+
         self.token_type_embeddings = nn.Embedding(config["type_vocab_size"],
                                                   config["hidden_size"])
         self.LayerNorm = nn.LayerNorm(config["hidden_size"],
@@ -256,13 +256,48 @@ class LayoutXLMPretrainedModel(PretrainedModel):
             "rel_pos_bins": 32,
             "type_vocab_size": 1,
             "vocab_size": 250002,
-        }
+        },
+        "layoutxlm-wo-backbone-base-uncased": {
+            "attention_probs_dropout_prob": 0.1,
+            "bos_token_id": 0,
+            "coordinate_size": 128,
+            "eos_token_id": 2,
+            "fast_qkv": False,
+            "gradient_checkpointing": False,
+            "has_relative_attention_bias": False,
+            "has_spatial_attention_bias": False,
+            "has_visual_segment_embedding": True,
+            "use_visual_backbone": False,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "image_feature_pool_shape": [7, 7, 256],
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "layer_norm_eps": 1e-05,
+            "max_2d_position_embeddings": 1024,
+            "max_position_embeddings": 514,
+            "max_rel_2d_pos": 256,
+            "max_rel_pos": 128,
+            "model_type": "layoutlmv2",
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "output_past": True,
+            "pad_token_id": 1,
+            "shape_size": 128,
+            "rel_2d_pos_bins": 64,
+            "rel_pos_bins": 32,
+            "type_vocab_size": 1,
+            "vocab_size": 250002,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "layoutxlm-base-uncased":
             "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/model_state.pdparams",
+            "layoutxlm-wo-backbone-base-uncased":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_wo_backbone_base/model_state.pdparams",
         }
     }
     base_model_prefix = "layoutxlm"
@@ -335,9 +370,10 @@ class LayoutXLMSelfAttention(nn.Layer):
         self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + [
+        new_x_shape = list(x.shape[:-1]) + [
             self.num_attention_heads, self.attention_head_size
         ]
+
         x = x.reshape(new_x_shape)
         return x.transpose([0, 2, 1, 3])
 
@@ -385,9 +421,12 @@ class LayoutXLMSelfAttention(nn.Layer):
             attention_scores += rel_pos
         if self.has_spatial_attention_bias:
             attention_scores += rel_2d_pos
+        bool_attention_mask = attention_mask.astype(paddle.bool)
+        bool_attention_mask.stop_gradient = True
+        attention_scores_shape = paddle.shape(attention_scores)
         attention_scores = paddle.where(
-            attention_mask.astype(paddle.bool).expand_as(attention_scores),
-            paddle.ones_like(attention_scores) * float("-inf"),
+            bool_attention_mask.expand(attention_scores_shape),
+            paddle.ones(attention_scores_shape) * float("-1e10"),
             attention_scores)
         attention_probs = F.softmax(attention_scores, axis=-1)
         # This is actually dropping out entire tokens to attend to, which might
@@ -395,13 +434,14 @@ class LayoutXLMSelfAttention(nn.Layer):
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_layer_shape = context_layer.shape[:-2] + [
-            self.all_head_size
-        ]
+        new_context_layer_shape = list(
+            context_layer.shape[:-2]) + [self.all_head_size]
         context_layer = context_layer.reshape(new_context_layer_shape)
 
-        outputs = (context_layer,
-                   attention_probs) if output_attentions else (context_layer, )
+        if output_attentions:
+            outputs = [context_layer, attention_probs]
+        else:
+            outputs = [context_layer]
         return outputs
 
 
@@ -437,8 +477,13 @@ class LayoutXLMAttention(nn.Layer):
             rel_2d_pos=rel_2d_pos,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,
-                   ) + self_outputs[1:]  # add attentions if we output them
+        # add attentions if we output them
+        if output_attentions:
+            outputs = [
+                attention_output,
+            ] + self_outputs[1:]
+        else:
+            outputs = [attention_output]
         return outputs
 
 
@@ -565,7 +610,7 @@ class LayoutXLMEncoder(nn.Layer):
 
             hidden_save["{}_data".format(i)] = hidden_states
 
-        return hidden_states,
+        return hidden_states, hidden_save
 
 
 class LayoutXLMIntermediate(nn.Layer):
@@ -644,14 +689,16 @@ class LayoutXLMLayer(nn.Layer):
             rel_2d_pos=rel_2d_pos,
         )
         attention_output = self_attention_outputs[0]
-
-        outputs = self_attention_outputs[
-            1:]  # add self attentions if we output attention weights
-
         layer_output = self.feed_forward_chunk(attention_output)
 
-        outputs = (layer_output, ) + outputs
-
+        if output_attentions:
+            outputs = self_attention_outputs[
+                1:]  # add self attentions if we output attention weights
+            outputs = [
+                layer_output,
+            ] + list(outputs)
+        else:
+            outputs = [layer_output]
         return outputs
 
 
@@ -736,19 +783,23 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
     def __init__(
         self,
         with_pool='tanh',
+        use_visual_backbone=True,
         **kwargs,
     ):
         super(LayoutXLMModel, self).__init__()
         config = kwargs
         self.config = kwargs
+        self.use_visual_backbone = use_visual_backbone
         self.has_visual_segment_embedding = config[
             "has_visual_segment_embedding"]
         self.embeddings = LayoutXLMEmbeddings(config)
 
-        self.visual = VisualBackbone(config)
-        self.visual.stop_gradient = True
-        self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1],
-                                     config["hidden_size"])
+        if self.use_visual_backbone is True:
+            self.visual = VisualBackbone(config)
+            self.visual.stop_gradient = True
+            self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1],
+                                         config["hidden_size"])
+
         if self.has_visual_segment_embedding:
             self.visual_segment_embedding = self.create_parameter(
                 shape=[
@@ -775,13 +826,13 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         return embeddings
 
     def _calc_img_embeddings(self, image, bbox, position_ids):
-        if image is not None:
-            visual_embeddings = self.visual_proj(
-                self.visual(image.astype(paddle.float32)))
+        use_image_info = self.use_visual_backbone and image is not None
         position_embeddings = self.embeddings.position_embeddings(position_ids)
         spatial_position_embeddings = self.embeddings._cal_spatial_position_embeddings(
             bbox)
-        if image is not None:
+        if use_image_info is True:
+            visual_embeddings = self.visual_proj(
+                self.visual(image.astype(paddle.float32)))
             embeddings = visual_embeddings + position_embeddings + spatial_position_embeddings
         else:
             embeddings = position_embeddings + spatial_position_embeddings
@@ -835,15 +886,13 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 head_mask=None,
-                output_hidden_states=None,
-                output_attentions=None):
-        input_shape = input_ids.shape
+                output_hidden_states=False,
+                output_attentions=False):
+        input_shape = paddle.shape(input_ids)
 
         visual_shape = list(input_shape)
         visual_shape[1] = self.config["image_feature_pool_shape"][
             0] * self.config["image_feature_pool_shape"][1]
-        final_shape = list(input_shape)
-        final_shape[1] += visual_shape[1]
 
         visual_bbox_x = (paddle.arange(
             0,
@@ -859,7 +908,6 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         ) // self.config["image_feature_pool_shape"][0])
 
         expand_shape = self.config["image_feature_pool_shape"][0:2]
-
         visual_bbox = paddle.stack(
             [
                 visual_bbox_x[:-1].expand(expand_shape),
@@ -868,14 +916,20 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([-1, bbox.shape[-1]])
-        visual_bbox = visual_bbox.expand([final_shape[0], -1, -1])
-        final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
+        ).reshape([expand_shape[0] * expand_shape[1],
+                   paddle.shape(bbox)[-1]])
 
+        visual_bbox = visual_bbox.expand(
+            [input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
+
+        final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
         if attention_mask is None:
             attention_mask = paddle.ones(input_shape)
 
-        visual_attention_mask = paddle.ones(visual_shape)
+        if self.use_visual_backbone is True:
+            visual_attention_mask = paddle.ones(visual_shape)
+        else:
+            visual_attention_mask = paddle.zeros(visual_shape)
 
         attention_mask = attention_mask.astype(visual_attention_mask.dtype)
 
@@ -888,10 +942,10 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         if position_ids is None:
             seq_length = input_shape[1]
             position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)
+            position_ids = position_ids.expand(input_shape)
 
         visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
-            [input_shape[0], -1])
+            [input_shape[0], visual_shape[1]])
         final_position_ids = paddle.concat([position_ids, visual_position_ids],
                                            axis=1)
 
@@ -939,8 +993,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
-
-        return sequence_output, pooled_output
+        return sequence_output, pooled_output, encoder_outputs[1]
 
 
 class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
@@ -1000,7 +1053,14 @@ class LayoutXLMForTokenClassification(LayoutXLMPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = logits,
+        hidden_states = {
+            f"hidden_states_{idx}": outputs[2][f"{idx}_data"]
+            for idx in range(self.layoutxlm.config["num_hidden_layers"])
+        }
+        if self.training:
+            outputs = logits, hidden_states
+        else:
+            outputs = logits
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -1264,8 +1324,11 @@ class REDecoder(nn.Layer):
             ])
             if len(all_possible_relations) == 0:
                 all_possible_relations = {(0, 1)}
-            positive_relations = set(
-                list(zip(relations[b]["head"], relations[b]["tail"])))
+            if "head" in relations[b]:
+                positive_relations = set(
+                    list(zip(relations[b]["head"], relations[b]["tail"])))
+            else:
+                positive_relations = set()
             negative_relations = all_possible_relations - positive_relations
             positive_relations = set(
                 [i for i in positive_relations if i in all_possible_relations])
@@ -1306,6 +1369,8 @@ class REDecoder(nn.Layer):
         loss = 0
         all_pred_relations = []
         for b in range(batch_size):
+            if "head" not in relations[b]:
+                continue
             head_entities = paddle.to_tensor(relations[b]["head"])
             tail_entities = paddle.to_tensor(relations[b]["tail"])
             relation_labels = paddle.to_tensor(relations[b]["label"],
@@ -1427,10 +1492,15 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
         loss, pred_relations = self.extractor(sequence_output, entities,
                                               relations)
 
-        return dict(
+        hidden_states = {
+            f"hidden_states_{idx}": outputs[2][f"{idx}_data"]
+            for idx in range(self.layoutxlm.config["num_hidden_layers"])
+        }
+        res = dict(
             loss=loss,
             entities=entities,
             relations=relations,
             pred_relations=pred_relations,
-            hidden_states=outputs[0],
         )
+        res.update(hidden_states)
+        return res

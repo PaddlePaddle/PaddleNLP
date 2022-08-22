@@ -180,7 +180,7 @@ def main(args):
                             token_type_ids=segment_ids,
                             labels=labels,
                             is_train=True)
-            # model outputs are always tuple in ppnlp (see doc)
+            # model outputs are always tuple in paddlenlp (see doc)
             loss = outputs[0]
             loss = loss.mean()
             if global_step % 50 == 0:
