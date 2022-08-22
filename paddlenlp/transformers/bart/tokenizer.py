@@ -19,7 +19,6 @@ from functools import lru_cache
 import json
 import jieba
 import shutil
-import sentencepiece as spm
 from paddle.utils import try_import
 from .. import PretrainedTokenizer, AddedToken
 
