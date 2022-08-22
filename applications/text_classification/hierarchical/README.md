@@ -366,7 +366,7 @@ python prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 
 使用GPU单卡/多卡训练
@@ -385,7 +385,7 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
@@ -401,6 +401,7 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
   * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
   * `seed`：随机种子，默认为3。
   * `CompressionArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[CompressionArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md)。
+  * `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是 ['3/4', '2/3', '1/2']。
 
 * `DataArguments`
   * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
@@ -408,7 +409,6 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
-  * `width_mult`：裁剪宽度（multi head）保留的比例，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是 '2/3'。
 
 以上参数都可通过 `python prune.py --dataset_dir xx --params_dir xx` 的方式传入）
 
@@ -416,7 +416,19 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 ```text
 prune/
-├── 0.6666666666666666
+├── width_mult_0.75
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.6666666666666666
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.25
 │   ├── float32.pdiparams
 │   ├── float32.pdiparams.info
 │   ├── float32.pdmodel

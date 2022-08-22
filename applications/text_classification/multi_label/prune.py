@@ -50,7 +50,6 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
-    width_mult: str = field(default='2/3',metadata={"help": "The reserved ratio for q, k, v, and ffn weight widths."})
 # yapf: enable
 
 
@@ -83,7 +82,6 @@ def main():
     )
     paddle.set_device(compression_args.device)
     compression_args.strategy = 'dynabert'
-    compression_args.width_mult_list = [eval(model_args.width_mult)]
     # Log model and data config
     compression_args.print_config(model_args, "Model")
     compression_args.print_config(data_args, "Data")
