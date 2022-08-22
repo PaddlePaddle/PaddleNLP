@@ -430,7 +430,7 @@ class ErnieViLModel(ErnieViLPreTrainedModel):
                 Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
             position_ids (Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings (ErnieModel). Selected in 
-                the range ``[0, max_text_length - 1]``.
+                the range ``[0, max_position_embeddings - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             token_type_ids (Tensor, optional):
                 Segment token indices to indicate different portions of the inputs.
