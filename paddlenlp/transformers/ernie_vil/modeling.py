@@ -834,7 +834,7 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             style = None
             artist = None
             text_prompt = model.preprocess_text_prompt(text_prompt)
-            tokenized_inputs = tokenizer(prompts, return_tensors="pd", padding="max_length", max_length=64)
+            tokenized_inputs = tokenizer(text_prompt, return_tensors="pd", padding="max_length", max_length=64)
 
             images = model.generate(**tokenized_inputs)
             # return List[PIL.Image]
