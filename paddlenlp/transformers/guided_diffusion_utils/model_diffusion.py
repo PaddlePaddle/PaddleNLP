@@ -75,7 +75,7 @@ def create_gaussian_diffusion(
     sigma_small=False,
     noise_schedule="linear",
     predict_xstart=False,
-    rescale_timesteps=False,
+    rescale_timesteps=True,
 ):
     # propcess steps
     timestep_respacing = f'ddim{steps}'

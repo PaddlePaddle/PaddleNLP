@@ -14,7 +14,9 @@
 # limitations under the License.
 
 from paddle.utils import try_import
-from .. import GPTTokenizer, AddedToken, BasicTokenizer
+import os
+import shutil
+from .. import PretrainedTokenizer, AddedToken, BasicTokenizer
 from ...utils.log import logger
 from functools import lru_cache
 import json
@@ -67,7 +69,7 @@ def get_pairs(word):
     return pairs
 
 
-class CLIPTokenizer(GPTTokenizer):
+class CLIPTokenizer(PretrainedTokenizer):
     r"""
     Construct a CLIP tokenizer based on byte-level Byte-Pair-Encoding.
 
@@ -243,6 +245,17 @@ class CLIPTokenizer(GPTTokenizer):
             self.re.IGNORECASE,
         )
 
+    @property
+    def vocab_size(self):
+        """
+        Returns the size of vocabulary.
+
+        Returns:
+            int: The sum of size of vocabulary and the size of speical tokens.
+
+        """
+        return len(self.encoder)
+
     def get_vocab(self):
         return dict(self.encoder, **self.added_tokens_encoder)
 
@@ -361,6 +374,12 @@ class CLIPTokenizer(GPTTokenizer):
                               for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
+    def _convert_token_to_id(self, token):
+        return self.encoder.get(token, self.encoder.get(self.unk_token))
+
+    def _convert_id_to_token(self, index):
+        return self.decoder[index]
+
     def convert_tokens_to_string(self, tokens):
         """
         Converts a sequence of tokens (string) in a single string.
@@ -371,6 +390,21 @@ class CLIPTokenizer(GPTTokenizer):
                                     errors=self.errors).replace("</w>",
                                                                 " ").strip()
         return text
+
+    def save_resources(self, save_directory):
+        """
+        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
+        (ends with '.spm') under `save_directory`.
+
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+        for name, file_name in self.resource_files_names.items():
+            source_path = getattr(self, "_%s" % name)
+
+            save_path = os.path.join(save_directory, file_name)
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)
 
     def __call__(
             self,

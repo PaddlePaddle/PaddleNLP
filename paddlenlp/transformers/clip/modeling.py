@@ -269,8 +269,7 @@ class AttentionPool2d(nn.Layer):
                  output_dim: int = None):
         super().__init__()
 
-        self.positional_embedding = paddle.create_parameter(
-            (spacial_dim**2 + 1, embed_dim), dtype=paddle.get_default_dtype())
+        self.positional_embedding = nn.Embedding(spacial_dim**2 + 1, embed_dim)
 
         self.q_proj = nn.Linear(embed_dim, embed_dim, bias_attr=True)
         self.k_proj = nn.Linear(embed_dim, embed_dim, bias_attr=True)
@@ -289,7 +288,7 @@ class AttentionPool2d(nn.Layer):
             (x.shape[0], x.shape[1], x.shape[2] * x.shape[3])).transpose(
                 (2, 0, 1))  # NCHW -> (HW)NC
         x = paddle.concat([x.mean(axis=0, keepdim=True), x], axis=0)
-        x = x + paddle.unsqueeze(self.positional_embedding, 1)
+        x = x + paddle.unsqueeze(self.positional_embedding.weight, 1)
         out = multi_head_attention_forward(x, self.num_heads, self.q_proj,
                                            self.k_proj, self.v_proj,
                                            self.c_proj)
@@ -470,11 +469,12 @@ class CLIPPreTrainedModel(PretrainedModel):
                     std=text_embed_dim**-0.5 * factor,
                     shape=layer.text_projection.shape,
                 ))
-            layer.vision_projection.set_value(
-                paddle.normal(
-                    std=vision_embed_dim**-0.5 * factor,
-                    shape=layer.vision_projection.shape,
-                ))
+            if hasattr(layer, "vision_projection"):
+                layer.vision_projection.set_value(
+                    paddle.normal(
+                        std=vision_embed_dim**-0.5 * factor,
+                        shape=layer.vision_projection.shape,
+                    ))
             for name, sub_layer in layer.named_sublayers():
                 num_layers = vision_layers if "vision_model" in name else text_layers
                 if isinstance(sub_layer, nn.TransformerEncoderLayer):
@@ -1332,7 +1332,7 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
             sigma_small=False,
             noise_schedule="linear",
             predict_xstart=False,
-            rescale_timesteps=False,
+            rescale_timesteps=True,
         )
         # get get_text_features
         target_text_embeds = self.get_text_features(
