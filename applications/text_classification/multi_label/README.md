@@ -6,6 +6,7 @@
    * [环境准备](#环境准备)
    * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
+       * [训练评估与模型优化](#训练评估与模型优化)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
    * [静态图导出](#静态图导出)
@@ -74,7 +75,7 @@ multi_label/
 - python >= 3.6
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.3.4
-- scikit-learn >= 0.24.2
+- scikit-learn >= 1.0.2
 
 **安装PaddlePaddle**
 
@@ -89,7 +90,7 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 
 **安装sklearn**
 ```shell
-pip install scikit-learn==0.24.2
+pip install scikit-learn==1.0.2
 ```
 
 ## 数据集准备
@@ -176,9 +177,26 @@ tar -zxvf divorce.tar.gz
 mv divorce data
 ```
 
-使用CPU训练
+使用CPU/GPU训练：
 ```shell
 python train.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --save_dir "./checkpoint" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --learning_rate 3e-5 \
+    --epochs 100 \
+    --logging_steps 5 \
+    --train_file "train.txt"
+```
+默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
+如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
+```shell
+python -m paddle.distributed.launch --nproc_per_node=8 --backend='gloo' train.py \
     --device "cpu" \
     --dataset_dir "data" \
     --save_dir "./checkpoint" \
@@ -188,10 +206,12 @@ python train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
 
-使用GPU单卡/多卡训练
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练：
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
@@ -204,8 +224,10 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
+
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
@@ -226,7 +248,9 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
-
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
@@ -241,6 +265,54 @@ checkpoint/
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
+
+### 训练评估与模型优化
+
+训练后的模型我们可以使用[评估脚本](analysis/evaluate.py)对每个类别分别进行评估，并输出预测错误样本（bad case）：
+
+```shell
+python evaluate.py \
+    --device "gpu" \
+    --dataset_dir "../data" \
+    --params_path "../checkpoint" \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --bad_case_path "./bad_case.txt"
+```
+
+默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
+
+输出打印示例：
+
+```text
+[2022-08-12 02:24:48,193] [    INFO] - -----Evaluate model-------
+[2022-08-12 02:24:48,194] [    INFO] - Train dataset size: 14377
+[2022-08-12 02:24:48,194] [    INFO] - Dev dataset size: 1611
+[2022-08-12 02:24:48,194] [    INFO] - Accuracy in dev dataset: 74.24%
+[2022-08-12 02:24:48,194] [    INFO] - Macro avg in dev dataset: precision: 82.96 | recall: 77.59 | F1 score 79.36
+[2022-08-12 02:24:48,194] [    INFO] - Micro avg in dev dataset: precision: 91.50 | recall: 89.66 | F1 score 90.57
+[2022-08-12 02:24:48,195] [    INFO] - Class name: 婚后有子女
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 6759(47.0%) | precision: 99.78 | recall: 99.59 | F1 score 99.68
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 784(48.7%) | precision: 97.07 | recall: 97.32 | F1 score 97.20
+[2022-08-12 02:24:48,195] [    INFO] - ----------------------------
+[2022-08-12 02:24:48,195] [    INFO] - Class name: 限制行为能力子女抚养
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 4358(30.3%) | precision: 99.36 | recall: 99.56 | F1 score 99.46
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 492(30.5%) | precision: 88.57 | recall: 88.21 | F1 score 88.39
+...
+```
+
+预测错误的样本保存在bad_case.txt文件中：
+
+```text
+Prediction    Label    Text
+不动产分割    不动产分割,有夫妻共同财产    2014年，王X以其与肖X协议离婚时未分割该套楼房的首付款为由，起诉至法院，要求分得楼房的首付款15万元。
+婚后分居,准予离婚    二次起诉离婚,准予离婚,婚后分居,法定离婚    但原、被告对已建立起的夫妻感情不够珍惜，因琐事即发生吵闹并最终分居，对夫妻感情造成了严重的影响，现原、被告已分居六年有余，且经人民法院判决不准离婚后仍未和好，夫妻感情确已破裂，依法应准予原、被告离婚。
+婚后有子女,限制行为能力子女抚养    婚后有子女    婚后生有一女，取名彭某乙，已11岁，现已由被告从铁炉白族乡中心小学转入走马镇李桥小学读书。
+婚后分居    不履行家庭义务,婚后分居    2015年2月23日，被告将原告赶出家门，原告居住于娘家待产，双方分居至今。
+...
+```
+
+模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 
 ### 训练效果
@@ -313,6 +385,8 @@ python predict.py \
 * `params_path`：待预测模型的目录；默认为"./checkpoint/"。
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 ## 静态图导出
 
