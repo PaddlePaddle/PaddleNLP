@@ -292,7 +292,7 @@ class SkepBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_offsets_mapping(self):
         self.skipTest(
-            "using basic-tokenizer or word-piece tokenzier to do this test, so to skpt"
+            "using basic-tokenizer or word-piece tokenzier to do this test, so to skip this testcase"
         )
 
     def test_special_tokens_mask_input_pairs(self):

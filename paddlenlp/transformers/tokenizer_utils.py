@@ -23,6 +23,7 @@ import json
 import os
 import six
 import unicodedata
+import shutil
 from collections import OrderedDict, UserDict
 from shutil import copyfile
 from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
@@ -253,6 +254,41 @@ def tokenize_special_chars(text):
         else:
             output.append(char)
     return "".join(output)
+
+
+def bytes_to_unicode():
+    """
+    Returns list of utf-8 byte and a corresponding list of unicode strings.
+    The reversible bpe codes work on unicode strings.
+    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
+    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
+    This is a signficant percentage of your normal, say, 32K bpe vocab.
+    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
+    And avoids mapping to whitespace/control characters the bpe code barfs on.
+    """
+    bs = list(range(33, 126 + 1)) + list(range(161, 172 + 1)) + list(
+        range(174, 255 + 1))
+    cs = bs[:]
+    n = 0
+    for b in range(2**8):
+        if b not in bs:
+            bs.append(b)
+            cs.append(2**8 + n)
+            n += 1
+    cs = [chr(n) for n in cs]
+    return dict(zip(bs, cs))
+
+
+def get_pairs(word):
+    """Return set of symbol pairs in a word.
+    Word is represented as tuple of symbols (symbols being variable-length strings).
+    """
+    pairs = set()
+    prev_char = word[0]
+    for char in word[1:]:
+        pairs.add((prev_char, char))
+        prev_char = char
+    return pairs
 
 
 class Trie:
@@ -1438,20 +1474,28 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 class BpeEncoder(object):
     """BpeEncoder"""
 
-    def __init__(self, encoder_json_file, vocab_bpe_file, errors='replace'):
+    def __init__(self,
+                 vocab_file,
+                 merges_file,
+                 errors='replace',
+                 unk_token="<|endoftext|>",
+                 **kwargs):
         """
         Constructs a BpeEncoder.
 
         Args:
-            encoder_json_file (`str`): The path to bpe encode json file.
-            vocab_bpe_file (`str`): The path to bpe vocab file.
+            vocab_file (`str`): The path to bpe encode json file.
+            merges_file (`str`): The path to bpe vocab file.
+            errors (`str`): the error handler
+            unk_token (`str`): the unk token
         """
-        self.encoder = self.__get_encoder(encoder_json_file)
+        self.encoder = self.__get_encoder(vocab_file)
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.errors = errors  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
-        self.bpe_ranks = self.__get_bpe_ranks(vocab_bpe_file)
+        self.bpe_ranks = self.__get_bpe_ranks(merges_file)
+        self.unk_token = unk_token
         self.cache = {}
         re = try_import("regex")
         self.pat = re.compile(
@@ -1463,8 +1507,8 @@ class BpeEncoder(object):
             encoder = json.load(f)
         return encoder
 
-    def __get_bpe_ranks(self, vocab_bpe_file):
-        with open(vocab_bpe_file, 'r', encoding="utf-8") as f:
+    def __get_bpe_ranks(self, merges_file: str):
+        with open(merges_file, 'r', encoding="utf-8") as f:
             bpe_data = f.read()
         bpe_merges = [
             tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
@@ -1518,9 +1562,10 @@ class BpeEncoder(object):
         self.cache[token] = word
         return word
 
-    def encode(self, text):
+    def encode(self, text: str) -> List[int]:
         """
-        encode
+        encode the text to token_ids
+        TODO(wj-Mcat): to be deprecated
         """
         bpe_tokens = []
         re = try_import("regex")
@@ -1530,13 +1575,46 @@ class BpeEncoder(object):
                               for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
-    def decode(self, tokens):
+    def decode(self, tokens: List[str]) -> str:
         """
         decode
+        TODO(wj-Mcat): to be deprecated
         """
         text = ''.join([self.decoder[token] for token in tokens])
         text = bytearray([self.byte_decoder[c]
                           for c in text]).decode('utf-8', errors=self.errors)
+        return text
+
+    def _tokenize(self, text: str) -> List[str]:
+        """tokenize text into tokens with bpe algo
+
+        Args:
+            text (str): the content of text
+
+        Returns:
+            List[str]: the sub token of text
+        """
+        bpe_tokens = []
+        re = try_import("regex")
+        for token in re.findall(self.pat, text):
+            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
+            bpe_tokens.extend(bpe_token
+                              for bpe_token in self.bpe(token).split(' '))
+        return bpe_tokens
+
+    def _convert_token_to_id(self, token: str) -> int:
+        """Converts a token (str) in an id using the vocab."""
+        return self.encoder.get(token, self.encoder.get(self.unk_token))
+
+    def _convert_id_to_token(self, index: int) -> str:
+        """Converts an index (integer) in a token (str) using the vocab."""
+        return self.decoder.get(index)
+
+    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+        """Converts a sequence of tokens (string) in a single string."""
+        text = "".join(tokens)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode("utf-8", errors=self.errors)
         return text
 
 
@@ -1568,24 +1646,27 @@ class BPETokenizer(PretrainedTokenizer):
 
     """
 
+    resource_files_names = {
+        "vocab_file": "vocab.json",
+        "merges_file": "merges.txt"
+    }
+
     def __init__(self,
-                 encoder_json_path="./configs/encoder.json",
-                 vocab_bpe_path="./configs/vocab.bpe",
+                 vocab_file,
+                 merges_file,
+                 do_lower_case: bool = True,
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        if not kwargs.get("vocab_file", None):
-            logger.warning(
-                'Deprecated: <vocab_file> field will depreacted after version<2.3.8>'
-            )
+        self.vocab_file = vocab_file
+        self.merges_file = merges_file
 
-        self.encoder_json_path = encoder_json_path
-        self.vocab_bpe_path = vocab_bpe_path
-        self.encoder = BPEEncoder(encoder_json_path, vocab_bpe_path)
+        self.encoder = BpeEncoder(vocab_file, merges_file)
         self.nltk = try_import('nltk')
+        self.do_lower_case = do_lower_case
 
     @property
     def vocab_size(self):
@@ -1595,8 +1676,10 @@ class BPETokenizer(PretrainedTokenizer):
         Returns:
             int: the size of vocabulary.
         """
+        return len(self.encoder.decoder)
 
-        return len(self.vocab)
+    def get_vocab(self):
+        return dict(self.encoder.encoder, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         r"""
@@ -1609,10 +1692,51 @@ class BPETokenizer(PretrainedTokenizer):
             list: A list of string representing converted tokens.
         """
         split_tokens = []
-        for token in self.encoder.encode(text):
+        for token in self.encoder._tokenize(text):
             split_tokens.append(str(token))
 
         return split_tokens
+
+    def _convert_token_to_id(self, token: str):
+        return self.encoder._convert_token_to_id(token)
+
+    def _convert_id_to_token(self, index: int) -> str:
+        """Converts an index (integer) in a token (str) using the vocab."""
+        return self.encoder._convert_id_to_token(index)
+
+    def get_special_tokens_mask(
+        self,
+        token_ids_0: List[int],
+        token_ids_1: Optional[List[int]] = None,
+        already_has_special_tokens: bool = False,
+    ) -> List[int]:
+        """
+        Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer `prepare_for_model` method.
+
+        Args:
+            token_ids_0 (`List[int]`):
+                List of IDs.
+            token_ids_1 (`List[int]`, *optional*):
+                Optional second list of IDs for sequence pairs.
+            already_has_special_tokens (`bool`, *optional*, defaults to `False`):
+                Whether or not the token list is already formatted with special tokens for the model.
+
+        Returns:
+            A list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            return super().get_special_tokens_mask(
+                token_ids_0=token_ids_0,
+                token_ids_1=token_ids_1,
+                already_has_special_tokens=True,
+            )
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + (
+                [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
 
     def num_special_tokens_to_add(self, pair=False):
         r"""
@@ -1664,6 +1788,26 @@ class BPETokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
+    def save_resources(self, save_directory):
+        """
+        Save tokenizer related resources to files under `save_directory`.
+
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+        for name, file_name in self.resource_files_names.items():
+            save_path = os.path.join(save_directory, file_name)
+            source_file = getattr(self, name, None)
+            if not source_file:
+                continue
+
+            if os.path.abspath(source_file) != os.path.abspath(save_path):
+                shutil.copyfile(source_file, save_path)
+
+    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+        """Converts a sequence of tokens (string) in a single string."""
+        return self.encoder.convert_tokens_to_string(tokens)
+
     def create_token_type_ids_from_sequences(self,
                                              token_ids_0,
                                              token_ids_1=None):
@@ -1690,29 +1834,32 @@ class BPETokenizer(PretrainedTokenizer):
         Returns:
             List[int]: List of token_type_id according to the given sequence(s).
         """
-        if self.need_token_type_id:
-            _sep = [self.sep_token_id]
-            _cls = [self.cls_token_id]
-            if token_ids_1 is None:
-                return len(_cls + token_ids_0 + _sep) * [0]
-            return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                              _sep) * [1]
-        else:
-            # For model skep-roberta-large-en, token type ids is no need.
-            return None
+        _sep = [self.sep_token_id]
+        _cls = [self.cls_token_id]
+        if token_ids_1 is None:
+            return len(_cls + token_ids_0 + _sep) * [0]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
+                                                          _sep) * [1]
 
-    def save_resources(self, save_directory):
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
         """
-        Save tokenizer related resources to files under `save_directory`.
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        Should be overridden in a subclass if the model has a special way of building those.
 
         Args:
-            save_directory (str): Directory to save files into.
-        """
-        for name, file_name in self.resource_files_names.items():
-            save_path = os.path.join(save_directory, file_name)
-            source_file = getattr(self, name, None)
-            if not source_file:
-                continue
+            offset_mapping_0 (List[tuple]):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_1 (List[tuple], optional):
+                Optional second list of char offsets for offset mapping pairs.
 
-            if os.path.abspath(source_file) != os.path.abspath(save_path):
-                shutil.copyfile(source_file, save_path)
+        Returns:
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
