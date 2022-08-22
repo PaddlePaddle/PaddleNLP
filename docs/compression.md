@@ -3,19 +3,19 @@
  **目录**
    * [模型压缩 API 功能简介](#模型压缩API功能介绍)
    * [如何启动模型压缩](#如何启动模型压缩)
-       * [Step1：获取 CompressionArguments 对象](#获取CompressionArguments对象)
+       * [Step1：获取模型压缩参数 compression_args](#获取模型压缩参数compression_args)
        * [Step2：实例化 Trainer 并调用 compress()](#实例化Trainer并调用compress())
            * [Trainer 实例化参数介绍](#Trainer实例化参数介绍)
-       * [Step3：实现自定义评估函数和loss计算函数（可选）](#实现自定义评估函数和loss计算函数（可选）)
+       * [Step3：实现自定义评估函数和 loss 计算函数（按需可选）](#实现自定义评估函数和loss计算函数（按需可选）)
        * [Step4：传参并运行压缩脚本](#传参并运行压缩脚本)
            * [CompressionArguments 参数介绍](#CompressionArguments参数介绍)
-       * [三大场景模型压缩 API 使用示例](#三大场景模型压缩 API 使用示例)
-   * [模型部署与评价](#模型部署与评价)
+       * [三大场景模型压缩 API 使用示例](#三大场景模型压缩API使用示例)
+   * [模型评估与部署](#模型评估与部署)
    * [FAQ](#FAQ)
    * [参考文献](#References)
 
 
-<a name="模型压缩API功能绍"></a>
+<a name="模型压缩API功能介绍"></a>
 
 ## 模型压缩 API 功能简介
 
@@ -48,9 +48,9 @@ pip install paddleslim
 
 大致分为四步：
 
-- Step 1: 获取 `CompressionArguments` 对象
-- Step 2: 实例化 Trainer 并调用 `compress()`
-- Step 3: 实现自定义评估函数和 loss 计算函数（可选）
+- Step 1: 使用 `PdArgumentParser` 解析从命令行传入的超参数，以获取压缩参数 `compression_args`；
+- Step 2: 实例化 Trainer 并调用 `compress()` 压缩 API
+- Step 3: 实现自定义评估函数和 loss 计算函数（按需可选），以适配自定义压缩任务
 - Step 4：传参并运行压缩脚本
 
 **示例代码**
@@ -58,7 +58,7 @@ pip install paddleslim
 ```python
 from paddlenlp.trainer import PdArgumentParser, CompressionArguments
 
-# Step1: 获取 CompressionArguments 对象
+# Step1: 使用 `PdArgumentParser` 解析从命令行传入的超参数，以获取压缩参数 `compression_args`；
 parser = PdArgumentParser(CompressionArguments)
 compression_args = parser.parse_args_into_dataclasses()
 
@@ -71,7 +71,7 @@ trainer = Trainer(
     eval_dataset=eval_dataset,
     criterion=criterion)
 
-# Step 3: 使用内置模型和评估方法，不需要实现自定义评估函数和 loss 计算函数
+# Step 3: 使用内置模型和评估方法，则不需要实现自定义评估函数和 loss 计算函数
 trainer.compress()
 ```
 
@@ -89,21 +89,21 @@ python compress.py \
 ```
 
 
-<a name="获取CompressionArguments对象"></a>
+<a name="获取模型压缩参数compression_args"></a>
 
-### Step 1：获取 CompressionArguments 对象
+### Step 1：获取模型压缩参数 compression_args
 
-`CompressionArguments` 对象用于获取模型压缩参数，并传给 `Trainer` 对象。获取 `CompressionArguments` 对象的方法通常如下：
+使用 `PdArgumentParser` 对象解析从命令行得到的超参数，从而得到 `compression_args`，并将 `compression_args` 传给 `Trainer` 对象。获取 `compression_args` 的方法通常如下：
 
 ```python
 from paddlenlp.trainer import PdArgumentParser, CompressionArguments
 
-# Step1: 获取 CompressionArguments 对象
+# Step1: 使用 `PdArgumentParser` 解析从命令行传入的超参数，以获取压缩参数 `compression_args`；
 parser = PdArgumentParser(CompressionArguments)
 compression_args = parser.parse_args_into_dataclasses()
 ```
 
-<a name="实例化Trainer"></a>
+<a name="实例化Trainer并调用compress()"></a>
 
 ### Step 2：实例化 Trainer 并调用 compress
 
@@ -113,10 +113,10 @@ compression_args = parser.parse_args_into_dataclasses()
 
 - **--model** 待压缩的模型，目前支持 ERNIE 等模型，是在下游任务中微调后的模型。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
 - **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
-- **--train_dataset** 裁剪训练需要使用的训练集，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)；
-- **--eval_dataset** 裁剪训练使用的评估集，也是量化使用的校准数据，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)；
+- **--train_dataset** 裁剪训练需要使用的训练集，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。不启动裁剪时，可以为 None；
+- **--eval_dataset** 裁剪训练使用的评估集，也是量化使用的校准数据，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。是 Trainer 的必选参数；
 - **--tokenizer** 模型 `model` 对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_name_or_path)` 来获取。
-- **--criterion** 模型的 loss 对象，是一个 nn.Layer 对象，用于在 ofa_utils.py 计算模型的 loss 用于计算梯度从而确定神经元相似度。
+- **--criterion** 模型的 loss 对象，是一个 nn.Layer 对象，用于在 ofa_utils.py 计算模型的 loss 用于计算梯度从而确定神经元重要程度。
 
 用以上参数实例化 Trainer 对象，之后直接调用 `compress()` 。`compress()` 会根据选择的策略进入不同的分支，以进行裁剪或者量化的过程。
 
@@ -125,7 +125,7 @@ compression_args = parser.parse_args_into_dataclasses()
 ```python
 from paddlenlp.trainer import PdArgumentParser, CompressionArguments
 
-# Step1: 获取 CompressionArguments 对象
+# Step1: 使用 `PdArgumentParser` 解析从命令行传入的超参数，以获取压缩参数 `compression_args`；
 parser = PdArgumentParser(CompressionArguments)
 compression_args = parser.parse_args_into_dataclasses()
 
@@ -141,9 +141,9 @@ trainer = Trainer(
 trainer.compress()
 ```
 
-<a name="实现自定义评估函数和loss计算函数（可选）"></a>
+<a name="实现自定义评估函数和loss计算函数（按需可选）"></a>
 
-### Step3：实现自定义评估函数和 loss 计算函数（可选）
+### Step3：实现自定义评估函数和 loss 计算函数（按需可选），以适配自定义压缩任务
 
 当使用 DynaBERT 裁剪功能时，如果模型、Metrics 不符合下表的情况，那么模型压缩 API 中自带的评估函数和计算 loss 的参数可能需要自定义。
 
@@ -306,9 +306,9 @@ python compress.py \
 
 - **--batch_size_list** 校准样本的 batch_size 搜索列表。并非越大越好，也是一个超参数，建议传入多种校准样本数，最后可从多个量化模型中选择最优模型。默认是 `[4]`；
 
-- **--weight_quantize_type** 权重的量化类型，支持 'abs_max' 和 'channel_wise_abs_max' 两种方式。通常使用 'channel_wise_abs_max'， 这种方法得到的模型通常精度更高；
+- **--weight_quantize_type** 权重的量化类型，支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'， 这种方法得到的模型通常精度更高；
 
-- **--round_type** 权重值从 FP32 到 INT8 的转化方法，目前支持 'round' 和 '[adaround](https://arxiv.org/abs/2004.10568.)'，默认是 'round'；
+- **--round_type** 权重值从 FP32 到 INT8 的转化方法，目前支持 `'round'` 和 '[adaround](https://arxiv.org/abs/2004.10568.)'，默认是 `'round'`；
 
 - **--bias_correction** 如果是 True，表示使用 [bias correction](https://arxiv.org/abs/1810.05723) 功能，默认为 False。
 
@@ -355,9 +355,9 @@ python compress_qa.py \
 
 示例代码中压缩使用的是 datasets 内置的数据集，若想要使用自定义数据集压缩，可参考 [datasets 加载自定义数据集文档](https://huggingface.co/docs/datasets/loading)。
 
-<a name="模型部署与评价"></a>
+<a name="模型评估与部署"></a>
 
-## 模型部署与评价
+## 模型评估与部署
 
 裁剪、量化后的模型不能再通过 `from_pretrained` 导入进行预测，而是需要使用 Paddle 部署工具才能完成预测。
 
@@ -418,9 +418,8 @@ A：使用量化时，`eval_dataset` 不可以是 `TensorDataset` 对象，因�
 <a name="References"></a>
 
 ## 参考文献
+- Hou L, Huang Z, Shang L, Jiang X, Chen X and Liu Q. DynaBERT: Dynamic BERT with Adaptive Width and Depth[J]. arXiv preprint arXiv:2004.04037, 2020.
 
-1.Hou L, Huang Z, Shang L, Jiang X, Chen X and Liu Q. DynaBERT: Dynamic BERT with Adaptive Width and Depth[J]. arXiv preprint arXiv:2004.04037, 2020.
+- Cai H, Gan C, Wang T, Zhang Z, and Han S. Once for all: Train one network and specialize it for efficient deployment[J]. arXiv preprint arXiv:1908.09791, 2020.
 
-2.Cai H, Gan C, Wang T, Zhang Z, and Han S. Once for all: Train one network and specialize it for efficient deployment[J]. arXiv preprint arXiv:1908.09791, 2020.
-
-3.Wu H, Judd P, Zhang X, Isaev M and Micikevicius P. Integer Quantization for Deep Learning Inference: Principles and Empirical Evaluation[J]. arXiv preprint arXiv:2004.09602v1, 2020.
+- Wu H, Judd P, Zhang X, Isaev M and Micikevicius P. Integer Quantization for Deep Learning Inference: Principles and Empirical Evaluation[J]. arXiv preprint arXiv:2004.09602v1, 2020.

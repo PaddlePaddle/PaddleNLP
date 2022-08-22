@@ -27,7 +27,8 @@ class ErnieEncoder(ErniePretrainedModel):
         super(ErnieEncoder, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(768, num_classes)
+        self.classifier = nn.Linear(self.ernie.config["hidden_size"],
+                                    num_classes)
         self.apply(self.init_weights)
 
     def init_weights(self, layer):
@@ -267,9 +268,10 @@ class ErnieCrossEncoder(nn.Layer):
                               position_ids=position_ids,
                               attention_mask=attention_mask,
                               return_prob_distributation=True)
-        accuracy = paddle.metric.accuracy(input=probs, label=labels)
-        loss = F.cross_entropy(input=logits, label=labels)
-
-        outputs = {"loss": loss, "accuracy": accuracy}
-
-        return outputs
+        if (labels is not None):
+            accuracy = paddle.metric.accuracy(input=probs, label=labels)
+            loss = F.cross_entropy(input=probs, label=labels)
+            outputs = {"loss": loss, "accuracy": accuracy}
+            return outputs
+        else:
+            return probs[:, 1]
