@@ -24,9 +24,9 @@ import paddle
 global_rng = random.Random()
 
 
-def ids_tensor(shape, vocab_size):
+def ids_tensor(shape, vocab_size, dtype="int32"):
     #  Creates a random int32 tensor of the shape within the vocab size
-    return paddle.randint(low=0, high=vocab_size, dtype="int32", shape=shape)
+    return paddle.randint(low=0, high=vocab_size, dtype=dtype, shape=shape)
 
 
 def random_attention_mask(shape):
