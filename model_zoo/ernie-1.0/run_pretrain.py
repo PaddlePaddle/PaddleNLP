@@ -31,7 +31,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_
 from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
 
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
+from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer, ErnieForMaskedLM
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
@@ -56,6 +56,7 @@ def create_pretrained_dataset(
     max_seq_len,
     places=None,
     data_holders=None,
+    binary_head=True,
     current_step=0,
 ):
 
@@ -76,9 +77,25 @@ def create_pretrained_dataset(
         short_seq_prob=args.short_seq_prob,
         seed=args.seed,
         skip_warmup=True,
-        binary_head=True,
+        binary_head=binary_head,
         max_seq_length_dec=None,
         dataset_type='ernie')
+
+    def print_dataset(data, mode="train"):
+        logger.info(f"Sample data for {mode} mode")
+        input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels = data
+        if tokenizer.pad_token_id in input_ids:
+            input_ids = input_ids[0:list(input_ids).index(tokenizer.pad_token_id
+                                                          )]
+        logger.info(tokenizer._decode(input_ids))
+        for pos, label in zip(masked_lm_positions, masked_lm_labels):
+            input_ids[pos] = label
+        logger.info(tokenizer._decode(input_ids))
+        logger.info(tokenizer.convert_ids_to_tokens(masked_lm_labels))
+
+    print_dataset(train_ds[0], "train")
+    print_dataset(valid_ds[0], "valid")
+    print_dataset(test_ds[0], "test")
 
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
@@ -138,12 +155,26 @@ def create_pretrained_dataset(
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f))
-            and "_idx.npz" in str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f))
+                and "_idx.npz" in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
@@ -168,11 +199,16 @@ def run_evaluate(data_loader,
     model.eval()
     all_loss, all_lm_loss, all_sop_loss = [], [], []
 
-    loss_global = {
-        "loss": paddle.to_tensor(0.0),
-        "lm_loss": paddle.to_tensor(0.0),
-        "sop_loss": paddle.to_tensor(0.0),
-    }
+    if args.binary_head:
+        loss_global = {
+            "loss": paddle.to_tensor(0.0),
+            "lm_loss": paddle.to_tensor(0.0),
+            "sop_loss": paddle.to_tensor(0.0),
+        }
+    else:
+        loss_global = {
+            "loss": paddle.to_tensor(0.0),
+        }
 
     local_time = time.time()
 
@@ -180,21 +216,32 @@ def run_evaluate(data_loader,
         input_ids, segment_ids, input_mask, masked_lm_positions, \
         masked_lm_labels, next_sentence_labels = batch
 
-        # Create the model for the gpt pretrain
-        prediction_scores, seq_relationship_score = model(
-            input_ids=input_ids,
-            token_type_ids=segment_ids,
-            position_ids=None,
-            attention_mask=input_mask,
-            masked_positions=masked_lm_positions)
+        if args.binary_head:
+            prediction_scores, seq_relationship_score = model(
+                input_ids=input_ids,
+                token_type_ids=segment_ids,
+                position_ids=None,
+                attention_mask=input_mask,
+                masked_positions=masked_lm_positions)
 
-        lm_loss, sop_loss = criterion(prediction_scores, seq_relationship_score,
-                                      masked_lm_labels, next_sentence_labels)
-        loss = lm_loss + sop_loss
+            lm_loss, sop_loss = criterion(prediction_scores,
+                                          seq_relationship_score,
+                                          masked_lm_labels,
+                                          next_sentence_labels)
+            loss = lm_loss + sop_loss
+        else:
+            prediction_scores = model(input_ids=input_ids,
+                                      token_type_ids=segment_ids,
+                                      position_ids=None,
+                                      attention_mask=input_mask,
+                                      masked_positions=masked_lm_positions)
+
+            loss = criterion(prediction_scores, None, masked_lm_labels)
 
         loss_global["loss"] += loss.detach()
-        loss_global["lm_loss"] += lm_loss.detach()
-        loss_global["sop_loss"] += sop_loss.detach()
+        if args.binary_head:
+            loss_global["lm_loss"] += lm_loss.detach()
+            loss_global["sop_loss"] += sop_loss.detach()
 
         if eval_step >= iter_steps - 1:
             log_info_dict = dict()
@@ -203,14 +250,16 @@ def run_evaluate(data_loader,
                 v.subtract_(v)
             if dist.get_rank() == 0:
                 log_info_dict[
-                    "samples_per_second"] = iter_steps * args.micro_batch_size / (
-                        time.time() - local_time)
-                logger.info(
-                    "%s step %d, batch: %d, loss: %f, lm_loss: %.6f, sop_loss: %.6f, speed: %.0f seqs/s"
-                    %
-                    (task_name, global_step, iter_steps, log_info_dict["loss"],
-                     log_info_dict["lm_loss"], log_info_dict["sop_loss"],
-                     log_info_dict["samples_per_second"]))
+                    "samples_per_second"] = iter_steps * args.micro_batch_size * dist.get_world_size(
+                    ) / (time.time() - local_time)
+                loss_info = ", ".join([
+                    "{}: {:.6f}".format(k, log_info_dict[k])
+                    for k in log_info_dict.keys() if k.endswith("loss")
+                ])
+
+                logger.info("%s step %d, batch: %d, %s, ips: %.0f seqs/s" %
+                            (task_name, global_step, iter_steps, loss_info,
+                             log_info_dict["samples_per_second"]))
 
                 for k, v in log_info_dict.items():
                     log_writer.add_scalar("%s/%s" % (task_name, k), v,
@@ -305,6 +354,9 @@ def do_train(args):
     # Define the input data in the static mode
     base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
         args.model_type]
+    if args.binary_head is False:
+        model_class = ErnieForMaskedLM
+
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
 
@@ -322,7 +374,10 @@ def do_train(args):
                 consumed_samples = step_config["consumed_samples"]
                 global_step = step_config["global_step"]
 
-    if args.model_name_or_path in pretrained_models_list:
+    if args.model_name_or_path in pretrained_models_list and not args.continue_training:
+        logger.warning(
+            f"Your model {args.model_name_or_path} is training from scratch !!!"
+        )
         model_config = model_class.pretrained_init_configuration[
             args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
@@ -331,12 +386,15 @@ def do_train(args):
         model_config["enable_recompute"] = args.use_recompute
         model = model_class(base_class(**model_config))
     else:
+        logger.warning(
+            f"Your model is continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             args.model_name_or_path,
             hidden_dropout_prob=args.hidden_dropout_prob,
-            attention_probs_dropout_prob=args.attention_probs_dropout_prob)
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+            enable_recompute=args.use_recompute)
 
-    criterion = criterion_class()
+    criterion = criterion_class(with_nsp_loss=args.binary_head)
 
     if worker_index == 0:
         # log the model config and args
@@ -384,7 +442,7 @@ def do_train(args):
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(models=model, level='O2')
+        model = paddle.amp.decorate(models=model, level=args.fp16_opt_level)
     else:
         scaler = None
 
@@ -392,7 +450,8 @@ def do_train(args):
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
+    tokenizer.extend_chinese_char()
 
     data_file = get_train_data_file(args)
     train_data_loader, valid_data_loader, test_data_loader = create_pretrained_dataset(
@@ -414,14 +473,17 @@ def do_train(args):
             if os.path.exists(opt_path):
                 load_dict = paddle.load(params_path)
                 model_dict = model.state_dict()
-                if args.use_amp:
+                if args.use_amp and args.fp16_opt_level == "O2":
                     for k, v in load_dict.items():
+                        if k not in model_dict:
+                            logger.warning(
+                                f"Checkpoint have too much keys: {k}")
+                            continue
                         if "layer_norm" not in model_dict[k].name:
                             load_dict[k] = v.astype("float16")
                 model.set_state_dict(load_dict)
                 opt_dict = paddle.load(opt_path)
                 optimizer.set_state_dict(opt_dict)
-
             else:
                 logger.warning("No optimizer checkpoint file found in %s." %
                                opt_path)
@@ -433,11 +495,17 @@ def do_train(args):
             logger.info(
                 "Checkpoint loaded from global step: {}".format(global_step))
 
-    loss_global = {
-        "loss": paddle.to_tensor(0.0),
-        "lm_loss": paddle.to_tensor(0.0),
-        "sop_loss": paddle.to_tensor(0.0),
-    }
+    if args.binary_head:
+        loss_global = {
+            "loss": paddle.to_tensor(0.0),
+            "lm_loss": paddle.to_tensor(0.0),
+            "sop_loss": paddle.to_tensor(0.0),
+        }
+    else:
+        loss_global = {
+            "loss": paddle.to_tensor(0.0),
+        }
+
     tic_train = time.time()
     while True:
         # If not call valid_data_loader, the enumerate will call valid_data_loader
@@ -466,26 +534,39 @@ def do_train(args):
 
             with model.no_sync():
                 with paddle.amp.auto_cast(args.use_amp,
-                                          custom_black_list=[
-                                              "reduce_sum",
-                                              "c_softmax_with_cross_entropy",
-                                              "elementwise_div"
+                                          custom_white_list=[
+                                              'softmax',
+                                              'layer_norm',
+                                              'gelu',
                                           ],
-                                          level='O2'):
+                                          custom_black_list=[
+                                              "c_softmax_with_cross_entropy",
+                                          ],
+                                          level=args.fp16_opt_level):
 
                     # Create the model for the ernie pretrain
-                    prediction_scores, seq_relationship_score = model(
-                        input_ids=input_ids,
-                        token_type_ids=segment_ids,
-                        position_ids=None,
-                        attention_mask=input_mask,
-                        masked_positions=masked_lm_positions)
+                    if args.binary_head:
+                        prediction_scores, seq_relationship_score = model(
+                            input_ids=input_ids,
+                            token_type_ids=segment_ids,
+                            position_ids=None,
+                            attention_mask=input_mask,
+                            masked_positions=masked_lm_positions)
+                        lm_loss, sop_loss = criterion(prediction_scores,
+                                                      seq_relationship_score,
+                                                      masked_lm_labels,
+                                                      next_sentence_labels)
+                        loss = lm_loss + sop_loss
+                    else:
+                        prediction_scores = model(
+                            input_ids=input_ids,
+                            token_type_ids=segment_ids,
+                            position_ids=None,
+                            attention_mask=input_mask,
+                            masked_positions=masked_lm_positions)
 
-                    lm_loss, sop_loss = criterion(prediction_scores,
-                                                  seq_relationship_score,
-                                                  masked_lm_labels,
-                                                  next_sentence_labels)
-                    loss = lm_loss + sop_loss
+                        loss = criterion(prediction_scores, None,
+                                         masked_lm_labels)
 
                 if args.use_amp:
                     scaler.scale(loss).backward()
@@ -509,8 +590,9 @@ def do_train(args):
             global_step += 1
 
             loss_global["loss"] += loss.detach()
-            loss_global["lm_loss"] += lm_loss.detach()
-            loss_global["sop_loss"] += sop_loss.detach()
+            if args.binary_head:
+                loss_global["lm_loss"] += lm_loss.detach()
+                loss_global["sop_loss"] += sop_loss.detach()
 
             if global_step % args.logging_freq == 0:
                 log_info_dict = dict()
@@ -528,10 +610,14 @@ def do_train(args):
                     for k, v in log_info_dict.items():
                         log_writer.add_scalar("train/%s" % k, v, global_step)
 
-                    common_loginfo = "global step %d, loss: %.9f, lm_loss: %.6f, sop_loss: %.6f, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                        global_step, log_info_dict["loss"],
-                        log_info_dict["lm_loss"], log_info_dict["sop_loss"],
-                        speed, log_info_dict["samples_per_second"],
+                    loss_info = ", ".join([
+                        "{}: {:.6f}".format(k, log_info_dict[k])
+                        for k in log_info_dict.keys() if k.endswith("loss")
+                    ])
+
+                    common_loginfo = "global step %d, %s, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
+                        global_step, loss_info, speed,
+                        log_info_dict["samples_per_second"],
                         log_info_dict["learning_rate"])
 
                     addition_info = ""
@@ -541,13 +627,12 @@ def do_train(args):
                             "incr_count": scaler._incr_count,
                             "decr_count": scaler._decr_count
                         }
-                        addition_info = ", ".join("%s: %d" % (k, v)
+                        addition_info = ", ".join("%s: %.2f" % (k, v)
                                                   for k, v in amp_info.items())
-                        addition_info = " " + addition_info
                         for k, v in amp_info.items():
                             log_writer.add_scalar("amp/%s" % k, v, global_step)
 
-                    logger.info(common_loginfo + addition_info)
+                    logger.info(", ".join([common_loginfo, addition_info]))
 
                 tic_train = time.time()
 
@@ -581,6 +666,11 @@ def do_train(args):
                     model, paddle.DataParallel) else model
 
                 tokenizer.save_pretrained(output_dir)
+                # added token is not need for downstream finetune tasks.
+                added_token_path = os.path.join(output_dir, "added_tokens.json")
+                if os.path.exists(added_token_path):
+                    os.remove(added_token_path)
+
                 model_to_save.save_model_config(output_dir)
                 model_dict = model_to_save.state_dict()
                 if scaler is not None:
@@ -639,6 +729,8 @@ def do_train(args):
                              args,
                              task_name="test")
                 del train_data_loader
+                del valid_data_loader
+                del test_data_loader
                 return
 
 

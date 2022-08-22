@@ -83,8 +83,9 @@ class BlendableDataset(paddle.io.Dataset):
         self.dataset_index = np.zeros(self.size, dtype=np.uint8)
         self.dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
-        local_rank = 0 if fleet.local_rank() is None else int(
-            fleet.local_rank())
+        # local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank(
+        # ))
+        local_rank = get_local_rank()
 
         while True:
             try:
@@ -367,6 +368,7 @@ def create_masked_lm_predictions(tokens,
                 token_boundary[i] = 1
 
     if to_chinese_char:
+        # set ## chinse char to original chinese char
         char_tokens = []
         assert vocab_token_to_id_dict is not None
         for i, b in enumerate(token_boundary):
@@ -731,6 +733,7 @@ def _build_train_valid_test_datasets(data_prefix,
                 max_seq_length=max_seq_length,
                 seed=seed,
                 share_folder=args.share_folder,
+                args=args,
             )
             if dataset_type == DSET_TYPE_T5:
                 dataset = T5Dataset(indexed_dataset=indexed_dataset,
