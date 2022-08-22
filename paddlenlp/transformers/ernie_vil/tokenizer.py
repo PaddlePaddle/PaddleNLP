@@ -47,7 +47,7 @@ class ErnieViLTokenizer(ErnieTokenizer):
             truncation=False,
             return_position_ids=False,
             return_token_type_ids=False,  # don't return token_type_ids 
-            return_attention_mask=True,  # return attention_mask 
+            return_attention_mask=False,
             return_length=False,
             return_overflowing_tokens=False,
             return_special_tokens_mask=False,

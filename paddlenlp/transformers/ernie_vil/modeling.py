@@ -108,12 +108,11 @@ class ErnieViLPreTrainedModel(PretrainedModel):
             "hidden_dropout_prob": 0.1,
             "attention_probs_dropout_prob": 0.1,
             "max_position_embeddings": 2048,
-            "type_vocab_size": 4,
+            "type_vocab_size": 0,
             "task_type_vocab_size": 3,
             "hidden_act": "gelu",
             "task_id": 0,
             "use_task_id": False,
-            "use_token_type_id": False,
             "text_epsilon": 1e-5,
             "initializer_range": 0.02,
             "pad_token_id": 0
@@ -135,12 +134,11 @@ class ErnieViLPreTrainedModel(PretrainedModel):
             "hidden_dropout_prob": 0.1,
             "attention_probs_dropout_prob": 0.1,
             "max_position_embeddings": 2048,
-            "type_vocab_size": 4,
+            "type_vocab_size": 0,
             "task_type_vocab_size": 3,
             "hidden_act": "gelu",
             "task_id": 0,
             "use_task_id": False,
-            "use_token_type_id": False,
             "text_epsilon": 1e-5,
             "initializer_range": 0.02,
             "pad_token_id": 0
@@ -258,8 +256,6 @@ class ErnieViLModel(ErnieViLPreTrainedModel):
             Task id. Defaults to `0`.
         use_task_id (bool, optional):
             Whether or not use task_id. Defaults to `False`.
-        use_token_type_id (bool, optional):
-            Whether or not use use_token_type_id. Defaults to `False`.
         text_epsilon (float, optional):
             The `epsilon` parameter used in :class:`paddle.nn.LayerNorm` for initializing layer normalization layers.
             Default to `1e-5`.
@@ -297,7 +293,6 @@ class ErnieViLModel(ErnieViLPreTrainedModel):
             hidden_act: str = "gelu",
             task_id: int = 0,
             use_task_id: bool = False,
-            use_token_type_id: bool = False,
             text_epsilon: float = 1e-5,
             initializer_range: float = 0.02,
             pad_token_id: int = 0):
@@ -329,8 +324,7 @@ class ErnieViLModel(ErnieViLPreTrainedModel):
             pad_token_id=pad_token_id,
             task_type_vocab_size=task_type_vocab_size,
             task_id=task_id,
-            use_task_id=use_task_id,
-            use_token_type_id=use_token_type_id)
+            use_task_id=use_task_id)
 
         self.temperature = self.create_parameter(
             shape=(1, ),
@@ -605,16 +599,18 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
         input_ids,
         attention_mask=None,
         position_ids=None,
+        token_type_ids=None,
+        task_type_ids=None,
         init_image=None,
         output_dir='disco_diffusion_ernie_vil-2.0-base-zh/',
         width_height=[1280, 768],
-        skip_steps=10,
+        skip_steps=0,
         steps=250,
         cut_ic_pow=1,
         init_scale=1000,
         clip_guidance_scale=5000,
         tv_scale=0,
-        range_scale=150,
+        range_scale=0,
         sat_scale=0,
         cutn_batches=4,
         perlin_init=False,
@@ -642,6 +638,10 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             attention_mask (Tensor, optional):
                 See :class:`ErnieViLModel`.
             position_ids (Tensor, optional):
+                See :class:`ErnieViLModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieViLModel`.
+            task_type_ids (Tensor, optional):
                 See :class:`ErnieViLModel`.
             init_image (Path, optional): 
                 Recall that in the image sequence above, the first image shown is just noise.  If an init_image 
@@ -676,7 +676,7 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
                 skip_steps up or down for creative reasons.  With low skip_steps you can get a result "inspired by" 
                 the init_image which will retain the colors and rough layout and shapes but look quite different. 
                 With high skip_steps you can preserve most of the init_image contents and just do fine tuning of the texture.
-                Default to `10`.
+                Default to `0`.
             steps: 
                 When creating an image, the denoising curve is subdivided into steps for processing. Each step (or iteration) 
                 involves the AI looking at subsets of the image called 'cuts' and calculating the 'direction' the image 
@@ -719,7 +719,7 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
                 Optional, set to zero to turn off.  Used for adjustment of color contrast.  Lower range_scale will increase 
                 contrast. Very low numbers create a reduced color palette, resulting in more vibrant or poster-like images. 
                 Higher range_scale will reduce contrast, for more muted images.
-                Default to `150`.
+                Default to `0`.
             sat_scale (int, optional): 
                 Saturation scale. Optional, set to zero to turn off.  If used, sat_scale will help mitigate oversaturation. 
                 If your image is too saturated, increase sat_scale to reduce the saturation.
@@ -830,8 +830,11 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             model.eval()
 
             # Prepare the model inputs.
-            prompts = "小桥流水人家。"
-            tokenized_inputs = tokenizer(prompts, return_tensors="pd")
+            text_prompt = "小桥流水人家。"
+            style = None
+            artist = None
+            text_prompt = model.preprocess_text_prompt(text_prompt)
+            tokenized_inputs = tokenizer(prompts, return_tensors="pd", padding="max_length", max_length=64)
 
             images = model.generate(**tokenized_inputs)
             # return List[PIL.Image]
@@ -844,12 +847,17 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             sigma_small=False,
             noise_schedule="linear",
             predict_xstart=False,
-            rescale_timesteps=False,
+            rescale_timesteps=True,
         )
-        images_list = super().diffusion_generate(
+        target_text_embeds = self.get_text_features(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            task_type_ids=task_type_ids)
+
+        images_list = super().diffusion_generate(
+            target_text_embeds=target_text_embeds,
             clamp_grad=clamp_grad,
             clamp_max=clamp_max,
             clip_denoised=clip_denoised,
@@ -880,6 +888,14 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             batch_name=batch_name)
 
         return images_list
+
+    def preprocess_text_prompt(self, text_prompt, style=None, artist=None):
+        text_prompt = text_prompt.rstrip(',.，。')
+        if style is not None:
+            text_prompt += "，{}".format(style)
+        if artist is not None:
+            text_prompt += "，由{}所作".format(artist)
+        return text_prompt
 
     def __getattr__(self, name):
         try:
