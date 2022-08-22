@@ -22,13 +22,15 @@ ERNIE-CW项目，从数据下载，词表制作，数据转化，模型训练，
 
 ## 大规模中文数据
 
-### CLUECorpus2020  & WuDaoCorpus2.0 Base 数据集
+**CLUECorpus2020语料**
 
 CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载，方式如下：
 > 数据下载
 > 申请方式： 将使用语料研究目的和用途，计划、研究机构和申请者介绍，发送到邮箱，并承诺不向第三方提供。
 >
 > 邮箱: CLUEbenchmark@163.com，标题是：CLUECorpus2020 200G语料库
+
+**WuDaoCorpus2.0 Base 语料**
 
 WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。
 用户微信登录[官网](https://resource.wudaoai.cn/home)，即可直接下载数据。下载好的压缩数据约 64GB
@@ -74,12 +76,12 @@ python ../data_tools/trans_to_json.py  \
 
 词表的制作有两种方案：
 
-第一种，词表组合思路
+第一种，词表组合方案
 1. 统计字符
 2. 制作英文词表
 3. 合并词表
 
-第二种，预处理后直接生成
+第二种，预处理后直接生成，方案
 1. 文本预处理（中文加空格，文本normalize）
 2. 使用sentencepeice制作词表
 
