@@ -1684,6 +1684,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                masked_positions=None,
                 inputs_embeds=None,
                 labels=None,
                 output_hidden_states=False,
@@ -1700,6 +1701,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
                 See :class:`ErnieModel`.
+            masked_positions:
+                masked positions of output. 
             inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
@@ -1748,7 +1751,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output,
+                                     masked_positions=masked_positions)
 
         masked_lm_loss = None
         if labels is not None:

@@ -65,7 +65,7 @@ def preprocess_function(examples, tokenizer, max_seq_length, is_test=False):
     Returns:
         result(obj:`dict`): The preprocessed data including input_ids, token_type_ids, labels.
     """
-    result = tokenizer(text=examples["text_a"], max_seq_len=max_seq_length)
+    result = tokenizer(text=examples["text"], max_seq_len=max_seq_length)
     if not is_test:
         result["labels"] = np.array([examples['label']], dtype='int64')
     return result
@@ -75,4 +75,4 @@ def read_local_dataset(path, label_list):
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
             sentence, label = line.strip().split('\t')
-            yield {'text_a': sentence, 'label': label_list[label]}
+            yield {'text': sentence, 'label': label_list[label]}
