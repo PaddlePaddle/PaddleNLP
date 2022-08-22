@@ -63,9 +63,11 @@ class ErnieEmbeddings(nn.Layer):
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size,
                                                 weight_attr=weight_attr)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size,
-                                                  hidden_size,
-                                                  weight_attr=weight_attr)
+        self.type_vocab_size = type_vocab_size
+        if self.type_vocab_size > 0:
+            self.token_type_embeddings = nn.Embedding(type_vocab_size,
+                                                      hidden_size,
+                                                      weight_attr=weight_attr)
         self.use_task_id = use_task_id
         self.task_id = task_id
         if self.use_task_id:
@@ -98,12 +100,16 @@ class ErnieEmbeddings(nn.Layer):
             if past_key_values_length is not None:
                 position_ids += past_key_values_length
             position_ids.stop_gradient = True
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype="int64")
-        position_embeddings = self.position_embeddings(position_ids)
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embeddings + position_embeddings + token_type_embeddings
+        position_embeddings = self.position_embeddings(position_ids)
+        embeddings = input_embeddings + position_embeddings
+
+        if self.type_vocab_size > 0:
+            if token_type_ids is None:
+                token_type_ids = paddle.zeros(input_shape, dtype="int64")
+            token_type_embeddings = self.token_type_embeddings(token_type_ids)
+            embeddings = embeddings + token_type_embeddings
+
         if self.use_task_id:
             if task_type_ids is None:
                 task_type_ids = paddle.ones(input_shape,
@@ -853,6 +859,12 @@ class ErnieModel(ErniePretrainedModel):
                                              enable_recompute=enable_recompute)
         self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
     def forward(self,
                 input_ids,
