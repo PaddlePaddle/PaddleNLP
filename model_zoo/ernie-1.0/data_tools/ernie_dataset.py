@@ -14,9 +14,11 @@
 # limitations under the License.
 """BERT Style dataset."""
 
+import re
+import copy
+
 import numpy as np
 import paddle
-import re
 
 from .dataset_utils import (
     get_samples_mapping,
@@ -33,19 +35,22 @@ from paddlenlp.transformers import ErnieTokenizer
 
 class ErnieDataset(paddle.io.Dataset):
 
-    def __init__(self,
-                 name,
-                 tokenizer,
-                 indexed_dataset,
-                 data_prefix,
-                 num_epochs,
-                 max_num_samples,
-                 masked_lm_prob,
-                 max_seq_length,
-                 short_seq_prob,
-                 seed,
-                 binary_head,
-                 share_folder=False):
+    def __init__(
+        self,
+        name,
+        tokenizer,
+        indexed_dataset,
+        data_prefix,
+        num_epochs,
+        max_num_samples,
+        masked_lm_prob,
+        max_seq_length,
+        short_seq_prob,
+        seed,
+        binary_head,
+        share_folder=False,
+        args=None,
+    ):
 
         # Params to store.
         self.name = name
@@ -54,6 +59,7 @@ class ErnieDataset(paddle.io.Dataset):
         self.max_seq_length = max_seq_length
         self.binary_head = binary_head
         self.share_folder = share_folder
+        self.args = args
 
         # Dataset.
         self.indexed_dataset = indexed_dataset
@@ -76,8 +82,16 @@ class ErnieDataset(paddle.io.Dataset):
         # self.vocab_id_list = list(tokenizer.inv_vocab.keys())
         # self.vocab_id_to_token_dict = tokenizer.inv_vocab
         self.vocab_id_list = list(tokenizer.vocab.idx_to_token.keys())
-        self.vocab_id_to_token_dict = tokenizer.vocab.idx_to_token
-        self.vocab_token_to_id_dict = tokenizer.vocab.token_to_idx
+        self.vocab_id_to_token_dict = copy.deepcopy(
+            tokenizer.vocab.idx_to_token)
+        self.vocab_token_to_id_dict = copy.deepcopy(
+            tokenizer.vocab.token_to_idx)
+
+        # ERNIE is chinse char level model, sometime is need
+        # add ## chinse char to encode and decode.
+        # Here we extend the vocab dict.
+        self.vocab_id_to_token_dict.update(tokenizer.added_tokens_decoder)
+        self.vocab_token_to_id_dict.update(tokenizer.added_tokens_encoder)
 
         self.cls_id = tokenizer.cls_token_id
         self.sep_id = tokenizer.sep_token_id
@@ -90,6 +104,7 @@ class ErnieDataset(paddle.io.Dataset):
     def __getitem__(self, idx):
         start_idx, end_idx, seq_length = self.samples_mapping[idx]
         sample = [self.indexed_dataset[i] for i in range(start_idx, end_idx)]
+
         # Note that this rng state should be numpy and not python since
         # python randint is inclusive whereas the numpy one is exclusive.
         # We % 2**32 since numpy requres the seed to be between 0 and 2**32 - 1
@@ -107,13 +122,24 @@ class ErnieDataset(paddle.io.Dataset):
             self.pad_id,
             self.masked_lm_prob,
             np_rng,
-            self.binary_head)
+            self.binary_head,
+            self.args)
 
 
-def build_training_sample(sample, target_seq_length, max_seq_length,
-                          vocab_id_list, vocab_id_to_token_dict,
-                          vocab_token_to_id_dict, cls_id, sep_id, mask_id,
-                          pad_id, masked_lm_prob, np_rng, binary_head):
+def build_training_sample(sample,
+                          target_seq_length,
+                          max_seq_length,
+                          vocab_id_list,
+                          vocab_id_to_token_dict,
+                          vocab_token_to_id_dict,
+                          cls_id,
+                          sep_id,
+                          mask_id,
+                          pad_id,
+                          masked_lm_prob,
+                          np_rng,
+                          binary_head,
+                          args=None):
     """Biuld training sample.
 
     Arguments:
@@ -175,6 +201,8 @@ def build_training_sample(sample, target_seq_length, max_seq_length,
          vocab_token_to_id_dict=vocab_token_to_id_dict,
          to_chinese_char=True,
          inplace_random_mask=False,
+         favor_longer_ngram=False if args is None else args.favor_longer_ngram,
+         max_ngrams=3 if args is None else args.max_ngrams,
      )
 
     # Padding.

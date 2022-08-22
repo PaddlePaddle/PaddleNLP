@@ -52,6 +52,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
 ```
+【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 ### 3.2 数据说明
 问答知识库数据是我们爬取了百度百科上对国内重点城市的百科介绍文档。我们将所有文档中的非结构化文本数据抽取出来， 按照段落切分后作为问答系统知识库的数据，一共包含 365 个城市的百科介绍文档、切分后共 1318 个段落。
 
@@ -132,7 +133,7 @@ python rest_api/application.py 8891
 Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
-sh scripts/run_qa_server.sh
+sh examples/question-answering/run_qa_server.sh
 ```
 启动后可以使用curl命令验证是否成功运行：
 
@@ -150,7 +151,7 @@ python -m streamlit run ui/webapp_question_answering.py --server.port 8502
 Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
-sh scripts/run_qa_web.sh
+sh examples/question-answering/run_qa_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验城市百科知识问答系统服务了。
