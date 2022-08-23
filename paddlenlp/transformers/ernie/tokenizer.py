@@ -624,6 +624,14 @@ class ErnieTokenizer(PretrainedTokenizer):
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        vocab.update(self.added_tokens_encoder)
+        return vocab
+
 
 class ErnieTinyTokenizer(PretrainedTokenizer):
     r"""
@@ -984,3 +992,11 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        vocab.update(self.added_tokens_encoder)
+        return vocab

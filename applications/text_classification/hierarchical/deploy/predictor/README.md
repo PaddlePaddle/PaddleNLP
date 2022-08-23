@@ -11,13 +11,14 @@
 
 如果基于GPU部署，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
 ```shell
-python -m pip install onnxruntime-gpu onnx onnxconverter-common
+python -m pip install onnxruntime-gpu onnx onnxconverter-common psutil
 ```
 
 如果基于CPU部署，请使用如下命令安装所需依赖:
 ```shell
-python -m pip install onnxruntime
+python -m pip install onnxruntime psutil
 ```
+
 ## 基于GPU部署推理样例
 请使用如下命令进行部署
 ```
@@ -130,7 +131,7 @@ python infer.py \
 
 测试配置如下：
 
-1. 医疗意图分类CMID开发集
+1. [2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集
 
 2. 物理机环境
 
@@ -158,10 +159,10 @@ python infer.py \
 
 |                            | Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------- |------------- |
-| ERNIE 3.0 Medium+FP32+GPU  | 63.51|46.98| 2.12|
-| ERNIE 3.0 Medium+FP16+GPU  | 63.56| 47.00| 0.77|
-| ERNIE 3.0 Medium+FP32+CPU  | 63.51|46.98|  39.09 |
-| ERNIE 3.0 Medium+INT8+CPU  | 63.42 | 46.72| 20.27  |
+| ERNIE 3.0 Medium+FP32+GPU  | 95.26|93.22| 2.42|
+| ERNIE 3.0 Medium+FP16+GPU  | 95.26|93.22| 0.79|
+| ERNIE 3.0 Medium+FP32+CPU  | 95.26|93.22|  18.93 |
+| ERNIE 3.0 Medium+INT8+CPU  | 95.03 | 92.87| 12.14  |
 
 
 经过FP16转化加速比达到3~4倍左右，精度变化较小，与FP16相比,INT8在线量化精度下降较大，加速比在1.5~2倍左右。
