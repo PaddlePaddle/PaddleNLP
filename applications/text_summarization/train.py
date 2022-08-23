@@ -196,15 +196,14 @@ def run(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_ds = load_dataset(read_file, file=args.train_file, lazy=False)
-    dev_ds = load_dataset(read_file, file=args.eval_file, lazy=False)
-
-    train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
-                                                     'train')
-    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
-                                                 'test')
-
     if args.do_train:
+        train_ds = load_dataset(read_file, file=args.train_file, lazy=False)
+        dev_ds = load_dataset(read_file, file=args.eval_file, lazy=False)
+
+        train_ds, train_data_loader = create_data_loader(
+            train_ds, tokenizer, args, 'train')
+        dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
+                                                     'test')
         if args.max_steps > 0:
             num_training_steps = args.max_steps
             num_train_epochs = math.ceil(num_training_steps /
@@ -291,6 +290,10 @@ def run(args):
 
         print('\nTraining completed.')
     elif args.do_eval:
+        dev_ds = load_dataset(read_file, file=args.eval_file, lazy=False)
+        dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
+                                                     'test')
+
         model_eval = model._layers if isinstance(model,
                                                  paddle.DataParallel) else model
         evaluation(model_eval, dev_data_loader, args, tokenizer)
