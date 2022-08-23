@@ -263,9 +263,13 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
 
 
 def calc_loss(loss_fct, model, batch, head_mask):
-    logits = model(batch["input_ids"],
-                   batch["token_type_ids"],
-                   attention_mask=[None, head_mask])
+    if "token_type_ids" in batch:
+        logits = model(input_ids=batch["input_ids"],
+                       token_type_ids=batch["token_type_ids"],
+                       attention_mask=[None, head_mask])
+    else:
+        logits = model(input_ids=batch["input_ids"],
+                       attention_mask=[None, head_mask])
     class_name = model.__class__.__name__
     if "QuestionAnswering" in class_name:
         start_logits, end_logits = logits

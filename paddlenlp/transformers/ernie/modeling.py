@@ -1106,19 +1106,40 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 logits = model(**inputs)
 
         """
-        outputs = self.ernie(input_ids,
+        # import inspect
+        # print(inspect.signature(self.ernie.forward).parameters.keys())
+        # import pdb; pdb.set_trace()
+        # print("ernie/modeling input_ids", input_ids)
+        # print("ernie/modeling ernie embeddings: ", id(self.ernie.embeddings))
+        # print("self.ernie.id111 ", id(self.ernie))
+        # print(id(self.ernie.forward))
+        # from ...trainer.trainer_compress import auto_model_forward
+        # outputs = self.ernie(input_ids=input_ids,
+        #                      token_type_ids=token_type_ids,
+        #                      position_ids=position_ids,
+        #                      attention_mask=attention_mask,
+        # outputs = auto_model_forward(self.ernie, input_ids,
+        #                      token_type_ids=token_type_ids,
+        #                      position_ids=position_ids,
+        #                      attention_mask=attention_mask)#,
+        # __call__
+        # outputs = self.ernie.__class__._forward(self.ernie, input_ids,
+        # outputs = self.ernie.forward.__func__(self.ernie, input_ids,
+        outputs = self.ernie(input_ids=input_ids,
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
-                             attention_mask=attention_mask,
-                             inputs_embeds=inputs_embeds,
-                             output_attentions=output_attentions,
-                             output_hidden_states=output_hidden_states,
-                             return_dict=return_dict)
+                             attention_mask=attention_mask)  #,
+        #  inputs_embeds=inputs_embeds,
+        #  output_attentions=output_attentions,
+        #  output_hidden_states=output_hidden_states,
+        #  return_dict=return_dict)
+        # print("self.ernie.id222 ", id(self.ernie))
         pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-
+        return logits
+        '''
         loss = None
         if labels is not None:
             if self.num_classes == 1:
@@ -1142,6 +1163,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+        '''
 
 
 class ErnieForQuestionAnswering(ErniePretrainedModel):

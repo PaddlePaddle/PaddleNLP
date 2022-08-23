@@ -471,9 +471,10 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 logits = outputs[0]
         """
 
-        sequence_output, pooled_output = self.tinybert(input_ids,
-                                                       token_type_ids,
-                                                       attention_mask)
+        sequence_output, pooled_output = self.tinybert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask)
 
         logits = self.classifier(self.activation(pooled_output))
         return logits

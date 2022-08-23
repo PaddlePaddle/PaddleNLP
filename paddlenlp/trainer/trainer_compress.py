@@ -17,6 +17,7 @@ import os
 import copy
 import math
 import numpy as np
+import inspect
 
 import paddle
 from paddle.utils import try_import
@@ -80,8 +81,8 @@ def compress(self,
             input_spec = [
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64"),  # input_ids
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64")  # token_type_ids
+                paddle.static.InputSpec(shape=[None, None], dtype="int64")
+                if "token_type_ids" in self.train_dataset[0] else None
             ]
             input_dir = args.output_dir
             export_model(model=self.model,
@@ -106,7 +107,6 @@ def _dynabert(self, model, output_dir):
     # Each batch is a dict.
     train_dataloader = self.get_train_dataloader()
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
-
     if "QuestionAnswering" in model.__class__.__name__:
         eval_dataloader_with_label = self.get_eval_dataloader(
             self.eval_examples)
@@ -323,12 +323,12 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         model.eval()
         metric.reset()
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
-                           attention_mask=[None, None])
+            labels = batch.pop("labels")
+            batch["attention_mask"] = [None, None]
+            logits = model(**batch)
             if isinstance(model, OFA):
                 logits = logits[0]
-            correct = metric.compute(logits, batch['labels'])
+            correct = metric.compute(logits, labels)
             metric.update(correct)
         res = metric.accumulate()
         logger.info("acc: %s, " % res)
@@ -382,9 +382,14 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 # and use this config in supernet training.
                 net_config = utils.dynabert_config(ofa_model, width_mult)
                 ofa_model.set_net_config(net_config)
-                logits, teacher_logits = ofa_model(batch['input_ids'],
-                                                   batch['token_type_ids'],
-                                                   attention_mask=[None, None])
+                if "token_type_ids" in batch:
+                    logits, teacher_logits = ofa_model(
+                        input_ids=batch['input_ids'],
+                        token_type_ids=batch['token_type_ids'],
+                        attention_mask=[None, None])
+                else:
+                    logits, teacher_logits = ofa_model(
+                        batch['input_ids'], attention_mask=[None, None])
                 rep_loss = ofa_model.calc_distill_loss()
                 if isinstance(logits, tuple):
                     logit_loss = 0
@@ -476,6 +481,7 @@ def _dynabert_export(self, ofa_model):
         input_shape = [
             paddle.static.InputSpec(shape=[None, None], dtype='int64'),
             paddle.static.InputSpec(shape=[None, None], dtype='int64')
+            if 'token_type_ids' in self.train_dataset[0] else None
         ]
         pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
 
@@ -505,15 +511,20 @@ def _post_training_quantization_grid_search(self, model_dir):
     def _post_training_quantization(algo, batch_size, batch_nums):
 
         def _batch_generator_func():
-            batch_data = [[], []]
+            has_token_type_ids = "token_type_ids" in self.eval_dataset[0]
+            batch_data = [[], []] if has_token_type_ids else [[]]
             for data in self.eval_dataset:
                 batch_data[0].append(data['input_ids'])
-                batch_data[1].append(data['token_type_ids'])
+                if has_token_type_ids:
+                    batch_data[1].append(data['token_type_ids'])
                 if len(batch_data[0]) == batch_size:
                     input_ids = Pad(axis=0, pad_val=0)(batch_data[0])
-                    token_type_ids = Pad(axis=0, pad_val=0)(batch_data[1])
-                    yield [input_ids, token_type_ids]
-                    batch_data = [[], []]
+                    if has_token_type_ids:
+                        token_type_ids = Pad(axis=0, pad_val=0)(batch_data[1])
+                        yield [input_ids, token_type_ids]
+                    else:
+                        yield [input_ids]
+                    batch_data = [[], []] if has_token_type_ids else [[]]
 
         post_training_quantization = PostTrainingQuantization(
             executor=exe,
@@ -564,30 +575,33 @@ def auto_model_forward(self,
                        output_hidden_states=False,
                        output_attentions=False,
                        return_dict=False):
-    wtype = self.pooler.dense.fn.weight.dtype if hasattr(
-        self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
-
-    if input_ids is not None and inputs_embeds is not None:
+    kwargs = locals()
+    wtype = self.encoder.layers[0].norm1.fn.weight.dtype if hasattr(
+        self.encoder.layers[0].norm1,
+        'fn') else self.encoder.layers[0].norm1.weight.dtype
+    if input_ids is not None and "inputs_embeds" in kwargs and kwargs[
+            "inputs_embeds"] is not None:
         raise ValueError(
             "You cannot specify both input_ids and inputs_embeds at the same time."
         )
     elif input_ids is not None:
         input_shape = paddle.shape(input_ids)
-    elif inputs_embeds is not None:
+    # elif inputs_embeds is not None:
+    elif "inputs_embeds" in kwargs and kwargs["inputs_embeds"] is not None:
         input_shape = paddle.shape(inputs_embeds)[:-1]
     else:
         raise ValueError(
             "You have to specify either input_ids or inputs_embeds")
 
     past_key_values_length = None
-    if past_key_values is not None:
-        past_key_values_length = past_key_values[0][0].shape[2]
+    if "past_key_values" in kwargs and kwargs["past_key_values"] is not None:
+        past_key_values_length = kwargs["past_key_values"][0][0].shape[2]
 
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
-        if past_key_values is not None:
-            batch_size = past_key_values[0][0].shape[0]
+        if "past_key_values" in kwargs and kwargs["past_key_values"] is not None:
+            batch_size = kwargs["past_key_values"][0][0].shape[0]
             past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length],
                                      dtype=attention_mask.dtype)
             attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
@@ -599,32 +613,37 @@ def auto_model_forward(self,
         attention_mask[0] = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
 
-    if "use_task_id" in self.config:
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
-            task_type_ids=task_type_ids,
-            inputs_embeds=inputs_embeds,
-            past_key_values_length=past_key_values_length)
-    else:
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
-            inputs_embeds=inputs_embeds,
-            past_key_values_length=past_key_values_length)
+    embedding_kwargs_keys = inspect.signature(
+        self.embeddings.forward).parameters.keys()
+    embedding_kwargs = {}
 
-    self.encoder._use_cache = use_cache  # To be consistent with HF
-    encoder_outputs = self.encoder(embedding_output,
-                                   src_mask=attention_mask,
-                                   cache=past_key_values,
-                                   output_attentions=output_attentions,
-                                   output_hidden_states=output_hidden_states,
-                                   return_dict=return_dict)
+    encoder_kwargs_keys = inspect.signature(
+        self.encoder.forward).parameters.keys()
+    encoder_kwargs = {}
+
+    for key in embedding_kwargs_keys:
+        if key in kwargs.keys():
+            embedding_kwargs[key] = kwargs[key]
+
+    for key in encoder_kwargs_keys:
+        if key in kwargs.keys():
+            encoder_kwargs[key] = kwargs[key]
+
+    embedding_kwargs["input_ids"] = input_ids
+    embedding_output = self.embeddings(**embedding_kwargs)
+
+    if "use_cache" in kwargs:
+        self.encoder._use_cache = kwargs[
+            "use_cache"]  # To be consistent with HF
+
+    encoder_kwargs["src_mask"] = attention_mask
+    encoder_outputs = self.encoder(embedding_output, **encoder_kwargs)
     if isinstance(encoder_outputs, type(embedding_output)):
         sequence_output = encoder_outputs
-        pooled_output = self.pooler(sequence_output)
+        if hasattr(self, 'pooler'):
+            pooled_output = self.pooler(sequence_output)
+        else:
+            pooled_output = sequence_output[:, 0]
         return (sequence_output, pooled_output)
     else:
         sequence_output = encoder_outputs[0]

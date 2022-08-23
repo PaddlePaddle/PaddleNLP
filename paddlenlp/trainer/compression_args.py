@@ -147,7 +147,7 @@ class CompressionArguments(TrainingArguments):
             'weight_quantize_type', 'input_infer_model_path'
         ]
         default_arg_dict = {
-            "width_mult_list": [0.75],
+            "width_mult_list": ['3/4'],
             'batch_size_list': [1],
             'algo_list': ['mse', 'KL'],
             'batch_num_list': [4, 8, 16]
