@@ -159,7 +159,7 @@ add_custom_target(build_cpp_package_dir ALL
 # copy headers
 add_custom_target(copy_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory 
-    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include/faster_tokenizer
     DEPENDS build_cpp_package_dir)
 
 add_custom_target(copy_third_party_headers ALL
@@ -202,4 +202,3 @@ add_custom_target(create_commit_id_file ALL
     COMMAND ${GIT_EXECUTABLE} log -1 --format=%H > ${CPP_PACKAGE_DIR}/commit.log
     DEPENDS copy_shared_library)
 endif(WITH_PYTHON)
-    
