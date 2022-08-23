@@ -1332,15 +1332,37 @@ python compress.py \
 本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
-# --model_name_or_path 参数传入的是上面微调过程后得到的模型所在目录，压缩后的模型也会在该目录下
 # 分类任务
-python compress_seq_cls.py --dataset "clue tnews"  --model_name_or_path best_models/TNEWS  --output_dir ./
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+python compress_seq_cls.py \
+    --dataset "clue tnews"  \
+    --model_name_or_path best_models/TNEWS  \
+    --output_dir ./
 
 # 序列标注任务
-python compress_token_cls.py --dataset "msra_ner"  --model_name_or_path best_models/MSRA_NER  --output_dir ./
+python compress_token_cls.py \
+    --dataset "msra_ner"  \
+    --model_name_or_path best_models/MSRA_NER \
+    --output_dir ./ \
+    --max_seq_length 128 \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --learning_rate 0.00005 \
+    --remove_unused_columns False \
+    --num_train_epochs 3
 
 # 阅读理解任务
-python compress_seq_cls.py --dataset "clue cmrc2018"  --model_name_or_path best_models/CMRC2018  --output_dir ./
+python compress_qa.py \
+    --dataset "clue cmrc2018" \
+    --model_name_or_path best_models/CMRC2018  \
+    --output_dir ./ \
+    --max_seq_length 512 \
+    --learning_rate 0.00003 \
+    --num_train_epochs 8 \
+    --per_device_train_batch_size 24 \
+    --per_device_eval_batch_size 24 \
+    --max_answer_length 50 \
+
 ```
 
 一行代码验证上面模型压缩后模型的精度：

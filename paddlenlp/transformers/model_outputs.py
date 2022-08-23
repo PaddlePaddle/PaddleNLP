@@ -139,14 +139,11 @@ def _transformer_encoder_fwd(self,
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
         if self.enable_recompute:
+            # Note: recompute do not support pass as **kwargs yet.
             layer_outputs = recompute(
-                mod,
-                output,
-                src_mask=src_mask,
-                cache=None if cache is None else
+                mod, output, src_mask, None if cache is None else
                 cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
-                MultiHeadAttention.Cache(*cache[i]),
-                output_attentions=output_attentions)
+                MultiHeadAttention.Cache(*cache[i]), output_attentions)
         else:
             layer_outputs = mod(
                 output,

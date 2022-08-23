@@ -17,8 +17,8 @@ import os
 import collections
 import unicodedata
 
-from ..tokenizer_utils import PretrainedTokenizer
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation
+from ..tokenizer_utils import PretrainedTokenizer, AddedToken
+from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation, _is_symbol
 
 __all__ = [
     'BasicTokenizer',
@@ -126,7 +126,8 @@ class BasicTokenizer(object):
         output = []
         while i < len(chars):
             char = chars[i]
-            if _is_punctuation(char):
+            # punctuation and symbol should be treat as single char.
+            if _is_punctuation(char) or _is_symbol(char):
                 output.append([char])
                 start_new_word = True
             else:

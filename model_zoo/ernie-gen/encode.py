@@ -83,7 +83,6 @@ def gen_mask(batch_ids, mask_type='bidi', query_len=None, pad_value=0):
             mask = np.tril(mask, -1)
         elif mask_type == 'diag':
             assert query_len == batch_ids.shape[1]
-            # import pdb; pdb.set_trace()
             mask = np.stack([np.diag(np.diag(m)) for m in mask], 0)
 
     else:
