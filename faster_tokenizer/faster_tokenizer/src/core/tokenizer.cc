@@ -259,7 +259,7 @@ void Tokenizer::EncodeBatchStrings(
 // Use workload to determine whether create omp threads. Need to optimize the
 // workload estimation.
 #pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
-                                                     omp_get_num_threads() > \
+                                                     omp_get_max_threads() > \
                                                                          1)
 #endif
   for (int i = 0; i < batch_encode_input.size(); ++i) {
