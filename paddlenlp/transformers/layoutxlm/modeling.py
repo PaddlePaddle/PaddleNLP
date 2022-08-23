@@ -815,7 +815,8 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
     def _calc_text_embeddings(self, input_ids, bbox, position_ids,
                               token_type_ids):
         words_embeddings = self.embeddings.word_embeddings(input_ids)
-        position_embeddings = self.embeddings.position_embeddings(position_ids.astype(paddle.int64))
+        position_embeddings = self.embeddings.position_embeddings(
+            position_ids.astype(paddle.int64))
         spatial_position_embeddings = self.embeddings._cal_spatial_position_embeddings(
             bbox)
         token_type_embeddings = self.embeddings.token_type_embeddings(
@@ -827,7 +828,8 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
 
     def _calc_img_embeddings(self, image, bbox, position_ids):
         use_image_info = self.use_visual_backbone and image is not None
-        position_embeddings = self.embeddings.position_embeddings(position_ids.astype(paddle.int64))
+        position_embeddings = self.embeddings.position_embeddings(
+            position_ids.astype(paddle.int64))
         spatial_position_embeddings = self.embeddings._cal_spatial_position_embeddings(
             bbox)
         if use_image_info is True:
