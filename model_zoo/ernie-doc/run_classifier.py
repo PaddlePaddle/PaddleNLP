@@ -152,7 +152,7 @@ def do_train(args):
     tokenizer_class, eval_name, test_name, preprocess_text_fn, eval_metric = DATASET_INFO[
         args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    if args.dataset in ["hyp", "thucnews"]:
+    if args.dataset == "hyp":
         from paddlenlp.datasets import load_dataset
         train_ds, eval_ds, test_ds = load_dataset(
             args.dataset, splits=["train", eval_name, test_name])
