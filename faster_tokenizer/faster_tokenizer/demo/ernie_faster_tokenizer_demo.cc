@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "tokenizers/ernie_faster_tokenizer.h"
+#include "faster_tokenizer/tokenizers/ernie_faster_tokenizer.h"
 #include <iostream>
 #include <vector>
 using namespace paddlenlp;
