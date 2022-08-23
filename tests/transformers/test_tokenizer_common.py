@@ -32,7 +32,7 @@ from paddlenlp.transformers import (AlbertTokenizer, AutoTokenizer,
                                     BertTokenizer, PretrainedTokenizer)
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
-from tests.testing_utils import get_tests_dir, slow
+from ..testing_utils import get_tests_dir, slow
 
 sys.path.append(str(Path(__file__).parent.parent / "utils"))
 
@@ -54,6 +54,10 @@ def filter_non_english(_, pretrained_name: str):
     return not any([lang in pretrained_name for lang in NON_ENGLISH_TAGS])
 
 
+def filter_roberta_detectors(_, pretrained_name: str):
+    return "detector" not in pretrained_name
+
+
 class TokenizerTesterMixin:
 
     tokenizer_class = None
@@ -64,10 +68,12 @@ class TokenizerTesterMixin:
 
     # set to True to test a sentencepiece tokenizer
     test_sentencepiece = False
-
     # set to True to ignore casing when testing a sentencepiece tokenizer
     # test_sentencepiece must also be set to True
     test_sentencepiece_ignore_case = False
+    test_offsets = True
+
+    only_english_character: bool = True
 
     def setUp(self) -> None:
 
@@ -105,7 +111,11 @@ class TokenizerTesterMixin:
                            min_length=5) -> Tuple[str, list]:
         toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False))
                 for i in range(len(tokenizer))]
-        toks = list(filter(lambda t: re.match(r"^[ a-zA-Z]+$", t[1]), toks))
+
+        # filter the english only character
+        if self.only_english_character:
+            toks = list(filter(lambda t: re.match(r"^[ a-zA-Z]+$", t[1]), toks))
+
         toks = list(
             filter(
                 lambda t: [t[0]] == tokenizer.encode(
@@ -189,7 +199,9 @@ class TokenizerTesterMixin:
         for tokenizer_class in tokenizer_classes:
             tokenizer = tokenizer_class.from_pretrained(model_name)
 
-            encoding = tokenizer(sequences, padding=padding)
+            encoding = tokenizer(sequences,
+                                 padding=padding,
+                                 return_attention_mask=True)
             decoded_sequences = [
                 tokenizer.decode(seq, skip_special_tokens=True, **decode_kwargs)
                 for seq in encoding["input_ids"]
@@ -485,18 +497,14 @@ class TokenizerTesterMixin:
                 sample_text = " He is very happy, UNwant\u00E9d,running"
                 before_tokens = tokenizer.encode(sample_text,
                                                  add_special_tokens=False)
-                # before_vocab = tokenizer.get_vocab()
-                before_vocab = dict(tokenizer.vocab._token_to_idx,
-                                    **tokenizer.added_tokens_encoder)
+                before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
                 after_tokenizer = tokenizer.__class__.from_pretrained(
                     tmpdirname)
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
-                # after_vocab = after_tokenizer.get_vocab()
-                after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                                   **after_tokenizer.added_tokens_encoder)
+                after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens["input_ids"],
                                      after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
@@ -517,18 +525,14 @@ class TokenizerTesterMixin:
                     {"additional_special_tokens": additional_special_tokens})
                 before_tokens = tokenizer.encode(sample_text,
                                                  add_special_tokens=False)
-                # before_vocab = tokenizer.get_vocab()
-                before_vocab = dict(tokenizer.vocab._token_to_idx,
-                                    **tokenizer.added_tokens_encoder)
+                before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
                 after_tokenizer = tokenizer.__class__.from_pretrained(
                     tmpdirname)
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
-                # after_vocab = after_tokenizer.get_vocab()
-                after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                                   **after_tokenizer.added_tokens_encoder)
+                after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens["input_ids"],
                                      after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
@@ -561,18 +565,14 @@ class TokenizerTesterMixin:
                     {"additional_special_tokens": additional_special_tokens})
                 before_tokens = tokenizer.encode(sample_text,
                                                  add_special_tokens=False)
-                # before_vocab = tokenizer.get_vocab()
-                before_vocab = dict(tokenizer.vocab._token_to_idx,
-                                    **tokenizer.added_tokens_encoder)
+                before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
                 after_tokenizer = tokenizer.__class__.from_pretrained(
                     tmpdirname)
                 after_tokens = after_tokenizer.encode(sample_text,
                                                       add_special_tokens=False)
-                # after_vocab = after_tokenizer.get_vocab()
-                after_vocab = dict(after_tokenizer.vocab._token_to_idx,
-                                   **after_tokenizer.added_tokens_encoder)
+                after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens, after_tokens)
                 self.assertDictEqual(before_vocab, after_vocab)
                 self.assertIn("bim", after_vocab)
@@ -1860,9 +1860,7 @@ class TokenizerTesterMixin:
         tokenizers = self.get_tokenizers(do_lower_case=False)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
-                # vocab_dict = tokenizer.get_vocab()
-                vocab_dict = dict(tokenizer.vocab._token_to_idx,
-                                  **tokenizer.added_tokens_encoder)
+                vocab_dict = tokenizer.get_vocab()
                 self.assertIsInstance(vocab_dict, dict)
                 self.assertGreaterEqual(len(tokenizer), len(vocab_dict))
 
@@ -1883,9 +1881,7 @@ class TokenizerTesterMixin:
         tokenizers = self.get_tokenizers(do_lower_case=False)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
-                # vocab = tokenizer.get_vocab()
-                vocab = dict(tokenizer.vocab._token_to_idx,
-                             **tokenizer.added_tokens_encoder)
+                vocab = tokenizer.get_vocab()
                 for word, ind in vocab.items():
                     if word == tokenizer.unk_token:
                         continue
@@ -2335,166 +2331,6 @@ class TokenizerTesterMixin:
                 self.assertEqual(text,
                                  tokenizer.convert_tokens_to_string(tokens))
 
-    # @slow
-    # def test_torch_encode_plus_sent_to_model(self):
-    #     import torch
-    #
-    #     from transformers import MODEL_MAPPING, TOKENIZER_MAPPING
-    #
-    #     MODEL_TOKENIZER_MAPPING = merge_model_tokenizer_mappings(
-    #         MODEL_MAPPING, TOKENIZER_MAPPING)
-    #
-    #     tokenizers = self.get_tokenizers(do_lower_case=False)
-    #     for tokenizer in tokenizers:
-    #         with self.subTest(f"{tokenizer.__class__.__name__}"):
-    #
-    #             if tokenizer.__class__ not in MODEL_TOKENIZER_MAPPING:
-    #                 return
-    #
-    #             config_class, model_class = MODEL_TOKENIZER_MAPPING[
-    #                 tokenizer.__class__]
-    #             config = config_class()
-    #
-    #             if config.is_encoder_decoder or config.pad_token_id is None:
-    #                 return
-    #
-    #             model = model_class(config)
-    #
-    #             # Make sure the model contains at least the full vocabulary size in its embedding matrix
-    #             is_using_common_embeddings = hasattr(
-    #                 model.get_input_embeddings(), "weight")
-    #             if is_using_common_embeddings:
-    #                 self.assertGreaterEqual(
-    #                     model.get_input_embeddings().weight.shape[0],
-    #                     len(tokenizer))
-    #
-    #             # Build sequence
-    #             first_ten_tokens = list(tokenizer.get_vocab().keys())[:10]
-    #             sequence = " ".join(first_ten_tokens)
-    #             encoded_sequence = tokenizer.encode_plus(sequence,
-    #                                                      return_tensors="pt")
-    #
-    #             # Ensure that the BatchEncoding.to() method works.
-    #             encoded_sequence.to(model.device)
-    #
-    #             batch_encoded_sequence = tokenizer.batch_encode_plus(
-    #                 [sequence, sequence], return_tensors="pt")
-    #             # This should not fail
-    #
-    #             with torch.no_grad():  # saves some time
-    #                 model(**encoded_sequence)
-    #                 model(**batch_encoded_sequence)
-    #
-
-    # @slow
-    # def test_np_encode_plus_sent_to_model(self):
-    #     from transformers import MODEL_MAPPING, TOKENIZER_MAPPING
-    #
-    #     MODEL_TOKENIZER_MAPPING = merge_model_tokenizer_mappings(
-    #         MODEL_MAPPING, TOKENIZER_MAPPING)
-    #
-    #     tokenizers = self.get_tokenizers()
-    #     for tokenizer in tokenizers:
-    #         with self.subTest(f"{tokenizer.__class__.__name__}"):
-    #             if tokenizer.__class__ not in MODEL_TOKENIZER_MAPPING:
-    #                 return
-    #
-    #             config_class, model_class = MODEL_TOKENIZER_MAPPING[
-    #                 tokenizer.__class__]
-    #             config = config_class()
-    #
-    #             if config.is_encoder_decoder or config.pad_token_id is None:
-    #                 return
-    #
-    #             # Build sequence
-    #             first_ten_tokens = list(tokenizer.get_vocab().keys())[:10]
-    #             sequence = " ".join(first_ten_tokens)
-    #             encoded_sequence = tokenizer.encode_plus(sequence,
-    #                                                      return_tensors="np")
-    #             batch_encoded_sequence = tokenizer.batch_encode_plus(
-    #                 [sequence, sequence], return_tensors="np")
-    #
-    #             # TODO: add forward through JAX/Flax when PR is merged
-    #             # This is currently here to make flake8 happy !
-    #             if encoded_sequence is None:
-    #                 raise ValueError(
-    #                     "Cannot convert list to numpy tensor on  encode_plus()")
-    #
-    #             if batch_encoded_sequence is None:
-    #                 raise ValueError(
-    #                     "Cannot convert list to numpy tensor on  batch_encode_plus()"
-    #                 )
-    #
-    #             if self.test_rust_tokenizer:
-    #                 fast_tokenizer = self.get_rust_tokenizer()
-    #                 encoded_sequence_fast = fast_tokenizer.encode_plus(
-    #                     sequence, return_tensors="np")
-    #                 batch_encoded_sequence_fast = fast_tokenizer.batch_encode_plus(
-    #                     [sequence, sequence], return_tensors="np")
-    #
-    #                 # TODO: add forward through JAX/Flax when PR is merged
-    #                 # This is currently here to make flake8 happy !
-    #                 if encoded_sequence_fast is None:
-    #                     raise ValueError(
-    #                         "Cannot convert list to numpy tensor on  encode_plus() (fast)"
-    #                     )
-    #
-    #                 if batch_encoded_sequence_fast is None:
-    #                     raise ValueError(
-    #                         "Cannot convert list to numpy tensor on  batch_encode_plus() (fast)"
-    #                     )
-
-    # def test_prepare_seq2seq_batch(self):
-    #     if not self.test_seq2seq:
-    #         return
-    #
-    #     tokenizers = self.get_tokenizers()
-    #     for tokenizer in tokenizers:
-    #         with self.subTest(f"{tokenizer.__class__.__name__}"):
-    #             # Longer text that will definitely require truncation.
-    #             src_text = [
-    #                 " UN Chief Says There Is No Military Solution in Syria",
-    #                 " Secretary-General Ban Ki-moon says his response to Russia's stepped up military support for"
-    #                 " Syria is that 'there is no military solution' to the nearly five-year conflict and more weapons"
-    #                 " will only worsen the violence and misery for millions of people.",
-    #             ]
-    #             tgt_text = [
-    #                 "Şeful ONU declară că nu există o soluţie militară în Siria",
-    #                 "Secretarul General Ban Ki-moon declară că răspunsul său la intensificarea sprijinului militar al"
-    #                 ' Rusiei pentru Siria este că "nu există o soluţie militară" la conflictul de aproape cinci ani şi'
-    #                 " că noi arme nu vor face decât să înrăutăţească violenţele şi mizeria pentru milioane de oameni.",
-    #             ]
-    #             try:
-    #                 batch = tokenizer.prepare_seq2seq_batch(
-    #                     src_texts=src_text,
-    #                     tgt_texts=tgt_text,
-    #                     max_length=3,
-    #                     max_target_length=10,
-    #                     return_tensors="pd",
-    #                     src_lang=
-    #                     "en_XX",  # this should be ignored (for all but mbart) but not cause an error
-    #                 )
-    #             except NotImplementedError:
-    #                 return
-    #             self.assertEqual(batch.input_ids.shape[1], 3)
-    #             self.assertEqual(batch.labels.shape[1], 10)
-    #             # max_target_length will default to max_length if not specified
-    #             batch = tokenizer.prepare_seq2seq_batch(src_text,
-    #                                                     tgt_texts=tgt_text,
-    #                                                     max_length=3,
-    #                                                     return_tensors="pd")
-    #             self.assertEqual(batch.input_ids.shape[1], 3)
-    #             self.assertEqual(batch.labels.shape[1], 3)
-    #
-    #             batch_encoder_only = tokenizer.prepare_seq2seq_batch(
-    #                 src_texts=src_text,
-    #                 max_length=3,
-    #                 max_target_length=10,
-    #                 return_tensors="pd")
-    #             self.assertEqual(batch_encoder_only.input_ids.shape[1], 3)
-    #             self.assertEqual(batch_encoder_only.attention_mask.shape[1], 3)
-    #             self.assertNotIn("decoder_input_ids", batch_encoder_only)
-
     def test_add_tokens(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
@@ -2538,9 +2374,13 @@ class TokenizerTesterMixin:
                 self.assertEqual(len(tokenizer), vocab_size + 8)
 
     def test_offsets_mapping(self):
+        if not self.test_offsets:
+            return
+
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(
                     f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+
                 tokenizer = self.tokenizer_class.from_pretrained(
                     pretrained_name, **kwargs)
 
@@ -2625,12 +2465,8 @@ class TokenizerTesterMixin:
                     "an_additional_special_token",
                     tokenizer_without_change_in_init.additional_special_tokens)
 
-                # self.assertIn("an_additional_special_token", tokenizer_without_change_in_init.get_vocab())
-                self.assertIn(
-                    "an_additional_special_token",
-                    dict(
-                        tokenizer_without_change_in_init.vocab._token_to_idx, **
-                        tokenizer_without_change_in_init.added_tokens_encoder))
+                self.assertIn("an_additional_special_token",
+                              tokenizer_without_change_in_init.get_vocab())
                 self.assertEqual(
                     ["an_additional_special_token"],
                     tokenizer_without_change_in_init.convert_ids_to_tokens(

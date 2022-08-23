@@ -703,6 +703,12 @@ class RoFormerModel(RoFormerPretrainedModel):
                 hidden_states=encoder_outputs.hidden_states,
                 attentions=encoder_outputs.attentions)
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
+
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
     r"""
