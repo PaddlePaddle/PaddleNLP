@@ -35,12 +35,14 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [信息抽取](#信息抽取)           | `Taskflow("information_extraction")`| ✅        | ✅        | ✅        | ✅         | ✅          | 适配多场景的开放域通用信息抽取工具                     |
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`     | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
-| [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百度知道2200万对相似句组训练                       |
+| [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果|
 | [情感倾向分析](#情感倾向分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 基于情感知识增强预训练模型SKEP达到业界SOTA             |
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
+| [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 
 
 ## QuickStart
@@ -1155,7 +1157,7 @@ from paddlenlp import Taskflow
 </div></details>
 
 ### 文本相似度
-<details><summary>&emsp;基于百度知道2200万对相似句组训练SimBERT达到前沿文本相似效果</summary><div>
+<details><summary>&emsp;基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果</summary><div>
 
 #### 单条输入
 
@@ -1163,22 +1165,35 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 >>> similarity = Taskflow("text_similarity")
 >>> similarity([["春天适合种什么花？", "春天适合种什么菜？"]])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.8340253}]
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}]
 ```
-
 #### 批量样本输入，平均速度更快
 
 ```python
 >>> from paddlenlp import Taskflow
->>> similarity([["光眼睛大就好看吗", "眼睛好看吗？"], ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"]])
-[{'text1': '光眼睛大就好看吗', 'text2': '眼睛好看吗？', 'similarity': 0.74502707}, {'text1': '小蝌蚪找妈妈怎么样', 'text2': '小蝌蚪找妈妈是谁画的', 'similarity': 0.8192149}]
+>>> text_similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.7050786018371582}]
 ```
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `max_seq_len`：最大序列长度，默认为128。
+* `max_seq_len`：最大序列长度，默认为384。
 * `task_path`：自定义任务路径，默认为None。
 </div></details>
+
+#### 模型选择
+
+- 多模型选择，满足精度、速度要求
+
+  | 模型 |  结构  | 语言 |
+  | :---: | :--------: | :--------: |
+  | `rocketqa-zh-dureader-cross-encoder` (默认) | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `simbert-base-chinese` | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-base-cross-encoder` | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-medium-cross-encoder`| 6-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-mini-cross-encoder`| 6-layers, 384-hidden, 12-heads | 中文 |
+  | `rocketqa-micro-cross-encoder`| 4-layers, 384-hidden, 12-heads | 中文 |
+  | `rocketqa-nano-cross-encoder`| 4-layers, 312-hidden, 12-heads | 中文 |
 
 ### 情感倾向分析
 <details><summary>&emsp;基于情感知识增强预训练模型SKEP达到业界SOTA </summary><div>
@@ -1322,6 +1337,95 @@ from paddlenlp import Taskflow
 * `length_penalty`：解码长度控制值，默认为1.0。
 * `repetition_penalty`：解码重复惩罚值，默认为1.1。
 * `output_scores`：是否要输出解码得分，请默认为False。
+</div></details>
+
+### 文图生成
+<details><summary>&emsp; 通过文图生成模型来生成图片 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 pai-painter-painting-base-zh
+>>> text_to_image = Taskflow("text_to_image")
+# 单条输入
+>>> images = text_to_image("风阁水帘今在眼，且来先看早梅红")
+# [<PIL.Image.Image image mode=RGB size=2048x256>]
+>>> images[0].save("painting-figure.png")
+# 多条输入
+>>> images = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
+# [<PIL.Image.Image image mode=RGB size=2048x256>,
+#  <PIL.Image.Image image mode=RGB size=2048x256>]
+>>> for i, image in enumerate(images):
+>>>     image.save(f"painting-figure_{i}.png")
+# pai-painter-commercial-base-zh模型
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
+# 多条输入
+>>> images = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
+>>> for i, image in enumerate(images):
+>>>     image.save(f"commercial-figure_{i}.png")
+# dalle-mini模型
+>>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
+# 多条输入
+>>> images = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
+>>> for i, image in enumerate(images):
+>>>     image.save(f"dalle-mini-figure_{i}.png")
+```
+
+#### 图片生成效果展示
+<p align="center">
+ <img src="https://user-images.githubusercontent.com/50394665/183386146-9b265304-7294-46fa-896f-1dd90f44ba31.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386193-7a463852-f5f7-49e9-b3b0-3d8f4a9b2576.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386229-68374a39-6e14-4565-b2c6-cc547a729135.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183386237-b0243ec5-09fe-47cc-9010-bd9b97fda862.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183387833-0f9ef786-ea62-40e1-a48c-28680d418142.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/183387861-c4029b6c-f2e9-46d0-988f-6989f11a607d.png" align="middle">
+<p align="center">
+
+#### 可配置参数说明
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
+
+</div></details>
+
+### 文本摘要
+<details><summary>&emsp; 通过UNIMO-Text模型来生成摘要 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 Salesforce/codegen-350M-mono
+>>> Summarizer = Taskflow("text_summarization")
+# 单条输入
+>>> Summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+['\n    print("Hello World")']
+# 多条输入
+>>> Summarizer([
+  "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
+  "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+  ])
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为unimo-text-1.0，支持的模型支持的模型有["unimo-text-1.0", ]。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `device`：运行设备，默认为"gpu"。
+* `output_scores`：是否要输出解码得分，请默认为False。
+* `max_length`：生成代码的最大长度，默认为128。
+* `min_length`：生成代码的最小长度，默认为0。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
+* `temperature`：解码参数temperature，默认为0.6。
+* `top_k`：解码参数top_k，默认为5。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：beam_search解码的beam size，默认为4。
+* `length_penalty`：解码长度控制值，默认为1.0。
+* `num_return_sequences`：解码返回序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1。
+* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为True。
+
 </div></details>
 
 ## PART Ⅱ &emsp; 定制化训练

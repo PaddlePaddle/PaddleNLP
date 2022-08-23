@@ -22,65 +22,26 @@ from paddlenlp.datasets import load_dataset
 
 from predictor import Predictor
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_path_prefix",
-                    type=str,
-                    required=True,
-                    help="The path prefix of inference model to be used.")
-parser.add_argument("--model_name_or_path",
-                    default="ernie-3.0-medium-zh",
-                    type=str,
-                    help="The directory or name of model.")
-parser.add_argument("--max_seq_length",
-                    default=128,
-                    type=int,
-                    help="The maximum total input sequence length after "
-                    "tokenization. Sequences longer than this will "
-                    "be truncated, sequences shorter will be padded.")
-parser.add_argument("--use_fp16",
-                    action='store_true',
-                    help="Whether to use fp16 inference, only "
-                    "takes effect when deploying on gpu.")
-parser.add_argument("--use_quantize",
-                    action='store_true',
-                    help="Whether to use quantization for acceleration,"
-                    " only takes effect when deploying on cpu.")
-parser.add_argument("--batch_size",
-                    default=32,
-                    type=int,
-                    help="Batch size per GPU/CPU for predicting.")
-parser.add_argument("--num_threads",
-                    default=psutil.cpu_count(logical=False),
-                    type=int,
-                    help="num_threads for cpu, only takes effect"
-                    " when deploying on cpu.")
-parser.add_argument('--device',
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--device_id',
-                    default=0,
-                    help="Select which gpu device to train model.")
-parser.add_argument("--perf",
-                    action='store_true',
-                    help="Whether to compute the latency "
-                    "and f1 score of the test set.")
-parser.add_argument("--dataset_dir",
-                    required=True,
-                    default=None,
-                    type=str,
-                    help="The dataset directory including "
-                    "data.txt, taxonomy.txt, test.txt(optional, "
-                    "if evaluate the performance).")
-parser.add_argument("--perf_dataset",
-                    choices=['dev', 'test'],
-                    default='dev',
-                    type=str,
-                    help="evaluate the performance on"
-                    "dev dataset or test dataset")
+parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
+parser.add_argument("--model_name_or_path", default="ernie-3.0-medium-zh", type=str, help="The directory or name of model.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
+parser.add_argument("--use_quantize", action='store_true', help="Whether to use quantization for acceleration, only takes effect when deploying on cpu.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for predicting.")
+parser.add_argument("--num_threads", default=psutil.cpu_count(logical=False), type=int, help="num_threads for cpu, only takes effect when deploying on cpu.")
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument('--device_id', default=0, help="Select which gpu device to train model.")
+parser.add_argument("--perf", action='store_true', help="Whether to compute the latency and f1 score of the test set.")
+parser.add_argument("--dataset_dir", required=True, default=None, type=str, help="The dataset directory including data.txt, taxonomy.txt, test.txt(optional, if evaluate the performance).")
+parser.add_argument("--perf_dataset", choices=['dev', 'test'], default='dev', type=str, help="evaluate the performance on dev dataset or test dataset")
 args = parser.parse_args()
+# yapf: enable
 
 
 def read_local_dataset(path, label_list):
+    """Read dataset"""
     label_list_dict = {label_list[i]: i for i in range(len(label_list))}
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:

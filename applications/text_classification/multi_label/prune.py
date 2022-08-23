@@ -31,6 +31,7 @@ from utils import preprocess_function, read_local_dataset
 from prune_trainer import DynabertConfig
 
 
+# yapf: disable
 @dataclass
 class DataArguments:
     """
@@ -40,21 +41,8 @@ class DataArguments:
     the command line.
     """
 
-    dataset_dir: str = field(
-        default=None,
-        metadata={
-            "help":
-            "Local dataset directory should include train.txt, dev.txt and label.txt."
-        })
-
-    max_seq_length: int = field(
-        default=128,
-        metadata={
-            "help":
-            "The maximum total input sequence length after tokenization. Sequences longer "
-            "than this will be truncated, sequences shorter will be padded."
-        },
-    )
+    dataset_dir: str = field(default=None, metadata={"help": "The dataset directory should include train.txt, dev.txt and label.txt files."})
+    max_seq_length: int = field(default=512, metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
 @dataclass
@@ -62,17 +50,10 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-    params_dir: str = field(
-        default='./checkpoint/',
-        metadata={
-            "help":
-            "The output directory where the model checkpoints are written."
-        })
-    width_mult: str = field(
-        default='2/3',
-        metadata={
-            "help": "The reserved ratio for q, k, v, and ffn weight widths."
-        })
+    params_dir: str = field(default='./checkpoint/', metadata={"help": "The output directory where the model checkpoints are written."})
+    width_mult: str = field(default='2/3', metadata={"help": "The reserved ratio for q, k, v, and ffn weight widths."})
+
+# yapf: enable
 
 
 def main():
