@@ -324,8 +324,6 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
-                See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             attention_mask (Tensor, optional):
@@ -379,8 +377,6 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
@@ -456,8 +452,6 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.

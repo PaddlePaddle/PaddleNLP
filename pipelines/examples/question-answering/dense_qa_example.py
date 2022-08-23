@@ -82,7 +82,7 @@ def dense_qa_pipeline():
         num_processes=1)
 
     # ### Pipeline
-    from pipelines.pipelines import ExtractiveQAPipeline
+    from pipelines import ExtractiveQAPipeline
 
     pipe = ExtractiveQAPipeline(reader, ranker, retriever)
 
