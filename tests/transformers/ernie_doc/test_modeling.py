@@ -42,7 +42,7 @@ class ErnieDocTestModelConfig:
     relu_dropout: float = 0.0
     hidden_size: int = 64
     initializer_range: float = 0.02
-    max_position_embeddings: int = 20
+    max_position_embeddings: int = 60
     num_attention_heads: int = 8
     num_hidden_layers: int = 8
     task_type_vocab_size: int = 3
@@ -237,9 +237,9 @@ class ErnieDocModelTest(ModelTesterMixin, unittest.TestCase):
             model = ErnieDocModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
-    def test_save_load(self):
-        # TODO(wj-Mcat): should be removed later
-        pass
+    # def test_save_load(self):
+    #     # TODO(wj-Mcat): should be removed later
+    #     pass
 
 
 class ErnieDocModelIntegrationTest(unittest.TestCase):
