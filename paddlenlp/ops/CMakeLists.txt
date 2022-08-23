@@ -26,6 +26,7 @@ option(WITH_MKL         "Compile with MKL. Only works when ON_INFER is ON."     
 option(USE_TENSORRT     "Compiled with TensorRT."                                   OFF)
 option(WITH_TRANSFORMER "Compiled with Transformer."                                ON)
 option(WITH_GPT         "Compiled with GPT."                                        ON)
+option(WITH_OPT         "Compiled with OPT."                                        ON)
 option(WITH_UNIFIED     "Compiled with Unified Transformer."                        ON)
 option(WITH_SP          "Compiled with sentencepiece. Only works when WITH_GPT and ON_INFER is ON." OFF)
 option(WITH_DECODER     "Compile with Transformer Decoder"                          ON)
@@ -58,6 +59,10 @@ endif()
 
 if(WITH_GPT)
   list(APPEND decoding_op_files fusion_gpt_op.cc fusion_gpt_op.cu)
+endif()
+
+if(WITH_OPT)
+  list(APPEND decoding_op_files fusion_opt_op.cc fusion_opt_op.cu)
 endif()
 
 if(WITH_UNIFIED)
@@ -313,6 +318,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/gpt.h gpt_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/gpt.h gpt_h_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/opt.h opt_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/opt.h opt_h_dst)
+
 # Encoder patches.
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/bert_encoder_transformer.h bert_encoder_transformer_h_dst)
@@ -351,6 +359,7 @@ set(FT_PATCH_COMMAND
   && cp ${open_attention_h_src} ${open_attention_h_dst}
   && cp ${fastertransformer_cmakelists_src} ${fastertransformer_cmakelists_dst}
   && cp ${gpt_h_src} ${gpt_h_dst}
+  && cp ${opt_h_src} ${opt_h_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}

@@ -66,8 +66,8 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 推荐使用GPU进行训练，在预测阶段使用CPU或者GPU均可。
 
 **环境依赖**
-* python >= 3.6
-* paddlepaddle >= 2.1.3
+* python >= 3.6.2
+* paddlepaddle >= 2.2.3
 * paddlenlp >= 2.2
 * [hnswlib](https://github.com/nmslib/hnswlib) >= 0.5.2
 * visualdl >= 2.2.2

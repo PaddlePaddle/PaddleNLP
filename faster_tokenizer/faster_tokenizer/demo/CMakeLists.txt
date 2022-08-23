@@ -14,10 +14,10 @@ else()
     set(CMAKE_CXX_STANDARD 11)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 if(NOT DEFINED FASTER_TOKENIZER_LIB)
-  message(FATAL_ERROR "please set FASTER_TOKENIZER_LIB with -DFASTER_TOKENIZER_LIB=/path/to/faster_tokenizer_cpp")
+  message(FATAL_ERROR "please set FASTER_TOKENIZER_LIB with -DFASTER_TOKENIZER_LIB=/path/to/faster_tokenizer")
 endif()
 
 # Download ernie vocab for demo

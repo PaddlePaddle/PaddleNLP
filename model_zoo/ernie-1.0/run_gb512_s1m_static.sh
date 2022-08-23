@@ -17,6 +17,7 @@ python -u  -m paddle.distributed.launch \
     run_pretrain_static.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \

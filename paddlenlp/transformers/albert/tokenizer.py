@@ -572,6 +572,16 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
             "pad_token": "<pad>",
         },
     }
+    max_model_input_sizes = {
+        "albert-base-v1": 512,
+        "albert-large-v1": 512,
+        "albert-xlarge-v1": 512,
+        "albert-xxlarge-v1": 512,
+        "albert-base-v2": 512,
+        "albert-large-v2": 512,
+        "albert-xlarge-v2": 512,
+        "albert-xxlarge-v2": 512,
+    }
 
     def __init__(self,
                  sentencepiece_model_file,
@@ -585,18 +595,29 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
+                 sp_model_kwargs=None,
                  **kwargs):
 
+        self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.sentencepiece_model_file = sentencepiece_model_file
-        self.sp_model = spm.SentencePieceProcessor()
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(sentencepiece_model_file)
 
     @property
     def vocab_size(self):
         return len(self.sp_model)
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        vocab.update(self.added_tokens_encoder)
+        return vocab
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -605,7 +626,10 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
     def __setstate__(self, d):
         self.__dict__ = d
-        self.sp_model = spm.SentencePieceProcessor()
+        if not hasattr(self, "sp_model_kwargs"):
+            self.sp_model_kwargs = {}
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(self.sentencepiece_model_file)
 
     def preprocess_text(self, inputs):
@@ -624,14 +648,10 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
         return outputs
 
-    def _tokenize(self, text, sample=False):
+    def _tokenize(self, text):
         """Tokenize a string."""
         text = self.preprocess_text(text)
-
-        if not sample:
-            pieces = self.sp_model.EncodeAsPieces(text)
-        else:
-            pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
+        pieces = self.sp_model.encode(text, out_type=str)
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
@@ -721,9 +741,16 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(self.sentencepiece_model_file
-                               ) != os.path.abspath(save_path):
+            if os.path.abspath(
+                    self.sentencepiece_model_file) != os.path.abspath(
+                        save_path) and os.path.isfile(
+                            self.sentencepiece_model_file):
                 copyfile(self.sentencepiece_model_file, save_path)
+            elif not os.path.isfile(self.sentencepiece_model_file):
+                with open(save_path, "wb") as fi:
+                    content_spiece_model = self.sp_model.serialized_model_proto(
+                    )
+                    fi.write(content_spiece_model)
 
 
 class AlbertChineseTokenizer(BertTokenizer):
@@ -776,22 +803,38 @@ class AlbertChineseTokenizer(BertTokenizer):
             "pad_token": "[PAD]",
         },
     }
+    max_model_input_sizes = {
+        "albert-chinese-tiny": 512,
+        "albert-chinese-small": 512,
+        "albert-chinese-base": 512,
+        "albert-chinese-large": 512,
+        "albert-chinese-xlarge": 512,
+        "albert-chinese-xxlarge": 512,
+    }
 
     def __init__(self,
                  vocab_file,
-                 do_lower_case=False,
+                 do_lower_case=True,
+                 do_basic_tokenize=True,
+                 never_split=None,
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
+                 tokenize_chinese_chars=True,
+                 strip_accents=None,
                  **kwargs):
-        super(AlbertChineseTokenizer, self).__init__(
-            vocab_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token,
-        )
+        super(AlbertChineseTokenizer,
+              self).__init__(vocab_file,
+                             do_lower_case=do_lower_case,
+                             do_basic_tokenize=do_basic_tokenize,
+                             never_split=never_split,
+                             unk_token=unk_token,
+                             sep_token=sep_token,
+                             pad_token=pad_token,
+                             cls_token=cls_token,
+                             mask_token=mask_token,
+                             tokenize_chinese_chars=tokenize_chinese_chars,
+                             strip_accents=strip_accents,
+                             **kwargs)
