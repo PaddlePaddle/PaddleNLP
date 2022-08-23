@@ -8,6 +8,7 @@ import paddle
 import paddle.distributed as dist
 from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
 from paddlenlp.data import Pad
+from paddlenlp.metrics import BLEU
 
 
 def print_args(args):
@@ -32,6 +33,7 @@ def compute_metrics(preds, targets):
         'target_responses. But received {} and {}.'.format(
             len(preds), len(targets)))
     rouge = Rouge()
+    bleu4 = BLEU(n_size=4)
     scores = []
     for pred, target in zip(preds, targets):
         try:
@@ -42,14 +44,16 @@ def compute_metrics(preds, targets):
             ])
         except ValueError:
             scores.append([0, 0, 0])
+        bleu4.add_inst(pred, [target])
     rouge1 = np.mean([i[0] for i in scores])
     rouge2 = np.mean([i[1] for i in scores])
     rougel = np.mean([i[2] for i in scores])
     print('\n' + '*' * 15)
     print('The auto evaluation result is:')
-    print('rouge-1:', rouge1)
-    print('rouge-2:', rouge2)
-    print('rouge-L:', rougel)
+    print('rouge-1:', round(rouge1, 4))
+    print('rouge-2:', round(rouge2, 4))
+    print('rouge-L:', round(rougel, 4))
+    print('BLEU-4:', round(bleu4.score(), 4))
 
 
 def convert_example(example,
@@ -83,8 +87,8 @@ def convert_example(example,
             add_start_token_for_decoding=True,
             return_position_ids=True)
 
-        if 'content' in example and example['content']:
-            tokenized_example['content'] = example['content']
+        if 'title' in example and example['title']:
+            tokenized_example['title'] = example['title']
         return tokenized_example
 
 
