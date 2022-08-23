@@ -83,7 +83,7 @@ bool CharToBytesOffsetConverter::convert(const core::Offset& offset,
     byte_end = offset_map_.at(char_end);
   }
   *result = {byte_start, byte_end};
-  return false;
+  return true;
 }
 
 PreTokenizedString::PreTokenizedString(const std::string& original)
