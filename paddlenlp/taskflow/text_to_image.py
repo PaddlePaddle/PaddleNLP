@@ -20,31 +20,31 @@ from .task import Task
 usage = r"""
            from paddlenlp import Taskflow 
 
-           text2imagegen = Taskflow("text2image_generation")
-           images = text2imagegen("风阁水帘今在眼，且来先看早梅红")
+           text_to_image = Taskflow("text_to_image")
+           images = text_to_image("风阁水帘今在眼，且来先看早梅红")
            images[0].save("figure.png")
            
          """
 
 
-class Text2ImageGenerationTask(Task):
+class TextToImageGenerationTask(Task):
     """
-    The text2image generation model to generate the image. 
+    The text_to_image generation model to generate the image. 
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, task, model="pai-painter-painting-base-zh", **kwargs):
+    def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._batch_size = kwargs.get("batch_size", 1)
         self._temperature = kwargs.get("temperature", 1.)
         self._top_k = kwargs.get("top_k", 32)
         self._top_p = kwargs.get("top_p", 1.)
         self._condition_scale = kwargs.get("condition_scale", 10.)
-        self._num_return_images = kwargs.get("num_return_images", 4)
-        self._use_faster = kwargs.get("use_faster", False)
+        self._num_return_images = kwargs.get("num_return_images", 8)
+        self._use_faster = kwargs.get("use_faster", True)
         self._use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         self._construct_tokenizer(model)
         self._construct_model(model)
