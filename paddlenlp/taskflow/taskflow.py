@@ -192,9 +192,34 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-simbert-base-chinese"
             },
+            "rocketqa-zh-dureader-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag":
+                'text_similarity-rocketqa-zh-dureader-cross-encoder',
+            },
+            "rocketqa-base-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-base-cross-encoder',
+            },
+            "rocketqa-medium-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-medium-cross-encoder',
+            },
+            "rocketqa-mini-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-mini-cross-encoder',
+            },
+            "rocketqa-micro-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-micro-cross-encoder',
+            },
+            "rocketqa-nano-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-nano-cross-encoder',
+            },
         },
         "default": {
-            "model": "simbert-base-chinese"
+            "model": "rocketqa-zh-dureader-cross-encoder"
         }
     },
     "word_segmentation": {
