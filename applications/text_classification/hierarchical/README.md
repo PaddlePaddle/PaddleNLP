@@ -6,6 +6,7 @@
    * [环境准备](#环境准备)
    * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
+       * [训练评估与模型优化](#训练评估与模型优化)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
    * [静态图导出](#静态图导出)
@@ -74,7 +75,7 @@ multi_label/
 - python >= 3.6
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.3.4
-- scikit-learn >= 0.24.2
+- scikit-learn >= 1.0.2
 
 **安装PaddlePaddle**
 
@@ -89,7 +90,7 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 
 **安装sklearn**
 ```shell
-pip install scikit-learn==0.24.2
+pip install scikit-learn==1.0.2
 ```
 
 ## 数据集准备
@@ -121,11 +122,10 @@ train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(�
 
 - train.txt/dev.txt/test.txt 文件样例：
 ```text
-嗓子紧，有点咳咳，吃什么消炎药好，我现在吃阿莫西林胶囊    药物,药物##适用症
-支气管扩张发病率大概是多少    其他,其他##无法确定
-支气管扩张是癌症吗    病症,病症##定义
-支气管扩张引发的疾病有哪些    病症,病症##相关病症
-支气管扩张和哮喘哪个严重    其他,其他##对比
+又要停产裁员6000！通用汽车罢工危机再升级股价大跌市值蒸发近300亿！    组织行为,组织行为##罢工,组织关系,组织关系##裁员
+上海一改建厂房坍塌已救出19人其中5人死亡    人生,人生##死亡,灾害/意外,灾害/意外##坍/垮塌
+车闻：广本召回9万余辆；领动上市，10.98万起；艾力绅混动    产品行为,产品行为##召回
+86岁老翁过马路遭挖掘机碾压身亡警方：正在侦办中    灾害/意外,灾害/意外##车祸,人生,人生##死亡
 ...
 ```
 **分类标签**
@@ -142,13 +142,13 @@ label.txt(层次分类标签文件)记录数据集中所有标签路径集合，
 ```
 - label.txt  文件样例：
 ```text
-药物
-药物##适用症
-病症
-病症##定义
-其他
-其他##无法确定
-其他##对比
+人生
+人生##死亡
+灾害/意外
+灾害/意外##坍/垮塌
+灾害/意外##车祸
+产品行为
+产品行为##召回
 ...
 ```
 **待预测数据**
@@ -162,24 +162,41 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 ```
 - data.txt 文件样例：
 ```text
-请问木竭胶囊能同高血压药、氨糖同时服吗？
-低压100*高压140*头涨，想吃点降压药。谢谢！
-脑穿通畸形易发人群有哪些
+金属卡扣安装不到位，上海乐扣乐扣贸易有限公司将召回捣碎器1162件
+卡车超载致使跨桥侧翻，没那么简单
+消失的“外企光环”，5月份在华裁员900余人，香饽饽变“臭”了
 ...
 ```
 ## 模型训练
-我们以公开数据集CMID为示例，在训练集上进行模型微调，并在开发集上验证。CMID是一个人工标注的医疗意图分类信息数据集，包含4个一级标签和36个二级标签，数据集按8：2划分成训练集和开发集。
+我们以[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集为例，在训练集上进行模型微调，并在开发集上验证。
 
-下载CMID数据集：
+下载数据集：
 ```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/cmid.tar.gz
-tar -zxvf cmid.tar.gz
-mv cmid data
+wget https://paddlenlp.bj.bcebos.com/datasets/baidu_extract_2020.tar.gz
+tar -zxvf baidu_extract_2020.tar.gz
+mv baidu_extract_2020 data
 ```
 
-使用CPU训练
+使用CPU/GPU训练：
 ```shell
 python train.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --save_dir "./checkpoint" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --learning_rate 3e-5 \
+    --epochs 100 \
+    --logging_steps 5 \
+    --train_file "train.txt"
+```
+默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
+如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
+```shell
+python -m paddle.distributed.launch --nproc_per_node=8 --backend='gloo' train.py \
     --device "cpu" \
     --dataset_dir "data" \
     --save_dir "./checkpoint" \
@@ -189,10 +206,12 @@ python train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
 
-使用GPU单卡/多卡训练
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练：
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
@@ -205,8 +224,10 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
+
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
@@ -220,14 +241,16 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
 * `early_stop`：选择是否使用早停法(EarlyStopping)，模型在开发集经过一定epoch后精度表现不再上升，训练终止；默认为False。
-* `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
+* `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为10。
 * `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
 * `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.0。
 * `warmup`：是否使用学习率warmup策略，使用时应设置适当的训练轮次（epochs）；默认为False。
 * `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
-
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
@@ -243,12 +266,61 @@ checkpoint/
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
+### 训练评估与模型优化
+
+训练后的模型我们可以使用[评估脚本](analysis/evaluate.py)对每个类别分别进行评估，并输出预测错误样本（bad case）：
+
+```shell
+python evaluate.py \
+    --device "gpu" \
+    --dataset_dir "../data" \
+    --params_path "../checkpoint" \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --bad_case_path "./bad_case.txt"
+```
+
+默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
+
+输出打印示例：
+
+```text
+[2022-08-11 03:10:14,058] [    INFO] - -----Evaluate model-------
+[2022-08-11 03:10:14,059] [    INFO] - Train dataset size: 11958
+[2022-08-11 03:10:14,059] [    INFO] - Dev dataset size: 1498
+[2022-08-11 03:10:14,059] [    INFO] - Accuracy in dev dataset: 89.19%
+[2022-08-11 03:10:14,059] [    INFO] - Macro avg in dev dataset: precision: 93.48 | recall: 93.26 | F1 score 93.22
+[2022-08-11 03:10:14,059] [    INFO] - Micro avg in dev dataset: precision: 95.07 | recall: 95.46 | F1 score 95.26
+[2022-08-11 03:10:14,095] [    INFO] - Level 1 Label Performance: Macro F1 score: 96.39 | Micro F1 score: 96.81 | Accuracy: 94.93
+[2022-08-11 03:10:14,255] [    INFO] - Level 2 Label Performance: Macro F1 score: 92.79 | Micro F1 score: 93.90 | Accuracy: 89.72
+[2022-08-11 03:10:14,256] [    INFO] - Class name: 交往
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 471(3.9%) | precision: 99.57 | recall: 98.94 | F1 score 99.25
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 60(4.0%) | precision: 91.94 | recall: 95.00 | F1 score 93.44
+[2022-08-11 03:10:14,256] [    INFO] - ----------------------------
+[2022-08-11 03:10:14,256] [    INFO] - Class name: 交往##会见
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 98(0.8%) | precision: 100.00 | recall: 100.00 | F1 score 100.00
+[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 12(0.8%) | precision: 92.31 | recall: 100.00 | F1 score 96.00
+...
+```
+
+预测错误的样本保存在bad_case.txt文件中：
+
+```text
+Prediction    Label    Text
+组织关系,组织关系##解雇 组织关系,组织关系##加盟,组织关系##裁员  据猛龙随队记者JoshLewenberg报道，消息人士透露，猛龙已将前锋萨加巴-科纳特裁掉。此前他与猛龙签下了一份Exhibit10合同。在被裁掉后，科纳特下赛季大概率将前往猛龙的发展联盟球队效力。
+组织关系,组织关系##解雇    组织关系,组织关系##裁员    冠军射手被裁掉，欲加入湖人队，但湖人却无意，冠军射手何去何从
+组织关系,组织关系##裁员    组织关系,组织关系##退出,组织关系##裁员    有多名魅族员工表示，从6月份开始，魅族开始了新一轮裁员，重点裁员区域是营销和线下。裁员占比超过30%，剩余员工将不过千余人，魅族的知名工程师，爱讲真话的洪汉生已经从钉钉里退出了，外界传言说他去了OPPO。
+人生,人生##死亡,灾害/意外,灾害/意外##坍/垮塌    灾害/意外,灾害/意外##坍/垮塌    冲刺千亿的美的置业贵阳项目倒塌致8人死亡已责令全面停工
+...
+```
+
+模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 ### 训练效果
 
-PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们评测了不同预训练模型在医疗意图分类CMID任务的表现，测试配置如下：
+PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们评测了不同预训练模型在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集的表现，测试配置如下：
 
-1. 数据集：医疗意图分类CMID开发集
+1. 数据集：[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集
 
 2. 物理机环境
 
@@ -276,11 +348,12 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 
 |  model_name  | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |------------ |
-|"ernie-3.0-base-zh" |12-layer, 768-hidden, 12-heads|63.13|45.92| 4.16 |
-|"ernie-3.0-medium-zh"| 6-layer, 768-hidden, 12-heads|63.51|46.98| 2.12|
-|"ernie-3.0-mini-zh" |6-layer, 384-hidden, 12-heads|61.70|42.30| 0.83|
-|"ernie-3.0-micro-zh" | 4-layer, 384-hidden, 12-heads|61.14|42.97| 0.60|
-|"ernie-3.0-nano-zh" |4-layer, 312-hidden, 12-heads|60.15|32.62|0.25|
+|"ernie-3.0-xbase-zh" |20-layer, 1024-hidden, 12-heads|95.12|92.77| 12.51 |
+|"ernie-3.0-base-zh" |12-layer, 768-hidden, 12-heads|95.68|93.39| 4.63 |
+|"ernie-3.0-medium-zh"| 6-layer, 768-hidden, 12-heads|95.26|93.22| 2.42|
+|"ernie-3.0-mini-zh" |6-layer, 384-hidden, 12-heads|94.72|93.03| 0.93|
+|"ernie-3.0-micro-zh" | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.70|
+|"ernie-3.0-nano-zh" |4-layer, 312-hidden, 12-heads|93.98|91.25|0.54|
 
 ## 模型预测
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行。
@@ -313,6 +386,8 @@ python predict.py \
 * `params_path`：待预测模型的目录；默认为"./checkpoint/"。
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 ## 静态图导出
 
@@ -438,9 +513,9 @@ prune/
 
 
 ### 裁剪效果
-本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在医疗意图分类CMID的表现，测试配置如下：
+本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集的表现，测试配置如下：
 
-1. 数据集：医疗意图分类CMID开发集
+1. 数据集：[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集
 
 2. 物理机环境
 
@@ -468,10 +543,10 @@ prune/
 
 |                            | Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------- |------------- |
-| ERNIE 3.0 Medium             | 63.13|45.92| 4.16 |
-| ERNIE 3.0 Medium +裁剪(保留比例3/4)    | 62.11|45.04| 0.81   |
-| ERNIE 3.0 Medium +裁剪(保留比例2/3)    | 62.41|45.06 | 0.74  |
-| ERNIE 3.0 Medium +裁剪(保留比例1/2)    | 59.86 | 41.42| 0.61 |
+| ERNIE 3.0 Medium             | 95.27|93.22| 4.16 |
+| ERNIE 3.0 Medium +裁剪(保留比例3/4)    | **95.45**|**93.40**| 0.81   |
+| ERNIE 3.0 Medium +裁剪(保留比例2/3)    | 95.23|93.27 | 0.74  |
+| ERNIE 3.0 Medium +裁剪(保留比例1/2)    | 94.92 | 92.70| 0.61 |
 
 ## 模型部署
 
