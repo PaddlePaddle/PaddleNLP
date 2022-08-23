@@ -95,6 +95,7 @@ xxxx
 
 - 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"unimo-text-1.0"模型，unimo-text-1.0还支持large模型，详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)，可以根据任务和设备需求进行选择。
 
+
 3. **模型预测**
 
 - 训练结束后，我们可以加载保存的最佳模型进行模型测试，打印模型预测结果。
@@ -147,27 +148,15 @@ text_summarization/
 ```text
 data/
 ├── train.json # 训练数据集文件
-├── dev.json # 开发数据集文件
 └── test.json # 可选，待预测数据文件
 ```
 本地数据集文件格式如下：
-- train.json/dev.json/test.json 文件格式：
+- train.json/test.json 文件格式：
 ```text
 {
-  "context": <context>,
-  "answer": <context_text>,
-  "question": <question_text>,
+"title": "任志强抨击政府把土地作为投机品地产业被人为破坏",
+"content": "“北京的保障房市场就像一个巨大的赌场，每个人都在期待中奖。”面对中国目前现行的保障性住房政策，华远地产董事长任志强再次语出惊人。（分享自@第一财经-中国房地产金融）"
 }
-...
-```
-- train.txt/dev.txt/test.txt 文件样例：
-```text
-{
-  "context": "欠条是永久有效的,未约定还款期限的借款合同纠纷,诉讼时效自债权人主张债权之日起计算,时效为2年。 根据《中华人民共和国民法通则》第一百三十五条:向人民法院请求保护民事权利的诉讼时效期间为二年,法律另有规定的除外。 第一百三十七条:诉讼时效期间从知道或者应当知道权利被侵害时起计算。但是,从权利被侵害之日起超过二十年的,人民法院不予保护。有特殊情况的,人民法院可以延长诉讼时效期间。 第六十二条第(四)项:履行期限不明确的,债务人可以随时履行,债权人也可以随时要求履行,但应当给对方必要的准备时间。",
-  "answer": "永久有效",
-  "question": "欠条的有效期是多久"
-}
-...
 ```
 
 更多数据集读取格式详见[数据集加载](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#)和[自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
@@ -179,30 +168,38 @@ data/
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" --log_dir ./log run_gen.py \
-    --dataset_name=dureader_qg \
+
+log_dir=output
+rm -rf ${log_dir}
+mkdir -p ${log_dir}
+
+python -m paddle.distributed.launch --gpus "1,3,6,7" --log_dir ${log_dir} train.py \
     --model_name_or_path=unimo-text-1.0 \
-    --save_dir=./unimo/checkpoints \
+    --train_file train.json \
+    --eval_file test.json \
+    --save_dir=${log_dir}/checkpoints \
     --logging_steps=100 \
-    --save_steps=100000 \
-    --epochs=6 \
-    --batch_size=16 \
+    --save_steps=10000 \
+    --epochs=10 \
+    --batch_size=32 \
     --learning_rate=5e-5 \
     --warmup_propotion=0.02 \
     --weight_decay=0.01 \
-    --max_seq_len=512 \
+    --max_seq_len=60 \
     --max_target_len=30 \
+    --max_dec_len=20 \
+    --min_dec_len=3 \
     --do_train \
-    --do_predict \
-    --device=gpu
+    --do_eval \
+    --device=gpu \
 ```
-使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
+也可以直接使用`train.sh`
 
 关键参数释义如下：
 - `gpus` 指示了训练所用的GPU卡号。
 - `dataset_name` 数据集名称。
 - `train_file` 本地训练数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
-- `predict_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
+- `eval_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型（详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)），或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
@@ -224,7 +221,7 @@ python -m paddle.distributed.launch --gpus "0" --log_dir ./log run_gen.py \
 - `min_dec_len` 模型生成序列的最小长度。
 - `max_dec_len` 模型生成序列的最大长度。
 - `do_train` 是否进行训练。
-- `do_predict` 是否进行预测，在验证集上会自动评估。
+- `do_eval` 是否进行预测，在验证集上会自动评估。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
 更多参数详情和参数的默认值请参考`args.py`。
@@ -250,14 +247,14 @@ python -m paddle.distributed.launch --gpus "0" --log_dir ./log run_gen.py \
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python run_gen.py \
-    --dataset_name=dureader_qg \
+python train.py \
+    --do_eval \
+    --eval_file test.json \
     --model_name_or_path=your_model_path \
     --logging_steps=100 \
     --batch_size=16 \
-    --max_seq_len=512 \
+    --max_seq_len=60 \
     --max_target_len=30 \
-    --do_predict \
     --max_dec_len=20 \
     --min_dec_len=3 \
     --device=gpu
