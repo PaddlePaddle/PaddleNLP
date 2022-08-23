@@ -171,6 +171,9 @@ class GenerationTesterMixin:
             input_ids,
             attention_mask=attention_mask,
         )
+        if isinstance(encoder_outputs, (list, tuple)):
+            encoder_outputs = encoder_outputs[0]
+
         encoder_outputs = encoder_outputs.repeat_interleave(num_interleave,
                                                             axis=0)
 
@@ -496,7 +499,8 @@ class GenerationTesterMixin:
             # shorter than `max_length` can be generated which could lead to flaky circle ci
             # failures if the top `num_return_sequences` beams are all shorter than the longest beam
             config["eos_token_id"] = None
-            config["forced_eos_token_id"] = None
+            if "forced_eos_token_id" in config:
+                config["forced_eos_token_id"] = None
 
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
@@ -584,7 +588,8 @@ class GenerationTesterMixin:
             # shorter than `max_length` can be generated which could lead to flaky circle ci
             # failures if the top `num_return_sequences` beams are all shorter than the longest beam
             config["eos_token_id"] = None
-            config["forced_eos_token_id"] = None
+            if "forced_eos_token_id" in config:
+                config["forced_eos_token_id"] = None
 
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
