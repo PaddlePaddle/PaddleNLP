@@ -32,6 +32,7 @@ from paddlenlp.transformers import ErnieDocForSequenceClassification
 from paddlenlp.transformers import ErnieDocBPETokenizer, ErnieDocTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
+from paddlenlp.datasets import load_dataset
 from paddlenlp.ops.optimizer import layerwise_lr_decay
 
 from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor
@@ -66,7 +67,7 @@ DATASET_INFO = {
     "imdb":
     (ErnieDocBPETokenizer, "test", "test", ImdbTextPreprocessor(), Accuracy()),
     "hyp": (ErnieDocBPETokenizer, "dev", "test", HYPTextPreprocessor(), F1()),
-    "iflytek": (ErnieDocTokenizer, "validation", "test", None, Accuracy()),
+    "iflytek": (ErnieDocTokenizer, "dev", "dev", None, Accuracy()),
     "thucnews": (ErnieDocTokenizer, "dev", "test", None, Accuracy())
 }
 
@@ -152,26 +153,22 @@ def do_train(args):
     tokenizer_class, eval_name, test_name, preprocess_text_fn, eval_metric = DATASET_INFO[
         args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    if args.dataset == "hyp":
-        from paddlenlp.datasets import load_dataset
-        train_ds, eval_ds, test_ds = load_dataset(
-            args.dataset, splits=["train", eval_name, test_name])
-        num_classes = len(train_ds.label_list)
 
+    # Get dataset
+    if args.dataset == "iflytek":
+        train_ds, eval_ds, = load_dataset("clue",
+                                          name=args.dataset,
+                                          splits=["train", eval_name])
+        test_ds = eval_ds
     else:
-        from datasets import load_dataset
-        # Get dataset
-        if args.dataset == "iflytek":
-
-            train_ds, eval_ds, test_ds = load_dataset(
-                "clue",
-                name=args.dataset,
-                split=["train", eval_name, test_name])
-        else:
-            train_ds, eval_ds = load_dataset(args.dataset,
-                                             split=["train", eval_name])
+        train_ds, eval_ds = load_dataset(args.dataset,
+                                         splits=["train", eval_name])
+        if eval_name == test_name:
             test_ds = eval_ds
-        num_classes = train_ds.features['label'].num_classes
+        else:
+            test_ds = load_dataset(args.dataset, splits=[test_name])
+
+    num_classes = len(train_ds.label_list)
 
     # Initialize model
     paddle.set_device(args.device)
