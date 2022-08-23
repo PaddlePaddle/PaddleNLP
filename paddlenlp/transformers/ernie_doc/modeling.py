@@ -702,9 +702,12 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
         if memories is None:
             memories = [
-                paddle.zeros_like(input_embeddings,
-                                  dtype=paddle.get_default_dtype())
-                for _ in range(self.config['memory_len'])
+                paddle.zeros(shape=[
+                    batch_size, self.config['memory_len'],
+                    self.config['hidden_size']
+                ],
+                             dtype=paddle.get_default_dtype())
+                for _ in range(self.config['num_hidden_layers'])
             ]
 
         # [B, N, T, M + T]

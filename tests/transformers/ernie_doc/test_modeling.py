@@ -252,13 +252,13 @@ class ErnieDocModelIntegrationTest(unittest.TestCase):
             [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         with paddle.no_grad():
             output = model(input_ids)[0]
-        expected_shape = [1, 11, 1024]
+        expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[0.31737554, 0.58842468, 0.43969756],
-              [0.20048048, 0.04142965, -0.2655520],
-              [0.49883127, -0.15263288, 0.46780178]]])
+            [[[-0.17067151, -0.12679860, 0.10108676],
+              [-0.15048309, -0.11452073, 0.27110466],
+              [-0.64834023, 0.05063335, 0.07601062]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
@@ -268,17 +268,17 @@ class ErnieDocModelIntegrationTest(unittest.TestCase):
         model.eval()
         input_ids = paddle.to_tensor(
             [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attn_mask = paddle.ones(shape=[1, model.memory_len, 1])
+        attn_mask = paddle.ones(shape=[1, 11, 1])
 
         with paddle.no_grad():
             output = model(input_ids, attn_mask=attn_mask)[0]
-        expected_shape = [1, 11, 1024]
+        expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[0.31737554, 0.58842468, 0.43969756],
-              [0.20048048, 0.04142965, -0.2655520],
-              [0.49883127, -0.15263288, 0.46780178]]])
+            [[[-0.17067151, -0.12679860, 0.10108676],
+              [-0.15048309, -0.11452073, 0.27110466],
+              [-0.64834023, 0.05063335, 0.07601062]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
