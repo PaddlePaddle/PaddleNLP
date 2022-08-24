@@ -391,6 +391,27 @@ class CLIPPreTrainedModel(PretrainedModel):
             "initializer_range": 0.02,
             "logit_scale_init_value": 2.6592
         },
+        "openai/clip-vit-large-patch14": {
+            # vision
+            "image_resolution": 224,
+            "vision_layers": 24,
+            "vision_heads": 16,
+            "vision_mlp_ratio": 4,
+            "vision_embed_dim": 1024,
+            "vision_patch_size": 14,
+            "vision_hidden_act": "quick_gelu",
+            # text
+            "max_text_length": 77,
+            "vocab_size": 49408,
+            "text_embed_dim": 768,
+            "text_heads": 12,
+            "text_layers": 12,
+            "text_hidden_act": "quick_gelu",
+            # others
+            "projection_dim": 768,
+            "initializer_range": 0.02,
+            "logit_scale_init_value": 2.6592
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -410,6 +431,8 @@ class CLIPPreTrainedModel(PretrainedModel):
             # for image dd generation
             "openai/disco-diffusion-clip-rn101":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/model_state.pdparams",
+            "openai/clip-vit-large-patch14":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/model_state.pdparams",
         }
     }
     base_model_prefix = "clip"
@@ -1314,12 +1337,12 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
             # Style and artist can be specified
             style = None
             artist = None
-            text_prompt = model.preprocess_text_prompt(text_prompt)
+            text_prompt = model.preprocess_text_prompt(text_prompt, style=style, artist=artist)
             
-            # CLIP's pad_token_id is 0 and padding to max length 77. 
+            # CLIP's pad_token_id is 0 and padding to max length 77 (tokenizer.model_max_length). 
             raw_pad_token_id = tokenizer.pad_token_id
             tokenizer.pad_token_id = 0
-            tokenized_inputs = tokenizer(text_prompt, return_tensors="pd", padding="max_length", max_length=77)
+            tokenized_inputs = tokenizer(text_prompt, return_tensors="pd", padding="max_length", max_length=tokenizer.model_max_length)
             images = model.generate(**tokenized_inputs)
             
             # return List[PIL.Image]

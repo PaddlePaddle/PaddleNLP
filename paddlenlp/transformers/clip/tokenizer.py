@@ -139,6 +139,8 @@ class CLIPTokenizer(PretrainedTokenizer):
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/vocab.json",
             "openai/disco-diffusion-clip-rn101":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/vocab.json",
+            "openai/clip-vit-large-patch14":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/vocab.json",
         },
         "merges_file": {
             "openai/clip-vit-base-patch32":
@@ -155,6 +157,8 @@ class CLIPTokenizer(PretrainedTokenizer):
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/merges.txt",
             "openai/disco-diffusion-clip-rn101":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/merges.txt",
+            "openai/clip-vit-large-patch14":
+            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/merges.txt",
         }
     }
     pretrained_init_configuration = {
@@ -174,6 +178,9 @@ class CLIPTokenizer(PretrainedTokenizer):
             "max_len": 77
         },
         "openai/disco-diffusion-clip-rn101": {
+            "max_len": 77
+        },
+        "openai/clip-vit-large-patch14": {
             "max_len": 77
         },
     }
