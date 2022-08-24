@@ -18,12 +18,14 @@ from typing import Optional, Tuple
 from dataclasses import dataclass, fields, Field
 
 import paddle
+from parameterized import parameterized_class
 
-from paddlenlp.transformers import (
-    RoFormerModel, RoFormerPretrainedModel, RoFormerForPretraining,
-    RoFormerForSequenceClassification, RoFormerForTokenClassification,
-    RoFormerForQuestionAnswering, RoFormerForMultipleChoice,
-    RoFormerForMaskedLM)
+from paddlenlp.transformers import (RoFormerModel, RoFormerPretrainedModel,
+                                    RoFormerForSequenceClassification,
+                                    RoFormerForTokenClassification,
+                                    RoFormerForQuestionAnswering,
+                                    RoFormerForMultipleChoice,
+                                    RoFormerForMaskedLM)
 
 from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
@@ -75,11 +77,10 @@ class RoFormerModelTestConfig(RoFormerModelTestModelConfig):
 
 class RoFormerModelTester:
 
-    def __init__(
-        self,
-        parent,
-        config: Optional[RoFormerModelTestConfig] = None,
-    ):
+    def __init__(self,
+                 parent,
+                 config: Optional[RoFormerModelTestConfig] = None,
+                 return_dict: bool = False):
         self.parent = parent
         self.config: RoFormerModelTestConfig = config or RoFormerModelTestConfig(
         )
@@ -87,6 +88,7 @@ class RoFormerModelTester:
         self.is_training = self.config.is_training
         self.num_classes = self.config.num_classes
         self.num_choices = self.config.num_choices
+        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         config = self.config
@@ -109,6 +111,11 @@ class RoFormerModelTester:
     def get_config(self) -> dict:
         return self.config.model_kwargs
 
+    def __getattr__(self, key: str):
+        if not hasattr(self.config, key):
+            raise AttributeError(f'attribute <{key}> not exist')
+        return getattr(self.config, key)
+
     def create_and_check_model(
         self,
         config,
@@ -120,9 +127,16 @@ class RoFormerModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        result = model(input_ids, return_dict=self.return_dict)
+
+        if self.return_dict:
+            result = [result.last_hidden_state, result.pooler_output]
+
         self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.hidden_size
@@ -151,11 +165,12 @@ class RoFormerModelTester:
             input_mask = input_mask.unsqueeze(1).expand(
                 [-1, self.config.num_choices, -1])
 
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
         self.parent.assertEqual(
             result.shape, [self.config.batch_size, self.config.num_choices])
 
@@ -163,15 +178,20 @@ class RoFormerModelTester:
                                                 token_type_ids, input_mask):
         model = RoFormerForQuestionAnswering(RoFormerModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            start_logits, end_logits = result.start_logits, result.end_logits
+        else:
+            start_logits, end_logits = result[0], result[1]
+
         self.parent.assertEqual(
-            result[0].shape, [self.config.batch_size, self.config.seq_length])
+            start_logits.shape,
+            [self.config.batch_size, self.config.seq_length])
         self.parent.assertEqual(
-            result[1].shape, [self.config.batch_size, self.config.seq_length])
+            end_logits.shape, [self.config.batch_size, self.config.seq_length])
 
     def create_and_check_for_token_classification(
         self,
@@ -185,7 +205,11 @@ class RoFormerModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+
         self.parent.assertEqual(result.shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.num_classes
@@ -202,7 +226,11 @@ class RoFormerModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+
         self.parent.assertEqual(result.shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.vocab_size
@@ -218,11 +246,13 @@ class RoFormerModelTester:
         model = RoFormerForSequenceClassification(
             RoFormerModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+
         self.parent.assertEqual(
             result.shape, [self.config.batch_size, self.config.num_classes])
 
@@ -242,18 +272,19 @@ class RoFormerModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", ), [[True], [False]])
 class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RoFormerModel
+    return_dict: bool = False
 
-    all_model_classes = (
-        RoFormerModel,
-        RoFormerForMultipleChoice,
-        RoFormerForPretraining,
-        RoFormerForSequenceClassification,
-    )
+    all_model_classes = (RoFormerModel, RoFormerForSequenceClassification,
+                         RoFormerForTokenClassification,
+                         RoFormerForQuestionAnswering,
+                         RoFormerForMultipleChoice, RoFormerForMaskedLM)
 
     def setUp(self):
-        self.model_tester = RoFormerModelTester(self)
+        self.model_tester = RoFormerModelTester(self,
+                                                return_dict=self.return_dict)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
