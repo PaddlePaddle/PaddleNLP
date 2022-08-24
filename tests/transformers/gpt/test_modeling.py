@@ -57,7 +57,6 @@ class GPTModelTester:
         is_training=True,
         use_input_mask=True,
         use_labels=True,
-        use_mc_token_ids=True,
         vocab_size=99,
         hidden_size=32,
         num_hidden_layers=5,
@@ -80,7 +79,6 @@ class GPTModelTester:
         self.is_training = is_training
         self.use_input_mask = use_input_mask
         self.use_labels = use_labels
-        self.use_mc_token_ids = use_mc_token_ids
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -110,12 +108,6 @@ class GPTModelTester:
             input_mask = random_attention_mask(
                 [self.batch_size, self.seq_length], dtype="int64")
 
-        mc_token_ids = None
-        if self.use_mc_token_ids:
-            mc_token_ids = ids_tensor([self.batch_size, self.num_choices],
-                                      self.seq_length,
-                                      dtype="int64")
-
         sequence_labels = None
         token_labels = None
         choice_labels = None
@@ -136,7 +128,6 @@ class GPTModelTester:
             config,
             input_ids,
             input_mask,
-            mc_token_ids,
             sequence_labels,
             token_labels,
             choice_labels,
@@ -170,7 +161,6 @@ class GPTModelTester:
             config,
             input_ids,
             input_mask,
-            mc_token_ids,
             sequence_labels,
             token_labels,
             choice_labels,
@@ -382,8 +372,7 @@ class GPTModelTester:
         loss.backward()
 
     def create_and_check_gpt_for_sequence_classification(
-            self, config, input_ids, input_mask, mc_token_ids, sequence_labels,
-            *args):
+            self, config, input_ids, input_mask, sequence_labels, *args):
         base_model = GPTModel(**config)
         model = GPTForSequenceClassification(base_model, self.num_labels)
         model.eval()
@@ -392,7 +381,7 @@ class GPTModelTester:
                                 [self.batch_size, self.num_labels])
 
     def create_and_check_gpt_for_token_classification(self, config, input_ids,
-                                                      input_mask, mc_token_ids,
+                                                      input_mask,
                                                       sequence_labels, *args):
         # config.num_labels = self.num_labels
         base_model = GPTModel(**config)
@@ -421,7 +410,6 @@ class GPTModelTester:
             config,
             input_ids,
             input_mask,
-            mc_token_ids,
             sequence_labels,
             token_labels,
             choice_labels,
