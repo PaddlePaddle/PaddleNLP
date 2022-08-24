@@ -1436,49 +1436,7 @@ def gp_decode(batch_outputs,
               texts,
               label_maps,
               task_type="relation_extraction"):
-    if task_type == "event_extraction":
-        batch_results = []
-
-        for argu_output, head_output, tail_output, offset_mapping, text in zip(
-                batch_outputs[0].numpy(),
-                batch_outputs[1].numpy(),
-                batch_outputs[2].numpy(),
-                offset_mappings,
-                texts,
-        ):
-            argus = set()
-            argu_output[:, [0, -1]] -= np.inf
-            argu_output[:, :, [0, -1]] -= np.inf
-            for l, h, t in zip(*np.where(argu_output > 0.)):
-                argus.add(label_maps["id2label"][str(l)] + (h, t))
-
-            # 构建链接
-            links = set()
-            for i1, (_, _, h1, t1) in enumerate(argus):
-                for i2, (_, _, h2, t2) in enumerate(argus):
-                    if i2 > i1:
-                        if head_output[0, min(h1, h2), max(h1, h2)] > 0.:
-                            if tail_output[0, min(t1, t2), max(t1, t2)] > 0.:
-                                links.add((h1, t1, h2, t2))
-                                links.add((h2, t2, h1, t1))
-
-            # 析出事件
-            events = []
-            for _, sub_argus in groupby(sorted(argus), key=lambda s: s[0]):
-                for event in clique_search(list(sub_argus), links):
-                    events.append([])
-                    for argu in event:
-                        start, end = (
-                            offset_mapping[argu[2]][0],
-                            offset_mapping[argu[3]][1],
-                        )
-                        events[-1].append([argu[0], argu[1], start, end - 1])
-                    if all([argu[1] != "触发词" for argu in event]):
-                        events.pop()
-
-            batch_results.append(events)
-        return batch_results
-    elif task_type == "entity_extraction":
+    if task_type == "entity_extraction":
         batch_ent_results = []
         for entity_output, offset_mapping, text in zip(batch_outputs[0].numpy(),
                                                        offset_mappings, texts):
@@ -1495,7 +1453,7 @@ def gp_decode(batch_outputs,
                 ent_list.append(ent)
             batch_ent_results.append(ent_list)
         return batch_ent_results
-    elif task_type in ["opinion_extraction", "relation_extraction"]:
+    else:
         batch_ent_results = []
         batch_rel_results = []
         for entity_output, head_output, tail_output, offset_mapping, text in zip(

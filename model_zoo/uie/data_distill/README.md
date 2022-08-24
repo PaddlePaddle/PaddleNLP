@@ -21,3 +21,11 @@ from paddlenlp import Taskflow
 
 ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/")
 ```
+
+# References
+
+- **[GlobalPointer](https://kexue.fm/search/globalpointer/)**
+
+- **[GPLinker](https://kexue.fm/archives/8888)**
+
+- **[JunnYu/GPLinker_pytorch](https://github.com/JunnYu/GPLinker_pytorch)**
