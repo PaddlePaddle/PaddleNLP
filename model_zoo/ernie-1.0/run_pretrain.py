@@ -461,6 +461,7 @@ def do_train(args):
         data_world_size=worker_num,
         data_world_rank=worker_index,
         max_seq_len=args.max_seq_len,
+        binary_head=args.binary_head,
         current_step=global_step)
 
     # load checkpoint vars

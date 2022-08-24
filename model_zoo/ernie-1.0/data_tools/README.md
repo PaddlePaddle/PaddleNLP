@@ -29,10 +29,11 @@
  - tqdm
  - numpy
  - pybind11
+ - tool_helpers
  - lac (可选)
  - zstandard (可选)
 
-安装命令`pip install tqdm numpy pybind11 lac zstandard`。另，部分功能需要`g++>=4.8`编译支持
+安装命令`pip install tqdm numpy pybind11 tool_helpers lac zstandard`。另，部分功能需要`g++>=4.8`编译支持
 
 
 ## 训练全流程数据Pipeline
@@ -154,14 +155,14 @@ common config:
 ```
 通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample_ids.npy`, 文章索引信息`baike_sample_idx.npz`.
 ```
-python -u  create_pretraining_data.py \
+python -u  data_tools/create_pretraining_data.py \
     --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
-    --input_path baike_sample.jsonl \
+    --input_path eng_sample.jsonl \
     --split_sentences\
     --chinese \
     --cn_whole_word_segment \
-    --output_prefix baike_sample  \
+    --output_prefix eng_sample  \
     --workers 1 \
     --log_interval 5
 ```
