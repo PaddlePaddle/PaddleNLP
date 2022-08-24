@@ -27,6 +27,15 @@ from ...utils.log import logger
 
 __all__ = ['RobertaTokenizer', 'RobertaChineseTokenizer', 'RobertaBPETokenizer']
 
+PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "hfl/roberta-wwm-ext": 512,
+    "hfl/roberta-wwm-ext-large": 512,
+    "hfl/rbt6": 512,
+    "hfl/rbt4": 512,
+    "hfl/rbt3": 512,
+    "hfl/rbtl3": 512
+}
+
 
 class RobertaChineseTokenizer(PretrainedTokenizer):
     """
