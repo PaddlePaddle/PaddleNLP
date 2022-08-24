@@ -31,6 +31,7 @@ endif()
 
 # Include all necessary headers path
 include_directories("${FASTER_TOKENIZER_LIB}/include"
+                    "${FASTER_TOKENIZER_LIB}/include/faster_tokenizer"  # TODO (zhoushunjie): Need to remove later
                     "${FASTER_TOKENIZER_LIB}/third_party/include")
 add_executable(ernie_faster_tokenizer_demo ernie_faster_tokenizer_demo.cc)
 
