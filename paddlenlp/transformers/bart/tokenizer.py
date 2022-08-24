@@ -18,6 +18,8 @@ from .. import GPTTokenizer, AddedToken
 
 __all__ = ['BartTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"bart-base": 1024, "bart-large": 1024}
+
 
 class BartTokenizer(GPTTokenizer):
     r"""
@@ -100,6 +102,7 @@ class BartTokenizer(GPTTokenizer):
         }
     }
     pretrained_init_configuration = {"bart-base": {}, "bart-large": {}}
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

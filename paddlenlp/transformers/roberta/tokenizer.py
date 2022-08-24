@@ -112,6 +112,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

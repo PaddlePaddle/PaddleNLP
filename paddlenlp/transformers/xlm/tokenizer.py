@@ -29,6 +29,19 @@ from .. import PretrainedTokenizer
 
 __all__ = ["XLMTokenizer"]
 
+PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "xlm-mlm-en-2048": 512,
+    "xlm-mlm-ende-1024": 512,
+    "xlm-mlm-enfr-1024": 512,
+    "xlm-mlm-enro-1024": 512,
+    "xlm-mlm-tlm-xnli15-1024": 512,
+    "xlm-mlm-xnli15-1024": 512,
+    "xlm-clm-enfr-1024": 512,
+    "xlm-clm-ende-1024": 512,
+    "xlm-mlm-17-1280": 512,
+    "xlm-mlm-100-1280": 512
+}
+
 
 def get_pairs(word):
     """
@@ -173,7 +186,7 @@ class XLMTokenizer(PretrainedTokenizer):
             instead of per-token classification). It is the first token of the sequence when built with special tokens.
             Defaults to `"</s>"`.
         mask_token (str, optional):
-            The token used for masking values. This is the token used when training this model with masked language
+            he token used for masking values. This is the token used when training this model with masked language
             modeling. This is the token which the model will try to predict.
             Defaults to `"<special1>"`.
         additional_special_tokens (List[str], optional):
@@ -621,6 +634,7 @@ class XLMTokenizer(PretrainedTokenizer):
             },
         },
     }
+    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(
         self,
