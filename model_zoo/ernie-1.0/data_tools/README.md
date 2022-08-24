@@ -155,17 +155,19 @@ common config:
 ```
 通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample_ids.npy`, 文章索引信息`baike_sample_idx.npz`.
 ```
-python -u  data_tools/create_pretraining_data.py \
+python -u  create_pretraining_data.py \
     --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
-    --input_path eng_sample.jsonl \
+    --input_path baike_sample.jsonl \
     --split_sentences\
     --chinese \
     --cn_whole_word_segment \
-    --output_prefix eng_sample  \
+    --output_prefix baike_sample  \
     --workers 1 \
     --log_interval 5
 ```
+1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
+2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
 
 ### Ernie预训练开始
 得到了处理好的训练数据，就可以开始Ernie模型的预训练了。ernie预训练的代码在`model_zoo/ernie-1.0`。

@@ -1,12 +1,34 @@
 # ERNIE: Enhanced Representation through kNowledge IntEgration
 
+**目录**
+- [1. 模型简介](#模型简介)
+    - [1.1 目录结构](#目录结构)
+    - [1.1 环境依赖](#环境依赖)
+- [2. 中文预训练](#中文预训练)
+    - [2.1 小规模语料预训练: 14GB - CLUECorpusSmall](#CLUECorpusSmall)
+    - [2.2 大规模语料预训练: 400GB - CLUE & WuDao](#ERNIE-CW)
+    - [2.3 预训练模型贡献](#预训练模型贡献)
+- [3. 下游任务微调](#下游任务微调)
+  - [3.1 序列分类](#序列分类)
+  - [3.2 Token分类](#序列分类)
+  - [3.3 阅读理解](#阅读理解)
+- [4. 预测部署](#预测部署)
+- [5. 参考文献](#参考文献)
+
+
+
+
+<a name="模型简介"></a>
+
+## 1. 模型简介
+
 ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，它将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。
 
 ERNIE在情感分析、文本匹配、自然语言推理、词法分析、阅读理解、智能问答等16个公开数据集上全面显著超越世界领先技术，在国际权威的通用语言理解评估基准GLUE上，得分首次突破90分，获得全球第一。
 相关创新成果也被国际顶级学术会议AAAI、IJCAI收录。
 同时，ERNIE在工业界得到了大规模应用，如搜索引擎、新闻推荐、广告系统、语音交互、智能客服等。
 
-ERNIE 1.0 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 BERT 学习原始语言信号，ERNIE 直接对先验语义知识单元进行建模，增强了模型语义表示能力。
+ERNIE 通过建模海量数据中的词、实体及实体关系，学习真实世界的语义知识。相较于 BERT 学习原始语言信号，ERNIE 直接对先验语义知识单元进行建模，增强了模型语义表示能力。
 
 这里我们举个例子：
 ```
@@ -15,6 +37,21 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 ```
 在 BERT 模型中，我们通过『哈』与『滨』的局部共现，即可判断出『尔』字，模型没有学习与『哈尔滨』相关的任何知识。而 ERNIE 通过学习词与实体的表达，使模型能够建模出『哈尔滨』与『黑龙江』的关系，学到『哈尔滨』是 『黑龙江』的省会以及『哈尔滨』是个冰雪城市。
 
+<a name="项目特色"></a>
+
+**项目特色**
+- **中文预训练**
+    - 提供了完整中文预训练流程，从词表构造、数据处理、任务训练，到下游任务。
+    - 提供中文Whole Word Mask，支持文本动态Mask。
+- **数据流程**，
+    - 数据预处理流程高效，40分钟即可完成14G ERNIE数据制作。
+    - 数据稳定可复现，多数据集即插即用。
+- **分布式训练**，
+    - 支持多机多卡，支持混合精度、重计算、梯度累积等功能。
+
+<a name="目录结构"></a>
+
+### 1.1 目录结构
 
 整体的目录结构如下：
 
@@ -41,7 +78,10 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 ├── run_pretrain_static.py
 └── run_pretrain_trainer.py
 ```
-## 环境依赖
+
+<a name="环境依赖"></a>
+
+### 1.2 环境依赖
 
 - visualdl
 - pybind11
@@ -49,19 +89,26 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 安装命令 `pip install visualdl pybind11`
 
 
-## 中文预训练
-ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WWM（Whole Word Mask）方式，对于完整语义单元的Token，会同时进行Mask。整体的训练损失loss是mlm_loss + nsp_loss。
+<a name="中文预训练"></a>
 
-本样例为用户提供了高效的训练流程，支持动态文本mask，自动断点训练重启等功能。
-用户可以根据自己的需求，灵活修改mask方式。具体可以参考修改`data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
-用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
+## 2. 中文预训练
+ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WWM（Whole Word Mask）方式，对于完整语义单元的Token，会同时进行Mask。整体的训练损失loss是mlm_loss + sop_loss。
 
+本样例为用户提供了高效的训练流程，
+- **支持动态文本mask**： 用户可以根据自己的需求，灵活修改mask方式。具体可以参考修改`data_tools/dataset_utils.py`中`create_masked_lm_predictions`函数。
+- **支持自动断点训练重启恢复**。 用户可以设置`checkpoint_steps`，间隔`checkpoint_steps`数，即保留最新的checkpoint到`model_last`文件夹。重启训练时，程序默认从最新checkpoint重启训练，学习率、数据集都可以恢复到checkpoint时候的状态。
+
+
+<a name="CLUECorpusSmall"></a>
+
+### 2.1 小规模语料预训练: 14GB - CLUECorpusSmall
 下面是使用CLUECorpusSmall 14G文本进行预训练的流程：
+
 <details>
 <summary><b>CLUECorpusSmall 数据集预训练</b></summary>
 
-### 数据准备
-数据下载部分请参考[data_tools]目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
+#### 数据准备
+数据下载部分请参考[data_tools](./data_tools)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
 
 解压文件
 ```shell
@@ -94,7 +141,7 @@ clue_corpus_small_14g_20220104_ids.npy
 clue_corpus_small_14g_20220104_idx.npz
 ```
 
-###  开始训练
+####  开始训练
 
 将制作好的数据`clue_corpus_small_14g_20220104_ids.npy,clue_corpus_small_14g_20220104_idx.npz`移动到input_dir中，即可开始训练。
 这里以8卡训练为例任务脚本为例：
@@ -160,7 +207,7 @@ python -u  -m paddle.distributed.launch \
 - visualdl的日志在 `./output/ernie-1.0-dp8-gb512/train_log/xxx` 中。
 
 
-### CLUECorpusSmall 数据集训练效果
+#### CLUECorpusSmall 数据集训练效果
 
 使用创建好的训练clue_corpus_small_14g数据集。使用本训练脚本, batch_size=512, max_steps=100w，[详细训练日志](https://www.paddlepaddle.org.cn/paddle/visualdl/service/app/index?id=3fddf650db14b9319f9dc3a91dfe4ac6)
 
@@ -193,16 +240,19 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 - `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
 </details>
 
+<a name="ERNIE-CW"></a>
 
-### ERNIE-CW 预训练流程
+### 2.2 大规模语料预训练: 400GB - CLUE & WuDao
 
-PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布ERNIE-CW项目。让用户可以从零开始构建你的预训练模型。
+PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，提供大规模语料训练教程，让用户可以从零开始构建，基于大规模语料，训练预训练模型。
 
-ERNIE-CW项目，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
+本教程，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
 并训练发布开源最优的模型参数。
 
+#### 数据制作
+
 数据下载，词表制作，数据转化部分，请参见[此处](./scripts/README.md)。
-接下来我们主要介绍训练流程部分的特性
+接下来我们主要介绍训练流程部分的特性：
 
 
 训练结构：
@@ -245,31 +295,28 @@ ERNIE-CW项目，从数据下载，词表制作，数据转化，模型训练，
 
 **训练效果方面**，我们release了base、large两个模型。均取得了较好的预训练效果。
 
-**ERNIE 3.0-Base-zh-CW** 模型：
-
-- 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-3.0-base-zh-cw`，用户加载即可使用。
-使用CLUE benchmark 对最优超参数进行GradSearch搜索：
+- **ERNIE 3.0-Base-zh-CW** 模型：
+    - 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-3.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
 Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
-ERNIE 3.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |	58.02 |	60.87 |	83.56 | 78.61 |	89.14 |	84.00 |  72.26/90.40 |	84.73 |	77.15 |
-ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |	58.53 |	61.72 |	83.07 |	78.81 |	84.21 |	82.77 | 68.22/88.71	| 82.78	| 73.19
-ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |	58.91 |	62.25 |	81.68 |	76.58 |	85.20 |	82.77 | 67.32/87.83 | 82.47 | 69.68
+ERNIE 3.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
+ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
+ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
 
-**ERNIE 1.0-Large-zh-CW** 模型：
-- 除了base模型外，我们还训练了放出了large模型。此模型参数采用的是词表与ernie-1.0相同，因此命名为`ernie-1.0-large-zh-cw`。
-使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失：
+- **ERNIE 1.0-Large-zh-CW** 模型：
+    - 除了base模型外，我们还训练了放出了large模型。此模型参数采用的是词表与ernie-1.0相同，因此命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失：
 
 Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
 Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
-ERNIE 1.0-Large-zh-CW | 24L1024H | 79.03 | 75.97 |	59.65 |	62.91 |	85.09 |	81.73| 93.09 |	84.53 | 74.22/91.88 | 88.57 | 84.54
-ERNIE 3.0-Xbase-zh| 20L1024H | 78.71 | 76.85 |	59.89 |	62.41 |	84.76 |	82.51 |	89.80 |	84.47 |	75.49/92.67 | 86.36 | 84.59
-RoBERTa-wwm-ext-large | 24L1024H | 76.61 |	76.00 |	59.33 |	62.02 |	83.88 |	78.81 |	90.79 |	83.67 |	70.58/89.82 |	85.72 |	75.26
+ERNIE 1.0-Large-zh-CW | 24L1024H | 79.03 | 75.97 |    59.65 |    62.91 |    85.09 |    81.73| 93.09 |    84.53 | 74.22/91.88 | 88.57 | 84.54
+ERNIE 3.0-Xbase-zh| 20L1024H | 78.71 | 76.85 |    59.89 |    62.41 |    84.76 |    82.51 |    89.80 |    84.47 |    75.49/92.67 | 86.36 | 84.59
+RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    83.88 |    78.81 |    90.79 |    83.67 |    70.58/89.82 |    85.72 |    75.26
 
 
-
+###  开始训练
 <details>
 <summary><b>训练脚本如下</b></summary>
 
@@ -332,6 +379,8 @@ python3 -u  -m paddle.distributed.launch \
 ```
 </details>
 
+<a name="预训练模型贡献"></a>
+
 ### 预训练模型贡献
 PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。
 使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到`zhui/ernie-1.0-cluecorpussmall`参数，可直接使用。
@@ -341,13 +390,16 @@ model = AutoModelForMaskedLM.from_pretrained('zhui/ernie-1.0-cluecorpussmall')
 
 贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 
+<a name="下游任务微调"></a>
 
-## 下游任务finetune
+## 3. 下游任务微调
 
 使用训练中产出的checkpoint，或者paddlenlp内置的模型权重，使用本脚本，用户可以快速对当前模型效果进行评估。
 
 ### 运行示例
 本文档适配了三大主流下游任务，用户可以根据自己的需求，评估自己所需的数据集。
+
+<a name="序列分类"></a>
 
 1. 序列分类
 ```shell
@@ -362,6 +414,8 @@ python run_seq_cls.py \
     --output_dir ./tmp/$dataset
 ```
 
+<a name="Token分类"></a>
+
 2. Token分类
 ```shell
 cd finetune
@@ -374,6 +428,8 @@ python run_ner.py \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
+
+<a name="阅读理解"></a>
 
 3. 阅读理解
 ```shell
@@ -388,7 +444,9 @@ python run_qa.py \
 ```
 
 
-## 预测部署
+<a name="预测部署"></a>
+
+## 4. 预测部署
 以中文文本情感分类问题为例，介绍一下从模型finetune到部署的过程。
 
 与之前的finetune参数配置稍有区别，此处加入了一些配置选项。
@@ -427,5 +485,7 @@ Data: 挺失望的,还不如买一本张爱玲文集呢,以<色戒>命名,可这
 ```
 更多关于部署的情况可以参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_classification/pretrained_models#%E6%A8%A1%E5%9E%8B%E9%A2%84%E6%B5%8B)。
 
-## 参考文献
+<a name="参考文献"></a>
+
+## 5. 参考文献
 - [ERNIE: Enhanced Representation through Knowledge Integration](https://arxiv.org/pdf/1904.09223.pdf)
