@@ -252,17 +252,16 @@ void Tokenizer::EncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
     bool add_special_tokens) const {
-  encodings->resize(batch_encode_input.size());
+  auto batch_size = batch_encode_input.size();
+  encodings->resize(batch_size);
 #ifdef WITH_OMP
 // (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
 // tokenization.
 // Use workload to determine whether create omp threads. Need to optimize the
 // workload estimation.
-#pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
-                                                     omp_get_num_threads() > \
-                                                                         1)
+#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
 #endif
-  for (int i = 0; i < batch_encode_input.size(); ++i) {
+  for (int i = 0; i < batch_size; ++i) {
     EncodePairStrings(
         batch_encode_input[i], &(*encodings)[i], add_special_tokens);
   }
@@ -294,17 +293,16 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
     bool add_special_tokens) const {
-  encodings->resize(batch_encode_input.size());
+  auto batch_size = batch_encode_input.size();
+  encodings->resize(batch_size);
 #ifdef WITH_OMP
 // (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
 // tokenization.
 // Use workload to determine whether create omp threads. Need to optimize the
 // workload estimation.
-#pragma omp parallel for if (batch_encode_input.size() >= 4 &&               \
-                                                     omp_get_num_threads() > \
-                                                                         1)
+#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
 #endif
-  for (int i = 0; i < batch_encode_input.size(); ++i) {
+  for (int i = 0; i < batch_size; ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(
         batch_encode_input[i], &encoding, add_special_tokens);
