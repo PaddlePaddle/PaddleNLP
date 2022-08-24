@@ -186,7 +186,7 @@ class XLMTokenizer(PretrainedTokenizer):
             instead of per-token classification). It is the first token of the sequence when built with special tokens.
             Defaults to `"</s>"`.
         mask_token (str, optional):
-            he token used for masking values. This is the token used when training this model with masked language
+            The token used for masking values. This is the token used when training this model with masked language
             modeling. This is the token which the model will try to predict.
             Defaults to `"<special1>"`.
         additional_special_tokens (List[str], optional):

@@ -262,15 +262,36 @@ def reorder_neuron_head(model, head_importance, neuron_importance):
                        dim=0)
 
 
+def calc_loss(loss_fct, model, batch, head_mask):
+    logits = model(batch["input_ids"],
+                   batch["token_type_ids"],
+                   attention_mask=[None, head_mask])
+    class_name = model.__class__.__name__
+    if "QuestionAnswering" in class_name:
+        start_logits, end_logits = logits
+        loss = (loss_fct(start_logits, batch["start_positions"]) +
+                loss_fct(end_logits, batch["end_positions"])) / 2
+    elif "TokenClassification" in class_name or "SequenceClassification" in class_name:
+        loss = loss_fct(logits, batch["labels"])
+    else:
+        raise NotImplementedError(
+            "Model to be compressed is an instance of a custom class, " \
+            "so function `calc_loss(loss_fct, model, batch, head_mask)` should " \
+            "be implemented, and it should return a single float for precision " \
+            "value, such as acc.")
+    return loss
+
+
 def compute_neuron_head_importance(model,
                                    data_loader,
                                    num_layers,
                                    num_heads,
                                    loss_fct=nn.loss.CrossEntropyLoss(),
                                    intermediate_name='linear1',
-                                   output_name='linear2'):
+                                   output_name='linear2',
+                                   custom_dynabert_calc_loss=None):
     """
-    Compute the importance of multi-head attention and feed-forward  neuron in
+    Computes the importance of multi-head attention and feed-forward  neuron in
     each transformer layer.
 
     Args:
@@ -316,27 +337,13 @@ def compute_neuron_head_importance(model,
     for w in intermediate_weight:
         neuron_importance.append(np.zeros(shape=[w.shape[1]], dtype='float32'))
 
-    for batch in data_loader:
-        if isinstance(batch, dict):
-            if "QuestionAnswering" in model.__class__.__name__:
-                input_ids, segment_ids, start_positions, end_positions = batch[
-                    'input_ids'], batch['token_type_ids'], batch[
-                        'start_positions'], batch['end_positions']
-            else:
-                input_ids, segment_ids, labels = batch['input_ids'], batch[
-                    'token_type_ids'], batch['labels']
+    for i, batch in enumerate(data_loader):
+        if custom_dynabert_calc_loss is not None:
+            loss = custom_dynabert_calc_loss(loss_fct, model, batch, head_mask)
         else:
-            input_ids, segment_ids, labels = batch
-        logits = model(input_ids, segment_ids, attention_mask=[None, head_mask])
-        if "QuestionAnswering" in model.__class__.__name__:
-            start_logits, end_logits = logits
-            loss = (loss_fct(start_logits, start_positions) +
-                    loss_fct(end_logits, end_positions)) / 2
-        else:
-            loss = loss_fct(logits, labels)
+            loss = calc_loss(loss_fct, model, batch, head_mask)
         loss.backward()
         head_importance += paddle.abs(paddle.to_tensor(head_mask.gradient()))
-
         for w1, b1, w2, current_importance in zip(intermediate_weight,
                                                   intermediate_bias,
                                                   output_weight,

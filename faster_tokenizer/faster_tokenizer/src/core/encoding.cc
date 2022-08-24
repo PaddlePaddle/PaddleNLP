@@ -19,6 +19,9 @@ limitations under the License. */
 #include <sstream>
 #include "glog/logging.h"
 
+#ifdef WITH_OMP
+#include <omp.h>
+#endif
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
@@ -627,7 +630,12 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
       pad_length % method.pad_to_multiple_of_) {
     pad_length += pad_length - pad_length % method.pad_to_multiple_of_;
   }
-  for (auto& encoding : *encodings) {
+  auto batch_size = encodings->size();
+#ifdef WITH_OMP
+#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
+#endif
+  for (int i = 0; i < batch_size; ++i) {
+    auto& encoding = (*encodings)[i];
     encoding.Pad(pad_length,
                  method.pad_id_,
                  method.pad_token_type_id_,
