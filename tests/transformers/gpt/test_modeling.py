@@ -27,7 +27,6 @@ from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, 
 
 import paddle
 from paddlenlp.transformers import (
-    # GPT2DoubleHeadsModel,
     GPTForSequenceClassification,
     GPTForTokenClassification,
     GPTLMHeadModel,
@@ -43,8 +42,8 @@ GPT2_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "gpt2-xl-en",
     "gpt3-1.3B-en",
     "gpt3-13B-en",
-    # "gpt-cpm-small-cn-distill",
-    # "gpt-cpm-large-cn",
+    "gpt-cpm-small-cn-distill",
+    "gpt-cpm-large-cn",
 ]
 
 
