@@ -15,9 +15,11 @@
 
 import unittest
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import ErnieModel, ErnieForQuestionAnswering, ErnieForSequenceClassification,\
     ErnieForTokenClassification, ErnieForPretraining, ErnieForMultipleChoice, ErnieForMaskedLM, ErniePretrainedModel
+
 from ...transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
 
@@ -49,6 +51,7 @@ class ErnieModelTester:
         num_choices=4,
         num_classes=3,
         scope=None,
+        return_dict=False,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -73,6 +76,7 @@ class ErnieModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -118,9 +122,12 @@ class ErnieModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        result = model(input_ids, return_dict=self.return_dict)
         self.parent.assertEqual(
             result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
@@ -138,7 +145,11 @@ class ErnieModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
@@ -158,11 +169,12 @@ class ErnieModelTester:
             [-1, self.num_choices, -1])
         multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
             [-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
-        )
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=multiple_choice_input_mask,
+                       token_type_ids=multiple_choice_token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
         self.parent.assertEqual(result.shape,
                                 [self.batch_size, self.num_choices])
 
@@ -170,11 +182,10 @@ class ErnieModelTester:
                                                 token_type_ids, input_mask):
         model = ErnieForQuestionAnswering(ErnieModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
         self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.seq_length])
         self.parent.assertEqual(result[1].shape,
@@ -190,11 +201,13 @@ class ErnieModelTester:
         model = ErnieForSequenceClassification(ErnieModel(**config),
                                                num_classes=self.num_classes)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+
         self.parent.assertEqual(result.shape,
                                 [self.batch_size, self.num_classes])
 
@@ -210,7 +223,11 @@ class ErnieModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.num_classes])
 
@@ -230,8 +247,10 @@ class ErnieModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", ), [[False], [True]])
 class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ErnieModel
+    return_dict = False
 
     all_model_classes = (
         ErnieModel,
@@ -244,7 +263,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
-        self.model_tester = ErnieModelTester(self)
+        self.model_tester = ErnieModelTester(self, return_dict=self.return_dict)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
