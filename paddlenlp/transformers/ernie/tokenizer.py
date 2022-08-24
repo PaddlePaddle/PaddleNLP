@@ -278,6 +278,47 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "ernie-1.0": 513,
+        "ernie-1.0-base-zh": 513,
+        "ernie-1.0-large-zh-cw": 512,
+        "ernie-tiny": 600,
+        "ernie-2.0-base-zh": 513,
+        "ernie-2.0-large-zh": 512,
+        "ernie-2.0-base-en": 512,
+        "ernie-2.0-base-en-finetuned-squad": 512,
+        "ernie-2.0-large-en": 512,
+        "ernie-gen-base-en": 1024,
+        "ernie-gen-large-en": 1024,
+        "ernie-gen-large-en-430g": 1024,
+        "rocketqa-zh-dureader-query-encoder": 513,
+        "rocketqa-zh-dureader-para-encoder": 513,
+        "rocketqa-v1-marco-query-encoder": 512,
+        "rocketqa-v1-marco-para-encoder": 512,
+        "rocketqa-zh-dureader-cross-encoder": 513,
+        "rocketqa-v1-marco-cross-encoder": 512,
+        "ernie-3.0-base-zh": 2048,
+        "ernie-3.0-xbase-zh": 2048,
+        "ernie-3.0-medium-zh": 2048,
+        "ernie-3.0-mini-zh": 2048,
+        "ernie-3.0-micro-zh": 2048,
+        "ernie-3.0-nano-zh": 2048,
+        "rocketqa-zh-base-query-encoder": 2048,
+        "rocketqa-zh-base-para-encoder": 2048,
+        "rocketqa-zh-medium-query-encoder": 2048,
+        "rocketqa-zh-medium-para-encoder": 2048,
+        "rocketqa-zh-mini-query-encoder": 2048,
+        "rocketqa-zh-mini-para-encoder": 2048,
+        "rocketqa-zh-micro-query-encoder": 2048,
+        "rocketqa-zh-micro-para-encoder": 2048,
+        "rocketqa-zh-nano-query-encoder": 2048,
+        "rocketqa-zh-nano-para-encoder": 2048,
+        "rocketqa-base-cross-encoder": 2048,
+        "rocketqa-medium-cross-encoder": 2048,
+        "rocketqa-mini-cross-encoder": 2048,
+        "rocketqa-micro-cross-encoder": 2048,
+        "rocketqa-nano-cross-encoder": 2048,
+    }
 
     def __init__(self,
                  vocab_file,
@@ -310,6 +351,52 @@ class ErnieTokenizer(PretrainedTokenizer):
             int: The size of vocabulary.
         """
         return len(self.vocab)
+
+    def extend_chinese_char(self):
+        """
+        For, char level model such as ERNIE, we need add ## chinese token 
+        to demonstrate the segment information.
+        """
+        vocab_set = set(self.vocab.token_to_idx.keys())
+        extend_list = []
+        for i in range(len(self.vocab)):
+            if i not in self.vocab.idx_to_token:
+                continue
+            w = self.vocab.idx_to_token[i]
+            # Chose chinese char in [0x4E00, Ox9FA5], and try add  ## char to vocab.
+            if len(w) == 1 and ord(w) >= 0x4E00 and ord(w) <= 0x9FA5:
+                new_char = "##" + w
+                if new_char not in vocab_set:
+                    extend_list.append(new_char)
+        if len(self.vocab) + len(extend_list) > 2**16:
+            warnings.warn("The vocab size is larger than uint16")
+        new_tokens = [str(tok) for tok in extend_list]
+
+        tokens_to_add = []
+        for token in new_tokens:
+            if not isinstance(token, str):
+                raise TypeError(
+                    f"Token {token} is not a string but a {type(token)}.")
+            if hasattr(self, "do_lower_case") and self.do_lower_case:
+                token = token.lower()
+            if (token != self.unk_token and self.convert_tokens_to_ids(token)
+                    == self.convert_tokens_to_ids(self.unk_token)
+                    and token not in tokens_to_add):
+                tokens_to_add.append(token)
+
+        if self.verbose:
+            print(
+                f"Adding {len(tokens_to_add)} ## chinese tokens to the vocabulary"
+            )
+
+        added_tok_encoder = dict(
+            (tok, len(self) + i) for i, tok in enumerate(tokens_to_add))
+        added_tok_decoder = {v: k for k, v in added_tok_encoder.items()}
+        self.added_tokens_encoder.update(added_tok_encoder)
+        self.added_tokens_decoder.update(added_tok_decoder)
+
+    def get_vocab(self):
+        return dict(self.vocab._token_to_idx, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         r"""
@@ -498,6 +585,52 @@ class ErnieTokenizer(PretrainedTokenizer):
             return len(_cls + token_ids_0 + _sep) * [0]
         return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
                                                           _sep) * [1]
+
+    def get_special_tokens_mask(self,
+                                token_ids_0,
+                                token_ids_1=None,
+                                already_has_special_tokens=False):
+        r"""
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+        Args:
+            token_ids_0 (List[int]): 
+                List of ids of the first sequence.
+            token_ids_1 (List[int], optinal): 
+                Optional second list of IDs for sequence pairs.
+                Defaults to `None`.
+            already_has_special_tokens (str, optional): 
+                Whether or not the token list is already formatted with special tokens for the model. 
+                Defaults to `False`.
+        Returns:
+            List[int]: 
+                The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
+            return list(
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    token_ids_0))
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + (
+                [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        vocab.update(self.added_tokens_encoder)
+        return vocab
 
 
 class ErnieTinyTokenizer(PretrainedTokenizer):
@@ -859,3 +992,11 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        vocab.update(self.added_tokens_encoder)
+        return vocab
