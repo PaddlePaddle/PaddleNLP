@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
-option(WITH_TESTING     "Compile PaddleNLP faster_okenizer with unit testing"        OFF)
-option(WITH_PYTHON      "Compile PaddleNLP faster_okenizer with python interpreter"   ON)
+option(WITH_TESTING     "Compile PaddleNLP faster_tokenizer with unit testing"        OFF)
+option(WITH_PYTHON      "Compile PaddleNLP faster_tokenizer with python interpreter"   ON)
 add_definitions(-DFASTERTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
