@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 
 class DefaultConfig:
-    model_name = "Salesforce/codegen-2B-mono"
+    model_name_or_path = "Salesforce/codegen-2B-mono"
     device = "gpu"
     temperature = 0.5
     top_k = 10
@@ -48,9 +48,9 @@ generate_config = DefaultConfig()
 paddle.set_device(generate_config.device)
 paddle.set_default_dtype(generate_config.default_dtype)
 
-tokenizer = CodeGenTokenizer.from_pretrained(generate_config.model_name)
+tokenizer = CodeGenTokenizer.from_pretrained(generate_config.model_name_or_path)
 model = CodeGenForCausalLM.from_pretrained(
-    generate_config.model_name,
+    generate_config.model_name_or_path,
     load_state_as_np=generate_config.load_state_as_np)
 
 app = FastAPI()
