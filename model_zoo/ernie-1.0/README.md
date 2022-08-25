@@ -250,7 +250,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 #### 数据制作
 
-数据下载，词表制作，数据转化部分，请参见[此处](./scripts/README.md)。
+数据下载，词表制作，数据转化部分，请参见[CLUE WuDao数据预处理](./clue_wudao_process/README.md)。
 接下来我们主要介绍训练流程部分的特性：
 
 
@@ -316,10 +316,17 @@ RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    8
 
 
 ###  开始训练
-<details>
-<summary><b>训练脚本如下</b></summary>
 
 训练脚本如下
+
+<b>环境配置</b>
+
+- PYTHONPATH 设置为当前目录（适合paddlenlp develop运行）
+- 设置了一些FLAGS，包括增强报错，动态图Flag，提高矩阵乘法精度。
+
+<details>
+<summary>环境配置脚本</summary>
+
 ```shell
 set -x
 
@@ -331,7 +338,17 @@ export FLAGS_call_stack_level=2
 export FLAGS_gemm_use_half_precision_compute_type=False
 export FLAGS_enable_eager_mode=1
 unset CUDA_VISIBLE_DEVICES
+```
+</details>
 
+<b>路径配置</b>
+
+- 主要配置
+
+<details>
+<summary>路径配置</summary>
+
+```shell
 trainer_id=${PADDLE_TRAINER_ID:-"0"}
 task_name="0809-ernie-3.0-base-cw-dp16-gb1024"
 
@@ -339,7 +356,11 @@ base_nfs="/path/to/your/nfs/mount/point"
 base_dir="${base_nfs}/ernie-cw/output/${task_name}"
 data_dir="5.0 ${base_nfs}/clue_oscar/clue_corpus_oscar_0630 7.0 ${base_nfs}/clue_train/clue_corpus_train_0629 12.0 ${base_nfs}/wudao_200g/wudao_200g_0703"
 vocab_dir="${base_nfs}/"
+```
+</details>
 
+**启动训练**：这里启动的是两机16卡任务，dp_degree=16，整体全局的batch_size 1024
+```shell
 python3 -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "${base_dir}/log_${trainer_id}" \
@@ -376,7 +397,7 @@ python3 -u  -m paddle.distributed.launch \
     --attention_probs_dropout_prob 0.1 \
     --seed 1234 \
 ```
-</details>
+
 
 <a name="预训练模型贡献"></a>
 

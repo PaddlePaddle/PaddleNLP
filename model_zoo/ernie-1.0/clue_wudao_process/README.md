@@ -12,6 +12,10 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 * [1. **大规模**中文数据](#大规模中文数据)
 * [2. **高精准**中文分词](#高精准中文分词)
 * [3. **全字符**中文词表制作](#中文中文词表制作)
+    - [3.1 分析准备](#分析准备)
+    - [3.2 文本字符统计](#文本字符统计)
+    - [3.3 英文字符词表](#英文字符词表)
+    - [3.4 合并词表](#合并词表)
 * [4. **快速**Token ID 转化](#快速TokenID转化)
 * [5. 参考](#参考)
 
@@ -20,7 +24,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 ## 1. 大规模中文数据
 
-**CLUECorpus2020语料**
+**CLUECorpus2020 语料**
 
 CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载，方式如下：
 > 数据下载
@@ -60,7 +64,7 @@ python wudao_process.py \
     --workers 40  \
     --ouput_path ./wudao_lac_cut \
 ```
-注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。
+注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
 
 文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
 ```shell
@@ -89,13 +93,13 @@ python ../data_tools/trans_to_json.py  \
 第二种方案需要对文本先使用`BasicTokenizer`切分一遍语料。
 第一种方案，自定义程度高，但存在一些局限性。本项目采用了第一种方案，详细介绍如下：
 
-### 分析准备
+### 3.1 分析准备
 词表大小： 这里我们考虑的因素主要有两个
 - 已有模型对照：
     - ERNIE 3.0系列模型的词表，词表大小为 40000 左右。
 - 预训练数据存储占用：
     - 文本token id化后，希望使用uint16表示，此时表示的最大字符为65536。
-    - 同时考虑到ERNIE虽然是字模型，我们的仍然需要 `##中` 之类的中文字符表示分词信息。假设使用中文全字符20902(0x4E00, 0x9FA5)个字符，那么剩余 vocab 大小不能超过 44634。
+    - 同时考虑到ERNIE虽然是字模型，我们的仍然需要 `##中` 之类的中文字符表示分词信息。假设使用中文全字符20902(0x4E00-0x9FA5)个字符，那么剩余 vocab 大小不能超过 44634。
 
 综上，本项目决定采用 40000 左右的 vocab 容量。
 其中：
@@ -104,7 +108,7 @@ python ../data_tools/trans_to_json.py  \
 - 其他字符约 `2000` 左右
 
 
-### 文本字符统计
+### 3.2 文本字符统计
 首先第一步是对文本字符进行统计。字符统计的目的主要是添加常用的中文字符、特殊字符。
 
 由于语料文本过大，我们随机选取 10G 左右的原始文本进行了字符统计。
@@ -113,10 +117,10 @@ python gen_char.py path_to_corpus.txt
 ```
 可以在本地文件夹得到`char_dict.pickle`字符频率文件。同时我们也提供了自己统计的词频文件，方便用户复现：
 ```
-wget https://xxx.bos/data/char_dict.pickle
+wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/char_dict.pickle
 ```
 
-### 英文字符词表
+### 3.3 英文字符词表
 基于字符的词频统计，使得英文字符也切割为字母，为此我们需要添加英文词表。
 英文部分，我们使用了 [WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip)  数据集，来构造词表。
 下载解压数据，使用BPE切词
@@ -127,11 +131,11 @@ python gen_vocab.py ./wikitext-103-raw/wiki.train.raw
 ```
 即可产生英文部分的词表。这里我们也提供了处理好的 vocab 方便用户验证。
 ```
-wget  https://xxx.bos/data/eng.vocab
+wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/eng.vocab
 ```
 
 
-### 合并词表
+### 3.4 合并词表
 
 目前我们得到了字符统计表，和英文字符词表。下一步，我们将词表进行合并。
 
@@ -145,7 +149,7 @@ python merge_vocab.py
 1. 对于一些日文、谚文文字字符，需要进行 normalize
 2. 添加special_tokens
 
-### 问题遗留
+### 3.5 问题遗留
 本项目采用的第一种方式，即拼接产出的词表，对连续非中、英文字符文本，会出现UNK的情况。
 如issue: [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927)、 [#2585](https://github.com/PaddlePaddle/PaddleNLP/issues/2585)。本项目做了两点改进:
 
@@ -155,7 +159,7 @@ python merge_vocab.py
 虽然有上述两点修复，任然无法避免 [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927) 现象。
 彻底解决的话，建议使用第二种方式制作vocab文件。
 
-### 方案二：预处理后直接生成
+### 3.6 方案二：预处理后直接生成
 此方案没有被采用，这里也简单说明一下具体的方案：
 1. 对语料使用 BasicTokenizer 转换
 ```python
