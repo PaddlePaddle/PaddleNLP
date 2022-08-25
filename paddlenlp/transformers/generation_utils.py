@@ -330,7 +330,8 @@ class GenerationMixin(object):
                              num_beams=1,
                              num_beam_groups=1,
                              diversity_rate=0.0,
-                             repetition_penalty=None):
+                             repetition_penalty=None,
+                             logits_processors=None):
         processors = LogitsProcessorList()
 
         if min_length is not None and eos_token_id is not None and min_length > -1:
@@ -354,7 +355,18 @@ class GenerationMixin(object):
         # TODO
         # Add more pre_processing for distribution
 
-        return processors
+        if logits_processors is not None:
+            custom_processors = LogitsProcessorList()
+            custom_processors_type = [type(lp) for lp in logits_processors]
+
+            for processor in processors:
+                if type(processor) not in custom_processors_type:
+                    custom_processors.append(processor)
+            custom_processors.extend(logits_processors)
+
+            return custom_processors
+        else:
+            return processors
 
     @staticmethod
     def expand_inputs_for_generation(input_ids,
@@ -501,6 +513,31 @@ class GenerationMixin(object):
                                         dtype="int64") * decoder_start_token_id
 
         return decoder_input_ids
+
+    def get_decoder_start_token_id(self,
+                                   decoder_start_token_id=None,
+                                   bos_token_id=None):
+        decoder_start_token_id = (
+            decoder_start_token_id if decoder_start_token_id is not None else
+            getattr(self, self.base_model_prefix).config.get(
+                "decoder_start_token_id", None))
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
+            self, self.base_model_prefix).config["bos_token_id"]
+
+        if decoder_start_token_id is not None:
+            return decoder_start_token_id
+        elif getattr(self, self.base_model_prefix).config.get(
+                "decoder_start_token_id", None) is not None:
+            return getattr(
+                self, self.base_model_prefix).config["decoder_start_token_id"]
+        elif bos_token_id is not None:
+            return bos_token_id
+        elif getattr(self,
+                     self.base_model_prefix).config["bos_token_id"] is not None:
+            return getattr(self, self.base_model_prefix).config["bos_token_id"]
+        raise ValueError(
+            "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
+        )
 
     def prepare_inputs_for_generation(self, input_ids, **kwargs):
         # Implement in subclasses for custom behavior to prepare inputs in the
@@ -811,7 +848,6 @@ class GenerationMixin(object):
             else:
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id)
-
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for "
                   "open-end generation.".format(eos_token_id))
@@ -819,10 +855,11 @@ class GenerationMixin(object):
 
         model_kwargs["use_cache"] = use_cache
         max_length += input_ids.shape[-1]
+        generate_min_length = min_length
         min_length += input_ids.shape[-1]
 
         logits_processors = self.get_logits_processor(
-            min_length=min_length,
+            min_length=min_length if generate_min_length > 0 else None,
             max_length=max_length,
             eos_token_id=eos_token_id,
             forced_bos_token_id=forced_bos_token_id,
@@ -830,7 +867,15 @@ class GenerationMixin(object):
             num_beams=num_beams,
             num_beam_groups=num_beam_groups,
             diversity_rate=diversity_rate,
-            repetition_penalty=repetition_penalty)
+            repetition_penalty=repetition_penalty,
+            logits_processors=model_kwargs["logits_processors"]
+            if "logits_processors" in model_kwargs and isinstance(
+                model_kwargs["logits_processors"], LogitsProcessorList) else
+            None,
+        )
+
+        if "logits_processors" in model_kwargs:
+            model_kwargs.pop("logits_processors")
 
         if decode_strategy == 'greedy_search':
             if num_return_sequences > 1:
@@ -879,8 +924,8 @@ class GenerationMixin(object):
 
                 return self.group_beam_search(input_ids, diverse_beam_scorer,
                                               logits_processors, max_length,
-                                              diversity_rate, pad_token_id,
-                                              eos_token_id, **model_kwargs)
+                                              pad_token_id, eos_token_id,
+                                              **model_kwargs)
             else:
                 beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
@@ -900,6 +945,9 @@ class GenerationMixin(object):
 
     def greedy_search(self, input_ids, logits_processors, max_length,
                       pad_token_id, eos_token_id, **model_kwargs):
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList(
+        )
+
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
@@ -962,41 +1010,8 @@ class GenerationMixin(object):
                min_tokens_to_keep=1,
                **model_kwargs):
 
-        def TopKProcess(probs, top_k, min_tokens_to_keep):
-            top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
-            # Remove all tokens with a probability less than the last token of the top-k
-            topk_probs, _ = paddle.topk(probs, k=top_k)
-            probs = paddle.where(probs >= topk_probs[:, -1:], probs,
-                                 paddle.full_like(probs, 0.0))
-            return probs
-
-        def TopPProcess(probs, top_p, min_tokens_to_keep):
-            sorted_probs = paddle.sort(probs, descending=True)
-            sorted_indices = paddle.argsort(probs, descending=True)
-            cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
-
-            # Remove tokens with cumulative probs above the top_p, But keep at
-            # least min_tokens_to_keep tokens
-            sorted_indices_to_remove = cumulative_probs > top_p
-            if min_tokens_to_keep > 1:
-                # Set 'min_tokens_to_keep - 1' because the first token is kept
-                sorted_indices_to_remove[:, :min_tokens_to_keep - 1] = 0
-            # Keep the first token
-            sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove,
-                                                   dtype='int64')
-            sorted_indices_to_remove[:, 1:] = (
-                sorted_indices_to_remove[:, :-1].clone())
-            sorted_indices_to_remove[:, 0] = 0
-
-            # Scatter sorted tensors to original indexing
-            sorted_indices = sorted_indices + paddle.arange(
-                probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
-            condition = paddle.scatter(sorted_indices_to_remove.flatten(),
-                                       sorted_indices.flatten(),
-                                       sorted_indices_to_remove.flatten())
-            condition = paddle.cast(condition, 'bool').reshape(probs.shape)
-            probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
-            return probs
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList(
+        )
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
@@ -1059,6 +1074,9 @@ class GenerationMixin(object):
 
     def beam_search(self, input_ids, beam_scorer, logits_processors, max_length,
                     diversity_rate, pad_token_id, eos_token_id, **model_kwargs):
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList(
+        )
+
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
         batch_beam_size, cur_len = input_ids.shape
@@ -1183,8 +1201,10 @@ class GenerationMixin(object):
         return pred_ids[:, origin_len:], scores
 
     def group_beam_search(self, input_ids, beam_scorer, logits_processors,
-                          max_length, diversity_rate, pad_token_id,
-                          eos_token_id, **model_kwargs):
+                          max_length, pad_token_id, eos_token_id,
+                          **model_kwargs):
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList(
+        )
 
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
@@ -1503,3 +1523,40 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
             ]] = -1e9  #TODO change back to -inf after paddle.topk is fixed
             scores[:, self.forced_eos_token_id] = 0
         return scores
+
+
+def TopKProcess(probs, top_k, min_tokens_to_keep):
+    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
+    # Remove all tokens with a probability less than the last token of the top-k
+    topk_probs, _ = paddle.topk(probs, k=top_k)
+    probs = paddle.where(probs >= topk_probs[:, -1:], probs,
+                         paddle.full_like(probs, 0.0))
+    return probs
+
+
+def TopPProcess(probs, top_p, min_tokens_to_keep):
+    sorted_probs = paddle.sort(probs, descending=True)
+    sorted_indices = paddle.argsort(probs, descending=True)
+    cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
+
+    # Remove tokens with cumulative probs above the top_p, But keep at
+    # least min_tokens_to_keep tokens
+    sorted_indices_to_remove = cumulative_probs > top_p
+    if min_tokens_to_keep > 1:
+        # Set 'min_tokens_to_keep - 1' because the first token is kept
+        sorted_indices_to_remove[:, :min_tokens_to_keep - 1] = 0
+    # Keep the first token
+    sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove,
+                                           dtype='int64')
+    sorted_indices_to_remove[:, 1:] = (sorted_indices_to_remove[:, :-1].clone())
+    sorted_indices_to_remove[:, 0] = 0
+
+    # Scatter sorted tensors to original indexing
+    sorted_indices = sorted_indices + paddle.arange(
+        probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
+    condition = paddle.scatter(sorted_indices_to_remove.flatten(),
+                               sorted_indices.flatten(),
+                               sorted_indices_to_remove.flatten())
+    condition = paddle.cast(condition, 'bool').reshape(probs.shape)
+    probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
+    return probs

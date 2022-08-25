@@ -1,8 +1,10 @@
-FROM w5688414/pipelines-cpu-linux:1.3
+FROM paddlepaddle/pipelines:1.0
 COPY start.sh /root/start.sh
-COPY create_index.sh /root/PaddleNLP/applications/experimental/pipelines
-COPY run_server.sh  /root/PaddleNLP/applications/experimental/pipelines 
-COPY run_client.sh /root/PaddleNLP/applications/experimental/pipelines
+COPY create_index.sh /root/PaddleNLP/pipelines
+COPY run_server.sh  /root/PaddleNLP/pipelines 
+COPY run_client.sh /root/PaddleNLP/pipelines
+COPY semantic_search.yaml /root/PaddleNLP/pipelines
+COPY dense_qa.yaml /root/PaddleNLP/pipelines
 RUN chmod +x /root/start.sh
 WORKDIR /root
 RUN chmod +x /root/start.sh

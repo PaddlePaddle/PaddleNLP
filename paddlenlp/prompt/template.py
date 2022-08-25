@@ -14,6 +14,7 @@
 
 from abc import abstractmethod
 import os
+import re
 import json
 
 import paddle
@@ -284,7 +285,6 @@ class SoftTemplate(Template):
 
     @prompt_encoder.setter
     def prompt_encoder(self, prompt_encoder):
-        self._prompt_encoder = prompt_encoder
 
         if prompt_encoder is None:
             return None
@@ -294,23 +294,25 @@ class SoftTemplate(Template):
                 f"Encoder has already set as {self._prompt_encoder}, change " +
                 "`prompt_encoder` will reset parameters.")
 
+        self._prompt_encoder = prompt_encoder
+
         if self.encoder_hidden_size is None:
             hidden_size = self.embedding_size
         else:
             hidden_size = self.encoder_hidden_size
         if prompt_encoder == 'lstm':
-            self.lstm_head = nn.LSTM(input_size=hidden_size,
-                                     hidden_size=self.embedding_size,
+            self.lstm_head = nn.LSTM(input_size=self.embedding_size,
+                                     hidden_size=hidden_size,
                                      num_layers=2,
                                      direction='bidirect',
                                      time_major=False)
             self.mlp_head = nn.Sequential(
-                nn.Linear(2 * self.embedding_size, self.embedding_size),
-                nn.ReLU(), nn.Linear(self.embedding_size, self.embedding_size))
+                nn.Linear(2 * hidden_size, hidden_size), nn.ReLU(),
+                nn.Linear(hidden_size, self.embedding_size))
         elif prompt_encoder == 'mlp':
             self.mlp_head = nn.Sequential(
-                nn.Linear(hidden_size, self.embedding_size), nn.ReLU(),
-                nn.Linear(self.embedding_size, self.embedding_size))
+                nn.Linear(self.embedding_size, hidden_size), nn.ReLU(),
+                nn.Linear(hidden_size, self.embedding_size))
             if hasattr(self, "lstm_head"):
                 delattr(self, "lstm_head")
         else:
@@ -430,18 +432,13 @@ class SoftTemplate(Template):
         """
         if self.num_soft_token == 0 or self.token_embeddings is None:
             return None
-        if self.encoder_hidden_size is not None:
-            self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
-                                                self.encoder_hidden_size)
-        else:
-            self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
-                                                self.embedding_size)
+        self.soft_embeddings = nn.Embedding(self.num_soft_token + 1,
+                                            self.embedding_size)
 
-            weight = self.soft_embeddings.weight.clone().detach()
-            for soft_id, word_id in self.soft2word_init.items():
-                weight[soft_id] = self.token_embeddings(
-                    paddle.to_tensor(word_id))
-            self.soft_embeddings.weight.set_value(weight)
+        weight = self.soft_embeddings.weight.clone().detach()
+        for soft_id, word_id in self.soft2word_init.items():
+            weight[soft_id] = self.token_embeddings(paddle.to_tensor(word_id))
+        self.soft_embeddings.weight.set_value(weight)
 
     def process_batch(self, batch):
         word_embeds = self.token_embeddings(batch["input_ids"])
@@ -512,7 +509,6 @@ class AutoTemplate(object):
 
         if 'mask' not in template_keys:
             template.append({'add_prefix_space': ' ', 'mask': None})
-            template.append({'add_prefix_space': '', 'hard': '。'})
 
         if 'soft' in template_keys:
             return SoftTemplate(tokenizer=tokenizer,
