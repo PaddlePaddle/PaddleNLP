@@ -1,26 +1,24 @@
-# ERNIE-CW 从零开始构建预训练模型
+# **大规模** **开源** **中文** 语料预训练-<small>从零开始构建预训练模型</small>
 
 ERNIE是百度提出的大规模预训练模型，曾在中文场景下取得了SOTA效果。
-PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布ERNIE-CW项目。项目目标：从零开始构建你的预训练模型。
+PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布大规模开源语料预训练全流程。从零开始，轻松构建预训练模型。
 
-ERNIE-CW项目，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
+本项目，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
 并训练发布开源最优的模型参数。
 
 接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
 
-- **大规模**中文数据
-- **高精准**中文分词
-- **全字符**中文词表制作
-- **快速**Token ID 转化
-
 **目录**
-* [大规模中文数据](#大规模中文数据)
-* [高精准中文分词](#高精准中文分词)
-* [中文全字符词表制作](#中文全字符词表制作)
-* [快速Token ID 转化](#快速TokenID转化)
+* [1. **大规模**中文数据](#大规模中文数据)
+* [2. **高精准**中文分词](#高精准中文分词)
+* [3. **全字符**中文词表制作](#中文中文词表制作)
+* [4. **快速**Token ID 转化](#快速TokenID转化)
+* [5. 参考](#参考)
 
 
-## 大规模中文数据
+<a name="大规模中文数据"> </a>
+
+## 1. 大规模中文数据
 
 **CLUECorpus2020语料**
 
@@ -38,8 +36,9 @@ WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目�
 64GB WuDaoCorpus2.0_base_200G.rar
 ```
 
+<a name="高精准中文分词"> </a>
 
-## 高精准中文分词
+## 2. 高精准中文分词
 
 ERNIE 使用知识嵌入的方式进行预训练，如何尽可能精确的从原始文本中提取知识，直接关系预训练模型的效果。
 目前PaddleNLP常用的分词方式的有`jieba`，`lac`，`Wordtag`，
@@ -72,7 +71,9 @@ python ../data_tools/trans_to_json.py  \
     --no-shuffle
 ```
 
-## 中文全字符词表制作
+<a name="全字符中文词表制作"> </a>
+
+## 3. 全字符中文词表制作
 
 词表的制作有两种方案：
 
@@ -96,7 +97,7 @@ python ../data_tools/trans_to_json.py  \
     - 文本token id化后，希望使用uint16表示，此时表示的最大字符为65536。
     - 同时考虑到ERNIE虽然是字模型，我们的仍然需要 `##中` 之类的中文字符表示分词信息。假设使用中文全字符20902(0x4E00, 0x9FA5)个字符，那么剩余 vocab 大小不能超过 44634。
 
-综上，ERNIE-CW决定采用 40000 左右的 vocab 容量。
+综上，本项目决定采用 40000 左右的 vocab 容量。
 其中：
 - 中文全字符 `20902`
 - 英文字符 `17000`
@@ -146,7 +147,7 @@ python merge_vocab.py
 
 ### 问题遗留
 本项目采用的第一种方式，即拼接产出的词表，对连续非中、英文字符文本，会出现UNK的情况。
-如issue: [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927)、 [#2585](https://github.com/PaddlePaddle/PaddleNLP/issues/2585)。ERNIE-CW做了两点改进:
+如issue: [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927)、 [#2585](https://github.com/PaddlePaddle/PaddleNLP/issues/2585)。本项目做了两点改进:
 
 1. 对 Symbol 字符默认添加空格，变成独立字符
 2. 对 日文、谚文 在合并词表阶段默认添加 ## 字符。
@@ -171,7 +172,9 @@ python gen_vocab.py afer_basic_toknizer_corpus.txt
 对处理好的vocab文件手动替换一些`<pad> -> [PAD]`之类的special_tokens，即可产出词表。
 
 
-## 快速Token ID 转化
+<a name="快速TokenID转化"> </a>
+
+## 4. 快速Token ID 转化
 
 预料、词表准备妥当后，我们可以开始进行最后的数据ID转化。
 
@@ -186,7 +189,7 @@ python gen_vocab.py afer_basic_toknizer_corpus.txt
 使用 Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz CPU测试，40线程，处理速度 8+MB/s，约7个小时左右，即可完成 200GB 文本转化为ID.
 
 ```
-python -u  create_pretraining_data.py \
+python -u  ../data_tools/create_pretraining_data.py \
     --model_name ./vocab_path/vocab.txt \
     --tokenizer_name ErnieTokenizer \
     --input_path wudao_corpus_200g_0623.jsonl \
@@ -198,11 +201,15 @@ python -u  create_pretraining_data.py \
     --workers 40 \
     --log_interval 1000
 ```
-转化后的数据如下，使用这份数据，即可开始ERNIE-CW预训练
+转化后的数据如下，使用这份数据，即可开始ERNIE预训练
 ```
 -rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_200g_0703_ids.npy
 -rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_200g_0703_idx.npz
 ```
 
-## 其他
-- 感谢CLUE，WuDao提供的开源数据
+## 5. 参考
+感谢CLUE，WuDao提供的开源文本语料，参考资料：
+- Xu, L., Zhang, X. and Dong, Q., 2020. CLUECorpus2020: A large-scale Chinese corpus for pre-training language model. arXiv preprint arXiv:2003.01355.
+- Yuan, S., Zhao, H., Du, Z., Ding, M., Liu, X., Cen, Y., Zou, X., Yang, Z. and Tang, J., 2021. Wudaocorpora: A super large-scale chinese corpora for pre-training language models. AI Open, 2, pp.65-68.
+- https://github.com/CLUEbenchmark/CLUECorpus2020
+- https://resource.wudaoai.cn
