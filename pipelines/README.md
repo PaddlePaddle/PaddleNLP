@@ -85,19 +85,57 @@ prediction = pipeline.run(query="亚马逊河流的相关介绍")
 
 您可以基于我们发布的 Docker 镜像一键部署智能文本流水线系统，通过 Web UI 快速体验。
 
+#### 启动 elastic search
+
+```
+docker network create elastic
+docker pull docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms256m -Xmx256m"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+```
+
 #### 部署 CPU 服务
 ```
-docker pull paddlepaddle/paddlenlp:2.4.0
-docker run -d --name paddlenlp_pipelines --net host -ti paddlepaddle/paddlenlp:2.4.0
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
+docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 ```
-CPU 镜像下载大概耗时 20 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
 
 #### 部署 GPU 服务
 ```
-docker pull paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
-nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti paddlepaddle/paddlenlp:2.4.0
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
+nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
 ```
-GPU 镜像下载大概耗时 3 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
+
+对于国内用户，因为网络问题下载docker比较慢时，可使用百度提供的镜像：
+
+
+|  环境                         |   镜像 Tag               |    运行平台      |
+| :--------------------------: | :-------------------------------: | :-------------: |
+|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
+|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
+|  CUDA10.2 + cuDNN 7           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+
+如果您的机器不在中国大陆地区，我们推荐您使用DockerHub的镜像：
+
+|  环境                         |   镜像 Tag               |    运行平台      |
+| :--------------------------: | :-------------------------------: | :-------------: |
+|  CPU                         | paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
+|  CPU                         | paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
+|  CUDA10.2 + cuDNN 7           | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+
+对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 
 ## :man_office_worker: 用户案例
 
