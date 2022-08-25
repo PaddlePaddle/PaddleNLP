@@ -56,7 +56,6 @@ parser.add_argument("--seed", type=int, default=3, help="random seed for initial
 parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
 parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
 parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
-
 args = parser.parse_args()
 # yapf: enable
 
