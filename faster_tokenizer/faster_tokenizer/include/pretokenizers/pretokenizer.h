@@ -102,6 +102,13 @@ struct FASTERTOKENIZER_DECL BytesToCharOffsetConverter
   virtual bool convert(const core::Offset&, core::Offset*) const;
 };
 
+struct FASTERTOKENIZER_DECL CharToBytesOffsetConverter
+    : public OffsetConverter {
+  std::vector<size_t> offset_map_;
+  CharToBytesOffsetConverter(const std::string&);
+  virtual bool convert(const core::Offset&, core::Offset*) const;
+};
+
 }  // namespace pretokenizers
 }  // namespace faster_tokenizer
 }  // namespace paddlenlp
