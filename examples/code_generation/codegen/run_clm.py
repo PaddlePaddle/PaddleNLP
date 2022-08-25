@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -309,7 +309,7 @@ def do_train(args):
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
-    best_eval_ppl = 0
+    best_eval_ppl = float("inf")
     tic_train = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):

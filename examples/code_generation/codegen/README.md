@@ -124,12 +124,14 @@ python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。
 如：
 ```text
-./checkpoints/
-├── model_8000
-│   ├── model_config.json
-│   ├── model_state.pdparams
-│   ├── tokenizer_config.json
-│   └── vocab.txt
+./output/
+│── model_config.json
+│── model_state.pdparams
+│── tokenizer_config.json
+│── special_tokens_map.json
+│── added_tokens.json
+│── vocab.json
+│── merges.txt
 └── ...
 ```
 
