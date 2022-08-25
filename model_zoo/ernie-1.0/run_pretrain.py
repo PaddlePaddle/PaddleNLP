@@ -15,6 +15,7 @@
 ERNIE-1.0 pretraining scripts.
 """
 import argparse
+import contextlib
 import os
 import sys
 import random
@@ -66,6 +67,7 @@ def create_pretrained_dataset(
         args.eval_iters * data_world_size,
         args.micro_batch_size * args.test_iters * data_world_size
     ]
+
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
         data_prefix=data_file,
         args=args,
@@ -291,6 +293,7 @@ def args_post_process(args, worker_num):
         "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
         args.global_batch_size, micro_batch_size)
     accumulate_steps = bsz_per_dp // micro_batch_size
+    assert accumulate_steps >= 1, f"Larger global_batch_size: {arg.global_batch_size} is expect, micro_batch_size is {micro_batch_size}, but only {bsz_per_dp} on each card!"
 
     args.eval_iters *= accumulate_steps
     args.test_iters *= accumulate_steps
@@ -451,6 +454,7 @@ def do_train(args):
         optimizer = fleet.distributed_optimizer(optimizer)
 
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
+    # Must extend chinese char for ErnieTokenizer
     tokenizer.extend_chinese_char()
 
     data_file = get_train_data_file(args)
@@ -461,6 +465,7 @@ def do_train(args):
         data_world_size=worker_num,
         data_world_rank=worker_index,
         max_seq_len=args.max_seq_len,
+        binary_head=args.binary_head,
         current_step=global_step)
 
     # load checkpoint vars
@@ -516,6 +521,7 @@ def do_train(args):
         # time count
         train_reader_cost = 0.0
         train_run_cost = 0.0
+        tr_loss = paddle.to_tensor(0.0)
         reader_start = time.time()
 
         for step, batch in enumerate(train_data_loader()):
@@ -532,7 +538,17 @@ def do_train(args):
             input_ids, segment_ids, input_mask, masked_lm_positions, \
             masked_lm_labels, next_sentence_labels = batch
 
-            with model.no_sync():
+            ctx_manager = contextlib.nullcontext() if sys.version_info >= (
+                3, 7) else contextlib.suppress()
+
+            if worker_num > 1 and (args.use_recompute
+                                   or args.accumulate_steps > 1):
+                ctx_manager = model.no_sync()
+            else:
+                ctx_manager = contextlib.nullcontext() if sys.version_info >= (
+                    3, 7) else contextlib.suppress()
+
+            with ctx_manager:
                 with paddle.amp.auto_cast(args.use_amp,
                                           custom_white_list=[
                                               'softmax',
@@ -568,37 +584,47 @@ def do_train(args):
                         loss = criterion(prediction_scores, None,
                                          masked_lm_labels)
 
-                if args.use_amp:
-                    scaler.scale(loss).backward()
+                if args.accumulate_steps >= 1:
+                    tr_loss_step = loss / args.accumulate_steps
                 else:
-                    loss.backward()
+                    tr_loss_step = loss
 
-            fused_allreduce_gradients(list(model.parameters()), None)
+                if args.use_amp:
+                    scaler.scale(tr_loss_step).backward()
+                else:
+                    tr_loss_step.backward()
 
-            if args.use_amp:
-                scaler.minimize(optimizer, loss)
-            else:
-                optimizer.step()
-
-            optimizer.clear_grad()
-            train_run_cost += time.time() - train_start
-
-            # Skip for accumulate_steps in global step
-            if (step + 1) % args.accumulate_steps != 0:
-                continue
-
-            global_step += 1
+            tr_loss += tr_loss_step
 
             loss_global["loss"] += loss.detach()
             if args.binary_head:
                 loss_global["lm_loss"] += lm_loss.detach()
                 loss_global["sop_loss"] += sop_loss.detach()
 
+            # Skip for accumulate_steps in global step
+            if (step + 1) % args.accumulate_steps != 0:
+                continue
+
+            if worker_num > 1 and args.use_recompute:
+                fused_allreduce_gradients(list(model.parameters()), None)
+
+            if args.use_amp:
+                scaler.minimize(optimizer, tr_loss)
+            else:
+                optimizer.step()
+
+            optimizer.clear_grad()
+            train_run_cost += time.time() - train_start
+            tr_loss.subtract_(tr_loss)
+
+            global_step += 1
+
             if global_step % args.logging_freq == 0:
                 log_info_dict = dict()
                 log_info_dict["global_step"] = global_step
                 for k, v in loss_global.items():
-                    log_info_dict[k] = all_gather(v) / args.logging_freq
+                    log_info_dict[k] = all_gather(
+                        v) / args.logging_freq / args.accumulate_steps
                     v.subtract_(v)
                 if worker_index == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
