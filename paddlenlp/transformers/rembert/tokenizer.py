@@ -22,7 +22,7 @@ from .. import PretrainedTokenizer
 
 __all__ = ['RemBertTokenizer']
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {"rembert": 512}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"rembert": 512}
 
 
 class RemBertTokenizer(PretrainedTokenizer):
@@ -83,7 +83,7 @@ class RemBertTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
     }
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

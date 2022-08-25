@@ -27,7 +27,7 @@ from ...utils.log import logger
 
 __all__ = ['RobertaTokenizer', 'RobertaChineseTokenizer', 'RobertaBPETokenizer']
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "hfl/roberta-wwm-ext": 512,
     "hfl/roberta-wwm-ext-large": 512,
     "hfl/rbt6": 512,
@@ -121,7 +121,7 @@ class RobertaChineseTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

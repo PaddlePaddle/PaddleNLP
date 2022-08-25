@@ -33,7 +33,7 @@ from ...data.vocab import Vocab
 
 __all__ = ['UnifiedTransformerTokenizer']
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "unified_transformer-12L-cn": 512,
     "unified_transformer-12L-cn-luge": 512,
     "plato-mini": 512,
@@ -118,7 +118,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
     }
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     TASK_TO_SPECIAL_TOKEN = {
         'chitchat': "[CHAT]",

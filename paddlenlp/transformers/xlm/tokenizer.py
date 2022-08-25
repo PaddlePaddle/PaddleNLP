@@ -29,7 +29,7 @@ from .. import PretrainedTokenizer
 
 __all__ = ["XLMTokenizer"]
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "xlm-mlm-en-2048": 512,
     "xlm-mlm-ende-1024": 512,
     "xlm-mlm-enfr-1024": 512,
@@ -634,7 +634,7 @@ class XLMTokenizer(PretrainedTokenizer):
             },
         },
     }
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(
         self,

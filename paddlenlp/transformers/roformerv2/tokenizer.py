@@ -20,7 +20,7 @@ from ..tokenizer_utils import PretrainedTokenizer
 
 __all__ = ["RoFormerv2Tokenizer"]
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "roformer_v2_chinese_char_small": 512,
     "roformer_v2_chinese_char_base": 512,
     "roformer_v2_chinese_char_large": 512
@@ -101,7 +101,7 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
         },
     }
     padding_side = "right"
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

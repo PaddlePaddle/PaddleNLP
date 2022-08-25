@@ -20,7 +20,7 @@ from typing import List
 from .. import PretrainedTokenizer, BasicTokenizer, WordpieceTokenizer
 from ..tokenizer_utils import Trie
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {"prophetnet-large-uncased": 512}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"prophetnet-large-uncased": 512}
 
 
 def load_vocab(vocab_file):
@@ -88,7 +88,7 @@ class ProphetNetTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

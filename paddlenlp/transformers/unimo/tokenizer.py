@@ -27,7 +27,7 @@ from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ['UNIMOTokenizer']
 
-PRETAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "unimo-text-1.0": 513,
     "unimo-text-1.0-lcsts-new": 513,
     "unimo-text-1.0-large": 512
@@ -104,7 +104,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
-    max_model_input_sizes = PRETAINED_POSITIONAL_EMBEDDINGS_SIZES
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
