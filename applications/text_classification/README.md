@@ -1,13 +1,13 @@
 # 文本分类应用
 
 **目录**
-   * [文本分类应用简介](#文本分类应用简介)
-   * [文本分类场景](#文本分类场景)
-   * [文本分类技术方案](#文本分类技术方案)
-   * [文本分类应用全流程方案](#文本分类应用全流程方案)
-   * [文本分类快速开始](#文本分类快速开始)
+   - [1. 文本分类应用简介](#文本分类应用简介)
+   - [2. 文本分类场景](#文本分类场景)
+   - [3. 文本分类技术方案](#文本分类技术方案)
+   - [4. 文本分类应用全流程方案](#文本分类应用全流程方案)
+   - [5. 文本分类快速开始](#文本分类快速开始)
 
-## 文本分类应用简介
+## 1. 文本分类应用简介
 文本分类应用针对**多分类、多标签、层次分类等高频分类场景提供多种端到端应用方案，打通数据标注-模型训练-模型调优-模型压缩-预测部署全流程**，满足开发者多种分类需求，有效缩短开发周期，降低文本分类落地技术门槛。
 
 文本分类简单来说就是对给定的一个句子或一段文本使用分类模型分类，文本分类任务广泛应用于长短文本分类、情感分析、新闻分类、事件类别分类、政务数据分类、商品信息分类、商品类目预测、文章分类、论文类别分类、专利分类、案件描述分类、罪名分类、意图分类、论文专利分类、邮件自动标签、评论正负识别、药物反应分类、对话分类、税种识别、来电信息自动分类、投诉分类、广告检测、敏感违法内容检测、内容安全检测、舆情分析、话题标记等各类日常或专业领域中。
@@ -23,7 +23,7 @@
 
 
 
-## 文本分类场景
+## 2. 文本分类场景
 
 文本分类场景可以根据标签类型分为多分类（multi class）、多标签（multi label）、层次分类（hierarchical）等三种场景，接下来我们将以下图的新闻文本分类为例介绍三种分类场景的区别。
 
@@ -37,7 +37,7 @@
 
 - **层次分类👪 ：** 数据集的标签集具有多级标签且标签之间具有层级结构关系，输入句子/文本具有一个或多个标签。在文本层次分类任务中，我们需要预测输入句子/文本可能来自于不同级标签类别中的某一个或几个类别。以上图层次分类中新闻文本为例（新闻为根节点），该新闻一级分类标签为 `体育`，二级分类标签为 `足球`。快速开启层次分类任务参见 👉 [层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme) 。
 
-## 文本分类技术方案
+## 3. 文本分类技术方案
 ### 模型基座：预训练模型
 
 近年来，大量的研究表明在超大规模的语料采用无监督或者弱监督的方式训练模型，模型能够获得语言相关的知识。预训练模型学习到的文本语义表示能够避免从零开始训练模型，同时有利于下游自然语言处理(NLP)任务。预训练模型与具体的文本分类任务的关系可以直观地理解为，**预训练模型已经懂得了相关句法、语义的语言知识，用具体任务数据训练使得预训练模型”更懂”这个任务**，在预训练过程中学到的知识基础使学习文本分类任务事半功倍。
@@ -94,7 +94,7 @@ model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh",
 - 快速开启多标签分类任务参见 👉 [语义索引-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_lable/retrieval_based#readme)
 - 快速开启层次分类任务参见 👉 [语义索引-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/retrieval_based#readme)
 
-## 文本分类应用全流程方案
+## 4. 文本分类应用全流程方案
 
 <div align="center">
     <img width="1238" alt="image" src="https://user-images.githubusercontent.com/63761690/186386181-7cdf3015-3e6c-4ffe-9512-95ba707fd00c.png">
@@ -126,7 +126,7 @@ model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh",
 
 - 文本分类应用提供了离线部署，并且支持在GPU设备使用FP16，在CPU设备使用动态量化的低精度加速推理；同时提供基于Paddle Serving的在线服务化部署，详见各分类场景文档中模型部署介绍。
 
-## 文本分类快速开始
+## 5. 文本分类快速开始
 
 - 快速开启多分类 👉 [多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#readme)
 

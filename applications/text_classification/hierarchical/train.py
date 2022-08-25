@@ -43,7 +43,7 @@ parser.add_argument('--model_name', default="ernie-3.0-medium-zh", help="Select 
                     choices=["ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en"])
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--epochs", default=100, type=int, help="Total number of training epochs to perform.")
 parser.add_argument('--early_stop', action='store_true', help='Epoch before early stop.')
 parser.add_argument('--early_stop_nums', type=int, default=3, help='Number of epoch before early stop.')
 parser.add_argument("--logging_steps", default=5, type=int, help="The interval steps to logging.")
