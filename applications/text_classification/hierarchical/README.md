@@ -65,7 +65,6 @@ multi_label/
 ├── utils.py # 工具函数脚本
 ├── metric.py # metric脚本
 ├── prune.py # 裁剪脚本
-├── prune_trainer.py # 裁剪trainer脚本
 └── README.md # 使用说明
 ```
 
@@ -236,7 +235,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en"；默认为"ernie-3.0-medium-zh"。
+* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-1.0-large-zh-cw"；默认为"ernie-3.0-medium-zh"。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
@@ -416,7 +415,7 @@ export/
 
 ## 模型裁剪
 
-**如果有模型部署上线的需求，需要进一步压缩模型体积**，可以使用本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用脚本`prune.py` 即可一键启动裁剪和并自动保存裁剪后的模型参数。
+**如果有模型部署上线的需求，需要进一步压缩模型体积**，可以使用 PaddleNLP 的 压缩(Compression API）, API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用脚本`prune.py` 即可一键启动裁剪和并自动保存裁剪后的模型参数。
 ### 环境准备
 
 使用裁剪功能需要安装 paddleslim 包
@@ -442,7 +441,7 @@ python prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 
 使用GPU单卡/多卡训练
@@ -461,12 +460,12 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
-* `TrainingArguments`
+* `CompressionArguments`
   * `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
   * `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
   * `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
@@ -476,7 +475,8 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
   * `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
   * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
   * `seed`：随机种子，默认为3。
-  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)。
+  * `CompressionArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[CompressionArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md)。
+  * `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是 ['3/4', '2/3', '1/2']。
 
 * `DataArguments`
   * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
@@ -484,7 +484,6 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
-  * `width_mult`：裁剪宽度保留的比例，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，默认是 '2/3'。
 
 以上参数都可通过 `python prune.py --dataset_dir xx --params_dir xx` 的方式传入）
 
@@ -492,7 +491,19 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 ```text
 prune/
-├── 0.6666666666666666
+├── width_mult_0.75
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.6666666666666666
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.25
 │   ├── float32.pdiparams
 │   ├── float32.pdiparams.info
 │   ├── float32.pdmodel
@@ -511,6 +522,7 @@ prune/
 
 4. 导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
+5. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
 ### 裁剪效果
 本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取的多标签数据集的表现，测试配置如下：
