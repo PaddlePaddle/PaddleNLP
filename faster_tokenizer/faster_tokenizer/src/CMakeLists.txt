@@ -6,7 +6,9 @@ add_subdirectory(postprocessors)
 add_subdirectory(core)
 add_subdirectory(utils)
 # set the relative path of shared library
+if (NOT APPLE)
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath='$ORIGIN'")
+endif()
 
 if (WITH_PYTHON)
 add_subdirectory(pybind)
@@ -20,6 +22,14 @@ cc_library(core_tokenizers SHARED
 set_target_properties(core_tokenizers PROPERTIES PREFIX "")
 if (WIN32)
 set_target_properties(core_tokenizers PROPERTIES SUFFIX ".pyd")
+elseif(APPLE)
+set_target_properties(core_tokenizers PROPERTIES SUFFIX ".dylib")
+else()
+set_target_properties(core_tokenizers PROPERTIES SUFFIX ".so")
+endif()
+
+if (APPLE)
+  SET(CMAKE_INSTALL_RPATH "@loader_path/core_tokenizers.dylib")
 endif()
 
 else(WITH_PYTHON)
@@ -28,4 +38,8 @@ cc_library(core_tokenizers SHARED
            SRCS tokenizers/ernie_faster_tokenizer.cc
            DEPS normalizers pretokenizers models decoders
                 postprocessors core added_vocabulary tokenizer json)
+
+if (APPLE)
+  SET(CMAKE_INSTALL_RPATH "@loader_path/lib/libcore_tokenizers.dylib")
+endif()
 endif(WITH_PYTHON)
