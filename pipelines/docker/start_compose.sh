@@ -9,8 +9,6 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --host localhost \
                             --embedding_dim 312 \
                             --delete_index 
-
-
 # 使用端口号 8891 启动模型服务
 nohup python rest_api/application.py 8891 > server.log 2>&1 &
 # 在指定端口 8502 启动 WebUI

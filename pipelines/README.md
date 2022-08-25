@@ -108,14 +108,14 @@ docker run \
 docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 ```
-CPU 镜像下载大概耗时 20 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
 
 #### 部署 GPU 服务
 ```
 docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
 nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
 ```
-GPU 镜像下载大概耗时 3 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
 
 
 对于国内用户，因为网络问题下载docker比较慢时，可使用百度提供的镜像：

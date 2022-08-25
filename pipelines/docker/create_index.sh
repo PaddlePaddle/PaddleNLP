@@ -9,7 +9,7 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --host localhost \
                             --embedding_dim 312 \
                             --delete_index 
-# windows                             
+# windows & macos                             
 # python utils/offline_ann.py --index_name dureader_robust_query_encoder \
 #                             --doc_dir data/dureader_dev \
 #                             --query_embedding_model rocketqa-zh-nano-query-encoder \
