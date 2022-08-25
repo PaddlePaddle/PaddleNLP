@@ -69,6 +69,7 @@ class RoFormerModelTestConfig(RoFormerModelTestModelConfig):
     is_training: bool = False
     use_input_mask: bool = False
     use_token_type_ids: bool = True
+    type_sequence_label_size: int = 2
 
     # used for sequence classification
     num_classes: int = 3
@@ -80,7 +81,8 @@ class RoFormerModelTester:
     def __init__(self,
                  parent,
                  config: Optional[RoFormerModelTestConfig] = None,
-                 return_dict: bool = False):
+                 return_dict: bool = False,
+                 use_labels: bool = False):
         self.parent = parent
         self.config: RoFormerModelTestConfig = config or RoFormerModelTestConfig(
         )
@@ -88,7 +90,10 @@ class RoFormerModelTester:
         self.is_training = self.config.is_training
         self.num_classes = self.config.num_classes
         self.num_choices = self.config.num_choices
+
+        self.type_sequence_label_size = self.config.type_sequence_label_size
         self.return_dict = return_dict
+        self.use_labels = use_labels
 
     def prepare_config_and_inputs(self):
         config = self.config
@@ -105,8 +110,19 @@ class RoFormerModelTester:
             token_type_ids = ids_tensor([config.batch_size, config.seq_length],
                                         config.type_vocab_size)
 
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
+
+        if self.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_classes)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
+
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask
+        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self) -> dict:
         return self.config.model_kwargs
@@ -122,6 +138,9 @@ class RoFormerModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RoFormerModel(**config)
         model.eval()
@@ -150,6 +169,9 @@ class RoFormerModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RoFormerForMultipleChoice(RoFormerModel(**config),
                                           num_choices=self.config.num_choices)
@@ -168,22 +190,40 @@ class RoFormerModelTester:
         result = model(multiple_choice_inputs_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
+                       return_dict=self.return_dict,
+                       labels=choice_labels)
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
+
         self.parent.assertEqual(
             result.shape, [self.config.batch_size, self.config.num_choices])
 
-    def create_and_check_for_question_answering(self, config, input_ids,
-                                                token_type_ids, input_mask):
+    def create_and_check_for_question_answering(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
         model = RoFormerForQuestionAnswering(RoFormerModel(**config))
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            return_dict=self.return_dict,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+        )
         if self.return_dict:
             start_logits, end_logits = result.start_logits, result.end_logits
+        elif self.use_labels:
+            start_logits, end_logits = result[1], result[2]
         else:
             start_logits, end_logits = result[0], result[1]
 
@@ -199,6 +239,9 @@ class RoFormerModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RoFormerForTokenClassification(RoFormerModel(**config),
                                                num_classes=self.num_classes)
@@ -206,9 +249,12 @@ class RoFormerModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       labels=token_labels,
                        return_dict=self.return_dict)
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(result.shape, [
             self.config.batch_size, self.config.seq_length,
@@ -221,15 +267,21 @@ class RoFormerModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RoFormerForMaskedLM(RoFormerModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       labels=token_labels,
                        return_dict=self.return_dict)
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(result.shape, [
             self.config.batch_size, self.config.seq_length,
@@ -242,6 +294,9 @@ class RoFormerModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RoFormerForSequenceClassification(
             RoFormerModel(**config), num_classes=self.config.num_classes)
@@ -249,9 +304,12 @@ class RoFormerModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       labels=sequence_labels,
                        return_dict=self.return_dict)
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(
             result.shape, [self.config.batch_size, self.config.num_classes])
@@ -263,6 +321,9 @@ class RoFormerModelTester:
             input_ids,
             token_type_ids,
             input_mask,
+            sequence_labels,
+            token_labels,
+            choice_labels,
         ) = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
@@ -272,10 +333,16 @@ class RoFormerModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(("return_dict", ), [[True], [False]])
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RoFormerModel
     return_dict: bool = False
+    use_labels: bool = False
 
     all_model_classes = (RoFormerModel, RoFormerForSequenceClassification,
                          RoFormerForTokenClassification,
@@ -284,7 +351,8 @@ class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = RoFormerModelTester(self,
-                                                return_dict=self.return_dict)
+                                                return_dict=self.return_dict,
+                                                use_labels=self.use_labels)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

@@ -28,7 +28,7 @@ from paddlenlp.transformers import (
     RobertaModel,
 )
 
-from ...transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
 
 ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
@@ -36,7 +36,10 @@ ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
 
 class RobertaModelTester:
 
-    def __init__(self, parent, return_dict: bool = False):
+    def __init__(self,
+                 parent,
+                 return_dict: bool = False,
+                 use_labels: bool = False):
         self.parent = parent
         self.batch_size = 13
         self.seq_length = 7
@@ -63,6 +66,7 @@ class RobertaModelTester:
         self.num_choices = 4
         self.scope = None
         self.return_dict = return_dict
+        self.use_labels = use_labels
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -78,8 +82,18 @@ class RobertaModelTester:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length],
                                         self.type_vocab_size)
 
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
+        if self.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_labels)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
+
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask
+        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
         return {
@@ -105,6 +119,9 @@ class RobertaModelTester:
             input_ids,
             token_type_ids,
             input_mask,
+            sequence_labels,
+            token_labels,
+            choice_labels,
         ) = self.prepare_config_and_inputs()
 
         return (
@@ -112,10 +129,21 @@ class RobertaModelTester:
             input_ids,
             token_type_ids,
             input_mask,
+            sequence_labels,
+            token_labels,
+            choice_labels,
         )
 
-    def create_and_check_model(self, config, input_ids, token_type_ids,
-                               input_mask):
+    def create_and_check_model(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
         model = RobertaModel(**config)
         model.eval()
         result = model(input_ids,
@@ -145,15 +173,21 @@ class RobertaModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RobertaForCausalLM(RobertaModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       labels=token_labels,
                        return_dict=self.return_dict)
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.vocab_size])
@@ -164,21 +198,35 @@ class RobertaModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = RobertaForMaskedLM(RobertaModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       labels=token_labels,
                        return_dict=self.return_dict)
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
-    def create_and_check_for_token_classification(self, config, input_ids,
-                                                  token_type_ids, input_mask):
+    def create_and_check_for_token_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
         model = RobertaForTokenClassification(RobertaModel(**config),
                                               num_classes=self.num_labels,
                                               dropout=None)
@@ -186,16 +234,53 @@ class RobertaModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
+                       return_dict=self.return_dict,
+                       labels=token_labels)
 
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.num_labels])
 
-    def create_and_check_for_multiple_choice(self, config, input_ids,
-                                             token_type_ids, input_mask):
+    def create_and_check_for_sequence_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = RobertaForSequenceClassification(RobertaModel(**config),
+                                                 num_classes=self.num_labels)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=sequence_labels,
+                       return_dict=self.return_dict)
+        if self.return_dict:
+            result = result.logits
+        elif self.use_labels:
+            result = result[1]
+
+        self.parent.assertEqual(result.shape,
+                                [self.batch_size, self.num_labels])
+
+    def create_and_check_for_multiple_choice(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
         model = RobertaForMultipleChoice(RobertaModel(**config))
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
@@ -207,24 +292,40 @@ class RobertaModelTester:
         result = model(multiple_choice_inputs_ids,
                        attention_mask=multiple_choice_input_mask,
                        token_type_ids=multiple_choice_token_type_ids,
-                       return_dict=self.return_dict)
+                       return_dict=self.return_dict,
+                       labels=choice_labels)
+
         if self.return_dict:
             result = result.logits
+        elif self.use_labels:
+            result = result[1]
 
         self.parent.assertEqual(result.shape,
                                 [self.batch_size, self.num_choices])
 
-    def create_and_check_for_question_answering(self, config, input_ids,
-                                                token_type_ids, input_mask):
+    def create_and_check_for_question_answering(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
         model = RobertaForQuestionAnswering(RobertaModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
+                       return_dict=self.return_dict,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels)
 
         if self.return_dict:
             start_logits, end_logits = result.start_logits, result.end_logits
+        elif self.use_labels:
+            start_logits, end_logits = result[1], result[2]
         else:
             start_logits, end_logits = result[0], result[1]
 
@@ -240,6 +341,9 @@ class RobertaModelTester:
             input_ids,
             token_type_ids,
             input_mask,
+            sequence_labels,
+            token_labels,
+            choice_labels,
         ) = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
@@ -249,10 +353,16 @@ class RobertaModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(("return_dict", ), [[True], [False]])
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RobertaModel
-    return_dict = False
+    return_dict: bool = False
+    use_labels: bool = False
 
     all_model_classes = (
         RobertaForCausalLM,
@@ -267,7 +377,8 @@ class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = RobertaModelTester(self,
-                                               return_dict=self.return_dict)
+                                               return_dict=self.return_dict,
+                                               use_labels=self.use_labels)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -281,6 +392,11 @@ class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_masked_lm(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
+
+    def test_for_sequence_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_sequence_classification(
+            *config_and_inputs)
 
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
