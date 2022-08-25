@@ -67,14 +67,51 @@
             <td style="text-align:center;">
                 <span style="font-size:18px;">C<sup>3</sup></span>
             </td>
+        </tr>        <tr>
+            <td rowspan=3 align=center> 24L1024H </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 1.0-Large-zh-CW</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>79.03</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.97</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.65</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>62.91</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>85.09</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>81.73</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>93.09</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.53</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>74.22/91.88</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>88.57</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.54</b></span>
+            </td>
         </tr>
         <tr>
-            <td rowspan=2 align=center> 24L1024H </td>
             <td style="text-align:center">
                 <span style="font-size:18px">ERNIE 2.0-Large-zh</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>77.03</b></span>
+                <span style="font-size:18px">77.03</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>76.41</b></span>
@@ -89,16 +126,16 @@
                 <span style="font-size:18px">83.82</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>79.69</b></span>
+                <span style="font-size:18px">79.69</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">89.14</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.10</b></span>
+                <span style="font-size:18px">84.10</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.48/90.35</b></span>
+                <span style="font-size:18px">71.48/90.35</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">85.52</span>
@@ -124,13 +161,13 @@
                 <span style="font-size:18px">62.02</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>83.88</b></span>
+                <span style="font-size:18px">83.88</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">78.81</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>90.79</b></span>
+                <span style="font-size:18px">90.79</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">83.67</span>
@@ -139,7 +176,7 @@
                 <span style="font-size:18px">70.58/89.82</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>85.72</b></span>
+                <span style="font-size:18px">85.72</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">75.26</span>
@@ -1154,6 +1191,7 @@ AFQMC（语义相似度）、TNEWS（文本分类）、IFLYTEK（长文本分类
 
 | Model                            | AFQMC   | TNEWS   | IFLYTEK | CMNLI    | OCNLI    | CLUEWSC2020 | CSL     | CMRC2018 | CHID    | C<sup>3</sup> |
 | -------------------------------- | ------- | ------- | ------- | -------- | -------- | ----------- | ------- | -------- | ------- | ------------- |
+| ERNIE 1.0-Large-zh-cw            | 2e-5,64 | 3e-5,32 | 5e-5,16 | 2e-5,16  | 2e-5,32  | 1e-5,32     | 1e-5,16 | 2e-5,24  | 1e-5,24 | 2e-5,32       |
 | ERNIE 3.0-Xbase-zh               | 2e-5,16 | 3e-5,32 | 3e-5,32 | 3e-5,64  | 3e-5,64  | 2e-5,32     | 1e-5,16 | 3e-5,24  | 2e-5,24 | 3e-5,24       |
 | ERNIE 2.0-Large-zh               | 1e-5,32 | 3e-5,64 | 3e-5,32 | 2e-5,32  | 1e-5,16  | 3e-5,32     | 1e-5,64 | 2e-5,24  | 2e-5,24 | 3e-5,32       |
 | HFL/RoBERTa-wwm-ext-large        | 1e-5,32 | 3e-5,32 | 2e-5,32 | 1e-5,16  | 1e-5,16  | 2e-5,16     | 2e-5,16 | 3e-5,32  | 1e-5,24 | 2e-5,24       |
