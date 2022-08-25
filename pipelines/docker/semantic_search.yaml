@@ -4,7 +4,7 @@ components:    # define all the building-blocks for Pipeline
   - name: DocumentStore
     type: ElasticsearchDocumentStore  # consider using MilvusDocumentStore or WeaviateDocumentStore for scaling to large number of documents
     params:
-      host: localhost
+      host: localhost  # windows&mac host.docker.internal, linux: localhost
       port: 9200
       index: dureader_robust_query_encoder
       embedding_dim: 312
