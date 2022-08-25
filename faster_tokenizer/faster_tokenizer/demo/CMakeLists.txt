@@ -14,7 +14,7 @@ else()
     set(CMAKE_CXX_STANDARD 11)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wno-narrowing")
 
 if(NOT DEFINED FASTER_TOKENIZER_LIB)
   message(FATAL_ERROR "please set FASTER_TOKENIZER_LIB with -DFASTER_TOKENIZER_LIB=/path/to/faster_tokenizer")
@@ -31,6 +31,7 @@ endif()
 
 # Include all necessary headers path
 include_directories("${FASTER_TOKENIZER_LIB}/include"
+                    "${FASTER_TOKENIZER_LIB}/include/faster_tokenizer"  # TODO (zhoushunjie): Need to remove later
                     "${FASTER_TOKENIZER_LIB}/third_party/include")
 add_executable(ernie_faster_tokenizer_demo ernie_faster_tokenizer_demo.cc)
 
@@ -49,7 +50,10 @@ SET_PROPERTY(TARGET icuuc PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/thi
 SET_PROPERTY(TARGET icuuc PROPERTY IMPORTED_IMPLIB ${FASTER_TOKENIZER_LIB}/third_party/lib/icuuc.lib)
 
 target_link_libraries(ernie_faster_tokenizer_demo core_tokenizers icudt icuuc)
-else(WIN32)
+elseif(APPLE)
+SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/libcore_tokenizers.dylib)
+target_link_libraries(ernie_faster_tokenizer_demo core_tokenizers)
+else()
 SET_PROPERTY(TARGET core_tokenizers PROPERTY IMPORTED_LOCATION ${FASTER_TOKENIZER_LIB}/lib/libcore_tokenizers.so)
 target_link_libraries(ernie_faster_tokenizer_demo core_tokenizers)
-endif(WIN32)
+endif()

@@ -50,7 +50,7 @@ class CompressionArguments(TrainingArguments):
         },
     )
     # dynabert
-    width_mult_list: Optional[List[float]] = field(
+    width_mult_list: Optional[List[str]] = field(
         default=None,
         metadata={
             "help":
