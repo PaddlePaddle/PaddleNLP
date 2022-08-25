@@ -49,9 +49,7 @@ class ErnieModelTester:
                  num_labels=3,
                  num_choices=4,
                  num_classes=3,
-                 scope=None,
-                 return_dict: bool = False,
-                 use_labels: bool = False):
+                 scope=None):
         self.parent = parent
         self.batch_size = batch_size
         self.seq_length = seq_length
@@ -75,8 +73,6 @@ class ErnieModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
-        self.return_dict = return_dict
-        self.use_labels = use_labels
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -96,7 +92,7 @@ class ErnieModelTester:
         token_labels = None
         choice_labels = None
 
-        if self.use_labels:
+        if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size],
                                          self.type_sequence_label_size)
             token_labels = ids_tensor([self.batch_size, self.seq_length],
@@ -137,11 +133,11 @@ class ErnieModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
+                       return_dict=self.parent.return_dict)
         result = model(input_ids,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
-        result = model(input_ids, return_dict=self.return_dict)
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(
             result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
@@ -164,14 +160,16 @@ class ErnieModelTester:
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        labels=token_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
+
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_multiple_choice(
         self,
@@ -196,13 +194,13 @@ class ErnieModelTester:
                        attention_mask=multiple_choice_input_mask,
                        token_type_ids=multiple_choice_token_type_ids,
                        labels=choice_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
+        if choice_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
-        self.parent.assertEqual(result.shape,
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_choices])
 
     def create_and_check_for_question_answering(
@@ -222,11 +220,9 @@ class ErnieModelTester:
                        token_type_ids=token_type_ids,
                        start_positions=sequence_labels,
                        end_positions=sequence_labels,
-                       return_dict=self.return_dict)
+                       return_dict=self.parent.return_dict)
 
-        if self.return_dict:
-            start_logits, end_logits = result.start_logits, result.end_logits
-        elif self.use_labels:
+        if sequence_labels is not None:
             start_logits, end_logits = result[1], result[2]
         else:
             start_logits, end_logits = result[0], result[1]
@@ -253,13 +249,13 @@ class ErnieModelTester:
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        labels=sequence_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
-        self.parent.assertEqual(result.shape,
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_classes])
 
     def create_and_check_for_token_classification(
@@ -279,14 +275,15 @@ class ErnieModelTester:
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        labels=token_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.num_classes])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.num_classes])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -329,9 +326,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
-        self.model_tester = ErnieModelTester(self,
-                                             use_labels=self.use_labels,
-                                             return_dict=self.return_dict)
+        self.model_tester = ErnieModelTester(self)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
