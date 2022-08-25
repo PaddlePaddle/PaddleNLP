@@ -147,7 +147,7 @@ add_custom_target(build_tokenizers_bdist_wheel ALL
     DEPENDS copy_python_tokenizers)
 else()
 add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
+    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel
     COMMENT "Packing whl packages------>>>"
     DEPENDS copy_python_tokenizers)
 endif()
