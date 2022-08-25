@@ -17,9 +17,9 @@
     + 依托百度领先的NLP技术，包括[ERNIE](https://github.com/PaddlePaddle/ERNIE)语义理解技术与[RocketQA](https://github.com/PaddlePaddle/RocketQA)开放域问答技术
     + 预置领先的深度学习模型
 
-## 3. 快速开始: 快速搭建语义检索系统
+## 3. 快速开始: 快速搭建FAQ智能问答系统
 
-以下是针对mac和linux的安装流程，windows的安装和使用流程请参考[windows](./Install_windows.md)
+以下是针对mac和linux的安装流程
 
 ### 3.1 运行环境和安装说明
 
@@ -49,9 +49,9 @@ python setup.py install
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 3.2 数据说明
-语义检索数据库的数据来自于[8000 多条保险行业问答数据](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/baoxianzhidao/intro.ipynb)，共包含 8000 多个问答对，并过滤选取了其中3788条问答对来搭建FAQ智能问答系统。
+FAQ智能问答数据库的数据来自于[8000 多条保险行业问答数据](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/baoxianzhidao/intro.ipynb)，共包含 8000 多个问答对，并过滤选取了其中3788条问答对来搭建FAQ智能问答系统。
 
-### 3.3 一键体验语义检索系统
+### 3.3 一键体验FAQ智能问答系统
 
 #### 3.3.1 快速一键启动
 
@@ -97,13 +97,16 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以保险数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name insurance \
-                            --doc_dir data/insurance
+                            --doc_dir data/insurance \
+                            --split_answers \
+                            --delete_index
 ```
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
 * `host`: Elasticsearch的IP地址
 * `port`: Elasticsearch的端口号
+* `split_answers`: 是否切分每一行的数据为query和answer两部分
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 ```
@@ -118,7 +121,7 @@ curl http://localhost:9200/insurance/_search
 
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
-# 指定语义检索系统的Yaml配置文件
+# 指定FAQ智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_faq.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
@@ -132,8 +135,9 @@ sh examples/frequently-asked-question/run_faq_server.sh
 
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "企业如何办理养老保险?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
-
 ```
+如果成功运行，则会返回结果。
+
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址
@@ -147,7 +151,7 @@ Linux 用户推荐采用 Shell 脚本来启动服务：：
 sh examples/frequently-asked-question/run_faq_web.sh
 ```
 
-到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
+到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验FAQ智能问答系统服务了。
 
 #### 3.4.5 数据更新
 

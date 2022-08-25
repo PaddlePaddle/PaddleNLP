@@ -155,52 +155,15 @@ def semantic_search(
     answers = response["documents"]
     for answer in answers:
         results.append({
-            "context": answer["content"],
-            "source": answer["meta"]["name"],
-            "relevance": round(answer["score"] * 100, 2),
-        })
-    return results, response
-
-
-def faq_search(
-        query,
-        filters={},
-        top_k_reader=5,
-        top_k_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
-    """
-    Send a query to the REST API and parse the answer.
-    Returns both a ready-to-use representation of the results and the raw JSON.
-    """
-
-    url = f"{API_ENDPOINT}/{DOC_REQUEST}"
-    params = {
-        "filters": filters,
-        "Retriever": {
-            "top_k": top_k_retriever
-        },
-        "Ranker": {
-            "top_k": top_k_reader
-        }
-    }
-    req = {"query": query, "params": params}
-    response_raw = requests.post(url, json=req)
-
-    if response_raw.status_code >= 400 and response_raw.status_code != 503:
-        raise Exception(f"{vars(response_raw)}")
-
-    response = response_raw.json()
-    if "errors" in response:
-        raise Exception(", ".join(response["errors"]))
-
-    # Format response
-    results = []
-    answers = response["documents"]
-    for answer in answers:
-        results.append({
-            "context": answer["content"],
-            "source": answer["meta"]["name"],
-            "answer": answer["meta"]["answer"],
-            "relevance": round(answer["score"] * 100, 2),
+            "context":
+            answer["content"],
+            "source":
+            answer["meta"]["name"],
+            "answer":
+            answer["meta"]["answer"]
+            if "answer" in answer["meta"].keys() else "",
+            "relevance":
+            round(answer["score"] * 100, 2),
         })
     return results, response
 

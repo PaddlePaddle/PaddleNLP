@@ -24,7 +24,7 @@ from annotated_text import annotation
 from markdown import markdown
 
 sys.path.append('ui')
-from utils import pipelines_is_ready, faq_search, send_feedback, upload_doc, pipelines_version, get_backlink
+from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink
 
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
@@ -59,7 +59,7 @@ def on_change_text():
 def main():
 
     st.set_page_config(
-        page_title="pipelines 语义检索",
+        page_title="pipelines FAQ智能问答",
         page_icon=
         "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
@@ -169,7 +169,7 @@ def main():
                 "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
                 "Do you want to optimize speed or accuracy? \n"):
             try:
-                st.session_state.results, st.session_state.raw_json = faq_search(
+                st.session_state.results, st.session_state.raw_json = semantic_search(
                     question,
                     top_k_reader=top_k_reader,
                     top_k_retriever=top_k_retriever)
