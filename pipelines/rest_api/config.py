@@ -24,6 +24,10 @@ INDEXING_PIPELINE_NAME = os.getenv("INDEXING_PIPELINE_NAME", "indexing")
 FILE_UPLOAD_PATH = os.getenv(
     "FILE_UPLOAD_PATH", str((Path(__file__).parent / "file-upload").absolute()))
 
+FILE_PARSE_PATH = os.getenv(
+    "FILE_PARSE_PATH",
+    str((Path(__file__).parent.parent / "parse_files").absolute()))
+
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 ROOT_PATH = os.getenv("ROOT_PATH", "/")
 
