@@ -159,7 +159,7 @@ add_custom_target(build_cpp_package_dir ALL
 # copy headers
 add_custom_target(copy_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory 
-    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include/faster_tokenizer
     DEPENDS build_cpp_package_dir)
 
 add_custom_target(copy_third_party_headers ALL
@@ -189,6 +189,11 @@ if (WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.dll ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.lib ${CPP_PACKAGE_DIR}/lib
         COMMAND ${CMAKE_COMMAND} -E copy ${ICU_DLL_DIR}/icudt70.dll ${ICU_DLL_DIR}/icuuc70.dll ${ICU_LIB_DIR}/icudt.lib ${ICU_LIB_DIR}/icuuc.lib ${CPP_PACKAGE_DIR}/third_party/lib
         DEPENDS build_cpp_package_dir core_tokenizers)
+elseif(APPLE)
+    set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.dylib")
+    add_custom_target(copy_shared_library ALL
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+        DEPENDS build_cpp_package_dir core_tokenizers)
 else()
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
     add_custom_target(copy_shared_library ALL
@@ -196,10 +201,7 @@ else()
         DEPENDS build_cpp_package_dir core_tokenizers)
 endif()
 
-
-
 add_custom_target(create_commit_id_file ALL
     COMMAND ${GIT_EXECUTABLE} log -1 --format=%H > ${CPP_PACKAGE_DIR}/commit.log
     DEPENDS copy_shared_library)
 endif(WITH_PYTHON)
-    
