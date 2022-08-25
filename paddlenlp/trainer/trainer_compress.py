@@ -49,6 +49,10 @@ def compress(self,
     args = self.args
     if "dynabert" in args.strategy:
         try_import('paddleslim')
+        if self.args.width_mult_list is not None:
+            self.args.width_mult_list = [
+                eval(width_mult) for width_mult in self.args.width_mult_list
+            ]
         self.custom_dynabert_evaluate = custom_dynabert_evaluate
         self.custom_dynabert_calc_loss = custom_dynabert_calc_loss
         class_name = self.model.__class__.__name__
@@ -441,7 +445,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 return ofa_model
 
     for idx, width_mult in enumerate(self.args.width_mult_list):
-        logger.info("Best acc of width_mult %s: %.4f" %
+        logger.info("Best result of width_mult %s: %.4f" %
                     (width_mult, best_acc[idx]))
     return ofa_model
 
@@ -568,9 +572,9 @@ def auto_model_forward(self,
             "You cannot specify both input_ids and inputs_embeds at the same time."
         )
     elif input_ids is not None:
-        input_shape = input_ids.shape
+        input_shape = paddle.shape(input_ids)
     elif inputs_embeds is not None:
-        input_shape = inputs_embeds.shape[:-1]
+        input_shape = paddle.shape(inputs_embeds)[:-1]
     else:
         raise ValueError(
             "You have to specify either input_ids or inputs_embeds")
