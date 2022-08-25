@@ -5,12 +5,13 @@ import sys
 import random
 import time
 
+sys.path.append('../recall/milvus')
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from paddle_serving_server.pipeline import PipelineClient
-from data import gen_id2corpus
 from milvus_util import RecallByMilvus
+from config import collection_name, partition_tag, embedding_name
 
 
 def recall_result(list_data):
@@ -28,14 +29,14 @@ def recall_result(list_data):
     return result
 
 
-def search_in_milvus(text_embedding, query_text, id2corpus):
-    collection_name = 'literature_search'
-    partition_tag = 'partition_2'
-    client = RecallByMilvus()
+def search_in_milvus(embeddings, query_text):
+    recall_client = RecallByMilvus()
     start_time = time.time()
-    status, results = client.search(collection_name=collection_name,
-                                    vectors=text_embedding,
-                                    partition_tag=partition_tag)
+    results = recall_client.search(embeddings,
+                                   embedding_name,
+                                   collection_name,
+                                   partition_names=[partition_tag],
+                                   output_fields=['pk', 'text'])
     end_time = time.time()
     print('Search milvus time cost is {} seconds '.format(end_time -
                                                           start_time))
@@ -44,7 +45,7 @@ def search_in_milvus(text_embedding, query_text, id2corpus):
         for item in line:
             idx = item.id
             distance = item.distance
-            text = id2corpus[idx]
+            text = item.entity.get('text')
             list_data.append([query_text, text, distance])
     df = pd.DataFrame(list_data, columns=['query_text', 'text', 'distance'])
     df.to_csv('recall_result.csv', index=False)
@@ -74,8 +75,6 @@ def rerank(df):
 
 if __name__ == "__main__":
     list_data = ["中西方语言与文化的差异"]
-    corpus_file = "milvus/milvus_data.csv"
-    id2corpus = gen_id2corpus(corpus_file)
     result = recall_result(list_data)
-    df = search_in_milvus(result, list_data[0], id2corpus)
+    df = search_in_milvus(result, list_data[0])
     rerank(df)

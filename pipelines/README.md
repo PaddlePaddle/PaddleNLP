@@ -1,6 +1,6 @@
 ## PaddleNLP Pipelines：智能文本产线
 
-PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **全场景**为用户提供**低门槛**构建强大**产品级系统**的能力。
+PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **全场景**，帮助用户**低门槛**构建强大**产品级系统**。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
@@ -29,7 +29,7 @@ PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了�
 | :floppy_disk: [快速安装](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#floppy_disk-安装) |安装 PaddleNLP Pipelines|
 | :beginner: [快速体验](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#beginner-快速体验) |基于 Pipelines 快速搭建语义检索/智能问答等产品系统|
 | :man_office_worker: [用户案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#man_office_worker-用户案例) |各行业用户基于PaddleNLP Pipelinse 构建的产品案例|
-| :mortar_board: [Tutorials](https://github.com/deepset-ai/haystack#mortar_board-tutorials) |像搭积木一样一步步构建产品级系统教程|
+| :mortar_board: [Tutorials](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#mortar_board-tutorials) |像搭积木一样一步步构建 NLP 流水线系统教程|
 | :bar_chart: [Benchmarks](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/benchmarks) |针对各场景模型的性能、精度评测指标|
 | :telescope: [Roadmap](https://github.com/PaddlePaddle/PaddleNLP) | PaddleNLP Pipelines 产品路线图|
 | :newspaper: [技术博客](https://github.com/PaddlePaddle/PaddleNLP) | 阅读 PaddleNLP Pipelines 系列技术文章|
@@ -57,21 +57,85 @@ python setup.py install
 
 ## :beginner: 快速体验
 
-您可以基于我们发布的 Docker 镜像一键搭建产品级语义检索系统进行快速体验。
+### 快速开发
 
-### CPU 镜像
-```
-docker pull paddlepaddle/paddlenlp:2.4.0
-docker run -d --name paddlenlp_pipelines --net host -ti paddlepaddle/paddlenlp:2.4.0
-```
-CPU 镜像下载大概耗时 20 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+您可以参考如下示例像搭积木一样快速构建语义检索流水线，通过命令行终端输出快速体验流水线系统效果
 
-### GPU 镜像
+```python
+from pipelines.document_stores import FAISSDocumentStore
+from pipelines.nodes import DensePassageRetriever, ErnieRanker
+
+# Step1: Initialize a FaissDocumentStore to store texts of documents
+document_store = FAISSDocumentStore(embedding_dim=768)
+document_store.write_documents(documents)
+
+# Step2: Initialize a DenseRetriever and build ANN index
+retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-dureader-query-encoder")
+document_store.update_embeddings(retriever)
+
+# Step3: Initialize a Ranker
+ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder")
+
+# Step4: Initialize a SemanticSearchPipeline and ask questions
+from pipelines import SemanticSearchPipeline
+pipeline = SemanticSearchPipeline(retriever, ranker)
+prediction = pipeline.run(query="亚马逊河流的相关介绍")
 ```
-docker pull paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
-nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti paddlepaddle/paddlenlp:2.4.0
+### 快速部署
+
+您可以基于我们发布的 Docker 镜像一键部署智能文本流水线系统，通过 Web UI 快速体验。
+
+#### 启动 elastic search
+
 ```
-GPU 镜像下载大概耗时 3 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+docker network create elastic
+docker pull docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms256m -Xmx256m"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+```
+
+#### 部署 CPU 服务
+```
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
+docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
+```
+CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
+#### 部署 GPU 服务
+```
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
+nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
+```
+GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
+
+对于国内用户，因为网络问题下载docker比较慢时，可使用百度提供的镜像：
+
+
+|  环境                         |   镜像 Tag               |    运行平台      |
+| :--------------------------: | :-------------------------------: | :-------------: |
+|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
+|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
+|  CUDA10.2 + cuDNN 7           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+
+如果您的机器不在中国大陆地区，我们推荐您使用DockerHub的镜像：
+
+|  环境                         |   镜像 Tag               |    运行平台      |
+| :--------------------------: | :-------------------------------: | :-------------: |
+|  CPU                         | paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
+|  CPU                         | paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
+|  CUDA10.2 + cuDNN 7           | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+
+对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 
 ## :man_office_worker: 用户案例
 
@@ -88,8 +152,8 @@ GPU 镜像下载大概耗时 3 分钟左右，容器启动成功后，通过浏�
 市面已有的工程规范查询系统解决方案一直延续着传统关键字词匹配的方式，依赖用户对对查询结果进行自行排序、筛选，甚至要再次人工查阅工程规范文件后，才能最终确认是否为想要查询的规范条款。传统规范查询系统至少需要进行 3~5 次查询才能找到用户想要的规范条款，而寻规系统是基于强大预训练模型构建起来的语义检索系统，针对 80% 的规范查询需求仅 **1 次查询** 就能精确命中查询意图，并返回查询条款的结果！
 
 ## :mortar_board: Tutorials
-- Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook]() | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
-- Tutorial 2 - 智能问答 Pipeline: [AIStudio notebook]() | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
+- Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
+- Tutorial 2 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">
