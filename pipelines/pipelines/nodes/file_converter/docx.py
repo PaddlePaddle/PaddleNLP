@@ -101,17 +101,17 @@ class DocxToTextConverter(BaseConverter):
             raise Exception(
                 "Language validation using 'valid_languages' is not supported by DocxToTextConverter."
             )
-
-        file = docx.Document(file_path)  # Creating word reader object.
+        # Creating word reader object.
+        file = docx.Document(file_path)
         documents = []
         text_dict = {}
-        # this part will parse the docs files with images, the text and the following images will be added as an document
+        # This part will parse the docs files with images, the text and the following images will be added as an document
         for i in range(len(file.paragraphs)):
             paragraph = file.paragraphs[i]
-            # extract text from the paragraph
+            # Extracting text from the paragraph
             if (paragraph.text):
                 if bool(text_dict):
-                    # the texts and corresponding images will be added into documents
+                    # The texts and corresponding images will be added into documents
                     meta_data = {}
                     meta_data['name'] = meta['name']
                     meta_data['images'] = text_dict['images']
@@ -121,41 +121,40 @@ class DocxToTextConverter(BaseConverter):
                         "meta": meta_data
                     }
                     documents.append(document)
-                # initialize a new dict and store new paragraph text
+                # Storing new paragraph text into a new dict
                 text = paragraph.text
                 text_dict = {'text': text, 'images': []}
+            # Extracting images from the paragraph
             else:
-                # extract image from the paragraph
                 image_list = self.get_image_list(file, paragraph)
                 if (image_list is None):
                     continue
                 for i, image in enumerate(image_list):
                     if image:
-                        # file extension
-                        ext = image.ext
-                        # file content
-                        blob = image.blob
-                        # using md5 to generate image name and save image into desc_path
+                        # File extension & file content
+                        ext, blob = image.ext, image.blob
+                        # Using md5 to generate image name and save image into desc_path
                         md5hash = hashlib.md5(blob)
                         md5_name = md5hash.hexdigest()
                         image_name = '{}_{}.{}'.format(md5_name, i, ext)
                         image_path = os.path.join(self.desc_path, image_name)
                         Image.open(BytesIO(blob)).save(image_path)
-                        # Add image_name into the text_dict as the image for the text
+                        # Adding image_name into the text_dict as the image for the text
                         text_dict['images'].append(image_name)
         return documents
 
     def get_image_list(self, document: Document, paragraph: Paragraph):
         """
+        Extract images from  paragraph and document object.
         :param document: file objects
         :param paragraph: image paragraph
         """
         result_list = []
-        # find the images of the paragraph
+        # Looking up the images of the paragraph
         img_list = paragraph._element.xpath('.//pic:pic')
         if len(img_list) == 0 or not img_list:
             return
-        # extract images from the document
+        # Extracting images from the document
         for i in range(len(img_list)):
             img: CT_Picture = img_list[i]
             embed = img.xpath('.//a:blip/@r:embed')[0]
