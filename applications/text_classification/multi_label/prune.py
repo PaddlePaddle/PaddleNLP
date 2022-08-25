@@ -44,7 +44,6 @@ class DataArguments:
     max_seq_length: int = field(default=128,metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
-
 @dataclass
 class ModelArguments:
     """
@@ -74,7 +73,6 @@ def dynabert_evaluate(model, data_loader):
                 (micro_f1_score, macro_f1_score))
     model.train()
     return macro_f1_score
-
 
 
 def main():

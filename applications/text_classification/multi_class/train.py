@@ -35,7 +35,6 @@ from utils import evaluate, preprocess_function, read_local_dataset
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-
 parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--dataset_dir", required=True, default=None, type=str, help="Local dataset directory should include train.txt, dev.txt and label.txt")
 parser.add_argument("--save_dir", default="./checkpoint", type=str, help="The output directory where the model checkpoints will be written.")
