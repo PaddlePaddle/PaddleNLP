@@ -36,10 +36,7 @@ ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
 
 class RobertaModelTester:
 
-    def __init__(self,
-                 parent,
-                 return_dict: bool = False,
-                 use_labels: bool = False):
+    def __init__(self, parent):
         self.parent = parent
         self.batch_size = 13
         self.seq_length = 7
@@ -65,8 +62,6 @@ class RobertaModelTester:
         self.num_labels = 3
         self.num_choices = 4
         self.scope = None
-        self.return_dict = return_dict
-        self.use_labels = use_labels
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -85,7 +80,7 @@ class RobertaModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
-        if self.use_labels:
+        if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size],
                                          self.type_sequence_label_size)
             token_labels = ids_tensor([self.batch_size, self.seq_length],
@@ -149,22 +144,16 @@ class RobertaModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
+                       return_dict=self.parent.return_dict)
         result = model(input_ids,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict)
-        result = model(input_ids, return_dict=self.return_dict)
-
-        if self.return_dict:
-            last_hidden_state = result.last_hidden_state
-            pooler_output = result.pooler_output
-        else:
-            last_hidden_state, pooler_output = result[0], result[1]
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(
-            last_hidden_state.shape,
+            result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(pooler_output.shape,
+        self.parent.assertEqual(result[1].shape,
                                 [self.batch_size, self.hidden_size])
 
     def create_and_check_for_causal_lm(
@@ -183,14 +172,15 @@ class RobertaModelTester:
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        labels=token_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_masked_lm(
         self,
@@ -208,14 +198,16 @@ class RobertaModelTester:
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        labels=token_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
+
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_token_classification(
         self,
@@ -234,16 +226,17 @@ class RobertaModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict,
+                       return_dict=self.parent.return_dict,
                        labels=token_labels)
 
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.num_labels])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -262,13 +255,14 @@ class RobertaModelTester:
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        labels=sequence_labels,
-                       return_dict=self.return_dict)
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+                       return_dict=self.parent.return_dict)
 
-        self.parent.assertEqual(result.shape,
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_labels])
 
     def create_and_check_for_multiple_choice(
@@ -292,15 +286,15 @@ class RobertaModelTester:
         result = model(multiple_choice_inputs_ids,
                        attention_mask=multiple_choice_input_mask,
                        token_type_ids=multiple_choice_token_type_ids,
-                       return_dict=self.return_dict,
+                       return_dict=self.parent.return_dict,
                        labels=choice_labels)
 
-        if self.return_dict:
-            result = result.logits
-        elif self.use_labels:
-            result = result[1]
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
-        self.parent.assertEqual(result.shape,
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_choices])
 
     def create_and_check_for_question_answering(
@@ -318,13 +312,11 @@ class RobertaModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.return_dict,
+                       return_dict=self.parent.return_dict,
                        start_positions=sequence_labels,
                        end_positions=sequence_labels)
 
-        if self.return_dict:
-            start_logits, end_logits = result.start_logits, result.end_logits
-        elif self.use_labels:
+        if sequence_labels is not None:
             start_logits, end_logits = result[1], result[2]
         else:
             start_logits, end_logits = result[0], result[1]
@@ -376,9 +368,7 @@ class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
     all_generative_model_classes = (RobertaForCausalLM, )
 
     def setUp(self):
-        self.model_tester = RobertaModelTester(self,
-                                               return_dict=self.return_dict,
-                                               use_labels=self.use_labels)
+        self.model_tester = RobertaModelTester(self)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
