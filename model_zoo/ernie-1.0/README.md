@@ -101,12 +101,14 @@ python -u  -m paddle.distributed.launch \
     run_pretrain.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
     --split 949,50,1 \
     --max_seq_len 512 \
     --micro_batch_size 64 \
     --use_amp true \
+    --fp16_opt_level O2 \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
     --max_steps 1000000 \
@@ -125,12 +127,15 @@ python -u  -m paddle.distributed.launch \
 
 其中参数释义如下：
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `tokenizer_name_or_path` 模型词表文件所在的文件夹，或者PaddleNLP内置tokenizer的名字。
+- `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
 - `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
 - `max_seq_len` 输入文本序列的长度。
 - `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
 - `use_amp` 开启混合精度策略。
+- `fp16_opt_level` 混合精度策略，支持O1 自动混合精度，O2 pure fp16精度训练。
 - `max_lr` 训练学习率。
 - `min_lr` 学习率衰减的最小值。
 - `max_steps` 最大训练步数。
