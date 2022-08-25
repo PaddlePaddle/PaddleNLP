@@ -170,12 +170,18 @@ class ErnieDualEncoder(nn.Layer):
                                                         query_attention_mask)
 
         pos_title_cls_embedding = self.get_pooled_embedding(
-            pos_title_input_ids, pos_title_token_type_ids,
-            pos_title_position_ids, pos_title_attention_mask)
+            pos_title_input_ids,
+            pos_title_token_type_ids,
+            pos_title_position_ids,
+            pos_title_attention_mask,
+            is_query=False)
 
         neg_title_cls_embedding = self.get_pooled_embedding(
-            neg_title_input_ids, neg_title_token_type_ids,
-            neg_title_position_ids, neg_title_attention_mask)
+            neg_title_input_ids,
+            neg_title_token_type_ids,
+            neg_title_position_ids,
+            neg_title_attention_mask,
+            is_query=False)
 
         all_title_cls_embedding = paddle.concat(
             x=[pos_title_cls_embedding, neg_title_cls_embedding], axis=0)
