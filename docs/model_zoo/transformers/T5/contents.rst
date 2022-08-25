@@ -33,6 +33,9 @@ T5模型汇总
 |``Langboat/mengzi-t5-base``                                                       | Chinese      | Please refer to:                                                                 |                                   
 |                                                                                  |              | `Langboat/mengzi-t5-base`_                                                       |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``Langboat/mengzi-t5-base-mt``                                                    | Chinese      | Please refer to:                                                                 |                                   
+|                                                                                  |              | `Langboat/mengzi-t5-base-mt`_                                                    |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 |``deep-learning-analytics/wikihow-t5-small``                                      | English      | Please refer to:                                                                 |                                   
 |                                                                                  |              | `deep-learning-analytics/wikihow-t5-small`_                                      |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
@@ -156,6 +159,7 @@ T5模型汇总
 .. _t5-v1_1-base: https://huggingface.co/google/t5-v1_1-base
 .. _t5-v1_1-large: https://huggingface.co/google/t5-v1_1-large
 .. _Langboat/mengzi-t5-base: https://huggingface.co/Langboat/mengzi-t5-base
+.. _Langboat/mengzi-t5-base-mt: https://huggingface.co/Langboat/mengzi-t5-base-mt
 .. _deep-learning-analytics/wikihow-t5-small: https://huggingface.co/deep-learning-analytics/wikihow-t5-small
 .. _sberbank-ai/ruT5-base: https://huggingface.co/sberbank-ai/ruT5-base
 .. _Michau/t5-base-en-generate-headline: https://huggingface.co/Michau/t5-base-en-generate-headline
