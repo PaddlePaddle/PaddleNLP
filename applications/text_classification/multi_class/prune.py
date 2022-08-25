@@ -42,12 +42,14 @@ class DataArguments:
     max_seq_length: int = field(default=128,metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
+
 @dataclass
 class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
+
 # yapf: enable
 
 

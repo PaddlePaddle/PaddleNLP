@@ -266,11 +266,12 @@ def calc_loss(loss_fct, model, batch, head_mask):
     logits = model(batch["input_ids"],
                    batch["token_type_ids"],
                    attention_mask=[None, head_mask])
-    if "QuestionAnswering" in model.__class__.__name__:
+    class_name = model.__class__.__name__
+    if "QuestionAnswering" in class_name:
         start_logits, end_logits = logits
         loss = (loss_fct(start_logits, batch["start_positions"]) +
                 loss_fct(end_logits, batch["end_positions"])) / 2
-    elif "TokenClassification" in model.__class__.__name__ or "SequenceClassification" in model.__class__.__name__:
+    elif "TokenClassification" in class_name or "SequenceClassification" in class_name:
         loss = loss_fct(logits, batch["labels"])
     else:
         raise NotImplementedError(
@@ -336,7 +337,7 @@ def compute_neuron_head_importance(model,
     for w in intermediate_weight:
         neuron_importance.append(np.zeros(shape=[w.shape[1]], dtype='float32'))
 
-    for batch in data_loader:
+    for i, batch in enumerate(data_loader):
         if custom_dynabert_calc_loss is not None:
             loss = custom_dynabert_calc_loss(loss_fct, model, batch, head_mask)
         else:

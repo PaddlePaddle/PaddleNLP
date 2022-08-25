@@ -170,12 +170,18 @@ class ErnieDualEncoder(nn.Layer):
                                                         query_attention_mask)
 
         pos_title_cls_embedding = self.get_pooled_embedding(
-            pos_title_input_ids, pos_title_token_type_ids,
-            pos_title_position_ids, pos_title_attention_mask)
+            pos_title_input_ids,
+            pos_title_token_type_ids,
+            pos_title_position_ids,
+            pos_title_attention_mask,
+            is_query=False)
 
         neg_title_cls_embedding = self.get_pooled_embedding(
-            neg_title_input_ids, neg_title_token_type_ids,
-            neg_title_position_ids, neg_title_attention_mask)
+            neg_title_input_ids,
+            neg_title_token_type_ids,
+            neg_title_position_ids,
+            neg_title_attention_mask,
+            is_query=False)
 
         all_title_cls_embedding = paddle.concat(
             x=[pos_title_cls_embedding, neg_title_cls_embedding], axis=0)
@@ -268,9 +274,10 @@ class ErnieCrossEncoder(nn.Layer):
                               position_ids=position_ids,
                               attention_mask=attention_mask,
                               return_prob_distributation=True)
-        accuracy = paddle.metric.accuracy(input=probs, label=labels)
-        loss = F.cross_entropy(input=logits, label=labels)
-
-        outputs = {"loss": loss, "accuracy": accuracy}
-
-        return outputs
+        if (labels is not None):
+            accuracy = paddle.metric.accuracy(input=probs, label=labels)
+            loss = F.cross_entropy(input=probs, label=labels)
+            outputs = {"loss": loss, "accuracy": accuracy}
+            return outputs
+        else:
+            return probs[:, 1]
