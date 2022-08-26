@@ -127,8 +127,6 @@ def text_to_text(path):
                 words = seg_func(line)
                 final += " ".join(words) + "\n"
             f.write(final + "\n")
-            # if count % 100 == 0:
-            #     print("speed: ", data_len/1024/(time.time() - s))
 
     return data_len, None
 

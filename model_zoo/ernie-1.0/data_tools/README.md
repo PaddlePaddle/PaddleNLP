@@ -24,6 +24,7 @@
 `dataset_utils.py`中包含了index生成、动态mask的实现。
 `ernie_dataset.py`通过调用`dataset_utils.py`的一些函数，产生ernie的输入dataset。
 
+
 ### 环境依赖
 
  - tqdm
@@ -49,7 +50,19 @@
 |token动态mask（可选）| Dataset取数据 | 无 |-
 
 
-## ERNIE预训练例子
+## 数据教程汇总
+
+针对目前开源的数据集，PaddleNLP提供了详细的数据教程，点击对应数据集的链接，即可开始进行数据制作：
+
+| 名称 | 文本类型 | 纯文本大小 | 适配模型
+|-|-|-|-|
+| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)| 中文 | 14GB
+| ERNIE
+| [OpenWebText2](./docs/OpenWebText2.md) | 英文 | 70GB | GPT
+| [WuDaoCorpus2.0 Base](./docs/WuDaoCorpusBase.md)| 中文 |  200GB | ERNIE
+| [CLUECorpus2020](./docs/CLUECorpus2020.md)| 中文 | 200GB | ERNIE
+
+## ERNIE预训练详细准备
 
 下面以ERNIE预训练为例，简要介绍一下预训练的全流程。
 
@@ -169,6 +182,7 @@ python -u  create_pretraining_data.py \
 1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
 2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
 
+
 ### Ernie预训练开始
 得到了处理好的训练数据，就可以开始Ernie模型的预训练了。ernie预训练的代码在`model_zoo/ernie-1.0`。
 简单将预处理好的数据，拷贝到data目录，即可开始Ernie模型预训练。
@@ -196,51 +210,3 @@ sh run_static.sh
 ## 参考内容
 
 注: 大部分数据流程，参考自[Megatron](https://github.com/NVIDIA/Megatron-LM)，特此表达感谢。
-
-
-# 附录
-
-## CLUECorpusSmall 数据集处理教程
-**数据集简介**：可用于语言建模、预训练或生成型任务等，数据量超过14G，近4000个定义良好的txt文件、50亿个字。主要部分来自于nlp_chinese_corpus项目
-包含如下子语料库（总共14G语料）：新闻语料[news2016zh_corpus.zip](https://bj.bcebos.com/v1/ai-studio-online/6bac09db4e6d4857b6d680d34447457490cb2dbdd8b8462ea1780a407f38e12b?responseContentDisposition=attachment%3B%20filename%3Dnews2016zh_corpus.zip)， 社区互动语料[webText2019zh_corpus.zip](https://bj.bcebos.com/v1/ai-studio-online/83da03f7b4974871a52348b41c16c7e3b34a26d5ca644f558df8435be4de51c3?responseContentDisposition=attachment%3B%20filename%3DwebText2019zh_corpus.zip)，维基百科语料[wiki2019zh_corpus.zip](https://bj.bcebos.com/v1/ai-studio-online/d7a166408d8b4ffdaf4de9cfca09f6ee1e2340260f26440a92f78134d068b28f?responseContentDisposition=attachment%3B%20filename%3Dwiki2019zh_corpus.zip)，评论数据语料[comment2019zh_corpus.zip](https://bj.bcebos.com/v1/ai-studio-online/b66ddd445735408383c42322850ac4bb82faf9cc611447c2affb925443de7a6d?responseContentDisposition=attachment%3B%20filename%3Dcomment2019zh_corpus.zip)。
-
-**数据集下载**：
-用户可以通过官方github网页下载，https://github.com/CLUEbenchmark/CLUECorpus2020 。同时，为方便用户，我们也提供了aistudio数据集下载地址。[part1](https://aistudio.baidu.com/aistudio/datasetdetail/60598)，[part2](https://aistudio.baidu.com/aistudio/datasetdetail/124357)。使用aistudio版本的数据，下载好后，可以核对md5值：
-```shell
-> md5sum ./*
- 8a8be341ebce39cfe9524fb0b46b08c5  ./comment2019zh_corpus.zip
- 4bdc2c941a7adb4a061caf273fea42b8  ./news2016zh_corpus.zip
- fc582409f078b10d717caf233cc58ddd  ./webText2019zh_corpus.zip
- 157dacde91dcbd2e52a60af49f710fa5  ./wiki2019zh_corpus.zip
-```
-解压文件
-```shell
-unzip comment2019zh_corpus.zip -d  clue_corpus_small_14g/comment2019zh_corpus
-unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus
-unzip webText2019zh_corpus.zip -d  clue_corpus_small_14g/webText2019zh_corpus
-unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
-```
-将txt文件转换为jsonl格式
-```
-python trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
-```
-现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
-```
-python -u  create_pretraining_data.py \
-    --model_name ernie-1.0-base-zh \
-    --tokenizer_name ErnieTokenizer \
-    --input_path clue_corpus_small_14g.jsonl \
-    --split_sentences\
-    --chinese \
-    --cn_whole_word_segment \
-    --cn_seg_func jieba \
-    --output_prefix clue_corpus_small_14g_20220104 \
-    --workers 48 \
-    --log_interval 10000
-```
-数据共有文档`15702702`条左右，由于分词比较耗时，大概一小时左右可以完成。在当前目录下产出训练所需数据。
-```
-clue_corpus_small_14g_20220104_ids.npy
-clue_corpus_small_14g_20220104_idx.npz
-```
-用户可以使用此数据进行预训练任务。
