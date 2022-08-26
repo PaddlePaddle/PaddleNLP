@@ -782,8 +782,8 @@ class GPTModel(GPTPretrainedModel):
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Its data type should be float32.
-                The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
+                Its data type should be int64.
+                The `masked` tokens have `0` values, and the `unmasked` tokens have `1` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
@@ -842,9 +842,9 @@ class GPTModel(GPTPretrainedModel):
                 attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & casual_mask)) * -1e9
+            attention_mask = (1.0 - (attention_mask & casual_mask)) * -1e4
         else:
-            attention_mask = (1.0 - casual_mask) * -1e9
+            attention_mask = (1.0 - casual_mask) * -1e4
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 

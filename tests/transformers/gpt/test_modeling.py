@@ -151,11 +151,6 @@ class GPTModelTester:
             "pad_token_id": self.pad_token_id,
         }
 
-    def get_pipeline_config(self):
-        config = self.get_config()
-        config.vocab_size = 300
-        return config
-
     def prepare_config_and_inputs_for_decoder(self):
         (
             config,
@@ -429,7 +424,6 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
                          GPTForTokenClassification)
     all_generative_model_classes = {GPTLMHeadModel: (GPTModel, "gpt")}
     all_parallelizable_model_classes = (GPTLMHeadModel)
-    fx_compatible = True
     test_missing_keys = False
     test_model_parallel = True
 
@@ -552,15 +546,9 @@ class GPT2ModelLanguageGenerationTest(unittest.TestCase):
 
     def _test_lm_generate_gpt_helper(
         self,
-        reorder_and_upcast_attn=False,
-        scale_attn_by_inverse_layer_idx=False,
         verify_outputs=True,
     ):
-        model = GPTLMHeadModel.from_pretrained(
-            "gpt2-en",
-            reorder_and_upcast_attn=False,
-            scale_attn_by_inverse_layer_idx=False,
-        )
+        model = GPTLMHeadModel.from_pretrained("gpt2-en")
         model.eval()
 
         # The dog
@@ -598,15 +586,6 @@ class GPT2ModelLanguageGenerationTest(unittest.TestCase):
     @slow
     def test_lm_generate_gpt(self):
         self._test_lm_generate_gpt_helper()
-
-    @slow
-    def test_lm_generate_gpt_with_reorder_and_upcast_attn(self):
-        self._test_lm_generate_gpt_helper(reorder_and_upcast_attn=True)
-
-    @slow
-    def test_lm_generate_gpt_with_scale_attn_by_inverse_layer_idx(self):
-        self._test_lm_generate_gpt_helper(scale_attn_by_inverse_layer_idx=True,
-                                          verify_outputs=False)
 
     @slow
     def test_gpt_sample(self):

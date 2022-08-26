@@ -33,6 +33,7 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = GPTTokenizer
     from_pretrained_kwargs = {"add_prefix_space": True}
     test_seq2seq = False
+    test_offsets = False
 
     def setUp(self):
         super().setUp()
@@ -205,6 +206,3 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 list(
                     self.tokenizer_class.pretrained_resource_files_map.values())
                 [0]), 1)
-
-    def test_offsets_mapping(self):
-        pass
