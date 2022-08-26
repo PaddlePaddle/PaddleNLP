@@ -162,13 +162,19 @@ class TinyBertModelTester:
             input_mask = input_mask.unsqueeze(1).expand(
                 [-1, self.config.num_choices, -1])
 
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=choice_labels,
+                       return_dict=self.parent.return_dict)
+
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(
-            result.shape, [self.config.batch_size, self.config.num_choices])
+            result[0].shape, [self.config.batch_size, self.config.num_choices])
 
     def create_and_check_for_masked_lm(self, config, input_ids: Tensor,
                                        token_type_ids: Tensor,
@@ -180,9 +186,17 @@ class TinyBertModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(
-            result.shape,
+            result[0].shape,
             [self.config.batch_size, self.config.seq_length, self.vocab_size])
 
     def create_and_check_for_question_answering(self, config, input_ids: Tensor,
@@ -193,11 +207,17 @@ class TinyBertModelTester:
                                                 choice_labels: Tensor):
         model = TinyBertForQuestionAnswering(TinyBertModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(
             result[0].shape, [self.config.batch_size, self.config.seq_length])
         self.parent.assertEqual(
@@ -210,13 +230,19 @@ class TinyBertModelTester:
         model = TinyBertForSequenceClassification(
             TinyBertModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=sequence_labels,
+                       return_dict=self.parent.return_dict)
+
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(
-            result.shape, [self.config.batch_size, self.config.num_classes])
+            result[0].shape, [self.config.batch_size, self.config.num_classes])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
