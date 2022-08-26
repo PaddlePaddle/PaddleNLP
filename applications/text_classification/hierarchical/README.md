@@ -1,9 +1,8 @@
 # 层次分类指南
 
-## 目录
-
-  - [1. 层次分类简介](#层次分类简介)
-  - [2. 快速开始](#快速开始)
+**目录**
+- [1. 层次分类简介](#层次分类简介)
+- [2. 快速开始](#快速开始)
     - [2.1 运行环境](#运行环境)
     - [2.2 代码结构](#代码结构)
     - [2.3 数据准备](#数据准备)
@@ -177,7 +176,8 @@ data/
 ### 2.4 模型训练
 
 #### 2.4.1 预训练模型微调
-使用CPU/GPU训练：
+
+使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
 python train.py \
     --device "gpu" \
@@ -186,7 +186,7 @@ python train.py \
     --batch_size 32 \
     --early_stop
 ```
-默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
 ```shell
@@ -198,7 +198,7 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py
     --early_stop
 ```
 
-如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练：
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
@@ -210,7 +210,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --early_stop
 ```
 
-使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
+
 
 可支持配置的参数：
 
@@ -250,19 +250,11 @@ checkpoint/
 
 #### 2.4.2 训练评估与模型优化
 
-训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case）：
+训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python evaluate.py \
-    --device "gpu" \
-    --dataset_dir "../data" \
-    --params_path "../checkpoint" \
-    --max_seq_length 128 \
-    --batch_size 32 \
-    --bad_case_path "./bad_case.txt"
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt"
 ```
-
-默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
 
 输出打印示例：
 
@@ -299,12 +291,11 @@ Prediction    Label    Text
 模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 #### 2.4.3 模型预测
-训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行。
+训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
 
 ```shell
 python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
 ```
-默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
 
 可支持配置的参数：
 
@@ -316,7 +307,10 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
 * `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
-#### 2.4.4 静态图导出
+
+### 2.5 模型部署
+
+#### 2.5.1 静态图导出
 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
 
@@ -338,9 +332,7 @@ export/
 └── float32.pdmodel
 ```
  导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
-
-### 2.5 模型部署
-#### 2.5.1 模型裁剪
+#### 2.5.2 模型裁剪
 
 如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 压缩(Compression API）, 一行命令即可启动模型裁剪。
 
@@ -400,13 +392,13 @@ prune/
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
 
-#### 2.5.2 部署方案
+#### 2.5.3 部署方案
 
 - 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
 
 - 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
 
-### 2.6 效果展示
+### 2.6 模型效果
 
 我们在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)的多标签层次数据集评测模型表现，测试配置如下：
 
