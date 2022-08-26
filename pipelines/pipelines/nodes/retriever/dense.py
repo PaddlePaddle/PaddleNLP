@@ -133,7 +133,6 @@ class DensePassageRetriever(BaseRetriever):
                 "This can be set when initializing the DocumentStore")
 
         # Init & Load Encoders
-        #self.query_encoder = ErnieDualEncoder.from_pretrained(query_embedding_model)
         self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
                                                    passage_embedding_model)
         self.query_tokenizer = AutoTokenizer.from_pretrained(
@@ -248,7 +247,6 @@ class DensePassageRetriever(BaseRetriever):
         ) as progress_bar:
             for batch in data_loader:
                 input_ids, token_type_ids = batch
-                #input_ids, token_type_ids, label_ids = batch
                 with paddle.no_grad():
                     cls_embeddings = self.ernie_dual_encoder.get_pooled_embedding(
                         input_ids=input_ids, token_type_ids=token_type_ids)

@@ -29,6 +29,7 @@ from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 from paddle.optimizer.lr import LambdaDecay
+from ..utils.log import logger
 
 __all__ = [
     "TrainOutput",
@@ -390,12 +391,13 @@ def log_metrics(self, split, metrics):
     if not self.is_world_process_zero():
         return
 
-    print(f"***** {split} metrics *****")
+    logger.info(f"***** {split} metrics *****")
     metrics_formatted = self.metrics_format(metrics)
     k_width = max(len(str(x)) for x in metrics_formatted.keys())
     v_width = max(len(str(x)) for x in metrics_formatted.values())
     for key in sorted(metrics_formatted.keys()):
-        print(f"  {key: <{k_width}} = {metrics_formatted[key]:>{v_width}}")
+        logger.info(
+            f"  {key: <{k_width}} = {metrics_formatted[key]:>{v_width}}")
 
 
 def save_metrics(self, split, metrics, combined=True):
