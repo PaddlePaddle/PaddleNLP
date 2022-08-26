@@ -172,7 +172,7 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_add_bos_token_slow(self):
         bos_token = "$$$"
-        tokenizer = GPTTokenizer.from_pretrained("qnmd",
+        tokenizer = GPTTokenizer.from_pretrained(self.tmpdirname,
                                                  bos_token=bos_token,
                                                  add_bos_token=True)
 
