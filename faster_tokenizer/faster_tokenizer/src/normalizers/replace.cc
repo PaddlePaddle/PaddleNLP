@@ -42,7 +42,7 @@ void to_json(nlohmann::json& j, const ReplaceNormalizer& replace_normalizer) {
 
 void from_json(const nlohmann::json& j, ReplaceNormalizer& replace_normalizer) {
   replace_normalizer.pattern_ =
-      utils::make_unique<re2::RE2>(std::string(j.at("pattern")));
+      utils::make_unique<re2::RE2>(j.at("pattern").get<std::string>());
   j.at("content").get_to(replace_normalizer.content_);
 }
 

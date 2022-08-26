@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
-option(WITH_TESTING     "Compile PaddleNLP tokenizers with unit testing"        ON)
-option(WITH_PYTHON      "Compile PaddlePaddle with python interpreter"  ON)
+option(WITH_TESTING     "Compile PaddleNLP faster_tokenizer with unit testing"        OFF)
+option(WITH_PYTHON      "Compile PaddleNLP faster_tokenizer with python interpreter"   ON)
 add_definitions(-DFASTERTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -18,6 +18,9 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 if(NOT WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed")
+    endif()
 else()
     set(CMAKE_CXX_STANDARD 11)
 endif()
