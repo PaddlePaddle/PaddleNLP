@@ -18,6 +18,7 @@
 ├── Makefile
 ├── README.md
 └── trans_to_json.py
+
 ```
 其中，`trans_to_json.py`是原始数据转化的脚本，将数据转化为json串格式。
 `create_pretraining_data.py`将jsonl文本，断句、分词后，tokenizer转化为token id。
@@ -56,8 +57,7 @@
 
 | 名称 | 文本类型 | 纯文本大小 | 适配模型
 |-|-|-|-|
-| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)| 中文 | 14GB
-| ERNIE
+| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)| 中文 | 14GB | ERNIE
 | [OpenWebText2](./docs/OpenWebText2.md) | 英文 | 70GB | GPT
 | [WuDaoCorpus2.0 Base](./docs/WuDaoCorpusBase.md)| 中文 |  200GB | ERNIE
 | [CLUECorpus2020](./docs/CLUECorpus2020.md)| 中文 | 200GB | ERNIE
@@ -73,6 +73,7 @@ mkdir data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/baike.txt
 cd ..
 ```
+
 ### 原始数据转换 jsonl 格式
 使用`trans_to_json.py`转化为json串格式，下面是脚本的使用说明
 ```
