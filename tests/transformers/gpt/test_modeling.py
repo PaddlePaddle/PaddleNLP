@@ -435,6 +435,9 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = GPTModelTester(self)
+        random.seed(128)
+        np.random.seed(128)
+        paddle.seed(128)
 
     def test_gpt_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
