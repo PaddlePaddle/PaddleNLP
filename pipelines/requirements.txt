@@ -12,7 +12,7 @@ python-docx
 nltk
 pdfplumber
 faiss-cpu>=1.7.2
-opencv-python
+opencv-python>=4.4
 opencv-contrib-python-headless
 python-multipart
 st-annotated-text
