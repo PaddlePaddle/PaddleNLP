@@ -173,6 +173,9 @@ def semantic_search(
             answer["content"],
             "source":
             answer["meta"]["name"],
+            "answer":
+            answer["meta"]["answer"]
+            if "answer" in answer["meta"].keys() else "",
             "relevance":
             round(answer["score"] * 100, 2),
             "images":
