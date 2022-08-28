@@ -80,8 +80,8 @@ class Sampler(object):
     nan, idt, num, ostr, anno = 0, 1, 2, 3, 4
     var, func = -1, -2
 
-    def __init__(self, cont, tokenizer, seg_id: int, seq_length: int):
-        # cont: item: [name: str, begin: int, end: int, type: int]
+    def __init__(self, cont, tokenizer, seg_id: int, seq_length: int = 1025):
+        # sp: item: [name: str, begin: int, end: int, type: int]
         self.cont, self.sp = '\n' + cont + '\n\n', []
         self.stat = self.nan
         # mp: {identifier: str -> [rank: int, first_appearance: int]}
@@ -90,7 +90,6 @@ class Sampler(object):
         self.err = False
         try:
             self._load()
-            self._filter()
         except IndexError:
             self.err = True
 
@@ -171,7 +170,7 @@ class Sampler(object):
                 bcnt += int(x == '{') - int(x == '}')
         if buf and self.stat == self.idt:
             self.sp.append([buf, len(self.cont) - len(buf),
-                           len(self.cont), self.idt])
+                            len(self.cont), self.idt])
         self.sp.append(
             ['', len(self.cont) + 10, len(self.cont) + 10, self.idt])
 
@@ -186,7 +185,69 @@ class Sampler(object):
                 continue
             self.mp[it[0]] = it[1]
 
+    def _filter2(self):
+        seg, cnt, i = [], 0, 0
+        ctxt = self.cont.split('\n')
+        for line in ctxt:
+            cnt += len(line) + 1
+            seg.append(cnt)
+
+        vtxt = [list() for _ in range(len(seg))]
+        for name, begin, end, _ in self.sp:
+            if name in self.ignore or self.builtin(name):
+                continue
+            if not name:
+                break
+            while begin >= seg[i]:
+                i += 1
+            vtxt[i].append(name)
+            if name not in self.mp:
+                self.mp[name] = i
+
+        return ctxt, vtxt
+
+    def prompt(self, siz: int):
+        ctxt, vtxt = self._filter2()
+        vlen = np.zeros(len(ctxt))
+
+        head, comma = self.tokenizer('global = '), self.tokenizer(', ')
+        length = len(head) + 1
+        vbuf, vcnt, vmap = [], 0, dict()
+        cbuf = []
+        i = len(vlen)
+        for i in range(len(vlen) - 1, -1, -1):
+            vids = list(map(lambda y: self.tokenizer(y) + comma,
+                            filter(lambda x: x not in vmap, vtxt[i])))
+            cids = self.tokenizer('\n' + ctxt[i])
+            vl = sum(map(len, vids))
+            if length + vl - vlen[i] + len(vids) > siz:
+                break
+            length += vl - vlen[i]
+            cbuf.append(cids)
+            for j, v in enumerate(vtxt[i]):
+                if v not in vmap:
+                    ids = self.tokenizer(v) + comma
+                    vbuf.append([ids, (i, j)])
+                    vmap[v], vcnt = vcnt, vcnt + 1
+                    vlen[self.mp[v]] += len(ids)
+                    length += len(ids)
+                else:
+                    vbuf[vmap[v]][1] = (i, j)
+        globv = []
+        for k, idx in vmap.items():
+            if self.mp[k] < i:
+                globv.append(vbuf[idx])
+        globv.sort(key=lambda x: x[1])
+        for v in globv:
+            head += v[0]
+        idx = len(head)
+        for v in reversed(cbuf):
+            head += v
+        head[idx] = self.seg_id
+        return head
+
     def collect(self):
+        self._filter()
         ret = ([], [], [])  # item = ([ids], [i: loss_mask_head], [j: len])
         if self.err:
             return ret
@@ -239,9 +300,26 @@ def process(jsonl, key: str, tokenizer, seq_length: int = 1024):
     def tk(x):
         return tokenizer(x)['input_ids']
 
-    seq_length += 1
     return Sampler(json.loads(jsonl)[key], tk,
-                   tokenizer.eos_token_id, seq_length).collect()
+                   tokenizer.eos_token_id, seq_length + 1).collect()
+
+
+def prompt_ids(content: str, tokenizer, size: int = 80):
+    """
+    For example:
+    from tio_gen import prompt_ids
+
+    args = get_args()
+    tokenizer = GPTTokenizer(args.vocab_file, args.merge_file)
+    ids = prompt_ids(args.content, tokenizer, args.size)
+
+    print(tokenizer.convert_ids_to_string(ids))
+    """
+
+    def tk(x):
+        return tokenizer(x)['input_ids']
+
+    return Sampler(content, tk, tokenizer.eos_token_id).prompt(size)
 
 
 def test():
