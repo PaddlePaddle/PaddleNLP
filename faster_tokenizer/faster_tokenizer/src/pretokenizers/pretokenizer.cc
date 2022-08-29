@@ -55,6 +55,37 @@ bool BytesToCharOffsetConverter::convert(const core::Offset& offset,
   return true;
 }
 
+
+CharToBytesOffsetConverter::CharToBytesOffsetConverter(const std::string& seq)
+    : OffsetConverter(seq) {
+  std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+  std::u32string u32seq = conv.from_bytes(seq);
+  uint32_t index = 0;
+  offset_map_.reserve(u32seq.length() * 4);
+  for (int i = 0; i < u32seq.length(); ++i) {
+    offset_map_.push_back(index);
+    auto utf8_len = faster_tokenizer::utils::GetUTF8CharLen(u32seq[i]);
+    index += utf8_len;
+  }
+  offset_map_.push_back(index);
+}
+
+bool CharToBytesOffsetConverter::convert(const core::Offset& offset,
+                                         core::Offset* result) const {
+  size_t char_start = offset.first;
+  size_t char_end = offset.second;
+  if (offset_map_.size() <= char_start) {
+    return false;
+  }
+  auto byte_start = offset_map_.at(char_start);
+  auto byte_end = byte_start + 1;
+  if (offset_map_.size() > char_end) {
+    byte_end = offset_map_.at(char_end);
+  }
+  *result = {byte_start, byte_end};
+  return true;
+}
+
 PreTokenizedString::PreTokenizedString(const std::string& original)
     : original_(original) {
   splits_.emplace_back(std::move(StringSplit(original_)));
