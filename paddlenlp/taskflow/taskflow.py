@@ -38,6 +38,7 @@ from .dialogue import DialogueTask
 from .information_extraction import UIETask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask
+from .text_classification import TextClassificationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -192,34 +193,9 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-simbert-base-chinese"
             },
-            "rocketqa-zh-dureader-cross-encoder": {
-                "task_class": TextSimilarityTask,
-                "task_flag":
-                'text_similarity-rocketqa-zh-dureader-cross-encoder',
-            },
-            "rocketqa-base-cross-encoder": {
-                "task_class": TextSimilarityTask,
-                "task_flag": 'text_similarity-rocketqa-base-cross-encoder',
-            },
-            "rocketqa-medium-cross-encoder": {
-                "task_class": TextSimilarityTask,
-                "task_flag": 'text_similarity-rocketqa-medium-cross-encoder',
-            },
-            "rocketqa-mini-cross-encoder": {
-                "task_class": TextSimilarityTask,
-                "task_flag": 'text_similarity-rocketqa-mini-cross-encoder',
-            },
-            "rocketqa-micro-cross-encoder": {
-                "task_class": TextSimilarityTask,
-                "task_flag": 'text_similarity-rocketqa-micro-cross-encoder',
-            },
-            "rocketqa-nano-cross-encoder": {
-                "task_class": TextSimilarityTask,
-                "task_flag": 'text_similarity-rocketqa-nano-cross-encoder',
-            },
         },
         "default": {
-            "model": "rocketqa-zh-dureader-cross-encoder"
+            "model": "simbert-base-chinese"
         }
     },
     "word_segmentation": {
@@ -381,7 +357,18 @@ TASKS = {
         "default": {
             "model": "pai-painter-painting-base-zh",
         }
-    }
+    },
+    'text_classification': {
+        "models": {
+            "ernie-3.0-medium-zh": {
+                "task_class": TextClassificationTask,
+                "task_flag": 'text_classification-ernie-3.0-medium-zh',
+            },
+        },
+        "default": {
+            "model": "ernie-3.0-medium-zh"
+        }
+    },
 }
 
 support_schema_list = [

@@ -42,7 +42,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
-
+| [新闻文本分类](#新闻文本分类)          | `Taskflow("text_classification")`        | ✅        | ✅        | ✅        |            |            | 新闻文本分类 |
 ## QuickStart
 
 **环境依赖**
@@ -1177,7 +1177,7 @@ from paddlenlp import Taskflow
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_seq_len`：最大序列长度，默认为384。
 * `task_path`：自定义任务路径，默认为None。
-</div></details>
+
 
 #### 模型选择
 
@@ -1192,6 +1192,7 @@ from paddlenlp import Taskflow
   | `rocketqa-mini-cross-encoder`| 6-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-micro-cross-encoder`| 4-layers, 384-hidden, 12-heads | 中文 |
   | `rocketqa-nano-cross-encoder`| 4-layers, 312-hidden, 12-heads | 中文 |
+</div></details>
 
 ### 情感倾向分析
 <details><summary>&emsp;基于情感知识增强预训练模型SKEP达到业界SOTA </summary><div>
@@ -1387,6 +1388,25 @@ from paddlenlp import Taskflow
 
 </div></details>
 
+### 新闻文本分类
+<details><summary>&emsp;基于进行新闻文本分类 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+>>> classify = Taskflow("text_classification")
+>>> classify("7月6日，据《足球报》报道，中超联赛大概率延期到8月6日前后开启，参加东亚杯的国脚预计缺席一轮中超。")
+[{'text': '7月6日，据《足球报》报道，中超联赛大概率延期到8月6日前后开启，参加东亚杯的国脚预计缺席一轮中超。', 'label': ['体育', '足球'], 'confidence': [0.9848, 0.89951]}]
+>>> classify(["7月5日，周杰伦新专辑《最伟大的作品》开启预约，目前，QQ音乐上已经有超过270万人参与了预约。据悉，《最伟大的作品》7月6日迎来MV首播，7月8日会开启专辑预售，7月15日专辑将正式上线",  "7月6日，据《足球报》报道，中超联赛大概率延期到8月6日前后开启，参加东亚杯的国脚预计缺席一轮中超。"])
+>>> classify = Taskflow("text_classification", batch_size=2)
+[{'text': '7月5日，周杰伦新专辑《最伟大的作品》开启预约，目前，QQ音乐上已经有超过270万人参与了预约。据悉，《最伟大的作品》7月6日迎来MV首播，7月8日会开启专辑预售，7月15日专辑将正式上线', 'label': ['娱乐', '音乐'], 'confidence': [0.92587, 0.526]}, {'text': '7月6日，据《足球报》报道，中超联赛大概率延期到8月6日前后开启，参加东亚杯的国脚预计缺席一轮中超。', 'label': ['体育', '足球'], 'confidence': [0.9848, 0.89951]}]
+```
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+</div></details>
+
 ## PART Ⅱ &emsp; 定制化训练
 
 <details><summary>适配任务列表</summary><div>
@@ -1470,6 +1490,7 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
+  <tr><td>新闻文本分类<td>ERNIE 3.0 Medium<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification"> 训练详情 <td> 收集百科数据集140万条文本，包含143个分类
 </table>
 
 </div></details>
