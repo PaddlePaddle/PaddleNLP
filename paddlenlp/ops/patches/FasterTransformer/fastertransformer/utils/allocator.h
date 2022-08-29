@@ -87,16 +87,16 @@ public:
 
     int64_t buf_size = static_cast<int64_t>(size);
     std::vector<int64_t> buf_dims({buf_size});
-    #ifdef PADDLE_NEW_ALLOCATOR
+#ifdef PADDLE_NEW_ALLOCATOR
     // For PaddlePaddle>=2.3.0
     auto buf = paddle::empty(buf_dims, paddle::DataType::UINT8, paddle::GPUPlace());
     allocated_tensor_vector->push_back(buf);
     auto *flat = buf.data<uint8_t>();
-    #else
+#else
     auto buf = paddle::Tensor(paddle::PlaceType::kGPU, buf_dims);
     allocated_tensor_vector->push_back(buf);
     auto *flat = buf.mutable_data<uint8_t>(paddle::PlaceType::kGPU);
-    #endif
+#endif
     void *ptr = reinterpret_cast<void *>(flat);
     return ptr;
   }
