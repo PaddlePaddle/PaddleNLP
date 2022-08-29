@@ -67,6 +67,10 @@ def schema2label_maps(task_type, schema=None):
 
         label_maps["entity2id"] = entity2id
     elif task_type == "opinion_extraction":
+        schema = ["观点词", {"评价维度": ["观点词", "情感倾向[正向,负向]"]}]
+        logger.info(
+            "Opinion extracion does not support custom schema, the schema is default to %s."
+            % schema)
         label_maps["entity2id"] = {"评价维度": 0, "观点词": 1}
         label_maps["sentiment2id"] = {"正向": 0, "负向": 1}
     else:
@@ -85,7 +89,7 @@ def schema2label_maps(task_type, schema=None):
                     relation2id[child.name] = len(relation2id)
                 schema_list.append(child)
 
-        entity2id['OBJECT'] = len(entity2id)
+        entity2id['object'] = len(entity2id)
         label_maps["entity2id"] = entity2id
         label_maps["relation2id"] = relation2id
 
@@ -159,7 +163,7 @@ def doccano2distill(json_lines, task_type, label_maps=None):
             entities = json_line['entities']
             for entity in entities:
                 ent_text = text[entity['start_offset']:entity['end_offset']]
-                ent_type = "OBJECT" if entity['label'] not in label_maps[
+                ent_type = "object" if entity['label'] not in label_maps[
                     'entity2id'].keys() else entity['label']
                 ent_start_idx = entity['start_offset']
 
@@ -272,7 +276,7 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
                                 if 'relations' not in o1.keys():
                                     ent = {
                                         "text": o1['text'],
-                                        "type": "OBJECT",
+                                        "type": "object",
                                         "start_index": o1['start']
                                     }
                                     entity_list.append(ent)
@@ -287,7 +291,7 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
                                         for o2 in o1['relations'][key3]:
                                             ent = {
                                                 "text": o2['text'],
-                                                "type": "OBJECT",
+                                                "type": "object",
                                                 "start_index": o2['start']
                                             }
                                             entity_list.append(ent)
@@ -399,6 +403,46 @@ if __name__ == "__main__":
 
     # Define your schema here
     schema = ["观点词", {"评价维度": ["观点词", "情感倾向[正向,负向]"]}]
+
+    schema = [
+        {
+            "疾病": [
+                "预防", "阶段", "就诊科室", "辅助治疗", "化疗", "放射治疗", "手术治疗", "实验室检查",
+                "影像学检查", "辅助检查", "组织学检查", "内窥镜检查", "筛查", "多发群体", "发病率", "发病年龄",
+                "多发地区", "发病性别倾向", "死亡率", "多发季节", "传播途径", "同义词", "并发症", "病理分型",
+                "相关（导致）", "鉴别诊断", "相关（转化）", "相关（症状）", "临床表现", "治疗后症状",
+                "侵及周围组织转移的症状", "病因", "高危因素", "风险评估因素", "病史", "遗传因素", "发病机制",
+                "病理生理", "药物治疗", "发病部位", "转移部位", "外侵部位", "预后状况", "预后生存率"
+            ]
+        },
+        {
+            "其他": ["同义词"]
+        },
+        {
+            "其他治疗": ["同义词"]
+        },
+        {
+            "手术治疗": ["同义词"]
+        },
+        {
+            "检查": ["同义词"]
+        },
+        {
+            "流行病学": ["同义词"]
+        },
+        {
+            "症状": ["同义词"]
+        },
+        {
+            "社会学": ["同义词"]
+        },
+        {
+            "药物": ["同义词"]
+        },
+        {
+            "部位": ["同义词"]
+        },
+    ]
 
     args.schema = schema
 
