@@ -2,11 +2,12 @@ cmake_minimum_required(VERSION 3.10)
 
 project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
-option(WITH_TESTING     "Compile PaddleNLP tokenizers with unit testing"        ON)
-option(WITH_PYTHON      "Compile PaddlePaddle with python interpreter"  ON)
+option(WITH_TESTING     "Compile PaddleNLP faster_tokenizer with unit testing"        OFF)
+option(WITH_PYTHON      "Compile PaddleNLP faster_tokenizer with python interpreter"   ON)
 add_definitions(-DFASTERTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set (PUBLIC_DEPEND_LIBS "")
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING
@@ -17,6 +18,9 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 if(NOT WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed")
+    endif()
 else()
     set(CMAKE_CXX_STANDARD 11)
 endif()
@@ -98,6 +102,7 @@ endforeach()
 
 ELSE(WIN32)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
+set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
 # For OpenMP
@@ -157,7 +162,7 @@ add_custom_target(build_cpp_package_dir ALL
 # copy headers
 add_custom_target(copy_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory 
-    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include/faster_tokenizer
     DEPENDS build_cpp_package_dir)
 
 add_custom_target(copy_third_party_headers ALL
@@ -187,6 +192,11 @@ if (WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.dll ${TOKENIZER_CORE_PATH}/${TOKENIZER_CORE_NAME}.lib ${CPP_PACKAGE_DIR}/lib
         COMMAND ${CMAKE_COMMAND} -E copy ${ICU_DLL_DIR}/icudt70.dll ${ICU_DLL_DIR}/icuuc70.dll ${ICU_LIB_DIR}/icudt.lib ${ICU_LIB_DIR}/icuuc.lib ${CPP_PACKAGE_DIR}/third_party/lib
         DEPENDS build_cpp_package_dir core_tokenizers)
+elseif(APPLE)
+    set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.dylib")
+    add_custom_target(copy_shared_library ALL
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOKENIZER_CORE_LIBS_PATH} ${CPP_PACKAGE_DIR}/lib
+        DEPENDS build_cpp_package_dir core_tokenizers)
 else()
     set(TOKENIZER_CORE_LIBS_PATH "${TOKENIZER_CORE_PATH}/lib${TOKENIZER_CORE_NAME}.so")
     add_custom_target(copy_shared_library ALL
@@ -194,10 +204,7 @@ else()
         DEPENDS build_cpp_package_dir core_tokenizers)
 endif()
 
-
-
 add_custom_target(create_commit_id_file ALL
     COMMAND ${GIT_EXECUTABLE} log -1 --format=%H > ${CPP_PACKAGE_DIR}/commit.log
     DEPENDS copy_shared_library)
 endif(WITH_PYTHON)
-    

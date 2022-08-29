@@ -6,6 +6,7 @@
    * [环境准备](#环境准备)
    * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
+       * [训练评估与模型优化](#训练评估与模型优化)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
    * [静态图导出](#静态图导出)
@@ -64,7 +65,6 @@ multi_label/
 ├── utils.py # 工具函数脚本
 ├── metric.py # metric脚本
 ├── prune.py # 裁剪脚本
-├── prune_trainer.py # 裁剪trainer脚本
 └── README.md # 使用说明
 ```
 
@@ -74,7 +74,7 @@ multi_label/
 - python >= 3.6
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.3.4
-- scikit-learn >= 0.24.2
+- scikit-learn >= 1.0.2
 
 **安装PaddlePaddle**
 
@@ -89,7 +89,7 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 
 **安装sklearn**
 ```shell
-pip install scikit-learn==0.24.2
+pip install scikit-learn==1.0.2
 ```
 
 ## 数据集准备
@@ -176,9 +176,26 @@ tar -zxvf divorce.tar.gz
 mv divorce data
 ```
 
-使用CPU训练
+使用CPU/GPU训练：
 ```shell
 python train.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --save_dir "./checkpoint" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --learning_rate 3e-5 \
+    --epochs 100 \
+    --logging_steps 5 \
+    --train_file "train.txt"
+```
+默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
+如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
+```shell
+python -m paddle.distributed.launch --nproc_per_node=8 --backend='gloo' train.py \
     --device "cpu" \
     --dataset_dir "data" \
     --save_dir "./checkpoint" \
@@ -188,10 +205,12 @@ python train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
 
-使用GPU单卡/多卡训练
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练：
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
@@ -204,8 +223,10 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
+
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
@@ -214,7 +235,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en"；默认为"ernie-3.0-medium-zh"。
+* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-1.0-large-zh-cw"；默认为"ernie-3.0-medium-zh"。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
@@ -226,7 +247,9 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
-
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
@@ -241,6 +264,54 @@ checkpoint/
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
+
+### 训练评估与模型优化
+
+训练后的模型我们可以使用[评估脚本](analysis/evaluate.py)对每个类别分别进行评估，并输出预测错误样本（bad case）：
+
+```shell
+python evaluate.py \
+    --device "gpu" \
+    --dataset_dir "../data" \
+    --params_path "../checkpoint" \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --bad_case_path "./bad_case.txt"
+```
+
+默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
+
+输出打印示例：
+
+```text
+[2022-08-12 02:24:48,193] [    INFO] - -----Evaluate model-------
+[2022-08-12 02:24:48,194] [    INFO] - Train dataset size: 14377
+[2022-08-12 02:24:48,194] [    INFO] - Dev dataset size: 1611
+[2022-08-12 02:24:48,194] [    INFO] - Accuracy in dev dataset: 74.24%
+[2022-08-12 02:24:48,194] [    INFO] - Macro avg in dev dataset: precision: 82.96 | recall: 77.59 | F1 score 79.36
+[2022-08-12 02:24:48,194] [    INFO] - Micro avg in dev dataset: precision: 91.50 | recall: 89.66 | F1 score 90.57
+[2022-08-12 02:24:48,195] [    INFO] - Class name: 婚后有子女
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 6759(47.0%) | precision: 99.78 | recall: 99.59 | F1 score 99.68
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 784(48.7%) | precision: 97.07 | recall: 97.32 | F1 score 97.20
+[2022-08-12 02:24:48,195] [    INFO] - ----------------------------
+[2022-08-12 02:24:48,195] [    INFO] - Class name: 限制行为能力子女抚养
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 4358(30.3%) | precision: 99.36 | recall: 99.56 | F1 score 99.46
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 492(30.5%) | precision: 88.57 | recall: 88.21 | F1 score 88.39
+...
+```
+
+预测错误的样本保存在bad_case.txt文件中：
+
+```text
+Prediction    Label    Text
+不动产分割    不动产分割,有夫妻共同财产    2014年，王X以其与肖X协议离婚时未分割该套楼房的首付款为由，起诉至法院，要求分得楼房的首付款15万元。
+婚后分居,准予离婚    二次起诉离婚,准予离婚,婚后分居,法定离婚    但原、被告对已建立起的夫妻感情不够珍惜，因琐事即发生吵闹并最终分居，对夫妻感情造成了严重的影响，现原、被告已分居六年有余，且经人民法院判决不准离婚后仍未和好，夫妻感情确已破裂，依法应准予原、被告离婚。
+婚后有子女,限制行为能力子女抚养    婚后有子女    婚后生有一女，取名彭某乙，已11岁，现已由被告从铁炉白族乡中心小学转入走马镇李桥小学读书。
+婚后分居    不履行家庭义务,婚后分居    2015年2月23日，被告将原告赶出家门，原告居住于娘家待产，双方分居至今。
+...
+```
+
+模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 
 ### 训练效果
@@ -313,6 +384,8 @@ python predict.py \
 * `params_path`：待预测模型的目录；默认为"./checkpoint/"。
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 ## 静态图导出
 
@@ -341,7 +414,7 @@ export/
 
 ## 模型裁剪
 
-**如果有模型部署上线的需求，需要进一步压缩模型体积**，可以使用本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用脚本`prune.py` 即可一键启动裁剪和并自动保存裁剪后的模型参数。
+**如果有模型部署上线的需求，需要进一步压缩模型体积**，可以使用 PaddleNLP 的 压缩(Compression API）, API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用脚本`prune.py` 即可一键启动裁剪和并自动保存裁剪后的模型参数。
 ### 环境准备
 
 使用裁剪功能需要安装 paddleslim 包
@@ -367,7 +440,7 @@ python prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 
 使用GPU单卡/多卡训练
@@ -386,13 +459,12 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
-
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
-* `TrainingArguments`
+* `CompressionArguments`
   * `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
   * `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
   * `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
@@ -402,7 +474,8 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
   * `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
   * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
   * `seed`：随机种子，默认为3。
-  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)。
+  * `CompressionArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[CompressionArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md)。
+  * `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是 ['3/4', '2/3', '1/2']。
 
 * `DataArguments`
   * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
@@ -410,7 +483,6 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
-  * `width_mult`：裁剪宽度保留的比例，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，默认是 '2/3'。
 
 以上参数都可通过 `python prune.py --dataset_dir xx --params_dir xx` 的方式传入）
 
@@ -418,7 +490,19 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 ```text
 prune/
-├── 0.6666666666666666
+├── width_mult_0.75
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.6666666666666666
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.25
 │   ├── float32.pdiparams
 │   ├── float32.pdiparams.info
 │   ├── float32.pdmodel
@@ -437,6 +521,7 @@ prune/
 
 4. 导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
+5. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult_list`乘以宽度（multi haed数量）应为整数。
 
 ### 裁剪效果
 本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在CAIL2019—婚姻家庭要素提取任务的表现，测试配置如下：

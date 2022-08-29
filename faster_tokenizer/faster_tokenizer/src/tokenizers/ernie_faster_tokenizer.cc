@@ -93,8 +93,11 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
                                 bool lowercase,
                                 const std::string& wordpieces_prefix,
                                 uint32_t max_sequence_len) {
-  models::WordPiece wordpiece(
-      vocab, unk_token, 100 /* max_input_chars_per_word */, wordpieces_prefix);
+  models::FasterWordPiece wordpiece(vocab,
+                                    unk_token,
+                                    100 /* max_input_chars_per_word */,
+                                    wordpieces_prefix,
+                                    true);
   this->SetModel(wordpiece);
 
   std::vector<core::AddedToken> added_tokens;
@@ -120,9 +123,6 @@ void ErnieFasterTokenizer::Init(const core::Vocab& vocab,
   normalizers::BertNormalizer bert_normalizer(
       clean_text, handle_chinese_chars, strip_accents, lowercase);
   this->SetNormalizer(bert_normalizer);
-
-  pretokenizers::BertPreTokenizer bert_pretokenizer;
-  this->SetPreTokenizer(bert_pretokenizer);
 
   if (vocab.size() > 0) {
     uint32_t sep_id, cls_id;
