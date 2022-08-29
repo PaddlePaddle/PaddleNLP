@@ -257,10 +257,8 @@ std::vector<paddle::Tensor> GPTJCUDAForward(
   auto stream = word_embedding.stream();
   cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
 
-  std::vector<paddle::Tensor> ret;
-
   if (use_fp16) {
-    ret = gptj_kernel<paddle::DataType::FLOAT16>(input,
+    return gptj_kernel<paddle::DataType::FLOAT16>(input,
                                                  attn_mask,
                                                  start_length,
                                                  word_embedding,
@@ -294,7 +292,7 @@ std::vector<paddle::Tensor> GPTJCUDAForward(
                                                  layer_para_size,
                                                  layer_para_batch_size);
   } else {
-    ret = gptj_kernel<paddle::DataType::FLOAT32>(input,
+    return gptj_kernel<paddle::DataType::FLOAT32>(input,
                                                  attn_mask,
                                                  start_length,
                                                  word_embedding,
@@ -328,5 +326,4 @@ std::vector<paddle::Tensor> GPTJCUDAForward(
                                                  layer_para_size,
                                                  layer_para_batch_size);
   }
-  return ret;
 }
