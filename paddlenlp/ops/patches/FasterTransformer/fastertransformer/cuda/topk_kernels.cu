@@ -30,6 +30,16 @@ __global__ void ker_curand_setup(curandState_t* state,
   // Parallel
   if (threadIdx.x + blockIdx.x * blockDim.x < size)
     curand_init(seed,
+                blockIdx.x * blockDim.x + threadIdx.x,
+                seed,
+                &state[blockIdx.x * blockDim.x + threadIdx.x]);
+}
+
+__global__ void ker_curand_setup_bsz_one(curandState_t* state,
+                                 const int size,
+                                 const int seed) {
+  if (threadIdx.x + blockIdx.x * blockDim.x < size)
+    curand_init(seed,
                 0,
                 0,
                 &state[blockIdx.x * blockDim.x + threadIdx.x]);
@@ -41,7 +51,12 @@ void ker_curand_setupLauncher(curandState_t* state,
   dim3 block(256);
   dim3 grid((int)(ceil(args.batch_size_ * 1.0 / 256)));
   int seed = args.seed_ != -1 ? args.seed_ : clock() % INT_MAX;
-  ker_curand_setup<<<grid, block, 0, stream>>>(state, args.batch_size_, seed);
+  if(args.batch_size_ != 1)
+    ker_curand_setup<<<grid, block, 0, stream>>>(state, args.batch_size_, seed);
+  else
+    // Reduce the huge occupation of gpu memory due to curand_init func when bsz=1.
+    // TODO(gongenlei): Solve above problem when bsz > 1.
+    ker_curand_setup_bsz_one<<<grid, block, 0, stream>>>(state, args.batch_size_, seed);
 }
 
 
