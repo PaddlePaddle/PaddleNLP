@@ -159,6 +159,9 @@ add_custom_target(build_cpp_package_dir ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include ${CPP_PACKAGE_DIR}/third_party/lib
     DEPENDS core_tokenizers)
 
+# copy cmake
+file(COPY ${PROJECT_SOURCE_DIR}/FasterTokenizer.cmake DESTINATION ${CPP_PACKAGE_DIR}/)
+
 # copy headers
 file(COPY ${PROJECT_SOURCE_DIR}/faster_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/include/faster_tokenizer/
     FILES_MATCHING PATTERN "*.h"
