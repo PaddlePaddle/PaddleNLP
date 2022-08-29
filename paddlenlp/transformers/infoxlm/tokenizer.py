@@ -27,7 +27,6 @@ __all__ = ["InfoXLMTokenizer"]
 SPIECE_UNDERLINE = "▁"
 
 
-
 class InfoXLMTokenizer(AlbertEnglishTokenizer):
     """
         Construct an InfoXLM tokenizer. Inherit from :class:`AlbertEnglishTokenizer`. Based on `SentencePiece
