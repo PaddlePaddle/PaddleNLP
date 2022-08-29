@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 def convert_files_to_dicts(dir_path: str,
                            clean_func: Optional[Callable] = None,
                            split_paragraphs: bool = False,
+                           split_answers: bool = False,
                            encoding: Optional[str] = None) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
@@ -68,12 +69,22 @@ def convert_files_to_dicts(dir_path: str,
                 for para in text.split("\n"):
                     if not para.strip():  # skip empty paragraphs
                         continue
-                    documents.append({
-                        "content": para,
-                        "meta": {
-                            "name": path.name
-                        }
-                    })
+                    if (split_answers):
+                        query, answer = para.split('\t')
+                        documents.append({
+                            "content": query,
+                            "meta": {
+                                "name": path.name,
+                                "answer": answer,
+                            }
+                        })
+                    else:
+                        documents.append({
+                            "content": para,
+                            "meta": {
+                                "name": path.name
+                            }
+                        })
             else:
                 documents.append({"content": text, "meta": {"name": path.name}})
 
