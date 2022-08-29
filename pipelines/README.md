@@ -21,8 +21,9 @@ PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了�
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统（用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案）
 * 快速搭建产品级**多模态信息抽取**系统（即将开放，敬请期待）
-* 快速搭建产品级 **FAQ 问答**系统（即将开放，敬请期待）
+
 
 |  |  |
 |-|-|
@@ -43,6 +44,7 @@ Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装
 - paddlepaddle >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
+- Docker 18.03 以上
 ### pip 安装
 ```
 pip install --upgrade pipelines
@@ -154,6 +156,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 ## :mortar_board: Tutorials
 - Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
 - Tutorial 2 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
+- Tutorial 3 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/frequently-asked-question/dense_faq_example.py)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">
