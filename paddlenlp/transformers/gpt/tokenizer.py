@@ -369,6 +369,7 @@ class GPTTokenizer(PretrainedTokenizer):
             unk_token='<|endoftext|>',
             eol_token='\u010a',
             add_prefix_space=False,
+            add_bos_token=False,
             **kwargs  # The token of newline.
     ):
 
@@ -382,9 +383,11 @@ class GPTTokenizer(PretrainedTokenizer):
                                lstrip=False, rstrip=False) if isinstance(
                                    unk_token, str) else unk_token
         self.eol_token = eol_token
-        self._build_special_tokens_map_extended(bos_token=pad_token,
-                                                eos_token=eos_token,
-                                                unk_token=unk_token)
+        self._build_special_tokens_map_extended(
+            bos_token=pad_token
+            if getattr(self, "bos_token", None) is None else self.bos_token,
+            eos_token=eos_token,
+            unk_token=unk_token)
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
@@ -410,6 +413,7 @@ class GPTTokenizer(PretrainedTokenizer):
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
         self.add_prefix_space = add_prefix_space
+        self.add_bos_token = add_bos_token
 
         re = try_import("regex")
         self.pat = re.compile(
@@ -555,3 +559,16 @@ class GPTTokenizer(PretrainedTokenizer):
         if is_split_into_words or add_prefix_space:
             text = " " + text
         return (text, kwargs)
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        if self.add_bos_token:
+            bos_token_ids = [self.bos_token_id]
+        else:
+            bos_token_ids = []
+
+        output = bos_token_ids + token_ids_0
+
+        if token_ids_1 is None:
+            return output
+
+        return output + bos_token_ids + token_ids_1
