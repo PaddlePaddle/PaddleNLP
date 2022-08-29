@@ -35,7 +35,10 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 * [5. 参考](#参考)
 
 整体全部流程图如下：
-![image](https://user-images.githubusercontent.com/16911935/187170152-0778a6c1-6510-4c01-84d0-8e0ea3c05231.png)
+
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/16911935/187170152-0778a6c1-6510-4c01-84d0-8e0ea3c05231.png" align="middle"  width="500" />
+</p>
 
 
 <a name="数据准备"> </a>
@@ -234,12 +237,18 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
 
 使用开源中文语料CLUE、WuDao 总共400GB，提供上面提供的大规模语料数据集制作教程。接下来，看是模型训练。
 
-![image](https://user-images.githubusercontent.com/16911935/187134299-72628dce-cc04-49d7-89ef-078fad487724.png)
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/16911935/187134299-72628dce-cc04-49d7-89ef-078fad487724.png" align="middle"  width="500" />
+</p>
 
 ### 3.1 网络配置
 
 - SOP Loss
-    - SOP (Sentence Order Predict) 损失，是 模型训练的常用损失。将文本中的句子顺序分为两段打乱，最后判断文本是否被打乱。下图是数据组织形式的展示： ![image](https://user-images.githubusercontent.com/16911935/187140981-924fd21c-fb67-4ba8-a421-490fd293175c.png)
+    - SOP (Sentence Order Predict) 损失，是 模型训练的常用损失。将文本中的句子顺序分为两段打乱，最后判断文本是否被打乱。下图是数据组织形式的展示：
+    <p align="center">
+    <img src="https://user-images.githubusercontent.com/16911935/187140981-924fd21c-fb67-4ba8-a421-490fd293175c.png" align="middle"  width="500" />
+    </p>
+
     - 此开关由 `binary_head` 选项开启，`binary_head=True`添加sop loss， `binary_head=False` 关闭 sop loss。
     - **注意：如果你使用的语料文本中，只有一句话，无法分为多个句子段落，请设置 `binary_head=False`。否则，不符合要求的数据默认被删去，导致可训练的数据过小。**
 - MASK
@@ -247,7 +256,11 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
     - 用户可以设置 `masked_lm_prob` 控制mask的token占文本总token长度的比例。默认`masked_lm_prob=0.15` 随机mask 15% 的token数目。
     - 设置`short_seq_prob`， 控制长度小于max_seq_length的样本比例，默认值`short_seq_prob=0.1`。制作数据时候，会有相应比例的数据 最大长度会设置为 一个小于 max_seq_length 的随机值。
 - Ngram MASK
-    - 项目还支持了n-gram mask策略，如下图所示，在 WWM 进行词语级别MASK的基础上（如此处mask掉的`[模型]`词组），n-gram 可以MASK掉连续n个词组。下面例子中，连续mask了2个词组，`【[语言][模型]】`同时进行了mask。 ![image](https://user-images.githubusercontent.com/16911935/187145669-7c55386d-f57a-4589-9e6d-e4a36b93e24c.png)
+    - 项目还支持了n-gram mask策略，如下图所示，在 WWM 进行词语级别MASK的基础上（如此处mask掉的`[模型]`词组），n-gram 可以MASK掉连续n个词组。下面例子中，连续mask了2个词组，`【[语言][模型]】`同时进行了mask。
+    <p align="center">
+    <img src="https://user-images.githubusercontent.com/16911935/187145669-7c55386d-f57a-4589-9e6d-e4a36b93e24c.png" align="middle"  width="500" />
+    </p>
+
     - 用户通过`max_ngrams`设置最大的`ngram`长度。默认`max_ngrams=3`。
 - Dropout
     - Dropout 是常用的防止过拟合策略。对于大规模数据集训练，如`ernie-3.0`系列4T文本语料，可以设置 `dropout=0`，不考虑过拟合。实际`ernie-3.0-base-zh`训练中，没有开启Dropout。
@@ -266,7 +279,10 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
     - 用户可以指定梯度累积的步数，在梯度累积的step中，减少多卡之间梯度的通信，减少更新的次数，可以扩大训练的batch_size.
 - **重计算**训练：
     - 通过重新计算前向的方式，减少前向网络中间变量的存储，可以显著减少显存占用。理论上，该方式以时间换空间，但在batch size显著扩大的情况下，速度下降幅度较少。
-    - 如图所示，训练过程中占用显存的中间变量，修改成了反向需要时，重新计算，避免常驻显存。![image](https://user-images.githubusercontent.com/16911935/187176881-06103714-3061-42ab-8322-0b63422e7087.png)
+    - 如图所示，训练过程中占用显存的中间变量，修改成了反向需要时，重新计算，避免常驻显存。
+    <p align="center">
+    <img src="https://user-images.githubusercontent.com/16911935/187176881-06103714-3061-42ab-8322-0b63422e7087.png" align="middle"  width="500" />
+    </p>
 
 
 ### 3.3 训练体验
