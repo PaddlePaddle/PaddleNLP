@@ -1,20 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(cpp_faster_tokenizer_demo CXX C)
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-      "Choose the type of build, options are: Debug Release
-RelWithDebInfo MinSizeRel."
-      FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
-
-if(NOT WIN32)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wno-narrowing")
-else()
-    set(CMAKE_CXX_STANDARD 11)
-endif()
-
 option(FASTER_TOKENIZER_INSTALL_DIR "Path of downloaded faster_tokenizer sdk.")
 
 # Download ernie vocab for demo
