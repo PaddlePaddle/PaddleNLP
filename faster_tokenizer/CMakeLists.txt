@@ -160,12 +160,12 @@ add_custom_target(build_cpp_package_dir ALL
     DEPENDS core_tokenizers)
 
 # copy headers
-file(COPY ${PROJECT_SOURCE_DIR}/faster_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/include 
+file(COPY ${PROJECT_SOURCE_DIR}/faster_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/include/faster_tokenizer/
     FILES_MATCHING PATTERN "*.h"
     PATTERN "pybind" EXCLUDE)
 
 add_custom_target(copy_third_party_headers ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR}
     ${GLOG_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${RE2_INCLUDE_DIR}
     ${CPP_PACKAGE_DIR}/third_party/include

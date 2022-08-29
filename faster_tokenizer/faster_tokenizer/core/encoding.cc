@@ -489,20 +489,6 @@ std::string Encoding::DebugString() const {
   }
   oss << "\n";
 
-  oss << "words_idx: ";
-  for (int i = 0; i < words_idx_.size(); ++i) {
-    if (words_idx_[i] == static_cast<uint32_t>(-1)) {
-      // The [CLS], [SEP] word id
-      oss << "-";
-    } else {
-      oss << words_idx_[i];
-    }
-    if (i < words_idx_.size() - 1) {
-      oss << ", ";
-    }
-  }
-  oss << "\n";
-
   oss << "offsets: ";
   for (int i = 0; i < offsets_.size(); ++i) {
     oss << "(" << offsets_[i].first << ", " << offsets_[i].second << ")";
