@@ -19,42 +19,13 @@ import sentencepiece as spm
 from shutil import copyfile
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-from paddlenlp.transformers.albert.tokenizer import AlbertEnglishTokenizer
+from ..albert.tokenizer import AlbertEnglishTokenizer
+from ..tokenizer_utils import AddedToken
 
-__all__ = ["InfoXLMTokenizer", "dirty_fix"]
+__all__ = ["InfoXLMTokenizer"]
 
 SPIECE_UNDERLINE = "▁"
 
-
-# TODO: remove this by aligning the correct special tokens
-def dirty_fix(encoded_result):
-    # fix the bug of tokenizer manually
-    input_ids = encoded_result["input_ids"]
-    if isinstance(input_ids[0], list):
-        # then this is a list of lists
-        input_ids = [[0] + x[1:-1] + [2] for x in input_ids]
-    else:
-        input_ids = [0] + input_ids[1:-1] + [2]
-    encoded_result["input_ids"] = input_ids
-    return encoded_result
-
-
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    Copied from transformers.tokenization_utils_base
-    """
-
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-
-    def __getstate__(self):
-        return self.__dict__
 
 
 class InfoXLMTokenizer(AlbertEnglishTokenizer):

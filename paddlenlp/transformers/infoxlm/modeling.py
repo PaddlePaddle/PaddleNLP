@@ -165,9 +165,9 @@ class InfoXLMPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = {
         "model_state": {
             "infoxlm-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/infoxlm_base/infoxlm_chn_base.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/infoxlm_base/infoxlm_base.pdparams",
             "infoxlm-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/infoxlm_large/infoxlm_chn_large.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/infoxlm_large/infoxlm_large.pdparams",
         }
     }
     base_model_prefix = "infoxlm"
@@ -423,6 +423,7 @@ class InfoXLMForQuestionAnswering(InfoXLMPretrainedModel):
         super(InfoXLMForQuestionAnswering, self).__init__()
         self.infoxlm = infoxlm  # allow infoxlm to be config
         self.classifier = nn.Linear(self.infoxlm.config["hidden_size"], 2)
+        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -520,6 +521,7 @@ class InfoXLMForSequenceClassification(InfoXLMPretrainedModel):
 
         self.classifier = InfoXLMClassificationHead(
             self.infoxlm.config["hidden_size"], num_classes, dropout=dropout)
+        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -610,6 +612,7 @@ class InfoXLMForTokenClassification(InfoXLMPretrainedModel):
                                   infoxlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.infoxlm.config["hidden_size"],
                                     num_classes)
+        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -686,6 +689,7 @@ class InfoXLMForMultipleChoice(InfoXLMPretrainedModel):
         self.infoxlm = infoxlm
         self.dropout = nn.Dropout(self.infoxlm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.infoxlm.config["hidden_size"], 1)
+        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -745,6 +749,7 @@ class InfoXLMForMaskedLM(InfoXLMPretrainedModel):
         vocab_size = self.infoxlm.config["vocab_size"]
 
         self.lm_head = InfoXLMLMHead(hidden_size, layer_norm_eps, vocab_size)
+        self.apply(self.init_weights)
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -830,7 +835,6 @@ class InfoXLMLMHead(nn.Layer):
         super().__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-
         self.decoder = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, features, **kwargs):
@@ -840,5 +844,4 @@ class InfoXLMLMHead(nn.Layer):
 
         # project back to size of vocabulary with bias
         x = self.decoder(x)
-
         return x
