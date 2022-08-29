@@ -287,7 +287,9 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = ErnieMModelTester(self)
-        self.test_resize_embeddings = self.model_tester.config.test_resize_embeddings
+
+        # set attribute in setUp to overwrite the static attribute
+        self.test_resize_embeddings = False
 
     def get_config():
         pass
