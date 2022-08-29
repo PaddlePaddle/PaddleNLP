@@ -22,23 +22,24 @@ from pathlib import Path
 import streamlit as st
 from annotated_text import annotation
 from markdown import markdown
-import socket
 
 sys.path.append('ui')
 from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink
-from utils import pipelines_files
+
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
-                                        "衡量酒水的价格的因素有哪些?")
-DEFAULT_ANSWER_AT_STARTUP = os.getenv("DEFAULT_ANSWER_AT_STARTUP",
-                                      "酒水的血统，存储的时间等")
+                                        "如何办理企业养老保险?")
+DEFAULT_ANSWER_AT_STARTUP = os.getenv(
+    "DEFAULT_ANSWER_AT_STARTUP",
+    "企业养老保险一般是交由企业办理，个人需要准备好相关的文件即可。个人在参加企业养老保险的时候，需填报《参加企业基本养老保险人员基本情况表》，并提供以下证件和主要资料：1、身份证件及复印件；2、户口簿及复印件；3、以个人身份参保前原为职工身份的本人档案材料；4、曾在其他统筹地区参保的，重新登记应提供原参保所在地社保机构开具的《基本养老保险关系转移表》；5、与单位解除劳动关系的，应提供相关证明；6、省社保机构规定的其他证件资料。企业缴费以职工工资总额为基数，缴费比例为20%；职工个人缴费以本人全部工资收入为基数，月缴费工资超过全省上一年度职工平均工资300%以上的部分不计入，低于60%的按60%计算。职工个人应当缴纳的养老保险费，由所在单位从其工资中代扣代缴。"
+)
 # Sliders
 DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER",
                                             "30"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "3"))
 # Labels for the evaluation
 EVAL_LABELS = os.getenv("EVAL_FILE",
-                        str(Path(__file__).parent / "dureader_search.csv"))
+                        str(Path(__file__).parent / "insurance_faq.csv"))
 # Whether the file upload should be enabled or not
 DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 
@@ -58,7 +59,7 @@ def on_change_text():
 def main():
 
     st.set_page_config(
-        page_title="pipelines 语义检索",
+        page_title="pipelines FAQ智能问答",
         page_icon=
         "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
@@ -75,7 +76,7 @@ def main():
         st.session_state.raw_json = None
 
     # Title
-    st.write("# PaddleNLP语义检索")
+    st.write("# PaddleNLP 保险FAQ问答")
     # Sidebar
     st.sidebar.header("选项")
     top_k_reader = st.sidebar.slider(
@@ -134,6 +135,7 @@ def main():
 
     # Run button
     run_pressed = col1.button("运行")
+
     # Get next random question from the CSV
     if col2.button("随机生成"):
         reset_results()
@@ -197,13 +199,7 @@ def main():
                 markdown(context),
                 unsafe_allow_html=True,
             )
-            for image_path in result['images']:
-                image_url = pipelines_files(image_path)
-                st.image(
-                    image_url,
-                    width=
-                    400,  # Manually Adjust the width of the image as per requirement
-                )
+            st.write("**FAQ答案:** ", result["answer"])
             st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")
