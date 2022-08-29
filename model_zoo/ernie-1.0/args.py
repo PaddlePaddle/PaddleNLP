@@ -96,7 +96,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
-    # Argument for bert
+    # Argument for bert/ernie
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1, help="Short sequence prob.")
     parser.add_argument("--favor_longer_ngram", type=str2bool, default=False, help="Short sequence prob.")

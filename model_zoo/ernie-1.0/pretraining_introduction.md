@@ -1,0 +1,342 @@
+# ERNIE 中文预训练
+
+## 背景
+
+ERNIE是百度提出的大规模预训练模型，曾在中文场景下取得了SOTA效果。
+PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布大规模开源语料预训练全流程。从零开始，轻松构建预训练模型。
+
+本项目，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
+并训练发布开源最优的模型参数。
+
+接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
+
+* [1. **数据准备**](数据准备)
+    * [1.1 **大规模**中文数据](#大规模中文数据)
+    * [1.2 **高精准**中文分词](#高精准中文分词)
+    * [1.3 **快速**Token ID 转化](#快速TokenID转化)
+* [2. **全字符**中文词表制作](#中文中文词表制作)
+    - [2.1 分析准备](#分析准备)
+    - [2.2 文本字符统计](#文本字符统计)
+    - [2.3 英文字符词表](#英文字符词表)
+    - [2.4 合并词表](#合并词表)
+* [3. **开始训练**](#开始训练)
+    - [3.1 训练样例](训练样例)
+        - 环境准备
+        - 启动训练
+    - [3.2 功能支持](功能支持)
+        - 训练速度
+        - 训练体验
+    - [3.3 观察评估](观察评估)
+        - VisualDL 可视化
+        - CLUE Benchmark 效果评估
+- [4. 训练效果](#训练效果)
+    - [ERNIE 3.0-Base-zh-CW 模型](#ernie-3.0-base-zh-cw)
+    - [ERNIE 1.0-Large-zh-CW 模型](#ernie-1.0-large-zh-cw)
+* [5. 参考](#参考)
+
+整体全部流程图如下：
+![image](https://user-images.githubusercontent.com/16911935/187170152-0778a6c1-6510-4c01-84d0-8e0ea3c05231.png)
+
+
+<a name="数据准备"> </a>
+
+## 1. 数据准备
+
+<a name="大规模中文数据"> </a>
+
+### 1.1 大规模中文数据
+
+**CLUECorpus2020 语料**
+
+CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载。
+
+**WuDaoCorpus2.0 Base 语料**
+
+WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。
+用户微信登录[官网](https://resource.wudaoai.cn/home)，即可直接下载数据。下载好的压缩数据约 64GB
+
+
+<a name="高精准中文分词"> </a>
+
+### 1.2 高精准中文分词
+
+ERNIE 使用知识嵌入的方式进行预训练，如何尽可能精确的从原始文本中提取知识，直接关系预训练模型的效果。
+目前PaddleNLP常用的分词方式的有`jieba`，`lac`，`Wordtag`，
+效果、速度对比表格如下，假设CPU使用40线程，GPU使用16卡，处理200G文本：
+
+| 切词方式 | 效果 | 速度 | 预估耗时
+|-|-|-|-|
+| jieba | 一般 | 607 KB/s |  2.5 h |
+| lac   | 好 | 106 KB/s | 13.9 h
+| wordtag| 最好 | 0.94 KB/s | 159 D (GPU)|
+
+综合考虑分词的效果与速度，我们选择百度的LAC作为我们的文本分词工具。
+
+本文档以WuDao数据为例，对数据进行分词：
+
+```shell
+python wudao_process.py \
+    --input_path WuDaoCorpus2.0_base_200G \
+    --workers 40  \
+    --ouput_path ./wudao_lac_cut \
+```
+注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
+
+文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
+```shell
+python ../data_tools/trans_to_json.py  \
+    --input_path ./wudao_lac_cut \
+    --output_path wudao_corpus_200g_0623.jsonl \
+    --workers 40 \
+    --no-shuffle
+```
+
+
+<a name="快速TokenID转化"> </a>
+
+## 1.3 快速Token ID 转化
+
+预料、词表准备妥当后，我们可以开始进行最后的数据ID转化。
+
+- 高效的 Multiprocessing 多进程实现
+- 使用内存BytesIO存储ID数据
+
+由于转换的逻辑复杂，需要定义`class Converter`对象来进行转化处理。如果每次处理新的文本，都实例化一次class对象，速度瓶颈会在处理函数的实例化。
+我们使用了提前multiprocessing.Pool的`initializer`，对处理函数进行提前实例化，提高处理效率。
+
+处理后的token id数量巨大，可以达到数百Billion，如果使用普通的数据结构，如python的list保存，会出现存储瓶颈，不仅占用空间大，list对象还需要重新分配内存空间。这里我们采用了 BytesIO 的方式，类似写入内存文件的方式，速度快，可以非常方便转化为numpy文件保存。
+
+使用 Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz CPU测试，40线程，处理速度 8+MB/s，约7个小时左右，即可完成 200GB 文本转化为ID.
+
+```
+python -u  ../data_tools/create_pretraining_data.py \
+    --model_name ./vocab_path/vocab.txt \
+    --tokenizer_name ErnieTokenizer \
+    --input_path wudao_corpus_200g_0623.jsonl \
+    --split_sentences\
+    --chinese \
+    --cn_splited \
+    --cn_whole_word_segment \
+    --output_prefix wudao_200g_0703 \
+    --workers 40 \
+    --log_interval 1000
+```
+转化后的数据如下，使用这份数据，即可开始ERNIE预训练
+```
+-rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_200g_0703_ids.npy
+-rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_200g_0703_idx.npz
+```
+
+
+
+<a name="全字符中文词表制作"> </a>
+
+### 2. 全字符中文词表制作
+
+之前的 数据 id 化中，使用了已有的词表进行转化，当没有词表时，需要从头开始进行词表制作。这里提供了ERNIE模型词表制作的两种方案：
+
+第一种，词表组合方案
+1. 统计字符
+2. 制作英文词表
+3. 合并词表
+
+第二种，预处理后直接生成，方案
+1. 文本预处理（中文加空格，文本normalize）
+2. 使用sentencepeice制作词表
+
+第二种方案需要对文本先使用`BasicTokenizer`切分一遍语料。
+第一种方案，自定义程度高，但存在一些局限性。本项目采用了第一种方案，详细介绍如下：
+
+### 2.1 分析准备
+词表大小： 这里我们考虑的因素主要有两个
+- 已有模型对照：
+    - ERNIE 3.0系列模型的词表，词表大小为 40000 左右。
+- 预训练数据存储占用：
+    - 文本token id化后，希望使用uint16表示，此时表示的最大字符为65536。
+    - 同时考虑到ERNIE虽然是字模型，我们的仍然需要 `##中` 之类的中文字符表示分词信息。假设使用中文全字符20902(0x4E00-0x9FA5)个字符，那么剩余 vocab 大小不能超过 44634。
+
+综上，本项目决定采用 40000 左右的 vocab 容量。
+其中：
+- 中文全字符 `20902`
+- 英文字符 `17000`
+- 其他字符约 `2000` 左右
+
+
+### 2.2 文本字符统计
+首先第一步是对文本字符进行统计。字符统计的目的主要是添加常用的中文字符、特殊字符。
+
+由于语料文本过大，我们随机选取 10G 左右的原始文本进行了字符统计。
+```
+python ./vocab/gen_char.py path_to_corpus.txt
+```
+可以在本地文件夹得到`char_dict.pickle`字符频率文件。同时我们也提供了自己统计的词频文件，方便用户复现：
+```
+wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/char_dict.pickle
+```
+
+### 2.3 英文字符词表
+基于字符的词频统计，使得英文字符也切割为字母，为此我们需要添加英文词表。
+英文部分，我们使用了 [WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip)  数据集，来构造词表。
+下载解压数据，使用BPE切词
+```
+wget  https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip
+unzip wikitext-103-v1.zip
+python ./vocab/gen_vocab.py ./wikitext-103-raw/wiki.train.raw
+```
+即可产生英文部分的词表。这里我们也提供了处理好的 vocab 方便用户验证。
+```
+wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/eng.vocab
+```
+
+
+### 2.4 合并词表
+
+目前我们得到了字符统计表，和英文字符词表。下一步，我们将词表进行合并。
+
+将`char_dict.pickle`，`eng.vocab`放置到当前目录，使用下面命令
+```
+python ./vocab/merge_vocab.py
+```
+即可在 当前 目录生成 vocab.txt 得到最终词表。
+
+此阶段需要注意的一些问题是：
+1. 对于一些日文、谚文文字字符，需要进行 normalize
+2. 添加special_tokens
+
+### 2.5 问题遗留
+本项目采用的第一种方式，即拼接产出的词表，对连续非中、英文字符文本，会出现UNK的情况。
+如issue: [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927)、 [#2585](https://github.com/PaddlePaddle/PaddleNLP/issues/2585)。本项目做了两点改进:
+
+1. 对 Symbol 字符默认添加空格，变成独立字符
+2. 对 日文、谚文 在合并词表阶段默认添加 ## 字符。
+
+虽然有上述两点修复，任然无法避免 [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927) 现象。
+彻底解决的话，建议使用第二种方式制作vocab文件。
+
+### 2.6 方案二：预处理后直接生成
+此方案没有被采用，这里也简单说明一下具体的方案：
+1. 对语料使用 BasicTokenizer 转换
+```python
+from paddlenlp.transformers import
+tokenizer = BasicTokenizer()
+basic_toknizer = lambda x: " ".join(tokenizer.tokenize(x))
+# 对语料使用 basic_toknizer 转换
+# 并存储为新的语料 afer_basic_toknizer_corpus.txt
+```
+2. 处理转换后的语料
+```shell
+python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
+```
+对处理好的vocab文件手动替换一些`<pad> -> [PAD]`之类的special_tokens，即可产出词表。
+
+
+## 3. 开始训练
+
+使用开源中文语料CLUE、WuDao 总共400GB，提供上面提供的大规模语料数据集制作教程。接下来，看是模型训练。
+
+![image](https://user-images.githubusercontent.com/16911935/187134299-72628dce-cc04-49d7-89ef-078fad487724.png)
+
+### 3.1 网络配置
+
+- SOP Loss
+    - SOP (Sentence Order Predict) 损失，是 模型训练的常用损失。将文本中的句子顺序分为两段打乱，最后判断文本是否被打乱。下图是数据组织形式的展示： ![image](https://user-images.githubusercontent.com/16911935/187140981-924fd21c-fb67-4ba8-a421-490fd293175c.png)
+    - 此开关由 `binary_head` 选项开启，`binary_head=True`添加sop loss， `binary_head=False` 关闭 sop loss。
+    - **注意：如果你使用的语料文本中，只有一句话，无法分为多个句子段落，请设置 `binary_head=False`。否则，不符合要求的数据默认被删去，导致可训练的数据过小。**
+- MASK
+    -  MLM (Mask Language Model) 是通过随机将文本中的部分token，随机替换为`[MASK]` token，最后预测出真实的token值。ERNIE默认采用了Whole Word MASK方式，选定一些词语进行MASK。
+    - 用户可以设置 `masked_lm_prob` 控制mask的token占文本总token长度的比例。默认`masked_lm_prob=0.15` 随机mask 15% 的token数目。
+    - 设置`short_seq_prob`， 控制长度小于max_seq_length的样本比例，默认值`short_seq_prob=0.1`。制作数据时候，会有相应比例的数据 最大长度会设置为 一个小于 max_seq_length 的随机值。
+- Ngram MASK
+    - 项目还支持了n-gram mask策略，如下图所示，在 WWM 进行词语级别MASK的基础上（如此处mask掉的`[模型]`词组），n-gram 可以MASK掉连续n个词组。下面例子中，连续mask了2个词组，`【[语言][模型]】`同时进行了mask。 ![image](https://user-images.githubusercontent.com/16911935/187145669-7c55386d-f57a-4589-9e6d-e4a36b93e24c.png)
+    - 用户通过`max_ngrams`设置最大的`ngram`长度。默认`max_ngrams=3`。
+- Dropout
+    - Dropout 是常用的防止过拟合策略。对于大规模数据集训练，如`ernie-3.0`系列4T文本语料，可以设置 `dropout=0`，不考虑过拟合。实际`ernie-3.0-base-zh`训练中，没有开启Dropout。
+    - 用户可以设置 `hidden_dropout_prob`，`attention_probs_dropout_prob`。默认值为 `0.1`。
+
+### 3.2 训练速度
+
+**训练速度方面**，我们支持了如下策略，加
+速计算过程，减小显存占用，扩大batch_size：
+
+- **多卡多机**训练：
+    - 基于飞桨Fleet分布式API，用户可以十分方便的通过数据并行的方法，将训练扩展到多机多卡。
+- **混合精度**训练：
+    - 部分算子使用FP16计算kernel，加速计算过程。支持AMP混合精度O1，和Pure FP16全FP训练策略O2。
+- **梯度累积**训练：
+    - 用户可以指定梯度累积的步数，在梯度累积的step中，减少多卡之间梯度的通信，减少更新的次数，可以扩大训练的batch_size.
+- **重计算**训练：
+    - 通过重新计算前向的方式，减少前向网络中间变量的存储，可以显著减少显存占用。理论上，该方式以时间换空间，但在batch size显著扩大的情况下，速度下降幅度较少。
+    - 如图所示，训练过程中占用显存的中间变量，修改成了反向需要时，重新计算，避免常驻显存。![image](https://user-images.githubusercontent.com/16911935/187176881-06103714-3061-42ab-8322-0b63422e7087.png)
+
+
+### 3.3 训练体验
+**训练体验方面**，我们针对训练数据流、重启、可视化等方面做了针对性优化提升
+
+数据流
+- **多机扩展**
+    - 用户可以将数据放置到 NFS 服务器上，多机同时挂载数据即可。训练数据与计算资源分离。
+- **多数据混合**
+    - 训练数据集支持多个文件，即插即用，设置权重，传入参数即可data_dir="1.0  dateset_a  2.0 dataset_b"
+- **稳定可复现**
+    - MLM任务具有一定随机性，需要随机mask数据。本数据流通过固定每一个step数据的随机种子，实验数据流稳定可复现。
+- **快加载**
+    - 数据文件使用mmap读取，加载数百GB文件几乎不耗时。
+
+其他：
+- **断点重启**
+    - 用户可以单独设置，checkpoints steps 参数可设置较小，重启训练默认加载最新checkpoint。
+    - 断点数据自动恢复，学习率等参数也自动恢复。
+
+
+### 观察评估
+
+VisualDL训练可视化
+
+- **可视化日志记录**
+    - 日志展示为全局loss，波动小。
+    - 记录混合精度，loss_scaling等信息，方便用户debug。
+    - 对模型结构，配置参数，paddle版本信息进行记录，方便复现环境
+
+- CLUE Benchmark搜索评估参数效果
+pass
+
+
+## 训练效果
+
+**训练效果方面**，我们release了 base、large两个模型。均取得了较好的预训练效果。
+
+<a name="ernie-3.0-base-zh-cw"></a>
+
+### **ERNIE 3.0-Base-zh-CW** 模型
+
+使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-3.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
+
+Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
+-- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
+Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
+ERNIE 3.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
+ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
+ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
+
+
+<a name="ernie-1.0-large-zh-cw"> </a>
+
+### **ERNIE 1.0-Large-zh-CW** 模型
+
+- 除了base模型外，我们还训练了放出了large模型。此模型参数采用的是词表与ernie-1.0相同，因此命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失：
+
+Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
+-- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
+Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
+ERNIE 1.0-Large-zh-CW | 24L1024H | <b>79.03</b> | 75.97 |    59.65 |    62.91 |    85.09 |    81.73| 93.09 |    84.53 | 74.22/91.88 | 88.57 | 84.54
+ERNIE 3.0-Xbase-zh| 20L1024H | 78.71 | 76.85 |    59.89 |    62.41 |    84.76 |    82.51 |    89.80 |    84.47 |    75.49/92.67 | 86.36 | 84.59
+RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    83.88 |    78.81 |    90.79 |    83.67 |    70.58/89.82 |    85.72 |    75.26
+
+
+## 6. 参考文献
+
+感谢CLUE，WuDao提供的开源文本语料，参考资料：
+- Xu, L., Zhang, X. and Dong, Q., 2020. CLUECorpus2020: A large-scale Chinese corpus for pre-training language model. arXiv preprint arXiv:2003.01355.
+- Yuan, S., Zhao, H., Du, Z., Ding, M., Liu, X., Cen, Y., Zou, X., Yang, Z. and Tang, J., 2021. Wudaocorpora: A super large-scale chinese corpora for pre-training language models. AI Open, 2, pp.65-68.
+- https://github.com/CLUEbenchmark/CLUECorpus2020
+- https://resource.wudaoai.cn
