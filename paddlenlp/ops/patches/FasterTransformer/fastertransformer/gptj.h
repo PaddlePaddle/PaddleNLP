@@ -716,8 +716,7 @@ public:
                     check_cuda_error(cudaGetLastError());
 #endif
 
-	                apply_min_length_penalty_kernelLauncher(logits_buf_,
-						    embedding_bias_ptr,
+	                apply_logits_mask_kernelLauncher(logits_buf_,
 						    finished_buf_,
 						    args_.batch_size_,
 						    1,
@@ -725,7 +724,8 @@ public:
 						    args_.vocab_size_,
 						    decoding_params.stream,
                             (args_.min_length_ != 0 && step-input_len < args_.min_length_),
-                            args_.end_id_);
+                            args_.end_id_,
+                            embedding_bias_ptr);
 #ifndef NDEBUG
                     cudaDeviceSynchronize();
                     check_cuda_error(cudaGetLastError());

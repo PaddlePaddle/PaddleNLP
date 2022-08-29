@@ -150,19 +150,8 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       cudaStream_t stream,
                                       const T* logits_mask = nullptr,
                                       const bool min_penalty = false,
-                                      const int end_id = -1);
-
-template <typename T>
-void apply_min_length_penalty_kernelLauncher(T* log_probs,
-                                      const T* bias,
-                                      const bool* finished,
-                                      int batch_size,
-                                      int beam_width,
-                                      int vocab_size_padded,
-                                      int vocab_size,
-                                      cudaStream_t stream,
-                                      const bool min_penalty,
-                                      const int end_id);
+                                      const int end_id = -1,
+                                      const T* bias = nullptr);
 
 template <typename T>
 void gptj_start_id_embedding_lookups_kernel_launcher(T* from_tensor,
