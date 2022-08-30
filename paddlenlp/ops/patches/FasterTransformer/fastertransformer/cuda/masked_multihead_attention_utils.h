@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
  * Copyright (c) 2020-2021, NVIDIA CORPORATION.  All rights reserved.

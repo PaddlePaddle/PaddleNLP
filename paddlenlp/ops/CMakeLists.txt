@@ -382,9 +382,9 @@ set(FT_PATCH_COMMAND
   && cp ${opt_h_src} ${opt_h_dst}
   && cp ${gptj_h_src} ${gptj_h_dst}
   && cp ${masked_multihead_attention_h_src} ${masked_multihead_attention_h_dst}
-  && cat ${masked_multihead_attention_utils_h_src} >> ${masked_multihead_attention_utils_h_dst}
-  && cat ${attention_kernels_cu_src} >> ${attention_kernels_cu_dst}
-  && cat ${attention_kernels_cuh_src} >> ${attention_kernels_cuh_dst}
+  && cat blank_lines ${masked_multihead_attention_utils_h_src} >> ${masked_multihead_attention_utils_h_dst}
+  && cat blank_lines ${attention_kernels_cu_src} >> ${attention_kernels_cu_dst}
+  && cat blank_lines ${attention_kernels_cuh_src} >> ${attention_kernels_cuh_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
