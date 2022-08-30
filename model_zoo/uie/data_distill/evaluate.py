@@ -51,16 +51,17 @@ def evaluate(model, dataloader, label_maps, task_type="relation_extraction"):
 def do_eval():
     label_maps = get_label_maps(args.task_type, args.label_maps_path)
 
-    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
-    encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
+    tokenizer = AutoTokenizer.from_pretrained(args.encoder)
+    encoder = AutoModel.from_pretrained(args.encoder)
     if args.task_type == "entity_extraction":
         model = GlobalPointerForEntityExtraction(encoder, label_maps)
     else:
         model = GPLinkerForRelationExtraction(encoder, label_maps)
 
-    state_dict = paddle.load(
-        os.path.join(args.model_path, "model_state.pdparams"))
-    model.set_dict(state_dict)
+    if args.model_path:
+        state_dict = paddle.load(
+            os.path.join(args.model_path, "model_state.pdparams"))
+        model.set_dict(state_dict)
 
     test_ds = load_dataset(reader, data_path=args.test_path, lazy=False)
 
@@ -85,6 +86,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
+    parser.add_argument("--encoder", default="ernie-3.0-base-zh", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization.")

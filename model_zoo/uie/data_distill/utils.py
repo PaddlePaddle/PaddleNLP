@@ -62,23 +62,6 @@ def map_offset(ori_offset, offset_mapping):
     return -1
 
 
-def get_spots_fr_shaking_tag(shaking_idx2matrix_idx, shaking_outputs):
-    """
-    shaking_tag -> spots
-    shaking_tag: (shaking_seq_len, tag_id)
-    spots: [(start_ind, end_ind, tag_id), ]
-    """
-    spots = []
-    pred_shaking_tag = shaking_outputs > 0.
-    nonzero_points = paddle.nonzero(pred_shaking_tag, as_tuple=False)
-    for point in nonzero_points:
-        shaking_idx, tag_idx = point[0].item(), point[1].item()
-        pos1, pos2 = shaking_idx2matrix_idx[shaking_idx]
-        spot = (pos1, pos2, tag_idx)
-        spots.append(spot)
-    return spots
-
-
 def get_label_maps(task_type="relation_extraction", label_maps_path=None):
     with open(label_maps_path, 'r', encoding='utf-8') as fp:
         label_maps = json.load(fp)

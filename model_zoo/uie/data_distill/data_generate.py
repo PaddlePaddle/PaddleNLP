@@ -263,49 +263,55 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
                     entity_list.append(ent)
                     if "relations" in s.keys():
                         for key2 in s['relations'].keys():
-                            for o1 in s['relations'][key2]:
-                                rel = {
-                                    "subject": s['text'],
-                                    "predicate": key2,
-                                    "object": o1['text'],
-                                    "subject_start_index": s['start'],
-                                    "object_start_index": o1['start']
-                                }
-                                spo_list.append(rel)
-
-                                if 'relations' not in o1.keys():
-                                    ent = {
-                                        "text": o1['text'],
-                                        "type": "object",
-                                        "start_index": o1['start']
+                            try:
+                                for o1 in s['relations'][key2]:
+                                    rel = {
+                                        "subject": s['text'],
+                                        "predicate": key2,
+                                        "object": o1['text'],
+                                        "subject_start_index": s['start'],
+                                        "object_start_index": o1['start']
                                     }
-                                    entity_list.append(ent)
-                                else:
-                                    ent = {
-                                        "text": o1['text'],
-                                        "type": key2,
-                                        "start_index": o1['start']
-                                    }
-                                    entity_list.append(ent)
-                                    for key3 in o1['relations'].keys():
-                                        for o2 in o1['relations'][key3]:
-                                            ent = {
-                                                "text": o2['text'],
-                                                "type": "object",
-                                                "start_index": o2['start']
-                                            }
-                                            entity_list.append(ent)
+                                    spo_list.append(rel)
 
-                                            rel = {
-                                                "subject": o1['text'],
-                                                "predicate": key3,
-                                                "object": o2['text'],
-                                                "subject_start_index":
-                                                o1['start'],
-                                                "object_start_index":
-                                                o2['start']
-                                            }
-                                            spo_list.append(rel)
+                                    if 'relations' not in o1.keys():
+                                        ent = {
+                                            "text": o1['text'],
+                                            "type": "object",
+                                            "start_index": o1['start']
+                                        }
+                                        entity_list.append(ent)
+                                    else:
+                                        ent = {
+                                            "text": o1['text'],
+                                            "type": key2,
+                                            "start_index": o1['start']
+                                        }
+                                        entity_list.append(ent)
+                                        for key3 in o1['relations'].keys():
+                                            for o2 in o1['relations'][key3]:
+                                                ent = {
+                                                    "text": o2['text'],
+                                                    "type": "object",
+                                                    "start_index": o2['start']
+                                                }
+                                                entity_list.append(ent)
+
+                                                rel = {
+                                                    "subject":
+                                                    o1['text'],
+                                                    "predicate":
+                                                    key3,
+                                                    "object":
+                                                    o2['text'],
+                                                    "subject_start_index":
+                                                    o1['start'],
+                                                    "object_start_index":
+                                                    o2['start']
+                                                }
+                                                spo_list.append(rel)
+                            except:
+                                pass
             output["entity_list"] = entity_list
             output["spo_list"] = spo_list
             outputs.append(output)
@@ -316,10 +322,10 @@ def do_generate():
     set_seed(args.seed)
 
     # Generate closed-domain label maps
-    if not os.path.exists(args.output_dir):
-        os.mkdir(args.output_dir)
+    if not os.path.exists(args.save_dir):
+        os.mkdir(args.save_dir)
     label_maps = schema2label_maps(args.task_type, schema=args.schema)
-    label_maps_path = os.path.join(args.output_dir, "label_maps.json")
+    label_maps_path = os.path.join(args.save_dir, "label_maps.json")
 
     # Save closed-domain label maps file
     with open(label_maps_path, "w") as fp:
@@ -327,14 +333,14 @@ def do_generate():
 
     # Load doccano file and convert to distill format
     sample_index = json.loads(
-        open(os.path.join(args.data_dir, "sample_index.json")).readline())
+        open(os.path.join(args.data_path, "sample_index.json")).readline())
 
     train_ids = sample_index["train_ids"]
     dev_ids = sample_index["dev_ids"]
     test_ids = sample_index["test_ids"]
 
     json_lines = []
-    with open(os.path.join(args.data_dir, "doccano_ext.json")) as fp:
+    with open(os.path.join(args.data_path, "doccano_ext.json")) as fp:
         for line in fp:
             json_lines.append(json.loads(line))
 
@@ -352,23 +358,28 @@ def do_generate():
                    schema=args.schema,
                    task_path=args.model_path)
 
-    # Generate synthetic data
-    texts = open(os.path.join(args.data_dir, "unlabeled_data.txt")).readlines()
+    if args.synthetic_ratio > 0:
+        # Generate synthetic data
+        texts = open(os.path.join(args.data_path,
+                                  "unlabeled_data.txt")).readlines()
 
-    actual_ratio = math.ceil(len(texts) / len(train_lines))
-    if actual_ratio <= args.synthetic_ratio or args.synthetic_ratio == -1:
-        infer_texts = texts
-    else:
-        idxs = random.sample(range(0, len(texts)),
-                             args.synthetic_ratio * len(train_lines))
-        infer_texts = [texts[i] for i in idxs]
+        actual_ratio = math.ceil(len(texts) / len(train_lines))
+        if actual_ratio <= args.synthetic_ratio or args.synthetic_ratio == -1:
+            infer_texts = texts
+        else:
+            idxs = random.sample(range(0, len(texts)),
+                                 args.synthetic_ratio * len(train_lines))
+            infer_texts = [texts[i] for i in idxs]
 
-    infer_results = []
-    for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
-        infer_results.append(uie(text))
+        infer_results = []
+        for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
+            infer_results.append(uie(text))
 
-    train_synthetic_lines = synthetic2distill(texts, infer_results,
-                                              args.task_type)
+        train_synthetic_lines = synthetic2distill(texts, infer_results,
+                                                  args.task_type)
+
+        # Concat origin and synthetic data
+        train_lines.extend(train_synthetic_lines)
 
     def _save_examples(save_dir, file_name, examples):
         count = 0
@@ -379,21 +390,18 @@ def do_generate():
                 count += 1
         logger.info("Save %d examples to %s." % (count, save_path))
 
-    # Concat origin and synthetic data
-    train_lines.extend(train_synthetic_lines)
-
-    _save_examples(args.output_dir, "train_data.json", train_lines)
-    _save_examples(args.output_dir, "dev_data.json", dev_lines)
-    _save_examples(args.output_dir, "test_data.json", test_lines)
+    _save_examples(args.save_dir, "train_data.json", train_lines)
+    _save_examples(args.save_dir, "dev_data.json", dev_lines)
+    _save_examples(args.save_dir, "test_data.json", test_lines)
 
 
 if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_dir", default="../data", type=str, help="")
+    parser.add_argument("--data_path", default="../data", type=str, help="The directory for labeled data with doccano format and the large scale unlabeled data.")
     parser.add_argument("--model_path", type=str, default="../checkpoint/model_best", help="The path of saved model that you want to load.")
-    parser.add_argument("--output_dir", default="./distill_task", type=str, help="The path of data that you wanna save.")
+    parser.add_argument("--save_dir", default="./distill_task", type=str, help="The path of data that you wanna save.")
     parser.add_argument("--synthetic_ratio", default=10, type=int, help="The ratio of labeled and synthetic samples.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
@@ -402,47 +410,7 @@ if __name__ == "__main__":
     # yapf: enable
 
     # Define your schema here
-    schema = ["观点词", {"评价维度": ["观点词", "情感倾向[正向,负向]"]}]
-
-    schema = [
-        {
-            "疾病": [
-                "预防", "阶段", "就诊科室", "辅助治疗", "化疗", "放射治疗", "手术治疗", "实验室检查",
-                "影像学检查", "辅助检查", "组织学检查", "内窥镜检查", "筛查", "多发群体", "发病率", "发病年龄",
-                "多发地区", "发病性别倾向", "死亡率", "多发季节", "传播途径", "同义词", "并发症", "病理分型",
-                "相关（导致）", "鉴别诊断", "相关（转化）", "相关（症状）", "临床表现", "治疗后症状",
-                "侵及周围组织转移的症状", "病因", "高危因素", "风险评估因素", "病史", "遗传因素", "发病机制",
-                "病理生理", "药物治疗", "发病部位", "转移部位", "外侵部位", "预后状况", "预后生存率"
-            ]
-        },
-        {
-            "其他": ["同义词"]
-        },
-        {
-            "其他治疗": ["同义词"]
-        },
-        {
-            "手术治疗": ["同义词"]
-        },
-        {
-            "检查": ["同义词"]
-        },
-        {
-            "流行病学": ["同义词"]
-        },
-        {
-            "症状": ["同义词"]
-        },
-        {
-            "社会学": ["同义词"]
-        },
-        {
-            "药物": ["同义词"]
-        },
-        {
-            "部位": ["同义词"]
-        },
-    ]
+    schema = [{"疾病": ["手术治疗", "实验室检查", "影像学检查"]}]
 
     args.schema = schema
 

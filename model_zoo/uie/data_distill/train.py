@@ -32,8 +32,6 @@ from utils import reader, set_seed, get_label_maps, create_dataloader, criteria_
 
 
 def do_train():
-    paddle.disable_static()
-
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
@@ -44,7 +42,7 @@ def do_train():
 
     train_ds = load_dataset(reader, data_path=args.train_path, lazy=False)
     dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
-    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
+    tokenizer = AutoTokenizer.from_pretrained(args.encoder)
 
     train_dataloader = create_dataloader(train_ds,
                                          tokenizer,
@@ -62,13 +60,17 @@ def do_train():
                                        mode="dev",
                                        task_type=args.task_type)
 
-    encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
+    encoder = AutoModel.from_pretrained(args.encoder)
     if args.task_type == "entity_extraction":
         model = GlobalPointerForEntityExtraction(encoder, label_maps)
     else:
         model = GPLinkerForRelationExtraction(encoder, label_maps)
 
-    model_config = {"task_type": args.task_type, "label_maps": label_maps}
+    model_config = {
+        "task_type": args.task_type,
+        "label_maps": label_maps,
+        "encoder": args.encoder
+    }
 
     num_training_steps = len(train_dataloader) * args.num_epochs
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
@@ -78,7 +80,7 @@ def do_train():
     # All bias and LayerNorm parameters are excluded.
     decay_params = [
         p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm", "LayerNorm.weight"])
+        if not any(nd in n for nd in ["bias", "norm"])
     ]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
@@ -166,20 +168,21 @@ if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
+    parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
     parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--train_path", default="./ner_data/train_data.json", type=str, help="The path of train set.")
-    parser.add_argument("--dev_path", default="./ner_data/dev_data.json", type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--max_seq_len", default=256, type=int, help="The maximum input sequence length.")
     parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
-    parser.add_argument("--num_epochs", default=50, type=int, help="Number of epoches for training.")
+    parser.add_argument("--num_epochs", default=100, type=int, help="Number of epoches for training.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
+    parser.add_argument("--encoder", default="ernie-3.0-mini-zh", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
-    parser.add_argument("--valid_steps", default=500, type=int, help="The interval steps to evaluate model performance.")
+    parser.add_argument("--valid_steps", default=200, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 

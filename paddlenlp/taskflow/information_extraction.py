@@ -21,6 +21,7 @@ import paddle
 from ..datasets import load_dataset
 from ..transformers import AutoTokenizer, AutoModel
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
+from .models import UIE
 from .task import Task
 from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc, gp_decode, DataCollatorGP
 
@@ -748,6 +749,7 @@ class GPTask(Task):
             model_config = json.load(f)
         self._label_maps = model_config["label_maps"]
         self._task_type = model_config["task_type"]
+        self._encoder = model_config["encoder"]
         schema = model_config["label_maps"]["schema"]
         self._set_schema(schema)
 
@@ -773,16 +775,13 @@ class GPTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        encoder = AutoModel.from_pretrained("ernie-3.0-base-zh")
+        encoder = AutoModel.from_pretrained(self._encoder)
         if self._task_type == "entity_extraction":
             model_instance = GlobalPointerForEntityExtraction(
                 encoder, self._label_maps)
-        elif self._task_type in ["relation_extraction", "opinion_extraction"]:
+        else:
             model_instance = GPLinkerForRelationExtraction(
                 encoder, self._label_maps)
-        else:
-            model_instance = GPLinkerForEventExtraction(encoder,
-                                                        self._label_maps)
         model_path = os.path.join(self._task_path, "model_state.pdparams")
         state_dict = paddle.load(model_path)
         model_instance.set_dict(state_dict)
