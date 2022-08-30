@@ -32,7 +32,6 @@ using namespace std;
 
 const int32_t LONG_SENTENCE_LEN = 512;
 
-
 void build_blending_indices(py::array_t<uint8_t>& dataset_index,
                             py::array_t<int64_t>& dataset_sample_index,
                             const py::array_t<double>& weights,
@@ -292,10 +291,10 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
         }
         break;
       }
-      if( epoch > 0 &&  map_index == 0 ){
+      if(epoch > 0 && map_index == 0){
         cout << endl << "     No available documtment find this dataset." << endl << std::flush;
         throw std::invalid_argument(
-          "Invalid dataset! the documtment should be with more than " 
+          "Invalid dataset! the document should be with more than " 
           + std::to_string(min_num_sent) + " scentences.");
       }
       // For each document:

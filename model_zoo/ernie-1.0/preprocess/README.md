@@ -125,7 +125,7 @@ optional arguments:
                         必须设置，如：ernie-1.0-base-zh, 可以参考已有的模型名称 https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer
   --tokenizer_name {ErnieTokenizer,BertTokenizer,GPTTokenizer,GPTChineseTokenizer}
                         What type of tokenizer to use.
-                        模型对应的tokenizer, 目前暂时只支持 Ernie，Bert，GPT
+                        模型对应的tokenizer, 目前暂时只支持 ERNIE，BERT，GPT
 data input/output:
   --input_path INPUT_PATH
                         Path to input JSON files.
@@ -140,14 +140,14 @@ data input/output:
   --json_key JSON_KEY   For JSON format. Space separate listed of keys to extract from json
                         文本串json的key值。同前面trans_to_json.py的json_key，默认text为key
   --split_sentences     Split documents into sentences.
-                        是否需要将文章划分成句子。一般而言，GPT不需要，Bert/Ernie模型需要
+                        是否需要将文章划分成句子。一般而言，GPT不需要，BERT/ERNIE模型需要
 
 chinese words:
   --chinese             Is corpus need words segmentation step for chinese words.
                         中文情形必须设置。处理的文本类型是否是中文。
   --cn_whole_word_segment
                         Is corpus need words segmentation step for chinese words WWM.
-                        可选。是否需要WWM策略。一般而言，Bert/Ernie模型需要，GPT不需要。
+                        可选。是否需要WWM策略。一般而言，BERT/ERNIE模型需要，GPT不需要。
   --cn_seg_func {lac,seg,jieba}
                         Words segment function for chinese words.
                         默认jieba，jieba速度较快，lac模型更准确，计算量高。
@@ -184,12 +184,12 @@ python -u  create_pretraining_data.py \
 2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
 
 
-### Ernie预训练开始
-得到了处理好的训练数据，就可以开始Ernie模型的预训练了。ernie预训练的代码在`model_zoo/ernie-1.0`。
-简单将预处理好的数据，拷贝到data目录，即可开始Ernie模型预训练。
+### ERNIE 预训练开始
+得到了处理好的训练数据，就可以开始ERNIE模型的预训练了。ERNIE预训练的代码在`model_zoo/ernie-1.0`。
+简单将预处理好的数据，拷贝到data目录，即可开始ERNIE模型预训练。
 ```
 mkdir data
-mv ./data_tools/baike_sample* ./data
+mv ./preprocess/baike_sample* ./data
 sh run_static.sh
 # 建议修改 run_static.sh 中的配置，将max_steps设置小一些。
 ```
