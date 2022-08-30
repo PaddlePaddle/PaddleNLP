@@ -86,7 +86,12 @@ std::vector<paddle::Tensor> gptj_kernel(
   decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
   decoding_params.cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
 
+#ifdef PADDLE_NEW_ALLOCATOR
+  // For PaddlePaddle>=2.3.0
+  decoding_params.output_ids = output_ids.data<int>();
+#else
   decoding_params.output_ids = output_ids.mutable_data<int>(word_emb.place());
+#endif
 
   typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;

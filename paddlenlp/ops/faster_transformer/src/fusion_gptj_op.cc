@@ -56,9 +56,17 @@ std::vector<paddle::Tensor> GPTJForward(
   int start_len = input.shape()[1];
   int total_len = max_len + start_len;
   std::vector<int64_t> output_dims({total_len, batch_size});
+  
+#ifdef PADDLE_NEW_ALLOCATOR
+  // For PaddlePaddle>=2.3.0
+  auto output_ids = paddle::empty(output_dims, paddle::DataType::INT32, input.place());
+  auto gpu_place = paddle::GPUPlace();
+#else
   auto output_ids = paddle::Tensor(input.place(), output_dims);
+  auto gpu_place = paddle::PlaceType::kGPU;
+#endif
 
-  if (word_embedding.place() == paddle::PlaceType::kGPU) {
+  if (word_embedding.place() == gpu_place) {
     return GPTJCUDAForward(input,
                            attn_mask,
                            start_length,
