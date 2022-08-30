@@ -554,7 +554,7 @@ def quick_gelu(x):
 
 F.quick_gelu = quick_gelu
 
-INF = float("-inf")  # -1e4 -1e9
+NEG_INF = float("-inf")  # -1e4 -1e9
 
 
 class VisionTransformer(CLIPPreTrainedModel):
@@ -669,7 +669,8 @@ class TextTransformer(CLIPPreTrainedModel):
 
         self.register_buffer("causal_mask",
                              paddle.triu(paddle.ones(
-                                 (1, 1, context_length, context_length)) * INF,
+                                 (1, 1, context_length, context_length)) *
+                                         NEG_INF,
                                          diagonal=1),
                              persistable=False)
         self.register_buffer("position_ids",
@@ -685,13 +686,15 @@ class TextTransformer(CLIPPreTrainedModel):
                 return_dict=False):
         bs, seqlen = input_ids.shape[:2]
         if position_ids is None:
-            position_ids = self.position_ids[:, :seqlen]
+            position_ids = self.position_ids[:, :seqlen].astype("int64")
 
         causal_mask = self.causal_mask[:, :, :seqlen, :seqlen]
         if attention_mask is not None:
-            if attention_mask.ndim == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = attention_mask + causal_mask
+            assert attention_mask.ndim == 2
+            expanded_mask = attention_mask[:, None, None, :].expand(
+                [bs, 1, seqlen, -1]).astype(causal_mask.dtype)
+            inverted_mask = (1.0 - expanded_mask) * NEG_INF
+            attention_mask = inverted_mask + causal_mask
         else:
             attention_mask = causal_mask
         attention_mask.stop_gradient = True
@@ -973,8 +976,8 @@ class CLIPModel(CLIPPreTrainedModel):
                 Its data type can be int, float and bool.
                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
                 When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
+                It is a tensor with shape `[batch_size, sequence_length`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
