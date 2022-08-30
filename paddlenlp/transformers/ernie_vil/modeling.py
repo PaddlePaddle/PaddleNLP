@@ -40,8 +40,6 @@ def quick_gelu(x):
 
 F.quick_gelu = quick_gelu
 
-INF = float("-inf")  # -1e4 -1e9
-
 
 @dataclass
 class ErnieViLOutput(ModelOutput):
@@ -833,8 +831,8 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             text_prompt = "小桥流水人家。"
             style = None
             artist = None
-            text_prompt = model.preprocess_text_prompt(text_prompt)
-            tokenized_inputs = tokenizer(text_prompt, return_tensors="pd", padding="max_length", max_length=64)
+            text_prompt = model.preprocess_text_prompt(text_prompt, style=style, artist=artist)
+            tokenized_inputs = tokenizer(text_prompt, return_tensors="pd", padding="max_length", max_length=tokenizer.model_max_length)
 
             images = model.generate(**tokenized_inputs)
             # return List[PIL.Image]

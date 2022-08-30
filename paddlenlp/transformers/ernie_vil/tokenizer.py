@@ -35,6 +35,10 @@ class ErnieViLTokenizer(ErnieTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "ernie_vil-2.0-base-zh": 64,
+        "disco_diffusion_ernie_vil-2.0-base-zh": 64
+    }
 
     def __call__(
             self,
