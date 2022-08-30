@@ -341,7 +341,7 @@ __global__ void apply_logits_mask_kernel(int vocab_size_padded,
                                          const T* logits_mask = nullptr,
                                          const bool min_penalty = false,
                                          const int end_id = -1,
-                                         const T* bias) {
+                                         const T* bias = nullptr) {
   int tid = threadIdx.x;
   int bid = blockIdx.x;
   int bbid = blockIdx.y;  // batch_size * beam_size: index
