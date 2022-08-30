@@ -22,7 +22,7 @@ SQuAD v2.0
 
 ### 数据准备
 
-为了方便开发者进行测试，我们内置了数据下载脚本，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。
+为了方便开发者进行测试，我们使用了HuggingFace的数据集，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本。
 
 ### Fine-tune
 
@@ -192,4 +192,4 @@ python -u deploy/python/predict.py \
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断，和训练时一致。
 
-以上命令将在SQuAD v1.1的验证集上进行预测。此外，同训练时一样，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与SQuAD数据集格式一致。
+以上命令将在SQuAD v1.1的验证集上进行预测。此外，同训练时一样，用户可以通过命令行传入`--version_2_with_negative`控制所需要的SQuAD数据集版本。

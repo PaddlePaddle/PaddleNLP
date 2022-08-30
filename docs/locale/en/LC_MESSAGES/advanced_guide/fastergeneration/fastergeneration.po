@@ -1,0 +1,211 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:3
+msgid "FasterGeneration加速生成API"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:5
+msgid ""
+"FasterGeneration是PaddleNLP "
+"v2.2版本加入的一个高性能推理功能，可实现基于CUDA的序列解码。该功能可以用于多种生成类的预训练NLP模型，例如GPT、BART、UnifiedTransformer等，并且支持多种解码策略。因此该功能主要适用于机器翻译，文本续写，文本摘要，对话生成等任务。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:7
+msgid ""
+"功能底层依托于 `FasterTransformer "
+"<https://github.com/NVIDIA/FasterTransformer>`_ "
+"，该库专门针对Transformer系列模型及各种解码策略进行了优化。功能顶层封装于 `model.generate` "
+"函数。功能的开启和关闭通过传入 `use_faster` 参数进行控制（默认为开启状态）。该功能具有如下特性："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:9
+msgid "全面支持生成式预训练模型。包括GPT、BART、mBART、UnifiedTransformer和UNIMO-text。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:10
+msgid ""
+"支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling "
+"Search、Length Penalty等子策略。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:11
+msgid ""
+"解码速度快。最高可达非加速版generate函数的 **17倍**。HuggingFace generate函数的 "
+"**8倍**。**并支持FP16混合精度计算**。 详细性能试验数据请参见 `FasterGeneration Performence "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf>`_"
+" 。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:12
+msgid ""
+"易用性强。功能的入口为 `model.generate` "
+"，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。下图展示了FasterGeneration的启动流程："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:17
+msgid "快速开始"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:19
+msgid ""
+"为体现FasterGeneration的易用性，我们在 `samples "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/samples>`_"
+" 文件夹中内置了几个典型任务示例，下面以基于GPT模型的中文文本续写任务为例："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:26
+msgid ""
+"如果是第一次执行，PaddleNLP会启动即时编译（ `JIT Compile "
+"<https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/new_op/new_custom_op_cn.html"
+"#jit-compile>`_ ）自动编译高性能解码算子。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:49
+msgid "编译过程通常会花费几分钟的时间但是只会进行一次，之后再次使用高性能解码不需要重新编译了。编译完成后会继续运行，可以看到生成的结果如下："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:56
+msgid "打开示例代码 `samples/gpt_sample.py` ，我们可以看到如下代码："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:67
+msgid ""
+"可以看到，FasterGeneration的使用方法与 `model.generate()` "
+"相同，只需传入输入tensor和解码相关参数即可，使用非常简便。如果要使用非加速版的 `model.generate()` 方法，只需传入 "
+"`use_faster=False` 即可，示例如下："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:78
+msgid ""
+"需要注意的是，如果传入 `model.generate()` 的参数不满足高性能版本的要求。程序会做出提示并自动切换为非加速版本，例如我们传入 "
+"`min_length=1` ，会得到如下提示："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:86
+msgid ""
+"关于该方法的更多参数可以参考API文档 `generate "
+"<https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.generation_utils.html>`_"
+" 。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:88
+msgid ""
+"`samples "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/experimental/faster_generation/samples>`_"
+" 文件夹中的其他示例的使用方法相同。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:91
+msgid "其他示例"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:93
+msgid ""
+"除了以上简单示例之外，PaddleNLP的examples中所有使用了 `model.generate()` "
+"的示例都可以通过调整到合适的参数使用高性能推理。具体如下："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:95
+msgid ""
+"`examples/dialogue/unified_transformer "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:96
+msgid ""
+"`model_zoo/gpt/faster_gpt "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/faster_gpt>`_"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:97
+msgid ""
+"`examples/text_generation/unimo-text "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_generation"
+"/unimo-text>`_"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:98
+msgid ""
+"`examples/text_summarization/bart "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_summarization/bart>`_"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:100
+msgid ""
+"根据提示修改对应参数即可使用FasterGeneration加速生成。下面我们以基于 `Unified Transformer` "
+"的任务型对话为例展示一下FasterGeneration的加速效果："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:102
+msgid "打开以上链接中Unified Transformer对应的example，找到README中对应预测的脚本。稍作修改如下："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:122
+msgid ""
+"由于这里只是展示性能，我们直接在 `model_name_or_path` 填入PaddleNLP预训练模型名称 "
+"`unified_transformer-12L-cn-luge` 。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:124
+msgid ""
+"可以看到，由于该任务为对话任务，我们为了防止模型生成过多安全回复（如：哈哈哈、不错等），保证生成结果具有更多的随机性，我们选择TopK-"
+"sampling作为解码策略，并让k=5。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:126
+msgid "打开 `infer.py` ，可以看到我们传入的脚本参数大多都提供给了 `model.generate()` 方法："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:149
+msgid "运行脚本，输出结果如下："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:157
+msgid "可以看到，非加速版 `generate()` 方法的预测速度为每个step耗时1.5秒左右。"
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:159
+msgid ""
+"下面我们在启动脚本中传入 `--faster` 参数，这会让 `generate()` 方法传入 `use_faster=True` "
+"，启动加速模式。同时我们需要设置 `--min_dec_len=0` "
+"，因为FasterGeneration当前还不支持该参数。新的脚本启动参数如下："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:180
+msgid "再次运行脚本，输出结果如下（由于我们已经编译过高性能算子，所以这里不会重新编译）："
+msgstr ""
+
+#: ../advanced_guide/fastergeneration/fastergeneration.rst:189
+msgid ""
+"可以看到，FasterGeneration的预测速度为每个step耗时0.4秒左右，提速超过三倍。如果减少 "
+"`num_return_sequences` ，可以得到更高的加速比。"
+msgstr ""
+
+#~ msgid ""
+#~ "如果是第一次执行，PaddleNLP会启动即时编译（ `JIT Compile "
+#~ "<https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/new_op/new_custom_op_cn.html"
+#~ "#jit-compile#jit-compile>`_ ）自动编译高性能解码算子。"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`examples/language_model/gpt/faster_gpt "
+#~ "<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/gpt/faster_gpt>`_"
+#~ msgstr ""
+

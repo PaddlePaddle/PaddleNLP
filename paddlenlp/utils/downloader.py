@@ -31,6 +31,7 @@ try:
 except:
 
     class tqdm(object):
+
         def __init__(self, total=None, **kwargs):
             self.total = total
             self.n = 0
@@ -40,8 +41,8 @@ except:
             if self.total is None:
                 sys.stderr.write("\r{0:.1f} bytes".format(self.n))
             else:
-                sys.stderr.write("\r{0:.1f}%".format(100 * self.n / float(
-                    self.total)))
+                sys.stderr.write("\r{0:.1f}%".format(100 * self.n /
+                                                     float(self.total)))
             sys.stderr.flush()
 
         def __enter__(self):
@@ -55,11 +56,10 @@ from .log import logger
 
 __all__ = ['get_weights_path_from_url']
 
-COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/transformers/community/"
-
+COMMUNITY_MODEL_PREFIX = "https://bj.bcebos.com/paddlenlp/models/community/"
 WEIGHTS_HOME = osp.expanduser("~/.cache/paddle/hapi/weights")
-
 DOWNLOAD_RETRY_LIMIT = 3
+DOWNLOAD_CHECK = False
 
 nlp_models = OrderedDict((
     ('RoBERTa-zh-base',
@@ -97,7 +97,8 @@ nlp_models = OrderedDict((
     ('BERT-multilingual-cased-base',
      'https://bert-models.bj.bcebos.com/multi_cased_L-12_H-768_A-12.tar.gz'),
     ('BERT-zh-base',
-     'https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz'), ))
+     'https://bert-models.bj.bcebos.com/chinese_L-12_H-768_A-12.tar.gz'),
+))
 
 
 def is_url(path):
@@ -150,7 +151,7 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
         str: a local path to save downloaded models & weights & datasets.
     """
 
-    from paddle.fluid.dygraph.parallel import ParallelEnv
+    from paddle.distributed import ParallelEnv
 
     assert is_url(url), "downloading from {} not a url".format(url)
     # parse path after download to decompress under root_dir
@@ -206,11 +207,10 @@ def _download(url, path, md5sum=None):
         total_size = req.headers.get('content-length')
         with open(tmp_fullname, 'wb') as f:
             if total_size:
-                with tqdm(
-                        total=int(total_size),
-                        unit='B',
-                        unit_scale=True,
-                        unit_divisor=1024) as pbar:
+                with tqdm(total=int(total_size),
+                          unit='B',
+                          unit_scale=True,
+                          unit_divisor=1024) as pbar:
                     for chunk in req.iter_content(chunk_size=1024):
                         f.write(chunk)
                         pbar.update(len(chunk))
@@ -362,8 +362,7 @@ class DownloaderCheck(threading.Thread):
         self.command = command
         self.task = task
         self.addition = addition
-        self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + str(
-            int(time.time()))
+        self._initialize()
 
     def uri_path(self, server_url, api):
         srv = server_url
@@ -376,30 +375,40 @@ class DownloaderCheck(threading.Thread):
             srv += api
         return srv
 
+    def _initialize(self):
+        etime = str(int(time.time()))
+        self.full_hash_flag = _md5(str(uuid.uuid1())[-12:])
+        self.hash_flag = _md5(str(uuid.uuid1())[9:18]) + "-" + etime
+
     def request_check(self, task, command, addition):
         if task is None:
             return SUCCESS_STATUS
         payload = {'word': self.task}
-        api_url = self.uri_path(DOWNLOAD_SERVER, 'search')
+        api_url = self.uri_path(DOWNLOAD_SERVER, 'stat')
         cache_path = os.path.join("～")
         if os.path.exists(cache_path):
             extra = {
                 "command": self.command,
                 "mtime": os.stat(cache_path).st_mtime,
-                "hub_name": self.hash_flag
+                "hub_name": self.hash_flag,
+                "cache_info": self.full_hash_flag
             }
         else:
             extra = {
                 "command": self.command,
                 "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-                "hub_name": self.hash_flag
+                "hub_name": self.hash_flag,
+                "cache_info": self.full_hash_flag
             }
         if addition is not None:
             extra.update({"addition": addition})
         try:
             import paddle
+            import paddlenlp
             payload['hub_version'] = " "
+            payload['ppnlp_version'] = paddlenlp.__version__
             payload['paddle_version'] = paddle.__version__.split('-')[0]
+            payload['from'] = 'ppnlp'
             payload['extra'] = json.dumps(extra)
             r = requests.get(api_url, payload, timeout=1).json()
             if r.get("update_cache", 0) == 1:
@@ -411,3 +420,14 @@ class DownloaderCheck(threading.Thread):
 
     def run(self):
         self.request_check(self.task, self.command, self.addition)
+
+
+def download_check(model_id, model_class, addition=None):
+    logger.disable()
+    global DOWNLOAD_CHECK
+    if not DOWNLOAD_CHECK:
+        DOWNLOAD_CHECK = True
+        checker = DownloaderCheck(model_id, model_class, addition)
+        checker.start()
+        checker.join()
+    logger.enable()

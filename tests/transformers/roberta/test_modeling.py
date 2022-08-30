@@ -1,4 +1,5 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,213 +13,301 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import os
 import unittest
 import paddle
-import copy
-import sys
 
-from paddlenlp.transformers import RobertaModel
-from paddlenlp.transformers import RobertaForQuestionAnswering, RobertaForSequenceClassification, RobertaForTokenClassification, \
-                                RobertaForMultipleChoice, RobertaForMaskedLM, RobertaForCausalLM
+from paddlenlp.transformers import (
+    RobertaPretrainedModel,
+    RobertaForCausalLM,
+    RobertaForMaskedLM,
+    RobertaForMultipleChoice,
+    RobertaForQuestionAnswering,
+    RobertaForSequenceClassification,
+    RobertaForTokenClassification,
+    RobertaModel,
+)
 
-from common_test import CommonTest
-from util import softmax_with_cross_entropy, slow
-import unittest
+from ...transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+from ...testing_utils import slow
 
-
-def create_input_data(config, seed=None):
-    '''
-    the generated input data will be same if a specified seed is set 
-    '''
-    if seed is not None:
-        np.random.seed(seed)
-
-    input_ids = np.random.randint(
-        low=0,
-        high=config['vocab_size'],
-        size=(config["batch_size"], config["seq_len"]))
-    num_to_predict = int(config["seq_len"] * 0.15)
-    masked_lm_positions = np.random.choice(
-        config["seq_len"], (config["batch_size"], num_to_predict),
-        replace=False)
-    masked_lm_positions = np.sort(masked_lm_positions)
-    pred_padding_len = config["seq_len"] - num_to_predict
-    temp_masked_lm_positions = np.full(
-        masked_lm_positions.size, 0, dtype=np.int32)
-    mask_token_num = 0
-    for i, x in enumerate(masked_lm_positions):
-        for j, pos in enumerate(x):
-            temp_masked_lm_positions[mask_token_num] = i * config[
-                "seq_len"] + pos
-            mask_token_num += 1
-    masked_lm_positions = temp_masked_lm_positions
-    return input_ids, masked_lm_positions
+ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
 
 
-class TestRobertaForSequenceClassification(CommonTest):
-    def set_input(self):
-        self.config = copy.deepcopy(RobertaModel.pretrained_init_configuration[
-            'roberta-wwm-ext'])
-        self.config['num_hidden_layers'] = 2
-        self.config['vocab_size'] = 512
-        self.config['attention_probs_dropout_prob'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['intermediate_size'] = 1024
-        self.config['seq_len'] = 64
-        self.config['batch_size'] = 3
-        self.config['max_position_embeddings'] = 512
-        self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
+class RobertaModelTester:
 
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'], 2)
+    def __init__(
+        self,
+        parent,
+    ):
+        self.parent = parent
+        self.batch_size = 13
+        self.seq_length = 7
+        self.is_training = True
+        self.use_input_mask = True
+        self.use_token_type_ids = True
+        self.use_labels = True
+        self.vocab_size = 99
+        self.hidden_size = 32
+        self.num_hidden_layers = 5
+        self.num_attention_heads = 4
+        self.intermediate_size = 37
+        self.hidden_act = "gelu"
+        self.hidden_dropout_prob = 0.1
+        self.attention_probs_dropout_prob = 0.1
+        self.max_position_embeddings = 512
+        self.type_vocab_size = 16
+        self.type_sequence_label_size = 2
+        self.initializer_range = 0.02
+        self.pad_token_id = 0,
+        self.layer_norm_eps = 1e-12,
+        self.cls_token_id = 101
+        self.num_labels = 3
+        self.num_choices = 4
+        self.scope = None
 
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = RobertaForSequenceClassification
+    def prepare_config_and_inputs(self):
+        input_ids = ids_tensor([self.batch_size, self.seq_length],
+                               self.vocab_size)
+
+        input_mask = None
+        if self.use_input_mask:
+            input_mask = random_attention_mask(
+                [self.batch_size, self.seq_length])
+
+        token_type_ids = None
+        if self.use_token_type_ids:
+            token_type_ids = ids_tensor([self.batch_size, self.seq_length],
+                                        self.type_vocab_size)
+
+        config = self.get_config()
+        return config, input_ids, token_type_ids, input_mask
+
+    def get_config(self):
+        return {
+            "vocab_size": self.vocab_size,
+            "hidden_size": self.hidden_size,
+            "num_hidden_layers": self.num_hidden_layers,
+            "num_attention_heads": self.num_attention_heads,
+            "intermediate_size": self.intermediate_size,
+            "hidden_act": self.hidden_act,
+            "hidden_dropout_prob": self.hidden_dropout_prob,
+            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
+            "max_position_embeddings": self.max_position_embeddings,
+            "type_vocab_size": self.type_vocab_size,
+            "initializer_range": self.initializer_range,
+            "pad_token_id": 0,
+            "layer_norm_eps": 1e-12,
+            "cls_token_id": 101,
+        }
+
+    def prepare_config_and_inputs_for_decoder(self):
+        (
+            config,
+            input_ids,
+            token_type_ids,
+            input_mask,
+        ) = self.prepare_config_and_inputs()
+
+        return (
+            config,
+            input_ids,
+            token_type_ids,
+            input_mask,
+        )
+
+    def create_and_check_model(self, config, input_ids, token_type_ids,
+                               input_mask):
+        model = RobertaModel(**config)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids)
+        result = model(input_ids, token_type_ids=token_type_ids)
+        result = model(input_ids, return_dict=True)
+
+        self.parent.assertEqual(
+            result.last_hidden_state.shape,
+            [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result.pooler_output.shape,
+                                [self.batch_size, self.hidden_size])
+
+    def create_and_check_for_causal_lm(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = RobertaForCausalLM(RobertaModel(**config))
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=True)
+        self.parent.assertEqual(
+            result.logits.shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_for_masked_lm(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+    ):
+        model = RobertaForMaskedLM(RobertaModel(**config))
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=True)
+        self.parent.assertEqual(
+            result.logits.shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_for_token_classification(self, config, input_ids,
+                                                  token_type_ids, input_mask):
+        model = RobertaForTokenClassification(RobertaModel(**config),
+                                              num_classes=self.num_labels,
+                                              dropout=None)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=True)
+        self.parent.assertEqual(
+            result.logits.shape,
+            [self.batch_size, self.seq_length, self.num_labels])
+
+    def create_and_check_for_multiple_choice(self, config, input_ids,
+                                             token_type_ids, input_mask):
+        model = RobertaForMultipleChoice(RobertaModel(**config))
+        model.eval()
+        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=multiple_choice_input_mask,
+                       token_type_ids=multiple_choice_token_type_ids,
+                       return_dict=True)
+        self.parent.assertEqual(result.logits.shape,
+                                [self.batch_size, self.num_choices])
+
+    def create_and_check_for_question_answering(self, config, input_ids,
+                                                token_type_ids, input_mask):
+        model = RobertaForQuestionAnswering(RobertaModel(**config))
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=True)
+        self.parent.assertEqual(result.start_logits.shape,
+                                [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result.end_logits.shape,
+                                [self.batch_size, self.seq_length])
+
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        (
+            config,
+            input_ids,
+            token_type_ids,
+            input_mask,
+        ) = config_and_inputs
+        inputs_dict = {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "attention_mask": input_mask
+        }
+        return config, inputs_dict
+
+
+class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
+    base_model_class = RobertaModel
+
+    all_model_classes = (
+        RobertaForCausalLM,
+        RobertaForMaskedLM,
+        RobertaModel,
+        RobertaForSequenceClassification,
+        RobertaForTokenClassification,
+        RobertaForMultipleChoice,
+        RobertaForQuestionAnswering,
+    )
+    all_generative_model_classes = (RobertaForCausalLM, )
 
     def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
+        self.model_tester = RobertaModelTester(self)
 
-    def check_testcase(self):
-        self.check_output_equal(self.output.numpy().shape, self.expected_shape)
+    def test_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model(*config_and_inputs)
 
-    def test_forward(self):
-        config = copy.deepcopy(self.config)
-        del config['batch_size']
-        del config['seq_len']
+    def test_for_causal_lm(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs_for_decoder(
+        )
+        self.model_tester.create_and_check_for_causal_lm(*config_and_inputs)
 
-        roberta = RobertaModel(**config)
-        model = self.TEST_MODEL_CLASS(roberta)
-        input_ids = paddle.to_tensor(self.input_ids)
-        self.output = model(input_ids)
-        self.check_testcase()
+    def test_for_masked_lm(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
 
+    def test_for_token_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_token_classification(
+            *config_and_inputs)
 
-class TestRobertaForTokenClassification(TestRobertaForSequenceClassification):
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = RobertaForTokenClassification
+    def test_for_multiple_choice(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_multiple_choice(
+            *config_and_inputs)
 
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'],
-                               self.config['seq_len'], 2)
+    def test_for_question_answering(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_question_answering(
+            *config_and_inputs)
 
-
-class TestRobertaForQuestionAnswering(TestRobertaForSequenceClassification):
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = RobertaForQuestionAnswering
-
-    def set_output(self):
-        self.expected_start_logit_shape = (self.config['batch_size'],
-                                           self.config['seq_len'])
-        self.expected_end_logit_shape = (self.config['batch_size'],
-                                         self.config['seq_len'])
-
-    def check_testcase(self):
-        self.check_output_equal(self.output[0].numpy().shape,
-                                self.expected_start_logit_shape)
-        self.check_output_equal(self.output[1].numpy().shape,
-                                self.expected_end_logit_shape)
-
-
-class TestRobertaForMaskedLM(TestRobertaForSequenceClassification):
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = RobertaForMaskedLM
-
-    def set_output(self):
-        self.expected_seq_shape = (self.config['batch_size'],
-                                   self.config['seq_len'],
-                                   self.config['vocab_size'])
-
-    def test_forward(self):
-        config = copy.deepcopy(self.config)
-        del config['batch_size']
-        del config['seq_len']
-
-        roberta = RobertaModel(**config)
-        model = self.TEST_MODEL_CLASS(roberta)
-        input_ids = paddle.to_tensor(self.input_ids, dtype="int64")
-        masked_lm_positions = paddle.to_tensor(
-            self.masked_lm_positions, dtype="int64")
-        self.output = model(input_ids)
-        self.check_testcase()
-
-    def check_testcase(self):
-        self.check_output_equal(self.output.numpy().shape,
-                                self.expected_seq_shape)
-
-
-class TestRobertaForCausalLM(TestRobertaForMaskedLM):
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = RobertaForCausalLM
-
-
-class TestRobertaFromPretrain(CommonTest):
     @slow
-    def test_roberta_wwm_ext(self):
-        model = RobertaModel.from_pretrained(
-            'roberta-wwm-ext',
-            attention_probs_dropout_prob=0.0,
-            hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(model.config)
-        self.config['seq_len'] = 32
-        self.config['batch_size'] = 3
-
-        input_ids, _ = create_input_data(self.config, 102)
-        input_ids = paddle.to_tensor(input_ids)
-        output = model(input_ids)
-
-        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
-                              self.config['hidden_size'])
-        expected_pooled_shape = (self.config['batch_size'],
-                                 self.config['hidden_size'])
-        self.check_output_equal(output[0].numpy().shape, expected_seq_shape)
-        self.check_output_equal(output[1].numpy().shape, expected_pooled_shape)
-        expected_seq_slice = np.array([[1.1114169, 0.0225839, 0.4461781],
-                                       [1.83088, 0.23190491, 0.30874157],
-                                       [1.6826348, -0.19104452, 1.1281313]])
-        # There's output diff about 1e-6 between cpu and gpu
-        self.check_output_equal(
-            output[0].numpy()[0, 0:3, 0:3], expected_seq_slice, atol=1e-6)
-
-        expected_pooled_slice = np.array([[0.9812122, 0.1296441, 0.8904621],
-                                          [0.933545, 0.5196196, 0.7987352],
-                                          [0.96756446, 0.44966346, 0.801963]])
-        self.check_output_equal(
-            output[1].numpy()[0:3, 0:3], expected_pooled_slice, atol=1e-6)
+    def test_model_from_pretrained(self):
+        for model_name in list(RobertaPretrainedModel.
+                               pretrained_init_configuration.keys())[:1]:
+            model = RobertaModel.from_pretrained(model_name)
+            self.assertIsNotNone(model)
 
 
-class TestRobertaForMultipleChoice(TestRobertaForSequenceClassification):
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = RobertaForMultipleChoice
+class RobertaModelIntegrationTest(unittest.TestCase):
 
-    def set_input(self):
-        self.config = copy.deepcopy(RobertaModel.pretrained_init_configuration[
-            'roberta-wwm-ext'])
-        self.config['num_hidden_layers'] = 2
-        self.config['vocab_size'] = 512
-        self.config['attention_probs_dropout_prob'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['intermediate_size'] = 1024
-        self.config['seq_len'] = 64
-        self.config['batch_size'] = 3
-        self.config['max_position_embeddings'] = 512
-        self.num_choices = 2
-        input_ids, _ = create_input_data(self.config)
-        self.input_ids = np.array(
-            [input_ids for i in range(self.num_choices)]).transpose((1, 0, 2))
+    @slow
+    def test_inference_masked_lm(self):
+        model = RobertaForMaskedLM.from_pretrained("roberta-base")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]])
+        with paddle.no_grad():
+            output = model(input_ids)
+        expected_shape = [1, 11, 50265]
+        self.assertEqual(output.shape, expected_shape)
+        # compare the actual values for a slice.
+        expected_slice = paddle.to_tensor([[[33.8802, -4.3103, 22.7761],
+                                            [4.6539, -2.8098, 13.6253],
+                                            [1.8228, -3.6898, 8.8600]]])
+        self.assertTrue(
+            paddle.allclose(output[:, :3, :3], expected_slice, atol=1e-4))
 
-    def set_output(self):
-        self.expected_output_shape = (self.config['batch_size'],
-                                      self.num_choices)
-
-    def check_testcase(self):
-        self.check_output_equal(self.output.numpy().shape,
-                                self.expected_output_shape)
-
-
-if __name__ == "__main__":
-    unittest.main()
+    @slow
+    def test_inference_no_head(self):
+        model = RobertaModel.from_pretrained("roberta-base")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]])
+        with paddle.no_grad():
+            output = model(input_ids)[0]
+        # compare the actual values for a slice.
+        expected_slice = paddle.to_tensor([[[-0.0231, 0.0782, 0.0074],
+                                            [-0.1854, 0.0540, -0.0175],
+                                            [0.0548, 0.0799, 0.1687]]])
+        self.assertTrue(
+            paddle.allclose(output[:, :3, :3], expected_slice, atol=1e-4))

@@ -19,10 +19,11 @@ limitations under the License. */
 
 
 std::vector<paddle::Tensor> UnifiedDecodingForward(
-    const std::vector<paddle::Tensor>& cache_k,
-    const std::vector<paddle::Tensor>& cache_v,
+    const paddle::Tensor& input_ids,
+    const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
     const paddle::Tensor& type_id,
+    const paddle::Tensor& decoder_type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
     const std::vector<paddle::Tensor>& self_ln_weight,
@@ -51,6 +52,11 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const paddle::Tensor& embedding_bias,
     const paddle::Tensor& positional_embedding_weight,
     const paddle::Tensor& type_embedding_weight,
+    const paddle::Tensor& role_id,
+    const paddle::Tensor& decoder_role_id,
+    const paddle::Tensor& role_embedding_table,
+    const paddle::Tensor& position_ids,
+    const paddle::Tensor& decoder_position_ids,
     const std::string& decoding_strategy,
     const int& beam_size,
     const int& topk,
@@ -70,19 +76,25 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     const bool& pos_bias,
     const std::string& hidden_act,
     const bool& rel_len,
-    const bool& early_stopping) {
-  int batch_size = cache_k[0].shape()[0];
-  int max_out_len = rel_len ? max_len + cache_k[0].shape()[2] : max_len;
+    const bool& early_stopping,
+    const int& min_length,
+    const int& tensor_para_size,
+    const int& layer_para_size,
+    const int& layer_para_batch_size) {
+  int batch_size = input_ids.shape()[0];
+  int max_out_len = rel_len ? max_len + input_ids.shape()[1] : max_len;
 
-  std::vector<int64_t> output_dims;
+  std::vector<int64_t> output_ids_dims;
+  std::vector<int64_t> output_scores_dims;
   std::vector<int64_t> parent_ids_dims;
   std::vector<int64_t> sequence_length_dims({batch_size});
   if (decoding_strategy == "beam_search") {
     if (batch_size != -1) {
       batch_size /= beam_size;
     }
-    output_dims = {max_out_len, batch_size, beam_size};
-    parent_ids_dims = output_dims;
+    output_ids_dims = {max_out_len, batch_size, beam_size};
+    output_scores_dims = {batch_size, beam_size};
+    parent_ids_dims = output_ids_dims;
   } else if (decoding_strategy == "beam_search_v2" ||
              decoding_strategy == "beam_search_v3") {
     // Use separated alive and finish beam queues to avoid the decrease of alive
@@ -94,22 +106,25 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
     } else {
       sequence_length_dims = {batch_size};
     }
-    output_dims = {max_out_len, batch_size, beam_size * 2};
-    parent_ids_dims = output_dims;
+    output_ids_dims = {max_out_len, batch_size, beam_size * 2};
+    output_scores_dims = {batch_size, beam_size * 2};
+    parent_ids_dims = output_ids_dims;
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling" ||
              decoding_strategy == "sampling") {
-    output_dims = {max_out_len, batch_size};
+    output_ids_dims = {max_out_len, batch_size};
+    output_scores_dims = {batch_size};
     parent_ids_dims = {1};
   } else {
     PD_THROW("Not supported decoding strategy. ");
   }
-  auto output_ids = paddle::Tensor(cache_k[0].place(), output_dims);
-  auto parent_ids = paddle::Tensor(cache_k[0].place(), parent_ids_dims);
+  auto output_ids = paddle::Tensor(input_ids.place(), output_ids_dims);
+  auto parent_ids = paddle::Tensor(input_ids.place(), parent_ids_dims);
   auto sequence_length =
-      paddle::Tensor(cache_k[0].place(), sequence_length_dims);
+      paddle::Tensor(input_ids.place(), sequence_length_dims);
+  auto output_scores = paddle::Tensor(input_ids.place(), output_scores_dims);
 
-  if (cache_k[0].place() == paddle::PlaceType::kGPU) {
+  if (input_ids.place() == paddle::PlaceType::kGPU) {
     auto mem_seq_length = paddle::Tensor(paddle::PlaceType::kGPU);
 
     if (mem_seq_len.place() != paddle::PlaceType::kGPU) {
@@ -118,10 +133,11 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
       mem_seq_length = mem_seq_len;
     }
 
-    return UnifiedDecodingCUDAForward(cache_k,
-                                      cache_v,
+    return UnifiedDecodingCUDAForward(input_ids,
+                                      attn_mask,
                                       mem_seq_length,
                                       type_id,
+                                      decoder_type_id,
                                       logits_mask,
                                       word_embedding,
                                       self_ln_weight,
@@ -150,9 +166,15 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       embedding_bias,
                                       positional_embedding_weight,
                                       type_embedding_weight,
+                                      role_id,
+                                      decoder_role_id,
+                                      role_embedding_table,
+                                      position_ids,
+                                      decoder_position_ids,
                                       output_ids,
                                       parent_ids,
                                       sequence_length,
+                                      output_scores,
                                       decoding_strategy,
                                       beam_size,
                                       topk,
@@ -171,17 +193,23 @@ std::vector<paddle::Tensor> UnifiedDecodingForward(
                                       normalize_before,
                                       pos_bias,
                                       hidden_act,
-                                      early_stopping);
+                                      early_stopping,
+                                      min_length,
+                                      tensor_para_size,
+                                      layer_para_size,
+                                      layer_para_batch_size);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
 }
 
 std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
-    const std::vector<std::vector<int64_t>>& cache_k_shapes,
-    const std::vector<std::vector<int64_t>>& cache_v_shapes,
+    const std::vector<int64_t>& input_ids_shape,
+    const std::vector<int64_t>& attn_mask_shape,
     const std::vector<int64_t>& mem_seq_len_shape,
     const std::vector<int64_t>& logits_mask_shape,
+    const std::vector<int64_t>& type_id_shape,
+    const std::vector<int64_t>& decoder_type_id_shape,
     const std::vector<int64_t>& word_embedding_shape,
     const std::vector<std::vector<int64_t>>& self_ln_weight_shapes,
     const std::vector<std::vector<int64_t>>& self_ln_bias_shapes,
@@ -209,6 +237,11 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const std::vector<int64_t>& embedding_bias_shape,
     const std::vector<int64_t>& positional_embedding_weight_shape,
     const std::vector<int64_t>& type_embedding_weight_shape,
+    const std::vector<int64_t>& role_id_shape,
+    const std::vector<int64_t>& decoder_role_id_shape,
+    const std::vector<int64_t>& role_embedding_table_shape,
+    const std::vector<int64_t>& position_ids_shape,
+    const std::vector<int64_t>& decoder_position_ids_shape,
     const std::string& decoding_strategy,
     const int& beam_size,
     const int& topk,
@@ -228,17 +261,23 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     const bool& pos_bias,
     const std::string& hidden_act,
     const bool& rel_len,
-    const bool& early_stopping) {
-  int batch_size = cache_k_shapes[0][0];
+    const bool& early_stopping,
+    const int& min_length,
+    const int& tensor_para_size = 1,
+    const int& layer_para_size = 1,
+    const int& layer_para_batch_size = 1) {
+  int batch_size = input_ids_shape[0];
 
-  std::vector<int64_t> output_dims;
+  std::vector<int64_t> output_ids_dims;
+  std::vector<int64_t> output_scores_dims;
   std::vector<int64_t> sequence_length_dims({batch_size});
   if (decoding_strategy == "beam_search") {
     if (batch_size != -1) {
       batch_size /= beam_size;
     }
-    output_dims = {max_len, batch_size, beam_size};
-    return {output_dims, output_dims, sequence_length_dims};
+    output_ids_dims = {max_len, batch_size, beam_size};
+    output_scores_dims = {batch_size, beam_size};
+    return {output_ids_dims, output_ids_dims, sequence_length_dims, output_scores_dims};
   } else if (decoding_strategy == "beam_search_v2" ||
              decoding_strategy == "beam_search_v3") {
     // Use separated alive and finish beam queues to avoid the decrease of alive
@@ -250,23 +289,27 @@ std::vector<std::vector<int64_t>> UnifiedDecodingInferShape(
     } else {
       sequence_length_dims = {batch_size};
     }
-    output_dims = {max_len, batch_size, beam_size * 2};
-    return {output_dims, output_dims, sequence_length_dims};
+    output_ids_dims = {max_len, batch_size, beam_size * 2};
+    output_scores_dims = {batch_size, beam_size * 2};
+    return {output_ids_dims, output_ids_dims, sequence_length_dims, output_scores_dims};
   } else if (decoding_strategy == "topk_sampling" ||
              decoding_strategy == "topp_sampling" ||
              decoding_strategy == "sampling") {
-    output_dims = {max_len, batch_size};
-    return {output_dims, {1}, sequence_length_dims};
+    output_ids_dims = {max_len, batch_size};
+    output_scores_dims = {batch_size};
+    return {output_ids_dims, {1}, sequence_length_dims, output_scores_dims};
   } else {
     PD_THROW("Not supported decoding strategy. ");
   }
 }
 
 std::vector<paddle::DataType> UnifiedDecodingInferDtype(
-    const std::vector<paddle::DataType>& cache_k,
-    const std::vector<paddle::DataType>& cache_v,
+    const paddle::DataType& input_ids,
+    const paddle::DataType& attn_mask,
     const paddle::DataType& mem_seq_len,
     const paddle::DataType& logits_mask,
+    const paddle::DataType& type_id,
+    const paddle::DataType& decoder_type_id,
     const paddle::DataType& word_embedding,
     const std::vector<paddle::DataType>& self_ln_weight,
     const std::vector<paddle::DataType>& self_ln_bias,
@@ -293,17 +336,24 @@ std::vector<paddle::DataType> UnifiedDecodingInferDtype(
     const paddle::DataType& embedding_weight,
     const paddle::DataType& embedding_bias,
     const paddle::DataType& positional_embedding_weight,
-    const paddle::DataType& type_embedding_weight) {
+    const paddle::DataType& type_embedding_weight,
+    const paddle::DataType& role_id,
+    const paddle::DataType& decoder_role_id,
+    const paddle::DataType& role_embedding_table,
+    const paddle::DataType& position_ids,
+    const paddle::DataType& decoder_position_ids) {
   return {paddle::DataType::INT32,
           paddle::DataType::INT32,
-          paddle::DataType::INT32};
+          paddle::DataType::INT32,
+          paddle::DataType::FLOAT32};
 }
 
 PD_BUILD_OP(fusion_unified_decoding)
-    .Inputs({paddle::Vec("CacheK"),
-             paddle::Vec("CacheV"),
+    .Inputs({"InputIds",
+             "AttnMask",
              "MemSeqLen",
-             "TypeId",
+             "TypeIds",
+             "DecTypeIds",
              "LogitsMask",
              "WordEmbedding",
              paddle::Vec("SelfLayernormWeight"),
@@ -331,8 +381,13 @@ PD_BUILD_OP(fusion_unified_decoding)
              "EmbWeight",
              "EmbBias",
              "PositionEncEmb",
-             "TypeEmb"})
-    .Outputs({"OutputIds", "ParentIds", "SequenceLength"})
+             "TypeEmb",
+             "RoleIds",
+             "DecRoleIds",
+             "RoleEmbedding",
+             "PositionIds",
+             "DecPositionIds"})
+    .Outputs({"OutputIds", "ParentIds", "SequenceLength", "OutputScores"})
     .Attrs({"decoding_strategy: std::string",
             "beam_size: int",
             "topk: int",
@@ -352,7 +407,11 @@ PD_BUILD_OP(fusion_unified_decoding)
             "pos_bias: bool",
             "hidden_act: std::string",
             "rel_len: bool",
-            "early_stopping: bool"})
+            "early_stopping: bool",
+            "min_length: int",
+            "tensor_para_size: int",
+            "layer_para_size: int",
+            "layer_para_batch_size: int"})
     .SetKernelFn(PD_KERNEL(UnifiedDecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(UnifiedDecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(UnifiedDecodingInferDtype));

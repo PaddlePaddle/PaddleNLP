@@ -48,15 +48,15 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
     MD5 = '5988ede79690dc87aa6e4343b5299944'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('nlpcc13_evsam05_hit', 'train.conll'),
-            'd82e667950a5e22b18baf595b9feb30f'),
-        'dev': META_INFO(
-            os.path.join('nlpcc13_evsam05_hit', 'dev.conll'),
-            'b71b08dc85e652769bfbda30b1e352a9'),
-        'test': META_INFO(
-            os.path.join('nlpcc13_evsam05_hit', 'test.conll'),
-            '784fb9d966a286df5370f7eee4013cf0'),
+        'train':
+        META_INFO(os.path.join('nlpcc13_evsam05_hit', 'train.conll'),
+                  'd82e667950a5e22b18baf595b9feb30f'),
+        'dev':
+        META_INFO(os.path.join('nlpcc13_evsam05_hit', 'dev.conll'),
+                  'b71b08dc85e652769bfbda30b1e352a9'),
+        'test':
+        META_INFO(os.path.join('nlpcc13_evsam05_hit', 'test.conll'),
+                  '784fb9d966a286df5370f7eee4013cf0'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -84,7 +84,7 @@ class NLPCC13EVSAM05HIT(DatasetBuilder):
 
         for i, line in enumerate(lines):
             if not line:
-                values = list(zip(* [j.split('\t') for j in lines[start:i]]))
+                values = list(zip(*[j.split('\t') for j in lines[start:i]]))
                 if split == "test":
                     ID, FORM, LEMMA, CPOS, POS, FEATS, HEAD, DEPREL = values
                 else:

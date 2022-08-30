@@ -14,64 +14,93 @@ import paddle.distributed as dist
 import reader
 from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
+from paddlenlp.utils import profiler
 
-from util.record import AverageStatistical
-from util.to_static import apply_to_static
+from tls.record import AverageStatistical
+from tls.to_static import apply_to_static
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./configs/transformer.big.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./configs/transformer.big.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help=
+        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
-    parser.add_argument(
-        "--max_iter",
-        default=None,
-        type=int,
-        help="The maximum iteration for training. ")
+    parser.add_argument("--max_iter",
+                        default=None,
+                        type=int,
+                        help="The maximum iteration for training. ")
     parser.add_argument(
         "--train_file",
         nargs='+',
         default=None,
         type=str,
-        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+        help=
+        "The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
     )
     parser.add_argument(
         "--dev_file",
         nargs='+',
         default=None,
         type=str,
-        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+        help=
+        "The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
     )
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help=
+        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
+        help=
+        "The unknown token. It should be provided when use custom vocab_file. ")
     parser.add_argument(
         "--bos_token",
         default=None,
         type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
+        help="The bos token. It should be provided when use custom vocab_file. "
+    )
     parser.add_argument(
         "--eos_token",
         default=None,
         type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
+        help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument("--batch_size",
+                        default=None,
+                        type=int,
+                        help="The maximum tokens per batch. ")
+    parser.add_argument("--use_amp",
+                        default=None,
+                        type=str,
+                        choices=['true', 'false', 'True', 'False'],
+                        help="Whether to use amp to train Transformer. ")
+    parser.add_argument(
+        "--amp_level",
+        default=None,
+        type=str,
+        choices=['O1', 'O2'],
+        help="The amp level if --use_amp is on. Can be one of [O1, O2]. ")
+
+    # For benchmark.
+    parser.add_argument(
+        '--profiler_options',
+        type=str,
+        default=None,
+        help=
+        'The option of profiler, which should be in format \"key1=value1;key2=value2;key3=value3\".'
+    )
     args = parser.parse_args()
     return args
 
@@ -97,45 +126,44 @@ def do_train(args):
     (train_loader), (eval_loader) = reader.create_data_loader(args)
 
     # Define model
-    transformer = TransformerModel(
-        src_vocab_size=args.src_vocab_size,
-        trg_vocab_size=args.trg_vocab_size,
-        max_length=args.max_length + 1,
-        num_encoder_layers=args.n_layer,
-        num_decoder_layers=args.n_layer,
-        n_head=args.n_head,
-        d_model=args.d_model,
-        d_inner_hid=args.d_inner_hid,
-        dropout=args.dropout,
-        weight_sharing=args.weight_sharing,
-        bos_id=args.bos_idx,
-        eos_id=args.eos_idx)
+    transformer = TransformerModel(src_vocab_size=args.src_vocab_size,
+                                   trg_vocab_size=args.trg_vocab_size,
+                                   max_length=args.max_length + 1,
+                                   num_encoder_layers=args.n_layer,
+                                   num_decoder_layers=args.n_layer,
+                                   n_head=args.n_head,
+                                   d_model=args.d_model,
+                                   d_inner_hid=args.d_inner_hid,
+                                   dropout=args.dropout,
+                                   weight_sharing=args.weight_sharing,
+                                   bos_id=args.bos_idx,
+                                   eos_id=args.eos_idx)
 
     transformer = apply_to_static(args, transformer)
 
     # Define loss
     criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
 
-    scheduler = paddle.optimizer.lr.NoamDecay(
-        args.d_model, args.warmup_steps, args.learning_rate, last_epoch=0)
+    scheduler = paddle.optimizer.lr.NoamDecay(args.d_model,
+                                              args.warmup_steps,
+                                              args.learning_rate,
+                                              last_epoch=0)
 
     # Define optimizer
     if 'use_multi_tensor' not in inspect.getfullargspec(
             paddle.optimizer.Adam.__init__).args:
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=scheduler,
-            beta1=args.beta1,
-            beta2=args.beta2,
-            epsilon=float(args.eps),
-            parameters=transformer.parameters())
+        optimizer = paddle.optimizer.Adam(learning_rate=scheduler,
+                                          beta1=args.beta1,
+                                          beta2=args.beta2,
+                                          epsilon=float(args.eps),
+                                          parameters=transformer.parameters())
     else:
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=scheduler,
-            beta1=args.beta1,
-            beta2=args.beta2,
-            epsilon=float(args.eps),
-            parameters=transformer.parameters(),
-            use_multi_tensor=True)
+        optimizer = paddle.optimizer.Adam(learning_rate=scheduler,
+                                          beta1=args.beta1,
+                                          beta2=args.beta2,
+                                          epsilon=float(args.eps),
+                                          parameters=transformer.parameters(),
+                                          use_multi_tensor=True)
 
     # Init from some checkpoint, to resume the previous training
     if args.init_from_checkpoint:
@@ -156,9 +184,11 @@ def do_train(args):
     # for amp training
     if args.use_amp:
         amp_level = 'O2' if args.use_pure_fp16 else 'O1'
-        scaler = paddle.amp.GradScaler(
-            enable=True, init_loss_scaling=args.scale_loss)
-        transformer = paddle.amp.decorate(models=transformer, level=amp_level)
+        scaler = paddle.amp.GradScaler(enable=True,
+                                       init_loss_scaling=args.scale_loss)
+        transformer = paddle.amp.decorate(models=transformer,
+                                          level=amp_level,
+                                          save_dtype='float32')
 
     # for distributed training
     if trainer_count > 1:
@@ -166,9 +196,9 @@ def do_train(args):
 
     # The best cross-entropy value with label smoothing
     loss_normalizer = -(
-        (1. - args.label_smooth_eps) * np.log(
-            (1. - args.label_smooth_eps)) + args.label_smooth_eps *
-        np.log(args.label_smooth_eps / (args.trg_vocab_size - 1) + 1e-20))
+        (1. - args.label_smooth_eps) * np.log((1. - args.label_smooth_eps)) +
+        args.label_smooth_eps * np.log(args.label_smooth_eps /
+                                       (args.trg_vocab_size - 1) + 1e-20))
 
     step_idx = 0
 
@@ -188,11 +218,10 @@ def do_train(args):
             (src_word, trg_word, lbl_word) = input_data
 
             if args.use_amp:
-                with paddle.amp.auto_cast(
-                        custom_black_list={
-                            'scale', 'reduce_sum', 'elementwise_div'
-                        } if amp_level == 'O2' else {},
-                        level=amp_level):
+                with paddle.amp.auto_cast(custom_black_list={
+                        'scale', 'reduce_sum', 'elementwise_div'
+                } if amp_level == 'O2' else {},
+                                          level=amp_level):
                     logits = transformer(src_word=src_word, trg_word=trg_word)
                     sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
@@ -221,9 +250,13 @@ def do_train(args):
             batch_cost_avg.record(train_batch_cost)
             batch_ips_avg.record(train_batch_cost, tokens_per_cards)
 
+            # Profile for model benchmark
+            if args.profiler_options is not None:
+                profiler.add_profiler_step(args.profiler_options)
+
             # NOTE: For benchmark, loss infomation on all cards will be printed.
-            if step_idx % args.print_step == 0 and (args.benchmark or
-                                                    rank == 0):
+            if step_idx % args.print_step == 0 and (args.benchmark
+                                                    or rank == 0):
                 total_avg_cost = avg_cost.numpy()
 
                 if step_idx == 0:
@@ -260,23 +293,30 @@ def do_train(args):
                 with paddle.no_grad():
                     for input_data in eval_loader:
                         (src_word, trg_word, lbl_word) = input_data
-                        with paddle.amp.auto_cast(
-                                custom_black_list={
+                        if args.use_amp:
+                            with paddle.amp.auto_cast(custom_black_list={
                                     'scale', 'reduce_sum', 'elementwise_div'
-                                } if amp_level == 'O2' else {},
-                                level=amp_level):
-                            logits = transformer(
-                                src_word=src_word, trg_word=trg_word)
-                            sum_cost, avg_cost, token_num = criterion(logits,
-                                                                      lbl_word)
+                            } if amp_level == 'O2' else {},
+                                                      level=amp_level):
+                                logits = transformer(src_word=src_word,
+                                                     trg_word=trg_word)
+                                sum_cost, avg_cost, token_num = criterion(
+                                    logits, lbl_word)
+
+                        else:
+                            logits = transformer(src_word=src_word,
+                                                 trg_word=trg_word)
+                            sum_cost, avg_cost, token_num = criterion(
+                                logits, lbl_word)
+
                         total_sum_cost += sum_cost.numpy()
                         total_token_num += token_num.numpy()
                         total_avg_cost = total_sum_cost / total_token_num
-                    logger.info("validation, step_idx: %d, avg loss: %f, "
-                                "normalized loss: %f, ppl: %f" %
-                                (step_idx, total_avg_cost,
-                                 total_avg_cost - loss_normalizer,
-                                 np.exp([min(total_avg_cost, 100)])))
+                    logger.info(
+                        "validation, step_idx: %d, avg loss: %f, "
+                        "normalized loss: %f, ppl: %f" %
+                        (step_idx, total_avg_cost, total_avg_cost -
+                         loss_normalizer, np.exp([min(total_avg_cost, 100)])))
                 transformer.train()
 
                 if args.save_model and rank == 0:
@@ -289,7 +329,7 @@ def do_train(args):
                     paddle.save(optimizer.state_dict(),
                                 os.path.join(model_dir, "transformer.pdopt"))
 
-            #NOTE: Used for benchmark and use None as default. 
+            #NOTE: Used for benchmark and use None as default.
             if args.max_iter and step_idx == args.max_iter:
                 break
             batch_id += 1
@@ -297,7 +337,7 @@ def do_train(args):
             scheduler.step()
             batch_start = time.time()
 
-        #NOTE: Used for benchmark and use None as default. 
+        #NOTE: Used for benchmark and use None as default.
         if args.max_iter and step_idx == args.max_iter:
             break
 
@@ -323,6 +363,16 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    if ARGS.batch_size:
+        args.batch_size = ARGS.batch_size
+    if ARGS.use_amp:
+        ARGS.use_amp = ARGS.use_amp.lower()
+        if ARGS.use_amp == "true":
+            args.use_amp = True
+        else:
+            args.use_amp = False
+    if ARGS.amp_level:
+        args.use_pure_fp16 = ARGS.amp_level == 'O2'
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
     args.vocab_file = ARGS.vocab_file
@@ -330,5 +380,7 @@ if __name__ == "__main__":
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     pprint(args)
+
+    args.profiler_options = ARGS.profiler_options
 
     do_train(args)

@@ -39,7 +39,10 @@ std::vector<paddle::Tensor> GPT2Forward(
     const int& bos_id,
     const int& eos_id,
     const float& temperature,
-    const bool& use_fp16 = false) {
+    const bool& use_fp16 = false,
+    const int& tensor_para_size = 1,
+    const int& layer_para_size = 1,
+    const int& layer_para_batch_size = 1) {
   int batch_size = input.shape()[0];
   int start_len = input.shape()[1];
   int total_len = max_len + start_len;
@@ -81,7 +84,10 @@ std::vector<paddle::Tensor> GPT2Forward(
                            bos_id,
                            eos_id,
                            temperature,
-                           use_fp16);
+                           use_fp16,
+                           tensor_para_size,
+                           layer_para_size,
+                           layer_para_batch_size);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -121,7 +127,10 @@ std::vector<std::vector<int64_t>> GPT2InferShape(
     const int& bos_id,
     const int& eos_id,
     const float& temperature,
-    const bool& use_fp16 = false) {
+    const bool& use_fp16 = false,
+    const int& tensor_para_size = 1,
+    const int& layer_para_size = 1,
+    const int& layer_para_batch_size = 1) {
   int64_t batch_size = input_shape[0];
   int64_t start_len = input_shape[1];
   std::vector<int64_t> output_dims({max_len + start_len, batch_size});
@@ -191,7 +200,10 @@ PD_BUILD_OP(fusion_gpt)
             "bos_id: int",
             "eos_id: int",
             "temperature: float",
-            "use_fp16: bool"})
+            "use_fp16: bool",
+            "tensor_para_size: int",
+            "layer_para_size: int",
+            "layer_para_batch_size: int"})
     .SetKernelFn(PD_KERNEL(GPT2Forward))
     .SetInferShapeFn(PD_INFER_SHAPE(GPT2InferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(GPT2InferDtype));

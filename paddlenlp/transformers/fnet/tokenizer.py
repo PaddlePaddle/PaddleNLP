@@ -38,7 +38,7 @@ class AddedToken:
     lstrip: bool = False
     rstrip: bool = False
     normalized: bool = True
-    
+
     def __getstate__(self):
         return self.__dict__
 
@@ -96,8 +96,10 @@ class FNetTokenizer(AlbertEnglishTokenizer):
     }
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "fnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-base/spiece.model",
-            "fnet-large": "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-large/spiece.model",
+            "fnet-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-base/spiece.model",
+            "fnet-large":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/fnet/fnet-large/spiece.model",
         }
     }
     pretrained_init_configuration = {
@@ -109,57 +111,68 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         }
     }
     model_input_names = ["input_ids", "token_type_ids"]
-    
-    def __init__(self, sentencepiece_model_file, do_lower_case=False, remove_space=True, keep_accents=True,
-                 unk_token="<unk>", sep_token="[SEP]", pad_token="<pad>", cls_token="[CLS]", mask_token="[MASK]",
-                 sp_model_kwargs: Optional[Dict[str, Any]] = None, **kwargs):
+
+    def __init__(self,
+                 sentencepiece_model_file,
+                 do_lower_case=False,
+                 remove_space=True,
+                 keep_accents=True,
+                 unk_token="<unk>",
+                 sep_token="[SEP]",
+                 pad_token="<pad>",
+                 cls_token="[CLS]",
+                 mask_token="[MASK]",
+                 sp_model_kwargs: Optional[Dict[str, Any]] = None,
+                 **kwargs):
         # Mask token behave like a normal word, i.e. include the space before it
         # mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
-        
-        super().__init__(sentencepiece_model_file, do_lower_case, remove_space, keep_accents, unk_token, sep_token,
-                         pad_token, cls_token, mask_token, **kwargs)
+
+        super().__init__(sentencepiece_model_file, do_lower_case, remove_space,
+                         keep_accents, unk_token, sep_token, pad_token,
+                         cls_token, mask_token, **kwargs)
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
-        
+
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(sentencepiece_model_file)
-    
+
     @property
     def vocab_size(self):
         return len(self.sp_model)
-    
+
     def __getstate__(self):
         state = self.__dict__.copy()
         state["sp_model"] = None
         return state
-    
+
     def __setstate__(self, d):
         self.__dict__ = d
-        
+
         # for backward compatibility
         if not hasattr(self, "sp_model_kwargs"):
             self.sp_model_kwargs = {}
-        
+
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(self.vocab_file)
-    
+
     def preprocess_text(self, inputs):
         if self.remove_space:
             outputs = " ".join(inputs.strip().split())
         else:
             outputs = inputs
         outputs = outputs.replace("``", '"').replace("''", '"')
-        
+
         if not self.keep_accents:
             outputs = unicodedata.normalize("NFKD", outputs)
-            outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
+            outputs = "".join(
+                [c for c in outputs if not unicodedata.combining(c)])
         if self.do_lower_case:
             outputs = outputs.lower()
-        
+
         return outputs
-    
+
     def _tokenize(self, text: str) -> List[str]:
         """Tokenize a string."""
         text = self.preprocess_text(text)
@@ -169,7 +182,8 @@ class FNetTokenizer(AlbertEnglishTokenizer):
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
                 cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(
                     SPIECE_UNDERLINE, ""))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][0] == SPIECE_UNDERLINE:
+                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][
+                        0] == SPIECE_UNDERLINE:
                     if len(cur_pieces[0]) == 1:
                         cur_pieces = cur_pieces[1:]
                     else:
@@ -178,40 +192,41 @@ class FNetTokenizer(AlbertEnglishTokenizer):
                 new_pieces.extend(cur_pieces)
             else:
                 new_pieces.append(piece)
-        
+
         return new_pieces
-    
+
     def tokenize(self, text):
         return self._tokenize(text)
-    
+
     def _convert_token_to_id(self, token):
         """Converts a token (str) to an id using the vocab. """
         return self.sp_model.PieceToId(token)
-    
+
     def _convert_id_to_token(self, index):
         """Converts an index (integer) to a token (str) using the vocab."""
         return self.sp_model.IdToPiece(index)
-    
+
     def convert_tokens_to_ids(self, tokens):
         if not isinstance(tokens, (list, tuple)):
             return self._convert_token_to_id(tokens)
         else:
             return [self._convert_token_to_id(token) for token in tokens]
-    
+
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         if not isinstance(ids, (list, tuple)):
             return self._convert_id_to_token(ids)
         tokens = [self._convert_id_to_token(_id) for _id in ids]
         return tokens
-    
+
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
         out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
         return out_string
-    
+
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
-    ) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. An FNet sequence has the following format:
@@ -233,12 +248,12 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         if token_ids_1 is None:
             return cls + token_ids_0 + sep
         return cls + token_ids_0 + sep + token_ids_1 + sep
-    
+
     def get_special_tokens_mask(self,
                                 token_ids_0,
                                 token_ids_1=None,
                                 already_has_special_tokens=False):
-        
+
         if already_has_special_tokens:
             if token_ids_1 is not None:
                 raise ValueError(
@@ -246,17 +261,20 @@ class FNetTokenizer(AlbertEnglishTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
-        
+
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + (
-                    [0] * len(token_ids_1)) + [1]
+                [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
-    
+
     def create_token_type_ids_from_sequences(
-            self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
-    ) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. An FNet sequence
         pair mask has the following format: ::
@@ -277,11 +295,11 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         """
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
-        
+
         if token_ids_1 is None:
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1]
-    
+
     def save_resources(self, save_directory):
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)

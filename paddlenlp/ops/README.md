@@ -42,9 +42,11 @@
 
 目前支持 JIT 的预测加速 API 有：
 * `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample](./faster_transformer/sample/decoding_sample.py)，[Transformer 预测加速使用示例-机器翻译](../../examples/machine_translation/transformer/faster_transformer/)。
-* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../examples/language_model/gpt/faster_gpt/)。
-* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/)。
-* `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/text_generation/unimo-text/faster_unimo/)。
+* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../model_zoo/gpt/faster_gpt/)。
+* `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/) 以及 PLATO-XL 的使用示例可以参考 [PLATO-XL 11B 使用示例](../../examples/dialogue/plato-xl/)。
+* `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。
+  * 使用示例可以参考 [UNIMOText 预测加速使用示例](../../faster_generation/samples/unimo_text_sample.py)。
+  * 同样，我们提供了动转静以及 Paddle Inference 使用的示例，详细可以参考 [动转静导出](./faster_transformer/sample/unimo_text_export_model_sample.py) 和 [Paddle Inference 使用示例](./faster_transformer/sample/unimo_text_inference.py)。
 * `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例-sample](./faster_transformer/sample/bart_decoding_sample.py)，[BART 预测加速使用示例-文本摘要](../../examples/text_summarization/bart)。
 
 具体使用方法可以参考 API 文档或是使用示例。
@@ -236,7 +238,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=OFF
 make -j
 cd ../
 ```
@@ -261,7 +263,8 @@ cd ../
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
-* `-DWITH_MKL`: 若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
+* `-DWITH_MKL`: 若当前是使用的带有 MKL 的 Paddle lib，那么需要在编译时打开 MKL 以引入 MKL 相关的依赖。
+* `-DWITH_ONNXRUNTIME`: 若当前使用的是带有 ONNX 支持的 Paddle lib，那么需要在编译时打开 ONNX Runtime 以引入相关依赖。
 * `-DON_INFER`: 是否编译 paddle inference 预测库。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 
@@ -322,3 +325,29 @@ python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_pa
 cd bin/
 ./gpt -batch_size 1 -gpu_id 0 -model_dir path/to/model -vocab_file path/to/vocab -start_token "<|endoftext|>" -end_token "<|endoftext|>"
 ```
+
+## FAQ
+
+**问题 1**：编译报错 `module not found: paddle`
+
+解决方式：编译自定义 op，默认使用系统命令 `python` 所指定的 Python 的版本，需要启动相应的 conda 或是 virtualenv，或是在编译时候指定 `-DPY_CMD=python3.7`。
+
+**问题 2**：编译报错：
+
+``` shell
+error: unrecognized command line option '-std=c++14'
+```
+
+解决方式：需要确认环境中是否有多个 `gcc8.2`。`nvcc` 默认使用系统默认的 `gcc`，所以需要将预期使用的 `gcc` 加入到相关环境变量中。
+
+**问题 3**：编译自定义 op C++ Demo 报错，报错可能是但不限于：
+
+``` shell
+undefined reference to paddle_infer::Predictor::GetInputNames() ...
+undefined reference to paddle_infer::Predictor::GetOutputNames() ...
+undefined reference to paddle::AnalysisConfig::SetModel(std::string const&, std::string const&) ...
+
+undefined reference to google::FlagRegisterer::FlagRegisterer ...
+```
+
+解决方式：PaddlePaddle 编译的时候如果使用了 CXX11 ABI，自行编写 demo 并编译自定义 OP 时候需要在 CMakeLists.txt 里面加 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1) 或是 cmake 时候加上对应选项。

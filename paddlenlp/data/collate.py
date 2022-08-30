@@ -1,5 +1,6 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
-#
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -13,8 +14,14 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 
-__all__ = ['Stack', 'Pad', 'Tuple', 'Dict']
+__all__ = [
+    'Stack',
+    'Pad',
+    'Tuple',
+    'Dict',
+]
 
 
 class Stack(object):
@@ -59,10 +66,8 @@ class Stack(object):
                  [5, 6, 7, 8]]
                 '''
         """
-        data = np.stack(
-            data,
-            axis=self._axis).astype(self._dtype) if self._dtype else np.stack(
-                data, axis=self._axis)
+        data = np.stack(data, axis=self._axis).astype(
+            self._dtype) if self._dtype else np.stack(data, axis=self._axis)
         return data
 
 
@@ -133,6 +138,14 @@ class Pad(object):
                  [8, 9, 0, 0]]
                 '''
         """
+
+        # return data itself for rare unexpected cases when 1-D array is passed to Pad
+        if not isinstance(data[0], list) and not isinstance(
+                data[0], np.ndarray):
+            return np.asarray(
+                data,
+                dtype=self._dtype if self._dtype is not None else np.int64)
+
         arrs = [np.asarray(ele) for ele in data]
         original_length = [ele.shape[self._axis] for ele in arrs]
         max_size = max(original_length)

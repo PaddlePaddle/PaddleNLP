@@ -35,11 +35,10 @@ def quant_post(args):
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
-    trans_func = partial(
-        convert_example_to_feature,
-        tokenizer=tokenizer,
-        label2id=label2id,
-        max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example_to_feature,
+                         tokenizer=tokenizer,
+                         label2id=label2id,
+                         max_seq_len=args.max_seq_len)
     train_ds = train_ds.map(trans_func, lazy=True)
 
     def batch_generator_func():
@@ -49,7 +48,8 @@ def quant_post(args):
             batch_data[1].append(data[1])
             if len(batch_data[0]) == args.batch_size:
                 input_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[0])
-                segment_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[1])
+                segment_ids = Pad(axis=0, pad_val=0,
+                                  dtype="int64")(batch_data[1])
                 yield [input_ids, segment_ids]
                 batch_data = [[], []]
 

@@ -19,7 +19,8 @@ from .. import PretrainedModel, register_base_model
 
 __all__ = [
     'ErnieMModel', 'ErnieMPretrainedModel', 'ErnieMForSequenceClassification',
-    'ErnieMForTokenClassification', 'ErnieMForQuestionAnswering'
+    'ErnieMForTokenClassification', 'ErnieMForQuestionAnswering',
+    'ErnieMForMultipleChoice'
 ]
 
 
@@ -57,6 +58,7 @@ class ErnieMEmbeddings(nn.Layer):
 
 
 class ErnieMPooler(nn.Layer):
+
     def __init__(self, hidden_size):
         super(ErnieMPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -128,8 +130,8 @@ class ErnieMPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.ernie_m.config["initializer_range"],
                         shape=layer.weight.shape))
 
@@ -265,8 +267,8 @@ class ErnieMModel(ErnieMPretrainedModel):
                 import paddle
                 from paddlenlp.transformers import ErnieMModel, ErnieMTokenizer
 
-                tokenizer = ErnieMModel.from_pretrained('ernie-m-base')
-                model = ErnieMTokenizer.from_pretrained('ernie-m-base')
+                tokenizer = ErnieMTokenizer.from_pretrained('ernie-m-base')
+                model = ErnieMModel.from_pretrained('ernie-m-base')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -283,8 +285,8 @@ class ErnieMModel(ErnieMPretrainedModel):
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
-        embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
@@ -311,8 +313,8 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         super(ErnieMForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_m.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_m.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_m.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -321,8 +323,6 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
@@ -347,8 +347,9 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        _, pooled_output = self.ernie_m(input_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -376,8 +377,6 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
@@ -412,8 +411,9 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
                 logits = model(**inputs)
         """
 
-        sequence_output, _ = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        sequence_output, _ = self.ernie_m(input_ids,
+                                          position_ids=position_ids,
+                                          attention_mask=attention_mask)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -442,8 +442,8 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         super(ErnieMForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_m.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_m.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_m.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -452,8 +452,6 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
@@ -477,9 +475,74 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        sequence_output, _ = self.ernie_m(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        sequence_output, _ = self.ernie_m(input_ids,
+                                          position_ids=position_ids,
+                                          attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits
+
+
+class ErnieMForMultipleChoice(ErnieMPretrainedModel):
+    """
+    ERNIE-M with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+    
+    Args:
+        ernie (:class:`ErnieMModel`):
+            An instance of ErnieMModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Ernie.
+            If None, use the same value as `hidden_dropout_prob` of `ErnieMModel`
+            instance `ernie-m`. Defaults to None.
+    """
+
+    def __init__(self, ernie_m, num_choices=2, dropout=None):
+        super(ErnieMForMultipleChoice, self).__init__()
+        self.num_choices = num_choices
+        self.ernie_m = ernie_m
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_m.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ernie_m.config["hidden_size"], 1)
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
+        r"""
+        The ErnieMForMultipleChoice forward method, overrides the __call__() special method.
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieMModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`ErnieMModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`ErnieMModel` and shape as [batch_size, num_choice, sequence_length].
+        Returns:
+            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
+            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+        """
+        # input_ids: [bs, num_choice, seq_l]
+        input_ids = input_ids.reshape(shape=(
+            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(
+                shape=(-1, attention_mask.shape[-1]))
+
+        _, pooled_output = self.ernie_m(input_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
+
+        pooled_output = self.dropout(pooled_output)
+
+        logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
+        reshaped_logits = logits.reshape(
+            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+
+        return reshaped_logits

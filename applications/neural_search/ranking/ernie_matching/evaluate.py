@@ -22,10 +22,9 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, AutoModel, AutoTokenizer
 
 from data import create_dataloader, gen_pair
 from data import convert_pairwise_example as convert_example
@@ -77,8 +76,8 @@ def evaluate(model, metric, data_loader, phase="dev"):
     for idx, batch in enumerate(data_loader):
         input_ids, token_type_ids, labels = batch
 
-        pos_probs = model.predict(
-            input_ids=input_ids, token_type_ids=token_type_ids)
+        pos_probs = model.predict(input_ids=input_ids,
+                                  token_type_ids=token_type_ids)
 
         neg_probs = 1.0 - pos_probs
 
@@ -120,29 +119,27 @@ def do_train():
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
     print(dev_ds[0])
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    trans_func_eval = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        phase="eval")
+    trans_func_eval = partial(convert_example,
+                              tokenizer=tokenizer,
+                              max_seq_length=args.max_seq_length,
+                              phase="eval")
 
     batchify_fn_eval = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # pair_segment
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn_eval,
-        trans_fn=trans_func_eval)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn_eval,
+                                        trans_fn=trans_func_eval)
 
     model = PairwiseMatching(pretrained_model, margin=args.margin)
 

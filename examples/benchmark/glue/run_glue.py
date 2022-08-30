@@ -29,10 +29,7 @@ from paddle.metric import Metric, Accuracy, Precision, Recall
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import AlbertForSequenceClassification, AlbertTokenizer
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 
@@ -51,17 +48,9 @@ METRIC_CLASSES = {
     "rte": Accuracy,
 }
 
-MODEL_CLASSES = {
-    "bert": (BertForSequenceClassification, BertTokenizer),
-    "electra": (ElectraForSequenceClassification, ElectraTokenizer),
-    "ernie": (ErnieForSequenceClassification, ErnieTokenizer),
-    "albert": (AlbertForSequenceClassification, AlbertTokenizer),
-}
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
     # Required parameters
     parser.add_argument(
         "--task_name",
@@ -69,92 +58,92 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
-    parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument(
-        "--model_name_or_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([
-                list(classes[-1].pretrained_init_configuration.keys())
-                for classes in MODEL_CLASSES.values()
-            ], [])), )
+        ", ".join(METRIC_CLASSES.keys()),
+    )
+    parser.add_argument("--model_type",
+                        default=None,
+                        type=str,
+                        required=False,
+                        help="should be remove later")
+    parser.add_argument("--model_name_or_path",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model")
+    parser.add_argument("--tokenizer_name_or_path",
+                        default=None,
+                        type=str,
+                        required=False,
+                        help="Path to tokenizer")
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=1e-4,
-        type=float,
-        help="The initial learning rate for Adam.")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=1e-4,
+                        type=float,
+                        help="The initial learning rate for Adam.")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
+        help="Total number of training epochs to perform.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=100,
+                        help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
+        help="Batch size per GPU/CPU for training.",
+    )
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.1,
-        type=float,
-        help="Linear warmup proportion over total steps.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-6,
-        type=float,
-        help="Epsilon for Adam optimizer.")
+        help=
+        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--warmup_proportion",
+                        default=0.1,
+                        type=float,
+                        help="Linear warmup proportion over total steps.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-6,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -194,7 +183,8 @@ def evaluate(model, loss_fct, metric, data_loader):
                 res[1],
                 res[2],
                 res[3],
-                res[4], ),
+                res[4],
+            ),
             end='')
     elif isinstance(metric, Mcc):
         print("eval loss: %f, mcc: %s, " % (loss.numpy(), res[0]), end='')
@@ -224,10 +214,9 @@ def convert_example(example,
     if (int(is_test) + len(example)) == 2:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     else:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
@@ -244,17 +233,17 @@ def do_train(args):
 
     args.task_name = args.task_name.lower()
     metric_class = METRIC_CLASSES[args.task_name]
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     train_ds = load_dataset('glue', args.task_name, splits="train")
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    if args.tokenizer_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name_or_path)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         label_list=train_ds.label_list,
+                         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
@@ -263,12 +252,11 @@ def do_train(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
             'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
@@ -294,17 +282,17 @@ def do_train(args):
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds, batch_size=args.batch_size, shuffle=False)
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                                   batch_size=args.batch_size,
+                                                   shuffle=False)
+        dev_data_loader = DataLoader(dataset=dev_ds,
+                                     batch_sampler=dev_batch_sampler,
+                                     collate_fn=batchify_fn,
+                                     num_workers=0,
+                                     return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -373,9 +361,9 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "%s_ft_model_%d.pdparams" %
-                                              (args.task_name, global_step))
+                    output_dir = os.path.join(
+                        args.output_dir, "%s_ft_model_%d.pdparams" %
+                        (args.task_name, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel

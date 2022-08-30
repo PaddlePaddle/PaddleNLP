@@ -32,11 +32,10 @@ from utils.record import AverageStatistical
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./config/transformer.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./config/transformer.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     args = parser.parse_args()
     return args
 
@@ -73,12 +72,11 @@ def do_train(args):
     scheduler = paddle.optimizer.lr.NoamDecay(args.d_model, args.warmup_steps,
                                               args.learning_rate)
 
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=scheduler,
-        beta1=args.beta1,
-        beta2=args.beta2,
-        epsilon=float(args.eps),
-        parameters=transformer.parameters())
+    optimizer = paddle.optimizer.Adam(learning_rate=scheduler,
+                                      beta1=args.beta1,
+                                      beta2=args.beta2,
+                                      epsilon=float(args.eps),
+                                      parameters=transformer.parameters())
 
     # Init from some checkpoint, to resume the previous training
     if args.init_from_checkpoint:
@@ -101,9 +99,9 @@ def do_train(args):
 
     # The best cross-entropy value with label smoothing
     loss_normalizer = -(
-        (1. - args.label_smooth_eps) * np.log(
-            (1. - args.label_smooth_eps)) + args.label_smooth_eps *
-        np.log(args.label_smooth_eps / (args.trg_vocab_size - 1) + 1e-20))
+        (1. - args.label_smooth_eps) * np.log((1. - args.label_smooth_eps)) +
+        args.label_smooth_eps * np.log(args.label_smooth_eps /
+                                       (args.trg_vocab_size - 1) + 1e-20))
 
     step_idx = 0
 
@@ -187,18 +185,18 @@ def do_train(args):
                 with paddle.no_grad():
                     for input_data in eval_loader:
                         (src_word, trg_word, lbl_word) = input_data
-                        logits = transformer(
-                            src_word=src_word, trg_word=trg_word)
-                        sum_cost, avg_cost, token_num = criterion(logits,
-                                                                  lbl_word)
+                        logits = transformer(src_word=src_word,
+                                             trg_word=trg_word)
+                        sum_cost, avg_cost, token_num = criterion(
+                            logits, lbl_word)
                         total_sum_cost += sum_cost.numpy()
                         total_token_num += token_num.numpy()
                         total_avg_cost = total_sum_cost / total_token_num
-                    logger.info("validation, step_idx: %d, avg loss: %f, "
-                                "normalized loss: %f, ppl: %f" %
-                                (step_idx, total_avg_cost,
-                                 total_avg_cost - loss_normalizer,
-                                 np.exp([min(total_avg_cost, 100)])))
+                    logger.info(
+                        "validation, step_idx: %d, avg loss: %f, "
+                        "normalized loss: %f, ppl: %f" %
+                        (step_idx, total_avg_cost, total_avg_cost -
+                         loss_normalizer, np.exp([min(total_avg_cost, 100)])))
                 transformer.train()
 
                 if args.save_model and rank == 0:

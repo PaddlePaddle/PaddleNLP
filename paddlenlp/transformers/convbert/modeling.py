@@ -21,11 +21,18 @@ from ..electra.modeling import get_activation
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "ConvBertModel", "ConvBertPretrainedModel", "ConvBertForTotalPretraining",
-    "ConvBertDiscriminator", "ConvBertGenerator", "ConvBertClassificationHead",
-    "ConvBertForSequenceClassification", "ConvBertForTokenClassification",
-    "ConvBertPretrainingCriterion", "ConvBertForQuestionAnswering",
-    "ConvBertForMultipleChoice", "ConvBertForPretraining"
+    "ConvBertModel",
+    "ConvBertPretrainedModel",
+    "ConvBertForTotalPretraining",
+    "ConvBertDiscriminator",
+    "ConvBertGenerator",
+    "ConvBertClassificationHead",
+    "ConvBertForSequenceClassification",
+    "ConvBertForTokenClassification",
+    "ConvBertPretrainingCriterion",
+    "ConvBertForQuestionAnswering",
+    "ConvBertForMultipleChoice",
+    "ConvBertForPretraining",
 ]
 dtype_float = paddle.get_default_dtype()
 
@@ -44,6 +51,7 @@ def _convert_attention_mask(attn_mask, dtype):
 
 
 class GroupedLinear(nn.Layer):
+
     def __init__(self, input_size, output_size, num_groups):
         super().__init__()
         self.input_size = input_size
@@ -54,8 +62,9 @@ class GroupedLinear(nn.Layer):
         self.weight = paddle.create_parameter(
             shape=[self.num_groups, self.group_in_dim, self.group_out_dim],
             dtype=dtype_float)
-        self.bias = paddle.create_parameter(
-            shape=[output_size], dtype=dtype_float, is_bias=True)
+        self.bias = paddle.create_parameter(shape=[output_size],
+                                            dtype=dtype_float,
+                                            is_bias=True)
 
     def forward(self, hidden_states):
         batch_size = hidden_states.shape[0]
@@ -81,15 +90,18 @@ class SeparableConv1D(nn.Layer):
             groups=input_filters,
             padding=kernel_size // 2,
             bias_attr=False,
-            data_format="NLC", )
+            data_format="NLC",
+        )
         self.pointwise = nn.Conv1D(
             input_filters,
             output_filters,
             kernel_size=1,
             bias_attr=False,
-            data_format="NLC", )
-        self.bias = paddle.create_parameter(
-            shape=[output_filters], dtype=dtype_float, is_bias=True)
+            data_format="NLC",
+        )
+        self.bias = paddle.create_parameter(shape=[output_filters],
+                                            dtype=dtype_float,
+                                            is_bias=True)
 
     def forward(self, hidden_states):
         x = self.depthwise(hidden_states)
@@ -98,16 +110,18 @@ class SeparableConv1D(nn.Layer):
 
 
 class MultiHeadAttentionWithConv(Layer):
+
     def __init__(
-            self,
-            embed_dim,
-            num_heads,
-            dropout=0.,
-            kdim=None,
-            vdim=None,
-            need_weights=False,
-            conv_kernel_size=None,
-            head_ratio=None, ):
+        self,
+        embed_dim,
+        num_heads,
+        dropout=0.,
+        kdim=None,
+        vdim=None,
+        need_weights=False,
+        conv_kernel_size=None,
+        head_ratio=None,
+    ):
         super(MultiHeadAttentionWithConv, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -115,7 +129,8 @@ class MultiHeadAttentionWithConv(Layer):
         self.need_weights = need_weights
         self.head_dim = embed_dim // num_heads
         self.scale = self.head_dim**-0.5
-        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+        assert self.head_dim * \
+            num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
         new_num_attention_heads = num_heads // head_ratio
         if num_heads // head_ratio < 1:
@@ -135,14 +150,13 @@ class MultiHeadAttentionWithConv(Layer):
 
         if self.conv_type == "sdconv":
             self.conv_kernel_size = conv_kernel_size
-            self.key_conv_attn_layer = SeparableConv1D(
-                embed_dim, self.all_head_size, self.conv_kernel_size)
+            self.key_conv_attn_layer = SeparableConv1D(embed_dim,
+                                                       self.all_head_size,
+                                                       self.conv_kernel_size)
             self.conv_kernel_layer = nn.Linear(
                 self.all_head_size, self.num_heads * self.conv_kernel_size)
             self.conv_out_layer = nn.Linear(embed_dim, self.all_head_size)
-            self.unfold = nn.Unfold(
-                kernel_sizes=[self.conv_kernel_size, 1],
-                paddings=[(self.conv_kernel_size - 1) // 2, 0], )
+            self.padding = (self.conv_kernel_size - 1) // 2
 
     def forward(self, query, key=None, value=None, attn_mask=None, cache=None):
         key = query if key is None else key
@@ -153,28 +167,33 @@ class MultiHeadAttentionWithConv(Layer):
         v = self.v_proj(value)
 
         if self.conv_type == "sdconv":
+            bs = paddle.shape(q)[0]
+            seqlen = paddle.shape(q)[1]
             mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
             conv_attn_layer = mixed_key_conv_attn_layer * q
-            batch_size = q.shape[0]
+
             # conv_kernel_layer
             conv_kernel_layer = self.conv_kernel_layer(conv_attn_layer)
             conv_kernel_layer = tensor.reshape(
                 conv_kernel_layer, shape=[-1, self.conv_kernel_size, 1])
             conv_kernel_layer = F.softmax(conv_kernel_layer, axis=1)
-            # conv_out
             conv_out_layer = self.conv_out_layer(query)
-            conv_out_layer = tensor.reshape(
-                conv_out_layer, [batch_size, -1, self.all_head_size, 1])
-            conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1, 3])
-            conv_out_layer = self.unfold(conv_out_layer)
-            conv_out_layer = tensor.transpose(conv_out_layer, perm=[0, 2, 1])
+            conv_out_layer = F.pad(conv_out_layer,
+                                   pad=[self.padding, self.padding],
+                                   data_format="NLC")
+            conv_out_layer = paddle.stack([
+                paddle.slice(
+                    conv_out_layer, axes=[1], starts=[i], ends=[i + seqlen])
+                for i in range(self.conv_kernel_size)
+            ],
+                                          axis=-1)
             conv_out_layer = tensor.reshape(
                 conv_out_layer,
                 shape=[-1, self.head_dim, self.conv_kernel_size])
             conv_out_layer = tensor.matmul(conv_out_layer, conv_kernel_layer)
             conv_out = tensor.reshape(
                 conv_out_layer,
-                shape=[batch_size, -1, self.num_heads, self.head_dim])
+                shape=[bs, seqlen, self.num_heads, self.head_dim])
 
         q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
         q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
@@ -210,6 +229,7 @@ class MultiHeadAttentionWithConv(Layer):
 
 
 class TransformerEncoderLayerWithConv(nn.TransformerEncoderLayer):
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -223,26 +243,28 @@ class TransformerEncoderLayerWithConv(nn.TransformerEncoderLayer):
                  head_ratio=None,
                  num_groups=None,
                  **kwargs):
-        super().__init__(
-            d_model,
-            nhead,
-            dim_feedforward,
-            dropout=dropout,
-            activation=activation,
-            attn_dropout=attn_dropout,
-            act_dropout=act_dropout,
-            normalize_before=normalize_before)
+        super().__init__(d_model,
+                         nhead,
+                         dim_feedforward,
+                         dropout=dropout,
+                         activation=activation,
+                         attn_dropout=attn_dropout,
+                         act_dropout=act_dropout,
+                         normalize_before=normalize_before)
         self.self_attn = MultiHeadAttentionWithConv(
             d_model,
             nhead,
             dropout=attn_dropout,
             conv_kernel_size=conv_kernel_size,
-            head_ratio=head_ratio, )
+            head_ratio=head_ratio,
+        )
         if num_groups > 1:
-            self.linear1 = GroupedLinear(
-                d_model, dim_feedforward, num_groups=num_groups)
-            self.linear2 = GroupedLinear(
-                dim_feedforward, d_model, num_groups=num_groups)
+            self.linear1 = GroupedLinear(d_model,
+                                         dim_feedforward,
+                                         num_groups=num_groups)
+            self.linear2 = GroupedLinear(dim_feedforward,
+                                         d_model,
+                                         num_groups=num_groups)
         self._config.update({
             "conv_kernel_size": conv_kernel_size,
             "head_ratio": head_ratio,
@@ -256,12 +278,13 @@ class ConvBertEmbeddings(nn.Layer):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            embedding_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size, ):
+        self,
+        vocab_size,
+        embedding_size,
+        hidden_dropout_prob,
+        max_position_embeddings,
+        type_vocab_size,
+    ):
         super(ConvBertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
@@ -446,10 +469,11 @@ class ConvBertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.convbert.config["initializer_range"],
-                    shape=layer.weight.shape, ))
+                    shape=layer.weight.shape,
+                ))
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
@@ -458,17 +482,19 @@ class ConvBertPretrainedModel(PretrainedModel):
             layer.depthwise.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.convbert.config["initializer_range"],
-                    shape=layer.depthwise.weight.shape, ))
+                    shape=layer.depthwise.weight.shape,
+                ))
             layer.pointwise.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.convbert.config["initializer_range"],
-                    shape=layer.pointwise.weight.shape, ))
+                    shape=layer.pointwise.weight.shape,
+                ))
 
         if isinstance(layer, (nn.Linear, GroupedLinear,
                               SeparableConv1D)) and layer.bias is not None:
@@ -485,11 +511,12 @@ class ConvBertPretrainedModel(PretrainedModel):
             raise ValueError(
                 "when tie input/output embeddings, the shape of output embeddings: {}"
                 "should be equal to shape of input embeddings: {}"
-                "or should be equal to the shape of transpose input embeddings: {}".
-                format(
+                "or should be equal to the shape of transpose input embeddings: {}"
+                .format(
                     output_embeddings.weight.shape,
                     input_embeddings.weight.shape,
-                    input_embeddings.weight.t().shape, ))
+                    input_embeddings.weight.t().shape,
+                ))
         if getattr(output_embeddings, "bias", None) is not None:
             if output_embeddings.weight.shape[
                     -1] != output_embeddings.bias.shape[0]:
@@ -497,7 +524,8 @@ class ConvBertPretrainedModel(PretrainedModel):
                     "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
                     "please check output_embeddings configuration".format(
                         output_embeddings.weight.shape[-1],
-                        output_embeddings.bias.shape[0], ))
+                        output_embeddings.bias.shape[0],
+                    ))
 
 
 @register_base_model
@@ -598,7 +626,8 @@ class ConvBertModel(ConvBertPretrainedModel):
             embedding_size,
             hidden_dropout_prob,
             max_position_embeddings,
-            type_vocab_size, )
+            type_vocab_size,
+        )
 
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
@@ -613,7 +642,8 @@ class ConvBertModel(ConvBertPretrainedModel):
             act_dropout=0,
             conv_kernel_size=conv_kernel_size,
             head_ratio=head_ratio,
-            num_groups=num_groups, )
+            num_groups=num_groups,
+        )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
 
         self.init_weights()
@@ -686,14 +716,15 @@ class ConvBertModel(ConvBertPretrainedModel):
                 (input_ids == self.pad_token_id).astype(dtype_float) * -1e4,
                 axis=[1, 2])
         else:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(dtype_float)
+            attention_mask = paddle.unsqueeze(attention_mask,
+                                              axis=[1, 2]).astype(dtype_float)
             attention_mask = (1.0 - attention_mask) * -1e4
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
-            token_type_ids=token_type_ids, )
+            token_type_ids=token_type_ids,
+        )
 
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
@@ -779,8 +810,9 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
                 logits = model(**inputs)
         '''
 
-        discriminator_sequence_output = self.convbert(
-            input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.convbert(input_ids, token_type_ids,
+                                                      position_ids,
+                                                      attention_mask)
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
 
@@ -803,7 +835,8 @@ class ConvBertGenerator(ConvBertPretrainedModel):
         self.generator_predictions = ConvBertGeneratorPredictions(
             self.convbert.config["embedding_size"],
             self.convbert.config["hidden_size"],
-            self.convbert.config["hidden_act"], )
+            self.convbert.config["hidden_act"],
+        )
 
         if not self.tie_word_embeddings:
             self.generator_lm_head = nn.Linear(
@@ -813,18 +846,20 @@ class ConvBertGenerator(ConvBertPretrainedModel):
             self.generator_lm_head_bias = paddle.create_parameter(
                 shape=[self.convbert.config["vocab_size"]],
                 dtype=dtype_float,
-                is_bias=True, )
+                is_bias=True,
+            )
         self.init_weights()
 
     def get_input_embeddings(self):
         return self.convbert.embeddings.word_embeddings
 
     def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None, ):
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+    ):
         r'''
         The ConvBertGenerator forward method, overrides the `__call__()` special method.
 
@@ -890,8 +925,10 @@ class ConvBertGenerator(ConvBertPretrainedModel):
                 paddle.matmul(
                     prediction_scores,
                     self.get_input_embeddings().weight,
-                    transpose_y=True, ),
-                self.generator_lm_head_bias, )
+                    transpose_y=True,
+                ),
+                self.generator_lm_head_bias,
+            )
 
         return prediction_scores
 
@@ -942,16 +979,18 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
             hidden_size=self.convbert.config["hidden_size"],
             hidden_dropout_prob=dropout if dropout is not None else
             self.convbert.config["hidden_dropout_prob"],
-            num_classes=self.num_classes, )
+            num_classes=self.num_classes,
+        )
 
         self.init_weights()
 
     def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None, ):
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+    ):
         r"""
         The ConvBertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -1011,18 +1050,19 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
         super(ConvBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.convbert = convbert
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.convbert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  convbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.convbert.config["hidden_size"],
                                     self.num_classes)
         self.init_weights()
 
     def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None, ):
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+    ):
         r"""
         The ConvBertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1202,8 +1242,8 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
                                  gen_labels, use_softmax_sample):
         """Sample from the generator to create discriminator input."""
         # get generator token result
-        sampled_tokens = (
-            self.sample_from_softmax(gen_logits, use_softmax_sample)).detach()
+        sampled_tokens = (self.sample_from_softmax(
+            gen_logits, use_softmax_sample)).detach()
         sampled_tokids = paddle.argmax(sampled_tokens, axis=-1)
         # update token only at mask position
         # gen_labels : [B, L], L contains -100(unmasked) or token value(masked)
@@ -1227,8 +1267,8 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         else:
             gumbel_noise = paddle.zeros_like(logits)
         # softmax_sample equal to sampled_tokids.unsqueeze(-1)
-        softmax_sample = paddle.argmax(
-            F.softmax(logits + gumbel_noise), axis=-1)
+        softmax_sample = paddle.argmax(F.softmax(logits + gumbel_noise),
+                                       axis=-1)
         # one hot
         return F.one_hot(softmax_sample, logits.shape[-1])
 
@@ -1241,19 +1281,20 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         N = positions.shape[1]
         assert N == L, "the dimension of inputs and mask should be same as [batch_size, sequence_length]"
 
-        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence
-                            ) + (positions * updates)
+        updated_sequence = ((paddle.ones_like(sequence) - positions) *
+                            sequence) + (positions * updates)
 
         return updated_sequence
 
     def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None,
-            raw_input_ids=None,
-            gen_labels=None, ):
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        raw_input_ids=None,
+        gen_labels=None,
+    ):
         r"""
 
         Args:
@@ -1296,9 +1337,9 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         (
             disc_inputs,
             disc_labels,
-            generator_predict_tokens, ) = self.get_discriminator_inputs(
-                input_ids, raw_input_ids, gen_logits, gen_labels,
-                self.use_softmax_sample)
+            generator_predict_tokens,
+        ) = self.get_discriminator_inputs(input_ids, raw_input_ids, gen_logits,
+                                          gen_labels, self.use_softmax_sample)
 
         disc_logits = self.discriminator(disc_inputs, token_type_ids,
                                          position_ids, attention_mask)
@@ -1336,16 +1377,18 @@ class ConvBertPretrainingCriterion(nn.Layer):
         self.disc_loss_fct = nn.BCEWithLogitsLoss(reduction="none")
 
     def forward(
-            self,
-            generator_prediction_scores,
-            discriminator_prediction_scores,
-            generator_labels,
-            discriminator_labels,
-            attention_mask, ):
+        self,
+        generator_prediction_scores,
+        discriminator_prediction_scores,
+        generator_labels,
+        discriminator_labels,
+        attention_mask,
+    ):
         # generator loss
         gen_loss = self.gen_loss_fct(
             paddle.reshape(generator_prediction_scores, [-1, self.vocab_size]),
-            paddle.reshape(generator_labels, [-1]), )
+            paddle.reshape(generator_labels, [-1]),
+        )
         # todo: we can remove 4 lines after when CrossEntropyLoss(reduction='mean') improved
         umask_positions = paddle.zeros_like(generator_labels).astype(
             dtype_float)
@@ -1361,7 +1404,8 @@ class ConvBertPretrainingCriterion(nn.Layer):
         seq_length = discriminator_labels.shape[1]
         disc_loss = self.disc_loss_fct(
             paddle.reshape(discriminator_prediction_scores, [-1, seq_length]),
-            discriminator_labels.astype(dtype_float), )
+            discriminator_labels.astype(dtype_float),
+        )
         if attention_mask is not None:
             umask_positions = paddle.ones_like(discriminator_labels).astype(
                 dtype_float)
@@ -1381,6 +1425,7 @@ class ConvBertPretrainingCriterion(nn.Layer):
 
 
 class ConvBertPooler(Layer):
+
     def __init__(self, hidden_size, pool_act="tanh"):
         super(ConvBertPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -1418,8 +1463,8 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
         self.num_choices = num_choices
         self.convbert = convbert
         self.pooler = ConvBertPooler(self.convbert.config["hidden_size"])
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.convbert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  convbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.convbert.config["hidden_size"], 1)
         self.init_weights()
 
@@ -1545,11 +1590,10 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
                 end_logits  = outputs[1]
 
         """
-        sequence_output = self.convbert(
-            input_ids,
-            token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output = self.convbert(input_ids,
+                                        token_type_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)

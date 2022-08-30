@@ -77,9 +77,22 @@ class ErnieGramTokenizer(ErnieTokenizer):
         "vocab_file": {
             "ernie-gram-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
+            "ernie-gram-zh-finetuned-dureader-robust":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
         }
     }
-    pretrained_init_configuration = {"ernie-gram-zh": {"do_lower_case": True}, }
+    pretrained_init_configuration = {
+        "ernie-gram-zh": {
+            "do_lower_case": True
+        },
+        "ernie-gram-zh-finetuned-dureader-robust": {
+            "do_lower_case": True
+        },
+    }
+    max_model_input_sizes = {
+        "ernie-gram-zh": 512,
+        "ernie-gram-zh-finetuned-dureader-robust": 512,
+    }
 
     def __init__(self,
                  vocab_file,
@@ -90,11 +103,11 @@ class ErnieGramTokenizer(ErnieTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        super(ErnieGramTokenizer, self).__init__(
-            vocab_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        super(ErnieGramTokenizer, self).__init__(vocab_file,
+                                                 do_lower_case=do_lower_case,
+                                                 unk_token=unk_token,
+                                                 sep_token=sep_token,
+                                                 pad_token=pad_token,
+                                                 cls_token=cls_token,
+                                                 mask_token=mask_token,
+                                                 **kwargs)

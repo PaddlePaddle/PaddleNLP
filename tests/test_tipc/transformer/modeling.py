@@ -3,7 +3,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layers.utils import map_structure
 
 __all__ = [
@@ -49,8 +48,8 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float64"):
                                (num_timescales - 1))
     inv_timescales = np.exp(
         np.arange(num_timescales) * -log_timescale_increment)
-    scaled_time = np.expand_dims(position, 1) * np.expand_dims(inv_timescales,
-                                                               0)
+    scaled_time = np.expand_dims(position, 1) * np.expand_dims(
+        inv_timescales, 0)
     signal = np.concatenate([np.sin(scaled_time), np.cos(scaled_time)], axis=1)
     signal = np.pad(signal, [[0, 0], [0, np.mod(channels, 2)]], 'constant')
     position_enc = signal
@@ -146,11 +145,12 @@ class PositionalEmbedding(nn.Layer):
         super(PositionalEmbedding, self).__init__()
         self.emb_dim = emb_dim
 
-        self.pos_encoder = nn.Embedding(
-            num_embeddings=max_length, embedding_dim=self.emb_dim)
+        self.pos_encoder = nn.Embedding(num_embeddings=max_length,
+                                        embedding_dim=self.emb_dim)
         self.pos_encoder.weight.set_value(
-            position_encoding_init(
-                max_length, self.emb_dim, dtype=paddle.get_default_dtype()))
+            position_encoding_init(max_length,
+                                   self.emb_dim,
+                                   dtype=paddle.get_default_dtype()))
 
     def forward(self, pos):
         r"""
@@ -254,14 +254,13 @@ class CrossEntropyCriterion(nn.Layer):
 
                 criterion(predict, label)
         """
-        weights = paddle.cast(
-            label != self.pad_idx, dtype=paddle.get_default_dtype())
+        weights = paddle.cast(label != self.pad_idx,
+                              dtype=paddle.get_default_dtype())
         if self.label_smooth_eps:
             label = paddle.squeeze(label, axis=[2])
-            label = F.label_smooth(
-                label=F.one_hot(
-                    x=label, num_classes=predict.shape[-1]),
-                epsilon=self.label_smooth_eps)
+            label = F.label_smooth(label=F.one_hot(
+                x=label, num_classes=predict.shape[-1]),
+                                   epsilon=self.label_smooth_eps)
             if paddle.get_default_dtype() != "float32":
                 label = paddle.cast(label, dtype=paddle.get_default_dtype())
 
@@ -388,9 +387,8 @@ class TransformerDecodeCell(nn.Layer):
             word_emb = self.word_embedding(inputs[0])
             pos_emb = self.pos_embedding(inputs[1])
             word_emb = word_emb + pos_emb
-            inputs = F.dropout(
-                word_emb, p=self.dropout,
-                training=False) if self.dropout else word_emb
+            inputs = F.dropout(word_emb, p=self.dropout,
+                               training=False) if self.dropout else word_emb
 
             cell_outputs, new_states = self.decoder(inputs, memory, None,
                                                     trg_src_attn_bias, states)
@@ -435,12 +433,13 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         # Init length of cache is 0, and it increases with decoding carrying on,
         # thus need to reshape elaborately
         var_dim_in_state = self.var_dim_in_state + 1  # count in beam dim
-        c = paddle.transpose(c,
-                             list(range(var_dim_in_state, len(c.shape))) +
-                             list(range(0, var_dim_in_state)))
+        c = paddle.transpose(
+            c,
+            list(range(var_dim_in_state, len(c.shape))) +
+            list(range(0, var_dim_in_state)))
         c = paddle.reshape(
-            c, [0] * (len(c.shape) - var_dim_in_state
-                      ) + [self.batch_size * self.beam_size] +
+            c, [0] * (len(c.shape) - var_dim_in_state) +
+            [self.batch_size * self.beam_size] +
             [int(size) for size in c.shape[-var_dim_in_state + 2:]])
         c = paddle.transpose(
             c,
@@ -488,8 +487,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
                 TransformerBeamSearchDecoder.tile_beam_merge_with_batch(t, beam_size=4)
         """
         return map_structure(
-            lambda x: nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(x, beam_size),
-            t)
+            lambda x: nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                x, beam_size), t)
 
     def step(self, time, inputs, states, **kwargs):
         # Steps for decoding.
@@ -505,8 +504,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
         # Squeeze to adapt to BeamSearchDecoder which use 2D logits
         cell_outputs = map_structure(
-            lambda x: paddle.squeeze(x, [1]) if len(x.shape) == 3 else x,
-            cell_outputs)
+            lambda x: paddle.squeeze(x, [1])
+            if len(x.shape) == 3 else x, cell_outputs)
         cell_outputs = map_structure(self._split_batch_beams, cell_outputs)
         next_cell_states = map_structure(self._split_batch_beams_with_var_dim,
                                          next_cell_states)
@@ -518,7 +517,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             beam_state=states)
 
         if kwargs.get("trg_word", None) is not None:
-            if in_dygraph_mode():
+            if paddle.in_dynamic_mode():
                 if paddle.shape(kwargs.get("trg_word"))[1] > time:
                     beam_search_output, beam_search_state = self.force_decoding(
                         beam_search_output, beam_search_state,
@@ -533,17 +532,16 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
                 from functools import partial
                 beam_search_output, beam_search_state = paddle.static.nn.case(
-                    [(condition(kwargs.get("trg_word"), time), partial(
-                        self.force_decoding,
-                        beam_search_output=beam_search_output,
-                        beam_search_state=beam_search_state,
-                        trg_word=kwargs.get("trg_word"),
-                        trg_length=kwargs.get("trg_length"),
-                        time=time))],
-                    default=partial(
-                        default_fn,
-                        beam_search_output=beam_search_output,
-                        beam_search_state=beam_search_state))
+                    [(condition(kwargs.get("trg_word"), time),
+                      partial(self.force_decoding,
+                              beam_search_output=beam_search_output,
+                              beam_search_state=beam_search_state,
+                              trg_word=kwargs.get("trg_word"),
+                              trg_length=kwargs.get("trg_length"),
+                              time=time))],
+                    default=partial(default_fn,
+                                    beam_search_output=beam_search_output,
+                                    beam_search_state=beam_search_state))
 
         next_inputs, finished = (beam_search_output.predicted_ids,
                                  beam_search_state.finished)
@@ -558,12 +556,14 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         ids_dtype = beam_search_output.predicted_ids.dtype
         scores_dtype = beam_search_output.scores.dtype
         parent_ids = paddle.zeros(shape=[batch_size, 1], dtype=ids_dtype)
-        scores = paddle.ones(
-            shape=[batch_size, beam_size], dtype=scores_dtype) * -10e9
+        scores = paddle.ones(shape=[batch_size, beam_size],
+                             dtype=scores_dtype) * -10e9
         scores = paddle.scatter(
             scores.flatten(),
-            paddle.arange(
-                0, batch_size * beam_size, step=beam_size, dtype=scores_dtype),
+            paddle.arange(0,
+                          batch_size * beam_size,
+                          step=beam_size,
+                          dtype=scores_dtype),
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
@@ -571,8 +571,10 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         # and enable static mode, its stop_gradient must be True .
         force_position.stop_gradient = True
         force_position = paddle.tile(force_position, [1, beam_size])
-        crt_trg_word = paddle.slice(
-            trg_word, axes=[1], starts=[time], ends=[time + 1])
+        crt_trg_word = paddle.slice(trg_word,
+                                    axes=[1],
+                                    starts=[time],
+                                    ends=[time + 1])
         crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
 
         predicted_ids = paddle.where(force_position, crt_trg_word,
@@ -657,10 +659,11 @@ class TransformerModel(nn.Layer):
         self.eos_id = eos_id
         self.dropout = dropout
 
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_length)
+        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
+                                                emb_dim=d_model,
+                                                bos_id=self.bos_id)
+        self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                     max_length=max_length)
         if weight_sharing:
             assert src_vocab_size == trg_vocab_size, (
                 "Vocabularies in source and target should be same for weight sharing."
@@ -668,10 +671,11 @@ class TransformerModel(nn.Layer):
             self.trg_word_embedding = self.src_word_embedding
             self.trg_pos_embedding = self.src_pos_embedding
         else:
-            self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length)
+            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
+                                                    emb_dim=d_model,
+                                                    bos_id=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                         max_length=max_length)
 
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
@@ -687,13 +691,13 @@ class TransformerModel(nn.Layer):
 
         if weight_sharing:
             self.linear = lambda x: paddle.matmul(x=x,
-                                                  y=self.trg_word_embedding.word_embedding.weight,
+                                                  y=self.trg_word_embedding.
+                                                  word_embedding.weight,
                                                   transpose_y=True)
         else:
-            self.linear = nn.Linear(
-                in_features=d_model,
-                out_features=trg_vocab_size,
-                bias_attr=False)
+            self.linear = nn.Linear(in_features=d_model,
+                                    out_features=trg_vocab_size,
+                                    bias_attr=False)
 
     def forward(self, src_word, trg_word):
         r"""
@@ -773,12 +777,11 @@ class TransformerModel(nn.Layer):
                 trg_emb, p=self.dropout,
                 training=self.training) if self.dropout else trg_emb
 
-            dec_output = self.transformer(
-                enc_input,
-                dec_input,
-                src_mask=src_slf_attn_bias,
-                tgt_mask=trg_slf_attn_bias,
-                memory_mask=trg_src_attn_bias)
+            dec_output = self.transformer(enc_input,
+                                          dec_input,
+                                          src_mask=src_slf_attn_bias,
+                                          tgt_mask=trg_slf_attn_bias,
+                                          memory_mask=trg_src_attn_bias)
 
             predict = self.linear(dec_output)
 

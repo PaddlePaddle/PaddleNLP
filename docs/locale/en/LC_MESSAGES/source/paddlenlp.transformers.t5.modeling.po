@@ -1,0 +1,475 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.t5.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration:1
+#: paddlenlp.transformers.t5.modeling.T5Model:1
+msgid "基类：:class:`paddlenlp.transformers.t5.modeling.T5PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:1
+msgid ""
+"The bare T5 Model transformer outputting raw hidden-states without any "
+"specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward
+#: paddlenlp.transformers.t5.modeling.T5Model
+#: paddlenlp.transformers.t5.modeling.T5Model.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:10
+msgid "Whether to tie input and output embeddings. Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:12
+msgid "The id of the `padding` token. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:14
+msgid "The id of the `bos` token. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:16
+msgid "The id of the `eos` token. Defaults to `1`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:18
+msgid ""
+"A factor for initializing all weight matrices (should be kept to 1, used "
+"internally for initialization testing). Defaults to `1.0`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:21
+msgid ""
+"Vocabulary size of `inputs_ids` in `T5Model`. Also is the vocab size of "
+"token embedding matrix. Defines the number of different tokens that can "
+"be represented by the `inputs_ids` passed when calling `T5Model`. "
+"Defaults to `32128`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:24
+msgid "Dimensionality of the embedding layer, encoder layer. Defaults to `768`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:26
+msgid ""
+"Size of the key, query, value projections per attention head. Defaults to"
+" `64`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:28
+msgid ""
+"Dimensionality of the feed_forward layer in the residual attention block."
+" Defaults to `3072`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:30
+msgid "Number of hidden layers in the Transformer encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:32
+msgid "Number of hidden layers in the Transformer decoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:34
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder and decoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:37
+msgid "The number of buckets to use for each attention layer. Defaults to `32`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:39
+msgid "The dropout ratio for all layers. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:41
+msgid "The epsilon used by the layer normalization layers. Defaults to `1e-6`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model:43
+#: paddlenlp.transformers.t5.modeling.T5Model:45
+msgid ""
+"The non-linear activation function (function or string) in the feed "
+"forward layer in the residual attention block. If string, `\"relu\"`, "
+"`\"gated-gelu\"` are supported. Defaults to `\"relu\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:1
+msgid "The T5Model forward method, overrides the `__call__()` special method."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. Its data type "
+"should be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:7
+msgid ""
+"Mask used in multi-head attention to avoid performing attention on to "
+"some unwanted positions, usually the paddings or the subsequent "
+"positions. Its data type can be int, float. When the data type is int, "
+"the `masked` tokens have `0` values and the others have `1` values. When "
+"the data type is float, the `masked` tokens have `0.0` values and the "
+"others have `1.0` values. It is a tensor with shape broadcasted to "
+"[batch_size, num_attention_heads, sequence_length, sequence_length]. "
+"Defaults to `None`, which means nothing needed to be prevented attention "
+"to."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:17
+msgid ""
+"Indices of decoder input sequence tokens in the vocabulary. Its data type"
+" should be `int64` and it has a shape of [batch_size, sequence_length]. "
+"Defaults to `None`, which means no `decoder_input_ids` is provided, the "
+"model will create the tensor by shifting the `input_ids` to the right."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:22
+msgid ""
+"Mask used in multi-head attention to avoid performing attention to some "
+"unwanted positions in `decoder_input_ids`. Its data type and shape is the"
+" same as `attention_mask`. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:25
+msgid ""
+"The output of the encoder, a tuple consists `last_hidden_state`, "
+"`hidden_states`(optional), `attentions`(optional). The data type of "
+"`last_hidden_state` is float32 and its shape is [batch_size, "
+"sequence_length, hidden_size]. `hidden_states` is hidden_states of all "
+"layers in the Transformer encoder. The length of `hidden_states` is "
+"`num_hidden_layers + 1`. For all element in the tuple, its data type "
+"should be float32 and its shape is [batch_size, sequence_length, "
+"hidden_size]. `attentions` is attentions of all layers of in the "
+"Transformer encoder. The length of `attentions` is `num_hidden_layers`. "
+"For all element in the tuple, its data type should be float32 and its "
+"shape is [batch_size, num_attention_heads, sequence_length, "
+"sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:32
+msgid ""
+"Contains pre-computed hidden-states (key and values in the attention "
+"blocks) as computed by the model. Can be used to speed up sequential "
+"decoding. The `input_ids` which have their past given to this model "
+"should not be passed as input ids as they have already been computed. "
+"Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:38
+msgid ""
+"Whether or not to use cache. If set to `True`, `past_buckets_states` "
+"states are returned and can be used to speed up decoding. Defaults to "
+"`False`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:42
+msgid ""
+"Whether or not to return the attentions tensors of all attention layers. "
+"Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:45
+msgid ""
+"Whether or not to return the output of all hidden layers. Defaults to "
+"`False`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward
+#: paddlenlp.transformers.t5.modeling.T5Model.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:49
+msgid ""
+"Returns tuple (`last_hidden_state`, `cache`, `decoder_hidden_states`, "
+"`decoder_attentions`, `cross_attentions`, `encoder_last_hidden_state`, "
+"`encoder_hidden_states`, `encoder_attentions`)  With the fields:  - "
+"`last_hidden_state` (Tensor):     Sequence of hidden-states at the last "
+"layer of the decoder of the model.     It's data type should be float32 "
+"and     its shape is [batch_size, sequence_length, hidden_size].  - "
+"`cache` (List[tuple(Tensor, Tensor)], optional):     returned when "
+"`use_cache=True` is passed.     List of `tuple(Tensor, Tensor)` of length"
+" `config[\"num_layers\"]`,     with the first element being the previous "
+"`buckets` of shape     `[batch_size, num_heads, num_hashes, "
+"sequence_length]` and the second     being the previous `hidden_states` "
+"of shape `[batch_size, sequence_length, hidden_size]`.  - "
+"`decoder_hidden_states` (tuple(Tensor), optional)     returned when "
+"``output_hidden_states=True`` is passed.     Tuple of `Tensor` (one for "
+"the output of the embeddings + one for the output of decoder each layer) "
+"of shape `(batch_size, sequence_length, hidden_size)`.  - "
+"`decoder_attentions` (tuple(Tensor), optional):     returned when "
+"`output_attentions=True` is passed.     tuple of `Tensor` (one for each "
+"layer) of shape. Each Tensor has a data     type of float32 and its shape"
+" is [batch_size, num_heads, sequence_length, sequence_length].  - "
+"`cross_attentions` (tuple(Tensor), optional):     returned when "
+"`output_attentions=True` is passed.     tuple of `Tensor` (one for each "
+"layer) of shape. Each Tensor has a data     type of float32 and its shape"
+" is [batch_size, num_heads, sequence_length, sequence_length].  - "
+"`encoder_last_hidden_state` (Tensor):     Sequence of hidden-states at "
+"the last layer of the encoder of the model.     It's data type should be "
+"float32 and     its shape is [batch_size, sequence_length, hidden_size]."
+"  - `encoder_hidden_states` (tuple(Tensor), optional):     returned when "
+"`output_hidden_states=True` is passed.     tuple of `Tensor` (one for the"
+" output of the embeddings + one for the     output of encoder each "
+"layer). Each Tensor has a data type of float32     and its shape is "
+"[batch_size, sequence_length, hidden_size].  - `encoder_attentions` "
+"(tuple(Tensor), optional):     returned when `output_attentions=True` is "
+"passed.     tuple of `Tensor` (one for each layer) of shape. Each Tensor "
+"has a data     type of float32 and its shape is [batch_size, num_heads, "
+"sequence_length, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:49
+msgid ""
+"Returns tuple (`last_hidden_state`, `cache`, `decoder_hidden_states`, "
+"`decoder_attentions`, `cross_attentions`, `encoder_last_hidden_state`, "
+"`encoder_hidden_states`, `encoder_attentions`)"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:29
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:52
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:57
+msgid "`last_hidden_state` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:55
+msgid ""
+"Sequence of hidden-states at the last layer of the decoder of the model. "
+"It's data type should be float32 and its shape is [batch_size, "
+"sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:42
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:64
+msgid "`cache` (List[tuple(Tensor, Tensor)], optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:60
+msgid ""
+"returned when `use_cache=True` is passed. List of `tuple(Tensor, Tensor)`"
+" of length `config[\"num_layers\"]`, with the first element being the "
+"previous `buckets` of shape `[batch_size, num_heads, num_hashes, "
+"sequence_length]` and the second being the previous `hidden_states` of "
+"shape `[batch_size, sequence_length, hidden_size]`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:45
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:68
+msgid "`decoder_hidden_states` (tuple(Tensor), optional)"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:67
+msgid ""
+"returned when ``output_hidden_states=True`` is passed. Tuple of `Tensor` "
+"(one for the output of the embeddings + one for the output of decoder "
+"each layer) of shape `(batch_size, sequence_length, hidden_size)`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:48
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:73
+msgid "`decoder_attentions` (tuple(Tensor), optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:71
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:76
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:92
+msgid ""
+"returned when `output_attentions=True` is passed. tuple of `Tensor` (one "
+"for each layer) of shape. Each Tensor has a data type of float32 and its "
+"shape is [batch_size, num_heads, sequence_length, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:51
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:78
+msgid "`cross_attentions` (tuple(Tensor), optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:54
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:83
+msgid "`encoder_last_hidden_state` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:81
+msgid ""
+"Sequence of hidden-states at the last layer of the encoder of the model. "
+"It's data type should be float32 and its shape is [batch_size, "
+"sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:57
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:89
+msgid "`encoder_hidden_states` (tuple(Tensor), optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5Model.forward:86
+msgid ""
+"returned when `output_hidden_states=True` is passed. tuple of `Tensor` "
+"(one for the output of the embeddings + one for the output of encoder "
+"each layer). Each Tensor has a data type of float32 and its shape is "
+"[batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:59
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:93
+msgid "`encoder_attentions` (tuple(Tensor), optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward
+#: paddlenlp.transformers.t5.modeling.T5Model.forward
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:64
+#: paddlenlp.transformers.t5.modeling.T5Model.forward:98
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5PretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5PretrainedModel:1
+msgid ""
+"An abstract class for pretrained T5 models. It provides T5 related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5PretrainedModel.init_weights:1
+msgid "Initializes and tie weights if needed."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration:1
+msgid "The T5 Model transformer with a language modeling head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration:3
+msgid "An instance of :class:`T5Model`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:1
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:3
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:5
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:7
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:9
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:11
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:19
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:21
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:23
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:42
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:45
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:48
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:51
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:54
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:57
+#: paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:60
+msgid "See :class:`T5Model`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:13
+msgid ""
+"Labels for language modeling. Note that the labels **are shifted** inside"
+" the model, i.e. you can set `labels = input_ids` Indices are selected in"
+" `[-100, 0, ..., vocab_size]` All labels set to `-100` are ignored "
+"(masked), the loss is only computed for labels in `[0, ..., vocab_size]`."
+" Shape is [batch_size, sequence_length] and dtype is int64."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:26
+msgid ""
+"Returns tuple (`loss`, `logits`, `cache`, `decoder_hidden_states`, "
+"`decoder_attentions`, `cross_attentions`, `encoder_last_hidden_state`, "
+"`encoder_hidden_states`, `encoder_attentions`)  With the fields:  - "
+"`loss` (Tensor):     returned when `labels` is provided.     Language "
+"modeling loss. It's data type should be float32 and its shape is [1,].  -"
+" `logits` (Tensor):     Prediction scores of the language modeling head"
+"     (scores for each vocabulary token before SoftMax).     It's data "
+"type should be float32 and its shape is     [batch_size, sequence_length,"
+" vocab_size].  - `cache` (List[tuple(Tensor, Tensor)], optional):     See"
+" :class:`T5Model`.  - `decoder_hidden_states` (tuple(Tensor), optional)"
+"     See :class:`T5Model`.  - `decoder_attentions` (tuple(Tensor), "
+"optional):     See :class:`T5Model`.  - `cross_attentions` "
+"(tuple(Tensor), optional):     See :class:`T5Model`.  - "
+"`encoder_last_hidden_state` (Tensor):     See :class:`T5Model`.  - "
+"`encoder_hidden_states` (tuple(Tensor), optional):     See "
+":class:`T5Model`.  - `encoder_attentions` (tuple(Tensor), optional):     "
+"See :class:`T5Model`."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:26
+msgid ""
+"Returns tuple (`loss`, `logits`, `cache`, `decoder_hidden_states`, "
+"`decoder_attentions`, `cross_attentions`, `encoder_last_hidden_state`, "
+"`encoder_hidden_states`, `encoder_attentions`)"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:33
+msgid "`loss` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:32
+msgid ""
+"returned when `labels` is provided. Language modeling loss. It's data "
+"type should be float32 and its shape is [1,]."
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:39
+msgid "`logits` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.t5.modeling.T5ForConditionalGeneration.forward:36
+msgid ""
+"Prediction scores of the language modeling head (scores for each "
+"vocabulary token before SoftMax). It's data type should be float32 and "
+"its shape is [batch_size, sequence_length, vocab_size]."
+msgstr ""
+

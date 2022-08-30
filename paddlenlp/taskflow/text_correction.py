@@ -58,7 +58,7 @@ usage = r"""
 
          """
 
-TASK_MODEL_MAP = {"csc-ernie-1.0": "ernie-1.0"}
+TASK_MODEL_MAP = {"ernie-csc": "ernie-1.0"}
 
 
 class CSCTask(Task):
@@ -72,16 +72,16 @@ class CSCTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "pinyin_vocab": "pinyin_vocab.txt"    
+        "pinyin_vocab": "pinyin_vocab.txt"
     }
     resource_files_urls = {
-        "csc-ernie-1.0": {
+        "ernie-csc": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/model_state.pdparams",
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/ernie-csc/model_state.pdparams",
                 "cdc53e7e3985ffc78fedcdf8e6dca6d2"
             ],
             "pinyin_vocab": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/csc-ernie-1.0/pinyin_vocab.txt", 
+                "https://bj.bcebos.com/paddlenlp/taskflow/text_correction/ernie-csc/pinyin_vocab.txt",
                 "5599a8116b6016af573d08f8e686b4b2"
             ],
         }
@@ -101,11 +101,16 @@ class CSCTask(Task):
                 "Please install the dependencies first, pip install pypinyin --upgrade"
             )
         self._pypinyin = pypinyin
-        self._max_seq_length = 128
         self._batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'),  # input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64'),  # segment
-            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token], dtype='int64'),  # pinyin
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # input
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # segment
+            Pad(axis=0,
+                pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.
+                                                        pad_token],
+                dtype='int64'),  # pinyin
             Stack(axis=0, dtype='int64'),  # length
         ): [data for data in fn(samples)]
         self._num_workers = self.kwargs[
@@ -114,22 +119,29 @@ class CSCTask(Task):
             'batch_size'] if 'batch_size' in self.kwargs else 1
         self._lazy_load = self.kwargs[
             'lazy_load'] if 'lazy_load' in self.kwargs else False
+        self._max_seq_len = self.kwargs[
+            'max_seq_len'] if 'max_seq_len' in self.kwargs else 128
+        self._split_sentence = self.kwargs[
+            'split_sentence'] if 'split_sentence' in self.kwargs else False
 
     def _construct_input_spec(self):
         """
        Construct the input spec for the convert dygraph model to static model.
        """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='input_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='pinyin_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='pinyin_ids'),
         ]
 
     def _construct_vocabs(self):
         pinyin_vocab_path = os.path.join(self._task_path, "pinyin_vocab.txt")
-        self._pinyin_vocab = Vocab.load_vocabulary(
-            pinyin_vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+        self._pinyin_vocab = Vocab.load_vocabulary(pinyin_vocab_path,
+                                                   unk_token='[UNK]',
+                                                   pad_token='[PAD]')
 
     def _construct_model(self, model):
         """
@@ -154,10 +166,13 @@ class CSCTask(Task):
         self._tokenizer = ErnieTokenizer.from_pretrained(TASK_MODEL_MAP[model])
 
     def _preprocess(self, inputs, padding=True, add_special_tokens=True):
-        inputs = self._check_input_text(inputs)
+        input_texts = self._check_input_text(inputs)
         examples = []
         texts = []
-        for text in inputs:
+        max_predict_len = self._max_seq_len - 2
+        short_input_texts, self.input_mapping = self._auto_splitter(
+            input_texts, max_predict_len, split_sentence=self._split_sentence)
+        for text in short_input_texts:
             if not (isinstance(text, str) and len(text) > 0):
                 continue
             example = {"source": text.strip()}
@@ -171,7 +186,7 @@ class CSCTask(Task):
             for idx in range(0, len(examples), self._batch_size)
         ]
         batch_texts = [
-            texts[idx:idx + self._batch_size]
+            short_input_texts[idx:idx + self._batch_size]
             for idx in range(0, len(examples), self._batch_size)
         ]
         outputs = {}
@@ -206,48 +221,46 @@ class CSCTask(Task):
         """
         The model output is the logits and probs, this function will convert the model output to raw text.
         """
-        final_results = []
+        results = []
 
-        for examples, texts, results in zip(inputs['batch_examples'],
-                                            inputs['batch_texts'],
-                                            inputs['batch_results']):
+        for examples, texts, temp_results in zip(inputs['batch_examples'],
+                                                 inputs['batch_texts'],
+                                                 inputs['batch_results']):
             for i in range(len(examples)):
                 result = {}
-                det_pred, char_preds, length = results[i]
+                det_pred, char_preds, length = temp_results[i]
                 pred_result = self._parse_decode(texts[i], char_preds, det_pred,
                                                  length)
                 result['source'] = texts[i]
                 result['target'] = ''.join(pred_result)
-                errors_result = []
-                for i, (
-                        source_token, target_token
-                ) in enumerate(zip(result['source'], result['target'])):
-                    if source_token != target_token:
-                        errors_result.append({
-                            'position': i,
-                            'correction': {
-                                source_token: target_token
-                            }
-                        })
-                result['errors'] = errors_result
-                final_results.append(result)
-        return final_results
+                results.append(result)
+        results = self._auto_joiner(results, self.input_mapping, is_dict=True)
+        for result in results:
+            errors_result = []
+            for i, (source_token, target_token) in enumerate(
+                    zip(result['source'], result['target'])):
+                if source_token != target_token:
+                    errors_result.append({
+                        'position': i,
+                        'correction': {
+                            source_token: target_token
+                        }
+                    })
+            result['errors'] = errors_result
+        return results
 
     def _convert_example(self, example):
         source = example["source"]
         words = list(source)
-        if len(words) > self._max_seq_length - 2:
-            words = words[:self._max_seq_length - 2]
         length = len(words)
         words = ['[CLS]'] + words + ['[SEP]']
         input_ids = self._tokenizer.convert_tokens_to_ids(words)
         token_type_ids = [0] * len(input_ids)
 
         # Use pad token in pinyin emb to map word emb [CLS], [SEP]
-        pinyins = self._pypinyin.lazy_pinyin(
-            source,
-            style=self._pypinyin.Style.TONE3,
-            neutral_tone_with_five=True)
+        pinyins = self._pypinyin.lazy_pinyin(source,
+                                             style=self._pypinyin.Style.TONE3,
+                                             neutral_tone_with_five=True)
 
         pinyin_ids = [0]
         # Align pinyin and chinese char
@@ -277,18 +290,19 @@ class CSCTask(Task):
         det_pred = det_preds[1:1 + lengths].tolist()
         words = list(words)
         rest_words = []
-        max_seq_length = self._max_seq_length - 2
+        max_seq_length = self._max_seq_len - 2
         if len(words) > max_seq_length:
             rest_words = words[max_seq_length:]
             words = words[:max_seq_length]
 
         pred_result = ""
         for j, word in enumerate(words):
-            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[
-                j] if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
+            candidates = self._tokenizer.convert_ids_to_tokens(
+                corr_pred[j]
+                if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
             word_icc = is_chinese_char(ord(word))
-            cand_icc = is_chinese_char(ord(candidates)) if len(
-                candidates) == 1 else False
+            cand_icc = is_chinese_char(
+                ord(candidates)) if len(candidates) == 1 else False
             if not word_icc or det_pred[j] == 0\
                 or candidates in [UNK, '[PAD]']\
                 or (word_icc and not cand_icc):

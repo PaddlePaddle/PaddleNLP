@@ -28,6 +28,7 @@ __all__ = [
     "AlbertForMaskedLM",
     "AlbertForSequenceClassification",
     "AlbertForTokenClassification",
+    "AlbertForQuestionAnswering",
     "AlbertForMultipleChoice",
 ]
 
@@ -81,18 +82,20 @@ class AlbertEmbeddings(Layer):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            embedding_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size,
-            layer_norm_eps,
-            pad_token_id, ):
+        self,
+        vocab_size,
+        embedding_size,
+        hidden_dropout_prob,
+        max_position_embeddings,
+        type_vocab_size,
+        layer_norm_eps,
+        pad_token_id,
+    ):
         super(AlbertEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(
-            vocab_size, embedding_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            embedding_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 embedding_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
@@ -102,17 +105,18 @@ class AlbertEmbeddings(Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
         # Position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids",
-                             paddle.arange(max_position_embeddings).expand(
-                                 (1, -1)))
+        self.register_buffer(
+            "position_ids",
+            paddle.arange(max_position_embeddings).expand((1, -1)))
 
     def forward(
-            self,
-            input_ids,
-            token_type_ids=None,
-            position_ids=None,
-            inputs_embeds=None,
-            past_key_values_length=0, ):
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        past_key_values_length=0,
+    ):
         if input_ids is not None:
             input_shape = input_ids.shape
         else:
@@ -121,8 +125,8 @@ class AlbertEmbeddings(Layer):
         seq_length = input_shape[1]
 
         if position_ids is None:
-            position_ids = self.position_ids[:, past_key_values_length:
-                                             seq_length +
+            position_ids = self.position_ids[:,
+                                             past_key_values_length:seq_length +
                                              past_key_values_length]
 
         if token_type_ids is None:
@@ -142,13 +146,15 @@ class AlbertEmbeddings(Layer):
 
 
 class AlbertAttention(Layer):
+
     def __init__(
-            self,
-            hidden_size,
-            num_attention_heads,
-            hidden_dropout_prob,
-            attention_probs_dropout_prob,
-            layer_norm_eps, ):
+        self,
+        hidden_size,
+        num_attention_heads,
+        hidden_dropout_prob,
+        attention_probs_dropout_prob,
+        layer_norm_eps,
+    ):
         super(AlbertAttention, self).__init__()
         if hidden_size % num_attention_heads != 0:
             raise ValueError(
@@ -178,11 +184,12 @@ class AlbertAttention(Layer):
         return x.transpose([0, 2, 1, 3])
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=False, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_attentions=False,
+    ):
         mixed_query_layer = self.query(hidden_states)
         mixed_key_layer = self.key(hidden_states)
         mixed_value_layer = self.value(hidden_states)
@@ -192,8 +199,9 @@ class AlbertAttention(Layer):
         value_layer = self.transpose_for_scores(mixed_value_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = paddle.matmul(
-            query_layer, key_layer, transpose_y=True)
+        attention_scores = paddle.matmul(query_layer,
+                                         key_layer,
+                                         transpose_y=True)
         attention_scores = attention_scores / math.sqrt(
             self.attention_head_size)
 
@@ -229,41 +237,46 @@ class AlbertAttention(Layer):
 
 
 class AlbertLayer(Layer):
+
     def __init__(
-            self,
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            hidden_act,
-            hidden_dropout_prob,
-            attention_probs_dropout_prob,
-            layer_norm_eps, ):
+        self,
+        hidden_size,
+        num_attention_heads,
+        intermediate_size,
+        hidden_act,
+        hidden_dropout_prob,
+        attention_probs_dropout_prob,
+        layer_norm_eps,
+    ):
         super(AlbertLayer, self).__init__()
         self.seq_len_dim = 1
-        self.full_layer_layer_norm = nn.LayerNorm(
-            hidden_size, epsilon=layer_norm_eps)
+        self.full_layer_layer_norm = nn.LayerNorm(hidden_size,
+                                                  epsilon=layer_norm_eps)
         self.attention = AlbertAttention(
             hidden_size,
             num_attention_heads,
             hidden_dropout_prob,
             attention_probs_dropout_prob,
-            layer_norm_eps, )
+            layer_norm_eps,
+        )
         self.ffn = nn.Linear(hidden_size, intermediate_size)
         self.ffn_output = nn.Linear(intermediate_size, hidden_size)
         self.activation = ACT2FN[hidden_act]
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            output_attentions=False, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        output_attentions=False,
+    ):
         attention_output = self.attention(
             hidden_states,
             attention_mask=attention_mask,
             head_mask=head_mask,
-            output_attentions=output_attentions, )
+            output_attentions=output_attentions,
+        )
 
         ffn_output = self.ffn(attention_output[0])
         ffn_output = self.activation(ffn_output)
@@ -277,16 +290,18 @@ class AlbertLayer(Layer):
 
 
 class AlbertLayerGroup(Layer):
+
     def __init__(
-            self,
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            inner_group_num,
-            hidden_act,
-            hidden_dropout_prob,
-            attention_probs_dropout_prob,
-            layer_norm_eps, ):
+        self,
+        hidden_size,
+        num_attention_heads,
+        intermediate_size,
+        inner_group_num,
+        hidden_act,
+        hidden_dropout_prob,
+        attention_probs_dropout_prob,
+        layer_norm_eps,
+    ):
         super(AlbertLayerGroup, self).__init__()
 
         self.albert_layers = nn.LayerList([
@@ -297,15 +312,17 @@ class AlbertLayerGroup(Layer):
                 hidden_act,
                 hidden_dropout_prob,
                 attention_probs_dropout_prob,
-                layer_norm_eps, ) for _ in range(inner_group_num)
+                layer_norm_eps,
+            ) for _ in range(inner_group_num)
         ])
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            return_dict=False, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        return_dict=False,
+    ):
         layer_hidden_states = ()
         layer_attentions = ()
 
@@ -328,19 +345,21 @@ class AlbertLayerGroup(Layer):
 
 
 class AlbertTransformer(Layer):
+
     def __init__(
-            self,
-            embedding_size,
-            hidden_size,
-            num_hidden_layers,
-            num_hidden_groups,
-            num_attention_heads,
-            intermediate_size,
-            inner_group_num,
-            hidden_act,
-            hidden_dropout_prob,
-            attention_probs_dropout_prob,
-            layer_norm_eps, ):
+        self,
+        embedding_size,
+        hidden_size,
+        num_hidden_layers,
+        num_hidden_groups,
+        num_attention_heads,
+        intermediate_size,
+        inner_group_num,
+        hidden_act,
+        hidden_dropout_prob,
+        attention_probs_dropout_prob,
+        layer_norm_eps,
+    ):
         super(AlbertTransformer, self).__init__()
 
         self.num_hidden_layers = num_hidden_layers
@@ -357,15 +376,17 @@ class AlbertTransformer(Layer):
                 hidden_act,
                 hidden_dropout_prob,
                 attention_probs_dropout_prob,
-                layer_norm_eps, ) for _ in range(num_hidden_groups)
+                layer_norm_eps,
+            ) for _ in range(num_hidden_groups)
         ])
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            head_mask=None,
-            return_dict=False, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        return_dict=False,
+    ):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
         all_hidden_states = (hidden_states, ) if return_dict else None
@@ -384,7 +405,8 @@ class AlbertTransformer(Layer):
                 attention_mask,
                 head_mask[group_idx * layers_per_group:(group_idx + 1) *
                           layers_per_group],
-                return_dict, )
+                return_dict,
+            )
             hidden_states = layer_group_output if not return_dict \
                 else layer_group_output["last_hidden_state"]
 
@@ -739,8 +761,8 @@ class AlbertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.transformer.config["initializer_range"],
                     shape=layer.weight.shape))
             if layer.bias is not None:
@@ -749,8 +771,8 @@ class AlbertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.transformer.config["initializer_range"],
                     shape=layer.weight.shape))
             if layer._padding_idx is not None:
@@ -829,27 +851,31 @@ class AlbertModel(AlbertPretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size=30000,
-            embedding_size=128,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_hidden_groups=1,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            inner_group_num=1,
-            hidden_act="gelu",
-            hidden_dropout_prob=0,
-            attention_probs_dropout_prob=0,
-            max_position_embeddings=512,
-            type_vocab_size=2,
-            initializer_range=0.02,
-            layer_norm_eps=1e-12,
-            pad_token_id=0,
-            bos_token_id=2,
-            eos_token_id=3,
-            add_pooling_layer=True, ):
+        self,
+        vocab_size=30000,
+        embedding_size=128,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_hidden_groups=1,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        inner_group_num=1,
+        hidden_act="gelu",
+        hidden_dropout_prob=0,
+        attention_probs_dropout_prob=0,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        layer_norm_eps=1e-12,
+        pad_token_id=0,
+        bos_token_id=2,
+        eos_token_id=3,
+        add_pooling_layer=True,
+    ):
         super(AlbertModel, self).__init__()
+        self.pad_token_id = pad_token_id
+        self.bos_token_id = bos_token_id
+        self.eos_token_id = eos_token_id
         self.initializer_range = initializer_range
         self.num_hidden_layers = num_hidden_layers
         self.embeddings = AlbertEmbeddings(
@@ -859,7 +885,8 @@ class AlbertModel(AlbertPretrainedModel):
             max_position_embeddings,
             type_vocab_size,
             layer_norm_eps,
-            pad_token_id, )
+            pad_token_id,
+        )
 
         self.encoder = AlbertTransformer(
             embedding_size,
@@ -872,7 +899,8 @@ class AlbertModel(AlbertPretrainedModel):
             hidden_act,
             hidden_dropout_prob,
             attention_probs_dropout_prob,
-            layer_norm_eps, )
+            layer_norm_eps,
+        )
 
         if add_pooling_layer:
             self.pooler = nn.Linear(hidden_size, hidden_size)
@@ -918,14 +946,15 @@ class AlbertModel(AlbertPretrainedModel):
         return head_mask
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        return_dict=False,
+    ):
         r'''
          The AlbertModel forward method, overrides the `__call__()` special method.
 
@@ -1031,8 +1060,8 @@ class AlbertModel(AlbertPretrainedModel):
             token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
 
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        extended_attention_mask = paddle.cast(
-            extended_attention_mask, dtype=dtype_float)
+        extended_attention_mask = paddle.cast(extended_attention_mask,
+                                              dtype=dtype_float)
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         head_mask = self.get_head_mask(head_mask, self.num_hidden_layers)
 
@@ -1040,13 +1069,15 @@ class AlbertModel(AlbertPretrainedModel):
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            inputs_embeds=inputs_embeds, )
+            inputs_embeds=inputs_embeds,
+        )
 
         encoder_outputs = self.encoder(
             embedding_output,
             extended_attention_mask,
             head_mask=head_mask,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
 
         sequence_output = encoder_outputs if not return_dict \
             else encoder_outputs["last_hidden_state"]
@@ -1100,15 +1131,16 @@ class AlbertForPretraining(AlbertPretrainedModel):
         return self.transformer.embeddings.word_embeddings
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            sentence_order_label=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        sentence_order_label=None,
+        return_dict=False,
+    ):
         r"""
         The AlbertForPretraining forward method, overrides the __call__() special method.
 
@@ -1172,7 +1204,8 @@ class AlbertForPretraining(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
         sequence_output = outputs[0] if not return_dict \
             else outputs["last_hidden_state"]
         pooled_output = outputs[1] if not return_dict \
@@ -1192,12 +1225,14 @@ class AlbertForPretraining(AlbertPretrainedModel):
 
 
 class AlbertMLMHead(Layer):
+
     def __init__(
-            self,
-            embedding_size,
-            vocab_size,
-            hidden_size,
-            hidden_act, ):
+        self,
+        embedding_size,
+        vocab_size,
+        hidden_size,
+        hidden_act,
+    ):
         super(AlbertMLMHead, self).__init__()
 
         self.layer_norm = nn.LayerNorm(embedding_size)
@@ -1223,11 +1258,13 @@ class AlbertMLMHead(Layer):
 
 
 class AlbertSOPHead(Layer):
+
     def __init__(
-            self,
-            classifier_dropout_prob,
-            hidden_size,
-            num_labels, ):
+        self,
+        classifier_dropout_prob,
+        hidden_size,
+        num_labels,
+    ):
         super(AlbertSOPHead, self).__init__()
         self.dropout = nn.Dropout(classifier_dropout_prob)
         self.classifier = nn.Linear(hidden_size, num_labels)
@@ -1256,7 +1293,8 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
             embedding_size=self.transformer.config["embedding_size"],
             vocab_size=self.transformer.config["vocab_size"],
             hidden_size=self.transformer.config["hidden_size"],
-            hidden_act=self.transformer.config["hidden_act"], )
+            hidden_act=self.transformer.config["hidden_act"],
+        )
         self.init_weights()
 
     def get_output_embeddings(self):
@@ -1269,15 +1307,16 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         return self.transformer.embeddings.word_embeddings
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            labels=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        return_dict=False,
+    ):
         r"""
         The AlbertForPretraining forward method, overrides the __call__() special method.
 
@@ -1329,7 +1368,8 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
 
         sequence_outputs = transformer_outputs[0] if not return_dict \
             else transformer_outputs["last_hidden_state"]
@@ -1372,14 +1412,15 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
         self.init_weights()
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        return_dict=False,
+    ):
         r"""
         The AlbertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -1439,7 +1480,8 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
 
         pooled_output = transformer_outputs[1] if not return_dict \
             else transformer_outputs["pooler_output"]
@@ -1473,22 +1515,23 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         self.num_classes = num_classes
 
         self.transformer = albert
-        self.dropout = nn.Dropout(self.transformer.config[
-            "hidden_dropout_prob"])
+        self.dropout = nn.Dropout(
+            self.transformer.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.transformer.config["hidden_size"],
                                     self.num_classes)
 
         self.init_weights()
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        return_dict=False,
+    ):
         r"""
         The AlbertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1548,7 +1591,8 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
 
         sequence_output = transformer_outputs[0] if not return_dict \
             else transformer_outputs["sequence_output"]
@@ -1576,7 +1620,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
 
     """
 
-    def __init__(self, albert, num_labels):
+    def __init__(self, albert, num_labels=2):
         super(AlbertForQuestionAnswering, self).__init__()
         self.num_labels = num_labels
         self.transformer = albert
@@ -1586,16 +1630,17 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         self.init_weights()
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            start_positions=None,
-            end_positions=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        start_positions=None,
+        end_positions=None,
+        return_dict=False,
+    ):
         r"""
         The AlbertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1665,13 +1710,15 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
         sequence_output = transformer_outputs[0] if not return_dict \
             else transformer_outputs["sequence_output"]
         logits = self.qa_outputs(sequence_output)
 
-        start_logits, end_logits = paddle.split(
-            logits, num_or_sections=1, axis=-1)
+        start_logits, end_logits = paddle.split(logits,
+                                                num_or_sections=2,
+                                                axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
         end_logits = start_logits.squeeze(axis=-1)
 
@@ -1699,21 +1746,22 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
     def __init__(self, albert):
         super(AlbertForMultipleChoice, self).__init__()
         self.transformer = albert
-        self.dropout = nn.Dropout(self.transformer.config[
-            "hidden_dropout_prob"])
+        self.dropout = nn.Dropout(
+            self.transformer.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.transformer.config["hidden_size"], 1)
         self.init_weights()
 
     def forward(
-            self,
-            input_ids,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            labels=None,
-            return_dict=False, ):
+        self,
+        input_ids,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        return_dict=False,
+    ):
         r"""
         The AlbertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1768,9 +1816,9 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
             if token_type_ids is not None else None
         position_ids = position_ids.reshape([-1, position_ids.shape[-1]]) \
             if position_ids is not None else None
-        inputs_embeds = (inputs_embeds.reshape(
-            [-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
-                         if inputs_embeds is not None else None)
+        inputs_embeds = (inputs_embeds.reshape([
+            -1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]
+        ]) if inputs_embeds is not None else None)
         transformer_outputs = self.transformer(
             input_ids,
             attention_mask=attention_mask,
@@ -1778,7 +1826,8 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict, )
+            return_dict=return_dict,
+        )
         pooled_output = transformer_outputs[1] if not return_dict \
             else transformer_outputs["pooler_output"]
         pooled_output = self.dropout(pooled_output)

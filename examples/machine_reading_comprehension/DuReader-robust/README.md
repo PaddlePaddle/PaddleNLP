@@ -22,7 +22,7 @@ DuReader-robust数据集是单篇章、抽取式阅读理解数据集，具体�
 
 ### 数据准备
 
-为了方便开发者进行测试，我们内置了数据下载脚本，也可以通过`--train_file`和`--predict_file`传入本地数据集的位置，数据集需保证与DuReader-robust数据集格式一致。
+为了方便开发者进行测试，我们已将数据集上传至HuggingFace。
 
 
 ### Fine-tune
@@ -32,7 +32,6 @@ DuReader-robust数据集是单篇章、抽取式阅读理解数据集，具体�
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_du.py \
-    --task_name dureader_robust \
     --model_type ernie_gram \
     --model_name_or_path ernie-gram-zh \
     --max_seq_length 384 \
@@ -49,7 +48,6 @@ python -m paddle.distributed.launch --gpus "0" run_du.py \
     --device gpu \
  ```
 
-* `task_name`: 数据集的名称，不区分大小写，如dureader_robust，cmrc2018, drcd。
 * `model_type`: 预训练模型的种类。如bert，ernie，roberta等。
 * `model_name_or_path`: 预训练模型的具体名称。如bert-base-chinese，roberta-wwm-ext等。或者是模型文件的本地路径。
 * `output_dir`: 保存模型checkpoint的路径。

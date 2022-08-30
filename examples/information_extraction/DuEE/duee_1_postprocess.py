@@ -24,16 +24,16 @@ from utils import read_by_lines, write_by_lines, extract_result
 def predict_data_process(trigger_file, role_file, schema_file, save_path):
     """predict_data_process"""
     pred_ret = []
-    trigger_datas = read_by_lines(trigger_file)
+    trigger_data = read_by_lines(trigger_file)
     role_data = read_by_lines(role_file)
-    schema_datas = read_by_lines(schema_file)
-    print("trigger predict {} load from {}".format(
-        len(trigger_datas), trigger_file))
+    schema_data = read_by_lines(schema_file)
+    print("trigger predict {} load from {}".format(len(trigger_data),
+                                                   trigger_file))
     print("role predict {} load from {}".format(len(role_data), role_file))
-    print("schema {} load from {}".format(len(schema_datas), schema_file))
+    print("schema {} load from {}".format(len(schema_data), schema_file))
 
     schema = {}
-    for s in schema_datas:
+    for s in schema_data:
         d_json = json.loads(s)
         schema[d_json["event_type"]] = [r["role"] for r in d_json["role_list"]]
 
@@ -50,7 +50,7 @@ def predict_data_process(trigger_file, role_file, schema_file, save_path):
             role_ret[role_type].append("".join(r["text"]))
         sent_role_mapping[d_json["id"]] = role_ret
 
-    for d in trigger_datas:
+    for d in trigger_data:
         d_json = json.loads(d)
         t_ret = extract_result(d_json["text"], d_json["pred"]["labels"])
         pred_event_types = list(set([t["type"] for t in t_ret]))
@@ -80,10 +80,12 @@ def predict_data_process(trigger_file, role_file, schema_file, save_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Official evaluation script for DuEE version 1.0")
-    parser.add_argument(
-        "--trigger_file", help="trigger model predict data path", required=True)
-    parser.add_argument(
-        "--role_file", help="role model predict data path", required=True)
+    parser.add_argument("--trigger_file",
+                        help="trigger model predict data path",
+                        required=True)
+    parser.add_argument("--role_file",
+                        help="role model predict data path",
+                        required=True)
     parser.add_argument("--schema_file", help="schema file path", required=True)
     parser.add_argument("--save_path", help="save file path", required=True)
     args = parser.parse_args()

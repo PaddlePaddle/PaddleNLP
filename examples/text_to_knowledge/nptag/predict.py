@@ -17,7 +17,7 @@ import argparse
 
 import numpy as np
 import paddle
-from paddlenlp.data import Stack, Tuple
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer
 
 from data import convert_example, create_dataloader, read_custom_data
@@ -54,8 +54,9 @@ def do_predict(data,
     ]
 
     batchify_fn = lambda samples, fn=Tuple(
-        Stack(dtype='int64'),  # input_ids
-        Stack(dtype='int64'),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # token_type_ids
         Stack(dtype='int64'),  # label_indices
     ): fn(samples)
 
@@ -103,9 +104,11 @@ def do_predict(data,
                     break
                 else:
                     labels_can = bk_tree.search_similar_word(label)
-                    result['label'] = labels_can[0][0]
+                    if len(labels_can) != 0:
+                        result['label'] = labels_can[0][0]
 
-        result['category'] = name_dict[result['label']]
+        if result['label'] in name_dict:
+            result['category'] = name_dict[result['label']]
         results.append(result)
     return results
 

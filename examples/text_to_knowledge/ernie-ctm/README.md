@@ -129,7 +129,7 @@ custom_task_path/
 └── tags.txt
 ```
 
-```shell
+```python
 from paddlenlp import Taskflow
 
 my_wordtag = Taskflow("knowledge_mining", task_path="./custom_task_path/")

@@ -132,18 +132,16 @@ def convert_example(example,
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
     if (int(is_test) + len(example)) == 2:
-        example = tokenizer(
-            example['sentence'],
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len,
-            return_attention_mask=True)
+        example = tokenizer(example['sentence'],
+                            max_seq_len=max_seq_length,
+                            pad_to_max_seq_len=pad_to_max_seq_len,
+                            return_attention_mask=True)
     else:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len,
-            return_attention_mask=True)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length,
+                            pad_to_max_seq_len=pad_to_max_seq_len,
+                            return_attention_mask=True)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], example[
@@ -153,44 +151,33 @@ def convert_example(example,
             'attention_mask']
 
 
-def do_train(args):
-    paddle.set_device(args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
-    set_seed(args)
-    global final_res
-
-    args.task_name = args.task_name.lower()
-    metric_class = METRIC_CLASSES[args.task_name]
-    model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
-
+def create_data_loader(args, tokenizer):
     train_ds = load_dataset('glue', args.task_name, splits="train")
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
         label_list=train_ds.label_list,
         max_seq_length=args.max_seq_length,
-        pad_to_max_seq_len=args.pad_to_max_seq_len, )
+        pad_to_max_seq_len=args.pad_to_max_seq_len,
+    )
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),  # token_type
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False
+            ),  # token_type
         Pad(axis=0, pad_val=0, pad_right=False),  # attention_mask
         Stack(dtype="int64" if train_ds.label_list else "float32"),  # label
     ): fn(samples)
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
 
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
@@ -213,18 +200,44 @@ def do_train(args):
             collate_fn=batchify_fn,
             num_workers=0,
             return_list=True)
+
+        return train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, dev_ds_matched, dev_ds_mismatched
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds, batch_size=args.batch_size, shuffle=False)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                                   batch_size=args.batch_size,
+                                                   shuffle=False)
 
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
+        dev_data_loader = DataLoader(dataset=dev_ds,
+                                     batch_sampler=dev_batch_sampler,
+                                     collate_fn=batchify_fn,
+                                     num_workers=0,
+                                     return_list=True)
+
+        return train_data_loader, dev_data_loader, train_ds, dev_ds
+
+
+def do_train(args):
+    paddle.set_device(args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
+
+    set_seed(args)
+    global final_res
+
+    args.task_name = args.task_name.lower()
+    metric_class = METRIC_CLASSES[args.task_name]
+    model_class, tokenizer_class = XLNetForSequenceClassification, XLNetTokenizer
+
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+
+    if args.task_name == "mnli":
+        train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, dev_ds_matched, dev_ds_mismatched = create_data_loader(
+            args, tokenizer)
+    else:
+        train_data_loader, dev_data_loader, train_ds, dev_ds = create_data_loader(
+            args, tokenizer)
 
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = XLNetForSequenceClassification.from_pretrained(
@@ -291,8 +304,8 @@ def do_train(args):
             profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_steps == 0:
-                speed = args.logging_steps / (
-                    train_reader_cost + train_run_cost)
+                speed = args.logging_steps / (train_reader_cost +
+                                              train_run_cost)
                 avg_reader_cost = train_reader_cost / args.logging_steps
                 print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s, avg_reader_cost: %.4f sec, avg_batch_cost: %.4f sec, avg_samples: %d, avg_ips: %.4f sequences/sec"
@@ -308,7 +321,8 @@ def do_train(args):
                         avg_reader_cost,
                         1.0 / speed,
                         args.batch_size,
-                        speed * args.batch_size, ))
+                        speed * args.batch_size,
+                    ))
                 train_reader_cost = 0.0
                 train_run_cost = 0.0
 
@@ -329,8 +343,9 @@ def do_train(args):
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 if (not paddle.distributed.get_world_size() > 1
                     ) or paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir, "%s_ft_model_%d"
-                                              % (args.task_name, global_step))
+                    output_dir = os.path.join(
+                        args.output_dir,
+                        "%s_ft_model_%d" % (args.task_name, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel

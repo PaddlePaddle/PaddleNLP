@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) 2021, PaddleNLP
 # This file is distributed under the same license as the PaddleNLP package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PaddleNLP \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-04-07 11:40+0800\n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
 
-#: ../../source/paddlenlp.transformers.electra.tokenizer.rst:2
+#: ../source/paddlenlp.transformers.electra.tokenizer.rst:2
 msgid "tokenizer"
 msgstr ""
 
@@ -27,59 +27,78 @@ msgstr ""
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:1
 msgid ""
-"Constructs a Electra tokenizer. It uses a basic tokenizer to do "
+"Constructs an Electra tokenizer. It uses a basic tokenizer to do "
 "punctuation splitting, lower casing and so on, and follows a WordPiece "
-"tokenizer to tokenize as subwords. :param vocab_file: file path of the "
-"vocabulary :type vocab_file: str :param do_lower_case: Whether the text "
-"strips accents and convert to"
+"tokenizer to tokenize as subwords."
 msgstr ""
 
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:7
-msgid "lower case. Default: `True`. Default: True."
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:5
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` "
+"which contains most of the main methods. For more information regarding "
+"those methods, please refer to this superclass."
 msgstr ""
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_offset_mapping_with_special_tokens
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add
 msgid "参数"
 msgstr ""
 
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:10
-msgid "The special token for unkown words. Default: \"[UNK]\"."
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:9
+msgid ""
+"The vocabulary file path (ends with '.txt') required to instantiate a "
+"`WordpieceTokenizer`."
 msgstr ""
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:12
-msgid "The special token for separator token . Default: \"[SEP]\"."
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to `True`."
 msgstr ""
 
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:14
-msgid "The special token for padding. Default: \"[PAD]\"."
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:15
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
 msgstr ""
 
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:16
-msgid "The special token for cls. Default: \"[CLS]\"."
-msgstr ""
-
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:18
-msgid "The special token for mask. Default: \"[MASK]\"."
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:19
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
 msgstr ""
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:22
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:25
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:28
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:34
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string:12
 msgid "实际案例"
 msgstr ""
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size:1
-msgid ""
-"return the size of vocabulary. :returns: the size of vocabulary. :rtype: "
-"int"
-msgstr ""
-
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.tokenize:1
-msgid ""
-"End-to-end tokenization for Electra models. :param text: The text to be "
-"tokenized. :type text: str"
+msgid "Return the size of vocabulary."
 msgstr ""
 
 #: of
@@ -89,12 +108,12 @@ msgstr ""
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.tokenize
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size
 msgid "返回"
 msgstr ""
 
-#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.tokenize:5
-msgid "A list of string representing converted tokens."
+#: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size:3
+msgid "The size of vocabulary."
 msgstr ""
 
 #: of
@@ -103,7 +122,8 @@ msgstr ""
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.get_special_tokens_mask
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.tokenize
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size
 msgid "返回类型"
 msgstr ""
 
@@ -112,12 +132,16 @@ msgstr ""
 msgid ""
 "Converts a sequence of tokens (list of string) in a single string. Since "
 "the usage of WordPiece introducing `##` to concat subwords, also remove "
-"`##` when converting. :param tokens: A list of string representing tokens"
-" to be converted. :type tokens: list"
+"`##` when converting."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string:7
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string:5
+msgid "A list of string representing tokens to be converted."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string:8
 msgid "Converted string from tokens."
 msgstr ""
 
@@ -125,11 +149,11 @@ msgstr ""
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add:1
 msgid ""
 "Returns the number of added tokens when encoding a sequence with special "
-"tokens. .. note::"
+"tokens."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add:7
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add:3
 msgid ""
 "Returns the number of added tokens in the case of a sequence pair if set "
 "to True, returns the number of added tokens in the case of a single "
@@ -137,8 +161,8 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add:10
-msgid "Number of tokens added to sequences"
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add:6
+msgid "Number of tokens added to sequences."
 msgstr ""
 
 #: of
@@ -150,28 +174,33 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:4
-msgid "A ELECTRA sequence has the following format: ::"
+msgid "A ELECTRA sequence has the following format:"
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:8
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:      ``[CLS] X [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        ``[CLS] A [SEP] B [SEP]``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:9
 msgid "List of IDs to which the special tokens will be added."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:10
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:11
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:12
 msgid "Optional second list of IDs for sequence pairs."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:13
-msgid "List of input_id with the appropriate special tokens."
-msgstr ""
-
-#: of
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_inputs_with_special_tokens:14
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:13
-msgid ":obj:`List[int]`"
+msgid "List of input_id with the appropriate special tokens."
 msgstr ""
 
 #: of
@@ -183,7 +212,17 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_offset_mapping_with_special_tokens:3
-msgid "A ELECTRA offset_mapping has the following format: ::"
+msgid "A ELECTRA offset_mapping has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_offset_mapping_with_special_tokens:5
+msgid "single sequence:      ``(0,0) X (0,0)``"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_offset_mapping_with_special_tokens:6
+msgid "pair of sequences:        ``(0,0) A (0,0) B (0,0)``"
 msgstr ""
 
 #: of
@@ -202,29 +241,31 @@ msgid "List of char offsets with the appropriate offsets of special tokens."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.build_offset_mapping_with_special_tokens:14
-msgid ":obj:`List[tuple]`"
-msgstr ""
-
-#: of
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:1
 msgid ""
 "Create a mask from the two sequences passed to be used in a sequence-pair"
-" classification task. A ELECTRA sequence pair mask has the following "
-"format: ::"
+" classification task."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:6
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:3
+msgid "A ELECTRA sequence pair mask has the following format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:8
 msgid ""
 "If :obj:`token_ids_1` is :obj:`None`, this method only returns the first "
-"portion of the mask (0s). :param token_ids_0: List of IDs. :type "
-"token_ids_0: :obj:`List[int]` :param token_ids_1: Optional second list of"
-" IDs for sequence pairs. :type token_ids_1: :obj:`List[int]`, `optional`"
+"portion of the mask (0s)."
 msgstr ""
 
 #: of
-#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:12
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:10
+msgid "List of IDs."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.create_token_type_ids_from_sequences:15
 msgid "List of token_type_id according to the given sequence(s)."
 msgstr ""
 

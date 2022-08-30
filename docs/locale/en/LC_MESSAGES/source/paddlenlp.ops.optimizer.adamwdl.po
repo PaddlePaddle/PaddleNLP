@@ -1,0 +1,168 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.ops.optimizer.adamwdl.rst:2
+msgid "adamwdl"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:1
+msgid "基类：:class:`paddle.optimizer.adamw.AdamW`"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:1
+msgid ""
+"The AdamWDL optimizer is implemented based on the AdamW Optimization with"
+" dynamic lr setting. Generally it's used for transformer model."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:4
+msgid ""
+"We use \"layerwise_lr_decay\" as default dynamic lr setting method of "
+"AdamWDL. “Layer-wise decay” means exponentially decaying the learning "
+"rates of individual layers in a top-down manner. For example, suppose the"
+" 24-th layer uses a learning rate l, and the Layer-wise decay rate is α, "
+"then the learning rate of layer m is lα^(24-m). See more details on: "
+"https://arxiv.org/abs/1906.08237."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:10
+msgid ""
+"& t = t + 1\n"
+"\n"
+"& moment\\_1\\_out = {\\beta}_1 * moment\\_1 + (1 - {\\beta}_1) * grad\n"
+"\n"
+"& moment\\_2\\_out = {\\beta}_2 * moment\\_2 + (1 - {\\beta}_2) * grad * "
+"grad\n"
+"\n"
+"& learning\\_rate = learning\\_rate * \\frac{\\sqrt{1 - {\\beta}_2^t}}{1 "
+"- {\\beta}_1^t}\n"
+"\n"
+"& param\\_out = param - learning\\_rate * "
+"(\\frac{moment\\_1}{\\sqrt{moment\\_2} + \\epsilon} + \\lambda * param)"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:21
+msgid ""
+"The learning rate used to update ``Parameter``. It can be a float value "
+"or a LRScheduler. The default value is 0.001."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:24
+msgid ""
+"The exponential decay rate for the 1st moment estimates. It should be a "
+"float number or a Tensor with shape [1] and data type as float32. The "
+"default value is 0.9."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:28
+msgid ""
+"The exponential decay rate for the 2nd moment estimates. It should be a "
+"float number or a Tensor with shape [1] and data type as float32. The "
+"default value is 0.999."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:32
+msgid ""
+"A small float value for numerical stability. It should be a float number "
+"or a Tensor with shape [1] and data type as float32. The default value is"
+" 1e-08."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:36
+msgid ""
+"List/Tuple of ``Tensor`` to update to minimize ``loss``. \\ This "
+"parameter is required in dygraph mode. \\ The default value is None in "
+"static mode, at this time all parameters will be updated."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:40
+msgid ""
+"The weight decay coefficient, it can be float or Tensor. The default "
+"value is 0.01."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:42
+msgid ""
+"If it is not None, only tensors that makes "
+"apply_decay_param_fun(Tensor.name)==True will be updated. It only works "
+"when we want to specify tensors. Default: None."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:47
+msgid ""
+"Gradient cliping strategy, it's an instance of some derived class of "
+"``GradientClipBase`` . There are three cliping strategies ( "
+":ref:`api_fluid_clip_GradientClipByGlobalNorm` , "
+":ref:`api_fluid_clip_GradientClipByNorm` , "
+":ref:`api_fluid_clip_GradientClipByValue` ). Default None, meaning there "
+"is no gradient clipping."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:52
+msgid ""
+"The official Adam algorithm has two moving-average accumulators. The "
+"accumulators are updated at every step. Every element of the two moving-"
+"average is updated in both dense mode and sparse mode. If the size of "
+"parameter is very large, then the update may be very slow. The lazy mode "
+"only update the element that has gradient in current mini-batch, so it "
+"will be much more faster. But this mode has different semantics with the "
+"original Adam algorithm and may lead to different result. The default "
+"value is False."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:60
+msgid "Whether to use multi-precision during weight updating. Default is false."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:62
+msgid "The layer-wise decay ratio. Defaults to 1.0."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:64
+msgid "The total number of encoder layers. Defaults to 12."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:66
+msgid ""
+"If it's not None, set_param_lr_fun() will set the the parameter learning "
+"rate before it executes Adam Operator. Defaults to "
+":ref:`layerwise_lr_decay`."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:69
+msgid ""
+"The keys of name_dict is dynamic name of model while the value of "
+"name_dict is static name. Use model.named_parameters() to get name_dict."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:72
+msgid ""
+"Normally there is no need for user to set this property. For more "
+"information, please refer to :ref:`api_guide_Name`. The default value is "
+"None."
+msgstr ""
+
+#: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:78
+msgid "实际案例"
+msgstr ""
+

@@ -29,7 +29,8 @@ parser.add_argument("--params_file", type=str, required=True,
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru',
     'rnn', 'birnn', 'bilstm_attn', 'cnn', 'textcnn'], default="bilstm",
     help="Select which network to train, defaults to bilstm.")
-parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The path to vocabulary.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json",
+    help="The file path to save vocabulary.")
 parser.add_argument("--max_seq_length",
     default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
@@ -58,6 +59,7 @@ def preprocess_prediction_data(text, tokenizer):
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -111,7 +113,8 @@ class Predictor(object):
             examples.append((input_id, seq_len))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)),  # input_id
+            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)
+                ),  # input_id
             Stack()  # seq_len
         ): fn(samples)
 
@@ -148,20 +151,18 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data  and then do predict.
     data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+        '非常不错，服务很好，位于市中心区，交通方便，不过价格也高！',
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
         '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
     ]
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.from_json(args.vocab_path)
     tokenizer = JiebaTokenizer(vocab)
     label_map = {0: 'negative', 1: 'positive'}
 
-    results = predictor.predict(
-        data,
-        tokenizer,
-        label_map,
-        batch_size=args.batch_size,
-        network=args.network)
+    results = predictor.predict(data,
+                                tokenizer,
+                                label_map,
+                                batch_size=args.batch_size,
+                                network=args.network)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

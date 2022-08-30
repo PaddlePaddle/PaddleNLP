@@ -1,0 +1,160 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:3
+msgid "创建 :class:`DatasetBuilder`"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:5
+msgid ""
+"数据集的贡献通过定义一个 :class:`DatasetBuilder` 的子类来实现。一个合格的 :class:`DatasetBuilder`"
+" 需要遵循一些协议和规范。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:7
+msgid "下面我们以 :obj:`LCQMC` 为例了解一下 :class:`DatasetBuilder` 通常需要包含哪些方法和参数。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:10
+msgid "成员变量"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:40
+msgid ""
+"首先贡献的数据集需要继承 :class:`paddlenlp.datasets.DatasetBuilder` 类，类名格式为camel "
+"case。之后应该添加一段注释，简要说明数据集的来源等信息。之后需定义以下成员变量："
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:42
+msgid ""
+":attr:`lazy` ：数据集的默认类型。:obj:`False` 对应 :class:`MapDataset` ，:obj:`True` "
+"对应 :class:`IterDataset` 。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:43
+msgid ":attr:`URL` ：数据集压缩包下载地址，需提供有效并稳定的下载链接。如果数据集不是压缩包，可以不再这里提供。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:44
+msgid ":attr:`MD5` ：数据集压缩包的md5值，用于文件校验，如果数据集文件不是压缩包，可以不再这里提供。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:45
+msgid ":attr:`META_INFO` ：数据集split信息格式。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:46
+msgid ""
+":attr:`SPLITS` "
+"：数据集的split信息，包含数据集解压后的不同文件的具体位置，文件名，md5值等，如果数据集不是压缩包则通常在这里提供下载地址，还可以包含诸如不同文件对应的文件读取参数等信息。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:48
+msgid ""
+"除此之外，不同的数据集可能还需要诸如 :attr:`VOCAB_INFO` 等其他成员变量（参见 `iwslt15.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__"
+" ）。或者成员变量会有其他格式。贡献者可以根据实际情况自行调整。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:52
+msgid ""
+"如果贡献的数据集没有子数据集，那么 :class:`DatasetBuilder` **必须包含** :attr:`SPLITS` "
+"成员变量，且该变量必须是一个字典，字典的key是该数据集包含的splits。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:53
+msgid ""
+"如果贡献的数据集有子数据集，那么 :class:`DatasetBuilder` **必须包含** :attr:`BUILDER_CONFIGS`"
+" 成员变量，且该变量必须是一个字典，字典的key是该数据集包含的子数据集的 :attr:`name` "
+"。字典的value是包含该数据集的子数据集split信息的字典，key值必须是 `splits` 。具体格式（参见 `glue.py "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/glue.py>`__"
+" ）"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:56
+msgid ":func:`_get_data` 方法"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:71
+msgid ""
+":func:`_get_data` 方法根据传入的 :attr:`mode` "
+"和数据集的split信息定位到具体数据集文件。首先进行md5值校验本地文件，若校验失败则调用 "
+":func:`paddle.utils.download.get_path_from_url` "
+"方法下载并校验数据集文件，最后返回数据集文件的本地地址。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:74
+msgid ":func:`_read` 方法"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:90
+msgid ""
+":func:`_read` 方法根据传入的文件地址读取数据。该方法必须是一个生成器，以确保 :class:`DatasetBuilder` "
+"可以构造 :class:`MapDataset` 和  :class:`IterDataset` 两种数据集。 "
+"当不同split对应的数据文件读取方式不同时，该方法还需要支持 :attr:`split` 参数，并支持不同split下的读取方式。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:95
+msgid "该方法提供的每条example都应是一个 :class:`Dictionary` 对象。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:96
+msgid ""
+":class:`DatasetBuilder` 在生成Dataset时提供了将class "
+"label转换为id的功能。如果用户需要此功能，需要将example中label对应的key设置为 **\"label\"** 或 "
+"**\"labels\"** ，并在类中正确添加 :func:`get_labels` 方法。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:99
+msgid ":func:`get_labels` 方法"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:109
+msgid ""
+":func:`get_labels` 方法返回一个由该数据集中所有label组成的list。用于将数据集中的class "
+"label转换为id，并且这个list之后会作为实例变量传给生成的数据集。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:112
+msgid ":func:`get_vocab` 方法"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:114
+msgid "如果数据集提供词典文件，则需要加入 :func:`get_vocab` 方法和 :attr:`VOCAB_INFO` 变量。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:116
+msgid ""
+"该方法会根据 :attr:`VOCAB_INFO` 变量返回一个包含数据集词典信息的 :class:`Dictionary` "
+"对象并作为实例变量传给生成的数据集。用于在训练过程中初始化 :class:`paddlenlp.data.Vocab` 对象。 该方法的写法请参考"
+" `iwslt15.py  "
+"<https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/datasets/iwslt15.py>`__"
+" 。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:121
+msgid ""
+"贡献数据集时 :func:`get_labels` 和 :func:`get_vocab` 方法是可选的，视具体数据集内容而定。 "
+":func:`_read` 和 :func:`_get_data` 方法是 **必须包含** 的。"
+msgstr ""
+
+#: ../community/contribute_datasets/how_to_write_a_DatasetBuilder.rst:122
+msgid "如果您不希望在数据获取过程中进行md5值校验，可以不用给出相关成员变量和校验代码。"
+msgstr ""
+

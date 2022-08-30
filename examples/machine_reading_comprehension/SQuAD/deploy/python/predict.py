@@ -15,6 +15,7 @@
 import argparse
 import os
 import sys
+
 sys.path.append(
     os.path.abspath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
@@ -23,7 +24,7 @@ from functools import partial
 import paddle
 from paddle import inference
 from paddle.io import DataLoader
-from paddlenlp.datasets import load_dataset
+from datasets import load_dataset
 from paddlenlp.data import Pad, Stack, Dict
 from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
 
@@ -32,6 +33,7 @@ from run_squad import MODEL_CLASSES, prepare_validation_features
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -65,23 +67,23 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy(
+            ) if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
         ]
         return output
 
-    def predict(self, dataset, collate_fn, args, do_eval=True):
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=False)
-        data_loader = paddle.io.DataLoader(
-            dataset=dataset,
-            batch_sampler=batch_sampler,
-            collate_fn=collate_fn,
-            num_workers=0,
-            return_list=True)
+    def predict(self, dataset, raw_dataset, collate_fn, args, do_eval=True):
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+        data_loader = paddle.io.DataLoader(dataset=dataset,
+                                           batch_sampler=batch_sampler,
+                                           collate_fn=collate_fn,
+                                           num_workers=0,
+                                           return_list=True)
         outputs = []
         all_start_logits = []
         all_end_logits = []
@@ -93,14 +95,13 @@ class Predictor(object):
                 all_end_logits.extend(list(output[1]))
         if do_eval:
             all_predictions, all_nbest_json, scores_diff_json = compute_prediction(
-                data_loader.dataset.data, data_loader.dataset.new_data,
+                raw_dataset, data_loader.dataset,
                 (all_start_logits, all_end_logits),
                 args.version_2_with_negative, args.n_best_size,
                 args.max_answer_length, args.null_score_diff_threshold)
-            squad_evaluate(
-                examples=data_loader.dataset.data,
-                preds=all_predictions,
-                na_probs=scores_diff_json)
+            squad_evaluate(examples=[raw_data for raw_data in raw_dataset],
+                           preds=all_predictions,
+                           na_probs=scores_diff_json)
         return outputs
 
 
@@ -114,23 +115,25 @@ def main():
     tokenizer = tokenizer_class.from_pretrained(
         os.path.dirname(args.model_name_or_path))
 
-    if args.predict_file:
-        dataset = load_dataset('sqaud', data_files=args.predict_file)
-    elif args.version_2_with_negative:
-        dataset = load_dataset('squad', splits='dev_v2')
+    if args.version_2_with_negative:
+        raw_dataset = load_dataset('squad_v2', split='validation')
     else:
-        dataset = load_dataset('squad', splits='dev_v1')
+        raw_dataset = load_dataset('squad', split='validation')
+    column_names = raw_dataset.column_names
+    dataset = raw_dataset.map(partial(prepare_validation_features,
+                                      tokenizer=tokenizer,
+                                      args=args),
+                              batched=True,
+                              remove_columns=column_names,
+                              num_proc=4)
 
-    dataset.map(partial(
-        prepare_validation_features, tokenizer=tokenizer, args=args),
-                batched=True)
     batchify_fn = lambda samples, fn=Dict(
         {
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
             "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
         }): fn(samples)
     predictor = Predictor.create_predictor(args)
-    predictor.predict(dataset, args=args, collate_fn=batchify_fn)
+    predictor.predict(dataset, raw_dataset, args=args, collate_fn=batchify_fn)
 
 
 if __name__ == "__main__":

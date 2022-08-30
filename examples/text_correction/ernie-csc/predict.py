@@ -19,7 +19,6 @@ import numpy as np
 from functools import partial
 
 import paddle
-import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad, Vocab
 from paddlenlp.transformers import ErnieTokenizer
@@ -40,6 +39,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length,
                  tokenizer, pinyin_vocab):
         self.max_seq_length = max_seq_length
@@ -81,17 +81,21 @@ class Predictor(object):
         """
         examples = []
         texts = []
-        trans_func = partial(
-            convert_example,
-            tokenizer=self.tokenizer,
-            pinyin_vocab=self.pinyin_vocab,
-            max_seq_length=self.max_seq_length,
-            is_test=True)
+        trans_func = partial(convert_example,
+                             tokenizer=self.tokenizer,
+                             pinyin_vocab=self.pinyin_vocab,
+                             max_seq_length=self.max_seq_length,
+                             is_test=True)
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype='int64'),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype='int64'),  # segment
-            Pad(axis=0, pad_val=self.pinyin_vocab.token_to_idx[self.pinyin_vocab.pad_token], dtype='int64'),  # pinyin
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype='int64'
+                ),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype='int64'
+                ),  # segment
+            Pad(axis=0,
+                pad_val=self.pinyin_vocab.token_to_idx[self.pinyin_vocab.
+                                                       pad_token],
+                dtype='int64'),  # pinyin
             Stack(axis=0, dtype='int64'),  # length
         ): [data for data in fn(samples)]
 
@@ -134,8 +138,9 @@ class Predictor(object):
 
 if __name__ == "__main__":
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
-    pinyin_vocab = Vocab.load_vocabulary(
-        args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
+    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path,
+                                         unk_token='[UNK]',
+                                         pad_token='[PAD]')
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_len, tokenizer, pinyin_vocab)
 

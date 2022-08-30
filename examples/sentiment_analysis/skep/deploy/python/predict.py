@@ -13,13 +13,14 @@
 # limitations under the License.
 
 import argparse
-
-import numpy as np
-import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
+import numpy as np
+
+import paddle
 from paddle import inference
+
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import SkepTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -49,6 +50,7 @@ def convert_example(example,
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -131,8 +133,7 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_length)
 
-    tokenizer = ppnlp.transformers.SkepTokenizer.from_pretrained(
-        args.model_name)
+    tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
     # These data samples is in Chinese.
     # If you use the english model, you should change the test data in English.
@@ -143,7 +144,9 @@ if __name__ == "__main__":
     ]
     label_map = {0: 'negative', 1: 'positive'}
 
-    results = predictor.predict(
-        data, tokenizer, label_map, batch_size=args.batch_size)
+    results = predictor.predict(data,
+                                tokenizer,
+                                label_map,
+                                batch_size=args.batch_size)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

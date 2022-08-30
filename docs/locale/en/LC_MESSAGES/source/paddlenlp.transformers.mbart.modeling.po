@@ -1,0 +1,518 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.mbart.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder:1
+#: paddlenlp.transformers.mbart.modeling.MBartEncoder:1
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration:1
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering:1
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification:1
+#: paddlenlp.transformers.mbart.modeling.MBartModel:1
+msgid "基类：:class:`paddlenlp.transformers.mbart.modeling.MBartPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:1
+msgid "The bare MBart Model transformer outputting raw hidden-states."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartClassificationHead.forward
+#: paddlenlp.transformers.mbart.modeling.MBartDecoder.forward
+#: paddlenlp.transformers.mbart.modeling.MBartEncoder.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward
+#: paddlenlp.transformers.mbart.modeling.MBartModel
+#: paddlenlp.transformers.mbart.modeling.MBartModel.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:10
+msgid ""
+"Vocabulary size of `inputs_ids` in `MBartModel`. Also is the vocab size "
+"of token embedding matrix. Defines the number of different tokens that "
+"can be represented by the `inputs_ids` passed when calling `MBartModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:13
+msgid ""
+"The beginning of sequence token that was used during pretraining. Can be "
+"used a sequence classifier token. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:17
+msgid "The index of padding token in the token vocabulary. Defaults to `1`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:20
+msgid ""
+"A special token representing the end of a sequence that was used during "
+"pretraining. Defaults to `2`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:23
+msgid ""
+"Dimensionality of the embedding layer, encoder layer and decoder layer. "
+"Defaults to `768`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:25
+msgid "Number of hidden layers in the Transformer encoder. Defaults to `6`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:27
+msgid "Number of hidden layers in the Transformer decoder. Defaults to `6`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:29
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:32
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"decoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:35
+msgid ""
+"Dimensionality of the feed-forward (ff) layer in the encoder. Input "
+"tensors to ff layers are firstly projected from `d_model` to "
+"`encoder_ffn_dim`, and then projected back to `d_model`. Typically "
+"`encoder_ffn_dim` is larger than `d_model`. Defaults to `3072`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:40
+msgid ""
+"Dimensionality of the feed-forward (ff) layer in the encoder. Input "
+"tensors to ff layers are firstly projected from `d_model` to "
+"`decoder_ffn_dim`, and then projected back to `d_model`. Typically "
+"`decoder_ffn_dim` is larger than `d_model`. Defaults to `3072`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:45
+msgid ""
+"The dropout probability used in all fully connected layers (pre-process "
+"and post-process of MHA and FFN sub-layer) in the encoders and decoders. "
+"Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:48
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to `\"gelu\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:52
+msgid ""
+"The dropout probability used in MultiHeadAttention in all encoder layers "
+"and decoder layers to drop some attention target. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:55
+msgid ""
+"The dropout probability used after FFN activation in all encoder layers "
+"and decoder layers. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:58
+msgid ""
+"The maximum value of the dimensionality of position encoding, which "
+"dictates the maximum supported length of an input sequence. Defaults to "
+"`1024`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel:61
+msgid ""
+"The standard deviation of the truncated_normal_initializer for "
+"initializing all weight matrices. Default to `0.02`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:1
+msgid "The MBartModel forward method, overrides the `__call__()` special method."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. Its data type "
+"should be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:7
+msgid ""
+"Mask used in multi-head attention to avoid performing attention to some "
+"unwanted positions, usually the paddings or the subsequent positions. Its"
+" data type can be int, float and bool. When the data type is bool, the "
+"`masked` tokens have `False` values and the others have `True` values. "
+"When the data type is int, the `masked` tokens have `0` values and the "
+"others have `1` values. When the data type is float, the `masked` tokens "
+"have `-INF` values and the others have `0` values. It is a tensor with "
+"shape broadcasted to `[batch_size, num_attention_heads, sequence_length, "
+"sequence_length]`. For example, its shape can be  [batch_size, "
+"sequence_length], [batch_size, sequence_length, sequence_length], "
+"[batch_size, num_attention_heads, sequence_length, sequence_length]. "
+"Defaults to `None`, which means nothing needed to be prevented attention "
+"to."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:18
+msgid ""
+"Indices of decoder input sequence tokens in the vocabulary. Its data type"
+" should be `int64` and it has a shape of [batch_size, sequence_length]. "
+"Defaults to `None`, which means no `decoder_input_ids` is provided, the "
+"model will create the tensor by shifting the `input_ids` to the right."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:23
+msgid ""
+"Mask used in multi-head attention to avoid performing attention to some "
+"unwanted positions in `decoder_input_ids`. Its data type and shape is the"
+" same as `attention_mask`. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:26
+msgid ""
+"The output of the encoder, a tuple consists `last_hidden_state`, "
+"`hidden_states`(optional), `attentions`(optional). The data type of "
+"`last_hidden_state` is float32 and its shape is `[batch_size, "
+"sequence_length, hidden_size]`. `hidden_states` is hidden_states of all "
+"layers in the Transformer encoder. The length of `hidden_states` is "
+"`num_hidden_layers + 1`. For all element in the tuple, its data type "
+"should be float32 and its shape is [`batch_size, sequence_length, "
+"hidden_size`]. `attentions` is attentions of all layers of in the "
+"Transformer encoder. The length of `attentions` is `num_hidden_layers`. "
+"For all element in the tuple, its data type should be float32 and its "
+"shape is [`batch_size, num_attention_heads, sequence_length, "
+"sequence_length`]."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:33
+msgid ""
+"Whether or not to use cache. Defaults to `False`. If set to `True`, key "
+"value states will be returned and can be used to speed up decoding."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartModel.forward:36
+msgid ""
+"It is a list, and each element in the list is a tuple "
+"`(incremental_cache, static_cache)`. See `TransformerDecoder.gen_cache "
+"<https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__"
+" for more details. It is only used for inference and should be None for "
+"training. Default to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder.forward
+#: paddlenlp.transformers.mbart.modeling.MBartEncoder.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward
+#: paddlenlp.transformers.mbart.modeling.MBartModel.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:14
+#: paddlenlp.transformers.mbart.modeling.MBartModel.forward:42
+msgid ""
+"Returns tensor `decoder_output`, which is the output at the last layer of"
+" the model. Its data type should be float32 and has a shape of "
+"[batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder.forward
+#: paddlenlp.transformers.mbart.modeling.MBartEncoder.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward
+#: paddlenlp.transformers.mbart.modeling.MBartModel.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:31
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:32
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:23
+#: paddlenlp.transformers.mbart.modeling.MBartModel.forward:47
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartPretrainedModel:1
+msgid ""
+"An abstract class for pretrained MBart models. It provides MBart related "
+"`model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartEncoder:1
+msgid ""
+"The Transformer Encoder of MBartModel. The arguments of MBartEncoder can "
+"see :class:`MBartModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartEncoder.forward:1
+msgid ""
+"The MBartEncoder forward method, overrides the `__call__()` special "
+"method."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:3
+#: paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:5
+#: paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:7
+#: paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:9
+#: paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:11
+#: paddlenlp.transformers.mbart.modeling.MBartEncoder.forward:3
+#: paddlenlp.transformers.mbart.modeling.MBartEncoder.forward:5
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:3
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:5
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:7
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:9
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:11
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:13
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:15
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:27
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:3
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:5
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:7
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:9
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:11
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:13
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:15
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:3
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:5
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:7
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:9
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:11
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:13
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:15
+msgid "See :class:`MBartModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartEncoder.forward:8
+msgid ""
+"Returns tensor `encoder_output`, which is the output at the last layer of"
+" the model. Its data type should be float32 and has a shape of "
+"[batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder:1
+msgid ""
+"The Transformer Decoder of MBartModel. The arguments of MBartDecoder can "
+"see :class:`MBartModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:1
+msgid ""
+"The MBartDecoder forward method, overrides the `__call__()` special "
+"method."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartClassificationHead:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartClassificationHead:1
+msgid "Head for sentence-level classification tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartClassificationHead.forward:1
+msgid "Hidden states of the classification model."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification:1
+msgid ""
+"MBart Model with a linear layer on top of the pooled output, designed for"
+" sequence classification/regression tasks like GLUE tasks."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration:4
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering:4
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification:4
+msgid "An instance of MBartModel."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification:6
+msgid "The number of different labels. Defaults to `2`."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification:8
+msgid ""
+"The dropout probability for output of MBart. If None, use the same value "
+"as `hidden_dropout_prob` of `MBartModel` instance `mbart`. Defaults to "
+"None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:1
+msgid ""
+"The MBartForSequenceClassification forward method, overrides the "
+"__call__() special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:18
+msgid ""
+"Returns tensor `logits`, a tensor of the input text classification "
+"logits. Shape as `[batch_size, num_labels]` and dtype as float32."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering:1
+msgid ""
+"MBart Model with a linear layer on top of the hidden-states output to "
+"compute `span_start_logits` and `span_end_logits`, designed for question-"
+"answering tasks like SQuAD."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:1
+msgid ""
+"The MBartForQuestionAnswering forward method, overrides the __call__() "
+"special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:18
+msgid ""
+"Returns tuple (`start_logits`, `end_logits`).  With the fields:  - "
+"`start_logits` (Tensor):     A tensor of the input token classification "
+"logits, indicates the start position of the labelled span.     Its data "
+"type should be float32 and its shape is [batch_size, sequence_length].  -"
+" `end_logits` (Tensor):     A tensor of the input token classification "
+"logits, indicates the end position of the labelled span.     Its data "
+"type should be float32 and its shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:18
+msgid "Returns tuple (`start_logits`, `end_logits`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:20
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:20
+msgid "With the fields:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:24
+msgid "`start_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:23
+msgid ""
+"A tensor of the input token classification logits, indicates the start "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:27
+msgid "`end_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForQuestionAnswering.forward:27
+msgid ""
+"A tensor of the input token classification logits, indicates the end "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration:1
+msgid ""
+"MBart Model with a linear layer on top of the hidden-states output to "
+"compute `span_start_logits` and `span_end_logits`, designed for question-"
+"answering tasks like SQuAD ."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:1
+msgid ""
+"The MBartForConditionalGeneration forward method, overrides the "
+"__call__() special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:18
+msgid ""
+"Returns Tensor `lm_logits` if `use_cache` is `False`, otherwise, returns "
+"tuple (`lm_logits`, `cache`).  With the fields:  - `lm_logits` (Tensor):"
+"     The generated sentence of the model.     Its data type should be "
+"float32 and has a shape of [batch_size, sequence_length, vocab_size].  - "
+"`cache` (Tensor):     See :class:`MBartModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:18
+msgid ""
+"Returns Tensor `lm_logits` if `use_cache` is `False`, otherwise, returns "
+"tuple (`lm_logits`, `cache`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:24
+msgid "`lm_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:23
+msgid ""
+"The generated sentence of the model. Its data type should be float32 and "
+"has a shape of [batch_size, sequence_length, vocab_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:26
+msgid "`cache` (Tensor):"
+msgstr ""
+

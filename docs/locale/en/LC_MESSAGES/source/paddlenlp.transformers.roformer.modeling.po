@@ -1,0 +1,635 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.roformer.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel:1
+msgid "基类：:class:`paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:1
+msgid "The bare RoFormer Model transformer outputting raw hidden-states."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:10
+msgid ""
+"Vocabulary size of `inputs_ids` in `RoFormerModel`. Also is the vocab "
+"size of token embedding matrix. Defines the number of different tokens "
+"that can be represented by the `inputs_ids` passed when calling "
+"`RoFormerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:13
+msgid "Dimensionality of the embedding layer. Defaults to `768`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:15
+msgid "Dimensionality of the, encoder layers and pooler layer. Defaults to `768`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:17
+msgid "Number of hidden layers in the Transformer encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:19
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:22
+msgid ""
+"Dimensionality of the feed-forward (ff) layer in the encoder. Input "
+"tensors to ff layers are firstly projected from `hidden_size` to "
+"`intermediate_size`, and then projected back to `hidden_size`. Typically "
+"`intermediate_size` is larger than `hidden_size`. Defaults to `3072`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:27
+msgid ""
+"The non-linear activation function in the feed-forward layer. "
+"``\"gelu\"``, ``\"relu\"`` and any other paddle supported activation "
+"functions are supported. Defaults to `\"gelu\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:31
+msgid ""
+"The dropout probability for all fully connected layers in the embeddings "
+"and encoder. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:34
+msgid ""
+"The dropout probability used in MultiHeadAttention in all encoder layers "
+"to drop some attention target. Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:37
+msgid ""
+"The maximum value of the dimensionality of position encoding, which "
+"dictates the maximum supported length of an input sequence. Defaults to "
+"`512`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:40
+msgid "The vocabulary size of `token_type_ids`. Defaults to `2`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:43
+msgid ""
+"The standard deviation of the normal initializer. Defaults to 0.02.  .. "
+"note::     A normal_initializer initializes weight matrices as normal "
+"distributions.     See :meth:`BertPretrainedModel.init_weights()` for how"
+" weights are initialized in `BertModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:43
+msgid "The standard deviation of the normal initializer. Defaults to 0.02."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:47
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`BertPretrainedModel.init_weights()` for how weights are "
+"initialized in `BertModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:50
+msgid "The index of padding token in the token vocabulary. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:53
+msgid "The non-linear activation function in the pooler. Defaults to `\"tanh\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel:56
+msgid ""
+"Whether or not apply rotay position embeddings to value. Defaults to "
+"`False`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:1
+msgid ""
+"The RoFormerModel forward method, overrides the `__call__()` special "
+"method."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. Its data type "
+"should be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:7
+msgid ""
+"Segment token indices to indicate different portions of the inputs. "
+"Selected in the range ``[0, type_vocab_size - 1]``. If `type_vocab_size` "
+"is 2, which means the inputs have two portions. Indices can either be 0 "
+"or 1:  - 0 corresponds to a *sentence A* token, - 1 corresponds to a "
+"*sentence B* token.  Its data type should be `int64` and it has a shape "
+"of [batch_size, sequence_length]. Defaults to `None`, which means we "
+"don't add segment embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:7
+msgid ""
+"Segment token indices to indicate different portions of the inputs. "
+"Selected in the range ``[0, type_vocab_size - 1]``. If `type_vocab_size` "
+"is 2, which means the inputs have two portions. Indices can either be 0 "
+"or 1:"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:12
+msgid "0 corresponds to a *sentence A* token,"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:13
+msgid "1 corresponds to a *sentence B* token."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:15
+msgid ""
+"Its data type should be `int64` and it has a shape of [batch_size, "
+"sequence_length]. Defaults to `None`, which means we don't add segment "
+"embeddings."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:18
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range ``[0, max_position_embeddings - 1]``. "
+"Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to "
+"`None`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:22
+msgid ""
+"Mask used in multi-head attention to avoid performing attention on to "
+"some unwanted positions, usually the paddings or the subsequent "
+"positions. Its data type can be int, float and bool. When the data type "
+"is bool, the `masked` tokens have `False` values and the others have "
+"`True` values. When the data type is int, the `masked` tokens have `0` "
+"values and the others have `1` values. When the data type is float, the "
+"`masked` tokens have `-INF` values and the others have `0` values. It is "
+"a tensor with shape broadcasted to `[batch_size, num_attention_heads, "
+"sequence_length, sequence_length]`. Defaults to `None`, which means "
+"nothing needed to be prevented attention to."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:31
+msgid "Whether to return the output of each hidden layers. Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:35
+msgid ""
+"Returns tuple (`sequence_output`, `pooled_output`) or (`encoder_outputs`,"
+" `pooled_output`).  With the fields:  - `sequence_output` (Tensor):     "
+"Sequence of hidden-states at the last layer of the model.     It's data "
+"type should be float32 and its shape is [batch_size, sequence_length, "
+"hidden_size].  - `pooled_output` (Tensor):     The output of first token "
+"(`[CLS]`) in sequence.     We \"pool\" the model by simply taking the "
+"hidden state corresponding to the first token.     Its data type should "
+"be float32 and its shape is [batch_size, hidden_size].  - "
+"`encoder_outputs` (List(Tensor)):     A list of Tensor containing hidden-"
+"states of the model at each hidden layer in the Transformer encoder.     "
+"The length of the list is `num_hidden_layers`.     Each Tensor has a data"
+" type of float32 and its shape is [batch_size, sequence_length, "
+"hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:35
+msgid ""
+"Returns tuple (`sequence_output`, `pooled_output`) or (`encoder_outputs`,"
+" `pooled_output`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:12
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:10
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:37
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:16
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:41
+msgid "`sequence_output` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:40
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:1
+msgid ""
+"Sequence of hidden-states at the last layer of the model. It's data type "
+"should be float32 and its shape is [batch_size, sequence_length, "
+"hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:46
+msgid "`pooled_output` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:44
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:4
+msgid ""
+"The output of first token (`[CLS]`) in sequence. We \"pool\" the model by"
+" simply taking the hidden state corresponding to the first token. Its "
+"data type should be float32 and its shape is [batch_size, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:50
+msgid "`encoder_outputs` (List(Tensor)):"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:49
+msgid ""
+"A list of Tensor containing hidden-states of the model at each hidden "
+"layer in the Transformer encoder. The length of the list is "
+"`num_hidden_layers`. Each Tensor has a data type of float32 and its shape"
+" is [batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:22
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:13
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:13
+#: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:55
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel:1
+msgid ""
+"An abstract class for pretrained RoFormer models. It provides RoFormer "
+"related `model_config_file`, `pretrained_init_configuration`, "
+"`resource_files_names`, `pretrained_resource_files_map`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more "
+"details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel.init_weights:1
+msgid "Initialization hook"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining:1
+msgid "RoFormer Model with pretraining tasks on top."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining:3
+msgid "An instance of :class:`RoFormerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:3
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:5
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:3
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:5
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:3
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:5
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:3
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:5
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:3
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:5
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:7
+msgid "See :class:`RoFormerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:7
+msgid "See :class:`RoFormerPretrainingHeads`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:10
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:14
+msgid ""
+"Returns tuple (``prediction_scores``, ``seq_relationship_score``).  With "
+"the fields:  - `prediction_scores` (Tensor):     The scores of masked "
+"token prediction. Its data type should be float32.     If "
+"`masked_positions` is None, its shape is [batch_size, sequence_length, "
+"vocab_size].     Otherwise, its shape is [batch_size, mask_token_num, "
+"vocab_size].  - `seq_relationship_score` (Tensor):     The scores of next"
+" sentence prediction.     Its data type should be float32 and its shape "
+"is [batch_size, 2]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:10
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:14
+msgid "Returns tuple (``prediction_scores``, ``seq_relationship_score``)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:17
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:21
+msgid "`prediction_scores` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:15
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:19
+msgid ""
+"The scores of masked token prediction. Its data type should be float32. "
+"If `masked_positions` is None, its shape is [batch_size, sequence_length,"
+" vocab_size]. Otherwise, its shape is [batch_size, mask_token_num, "
+"vocab_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:20
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:24
+msgid "`seq_relationship_score` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForPretraining.forward:20
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:24
+msgid ""
+"The scores of next sentence prediction. Its data type should be float32 "
+"and its shape is [batch_size, 2]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:1
+msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1
+msgid ""
+"Vocabulary size of `inputs_ids` in `RoFormerModel`. Defines the number of"
+" different tokens that can be represented by the `inputs_ids` passed when"
+" calling `RoFormerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:1
+msgid ""
+"The scores of masked token prediction. Its data type should be float32. "
+"If `masked_positions` is None, its shape is [batch_size, sequence_length,"
+" vocab_size]. Otherwise, its shape is [batch_size, mask_token_num, "
+"vocab_size]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:5
+msgid ""
+"The scores of next sentence prediction. Its data type should be float32 "
+"and its shape is [batch_size, 2]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:8
+msgid ""
+"The labels of the masked language modeling, its dimensionality is equal "
+"to `prediction_scores`. Its data type should be int64. If "
+"`masked_positions` is None, its shape is [batch_size, sequence_length, "
+"1]. Otherwise, its shape is [batch_size, mask_token_num, 1]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:12
+msgid ""
+"The labels of the next sentence prediction task, the dimensionality of "
+"`next_sentence_labels` is equal to `seq_relation_labels`. Its data type "
+"should be int64 and its shape is [batch_size, 1]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:16
+msgid ""
+"The scale of masked tokens. Used for the normalization of masked language"
+" modeling loss. If it is a `Tensor`, its data type should be int64 and "
+"its shape is equal to `prediction_scores`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward:20
+msgid ""
+"The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean"
+" of `next_sentence_loss`. Its data type should be float32 and its shape "
+"is [1]."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:1
+msgid "Perform language modeling task and next sentence classification task."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:9
+msgid "Activation function used in the language modeling task."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:11
+msgid ""
+"Decoding weights used to map hidden_states to logits of the masked token "
+"prediction. Its data type should be float32 and its shape is [vocab_size,"
+" hidden_size]. Defaults to `None`, which means use the same weights of "
+"the embedding layer."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward:8
+msgid ""
+"A tensor indicates positions to be masked in the position embedding. Its "
+"data type should be int64 and its shape is [batch_size, mask_token_num]. "
+"`mask_token_num` is the number of masked tokens. It should be no bigger "
+"than `sequence_length`. Defaults to `None`, which means we output hidden-"
+"states of all tokens in masked token prediction."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:1
+msgid ""
+"RoFormer Model with a linear layer on top of the output layer, designed "
+"for sequence classification/regression tasks like GLUE tasks."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:4
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:4
+msgid "An instance of `paddlenlp.transformers.RoFormerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:6
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:6
+msgid "The number of classes. Default to `2`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification:8
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:8
+msgid ""
+"The dropout probability for output of RoFormer. If None, use the same "
+"value as `hidden_dropout_prob` of `paddlenlp.transformers.RoFormerModel` "
+"instance. Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForSequenceClassification.forward:8
+msgid ""
+"Returns tensor `logits`, a tensor of the input text classification "
+"logits. Shape as `[batch_size, num_classes]` and dtype as float32."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:1
+msgid ""
+"RoFormer Model with a linear layer on top of the hidden-states output "
+"layer, designed for token classification tasks like NER tasks."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:8
+msgid ""
+"Returns tensor `logits`, a tensor of the input token classification "
+"logits. Shape as `[batch_size, sequence_length, num_classes]` and dtype "
+"as `float32`."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering:1
+msgid ""
+"RoFormer with a linear layer on top of the hidden-states output to "
+"compute `span_start_logits` and `span_end_logits`, designed for question-"
+"answering tasks like SQuAD."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering:4
+msgid "An instance of RoFormerModel."
+msgstr ""
+
+#: of paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering:6
+msgid ""
+"The dropout probability for output of RoFormer. If None, use the same "
+"value as `hidden_dropout_prob` of `RoFormerModel` instance `roformer`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:1
+msgid ""
+"The RoFormerForQuestionAnswering forward method, overrides the __call__()"
+" special method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:8
+msgid ""
+"Returns tuple (`start_logits`, `end_logits`).  With the fields:  - "
+"`start_logits` (Tensor):     A tensor of the input token classification "
+"logits, indicates the start position of the labelled span.     Its data "
+"type should be float32 and its shape is [batch_size, sequence_length].  -"
+" `end_logits` (Tensor):     A tensor of the input token classification "
+"logits, indicates the end position of the labelled span.     Its data "
+"type should be float32 and its shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:8
+msgid "Returns tuple (`start_logits`, `end_logits`)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:14
+msgid "`start_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:13
+msgid ""
+"A tensor of the input token classification logits, indicates the start "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:17
+msgid "`end_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:17
+msgid ""
+"A tensor of the input token classification logits, indicates the end "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+

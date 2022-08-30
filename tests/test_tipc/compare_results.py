@@ -22,8 +22,10 @@ def parse_args():
 
 
 def run_shell_command(cmd):
-    p = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    p = subprocess.Popen(cmd,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         shell=True)
     out, err = p.communicate()
 
     if p.returncode == 0:
@@ -119,8 +121,8 @@ if __name__ == "__main__":
         try:
             testing_assert_allclose(gt_dict, pred_dict)
             print(
-                "Assert allclose passed! The results of {} and {} are consistent!".
-                format(filename, gt_filename))
+                "Assert allclose passed! The results of {} and {} are consistent!"
+                .format(filename, gt_filename))
         except Exception as E:
             print(E)
             raise ValueError(

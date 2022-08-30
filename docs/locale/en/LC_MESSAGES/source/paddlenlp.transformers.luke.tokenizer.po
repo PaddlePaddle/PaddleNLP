@@ -1,0 +1,262 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../source/paddlenlp.transformers.luke.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer:1
+msgid "Tokenization classes for LUKE."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaBPETokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:1
+msgid ""
+"Constructs a Luke tokenizer. It uses a basic tokenizer to do punctuation "
+"splitting, lower casing and so on, and follows a WordPiece tokenizer to "
+"tokenize as subwords."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:5
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` "
+"which contains most of the main methods. For more information regarding "
+"those methods, please refer to this superclass."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.add_special_tokens
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:9
+msgid ""
+"The vocabulary file path (ends with '.json') required to instantiate a "
+"`WordpieceTokenizer`."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:12
+msgid ""
+"The entity vocabulary file path (ends with '.tsv') required to "
+"instantiate a `EntityTokenizer`."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:15
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to`True`."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:18
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:22
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:25
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:28
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to \"[CLS]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:31
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to \"[MASK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer:37
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_entity_vocab:1
+msgid "Get the entity vocab"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.tokenize:6
+msgid "Tokenize a string."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.tokenize:6
+msgid "Args:"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.tokenize:3
+msgid "text (str):"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.tokenize:4
+msgid "The sentence to be tokenized."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.tokenize:6
+msgid "add_prefix_space (boolean, default False):"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.tokenize:6
+msgid ""
+"Begin the sentence with at least one space to get invariance to word "
+"order in GPT-2 (and Luke) tokenizers."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_tokens_to_string:1
+msgid "Converts a sequence of tokens (string) in a single string."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.add_special_tokens:1
+msgid "Adding special tokens if you need."
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.add_special_tokens:3
+msgid ""
+"The special token list you provided. If you provide a Dict, the key of "
+"the Dict must be \"additional_special_tokens\" and the value must be "
+"token list."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.convert_entity_to_id:1
+msgid "Convert the entity to id"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.entity_encode:1
+msgid "Convert the string entity to digital entity"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping:1
+msgid ""
+"Returns the map of tokens and the start and end index of their start and "
+"end character. Modified from "
+"https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping:4
+msgid "Input text."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping:7
+msgid "The offset map of input text."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.get_offset_mapping
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Create a mask from the two sequences passed to be used in a sequence-pair"
+" classification task."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:3
+msgid "A Luke sequence pair mask has the following format: ::"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:9
+msgid ""
+"If :obj:`token_ids_1` is :obj:`None`, this method only returns the first "
+"portion of the mask (0s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:11
+msgid "A list of `inputs_ids` for the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:13
+msgid "Optional second list of IDs for sequence pairs. Defaults to None."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.create_token_type_ids_from_sequences:16
+msgid "List of token_type_id according to the given sequence(s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add:3
+msgid ""
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.num_special_tokens_to_add:7
+msgid "Number of tokens added to sequences."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.luke.tokenizer.LukeTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens."
+msgstr ""
+
+#~ msgid "基类：:class:`paddlenlp.transformers.roberta.tokenizer.RobertaTokenizer`"
+#~ msgstr ""
+
+#~ msgid "Converts a sequence of tokens (list of string) to a list of ids."
+#~ msgstr ""
+
+#~ msgid "A list of string representing tokens to be converted."
+#~ msgstr ""
+
+#~ msgid "Converted ids from tokens."
+#~ msgstr ""
+

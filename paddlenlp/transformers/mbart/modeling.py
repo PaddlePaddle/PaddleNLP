@@ -38,8 +38,8 @@ def shift_tokens_right(input_ids, pad_token_id):
     input_flat = paddle.flatten(shifted_input_ids)
     batch_size, seq_length = paddle.shape(shifted_input_ids)
     index = paddle.arange(0, batch_size, 1, dtype='int32') * seq_length
-    index_of_eos = paddle.cast(
-        shifted_input_ids != pad_token_id, dtype='int32').sum(axis=-1) - 1
+    index_of_eos = paddle.cast(shifted_input_ids != pad_token_id,
+                               dtype='int32').sum(axis=-1) - 1
     decoder_start_tokens = paddle.gather(input_flat, index + index_of_eos)
     shifted_input_ids[:, 1:] = shifted_input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = decoder_start_tokens
@@ -193,23 +193,18 @@ class MBartLearnedPositionalEmbedding(Embedding):
     This module learns positional embeddings up to a fixed maximum size.
     """
 
-    def __init__(self, num_embeddings, embedding_dim, padding_idx):
-        assert padding_idx is not None, "`padding_idx` should not be None, but of type int"
+    def __init__(self, num_embeddings, embedding_dim):
         # MBart is set up so that if padding_idx is specified then offset the embedding ids by 2
         # and adjust num_embeddings appropriately. Other models dont have this hack
         self.offset = 2
-        super().__init__(
-            num_embeddings + self.offset,
-            embedding_dim,
-            padding_idx=padding_idx)
+        super().__init__(num_embeddings + self.offset, embedding_dim)
 
     def forward(self, input_ids_shape, past_key_values_length=0):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
-        positions = paddle.arange(
-            past_key_values_length,
-            past_key_values_length + seq_len,
-            dtype="int64")
+        positions = paddle.arange(past_key_values_length,
+                                  past_key_values_length + seq_len,
+                                  dtype="int64")
         return super().forward(positions + self.offset)
 
 
@@ -239,10 +234,10 @@ class MBartEncoder(MBartPretrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model, pad_token_id)
+            self.embed_tokens = nn.Embedding(vocab_size, d_model)
 
         self.encoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model, pad_token_id)
+            max_position_embeddings, d_model)
 
         self.encoder_dropout = nn.Dropout(dropout)
         self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
@@ -286,7 +281,12 @@ class MBartEncoder(MBartPretrainedModel):
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-            attention_mask.stop_gradient = True
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
 
         encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
         return encoder_output
@@ -317,10 +317,10 @@ class MBartDecoder(MBartPretrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model, pad_token_id)
+            self.embed_tokens = nn.Embedding(vocab_size, d_model)
 
         self.decoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model, pad_token_id)
+            max_position_embeddings, d_model)
         self.decoder_dropout = nn.Dropout(dropout)
         self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
 
@@ -365,28 +365,25 @@ class MBartDecoder(MBartPretrainedModel):
         """
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu(
-                (paddle.full(
-                    (decoder_length, decoder_length),
-                    -np.inf,
-                    dtype=paddle.get_default_dtype())),
-                1)
+            decoder_attention_mask = paddle.tensor.triu((paddle.full(
+                (decoder_length, decoder_length),
+                -np.inf,
+                dtype=paddle.get_default_dtype())), 1)
         decoder_inputs_embeds = self.d_model**0.5 * self.embed_tokens(
             decoder_input_ids)
-        past_key_values_length = paddle.shape(cache[0][0].k)[
-            2] if cache is not None else 0
+        past_key_values_length = paddle.shape(
+            cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
             decoder_input_ids.shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
 
-        decoder_output = self.decoder(
-            tgt=decoder_input,
-            memory=encoder_output,
-            tgt_mask=decoder_attention_mask,
-            memory_mask=memory_mask,
-            cache=cache)
+        decoder_output = self.decoder(tgt=decoder_input,
+                                      memory=encoder_output,
+                                      tgt_mask=decoder_attention_mask,
+                                      memory_mask=memory_mask,
+                                      cache=cache)
         return decoder_output
 
 
@@ -484,18 +481,20 @@ class MBartModel(MBartPretrainedModel):
         self.init_std = init_std
         self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(vocab_size, d_model, pad_token_id)
-        self.encoder = MBartEncoder(
-            self.shared, vocab_size, pad_token_id, d_model, num_encoder_layers,
-            encoder_attention_heads, encoder_ffn_dim, dropout,
-            activation_function, attention_dropout, activation_dropout,
-            max_position_embeddings, init_std)
+        self.shared = nn.Embedding(vocab_size, d_model)
+        self.encoder = MBartEncoder(self.shared, vocab_size, pad_token_id,
+                                    d_model, num_encoder_layers,
+                                    encoder_attention_heads, encoder_ffn_dim,
+                                    dropout, activation_function,
+                                    attention_dropout, activation_dropout,
+                                    max_position_embeddings, init_std)
 
-        self.decoder = MBartDecoder(
-            self.shared, vocab_size, pad_token_id, d_model, num_decoder_layers,
-            decoder_attention_heads, decoder_ffn_dim, dropout,
-            activation_function, attention_dropout, activation_dropout,
-            max_position_embeddings, init_std)
+        self.decoder = MBartDecoder(self.shared, vocab_size, pad_token_id,
+                                    d_model, num_decoder_layers,
+                                    decoder_attention_heads, decoder_ffn_dim,
+                                    dropout, activation_function,
+                                    attention_dropout, activation_dropout,
+                                    max_position_embeddings, init_std)
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -611,10 +610,7 @@ class MBartClassificationHead(Layer):
     Head for sentence-level classification tasks.
     """
 
-    def __init__(self,
-                 input_dim: int,
-                 inner_dim: int,
-                 num_classes: int,
+    def __init__(self, input_dim: int, inner_dim: int, num_classes: int,
                  pooler_dropout: float):
         super().__init__()
         self.dense = nn.Linear(input_dim, inner_dim)
@@ -708,8 +704,8 @@ class MBartForSequenceClassification(MBartPretrainedModel):
                             cache)
         if use_cache:
             output = output[0]
-        eos_mask = paddle.cast(
-            input_ids == self.mbart.config['eos_token_id'], dtype='int64')
+        eos_mask = paddle.cast(input_ids == self.mbart.config['eos_token_id'],
+                               dtype='int64')
         if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
             raise ValueError(
                 'All examples must have the same number of <eos> tokens.')
@@ -717,8 +713,8 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         output_shape = paddle.shape(output)
         # TODO(gongenlei): support bool tensor index
         output = output.masked_select(
-            eos_mask.unsqueeze(-1).astype('bool').tile(
-                [1, 1, output_shape[-1]]))
+            eos_mask.unsqueeze(-1).astype('bool').tile([1, 1,
+                                                        output_shape[-1]]))
         sentence_representation = output.reshape(
             [output_shape[0], -1, output_shape[-1]])[:, -1, :]
         logits = self.classifier(sentence_representation)
@@ -807,8 +803,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
 
 class MBartForConditionalGeneration(MBartPretrainedModel):
     r"""
-    MBart Model with a linear layer on top of the hidden-states output to
-    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD .
+    MBart Model with a `language modeling` head on top.
 
     Args:
         mbart (:class:`MBartModel`):
@@ -826,9 +821,8 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
             is_bias=False)
         self.register_buffer(
             "final_logits_bias",
-            paddle.zeros(
-                (1, self.mbart.config['vocab_size']),
-                dtype=paddle.get_default_dtype()))
+            paddle.zeros((1, self.mbart.config['vocab_size']),
+                         dtype=paddle.get_default_dtype()))
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -851,6 +845,10 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
             raise AttributeError(
                 "'repetition_penalty != 1' is not supported yet in the faster version"
             )
+        if kwargs['min_length'] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'min_length != 0' is not supported yet in the faster version")
         self._faster_entry = FasterMBART(
             self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry

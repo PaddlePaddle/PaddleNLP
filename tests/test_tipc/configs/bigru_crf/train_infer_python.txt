@@ -3,17 +3,17 @@ model_name:bigru_crf
 python:python3.7
 gpu_list:0|0,1
 --device:gpu
-Global.auto_cast:null
---epochs:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=100
---model_save_dir:./test_tipc/bigru_crf/output/
+null:null
+--epoch:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=100
+--save_model:./test_tipc/output/
 --batch_size:lite_train_lite_infer=16|lite_train_whole_infer=16|whole_train_whole_infer=32
-Global.pretrained_model:null
-train_model_name:best_model.pdparams
+null:null
+train_model_name:model.pdparams
 train_infer_img_dir:./data/lexical_analysis_dataset_tiny
---data_dir:./data/lexical_analysis_dataset_tiny
+null:null
 ##
 trainer:norm_train
-norm_train:test_tipc/bigru_crf/train.py
+norm_train:test_tipc/train.py --model lac --optimizer adam --max_seq_len 64 --data_dir ./data/lexical_analysis_dataset_tiny/ --seed 102
 pact_train:null
 fpgm_train:null
 distill_train:null
@@ -26,8 +26,8 @@ null:null
 ##
 ===========================infer_params===========================
 --output_path:./test_tipc/bigru_crf/infer_model/
---params_path:./test_tipc/bigru_crf/output/best_model.pdparams
-norm_export:test_tipc/bigru_crf/export_model.py
+--params_path:./test_tipc/output/bigru_crf/model.pdparams
+norm_export:test_tipc/bigru_crf/export_model.py --data_dir ./data/lexical_analysis_dataset_tiny/
 quant_export:null
 fpgm_export:null
 distill_export:null
@@ -49,3 +49,9 @@ inference:./test_tipc/bigru_crf/deploy/predict.py
 null:null
 --benchmark:True
 null:null
+===========================train_benchmark_params==========================
+batch_size:32
+fp_items:fp32
+epoch:7
+--profiler_options:batch_range=[10,20];state=GPU;tracer_option=Default;profile_path=model.profile  
+flags:FLAGS_eager_delete_tensor_gb=0.0;FLAGS_fraction_of_gpu_memory_to_use=0.98;FLAGS_conv_workspace_size_limit=4096

@@ -18,21 +18,20 @@ import random
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
 from model import BoWModel, BiLSTMAttentionModel, CNNModel, LSTMModel, GRUModel, RNNModel, SelfInteractiveAttention
-from utils import convert_example
+from utils import convert_example, build_vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--epochs", type=int, default=10, help="Number of epoches for training.")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--epochs", type=int, default=15, help="Number of epoches for training.")
+parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate used to train.")
 parser.add_argument("--save_dir", type=str, default='checkpoints/', help="Directory to save model checkpoint")
 parser.add_argument("--batch_size", type=int, default=64, help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The directory to dataset.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to save vocabulary.")
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
     default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
@@ -72,29 +71,44 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
-    set_seed()
+    set_seed(1000)
 
-    # Loads vocab.
-    if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                           args.vocab_path)
-
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    texts = []
+    for data in train_ds:
+        texts.append(data["text"])
+    for data in dev_ds:
+        texts.append(data["text"])
+
+    # Reads stop words.
+    # Stopwords are just for example.
+    # It should be updated according to the corpus.
+    stopwords = set(["的", "吗", "吧", "呀", "呜", "呢", "呗"])
+    # Builds vocab.
+    word2idx = build_vocab(texts,
+                           stopwords,
+                           min_freq=5,
+                           unk_token="[UNK]",
+                           pad_token="[PAD]")
+    vocab = Vocab.from_dict(word2idx, unk_token="[UNK]", pad_token="[PAD]")
+    # Saves vocab.
+    vocab.to_json(args.vocab_path)
 
     # Constructs the network.
     network = args.network.lower()
@@ -104,55 +118,48 @@ if __name__ == "__main__":
     if network == 'bow':
         model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'bigru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'bilstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='bidirect',
+                          padding_idx=pad_token_id)
     elif network == 'bilstm_attn':
         lstm_hidden_size = 196
         attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-        model = BiLSTMAttentionModel(
-            attention_layer=attention,
-            vocab_size=vocab_size,
-            lstm_hidden_size=lstm_hidden_size,
-            num_classes=num_classes,
-            padding_idx=pad_token_id)
+        model = BiLSTMAttentionModel(attention_layer=attention,
+                                     vocab_size=vocab_size,
+                                     lstm_hidden_size=lstm_hidden_size,
+                                     num_classes=num_classes,
+                                     padding_idx=pad_token_id)
     elif network == 'birnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'cnn':
         model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'gru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     elif network == 'lstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='forward',
+                          padding_idx=pad_token_id,
+                          pooling_type='max')
     elif network == 'rnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     else:
         raise ValueError(
             "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
@@ -167,21 +174,19 @@ if __name__ == "__main__":
         Stack(dtype="int64"),  # seq len
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    train_loader = create_dataloader(
-        train_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='train',
-        batchify_fn=batchify_fn)
-    dev_loader = create_dataloader(
-        dev_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='validation',
-        batchify_fn=batchify_fn)
+    train_loader = create_dataloader(train_ds,
+                                     trans_fn=trans_fn,
+                                     batch_size=args.batch_size,
+                                     mode='train',
+                                     batchify_fn=batchify_fn)
+    dev_loader = create_dataloader(dev_ds,
+                                   trans_fn=trans_fn,
+                                   batch_size=args.batch_size,
+                                   mode='validation',
+                                   batchify_fn=batchify_fn)
 
-    optimizer = paddle.optimizer.Adam(
-        parameters=model.parameters(), learning_rate=args.lr)
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
+                                      learning_rate=args.lr)
 
     # Defines loss and metric.
     criterion = paddle.nn.CrossEntropyLoss()

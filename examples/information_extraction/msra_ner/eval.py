@@ -24,8 +24,7 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 
-import paddlenlp as ppnlp
-from paddlenlp.datasets import load_dataset
+from datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 from paddlenlp.metrics import ChunkEvaluator
@@ -41,60 +40,63 @@ parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", 
 # yapf: enable
 
 
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
-                              max_seq_len=512):
-    labels = example['labels']
-    example = example['tokens']
-    tokenized_input = tokenizer(
-        example,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
-
-    # -2 for [CLS] and [SEP]
-    if len(tokenized_input['input_ids']) - 2 < len(labels):
-        labels = labels[:len(tokenized_input['input_ids']) - 2]
-    tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
-    tokenized_input['labels'] += [no_entity_id] * (
-        len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
-
-    return tokenized_input
-
-
 def do_eval(args):
     paddle.set_device(args.device)
 
     # Create dataset, tokenizer and dataloader.
-    train_ds, eval_ds = load_dataset(
-        'msra_ner', splits=('train', 'test'), lazy=False)
+    train_ds, eval_ds = load_dataset('msra_ner', split=('train', 'test'))
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    label_list = train_ds.label_list
+    label_list = train_ds.features['ner_tags'].feature.names
     label_num = len(label_list)
-    no_entity_id = label_num - 1
-    trans_func = partial(
-        tokenize_and_align_labels,
-        tokenizer=tokenizer,
-        no_entity_id=no_entity_id,
-        max_seq_len=args.max_seq_length)
+    no_entity_id = 0
+
+    def tokenize_and_align_labels(examples):
+        tokenized_inputs = tokenizer(
+            examples['tokens'],
+            max_seq_len=args.max_seq_length,
+            # We use this argument because the texts in our dataset are lists of words (with a label for each word).
+            is_split_into_words=True,
+            return_length=True)
+        labels = []
+
+        for i, label in enumerate(examples['ner_tags']):
+            label_ids = label
+            if len(tokenized_inputs['input_ids'][i]) - 2 < len(label_ids):
+                label_ids = label_ids[:len(tokenized_inputs['input_ids'][i]) -
+                                      2]
+            label_ids = [no_entity_id] + label_ids + [no_entity_id]
+            label_ids += [no_entity_id] * (
+                len(tokenized_inputs['input_ids'][i]) - len(label_ids))
+
+            labels.append(label_ids)
+        tokenized_inputs["labels"] = labels
+        return tokenized_inputs
+
     ignore_label = -100
     batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
-        'seq_len': Stack(dtype='int64'),
-        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
+        'input_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
+        'token_type_ids':
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'
+            ),  # segment
+        'seq_len':
+        Stack(dtype='int64'),
+        'labels':
+        Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
     }): fn(samples)
-    eval_ds = eval_ds.map(trans_func)
-    eval_data_loader = DataLoader(
-        dataset=eval_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        return_list=True)
+
+    eval_ds = eval_ds.select(range(len(eval_ds) - 1))
+    eval_ds = eval_ds.map(tokenize_and_align_labels, batched=True)
+    eval_data_loader = DataLoader(dataset=eval_ds,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  batch_size=args.batch_size,
+                                  return_list=True)
 
     # Define the model netword and its loss
-    model = BertForTokenClassification.from_pretrained(
-        args.model_name_or_path, num_classes=label_num)
+    model = BertForTokenClassification.from_pretrained(args.model_name_or_path,
+                                                       num_classes=label_num)
     if args.init_checkpoint_path:
         model_dict = paddle.load(args.init_checkpoint_path)
         model.set_dict(model_dict)
@@ -112,8 +114,8 @@ def do_eval(args):
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             length, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
     print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (avg_loss, precision, recall, f1_score))

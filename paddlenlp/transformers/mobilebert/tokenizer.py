@@ -197,8 +197,8 @@ class MobileBertTokenizer(BertTokenizer):
 
                     offset_mapping = self.build_offset_mapping_with_special_tokens(
                         mapping, pair_mapping)
-                    sequence = self.build_inputs_with_special_tokens(ids,
-                                                                     pair_ids)
+                    sequence = self.build_inputs_with_special_tokens(
+                        ids, pair_ids)
                     token_type_ids = self.create_token_type_ids_from_sequences(
                         ids, pair_ids)
 
@@ -211,12 +211,12 @@ class MobileBertTokenizer(BertTokenizer):
                             "special_tokens_mask"] = self.get_special_tokens_mask(
                                 ids, pair_ids)
                     if return_length:
-                        encoded_inputs["seq_len"] = len(encoded_inputs[
-                            "input_ids"])
+                        encoded_inputs["seq_len"] = len(
+                            encoded_inputs["input_ids"])
 
                     # Check lengths
-                    assert max_seq_len is None or len(encoded_inputs[
-                        "input_ids"]) <= max_seq_len
+                    assert max_seq_len is None or len(
+                        encoded_inputs["input_ids"]) <= max_seq_len
 
                     # Padding
                     needs_to_be_padded = pad_to_max_seq_len and \
@@ -225,13 +225,13 @@ class MobileBertTokenizer(BertTokenizer):
                     encoded_inputs['offset_mapping'] = offset_mapping
 
                     if needs_to_be_padded:
-                        difference = max_seq_len - len(encoded_inputs[
-                            "input_ids"])
+                        difference = max_seq_len - len(
+                            encoded_inputs["input_ids"])
                         if self.padding_side == 'right':
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [1] * len(
-                                    encoded_inputs[
-                                        "input_ids"]) + [0] * difference
+                                    encoded_inputs["input_ids"]
+                                ) + [0] * difference
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (
@@ -250,8 +250,8 @@ class MobileBertTokenizer(BertTokenizer):
                             if return_attention_mask:
                                 encoded_inputs["attention_mask"] = [
                                     0
-                                ] * difference + [1] * len(encoded_inputs[
-                                    "input_ids"])
+                                ] * difference + [1] * len(
+                                    encoded_inputs["input_ids"])
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (

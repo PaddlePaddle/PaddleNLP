@@ -24,13 +24,14 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from model import SimCSE
 from data import read_simcse_text, read_text_pair, convert_example, create_dataloader
+from data import word_repetition
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -54,6 +55,7 @@ parser.add_argument("--test_set_file", type=str, required=True, help="The full p
 parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween pos_sample and neg_samples.")
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout for pretrained model encoder.")
+parser.add_argument("--dup_rate", default=0.32, type=float, help="duplicate rate for word reptition.")
 parser.add_argument("--infer_with_fc_pooler", action='store_true', help="Whether use fc layer after cls embedding or not for when infer.")
 
 args = parser.parse_args()
@@ -107,12 +109,12 @@ def do_train():
     dev_ds = load_dataset(
         read_text_pair, data_path=args.test_set_file, lazy=False)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-       'ernie-1.0',
+    pretrained_model = AutoModel.from_pretrained(
+       'ernie-3.0-medium-zh',
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(
         convert_example,
@@ -184,6 +186,9 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
+            if(args.dup_rate > 0):
+                query_input_ids,query_token_type_ids=word_repetition(query_input_ids,query_token_type_ids,args.dup_rate)
+                title_input_ids,title_token_type_ids=word_repetition(title_input_ids,title_token_type_ids,args.dup_rate)
 
             loss = model(
                 query_input_ids=query_input_ids,

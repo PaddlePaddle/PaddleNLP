@@ -89,11 +89,11 @@ class TokenEmbedding(nn.Embedding):
             unk_vector = np.array(unknown_token_vector).astype(
                 paddle.get_default_dtype())
         else:
-            unk_vector = np.random.normal(
-                scale=0.02,
-                size=self.embedding_dim).astype(paddle.get_default_dtype())
-        pad_vector = np.array(
-            [0] * self.embedding_dim).astype(paddle.get_default_dtype())
+            unk_vector = np.random.normal(scale=0.02,
+                                          size=self.embedding_dim).astype(
+                                              paddle.get_default_dtype())
+        pad_vector = np.array([0] * self.embedding_dim).astype(
+            paddle.get_default_dtype())
         if extended_vocab_path is not None:
             embedding_table = self._extend_vocab(extended_vocab_path, vector_np,
                                                  pad_vector, unk_vector,
@@ -103,14 +103,15 @@ class TokenEmbedding(nn.Embedding):
             embedding_table = self._init_without_extend_vocab(
                 vector_np, pad_vector, unk_vector)
 
-        self.vocab = Vocab.from_dict(
-            self._word_to_idx, unk_token=unknown_token, pad_token=PAD_TOKEN)
+        self.vocab = Vocab.from_dict(self._word_to_idx,
+                                     unk_token=unknown_token,
+                                     pad_token=PAD_TOKEN)
         self.num_embeddings = embedding_table.shape[0]
         # import embedding
-        super(TokenEmbedding, self).__init__(
-            self.num_embeddings,
-            self.embedding_dim,
-            padding_idx=self._word_to_idx[PAD_TOKEN])
+        super(TokenEmbedding,
+              self).__init__(self.num_embeddings,
+                             self.embedding_dim,
+                             padding_idx=self._word_to_idx[PAD_TOKEN])
         self.weight.set_value(embedding_table)
         self.set_trainable(trainable)
         logger.info("Finish loading embedding vector.")
@@ -119,9 +120,10 @@ class TokenEmbedding(nn.Embedding):
              \nUnknown token: {}\
              \nPadding index: {}\
              \nPadding token: {}\
-             \nShape :{}".format(
-            self._word_to_idx[self.unknown_token], self.unknown_token,
-            self._word_to_idx[PAD_TOKEN], PAD_TOKEN, self.weight.shape)
+             \nShape :{}".format(self._word_to_idx[self.unknown_token],
+                                 self.unknown_token,
+                                 self._word_to_idx[PAD_TOKEN], PAD_TOKEN,
+                                 self.weight.shape)
         logger.info(s)
 
     def _init_without_extend_vocab(self, vector_np, pad_vector, unk_vector):
@@ -133,8 +135,9 @@ class TokenEmbedding(nn.Embedding):
         self._idx_to_word.append(PAD_TOKEN)
         self._word_to_idx = self._construct_word_to_idx(self._idx_to_word)
         # insert unk, pad embedding
-        embedding_table = np.append(
-            vector_np['embedding'], [unk_vector, pad_vector], axis=0)
+        embedding_table = np.append(vector_np['embedding'],
+                                    [unk_vector, pad_vector],
+                                    axis=0)
 
         return embedding_table
 
@@ -361,8 +364,8 @@ class TokenEmbedding(nn.Embedding):
         """
         dot = self._dot_np
         return self._calc_word(
-            word_a, word_b,
-            lambda x, y: dot(x, y) / (np.sqrt(dot(x, x)) * np.sqrt(dot(y, y))))
+            word_a, word_b, lambda x, y: dot(x, y) /
+            (np.sqrt(dot(x, x)) * np.sqrt(dot(y, y))))
 
     def _construct_word_to_idx(self, idx_to_word):
         """

@@ -24,7 +24,7 @@ from utils import preprocess_prediction_data
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--batch_size", type=int, default=1, help="Total examples' number of a batch for training.")
-parser.add_argument("--vocab_path", type=str, default="./senta_word_dict.txt", help="The path to vocabulary.")
+parser.add_argument("--vocab_path", type=str, default="./vocab.json", help="The file path to vocabulary.")
 parser.add_argument('--network', choices=['bow', 'lstm', 'bilstm', 'gru', 'bigru', 'rnn', 'birnn', 'bilstm_attn', 'cnn'],
     default="bilstm", help="Select which network to train, defaults to bilstm.")
 parser.add_argument("--params_path", type=str, default='./checkpoints/final.pdparams', help="The path of model parameter to be loaded.")
@@ -76,8 +76,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device.lower())
 
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.from_json(args.vocab_path)
     label_map = {0: 'negative', 1: 'positive'}
 
     # Constructs the newtork.
@@ -88,55 +87,48 @@ if __name__ == "__main__":
     if network == 'bow':
         model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'bigru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'bilstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='bidirect',
+                          padding_idx=pad_token_id)
     elif network == 'bilstm_attn':
         lstm_hidden_size = 196
         attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-        model = BiLSTMAttentionModel(
-            attention_layer=attention,
-            vocab_size=vocab_size,
-            lstm_hidden_size=lstm_hidden_size,
-            num_classes=num_classes,
-            padding_idx=pad_token_id)
+        model = BiLSTMAttentionModel(attention_layer=attention,
+                                     vocab_size=vocab_size,
+                                     lstm_hidden_size=lstm_hidden_size,
+                                     num_classes=num_classes,
+                                     padding_idx=pad_token_id)
     elif network == 'birnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id)
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='bidirect',
+                         padding_idx=pad_token_id)
     elif network == 'cnn':
         model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
     elif network == 'gru':
-        model = GRUModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = GRUModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     elif network == 'lstm':
-        model = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = LSTMModel(vocab_size,
+                          num_classes,
+                          direction='forward',
+                          padding_idx=pad_token_id,
+                          pooling_type='max')
     elif network == 'rnn':
-        model = RNNModel(
-            vocab_size,
-            num_classes,
-            direction='forward',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model = RNNModel(vocab_size,
+                         num_classes,
+                         direction='forward',
+                         padding_idx=pad_token_id,
+                         pooling_type='max')
     else:
         raise ValueError(
             "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
@@ -149,18 +141,17 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data  and then do predict.
     data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
+        '非常不错，服务很好，位于市中心区，交通方便，不过价格也高！',
         '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
         '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
     ]
     tokenizer = JiebaTokenizer(vocab)
     examples = preprocess_prediction_data(data, tokenizer)
 
-    results = predict(
-        model,
-        examples,
-        label_map=label_map,
-        batch_size=args.batch_size,
-        pad_token_id=vocab.token_to_idx.get("[PAD]", 0))
+    results = predict(model,
+                      examples,
+                      label_map=label_map,
+                      batch_size=args.batch_size,
+                      pad_token_id=vocab.token_to_idx.get("[PAD]", 0))
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

@@ -1,0 +1,133 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.bart.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:1
+msgid "Construct a BART tokenizer based on byte-level Byte-Pair-Encoding."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:3
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`. For more "
+"information regarding those methods, please refer to this superclass."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:6
+msgid ""
+"Path to the vocabulary file. The vocab file contains a mapping from "
+"vocabulary strings to indices."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:9
+msgid ""
+"Path to the merge file. The merge file is used to split the input "
+"sentence into \"subword\" units. The vocab file is then used to encode "
+"those units as intices."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:13
+msgid "Paradigm to follow when decoding bytes to UTF-8. Defaults to `'replace'`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:16
+msgid "The maximum value of the input sequence length. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:19
+msgid ""
+"The beginning of sequence token that was used during pretraining. Can be "
+"used a sequence classifier token. Defaults to `\"<s>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:23
+msgid ""
+"A special token representing the end of a sequence that was used during "
+"pretraining. Defaults to `\"</s>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:26
+msgid ""
+"A special token used for sequence classification. It is the last token of"
+" the sequence when built with special tokens. Defaults to `\"<s>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:30
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to `\"</s>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:33
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to `\"<unk>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:37
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to `\"<pad>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:40
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task which the model tries to predict the "
+"original unmasked ones. Defaults to `\"<mask>\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:46
+msgid "实际案例"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bart.tokenizer.BartTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequence for sequence "
+"classification tasks by concatenating and adding special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bart.tokenizer.BartTokenizer.get_special_tokens_mask:1
+msgid ""
+"Retrieves sequence ids from a token list that has no special tokens "
+"added. This method is called when adding special tokens using the "
+"tokenizer ``encode`` methods."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.bart.tokenizer.BartTokenizer.create_token_type_ids_from_sequences:1
+msgid ""
+"Create a mask from the two sequences passed to be used in a sequence-pair"
+" classification task."
+msgstr ""
+

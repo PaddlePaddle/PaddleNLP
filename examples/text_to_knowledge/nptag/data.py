@@ -51,16 +51,14 @@ def convert_example(example,
     """
 
     if len(example["text"]) + max_cls_len + 1 + summary_num + 1 > max_seq_len:
-        example["text"] = example["text"][:(max_seq_len - (max_cls_len + 1 +
-                                                           summary_num + 1))]
+        example["text"] = example["text"][:(
+            max_seq_len - (max_cls_len + 1 + summary_num + 1))]
 
     tokens = list(example["text"]) + ["是"] + ["[MASK]"] * max_cls_len
-    inputs = tokenzier(
-        tokens,
-        return_length=True,
-        is_split_into_words=True,
-        pad_to_max_seq_len=True,
-        max_seq_len=max_seq_len)
+    inputs = tokenzier(tokens,
+                       return_length=True,
+                       is_split_into_words=True,
+                       max_length=max_seq_len)
 
     label_indices = list(
         range(inputs["seq_len"] - 1 - max_cls_len, inputs["seq_len"] - 1))
@@ -68,9 +66,9 @@ def convert_example(example,
     if is_test:
         return inputs["input_ids"], inputs["token_type_ids"], label_indices
 
-    label_tokens = list(example["label"]) + ["[PAD]"] * (max_cls_len -
-                                                         len(example["label"]))
-    labels = np.full([max_seq_len], fill_value=-100, dtype=np.int64)
+    label_tokens = list(
+        example["label"]) + ["[PAD]"] * (max_cls_len - len(example["label"]))
+    labels = np.full([inputs["seq_len"]], fill_value=-100, dtype=np.int64)
     labels[label_indices] = tokenzier.convert_tokens_to_ids(label_tokens)
     return inputs["input_ids"], inputs["token_type_ids"], labels
 
@@ -85,17 +83,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def read_custom_data(filename):

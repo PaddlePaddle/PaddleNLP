@@ -1,0 +1,53 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../source/paddlenlp.transformers.semantic_indexing.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#~ msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This class encapsulates two ErnieEncoder "
+#~ "models into one model, so query "
+#~ "embedding and title embedding could be"
+#~ " obtained using one model. And this"
+#~ " class allows two ErnieEncoder models "
+#~ "to be trained at the same time."
+#~ msgstr ""
+
+#~ msgid "示例"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Defines the computation performed at "
+#~ "every call. Should be overridden by "
+#~ "all subclasses."
+#~ msgstr ""
+
+#~ msgid "参数"
+#~ msgstr ""
+
+#~ msgid "unpacked tuple arguments"
+#~ msgstr ""
+
+#~ msgid "unpacked dict arguments"
+#~ msgstr ""
+

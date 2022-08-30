@@ -1,0 +1,807 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.reformer.modeling.rst:2
+msgid "modeling"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM:1
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering:1
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification:1
+#: paddlenlp.transformers.reformer.modeling.ReformerModel:1
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead:1
+msgid "基类：:class:`paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:1
+msgid ""
+"The bare Reformer Model transformer outputting raw hidden-states without "
+"any specific head on top."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:3
+msgid ""
+"This model inherits from "
+":class:`~paddlenlp.transformers.model_utils.PretrainedModel`. Refer to "
+"the superclass documentation for the generic methods."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:6
+msgid ""
+"This model is also a Paddle `paddle.nn.Layer "
+"<https://www.paddlepaddle.org.cn/documentation "
+"/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use "
+"it as a regular Paddle Layer and refer to the Paddle documentation for "
+"all matter related to general usage and behavior."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerModel
+#: paddlenlp.transformers.reformer.modeling.ReformerModel.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:10
+msgid "Whether to tie input and output embeddings. Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:12
+msgid ""
+"Whether or not to use a causal mask in addition to the `attention_mask` "
+"passed to `ReformerModel`. When using the Reformer for causal language "
+"modeling, this argument should be set to `True`. Defaults to `True`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:14
+msgid ""
+"The chunk size of all feed forward layers in the residual attention "
+"blocks. A chunk size of `0` means that the feed forward layer is not "
+"chunked. A chunk size of n means that the feed forward layer processes "
+"`n` < sequence_length embeddings at a time. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:18
+msgid "The id of the `padding` token. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:20
+msgid ""
+"Seed that can be used to make local sensitive hashing in "
+"`LSHSelfAttention` deterministic. This should only be set for testing "
+"purposed. For evaluation and training purposes `hash_seed` should be left"
+" as `None` to ensure fully random rotations in local sensitive hashing "
+"scheme. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:24
+msgid ""
+"Vocabulary size of `inputs_ids` in `ReformerModel`. Also is the vocab "
+"size of token embedding matrix. Defines the number of different tokens "
+"that can be represented by the `inputs_ids` passed when calling "
+"`ReformerModel`. Defaults to `258`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:27
+msgid ""
+"Dimensionality of the projected key, query and value vectors. Defaults to"
+" `128`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:29
+msgid "Dimensionality of the embedding layer, encoder layer.Defaults to `1024`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:31
+msgid ""
+"Number of attention heads for each attention layer in the Transformer "
+"encoder. Defaults to `8`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:34
+msgid ""
+"Number of hashing rounds (e.g., number of random rotations) in Local "
+"Sensitive Hashing scheme. The higher `num_hashes`, the more accurate the "
+"`LSHSelfAttention` becomes, but also the more memory and time intensive "
+"the hashing becomes. Defaults to `4`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:36
+msgid "Number of hidden layers in the Transformer encoder. Defaults to `12`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:38
+msgid ""
+"Number of buckets, the key query vectors can be \"hashed into\" using the"
+" locality sensitive hashing scheme. Each query key vector is hashed into "
+"a hash in `1, ..., num_buckets`. The number of buckets can also be "
+"factorized into a list for improved memory complexity. In this case, each"
+" query key vector is hashed into a hash in `1-1, 1-2, ..., "
+"num_buckets[0]-1, ..., num_buckets[0]-num_buckets[1]` if `num_buckets` is"
+" factorized into two factors. The number of buckets (or the product the "
+"factors) should approximately equal sequence length / lsh_chunk_length. "
+"If `num_buckets` not set, a good value is calculated on the fly. Defaults"
+" to `512`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:41
+msgid ""
+"Length of chunk which attends to itself in `LSHSelfAttention`. Chunking "
+"reduces memory complexity from sequence length x sequence length (self "
+"attention) to chunk length x chunk length x sequence length / chunk "
+"length (chunked self attention).Defaults to `256`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:43
+msgid ""
+"Length of chunk which attends to itself in `LocalSelfAttention`. Chunking"
+" reduces memory complexity from sequence length x sequence length (self "
+"attention) to chunk length x chunk length x sequence length / chunk "
+"length (chunked self attention).Defaults to `128`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:45
+msgid ""
+"Number of following neighbouring chunks to attend to in "
+"`LSHSelfAttention` layer to itself. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:47
+msgid ""
+"Number of previous neighbouring chunks to attend to in `LSHSelfAttention`"
+" layer to itself. Defaults to `1`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:49
+msgid ""
+"Number of following neighbouring chunks to attend to in "
+"`LocalSelfAttention` layer to itself. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:51
+msgid ""
+"Number of previous neighbouring chunks to attend to in "
+"`LocalSelfAttention` layer to itself. Defaults to `1`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:53
+msgid ""
+"The non-linear activation function (function or string) in the feed "
+"forward layer in the residual attention block. If string, `\"gelu\"`, "
+"`\"relu\"`, `\"tanh\"`, `\"mish\"` and `\"gelu_new\"` are supported. "
+"Defaults to `\"relu\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:55
+msgid ""
+"Dimensionality of the feed_forward layer in the residual attention block."
+" Defaults to `4096`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:57
+msgid ""
+"The dropout ratio for all fully connected layers in the embeddings and "
+"encoder. Defaults to `0.2`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:59
+msgid ""
+"The dropout ratio for the attention probabilities in `LSHSelfAttention`. "
+"Defaults to `0.1`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:61
+msgid ""
+"The dropout ratio for the attention probabilities in "
+"`LocalSelfAttention`. Defaults to `0.2`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:63
+msgid ""
+"The maximum sequence length that this model might ever be used with. "
+"Typically set this to something large just in case (e.g., 512 or 1024 or "
+"2048). Defaults to `65536`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:65
+msgid ""
+"The standard deviation of the normal initializer. Defaults to `0.02`.  .."
+" note::     A normal_initializer initializes weight matrices as normal "
+"distributions.     See :meth:`ReformerPretrainedModel._init_weights()` "
+"for how weights are initialized in `ReformerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:65
+msgid "The standard deviation of the normal initializer. Defaults to `0.02`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:68
+msgid ""
+"A normal_initializer initializes weight matrices as normal distributions."
+" See :meth:`ReformerPretrainedModel._init_weights()` for how weights are "
+"initialized in `ReformerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:71
+msgid "The epsilon used by the layer normalization layers. Defaults to `1e-12`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:73
+msgid "Whether or not to use axial position embeddings. Defaults to `True`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:75
+msgid ""
+"The position dims of the axial position encodings. During training, the "
+"product of the position dims has to be equal to the sequence length. "
+"Defaults to `[128, 512]`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:77
+msgid ""
+"The embedding dims of the axial position encodings. The sum of the "
+"embedding dims has to be equal to the hidden size. Defaults to `[256, "
+"768]`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:80
+msgid ""
+"The standard deviation of the normal_initializer for initializing the "
+"weight matrices of the axial positional encodings. Defaults to `1.0`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:83
+msgid ""
+"The chunk size of the final language model feed forward head layer. A "
+"chunk size of 0 means that the feed forward layer is not chunked. A chunk"
+" size of n means that the feed forward layer processes n < "
+"sequence_length embeddings at a time. Defaults to `0`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel:86
+msgid ""
+"List of attention layer types in ascending order. It can be chosen "
+"between a LSHSelfAttention layer (`\"lsh\"`) and a LocalSelfAttention "
+"layer (`\"local\"`). Defaults to `[\"local\", \"local\", \"lsh\", "
+"\"local\", \"local\", \"local\", \"lsh\", \"local\", \"local\", "
+"\"local\", \"lsh\", \"local\"]`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:1
+msgid ""
+"The ReformerModel forward method, overrides the `__call__()` special "
+"method."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:3
+msgid ""
+"Indices of input sequence tokens in the vocabulary. They are numerical "
+"representations of tokens that build the input sequence. Its data type "
+"should be `int64` and it has a shape of [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:7
+msgid ""
+"Mask used in multi-head attention to avoid performing attention on to "
+"some unwanted positions, usually the paddings or the subsequent "
+"positions. Its data type can be int, float. When the data type is int, "
+"the `masked` tokens have `0` values and the others have `1` values. When "
+"the data type is float, the `masked` tokens have `0.0` values and the "
+"others have `1.0` values. It is a tensor with shape broadcasted to "
+"`[batch_size, num_attention_heads, sequence_length, sequence_length]`. "
+"Defaults to `None`, which means nothing needed to be prevented attention "
+"to."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:17
+msgid ""
+"Indices of positions of each input sequence tokens in the position "
+"embeddings. Selected in the range `[0, max_position_embeddings - 1]`. "
+"Shape as [batch_size, num_tokens] and dtype as int64. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:21
+msgid ""
+"The number of hashing rounds that should be performed during bucketing. "
+"Setting this argument overwrites the default defined in "
+"`config[\"num_hashes\"]`. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:25
+msgid ""
+"List of `tuple(Tensor, Tensor)` of length "
+"`config[\"num_hidden_layers\"]`, with the first element being the "
+"previous `buckets` of shape `[batch_size, num_heads, num_hashes, "
+"sequence_length]` and the second being the previous `hidden_states` of "
+"shape `[batch_size, sequence_length, hidden_size]`. Contains precomputed "
+"hidden-states and buckets (only relevant for LSH Self-Attention). Can be "
+"used to speed up sequential decoding. Defaults to `None`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:32
+msgid ""
+"Whether or not to use cache. If set to `True`, `cache` states are "
+"returned and can be used to speed up decoding. Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:36
+msgid ""
+"Whether or not to return the attentions tensors of all attention layers. "
+"Defaults to `False`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:39
+msgid ""
+"Whether or not to return the output of all hidden layers. Defaults to "
+"`False`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerModel.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:43
+msgid ""
+"Returns tuple (`last_hidden_state`, `cache`, `hidden_states`, "
+"`attentions`)  With the fields:  - `last_hidden_state` (Tensor):     "
+"Sequence of hidden-states at the last layer of the model.     It's data "
+"type should be float32 and     its shape is [batch_size, sequence_length,"
+" hidden_size].  - `cache` (List[tuple(Tensor, Tensor)], optional):     "
+"returned when `use_cache=True` is passed.     List of `tuple(Tensor, "
+"Tensor)` of length `config[\"num_hidden_layers\"]`,     with the first "
+"element being the previous `buckets` of shape     `[batch_size, "
+"num_heads, num_hashes, sequence_length]` and the second     being the "
+"previous `hidden_states` of shape `[batch_size, sequence_length, "
+"hidden_size]`.  - `hidden_states` (tuple(Tensor), optional):     returned"
+" when `output_hidden_states=True` is passed.     tuple of `Tensor` (one "
+"for the output of the embeddings + one for the     output of each layer)."
+" Each Tensor has a data type of float32     and its shape is [batch_size,"
+" sequence_length, hidden_size].  - `attentions` (tuple(Tensor), "
+"optional):     returned when `output_attentions=True` is passed.     "
+"tuple of `Tensor` (one for each layer) of shape. Each Tensor has a data"
+"     type of float32 and its shape is [batch_size, num_heads, "
+"sequence_length, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:43
+msgid ""
+"Returns tuple (`last_hidden_state`, `cache`, `hidden_states`, "
+"`attentions`)"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:23
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:30
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:22
+#: paddlenlp.transformers.reformer.modeling.ReformerModel.forward:45
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:26
+msgid "With the fields:"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:50
+msgid "`last_hidden_state` (Tensor):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:48
+msgid ""
+"Sequence of hidden-states at the last layer of the model. It's data type "
+"should be float32 and its shape is [batch_size, sequence_length, "
+"hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:57
+msgid "`cache` (List[tuple(Tensor, Tensor)], optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:53
+msgid ""
+"returned when `use_cache=True` is passed. List of `tuple(Tensor, Tensor)`"
+" of length `config[\"num_hidden_layers\"]`, with the first element being "
+"the previous `buckets` of shape `[batch_size, num_heads, num_hashes, "
+"sequence_length]` and the second being the previous `hidden_states` of "
+"shape `[batch_size, sequence_length, hidden_size]`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:63
+msgid "`hidden_states` (tuple(Tensor), optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:60
+msgid ""
+"returned when `output_hidden_states=True` is passed. tuple of `Tensor` "
+"(one for the output of the embeddings + one for the output of each "
+"layer). Each Tensor has a data type of float32 and its shape is "
+"[batch_size, sequence_length, hidden_size]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:67
+msgid "`attentions` (tuple(Tensor), optional):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:66
+msgid ""
+"returned when `output_attentions=True` is passed. tuple of `Tensor` (one "
+"for each layer) of shape. Each Tensor has a data type of float32 and its "
+"shape is [batch_size, num_heads, sequence_length, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerModel.forward
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:44
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:55
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:41
+#: paddlenlp.transformers.reformer.modeling.ReformerModel.forward:72
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:50
+msgid "示例"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel:1
+msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel:1
+msgid ""
+"An abstract class for pretrained Reformer models. It provides Reformer "
+"related `model_config_file`, `resource_files_names`, "
+"`pretrained_resource_files_map`, `pretrained_init_configuration`, "
+"`base_model_prefix` for downloading and loading pretrained models. See "
+"`PretrainedModel` for more details."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel.init_weights:1
+msgid "Initializes and tie weights if needed."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel.tie_weights:1
+msgid "Tie the weights between the input embeddings and the output embeddings."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification:1
+msgid ""
+"The Reformer Model transformer with a sequence classification head on top"
+" (linear layer)."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM:3
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification:3
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead:3
+msgid "An instance of :class:`ReformerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification:5
+msgid "The number of classes. Defaults to `2`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification:7
+msgid ""
+"The dropout probability for output of Reformer. If None, use the same "
+"value as `hidden_dropout_prob` of `ReformerModel` instance `reformer`. "
+"Defaults to None."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:1
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:3
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:5
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:7
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:16
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:18
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:37
+#: paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:40
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:1
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:3
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:5
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:7
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:23
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:25
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:48
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:51
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:1
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:3
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:5
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:7
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:15
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:17
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:34
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:37
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:1
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:3
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:5
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:7
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:9
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:11
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:19
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:21
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:40
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:43
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:46
+msgid "See :class:`ReformerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:9
+msgid ""
+"Labels for computing the sequence classification/regression loss. Indices"
+" should be in `[0, ...,num_classes - 1]`. If `num_classes == 1` a "
+"regression loss is computed (Mean-Square loss), If `num_classes > 1` a "
+"classification loss is computed (Cross-Entropy). Shape is [batch_size,] "
+"and dtype is int64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:20
+msgid ""
+"Returns tuple `(loss, logits, hidden_states, attentions)`.  With the "
+"fields:  - `loss` (Tensor):     returned when `labels` is provided.     "
+"Classification (or regression if num_classes==1) loss.     It's data type"
+" should be float32 and its shape is [1,].  - `logits` (Tensor):     "
+"Classification (or regression if num_classes==1) scores (before SoftMax)."
+"     It's data type should be float32 and its shape is [batch_size, "
+"num_classes].  - `hidden_states` (tuple(Tensor)):     See "
+":class:`ReformerModel`.  - `attentions` (tuple(Tensor)):     See "
+":class:`ReformerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:21
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:28
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:20
+msgid "Returns tuple `(loss, logits, hidden_states, attentions)`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:28
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:35
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:27
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:31
+msgid "`loss` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:33
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:25
+msgid ""
+"returned when `labels` is provided. Classification (or regression if "
+"num_classes==1) loss. It's data type should be float32 and its shape is "
+"[1,]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:34
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:31
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:37
+msgid "`logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:30
+msgid ""
+"Classification (or regression if num_classes==1) scores (before SoftMax)."
+" It's data type should be float32 and its shape is [batch_size, "
+"num_classes]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:37
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:48
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:34
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:43
+msgid "`hidden_states` (tuple(Tensor)):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:39
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:50
+#: paddlenlp.transformers.reformer.modeling.ReformerForSequenceClassification.forward:36
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:45
+msgid "`attentions` (tuple(Tensor)):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering:1
+msgid ""
+"Reformer Model with a span classification head on top for extractive "
+"question-answering tasks like SQuAD (a linear layers on top of the "
+"hidden-states output to compute `span start logits` and `span end "
+"logits`)."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering:5
+msgid "An instance of ReformerModel."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering:7
+msgid ""
+"The dropout probability for output of Reformer. If None, use the same "
+"value as `hidden_dropout_prob` of `ReformerModel` instance `reformer`. "
+"Defaults to `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:9
+msgid ""
+"Labels for position (index) of the start of the labelled span for "
+"computing the token classification loss. Positions are clamped to the "
+"length of the sequence (`sequence_length`). Position outside of the "
+"sequence are not taken into account for computing the loss. Shape is "
+"[batch_size,] and dtype is int64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:16
+msgid ""
+"Labels for position (index) of the end of the labelled span for computing"
+" the token classification loss. Positions are clamped to the length of "
+"the sequence (`sequence_length`). Position outside of the sequence are "
+"not taken into account for computing the loss. Shape is [batch_size,] and"
+" dtype is int64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:28
+msgid ""
+"Returns tuple `(loss, logits, hidden_states, attentions)`.  With the "
+"fields:  - `loss` (Tensor):     returned when `labels` is provided.     "
+"Classification (or regression if num_classes==1) loss.     It's data type"
+" should be float32 and its shape is [1,].  - `start_logits` (Tensor):"
+"     A tensor of the input token classification logits, indicates     the"
+" start position of the labelled span.     Its data type should be float32"
+" and its shape is [batch_size, sequence_length].  - `end_logits` "
+"(Tensor):     A tensor of the input token classification logits, "
+"indicates     the end position of the labelled span.     Its data type "
+"should be float32 and its shape is [batch_size, sequence_length].  - "
+"`hidden_states` (tuple(Tensor)):     See :class:`ReformerModel`.  - "
+"`attentions` (tuple(Tensor)):     See :class:`ReformerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:40
+msgid "`start_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:38
+msgid ""
+"A tensor of the input token classification logits, indicates the start "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:45
+msgid "`end_logits` (Tensor):"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:43
+msgid ""
+"A tensor of the input token classification logits, indicates the end "
+"position of the labelled span. Its data type should be float32 and its "
+"shape is [batch_size, sequence_length]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead:1
+msgid "The Reformer Model transformer with a language modeling head on top."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:13
+msgid ""
+"Labels for language modeling. Note that the labels **are shifted** inside"
+" the model, i.e. you can set `labels = input_ids` Indices are selected in"
+" `[-100, 0, ..., vocab_size]` All labels set to `-100` are ignored "
+"(masked), the loss is only computed for labels in `[0, ..., vocab_size]`."
+" Shape is [batch_size, sequence_length] and dtype is int64."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:24
+msgid ""
+"Returns tuple `(loss, logits, cache, hidden_states, attentions)`.  With "
+"the fields:  - `loss` (Tensor):     returned when `labels` is provided."
+"     Language modeling loss (for next-token prediction).     It's data "
+"type should be float32 and its shape is [1,].  - `logits` (Tensor):     "
+"Prediction scores of the language modeling head     (scores for each "
+"vocabulary token before SoftMax).     It's data type should be float32 "
+"and its shape is     [batch_size, sequence_length, vocab_size].  - "
+"`cache` (List[tuple(Tensor, Tensor)]):     See :class:`ReformerModel`.  -"
+" `hidden_states` (tuple(Tensor)):     See :class:`ReformerModel`.  - "
+"`attentions` (tuple(Tensor)):     See :class:`ReformerModel`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:24
+msgid "Returns tuple `(loss, logits, cache, hidden_states, attentions)`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:29
+msgid ""
+"returned when `labels` is provided. Language modeling loss (for next-"
+"token prediction). It's data type should be float32 and its shape is "
+"[1,]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:34
+msgid ""
+"Prediction scores of the language modeling head (scores for each "
+"vocabulary token before SoftMax). It's data type should be float32 and "
+"its shape is [batch_size, sequence_length, vocab_size]."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:40
+msgid "`cache` (List[tuple(Tensor, Tensor)]):"
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM:1
+msgid ""
+"The Reformer Model transformer with a masked language modeling head on "
+"top."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:9
+msgid ""
+"Labels for computing the masked language modeling loss. Indices should be"
+" in ``[-100, 0, ..., vocab_size]`` (see ``input_ids`` docstring) Tokens "
+"with indices set to ``-100`` are ignored(masked), the loss is only "
+"computed for the tokens with labels in ``[0, ..., vocab_size]``. Shape is"
+" [batch_size, sequence_length] and dtype is int64."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:21
+msgid ""
+"Returns tuple `(loss, logits, hidden_states, attentions)`.  With the "
+"fields:  - `loss` (Tensor):     returned when `labels` is provided.     "
+"Masked Language modeling loss.     It's data type should be float32 and "
+"its shape is [1,].  - `logits` (Tensor):     Prediction scores of the "
+"masked language modeling head     (scores for each vocabulary token "
+"before SoftMax).     It's data type should be float32 and its shape is"
+"     [batch_size, sequence_length, vocab_size].  - `hidden_states` "
+"(tuple(Tensor)):     See :class:`ReformerModel`.  - `attentions` "
+"(tuple(Tensor)):     See :class:`ReformerModel`."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:26
+msgid ""
+"returned when `labels` is provided. Masked Language modeling loss. It's "
+"data type should be float32 and its shape is [1,]."
+msgstr ""
+
+#: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:31
+msgid ""
+"Prediction scores of the masked language modeling head (scores for each "
+"vocabulary token before SoftMax). It's data type should be float32 and "
+"its shape is [batch_size, sequence_length, vocab_size]."
+msgstr ""
+

@@ -22,9 +22,9 @@ import distutils.util
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
 from utils import convert_example
@@ -96,17 +96,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def do_train():
@@ -117,35 +118,33 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        args.dataset, splits=["train", "dev", "test"])
+    train_ds, dev_ds, test_ds = load_dataset(args.dataset,
+                                             splits=["train", "dev", "test"])
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=len(train_ds.label_list))
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'ernie-3.0-medium-zh', num_classes=len(train_ds.label_list))
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        is_pair=args.dataset == "xnli_cn")
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         is_pair=args.dataset == "xnli_cn")
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -170,18 +169,19 @@ def do_train():
         apply_decay_param_fun=lambda x: x in decay_params)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
+
     metric = paddle.metric.Accuracy()
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
     tic_train = time.time()
-    total_train_time = 0
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=["layer_norm", "softmax", "gelu"], ):
+                    custom_white_list=["layer_norm", "softmax", "gelu"],
+            ):
                 logits = model(input_ids, token_type_ids)
                 loss = criterion(logits, labels)
             probs = F.softmax(logits, axis=1)
@@ -201,7 +201,6 @@ def do_train():
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
                 time_diff = time.time() - tic_train
-                total_train_time += time_diff
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accuracy: %.5f, speed: %.2f step/s"
                     % (global_step, epoch, step, loss, acc,
@@ -219,8 +218,6 @@ def do_train():
                 model._layers.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
-
-    print("Speed: %.2f steps/s" % (global_step / total_train_time))
 
 
 if __name__ == "__main__":

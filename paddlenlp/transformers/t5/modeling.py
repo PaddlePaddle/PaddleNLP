@@ -55,8 +55,8 @@ class T5LayerNorm(nn.Layer):
 
     def forward(self, hidden_states):
         # layer norm should always be calculated in float32
-        variance = paddle.pow(hidden_states.astype(paddle.float32), 2).mean(
-            axis=-1, keepdim=True)
+        variance = paddle.pow(hidden_states.astype(paddle.float32),
+                              2).mean(axis=-1, keepdim=True)
         hidden_states = hidden_states * paddle.rsqrt(variance +
                                                      self.variance_epsilon)
 
@@ -108,6 +108,7 @@ class T5DenseGatedGeluDense(nn.Layer):
 
 
 class T5LayerFF(nn.Layer):
+
     def __init__(self, feed_forward_proj, d_model, d_ff, layer_norm_epsilon,
                  dropout_rate):
         super().__init__()
@@ -132,6 +133,7 @@ class T5LayerFF(nn.Layer):
 
 
 class T5Attention(nn.Layer):
+
     def __init__(self,
                  is_decoder,
                  relative_attention_num_buckets,
@@ -190,8 +192,8 @@ class T5Attention(nn.Layer):
         relative_buckets = 0
         if bidirectional:
             num_buckets //= 2
-            relative_buckets += (
-                relative_position > 0).astype(paddle.int64) * num_buckets
+            relative_buckets += (relative_position > 0).astype(
+                paddle.int64) * num_buckets
             relative_position = paddle.abs(relative_position)
         else:
             relative_position = -paddle.minimum(
@@ -203,13 +205,15 @@ class T5Attention(nn.Layer):
         is_small = relative_position < max_exact
 
         # The other half of the buckets are for logarithmically bigger bins in positions up to max_distance
-        relative_postion_if_large = max_exact + (paddle.log(
-            relative_position.astype(paddle.get_default_dtype()) /
-            max_exact) / math.log(max_distance / max_exact) * (
-                num_buckets - max_exact)).astype(paddle.int64)
+        relative_postion_if_large = max_exact + (
+            paddle.log(
+                relative_position.astype(paddle.get_default_dtype()) /
+                max_exact) / math.log(max_distance / max_exact) *
+            (num_buckets - max_exact)).astype(paddle.int64)
         relative_postion_if_large = paddle.minimum(
             relative_postion_if_large,
-            paddle.full_like(relative_postion_if_large, num_buckets - 1), )
+            paddle.full_like(relative_postion_if_large, num_buckets - 1),
+        )
 
         relative_buckets += paddle.where(is_small, relative_position,
                                          relative_postion_if_large)
@@ -224,7 +228,8 @@ class T5Attention(nn.Layer):
         relative_position_bucket = self._relative_position_bucket(
             relative_position,  # shape (query_length, key_length)
             bidirectional=(not self.is_decoder),
-            num_buckets=self.relative_attention_num_buckets, )
+            num_buckets=self.relative_attention_num_buckets,
+        )
         values = self.relative_attention_bias(
             relative_position_bucket
         )  # shape (query_length, key_length, num_heads)
@@ -264,8 +269,8 @@ class T5Attention(nn.Layer):
         def shape(states):
             """projection"""
             return states.reshape(
-                shape=[batch_size, -1, self.n_heads,
-                       self.key_value_proj_dim]).transpose(perm=[0, 2, 1, 3])
+                shape=[batch_size, -1, self.n_heads, self.key_value_proj_dim
+                       ]).transpose(perm=[0, 2, 1, 3])
 
         def unshape(states):
             """reshape"""
@@ -287,8 +292,8 @@ class T5Attention(nn.Layer):
                 if key_value_states is None:
                     # self-attn
                     # (batch_size, n_heads, key_length, dim_per_head)
-                    hidden_states = paddle.concat(
-                        [cache, hidden_states], axis=2)
+                    hidden_states = paddle.concat([cache, hidden_states],
+                                                  axis=2)
                 else:
                     # cross-attn
                     hidden_states = cache
@@ -303,12 +308,14 @@ class T5Attention(nn.Layer):
             hidden_states,
             self.k,
             key_value_states,
-            cache[0] if cache is not None else None, )
+            cache[0] if cache is not None else None,
+        )
         value_states = project(
             hidden_states,
             self.v,
             key_value_states,
-            cache[1] if cache is not None else None, )
+            cache[1] if cache is not None else None,
+        )
 
         # compute scores
         scores = paddle.matmul(query_states, key_states, transpose_y=True)
@@ -317,7 +324,8 @@ class T5Attention(nn.Layer):
             if not self.has_relative_attention_bias:
                 position_bias = paddle.zeros(
                     shape=(1, self.n_heads, real_seq_length, key_length),
-                    dtype=scores.dtype, )
+                    dtype=scores.dtype,
+                )
             else:
                 position_bias = self.compute_bias(real_seq_length, key_length)
 
@@ -332,19 +340,18 @@ class T5Attention(nn.Layer):
                 )  # (batch_size, n_heads, seq_length, key_length)
 
         scores += position_bias
-        attn_weights = F.softmax(
-            scores.astype(paddle.float32), axis=-1).astype(
-                scores.dtype)  # (batch_size, n_heads, seq_length, key_length)
+        attn_weights = F.softmax(scores.astype(paddle.float32), axis=-1).astype(
+            scores.dtype)  # (batch_size, n_heads, seq_length, key_length)
         attn_weights = F.dropout(
-            attn_weights, p=self.dropout, training=self.
-            training)  # (batch_size, n_heads, seq_length, key_length)
+            attn_weights, p=self.dropout, training=self.training
+        )  # (batch_size, n_heads, seq_length, key_length)
 
         attn_output = unshape(paddle.matmul(
             attn_weights, value_states))  # (batch_size, seq_length, dim)
         attn_output = self.o(attn_output)
 
-        present_key_value_state = ((key_states, value_states)
-                                   if (self.is_decoder and use_cache) else None)
+        present_key_value_state = ((key_states, value_states) if
+                                   (self.is_decoder and use_cache) else None)
         outputs = (attn_output, ) + (present_key_value_state, ) + (
             position_bias, )
 
@@ -354,6 +361,7 @@ class T5Attention(nn.Layer):
 
 
 class T5LayerSelfAttention(nn.Layer):
+
     def __init__(self,
                  is_decoder,
                  relative_attention_num_buckets,
@@ -389,7 +397,8 @@ class T5LayerSelfAttention(nn.Layer):
             position_bias=position_bias,
             cache=cache,
             use_cache=use_cache,
-            output_attentions=output_attentions, )
+            output_attentions=output_attentions,
+        )
         hidden_states = hidden_states + self.dropout(attention_output[0])
         outputs = (hidden_states,
                    ) + attention_output[1:]  # add attentions if we output them
@@ -397,30 +406,31 @@ class T5LayerSelfAttention(nn.Layer):
 
 
 class T5LayerCrossAttention(nn.Layer):
+
     def __init__(self, is_decoder, relative_attention_num_buckets, d_model,
                  d_kv, num_heads, dropout_rate, layer_norm_epsilon):
         super().__init__()
-        self.EncDecAttention = T5Attention(
-            is_decoder,
-            relative_attention_num_buckets,
-            d_model,
-            d_kv,
-            num_heads,
-            dropout_rate,
-            has_relative_attention_bias=False)
+        self.EncDecAttention = T5Attention(is_decoder,
+                                           relative_attention_num_buckets,
+                                           d_model,
+                                           d_kv,
+                                           num_heads,
+                                           dropout_rate,
+                                           has_relative_attention_bias=False)
         self.layer_norm = T5LayerNorm(d_model, eps=layer_norm_epsilon)
         self.dropout = nn.Dropout(dropout_rate)
 
     def forward(
-            self,
-            hidden_states,
-            key_value_states,
-            attention_mask=None,
-            position_bias=None,
-            cache=None,
-            use_cache=False,
-            query_length=None,
-            output_attentions=False, ):
+        self,
+        hidden_states,
+        key_value_states,
+        attention_mask=None,
+        position_bias=None,
+        cache=None,
+        use_cache=False,
+        query_length=None,
+        output_attentions=False,
+    ):
         normed_hidden_states = self.layer_norm(hidden_states)
         attention_output = self.EncDecAttention(
             normed_hidden_states,
@@ -430,7 +440,8 @@ class T5LayerCrossAttention(nn.Layer):
             cache=cache,
             use_cache=use_cache,
             query_length=query_length,
-            output_attentions=output_attentions, )
+            output_attentions=output_attentions,
+        )
         layer_output = hidden_states + self.dropout(attention_output[0])
         outputs = (layer_output,
                    ) + attention_output[1:]  # add attentions if we output them
@@ -438,6 +449,7 @@ class T5LayerCrossAttention(nn.Layer):
 
 
 class T5Block(nn.Layer):
+
     def __init__(self,
                  is_decoder,
                  relative_attention_num_buckets,
@@ -464,25 +476,27 @@ class T5Block(nn.Layer):
                 has_relative_attention_bias=has_relative_attention_bias))
         if self.is_decoder:
             self.layer.append(
-                T5LayerCrossAttention(
-                    is_decoder, relative_attention_num_buckets, d_model, d_kv,
-                    num_heads, dropout_rate, layer_norm_epsilon))
+                T5LayerCrossAttention(is_decoder,
+                                      relative_attention_num_buckets, d_model,
+                                      d_kv, num_heads, dropout_rate,
+                                      layer_norm_epsilon))
 
         self.layer.append(
             T5LayerFF(feed_forward_proj, d_model, d_ff, layer_norm_epsilon,
                       dropout_rate))
 
     def forward(
-            self,
-            hidden_states,
-            attention_mask=None,
-            position_bias=None,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
-            encoder_decoder_position_bias=None,
-            cache=None,
-            use_cache=False,
-            output_attentions=False, ):
+        self,
+        hidden_states,
+        attention_mask=None,
+        position_bias=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        encoder_decoder_position_bias=None,
+        cache=None,
+        use_cache=False,
+        output_attentions=False,
+    ):
 
         if cache is not None:
             assert self.is_decoder, "Only decoder can use `caches`"
@@ -505,7 +519,8 @@ class T5Block(nn.Layer):
             position_bias=position_bias,
             cache=self_attn_cache,
             use_cache=use_cache,
-            output_attentions=output_attentions, )
+            output_attentions=output_attentions,
+        )
         hidden_states, present_key_value_state = self_attention_outputs[:2]
         attention_outputs = self_attention_outputs[
             2:]  # Keep self-attention outputs and relative position weights
@@ -515,8 +530,9 @@ class T5Block(nn.Layer):
                 hidden_states).any():
             # TODO finfo
             clamp_value = finfo(hidden_states.dtype).max - 1000
-            hidden_states = paddle.clip(
-                hidden_states, min=-clamp_value, max=clamp_value)
+            hidden_states = paddle.clip(hidden_states,
+                                        min=-clamp_value,
+                                        max=clamp_value)
 
         do_cross_attention = self.is_decoder and encoder_hidden_states is not None
         if do_cross_attention:
@@ -535,20 +551,22 @@ class T5Block(nn.Layer):
                 cache=cross_attn_cache,
                 query_length=query_length,
                 use_cache=use_cache,
-                output_attentions=output_attentions, )
+                output_attentions=output_attentions,
+            )
             hidden_states = cross_attention_outputs[0]
 
             # clamp inf values to enable fp16 training
-            if (hidden_states.dtype == paddle.float16 and
-                    paddle.isinf(hidden_states).any()):
+            if (hidden_states.dtype == paddle.float16
+                    and paddle.isinf(hidden_states).any()):
                 clamp_value = finfo(hidden_states.dtype).max - 1000
-                hidden_states = paddle.clip(
-                    hidden_states, min=-clamp_value, max=clamp_value)
+                hidden_states = paddle.clip(hidden_states,
+                                            min=-clamp_value,
+                                            max=clamp_value)
 
             # Combine self attn and cross attn key value states
             if present_key_value_state is not None:
-                present_key_value_state = (
-                    present_key_value_state + cross_attention_outputs[1])
+                present_key_value_state = (present_key_value_state +
+                                           cross_attention_outputs[1])
 
             # Keep cross-attention outputs and relative position weights
             attention_outputs = attention_outputs + cross_attention_outputs[2:]
@@ -560,8 +578,9 @@ class T5Block(nn.Layer):
         if hidden_states.dtype == paddle.float16 and paddle.isinf(
                 hidden_states).any():
             clamp_value = finfo(hidden_states.dtype).max - 1000
-            hidden_states = paddle.clip(
-                hidden_states, min=-clamp_value, max=clamp_value)
+            hidden_states = paddle.clip(hidden_states,
+                                        min=-clamp_value,
+                                        max=clamp_value)
 
         outputs = (hidden_states, )
 
@@ -731,60 +750,54 @@ class T5PretrainedModel(PretrainedModel):
             # Mesh TensorFlow embeddings initialization
             # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L1624
             layer.shared.weight.set_value(
-                paddle.normal(
-                    mean=0.0, std=factor * 1.0,
-                    shape=layer.shared.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * 1.0,
+                              shape=layer.shared.weight.shape))
         elif isinstance(layer, (T5ForConditionalGeneration, )):
             layer.t5.shared.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * 1.0,
-                    shape=layer.t5.shared.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * 1.0,
+                              shape=layer.t5.shared.weight.shape))
 
         elif isinstance(layer, T5DenseReluDense):
             # Mesh TensorFlow FF initialization
             # See https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/transformer_layers.py#L56
             # and https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L89
             layer.wi.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((d_model)**-0.5),
-                    shape=layer.wi.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * ((d_model)**-0.5),
+                              shape=layer.wi.weight.shape))
 
             if hasattr(layer.wi, "bias") and layer.wi.bias is not None:
                 layer.wi.bias.set_value(paddle.zeros_like(layer.wi.bias))
 
             layer.wo.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((d_ff)**-0.5),
-                    shape=layer.wo.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * ((d_ff)**-0.5),
+                              shape=layer.wo.weight.shape))
 
             if hasattr(layer.wo, "bias") and layer.wo.bias is not None:
                 layer.wo.bias.set_value(paddle.zeros_like(layer.wo.bias))
 
         elif isinstance(layer, T5DenseGatedGeluDense):
             layer.wi_0.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((d_model)**-0.5),
-                    shape=layer.wi_0.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * ((d_model)**-0.5),
+                              shape=layer.wi_0.weight.shape))
             if hasattr(layer.wi_0, "bias") and layer.wi_0.bias is not None:
                 layer.wi_0.bias.set_value(paddle.zeros_like(layer.wi_0.bias))
 
             layer.wi_1.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((d_model)**-0.5),
-                    shape=layer.wi_1.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * ((d_model)**-0.5),
+                              shape=layer.wi_1.weight.shape))
             if hasattr(layer.wi_1, "bias") and layer.wi_1.bias is not None:
                 layer.wi_1.bias.set_value(paddle.zeros_like(layer.wi_1.bias))
 
             layer.wo.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((d_ff)**-0.5),
-                    shape=layer.wo.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * ((d_ff)**-0.5),
+                              shape=layer.wo.weight.shape))
 
             if hasattr(layer.wo, "bias") and layer.wo.bias is not None:
                 layer.wo.bias.set_value(paddle.zeros_like(layer.wo.bias))
@@ -793,28 +806,26 @@ class T5PretrainedModel(PretrainedModel):
             # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/attention.py#L136
 
             layer.q.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((d_model * key_value_proj_dim)**-0.5),
-                    shape=layer.q.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor *
+                              ((d_model * key_value_proj_dim)**-0.5),
+                              shape=layer.q.weight.shape))
 
             layer.k.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * (d_model**-0.5),
-                    shape=layer.k.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * (d_model**-0.5),
+                              shape=layer.k.weight.shape))
 
             layer.v.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * (d_model**-0.5),
-                    shape=layer.v.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor * (d_model**-0.5),
+                              shape=layer.v.weight.shape))
 
             layer.o.weight.set_value(
-                paddle.normal(
-                    mean=0.0,
-                    std=factor * ((n_heads * key_value_proj_dim)**-0.5),
-                    shape=layer.o.weight.shape))
+                paddle.normal(mean=0.0,
+                              std=factor *
+                              ((n_heads * key_value_proj_dim)**-0.5),
+                              shape=layer.o.weight.shape))
 
             if layer.has_relative_attention_bias:
                 layer.relative_attention_bias.weight.set_value(
@@ -842,18 +853,18 @@ class T5PretrainedModel(PretrainedModel):
         # replace possible -100 values in labels by `pad_token_id`
         shifted_input_ids = paddle.where(
             shifted_input_ids == -100,
-            paddle.to_tensor(
-                pad_token_id, dtype=shifted_input_ids.dtype),
+            paddle.to_tensor(pad_token_id, dtype=shifted_input_ids.dtype),
             shifted_input_ids)
 
         assert paddle.all(
-            shifted_input_ids >=
-            0), "Verify that `shifted_input_ids` has only positive values"
+            shifted_input_ids >= 0
+        ), "Verify that `shifted_input_ids` has only positive values"
 
         return shifted_input_ids
 
 
 class T5Stack(nn.Layer):
+
     def __init__(self,
                  d_model,
                  num_layers,
@@ -870,17 +881,16 @@ class T5Stack(nn.Layer):
         self.is_decoder = is_decoder
         self.embed_tokens = embed_tokens
         self.block = nn.LayerList([
-            T5Block(
-                is_decoder,
-                relative_attention_num_buckets,
-                d_model,
-                d_kv,
-                num_heads,
-                dropout_rate,
-                layer_norm_epsilon,
-                feed_forward_proj,
-                d_ff,
-                has_relative_attention_bias=bool(i == 0))
+            T5Block(is_decoder,
+                    relative_attention_num_buckets,
+                    d_model,
+                    d_kv,
+                    num_heads,
+                    dropout_rate,
+                    layer_norm_epsilon,
+                    feed_forward_proj,
+                    d_ff,
+                    has_relative_attention_bias=bool(i == 0))
             for i in range(num_layers)
         ])
         self.final_layer_norm = T5LayerNorm(d_model, eps=layer_norm_epsilon)
@@ -914,8 +924,8 @@ class T5Stack(nn.Layer):
         batch_size, seq_length = input_shape
 
         # required mask seq length can be calculated via length of past
-        mask_seq_length = (cache[0][0].shape[2] + seq_length
-                           if cache is not None else seq_length)
+        mask_seq_length = (cache[0][0].shape[2] +
+                           seq_length if cache is not None else seq_length)
 
         if use_cache is True:
             assert (
@@ -924,8 +934,8 @@ class T5Stack(nn.Layer):
 
         if attention_mask is None:
             attention_mask = paddle.ones(shape=[batch_size, mask_seq_length])
-        if (self.is_decoder and encoder_attention_mask is None and
-                encoder_hidden_states is not None):
+        if (self.is_decoder and encoder_attention_mask is None
+                and encoder_hidden_states is not None):
             encoder_seq_length = encoder_hidden_states.shape[1]
             encoder_attention_mask = paddle.ones(
                 [batch_size, encoder_seq_length], dtype=paddle.int64)
@@ -954,8 +964,8 @@ class T5Stack(nn.Layer):
         present_key_value_states = () if use_cache else None
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
-        all_cross_attentions = () if (output_attentions and
-                                      self.is_decoder) else None
+        all_cross_attentions = () if (output_attentions
+                                      and self.is_decoder) else None
         position_bias = None
         encoder_decoder_position_bias = None
 
@@ -976,7 +986,8 @@ class T5Stack(nn.Layer):
                 encoder_decoder_position_bias=encoder_decoder_position_bias,
                 cache=past_key_value,
                 use_cache=use_cache,
-                output_attentions=output_attentions, )
+                output_attentions=output_attentions,
+            )
 
             # layer_outputs is a tuple with:
             # hidden-states, key-value-states, (self-attention position bias), (self-attention weights), (cross-attention position bias), (cross-attention weights)
@@ -1010,14 +1021,13 @@ class T5Stack(nn.Layer):
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states, )
 
-        return tuple(v
-                     for v in [
-                         hidden_states,
-                         present_key_value_states,
-                         all_hidden_states,
-                         all_attentions,
-                         all_cross_attentions,
-                     ] if v is not None)
+        return tuple(v for v in [
+            hidden_states,
+            present_key_value_states,
+            all_hidden_states,
+            all_attentions,
+            all_cross_attentions,
+        ] if v is not None)
 
     def get_extended_attention_mask(self, attention_mask, input_shape):
         if attention_mask.ndim == 3:
@@ -1029,10 +1039,9 @@ class T5Stack(nn.Layer):
             if self.is_decoder:
                 batch_size, seq_length = input_shape
                 seq_ids = paddle.arange(seq_length)
-                causal_mask = paddle.tile(
-                    seq_ids.unsqueeze(axis=[0, 1]),
-                    [batch_size, seq_length, 1]) <= seq_ids.unsqueeze(
-                        axis=[0, 2])
+                causal_mask = paddle.tile(seq_ids.unsqueeze(axis=[0, 1]),
+                                          [batch_size, seq_length, 1
+                                           ]) <= seq_ids.unsqueeze(axis=[0, 2])
                 # in case cache are used we need to add a prefix ones mask to the causal mask
                 # causal and attention masks must have same type with pytorch version < 1.3
                 causal_mask = causal_mask.astype(attention_mask.dtype)
@@ -1044,10 +1053,12 @@ class T5Stack(nn.Layer):
                         [
                             paddle.ones(
                                 [batch_size, seq_length, prefix_seq_len],
-                                dtype=causal_mask.dtype, ),
+                                dtype=causal_mask.dtype,
+                            ),
                             causal_mask,
                         ],
-                        axis=-1, )
+                        axis=-1,
+                    )
 
                 extended_attention_mask = causal_mask.unsqueeze(
                     1) * attention_mask.unsqueeze([1, 2])
@@ -1168,30 +1179,28 @@ class T5Model(T5PretrainedModel):
         self.initializer_factor = initializer_factor
 
         self.shared = nn.Embedding(vocab_size, d_model)
-        self.encoder = T5Stack(
-            d_model,
-            num_layers,
-            layer_norm_epsilon,
-            dropout_rate,
-            relative_attention_num_buckets,
-            d_kv,
-            num_heads,
-            feed_forward_proj,
-            d_ff,
-            self.shared,
-            is_decoder=False)
-        self.decoder = T5Stack(
-            d_model,
-            num_decoder_layers,
-            layer_norm_epsilon,
-            dropout_rate,
-            relative_attention_num_buckets,
-            d_kv,
-            num_heads,
-            feed_forward_proj,
-            d_ff,
-            self.shared,
-            is_decoder=True)
+        self.encoder = T5Stack(d_model,
+                               num_layers,
+                               layer_norm_epsilon,
+                               dropout_rate,
+                               relative_attention_num_buckets,
+                               d_kv,
+                               num_heads,
+                               feed_forward_proj,
+                               d_ff,
+                               self.shared,
+                               is_decoder=False)
+        self.decoder = T5Stack(d_model,
+                               num_decoder_layers,
+                               layer_norm_epsilon,
+                               dropout_rate,
+                               relative_attention_num_buckets,
+                               d_kv,
+                               num_heads,
+                               feed_forward_proj,
+                               d_ff,
+                               self.shared,
+                               is_decoder=True)
 
         self.init_weights()
 
@@ -1327,10 +1336,14 @@ class T5Model(T5PretrainedModel):
                 model = T5Model.from_pretrained('t5-base')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                input_ids = paddle.to_tensor([inputs["input_ids"]], dtype="int64")
+                decoder_inputs = tokenizer("It means you can")
+                decoder_input_ids = paddle.to_tensor([decoder_inputs["input_ids"]], dtype="int64")
 
-                outputs = model(**inputs)
+                outputs = model(input_ids=input_ids, decoder_input_ids=decoder_input_ids)
                 last_hidden_state = outputs[0]
+                print(last_hidden_state.shape)
+                # [1, 5, 768]
 
         """
 
@@ -1372,10 +1385,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         super().__init__()
         self.t5 = t5
         if not self.t5.config["tie_word_embeddings"]:
-            self.lm_head = nn.Linear(
-                self.t5.config["d_model"],
-                self.t5.config["vocab_size"],
-                bias_attr=False)
+            self.lm_head = nn.Linear(self.t5.config["d_model"],
+                                     self.t5.config["vocab_size"],
+                                     bias_attr=False)
 
         self.init_weights()
 
@@ -1535,19 +1547,19 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         if self.t5.config["tie_word_embeddings"]:
             # Rescale output before projecting on vocab
             # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/transformer.py#L586
-            sequence_output = sequence_output * (self.t5.config["d_model"]
-                                                 **-0.5)
-            lm_logits = paddle.matmul(
-                sequence_output, self.t5.shared.weight, transpose_y=True)
+            sequence_output = sequence_output * (self.t5.config["d_model"]**
+                                                 -0.5)
+            lm_logits = paddle.matmul(sequence_output,
+                                      self.t5.shared.weight,
+                                      transpose_y=True)
         else:
             lm_logits = self.lm_head(sequence_output)
 
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
-            loss = loss_fct(
-                lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
-                labels.flatten())
+            loss = loss_fct(lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
+                            labels.flatten())
 
         output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
         return ((loss, ) + output) if loss is not None else output
@@ -1595,18 +1607,18 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         input_ids = paddle.index_select(input_ids, index)
 
         if attention_mask is not None:
-            model_kwargs["attention_mask"] = paddle.index_select(attention_mask,
-                                                                 index)
+            model_kwargs["attention_mask"] = paddle.index_select(
+                attention_mask, index)
 
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.index_select(token_type_ids,
-                                                                 index)
+            model_kwargs["token_type_ids"] = paddle.index_select(
+                token_type_ids, index)
 
         if "position_ids" in model_kwargs:
             position_ids = model_kwargs["position_ids"]
-            model_kwargs["position_ids"] = paddle.index_select(position_ids,
-                                                               index)
+            model_kwargs["position_ids"] = paddle.index_select(
+                position_ids, index)
 
         if "seq_len" in model_kwargs:
             seq_len = model_kwargs["seq_len"]

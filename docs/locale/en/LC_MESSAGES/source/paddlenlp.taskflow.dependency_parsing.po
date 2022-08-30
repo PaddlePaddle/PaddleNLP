@@ -1,0 +1,158 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.dependency_parsing.rst:2
+msgid "dependency\\_parsing"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DDParserTask:1
+msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DDParserTask:1
+msgid ""
+"DDParser task to analyze the dependency relationship between words in a "
+"sentence :param task: The name of task. :type task: string :param model: "
+"The model name in the task. :type model: string :param tree: Ensure the "
+"output conforms to the tree structure. :type tree: bool :param prob: "
+"Whether to return the probability of predicted heads. :type prob: bool "
+":param use_pos: Whether to return the postag. :type use_pos: bool :param "
+"batch_size: Numbers of examples a batch. :type batch_size: int :param "
+"return_visual: If True, the result will contain the dependency "
+"visualization. :type return_visual: bool :param kwargs: Additional "
+"keyword arguments passed along to the specific task. :type kwargs: dict, "
+"optional"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.pad_sequence:1
+msgid "Fill sequences(np.ndarray) into a fixed-length matrix."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.eisner:1
+msgid ""
+"Eisner algorithm is a general dynamic programming decoding algorithm for "
+"bilexical grammar."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.eisner:5
+msgid "Args："
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.eisner:4
+msgid ""
+"scores: Adjacency matrix，shape=(batch, seq_len, seq_len) mask: mask "
+"matrix，shape=(batch, sql_len)"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.eisner
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.eisner:7
+msgid ""
+"output，shape=(batch, seq_len)，the index of the parent node corresponding "
+"to the token in the query"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.fill_diagonal:1
+msgid ""
+"Fill value into the diagoanl of x that offset is ${offset} and the "
+"coordinate system is (dim1, dim2)."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.backtrack:1
+msgid "Backtrack the position matrix of eisner to generate the tree"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:1
+msgid "Returns a diagonal stripe of the tensor."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:3
+msgid "the input tensor with 2 or more dims."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:5
+msgid "the length of the stripe."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:7
+msgid "the width of the stripe."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:9
+msgid "the offset of the first two dims."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:11
+msgid "0 if returns a horizontal stripe; 1 else."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:14
+msgid ""
+"Example: >>> x = np.arange(25).reshape(5, 5) >>> x tensor([[ 0,  1,  2,  "
+"3,  4],"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.stripe:18
+msgid ""
+"[ 5,  6,  7,  8,  9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, "
+"21, 22, 23, 24]])"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DepTree:1
+#: paddlenlp.taskflow.dependency_parsing.Node:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.Node:1
+msgid "Node class"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DepTree:1
+msgid ""
+"DepTree class, used to check whether the prediction result is a project "
+"Tree. A projective tree means that you can project the tree without "
+"crossing arcs."
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DepTree.build_tree:1
+msgid "Build the tree"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DepTree.add:1
+msgid "Add a child node"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DepTree.judge_legal:1
+msgid "Determine whether it is a project tree"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.DepTree.inorder_traversal:1
+msgid "Inorder traversal"
+msgstr ""
+
+#: of paddlenlp.taskflow.dependency_parsing.istree:1
+msgid "Is the sequence a project tree"
+msgstr ""
+

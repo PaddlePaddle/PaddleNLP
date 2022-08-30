@@ -1,0 +1,5 @@
+nvgpu>=0.9.0
+regex>=2021.11.10
+spacy>=2.3.7
+tqdm>=4.62.3
+visualdl>=2.2.2

@@ -17,7 +17,9 @@ import os
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
-__all__ = ['ElectraTokenizer', ]
+__all__ = [
+    'ElectraTokenizer',
+]
 
 
 class ElectraTokenizer(PretrainedTokenizer):
@@ -80,6 +82,8 @@ class ElectraTokenizer(PretrainedTokenizer):
             "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-base/vocab.txt",
             "chinese-electra-small":
             "http://bj.bcebos.com/paddlenlp/models/transformers/chinese-electra-small/vocab.txt",
+            "ernie-health-chinese":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/ernie-health-chinese/vocab.txt"
         }
     }
     pretrained_init_configuration = {
@@ -98,28 +102,50 @@ class ElectraTokenizer(PretrainedTokenizer):
         "chinese-electra-small": {
             "do_lower_case": True
         },
+        "ernie-health-chinese": {
+            "do_lower_case": True
+        }
+    }
+    max_model_input_sizes = {
+        "electra-small": 512,
+        "electra-base": 512,
+        "electra-large": 512,
+        "chinese-electra-base": 512,
+        "chinese-electra-small": 512,
+        "ernie-health-chinese": 512,
     }
 
     def __init__(self,
                  vocab_file,
                  do_lower_case=True,
+                 do_basic_tokenize=True,
+                 never_split=None,
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
                  mask_token="[MASK]",
+                 tokenize_chinese_chars=True,
+                 strip_accents=None,
                  **kwargs):
-
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = ElectraTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
                 .format(vocab_file))
+        self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.do_basic_tokenize = do_basic_tokenize
+        if do_basic_tokenize:
+            self.basic_tokenizer = BasicTokenizer(
+                do_lower_case=do_lower_case,
+                never_split=never_split,
+                tokenize_chinese_chars=tokenize_chinese_chars,
+                strip_accents=strip_accents,
+            )
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -131,20 +157,29 @@ class ElectraTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
+    def get_vocab(self):
+        return dict(self.vocab._token_to_idx, **self.added_tokens_encoder)
+
     def _tokenize(self, text):
         """
         End-to-end tokenization for Electra models.
-
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
             list: A list of string representing converted tokens.
         """
         split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token)
+        if self.do_basic_tokenize:
+            for token in self.basic_tokenizer.tokenize(
+                    text, never_split=self.all_special_tokens):
+                # If the token is part of the never_split set
+                if token in self.basic_tokenizer.never_split:
+                    split_tokens.append(token)
+                else:
+                    split_tokens += self.wordpiece_tokenizer.tokenize(token)
+        else:
+            split_tokens = self.wordpiece_tokenizer.tokenize(text)
         return split_tokens
 
     def convert_tokens_to_string(self, tokens):
@@ -186,8 +221,8 @@ class ElectraTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -294,7 +329,9 @@ class ElectraTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:

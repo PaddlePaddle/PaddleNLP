@@ -61,3 +61,11 @@ class TinyBertTokenizer(BertTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "tinybert-4l-312d": 512,
+        "tinybert-6l-768d": 512,
+        "tinybert-4l-312d-v2": 512,
+        "tinybert-6l-768d-v2": 512,
+        "tinybert-4l-312d-zh": 512,
+        "tinybert-6l-768d-zh": 512
+    }

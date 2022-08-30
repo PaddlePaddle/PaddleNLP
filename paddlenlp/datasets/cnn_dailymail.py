@@ -16,9 +16,16 @@
 import collections
 import os
 import hashlib
+import shutil
 
 from paddle.dataset.common import md5file
-from paddlenlp.utils.downloader import get_path_from_url, _decompress
+from paddle.utils.download import get_path_from_url, _decompress, _get_unique_endpoints
+try:
+    from paddle.distributed import ParallelEnv
+except Exception as e:
+    import warnings
+    warnings.warn("paddle.distributed is not contains in you paddle!")
+
 from paddlenlp.utils.env import DATA_HOME
 from paddlenlp.utils.log import logger
 from . import DatasetBuilder
@@ -48,15 +55,18 @@ class CnnDailymail(DatasetBuilder):
     lazy = False
     META_INFO = collections.namedtuple("META_INFO", ("file", "url", "md5"))
     SPLITS = {
-        "train": META_INFO(
+        "train":
+        META_INFO(
             "all_train.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_train.txt",
             "c8ca98cfcb6cf3f99a404552568490bc"),
-        "dev": META_INFO(
+        "dev":
+        META_INFO(
             "all_val.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_val.txt",
             "83a3c483b3ed38b1392285bed668bfee"),
-        "test": META_INFO(
+        "test":
+        META_INFO(
             "all_test.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_test.txt",
             "4f3ac04669934dbc746b7061e68a0258")
@@ -181,7 +191,9 @@ class CnnDailymail(DatasetBuilder):
     def _get_data(self, mode):
         """ Check and download Dataset """
         dl_paths = {}
-        version = self.config.get("version", "3.0.0")
+        version = self.name
+        if version is None:
+            version = "3.0.0"
         if version not in ["1.0.0", "2.0.0", "3.0.0"]:
             raise ValueError("Unsupported version: %s" % version)
         dl_paths["version"] = version
@@ -190,13 +202,17 @@ class CnnDailymail(DatasetBuilder):
             dir_path = os.path.join(default_root, k)
             if not os.path.exists(dir_path):
                 get_path_from_url(v["url"], default_root, v["md5"])
-            file_num = len(os.listdir(os.path.join(dir_path, "stories")))
-            if file_num != v["file_num"]:
-                logger.warning(
-                    "Number of %s stories is %d != %d, decompress again." %
-                    (k, file_num, v["file_num"]))
-                _decompress(
-                    os.path.join(default_root, os.path.basename(v["url"])))
+            unique_endpoints = _get_unique_endpoints(
+                ParallelEnv().trainer_endpoints[:])
+            if ParallelEnv().current_endpoint in unique_endpoints:
+                file_num = len(os.listdir(os.path.join(dir_path, "stories")))
+                if file_num != v["file_num"]:
+                    logger.warning(
+                        "Number of %s stories is %d != %d, decompress again." %
+                        (k, file_num, v["file_num"]))
+                    shutil.rmtree(os.path.join(dir_path, "stories"))
+                    _decompress(
+                        os.path.join(default_root, os.path.basename(v["url"])))
             dl_paths[k] = dir_path
         filename, url, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)

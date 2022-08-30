@@ -60,7 +60,7 @@
 
 给定一段文本，使用我们提供的全流程预测脚本可以轻松获得情感分析结果，如下所示。
 
-- input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒  
+- input_text: 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
   - aspect: 蛋糕味道, opinions: ['不错', '好吃'], sentiment_polarity: 正向
   - aspect: 店家, opinions: ['耐心'], sentiment_polarity: 正向
   - aspect: 服务, opinions: ['好', '棒'], sentiment_polarity: 正向
@@ -91,13 +91,13 @@
 ```
 
 ### 4.1 运行环境和依赖安装
-(1) 环境依赖  
+(1) 环境依赖
 
 - python >= 3.6
 - paddlenlp >= 2.2.2
 - paddlepaddle-gpu >= 2.2.1
 
-(2) 运行环境准备  
+(2) 运行环境准备
 在运行之前，请在本目录下新建目录 `data` 和 `checkpoints`，分别用于存放数据和保存模型。
 
 本项目需要训练两个阶段的模型：评论观点抽取模型，属性级情感分类模型。本次针对这抽取和分类模型，我们分别开源了 Demo 数据： [ext_data](https://bj.bcebos.com/v1/paddlenlp/data/ext_data.tar.gz)和[cls_data](https://bj.bcebos.com/v1/paddlenlp/data/cls_data.tar.gz)。
@@ -109,7 +109,7 @@
 
 另外，考虑到不同用户可能有不同的需求，本项目提供了如下的方式学习或使用本项目。
 
-**(1）快速体验效果**  
+**(1）快速体验效果**
 如果你想快速体验本项目提供的情感分析能力，可使用本项目提供的 `demo.sh` 脚本以交互式的方式进行体验。
 ```shell
 sh run_demo.sh
@@ -117,7 +117,7 @@ sh run_demo.sh
 
 **备注**：体验之前，请确保下载以上提到的 `ext_model` 和 `cls_model`，重命名后放入相应的目录中。
 
-**(2) 文本批量预测**  
+**(2) 文本批量预测**
 如果你有一批数据，不方便逐句输入，可使用本项目提供的正式预测脚本 `predict.py`， 以文件的形式进行输入，处理后该脚本会将结果文件保存到与输入文件相同的目录下，默认的结果文件名为 `sentiment_results.json`。
 
 本功能在预测时需要传入测试集文件路径，可将测试集文件命名为`test.txt`， 然后放入 `./data` 目录下。需要注意的是，测试集文件每行均为一个待预测的语句，如下所示。
@@ -125,7 +125,7 @@ sh run_demo.sh
 - 蛋糕味道不错，很好吃，店家很耐心，服务也很好，很棒
 - 酒店干净整洁，性价比很高
 - 酒店环境不错，非常安静，性价比还可以
-- 房间很大，环境不错  
+- 房间很大，环境不错
 
 通过运行如下命令，便可进行批量文本情感分析预测：
 ```shell
@@ -134,7 +134,7 @@ sh run_predict.sh
 
 **备注**：体验之前，请确保下载以上提到的 `ext_model` 和 `cls_model`，重命名后放入相应的目录中。
 
-**（3）高性能预测**  
+**（3）高性能预测**
 如果你想将本项目部署到线上环境去运行，那么建议你使用本项目基于 Paddle Inference 实现的高性能推理脚本 `deploy/predict.py`。
 
 在使用之前，首先需要将保存的动态图模型转为静态图，通过调用下面的命令，便可将评论观点抽取模型和属性级情感分类模型转为静态图模型：
@@ -151,13 +151,36 @@ cd deploy
 sh run_predict.sh
 ```
 
-**（4）自定义模型训练**  
+**（4）自定义模型训练**
 如果你希望自己尝试进行评论观点抽取模型训练，可使用4.1节中提供的 `ext_data` Demo 数据，或自己业务的标注数据重新训练模型，本项目已将评论观点抽取模型的相关训练和测试代码放入 `extraction` 目录下， 请到该目录下执行模型训练即可，更多的实现细节和和使用方式，请参考[这里](extraction/README.md)。
 
 如果你希望自己尝试进行属性级情感分类模型训练，可使用4.1节中提供的 `cls_data` Demo 数据，或自己业务的标注数据重新训练模型，本项目已将属性级情感分类模型的相关训练和测试代码放入 `classification` 目录下，请到该目录下执行模型训练即可，更多的实现细节和使用方式，请参考[这里](classification/README.md)。
 
 在训练后，如果需要进行高性能预测，可参考（3）进行动转静，然后基于Paddle Inference 进行高性能预测。
 
+### 4.3 数据标注说明
+如果你想标注自己的业务数据，并尝试利用标注的新数据重新训练本项目。本项目推荐使用 [doccano](https://github.com/doccano/doccano) 进行数据标注平台，同时本项目也打通了其从标注到训练的通道，即 doccano 导出的数据后可通过 [doccano.py](./doccano.py) 脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。 为达到这个目的，您需要按以下标注规则在 doccano 平台上标注数据：
+
+<div align="center">
+    <img src="./imgs/labeling_example.png" />
+    <p>图2 数据标注样例图<p/>
+</div>
+
+- 在doccano平台上，定义标签 Pos-Aspect、 Neg-Aspect 和 Opinion，其中 Pos-Aspect 表示 Aspect 的情感极性为正向；Neg-Aspect 表示 Aspect 的情感极性为负向；Opinion 表示相应的观点词。
+- 使用以上定义的标签开始标注数据，图2展示了一个标注样例。
+- 当标注完成后，在 doccano 平台上导出 `jsonl` 形式的文件，并将其重命名为 `doccano.json` 后，放入 `./data` 目录下。
+- 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
+
+```shell
+python doccano.py \
+    --doccano_file ./data/doccano.json \
+    --save_ext_dir ./data/ext_data \
+    --save_cls_dir ./data/cls_data
+```
+
+**备注：**
+- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
+- 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 
 ## 5. 小模型优化策略
 以上实验中，无论是评论观点抽取模型，还是属性级情感分类模型，使用的均是 Large 版的 SKEP 模型，考虑到企业用户在线上部署时会考虑到模型预测效率，本项目提供了一套基于 [PP-MiniLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression/pp-minilm) 中文特色小模型的解决方案。PP-MiniLM 提供了一套完整的小模型优化方案：首先使用 Task-agnostic 的方式进行模型蒸馏、然后依托于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 进行模型裁剪、模型量化等模型压缩技术，有效减小了模型的规模，加快了模型运行速度。
