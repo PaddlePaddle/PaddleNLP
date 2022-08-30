@@ -24,8 +24,6 @@ limitations under the License. */
 #include "faster_tokenizer/utils/utf8.h"
 #include "glog/logging.h"
 
-#include "unicode/uchar.h"  // For u_isalnum
-
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace models {
