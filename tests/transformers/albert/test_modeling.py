@@ -14,7 +14,9 @@
 # limitations under the License.
 
 import unittest
+from parameterized import parameterized_class
 import paddle
+from paddle import Tensor
 
 from paddlenlp.transformers import (
     AlbertPretrainedModel,
@@ -25,7 +27,7 @@ from paddlenlp.transformers import (
     AlbertForTokenClassification,
     AlbertModel,
 )
-from ...transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
 
 
@@ -61,7 +63,7 @@ class AlbertModelTester:
         self.eos_token_id = 3,
         self.add_pooling_layer = True
         self.type_sequence_label_size = 2
-        self.num_labels = 3
+        self.num_classes = 3
         self.num_choices = 4
         self.scope = None
 
@@ -79,8 +81,19 @@ class AlbertModelTester:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length],
                                         self.type_vocab_size)
 
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
+
+        if self.parent.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_classes)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
+
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask
+        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
         return {
@@ -98,79 +111,115 @@ class AlbertModelTester:
             "num_hidden_groups": self.num_hidden_groups,
         }
 
-    def create_and_check_model(self, config, input_ids, token_type_ids,
-                               input_mask):
+    def create_and_check_model(self, config, input_ids: Tensor,
+                               token_type_ids: Tensor, input_mask: Tensor,
+                               sequence_labels: Tensor, token_labels: Tensor,
+                               choice_labels: Tensor):
         model = AlbertModel(**config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       return_dict=self.parent.return_dict)
         result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+        result = model(input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(
             result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(result[1].shape,
                                 [self.batch_size, self.hidden_size])
 
-    def create_and_check_for_masked_lm(self, config, input_ids, token_type_ids,
-                                       input_mask):
+    def create_and_check_for_masked_lm(self, config, input_ids: Tensor,
+                                       token_type_ids: Tensor,
+                                       input_mask: Tensor,
+                                       sequence_labels: Tensor,
+                                       token_labels: Tensor,
+                                       choice_labels: Tensor):
         model = AlbertForMaskedLM(AlbertModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
 
-    def create_and_check_for_question_answering(self, config, input_ids,
-                                                token_type_ids, input_mask):
+    def create_and_check_for_question_answering(self, config, input_ids: Tensor,
+                                                token_type_ids: Tensor,
+                                                input_mask: Tensor,
+                                                sequence_labels: Tensor,
+                                                token_labels: Tensor,
+                                                choice_labels: Tensor):
         model = AlbertForQuestionAnswering(AlbertModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.seq_length])
         self.parent.assertEqual(result[1].shape,
                                 [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-    ):
+            self, config, input_ids: Tensor, token_type_ids: Tensor,
+            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
+            choice_labels: Tensor):
         model = AlbertForSequenceClassification(AlbertModel(**config),
-                                                num_classes=self.num_labels)
+                                                num_classes=self.num_classes)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
-        self.parent.assertEqual(result.shape,
-                                [self.batch_size, self.num_labels])
+                       token_type_ids=token_type_ids,
+                       labels=sequence_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+        self.parent.assertEqual(result[0].shape,
+                                [self.batch_size, self.num_classes])
 
     def create_and_check_for_token_classification(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-    ):
+            self, config, input_ids: Tensor, token_type_ids: Tensor,
+            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
+            choice_labels: Tensor):
         model = AlbertForTokenClassification(AlbertModel(**config),
-                                             num_classes=self.num_labels)
+                                             num_classes=self.num_classes)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
-        self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.num_labels])
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
-    def create_and_check_for_multiple_choice(self, config, input_ids,
-                                             token_type_ids, input_mask):
+        self.parent.assertEqual(
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.num_classes])
+
+    def create_and_check_for_multiple_choice(self, config, input_ids: Tensor,
+                                             token_type_ids: Tensor,
+                                             input_mask: Tensor,
+                                             sequence_labels: Tensor,
+                                             token_labels: Tensor,
+                                             choice_labels: Tensor):
         model = AlbertForMultipleChoice(AlbertModel(**config))
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
@@ -179,22 +228,22 @@ class AlbertModelTester:
             [-1, self.num_choices, -1])
         multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
             [-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
-        )
-        self.parent.assertEqual(result.shape,
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=multiple_choice_input_mask,
+                       token_type_ids=multiple_choice_token_type_ids,
+                       labels=choice_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_choices])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
-        (
-            config,
-            input_ids,
-            token_type_ids,
-            input_mask,
-        ) = config_and_inputs
+        (config, input_ids, token_type_ids, input_mask, _, _,
+         _) = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
@@ -203,8 +252,16 @@ class AlbertModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class AlbertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = AlbertModel
+    use_labels = False
+    return_dict = False
 
     all_model_classes = (
         AlbertModel,
