@@ -1173,12 +1173,6 @@ from paddlenlp import Taskflow
 [{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.7050786018371582}]
 ```
 
-#### 可配置参数说明
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `max_seq_len`：最大序列长度，默认为384。
-* `task_path`：自定义任务路径，默认为None。
-</div></details>
-
 #### 模型选择
 
 - 多模型选择，满足精度、速度要求
@@ -1186,12 +1180,19 @@ from paddlenlp import Taskflow
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
   | `rocketqa-zh-dureader-cross-encoder` (默认) | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `simbert-base-chinese` | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `rocketqa-base-cross-encoder` | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `rocketqa-medium-cross-encoder`| 6-layers, 768-hidden, 12-heads | 中文 |
-  | `rocketqa-mini-cross-encoder`| 6-layers, 384-hidden, 12-heads | 中文 |
-  | `rocketqa-micro-cross-encoder`| 4-layers, 384-hidden, 12-heads | 中文 |
-  | `rocketqa-nano-cross-encoder`| 4-layers, 312-hidden, 12-heads | 中文 |
+  | `simbert-base-chinese`                     | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-base-cross-encoder`              | 12-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-medium-cross-encoder`            | 6-layers, 768-hidden, 12-heads | 中文 |
+  | `rocketqa-mini-cross-encoder`              | 6-layers, 384-hidden, 12-heads | 中文 |
+  | `rocketqa-micro-cross-encoder`             | 4-layers, 384-hidden, 12-heads | 中文 |
+  | `rocketqa-nano-cross-encoder`              | 4-layers, 312-hidden, 12-heads | 中文 |
+
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_seq_len`：最大序列长度，默认为384。
+* `task_path`：自定义任务路径，默认为None。
+</div></details>
 
 ### 情感倾向分析
 <details><summary>&emsp;基于情感知识增强预训练模型SKEP达到业界SOTA </summary><div>
