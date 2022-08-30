@@ -657,6 +657,8 @@ class TransformerModel(nn.Layer):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
     """
 
     def __init__(self,
@@ -673,7 +675,8 @@ class TransformerModel(nn.Layer):
                  attn_dropout=None,
                  act_dropout=None,
                  bos_id=0,
-                 eos_id=1):
+                 eos_id=1,
+                 activation="relu"):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
@@ -708,7 +711,7 @@ class TransformerModel(nn.Layer):
             dropout=dropout,
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
-            activation="relu",
+            activation=activation,
             normalize_before=True)
 
         if weight_sharing:
