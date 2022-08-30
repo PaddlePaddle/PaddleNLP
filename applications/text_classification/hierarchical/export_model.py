@@ -18,17 +18,12 @@ import os
 import paddle
 from paddlenlp.transformers import AutoModelForSequenceClassification
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path",
-                    type=str,
-                    default='./checkpoint/',
-                    help="The path to model parameters to be loaded.")
-parser.add_argument("--output_path",
-                    type=str,
-                    default='./export',
-                    help="The path of model parameter in "
-                    "static graph to be saved.")
+parser.add_argument("--params_path", type=str, default='./checkpoint/', help="The path to model parameters to be loaded.")
+parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
+# yapf: enable
 
 if __name__ == "__main__":
 

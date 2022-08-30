@@ -50,7 +50,7 @@ inline std::string PathJoin(const std::vector<std::string>& paths,
 inline std::string PathJoin(const std::string& folder,
                             const std::string filename,
                             const std::string& sep = PATH_SEP) {
-  return PathJoin({folder, filename}, sep);
+  return PathJoin(std::vector<std::string>{folder, filename}, sep);
 }
 
 }  // namespace utils
