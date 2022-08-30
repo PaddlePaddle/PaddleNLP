@@ -35,10 +35,18 @@ class JiebaBasicTokenizer(BasicTokenizer):
             Defaults to `True`.
     """
 
-    def __init__(self, vocab, do_lower_case=True):
+    def __init__(self,
+                 vocab,
+                 do_lower_case=True,
+                 never_split=None,
+                 tokenize_chinese_chars=True,
+                 strip_accents=None):
         """Constructs a JiebaBasicTokenizer."""
+        super().__init__(never_split=never_split,
+                         do_lower_case=do_lower_case,
+                         tokenize_chinese_chars=tokenize_chinese_chars,
+                         strip_accents=strip_accents)
         self.vocab = vocab
-        self.do_lower_case = do_lower_case
 
     def _tokenize_chinese_chars(self, text):
         output = []
@@ -140,6 +148,18 @@ class RoFormerTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-generator/vocab.txt",
         }
     }
+    max_model_input_sizes = {
+        "roformer-chinese-small": 512,
+        "roformer-chinese-base": 1536,
+        "roformer-chinese-char-small": 512,
+        "roformer-chinese-char-base": 512,
+        "roformer-chinese-sim-char-ft-small": 512,
+        "roformer-chinese-sim-char-ft-base": 512,
+        "roformer-chinese-sim-char-small": 512,
+        "roformer-chinese-sim-char-base": 512,
+        "roformer-english-small-discriminator": 128,
+        "roformer-english-small-generator": 128,
+    }
     pretrained_init_configuration = {
         "roformer-chinese-small": {
             "do_lower_case": True,
@@ -207,8 +227,8 @@ class RoFormerTokenizer(PretrainedTokenizer):
                 vocab=self.vocab, do_lower_case=do_lower_case)
         else:
             self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -276,8 +296,8 @@ class RoFormerTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -388,10 +408,15 @@ class RoFormerTokenizer(PretrainedTokenizer):
                 )
             return list(
                 map(
-                    lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0, ))
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    token_ids_0,
+                ))
 
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)

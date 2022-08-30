@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 
-from .adamwdl import AdamWDL
+from .ema import ExponentialMovingAverage
+from .adamwdl import layerwise_lr_decay, AdamWDL
 
-__all__ = ['AdamWDL', ]
+__all__ = ['layerwise_lr_decay', 'AdamWDL', 'ExponentialMovingAverage']

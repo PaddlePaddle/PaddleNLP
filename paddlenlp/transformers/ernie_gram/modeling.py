@@ -43,8 +43,9 @@ class ErnieGramEmbeddings(nn.Layer):
                  num_attention_heads=None):
         super(ErnieGramEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(
-            vocab_size, emb_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            emb_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 emb_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, emb_size)
@@ -98,12 +99,27 @@ class ErnieGramPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 18018
         },
+        "ernie-gram-zh-finetuned-dureader-robust": {
+            "attention_probs_dropout_prob": 0.1,
+            "emb_size": 768,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 2,
+            "vocab_size": 18018
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-gram-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/ernie_gram_zh.pdparams",
+            "ernie-gram-zh-finetuned-dureader-robust":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gram-zh-finetuned-dureader-robust/model_state.pdparams",
         },
     }
     base_model_prefix = "ernie_gram"
@@ -117,8 +133,8 @@ class ErnieGramPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.ernie_gram.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -202,9 +218,11 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         super(ErnieGramModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = ErnieGramEmbeddings(
-            vocab_size, emb_size, hidden_dropout_prob, max_position_embeddings,
-            type_vocab_size, pad_token_id, rel_pos_size, num_attention_heads)
+        self.embeddings = ErnieGramEmbeddings(vocab_size, emb_size,
+                                              hidden_dropout_prob,
+                                              max_position_embeddings,
+                                              type_vocab_size, pad_token_id,
+                                              rel_pos_size, num_attention_heads)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -285,13 +303,20 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1,
+                                      2]).astype(self.pooler.dense.weight.dtype)
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
+
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
@@ -318,8 +343,8 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
         super(ErnieGramForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_gram = ernie_gram  # allow ernie_gram to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_gram.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_gram.config["hidden_dropout_prob"])
         initializer = nn.initializer.TruncatedNormal(
             std=self.ernie_gram.config['initializer_range'])
         self.classifier = nn.Linear(
@@ -363,11 +388,10 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        sequence_output, _ = self.ernie_gram(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, _ = self.ernie_gram(input_ids,
+                                             token_type_ids=token_type_ids,
+                                             position_ids=position_ids,
+                                             attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -435,11 +459,10 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                 logits = model(**inputs)
         """
 
-        sequence_output, _ = self.ernie_gram(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, _ = self.ernie_gram(input_ids,
+                                             token_type_ids=token_type_ids,
+                                             position_ids=position_ids,
+                                             attention_mask=attention_mask)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -468,8 +491,8 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
         super(ErnieGramForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_gram = ernie_gram  # allow ernie gram to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_gram.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_gram.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_gram.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -508,11 +531,10 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.ernie_gram(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        _, pooled_output = self.ernie_gram(input_ids,
+                                           token_type_ids=token_type_ids,
+                                           position_ids=position_ids,
+                                           attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)

@@ -20,8 +20,8 @@ namespace fastertransformer {
 template <typename T>
 void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                 T* v_dst,
-                                                const float* k_src,
-                                                const float* v_src,
+                                                const T* k_src,
+                                                const T* v_src,
                                                 const int* memory_seq_len,
                                                 const int local_batch_size,
                                                 const int memory_max_seq_len,
@@ -31,20 +31,19 @@ void transpose_cache_batch_major_kernelLauncher(T* k_dst,
                                                 cudaStream_t stream);
 
 template <typename T>
-void self_attention_dispatch(const int* memory_sequence_length,
-                             T* key_buf,
-                             T* value_buf,
-                             T* query_buf,
-                             const T* self_Q_bias,
-                             T* key_cache,
-                             const T* self_K_bias,
-                             T* value_cache,
-                             const T* self_V_bias,
-                             T* context_buf,
-                             int batch_size,
-                             int head_num,
-                             int size_per_head,
-                             const int step,
-                             const int memory_max_seq_len,
-                             cudaStream_t stream);
+void transpose_general_kernelLauncher(T* dst,
+                                      T* src,
+                                      const int batch_size,
+                                      const int seq_len,
+                                      const int head_num,
+                                      const int size_per_head,
+                                      cudaStream_t stream);
+
+template <typename T>
+__global__ void transpose(T* src,
+                          T* dst,
+                          const int batch_size,
+                          const int seq_len,
+                          const int head_num,
+                          const int size_per_head);
 }

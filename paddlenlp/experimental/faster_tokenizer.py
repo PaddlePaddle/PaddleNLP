@@ -17,8 +17,7 @@ import importlib
 import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
-from paddle.fluid.layer_helper import LayerHelper
-from paddle.fluid.framework import in_dygraph_mode
+from paddle.common_ops_import import LayerHelper
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
 from paddlenlp.transformers.ppminilm.tokenizer import PPMiniLMTokenizer
@@ -101,7 +100,7 @@ class FasterTokenizer(nn.Layer):
                 text_pair=None,
                 max_seq_len=0,
                 pad_to_max_seq_len=False):
-        if in_dygraph_mode():
+        if paddle.in_dynamic_mode():
             if isinstance(text, list) or isinstance(text, tuple):
                 text = to_tensor(list(text))
             if text_pair is not None:
@@ -125,24 +124,28 @@ class FasterTokenizer(nn.Layer):
         input_ids = helper.create_variable_for_type_inference(dtype="int64")
         seg_ids = helper.create_variable_for_type_inference(dtype="int64")
         if text_pair is None:
-            helper.append_op(
-                type='faster_tokenizer',
-                inputs={'Vocab': self.vocab,
-                        'Text': text},
-                outputs={'InputIds': input_ids,
-                         'SegmentIds': seg_ids},
-                attrs=attrs)
+            helper.append_op(type='faster_tokenizer',
+                             inputs={
+                                 'Vocab': self.vocab,
+                                 'Text': text
+                             },
+                             outputs={
+                                 'InputIds': input_ids,
+                                 'SegmentIds': seg_ids
+                             },
+                             attrs=attrs)
         else:
-            helper.append_op(
-                type='faster_tokenizer',
-                inputs={
-                    'Vocab': self.vocab,
-                    'Text': text,
-                    'TextPair': text_pair
-                },
-                outputs={'InputIds': input_ids,
-                         'SegmentIds': seg_ids},
-                attrs=attrs)
+            helper.append_op(type='faster_tokenizer',
+                             inputs={
+                                 'Vocab': self.vocab,
+                                 'Text': text,
+                                 'TextPair': text_pair
+                             },
+                             outputs={
+                                 'InputIds': input_ids,
+                                 'SegmentIds': seg_ids
+                             },
+                             attrs=attrs)
         return input_ids, seg_ids
 
     @classmethod

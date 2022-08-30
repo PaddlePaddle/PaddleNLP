@@ -80,12 +80,49 @@ class BertJapaneseTokenizer(BertTokenizer):
 
     """
 
+    resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "cl-tohoku/bert-base-japanese":
+            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese/vocab.txt",
+            "cl-tohoku/bert-base-japanese-whole-word-masking":
+            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-whole-word-masking/vocab.txt",
+            "cl-tohoku/bert-base-japanese-char":
+            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-char/vocab.txt",
+            "cl-tohoku/bert-base-japanese-char-whole-word-masking":
+            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-char-whole-word-masking/vocab.txt",
+        }
+    }
+    pretrained_init_configuration = {
+        "cl-tohoku/bert-base-japanese": {
+            "do_lower_case": False,
+            "word_tokenizer_type": "mecab",
+            "subword_tokenizer_type": "wordpiece",
+        },
+        "cl-tohoku/bert-base-japanese-whole-word-masking": {
+            "do_lower_case": False,
+            "word_tokenizer_type": "mecab",
+            "subword_tokenizer_type": "wordpiece",
+        },
+        "cl-tohoku/bert-base-japanese-char": {
+            "do_lower_case": False,
+            "word_tokenizer_type": "mecab",
+            "subword_tokenizer_type": "character",
+        },
+        "cl-tohoku/bert-base-japanese-char-whole-word-masking": {
+            "do_lower_case": False,
+            "word_tokenizer_type": "mecab",
+            "subword_tokenizer_type": "character",
+        },
+    }
+    padding_side = "right"
+
     def __init__(self,
                  vocab_file,
                  do_lower_case=False,
                  do_word_tokenize=True,
                  do_subword_tokenize=True,
-                 word_tokenizer_type="basic",
+                 word_tokenizer_type="mecab",
                  subword_tokenizer_type="wordpiece",
                  never_split=None,
                  mecab_kwargs=None,
@@ -104,8 +141,9 @@ class BertJapaneseTokenizer(BertTokenizer):
                 .format(vocab_file))
 
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.ids_to_tokens = collections.OrderedDict(
-            [(ids, tok) for tok, ids in self.vocab.idx_to_token.items()])
+        self.ids_to_tokens = collections.OrderedDict([
+            (ids, tok) for tok, ids in self.vocab.idx_to_token.items()
+        ])
 
         self.do_word_tokenize = do_word_tokenize
         self.word_tokenizer_type = word_tokenizer_type
@@ -160,15 +198,17 @@ class BertJapaneseTokenizer(BertTokenizer):
 
     def _tokenize(self, text):
         if self.do_word_tokenize:
-            tokens = self.basic_tokenizer.tokenize(
-                text, never_split=self.all_special_tokens)
+            if self.word_tokenizer_type == "basic":
+                tokens = self.basic_tokenizer.tokenize(text)
+            elif self.word_tokenizer_type == "mecab":
+                tokens = self.basic_tokenizer.tokenize(
+                    text, never_split=self.all_special_tokens)
         else:
             tokens = [text]
 
         if self.do_subword_tokenize:
             split_tokens = [
-                sub_token
-                for token in tokens
+                sub_token for token in tokens
                 for sub_token in self.wordpiece_tokenizer.tokenize(token)
             ]
         else:
@@ -181,12 +221,13 @@ class MecabTokenizer:
     """Runs basic tokenization with MeCab morphological parser."""
 
     def __init__(
-            self,
-            do_lower_case=False,
-            never_split=None,
-            normalize_text=True,
-            mecab_dic="ipadic",
-            mecab_option=None, ):
+        self,
+        do_lower_case=False,
+        never_split=None,
+        normalize_text=True,
+        mecab_dic="ipadic",
+        mecab_option=None,
+    ):
         """
         Constructs a MecabTokenizer.
 

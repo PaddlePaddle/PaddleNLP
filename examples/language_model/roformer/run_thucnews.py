@@ -49,7 +49,8 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -60,90 +61,91 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=1e-4,
-        type=float,
-        help="The initial learning rate for Adam.")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=1e-4,
+                        type=float,
+                        help="The initial learning rate for Adam.")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
+        help="Total number of training epochs to perform.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=100,
+                        help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
+        help="Batch size per GPU/CPU for training.",
+    )
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.1,
-        type=float,
-        help="Linear warmup proportion over total steps.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-6,
-        type=float,
-        help="Epsilon for Adam optimizer.")
+        help=
+        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--warmup_proportion",
+                        default=0.1,
+                        type=float,
+                        help="Linear warmup proportion over total steps.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-6,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
         type=str,
         choices=["cpu", "gpu", "xpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument(
-        "--use_amp",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Enable mixed precision training.")
-    parser.add_argument(
-        "--scale_loss",
-        type=float,
-        default=2**15,
-        help="The value of scale_loss for fp16.")
+    parser.add_argument("--use_amp",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Enable mixed precision training.")
+    parser.add_argument("--scale_loss",
+                        type=float,
+                        default=2**15,
+                        help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
 
@@ -186,7 +188,7 @@ def convert_example(example,
         label = example['label']
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
-    example = tokenizer(example['text'], max_seq_len=max_seq_length)
+    example = tokenizer(example['text'], max_length=max_seq_length)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
@@ -206,11 +208,10 @@ def do_train(args):
     train_ds = load_dataset('thucnews', splits="train")
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         label_list=train_ds.label_list,
+                         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
@@ -219,27 +220,26 @@ def do_train(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
 
     dev_ds = load_dataset('thucnews', splits='dev')
     dev_ds = dev_ds.map(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    dev_data_loader = DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    dev_data_loader = DataLoader(dataset=dev_ds,
+                                 batch_sampler=dev_batch_sampler,
+                                 collate_fn=batchify_fn,
+                                 num_workers=0,
+                                 return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+    model = model_class.from_pretrained(args.model_name_or_path,
+                                        num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 

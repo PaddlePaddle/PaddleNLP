@@ -23,6 +23,7 @@ import unittest
 
 
 class TestMultiLabelsMetric(unittest.TestCase):
+
     def setUp(self):
         self.cls_num = 10
         self.shape = (5, 20, self.cls_num)
@@ -30,8 +31,8 @@ class TestMultiLabelsMetric(unittest.TestCase):
         self.metrics = MultiLabelsMetric(num_labels=self.cls_num)
 
     def get_multi_labels_random_case(self):
-        label = np.random.randint(
-            self.cls_num, size=self.label_shape).astype("int64")
+        label = np.random.randint(self.cls_num,
+                                  size=self.label_shape).astype("int64")
         pred = np.random.uniform(0.1, 1.0,
                                  self.shape).astype(paddle.get_default_dtype())
         np_label = label.reshape(-1)
@@ -49,11 +50,11 @@ class TestMultiLabelsMetric(unittest.TestCase):
             )
             precision, recall, f, _ = precision_recall_fscore_support(
                 np_label, np_pred, average=average_type, pos_label=pos_label)
-            args = self.metrics.compute(
-                paddle.to_tensor(pred), paddle.to_tensor(label))
+            args = self.metrics.compute(paddle.to_tensor(pred),
+                                        paddle.to_tensor(label))
             self.metrics.update(args)
-            result = self.metrics.accumulate(
-                average=average_type, pos_label=pos_label)
+            result = self.metrics.accumulate(average=average_type,
+                                             pos_label=pos_label)
             self.assertEqual(precision, result[0])
             self.assertEqual(recall, result[1])
             self.assertEqual(f, result[2])
@@ -63,8 +64,8 @@ class TestMultiLabelsMetric(unittest.TestCase):
         numpy.random.seed(0)
         label, pred, np_label, np_pred, average_type, pos_label = self.get_multi_labels_random_case(
         )
-        args = self.metrics.compute(
-            paddle.to_tensor(pred), paddle.to_tensor(label))
+        args = self.metrics.compute(paddle.to_tensor(pred),
+                                    paddle.to_tensor(label))
         self.metrics.update(args)
 
         numpy.random.seed(1)
@@ -72,21 +73,21 @@ class TestMultiLabelsMetric(unittest.TestCase):
         )
         precision, recall, f, _ = precision_recall_fscore_support(
             np_label, np_pred, average=average_type, pos_label=pos_label)
-        args = self.metrics.compute(
-            paddle.to_tensor(pred), paddle.to_tensor(label))
+        args = self.metrics.compute(paddle.to_tensor(pred),
+                                    paddle.to_tensor(label))
         self.metrics.update(args)
-        result = self.metrics.accumulate(
-            average=average_type, pos_label=pos_label)
+        result = self.metrics.accumulate(average=average_type,
+                                         pos_label=pos_label)
         self.assertNotEqual(precision, result[0])
         self.assertNotEqual(recall, result[1])
         self.assertNotEqual(f, result[2])
 
         self.metrics.reset()
-        args = self.metrics.compute(
-            paddle.to_tensor(pred), paddle.to_tensor(label))
+        args = self.metrics.compute(paddle.to_tensor(pred),
+                                    paddle.to_tensor(label))
         self.metrics.update(args)
-        result = self.metrics.accumulate(
-            average=average_type, pos_label=pos_label)
+        result = self.metrics.accumulate(average=average_type,
+                                         pos_label=pos_label)
         self.assertEqual(precision, result[0])
         self.assertEqual(recall, result[1])
         self.assertEqual(f, result[2])
@@ -103,18 +104,18 @@ class TestMultiLabelsMetric(unittest.TestCase):
             np_pred = np.concatenate((np_pred, cur_np_pred))
             precision, recall, f, _ = precision_recall_fscore_support(
                 np_label, np_pred, average=average_type, pos_label=pos_label)
-            args = self.metrics.compute(
-                paddle.to_tensor(pred), paddle.to_tensor(label))
+            args = self.metrics.compute(paddle.to_tensor(pred),
+                                        paddle.to_tensor(label))
             self.metrics.update(args)
-            result = self.metrics.accumulate(
-                average=average_type, pos_label=pos_label)
+            result = self.metrics.accumulate(average=average_type,
+                                             pos_label=pos_label)
             self.assertEqual(precision, result[0])
             self.assertEqual(recall, result[1])
             self.assertEqual(f, result[2])
 
     def get_binary_labels_random_case(self):
-        label = np.random.randint(
-            self.cls_num, size=self.label_shape).astype("int64")
+        label = np.random.randint(self.cls_num,
+                                  size=self.label_shape).astype("int64")
         pred = np.random.uniform(0.1, 1.0,
                                  self.shape).astype(paddle.get_default_dtype())
         average_type = 'binary'
@@ -139,11 +140,11 @@ class TestMultiLabelsMetric(unittest.TestCase):
             )
             precision, recall, f, _ = precision_recall_fscore_support(
                 np_label, np_pred, average=average_type)
-            args = self.metrics.compute(
-                paddle.to_tensor(pred), paddle.to_tensor(label))
+            args = self.metrics.compute(paddle.to_tensor(pred),
+                                        paddle.to_tensor(label))
             self.metrics.update(args)
-            result = self.metrics.accumulate(
-                average=average_type, pos_label=pos_label)
+            result = self.metrics.accumulate(average=average_type,
+                                             pos_label=pos_label)
             self.assertEqual(precision, result[0])
             self.assertEqual(recall, result[1])
             self.assertEqual(f, result[2])

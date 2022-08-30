@@ -40,8 +40,10 @@ def test():
     else:
         paddle.set_device("cpu")
 
-    test_dataset = CovidDataset(
-        args.data_path, args.test_data_size, args.seq_length, mode="test")
+    test_dataset = CovidDataset(args.data_path,
+                                args.test_data_size,
+                                args.seq_length,
+                                mode="test")
 
     network = TCNNetwork(input_size=1)
 

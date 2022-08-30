@@ -37,7 +37,8 @@ class Embedder(paddle.nn.Layer):
             assert num_tokens < 0, "Specified a vocabulary but also set number of tokens to " + \
                 str(num_tokens)
             self.in_vocabulary = lambda token: token in vocabulary.tokens
-            self.vocab_token_lookup = lambda token: vocabulary.token_to_id(token)
+            self.vocab_token_lookup = lambda token: vocabulary.token_to_id(token
+                                                                           )
             if use_unk:
                 self.unknown_token_id = vocabulary.token_to_id(
                     vocabulary_handler.UNK_TOK)
@@ -61,8 +62,8 @@ class Embedder(paddle.nn.Layer):
         self.anonymizer = anonymizer
 
         emb_name = name + "-tokens"
-        print("Creating token embedder called " + emb_name + " of size " + str(
-            self.vocabulary_size) + " x " + str(embedding_size))
+        print("Creating token embedder called " + emb_name + " of size " +
+              str(self.vocabulary_size) + " x " + str(embedding_size))
 
         if initializer is not None:
             self.token_embedding_matrix = paddle.nn.Embedding(
@@ -70,8 +71,8 @@ class Embedder(paddle.nn.Layer):
             self.token_embedding_matrix.weight.set_value(initializer)
         else:
             initializer = paddle.nn.initializer.Uniform(low=-0.1, high=0.1)
-            init_tensor = paddle.ParamAttr(
-                initializer=initializer, trainable=True)
+            init_tensor = paddle.ParamAttr(initializer=initializer,
+                                           trainable=True)
             self.token_embedding_matrix = paddle.nn.Embedding(
                 self.vocabulary_size, embedding_size, weight_attr=initializer)
 
@@ -81,8 +82,8 @@ class Embedder(paddle.nn.Layer):
         ), "embedder should only be called on flat tokens; use snippet_bow if you are trying to encode snippets"
 
         if self.in_vocabulary(token):
-            index_list = paddle.to_tensor(
-                self.vocab_token_lookup(token), 'int64')
+            index_list = paddle.to_tensor(self.vocab_token_lookup(token),
+                                          'int64')
             return self.token_embedding_matrix(index_list).squeeze()
         else:
             index_list = paddle.to_tensor(self.unknown_token_id, 'int64')
@@ -104,14 +105,14 @@ def bow_snippets(token, snippets, output_embedder, input_schema):
         snippet_embeddings = []
         for output_token in snippet_sequence:
             assert output_embedder.in_vocabulary(
-                output_token) or input_schema.in_vocabulary(
-                    output_token, surface_form=True)
+                output_token) or input_schema.in_vocabulary(output_token,
+                                                            surface_form=True)
             if output_embedder.in_vocabulary(output_token):
                 snippet_embeddings.append(output_embedder(output_token))
             else:
                 snippet_embeddings.append(
-                    input_schema.column_name_embedder(
-                        output_token, surface_form=True))
+                    input_schema.column_name_embedder(output_token,
+                                                      surface_form=True))
     else:
         snippet_embeddings = [
             output_embedder(subtoken) for subtoken in snippet_sequence

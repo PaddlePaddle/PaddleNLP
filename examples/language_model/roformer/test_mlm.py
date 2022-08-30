@@ -14,11 +14,11 @@
 
 import paddle
 import argparse
-from paddlenlp.transformers import RoFormerForPretraining, RoFormerTokenizer
+from paddlenlp.transformers import RoFormerForMaskedLM, RoFormerTokenizer
 
 
 def test_mlm(text, model_name):
-    model = RoFormerForPretraining.from_pretrained(model_name)
+    model = RoFormerForMaskedLM.from_pretrained(model_name)
     model.eval()
     tokenizer = RoFormerTokenizer.from_pretrained(model_name)
     tokens = ["[CLS]"]
@@ -34,29 +34,29 @@ def test_mlm(text, model_name):
     input_ids = paddle.to_tensor([input_ids_list])
 
     with paddle.no_grad():
-        pd_outputs = model(input_ids)[0][0]
+        pd_outputs = model(input_ids)[0]
     pd_outputs_sentence = "paddle: "
     for i, id in enumerate(input_ids_list):
         if id == tokenizer.convert_tokens_to_ids(["[MASK]"])[0]:
-            tokens = tokenizer.convert_ids_to_tokens(pd_outputs[i].topk(5)[1]
-                                                     .tolist())
+            tokens = tokenizer.convert_ids_to_tokens(
+                pd_outputs[i].topk(5)[1].tolist())
             pd_outputs_sentence += "[" + "||".join(tokens) + "]"
         else:
             pd_outputs_sentence += "".join(
-                tokenizer.convert_ids_to_tokens(
-                    [id], skip_special_tokens=True))
+                tokenizer.convert_ids_to_tokens([id], skip_special_tokens=True))
 
     print(pd_outputs_sentence)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_name",
-        default="roformer-chinese-base",
-        type=str,
-        help="Pretrained roformer name or path.")
-    parser.add_argument(
-        "--text", default="今天[MASK]很好，我想去公园玩！", type=str, help="MLM text.")
+    parser.add_argument("--model_name",
+                        default="roformer-chinese-base",
+                        type=str,
+                        help="Pretrained roformer name or path.")
+    parser.add_argument("--text",
+                        default="今天[MASK]很好，我想去公园玩！",
+                        type=str,
+                        help="MLM text.")
     args = parser.parse_args()
     test_mlm(text=args.text, model_name=args.model_name)

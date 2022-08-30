@@ -35,21 +35,23 @@ def _build_linear(n_in, n_out, name, init):
     return nn.Linear(
         n_in,
         n_out,
-        weight_attr=paddle.ParamAttr(
-            name='%s.w_0' % name if name is not None else None,
-            initializer=init),
-        bias_attr='%s.b_0' % name if name is not None else None, )
+        weight_attr=paddle.ParamAttr(name='%s.w_0' %
+                                     name if name is not None else None,
+                                     initializer=init),
+        bias_attr='%s.b_0' % name if name is not None else None,
+    )
 
 
 def _build_ln(n_in, name):
     return nn.LayerNorm(
         normalized_shape=n_in,
-        weight_attr=paddle.ParamAttr(
-            name='%s_layer_norm_scale' % name if name is not None else None,
-            initializer=nn.initializer.Constant(1.)),
-        bias_attr=paddle.ParamAttr(
-            name='%s_layer_norm_bias' % name if name is not None else None,
-            initializer=nn.initializer.Constant(1.)), )
+        weight_attr=paddle.ParamAttr(name='%s_layer_norm_scale' %
+                                     name if name is not None else None,
+                                     initializer=nn.initializer.Constant(1.)),
+        bias_attr=paddle.ParamAttr(name='%s_layer_norm_bias' %
+                                   name if name is not None else None,
+                                   initializer=nn.initializer.Constant(1.)),
+    )
 
 
 def append_name(name, postfix):
@@ -63,6 +65,7 @@ def append_name(name, postfix):
 
 
 class AttentionLayer(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(AttentionLayer, self).__init__()
         initializer = nn.initializer.TruncatedNormal(
@@ -78,8 +81,8 @@ class AttentionLayer(nn.Layer):
         self.d_key = d_model_q // n_head
         self.q = _build_linear(d_model, d_model_q,
                                append_name(name, 'query_fc'), initializer)
-        self.k = _build_linear(d_model, d_model_q,
-                               append_name(name, 'key_fc'), initializer)
+        self.k = _build_linear(d_model, d_model_q, append_name(name, 'key_fc'),
+                               initializer)
         self.v = _build_linear(d_model, d_model_v,
                                append_name(name, 'value_fc'), initializer)
         self.o = _build_linear(d_model_v, d_model,
@@ -103,15 +106,12 @@ class AttentionLayer(nn.Layer):
             k = paddle.concat([cached_k, k], 1)
             v = paddle.concat([cached_v, v], 1)
 
-        q = q.reshape(
-            [0, 0, self.n_head, q.shape[-1] // self.n_head]).transpose(
-                [0, 2, 1, 3])  #[batch, head, seq, dim]
-        k = k.reshape(
-            [0, 0, self.n_head, k.shape[-1] // self.n_head]).transpose(
-                [0, 2, 1, 3])  #[batch, head, seq, dim]
-        v = v.reshape(
-            [0, 0, self.n_head, v.shape[-1] // self.n_head]).transpose(
-                [0, 2, 1, 3])  #[batch, head, seq, dim]
+        q = q.reshape([0, 0, self.n_head, q.shape[-1] // self.n_head
+                       ]).transpose([0, 2, 1, 3])  #[batch, head, seq, dim]
+        k = k.reshape([0, 0, self.n_head, k.shape[-1] // self.n_head
+                       ]).transpose([0, 2, 1, 3])  #[batch, head, seq, dim]
+        v = v.reshape([0, 0, self.n_head, v.shape[-1] // self.n_head
+                       ]).transpose([0, 2, 1, 3])  #[batch, head, seq, dim]
 
         q = q.scale(self.d_key**-0.5)
         score = q.matmul(k, transpose_y=True)
@@ -127,6 +127,7 @@ class AttentionLayer(nn.Layer):
 
 
 class PositionwiseFeedForwardLayer(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(PositionwiseFeedForwardLayer, self).__init__()
         initializer = nn.initializer.TruncatedNormal(
@@ -138,9 +139,10 @@ class PositionwiseFeedForwardLayer(nn.Layer):
             d_model,
             d_ffn,
             append_name(name, 'fc_0'),
-            initializer, )
-        self.o = _build_linear(d_ffn, d_model,
-                               append_name(name, 'fc_1'), initializer)
+            initializer,
+        )
+        self.o = _build_linear(d_ffn, d_model, append_name(name, 'fc_1'),
+                               initializer)
         prob = cfg.get('intermediate_dropout_prob', 0.)
         self.dropout = nn.Dropout(p=prob)
 
@@ -152,22 +154,25 @@ class PositionwiseFeedForwardLayer(nn.Layer):
 
 
 class ErnieEncoderLayer(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(ErnieEncoderLayer, self).__init__()
         d_model = cfg['hidden_size']
-        self.attn = AttentionLayer(
-            cfg, name=append_name(name, 'multi_head_att'))
+        self.attn = AttentionLayer(cfg,
+                                   name=append_name(name, 'multi_head_att'))
         self.ln1 = _build_ln(d_model, name=append_name(name, 'post_att'))
-        self.ffn = PositionwiseFeedForwardLayer(
-            cfg, name=append_name(name, 'ffn'))
+        self.ffn = PositionwiseFeedForwardLayer(cfg,
+                                                name=append_name(name, 'ffn'))
         self.ln2 = _build_ln(d_model, name=append_name(name, 'post_ffn'))
         prob = cfg.get('intermediate_dropout_prob', cfg['hidden_dropout_prob'])
         self.dropout = nn.Dropout(p=prob)
 
     def forward(self, inputs, attn_bias=None, past_cache=None):
-        attn_out, cache = self.attn(
-            inputs, inputs, inputs, attn_bias,
-            past_cache=past_cache)  #self attn
+        attn_out, cache = self.attn(inputs,
+                                    inputs,
+                                    inputs,
+                                    attn_bias,
+                                    past_cache=past_cache)  #self attn
         attn_out = self.dropout(attn_out)
         hidden = attn_out + inputs
         hidden = self.ln1(hidden)  # dropout/ add/ norm
@@ -180,6 +185,7 @@ class ErnieEncoderLayer(nn.Layer):
 
 
 class ErnieEncoderStack(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(ErnieEncoderStack, self).__init__()
         n_layers = cfg['num_hidden_layers']
@@ -271,27 +277,26 @@ class ErnieGenPretrainedModel(object):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base/ernie_gen_base.pdparams",
             "ernie-gen-large-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/ernie_gen_large.pdparams",
-            "ernie-gen-large-430g-en":
+            "ernie-gen-large-en-430g":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/ernie_gen_large_430g.pdparams",
         }
     }
 
     # Support more model to warm start.
     pretrained_init_configuration = {
-        ** ernie_gen_pretrained_init_configuration, **
-        BertPretrainedModel.pretrained_init_configuration, **
-        ElectraPretrainedModel.pretrained_init_configuration, **
-        RobertaPretrainedModel.pretrained_init_configuration, **
-        ErniePretrainedModel.pretrained_init_configuration
+        **ernie_gen_pretrained_init_configuration,
+        **BertPretrainedModel.pretrained_init_configuration,
+        **ElectraPretrainedModel.pretrained_init_configuration,
+        **RobertaPretrainedModel.pretrained_init_configuration,
+        **ErniePretrainedModel.pretrained_init_configuration
     }
     pretrained_resource_files_map = {
         "model_state": {
-            ** ernie_gen_pretrained_resource_files_map["model_state"], **
-            BertPretrainedModel.pretrained_resource_files_map["model_state"], **
-            ElectraPretrainedModel.pretrained_resource_files_map["model_state"],
-            **
-            RobertaPretrainedModel.pretrained_resource_files_map["model_state"],
-            ** ErniePretrainedModel.pretrained_resource_files_map["model_state"]
+            **ernie_gen_pretrained_resource_files_map["model_state"],
+            **BertPretrainedModel.pretrained_resource_files_map["model_state"],
+            **ElectraPretrainedModel.pretrained_resource_files_map["model_state"],
+            **RobertaPretrainedModel.pretrained_resource_files_map["model_state"],
+            **ErniePretrainedModel.pretrained_resource_files_map["model_state"]
         }
     }
 
@@ -305,8 +310,8 @@ class ErnieGenPretrainedModel(object):
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
-                cls.pretrained_init_configuration[
-                    pretrained_model_name_or_path])
+                cls.pretrained_init_configuration[pretrained_model_name_or_path]
+            )
         else:
             if os.path.isdir(pretrained_model_name_or_path):
                 for file_id, file_name in cls.resource_files_names.items():
@@ -347,15 +352,18 @@ class ErnieGenPretrainedModel(object):
         else:
             init_kwargs = init_configuration
 
-        # import pdb; pdb.set_trace()
-        if not os.path.exists(resolved_resource_files[file_id]):
-            raise ValueError('pretrain dir not found: %s' %
-                             resolved_resource_files[file_id])
+        # position args are stored in kwargs, maybe better not include
+        init_args = init_kwargs.pop("init_args", [{}])[0]
+        if len(init_args) == 0:
+            init_args = init_kwargs
 
         name_prefix = kwargs.pop('name', None)
-        model = cls(init_kwargs, name=name_prefix)
+        init_kwargs.pop('name', None)
+        init_args.pop('name', None)
 
-        weight_path = list(resolved_resource_files.values())[0]
+        model = cls(init_args, name=name_prefix)
+
+        weight_path = resolved_resource_files["model_state"]
         logger.info('loading pretrained model from %s' % weight_path)
 
         if os.path.exists(weight_path):
@@ -401,9 +409,8 @@ class ErnieGenPretrainedModel(object):
             if key == "init_args":
                 args = []
                 for arg in value:
-                    args.append(
-                        arg.init_config
-                        if isinstance(arg, ErnieGenPretrainedModel) else arg)
+                    args.append(arg.init_config if isinstance(
+                        arg, ErnieGenPretrainedModel) else arg)
                 model_config[key] = tuple(args)
             elif isinstance(value, ErnieGenPretrainedModel):
                 model_config[key] = value.init_config
@@ -414,7 +421,7 @@ class ErnieGenPretrainedModel(object):
                                  list(self.resource_files_names.values())[0])
         paddle.save(self.state_dict(), file_name)
 
-    def _wrap_init(self, original_init, *args, **kwargs):
+    def _post_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
         `__init__` as a attribute named `config` of the prtrained model instance.
@@ -424,6 +431,7 @@ class ErnieGenPretrainedModel(object):
 
 
 class ErnieModel(nn.Layer, ErnieGenPretrainedModel):
+
     def __init__(self, cfg, name=None):
         """
         Fundamental pretrained Ernie model
@@ -441,24 +449,23 @@ class ErnieModel(nn.Layer, ErnieGenPretrainedModel):
             std=cfg['initializer_range'])
 
         self.ln = _build_ln(d_model, name=append_name(name, 'pre_encoder'))
-        self.word_emb = nn.Embedding(
-            d_vocab,
-            d_emb,
-            weight_attr=paddle.ParamAttr(
-                name=append_name(name, 'word_embedding'),
-                initializer=initializer))
-        self.pos_emb = nn.Embedding(
-            d_pos,
-            d_emb,
-            weight_attr=paddle.ParamAttr(
-                name=append_name(name, 'pos_embedding'),
-                initializer=initializer))
-        self.sent_emb = nn.Embedding(
-            d_sent,
-            d_emb,
-            weight_attr=paddle.ParamAttr(
-                name=append_name(name, 'sent_embedding'),
-                initializer=initializer))
+        self.word_emb = nn.Embedding(d_vocab,
+                                     d_emb,
+                                     weight_attr=paddle.ParamAttr(
+                                         name=append_name(
+                                             name, 'word_embedding'),
+                                         initializer=initializer))
+        self.pos_emb = nn.Embedding(d_pos,
+                                    d_emb,
+                                    weight_attr=paddle.ParamAttr(
+                                        name=append_name(name, 'pos_embedding'),
+                                        initializer=initializer))
+        self.sent_emb = nn.Embedding(d_sent,
+                                     d_emb,
+                                     weight_attr=paddle.ParamAttr(
+                                         name=append_name(
+                                             name, 'sent_embedding'),
+                                         initializer=initializer))
         prob = cfg['hidden_dropout_prob']
         self.dropout = nn.Dropout(p=prob)
 
@@ -521,14 +528,15 @@ class ErnieModel(nn.Layer, ErnieGenPretrainedModel):
                 Additional middle level info, inclues all hidden stats and k/v caches.
         """
         assert len(
-            src_ids.
-            shape) == 2, 'expect src_ids.shape = [batch, sequecen], got %s' % (
-                repr(src_ids.shape))
+            src_ids.shape
+        ) == 2, 'expect src_ids.shape = [batch, sequecen], got %s' % (repr(
+            src_ids.shape))
         assert attn_bias is not None if past_cache else True, 'if `past_cache` is specified; attn_bias should not be None'
         d_seqlen = paddle.shape(src_ids)[1]
         if pos_ids is None:
-            pos_ids = paddle.arange(
-                0, d_seqlen, 1, dtype='int32').reshape([1, -1]).cast('int64')
+            pos_ids = paddle.arange(0, d_seqlen, 1,
+                                    dtype='int32').reshape([1,
+                                                            -1]).cast('int64')
         if attn_bias is None:
             if input_mask is None:
                 input_mask = paddle.cast(src_ids != 0, 'float32')
@@ -537,18 +545,18 @@ class ErnieModel(nn.Layer, ErnieGenPretrainedModel):
             attn_bias = input_mask.matmul(input_mask, transpose_y=True)
             if use_causal_mask:
                 sequence = paddle.reshape(
-                    paddle.arange(
-                        0, d_seqlen, 1, dtype='float32') + 1., [1, 1, -1, 1])
-                causal_mask = (sequence.matmul(
-                    1. / sequence, transpose_y=True) >= 1.).cast('float32')
+                    paddle.arange(0, d_seqlen, 1, dtype='float32') + 1.,
+                    [1, 1, -1, 1])
+                causal_mask = (sequence.matmul(1. / sequence, transpose_y=True)
+                               >= 1.).cast('float32')
                 attn_bias *= causal_mask
         else:
             assert len(
                 attn_bias.shape
             ) == 3, 'expect attn_bias tobe rank 3, got %r' % attn_bias.shape
         attn_bias = (1. - attn_bias) * -10000.0
-        attn_bias = attn_bias.unsqueeze(1).tile(
-            [1, self.n_head, 1, 1])  # avoid broadcast =_=
+        attn_bias = attn_bias.unsqueeze(1).tile([1, self.n_head, 1,
+                                                 1])  # avoid broadcast =_=
 
         if sent_ids is None:
             sent_ids = paddle.zeros_like(src_ids)
@@ -591,17 +599,19 @@ class ErnieForGeneration(ErnieModel):
             d_model,
             d_model,
             append_name(name, 'mask_lm_trans_fc'),
-            initializer, )
+            initializer,
+        )
         self.act = getattr(paddle.nn.functional, cfg['hidden_act'])
-        self.mlm_ln = _build_ln(
-            d_model, name=append_name(name, 'mask_lm_trans'))
+        self.mlm_ln = _build_ln(d_model,
+                                name=append_name(name, 'mask_lm_trans'))
         self.mlm_bias = paddle.create_parameter(
             dtype='float32',
             shape=[d_vocab],
             attr=paddle.ParamAttr(
                 name=append_name(name, 'mask_lm_out_fc.b_0'),
                 initializer=nn.initializer.Constant(value=0.0)),
-            is_bias=True, )
+            is_bias=True,
+        )
 
     def forward(self, *args, **kwargs):
         """
@@ -654,24 +664,23 @@ class ErnieForGeneration(ErnieModel):
         if tgt_labels is None or tgt_pos is None:
             encoded = self.act(self.mlm(encoded))
             encoded = self.mlm_ln(encoded)
-            logits = encoded.matmul(
-                self.word_emb.weight, transpose_y=True) + self.mlm_bias
+            logits = encoded.matmul(self.word_emb.weight,
+                                    transpose_y=True) + self.mlm_bias
             output_ids = logits.argmax(-1)
             return output_ids, logits, info
         else:
             encoded_2d = encoded.gather_nd(tgt_pos)
             encoded_2d = self.act(self.mlm(encoded_2d))
             encoded_2d = self.mlm_ln(encoded_2d)
-            logits_2d = encoded_2d.matmul(
-                self.word_emb.weight, transpose_y=True) + self.mlm_bias
+            logits_2d = encoded_2d.matmul(self.word_emb.weight,
+                                          transpose_y=True) + self.mlm_bias
             if len(tgt_labels.shape) == 1:
                 tgt_labels = paddle.reshape(tgt_labels, [-1, 1])
 
-            loss = F.cross_entropy(
-                logits_2d,
-                tgt_labels,
-                reduction="none",
-                soft_label=(tgt_labels.shape[-1] != 1))
+            loss = F.cross_entropy(logits_2d,
+                                   tgt_labels,
+                                   reduction="none",
+                                   soft_label=(tgt_labels.shape[-1] != 1))
 
             return loss, logits_2d, info
 

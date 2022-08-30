@@ -98,7 +98,7 @@ with LogWriter(logdir='./visualize') as writer:
 ```
 执行完毕后会在当前路径下生成一个visualize目录，并将日志存放在其中，我们在命令行启动VisualDL即可进行查看，启动命令为：
 ```shell
-visualdl logdir ./visualize
+visualdl --logdir ./visualize
 ```
 启动后打开浏览器即可看到可视化结果
 

@@ -90,6 +90,7 @@ class POSTaggingTask(LacTask):
 
             result = list(zip(sent_out, tags_out))
             final_results.append(result)
+        final_results = self._auto_joiner(final_results, self.input_mapping)
         final_results = final_results if len(
             final_results) > 1 else final_results[0]
         return final_results

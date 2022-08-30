@@ -5,7 +5,7 @@
 * [背景介绍](#背景介绍)
 * [In-batch Negatives](#In-batchNegatives)
     * [1. 技术方案和评估指标](#技术方案)
-    * [2. 环境依赖](#环境依赖)  
+    * [2. 环境依赖](#环境依赖)
     * [3. 代码结构](#代码结构)
     * [4. 数据准备](#数据准备)
     * [5. 模型训练](#模型训练)
@@ -66,8 +66,8 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 推荐使用GPU进行训练，在预测阶段使用CPU或者GPU均可。
 
 **环境依赖**
-* python >= 3.6
-* paddlepaddle >= 2.1.3
+* python >= 3.6.2
+* paddlepaddle >= 2.2.3
 * paddlenlp >= 2.2
 * [hnswlib](https://github.com/nmslib/hnswlib) >= 0.5.2
 * visualdl >= 2.2.2
@@ -157,6 +157,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 <a name="模型训练"></a>
 
+
 ## 5. 模型训练
 
 **语义索引训练模型下载链接：**
@@ -196,30 +197,45 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --save_steps 10 \
     --max_seq_length 64 \
     --margin 0.2 \
-    --train_set_file recall/train.csv
-
+    --train_set_file recall/train.csv \
+    --evaluate \
+    --recall_result_dir "recall_result_dir" \
+    --recall_result_file "recall_result.txt" \
+    --hnsw_m 100 \
+    --hnsw_ef 100 \
+    --recall_num 50 \
+    --similar_text_pair "recall/dev.csv" \
+    --corpus_file "recall/corpus.csv"  \
+    --similar_text_pair "recall/dev.csv"
 ```
 
 参数含义说明
 
 * `device`: 使用 cpu/gpu 进行训练
+* `save_dir`: 模型存储路径
 * `batch_size`: 训练的batch size的大小
 * `learning_rate`: 训练的学习率的大小
 * `epochs`: 训练的epoch数
-* `save_dir`: 模型存储路径
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
 * `max_seq_length`: 输入序列的最大长度
 * `margin`: 正样本相似度与负样本之间的目标 Gap
 * `train_set_file`: 训练集文件
-
+* `evaluate`: 是否开启边训练边评估模型训练效果，默认开启
+* `recall_result_dir`: 召回结果存储目录
+* `recall_result_file`: 召回结果的文件名
+* `hnsw_m`: hnsw 算法相关参数，保持默认即可
+* `hnsw_ef`: hnsw 算法相关参数，保持默认即可
+* `recall_num`: 对 1 个文本召回的相似文本数量
+* `similar_text_pair`: 由相似文本对构成的评估集
+* `corpus_file`: 召回库数据 corpus_file
+* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
 
 也可以使用bash脚本：
 
 ```
 sh scripts/train_batch_neg.sh
 ```
-
 
 
 <a name="评估"></a>
@@ -481,7 +497,11 @@ python export_to_serving.py \
 sh scripts/export_to_serving.sh
 ```
 
-然后启动server:
+Paddle Serving的部署有两种方式，第一种方式是Pipeline的方式，第二种是C++的方式，下面分别介绍这两种方式的用法：
+
+#### Pipeline方式
+
+启动 Pipeline Server:
 
 ```
 python web_service.py
@@ -516,6 +536,81 @@ PipelineClient::predict before time:1641450851.375738
 ```
 
 可以看到客户端发送了2条文本，返回了2个 embedding 向量
+
+#### C++的方式
+
+启动C++的Serving：
+
+```
+python -m paddle_serving_server.serve --model serving_server --port 9393 --gpu_id 2 --thread 5 --ir_optim True --use_trt --precision FP16
+```
+也可以使用脚本：
+
+```
+sh deploy/C++/start_server.sh
+```
+Client 可以使用 http 或者 rpc 两种方式，rpc 的方式为：
+
+```
+python deploy/C++/rpc_client.py
+```
+运行的输出为：
+```
+I0209 20:40:07.978225 20896 general_model.cpp:490] [client]logid=0,client_cost=395.695ms,server_cost=392.559ms.
+time to cost :0.3960278034210205 seconds
+{'output_embedding': array([[ 9.01343748e-02, -1.21870913e-01,  1.32834800e-02,
+        -1.57673359e-01, -2.60387752e-02,  6.98455423e-02,
+         1.58108603e-02,  3.89952064e-02,  3.22783105e-02,
+         3.49135026e-02,  7.66086206e-02, -9.12970975e-02,
+         6.25643134e-02,  7.21886680e-02,  7.03565404e-02,
+         5.44054210e-02,  3.25332815e-03,  5.01751155e-02,
+......
+```
+可以看到服务端返回了向量
+
+或者使用 http 的客户端访问模式：
+
+```
+python deploy/C++/http_client.py
+```
+运行的输出为：
+
+```
+(2, 64)
+(2, 64)
+outputs {
+  tensor {
+    float_data: 0.09013437479734421
+    float_data: -0.12187091261148453
+    float_data: 0.01328347995877266
+    float_data: -0.15767335891723633
+......
+```
+可以看到服务端返回了向量
+
+## FAQ
+
+#### 如何基于无监督SimCSE训练出的模型参数作为参数初始化继续做有监督 In-Batch Negative 训练？
+
++ 使用 `--init_from_ckpt` 参数加载即可，下面是使用示例：
+
+```
+python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+    train_batch_neg.py \
+    --device gpu \
+    --save_dir ./checkpoints/simcse_inbatch_negative \
+    --batch_size 64 \
+    --learning_rate 5E-5 \
+    --epochs 3 \
+    --output_emb_size 256 \
+    --save_steps 10 \
+    --max_seq_length 64 \
+    --margin 0.2 \
+    --train_set_file recall/train.csv  \
+    --init_from_ckpt simcse/model_20000/model_state.pdparams
+```
+
+
 
 ## Reference
 

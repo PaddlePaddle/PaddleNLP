@@ -24,15 +24,15 @@ class BQCorpus(DatasetBuilder):
     MD5 = "abe6c480b96cb705b4d24bd522848009"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('bq_corpus', 'bq_corpus', 'train.tsv'),
-            'd37683e9ee778ee2f4326033b654adb9'),
-        'dev': META_INFO(
-            os.path.join('bq_corpus', 'bq_corpus', 'dev.tsv'),
-            '8a71f2a69453646921e9ee1aa457d1e4'),
-        'test': META_INFO(
-            os.path.join('bq_corpus', 'bq_corpus', 'test.tsv'),
-            'c797995baa248b144ceaa4018b191e52'),
+        'train':
+        META_INFO(os.path.join('bq_corpus', 'bq_corpus', 'train.tsv'),
+                  'd37683e9ee778ee2f4326033b654adb9'),
+        'dev':
+        META_INFO(os.path.join('bq_corpus', 'bq_corpus', 'dev.tsv'),
+                  '8a71f2a69453646921e9ee1aa457d1e4'),
+        'test':
+        META_INFO(os.path.join('bq_corpus', 'bq_corpus', 'test.tsv'),
+                  'c797995baa248b144ceaa4018b191e52'),
     }
 
     def _get_data(self, mode, **kwargs):

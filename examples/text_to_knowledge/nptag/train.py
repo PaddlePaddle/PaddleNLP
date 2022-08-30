@@ -23,7 +23,7 @@ import paddle
 import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Stack, Tuple
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 
 from data import convert_example, create_dataloader, read_custom_data
@@ -89,43 +89,41 @@ def do_train(args):
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(
-        read_custom_data,
-        filename=os.path.join(args.data_dir, "train.txt"),
-        is_test=False,
-        lazy=False)
-    dev_ds = load_dataset(
-        read_custom_data,
-        filename=os.path.join(args.data_dir, "dev.txt"),
-        is_test=False,
-        lazy=False)
+    train_ds = load_dataset(read_custom_data,
+                            filename=os.path.join(args.data_dir, "train.txt"),
+                            is_test=False,
+                            lazy=False)
+    dev_ds = load_dataset(read_custom_data,
+                          filename=os.path.join(args.data_dir, "dev.txt"),
+                          is_test=False,
+                          lazy=False)
 
     tokenizer = ErnieCtmTokenizer.from_pretrained("nptag")
     model = ErnieCtmNptagModel.from_pretrained("nptag")
     vocab_size = model.ernie_ctm.config["vocab_size"]
 
-    trans_func = partial(
-        convert_example, tokenzier=tokenizer, max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example,
+                         tokenzier=tokenizer,
+                         max_seq_len=args.max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Stack(dtype='int64'),  # input_ids
-        Stack(dtype='int64'),  # token_type_ids
-        Stack(dtype='int64'),  # labels
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # token_type_ids
+        Pad(axis=0, pad_val=-100, dtype='int64'),  # labels
     ): fn(samples)
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode="train",
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode="train",
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode="dev",
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode="dev",
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -161,8 +159,8 @@ def do_train(args):
             global_step += 1
             input_ids, token_type_ids, labels = batch
             logits = model(input_ids, token_type_ids)
-            loss = criterion(
-                logits.reshape([-1, vocab_size]), labels.reshape([-1]))
+            loss = criterion(logits.reshape([-1, vocab_size]),
+                             labels.reshape([-1]))
 
             loss.backward()
             optimizer.step()
@@ -177,8 +175,8 @@ def do_train(args):
                     % (global_step, epoch, loss.numpy().item(), speed))
                 start_time = time.time()
 
-            if (global_step % args.save_steps == 0 or
-                    global_step == num_training_steps) and rank == 0:
+            if (global_step % args.save_steps == 0
+                    or global_step == num_training_steps) and rank == 0:
                 output_dir = os.path.join(args.output_dir,
                                           "model_%d" % (global_step))
                 if not os.path.exists(output_dir):

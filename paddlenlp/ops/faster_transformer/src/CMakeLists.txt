@@ -52,12 +52,20 @@ if(ON_INFER)
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/include")
+  if (WITH_ONNXRUNTIME)
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/include")
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}paddle2onnx/include")
+  endif()
 
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/lib")
   link_directories("${PADDLE_LIB}/paddle/lib")
+  if (WITH_ONNXRUNTIME)
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib")
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}paddle2onnx/lib")
+  endif()
 
   if (WIN32)
     add_definitions("/DGOOGLE_GLOG_DLL_DECL=")
@@ -137,6 +145,10 @@ if(ON_INFER)
     endif()
   endif()
 
+  if (WITH_ONNXRUNTIME)
+    set(DEPS ${DEPS} ${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib/libonnxruntime.so paddle2onnx)
+  endif()
+
   if (NOT WIN32)
     set(EXTERNAL_LIB "-lrt -ldl -lpthread")
     set(DEPS ${DEPS}
@@ -167,6 +179,10 @@ if(ON_INFER)
   if(WITH_GPT AND WITH_SP)
     set(DEPS ${DEPS} sentencepiece)
     add_dependencies(decoding_infer_op extern_sentencepiece)
+  endif()
+
+  if(WITH_PARALLEL)
+    set(DEPS ${DEPS} mpi nccl)
   endif()
 
   if(WIN32)
@@ -265,6 +281,10 @@ else(ON_INFER)
   set(ft_lib_link
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils
   )
+
+  if(WITH_PARALLEL)
+    set(ft_lib_link ${ft_lib_link} -lmpi -lnccl)
+  endif()
 
   add_definitions(-DPADDLE_WITH_CUDA)
   add_definitions(-DEIGEN_USE_GPU)

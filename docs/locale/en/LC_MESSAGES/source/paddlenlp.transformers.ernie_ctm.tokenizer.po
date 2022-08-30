@@ -1,0 +1,295 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.transformers.ernie_ctm.tokenizer.rst:2
+msgid "tokenizer"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:1
+msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:1
+msgid "Construct an ERNIE-CTM tokenizer."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:3
+msgid ""
+"This tokenizer inherits from "
+":class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer` "
+"which contains most of the main methods. For more information regarding "
+"those methods, please refer to this superclass."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:7
+msgid "File path of the vocabulary."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:9
+msgid "Whether or not to lowercase the input when tokenizing. Defaults to `True`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:11
+msgid ""
+"Whether or not to do basic tokenization before WordPiece. Defaults to "
+"`True`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:13
+msgid ""
+"A special token representing the *unknown (out-of-vocabulary)* token. An "
+"unknown token is set to be `unk_token` inorder to be converted to an ID. "
+"Defaults to \"[UNK]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:17
+msgid ""
+"A special token separating two different sentences in the same input. "
+"Defaults to \"[SEP]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:20
+msgid ""
+"A special token used to make arrays of tokens the same size for batching "
+"purposes. Defaults to \"[PAD]\"."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:23
+msgid ""
+"The template of summary token for multiple summary placeholders. Defaults"
+" to `\"[CLS{}]\"`"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:25
+msgid ""
+"Summary placeholder used in ernie-ctm model. For catching a sentence "
+"global feature from multiple aware. Defaults to `1`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:28
+msgid ""
+"A special token representing a masked token. This is the token used in "
+"the masked language modeling task. This is the token which the model will"
+" try to predict the original unmasked ones. Defaults to `\"[MASK]\"`."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:32
+msgid ""
+"(bool, optional): Whether or not to strip all accents. If this option is "
+"not specified, then it will be determined by the value for `lowercase` "
+"(as in the original BERT)."
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:37
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string:12
+msgid "实际案例"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size:1
+msgid "Return the size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size:3
+msgid "The size of vocabulary."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size
+msgid "返回类型"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string:1
+msgid ""
+"Converts a sequence of tokens (list of string) in a single string. Since "
+"the usage of WordPiece introducing `##` to concat subwords, also remove "
+"`##` when converting."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string:5
+msgid "A list of string representing tokens to be converted."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string:8
+msgid "Converted string from tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:1
+msgid ""
+"Build model inputs from a sequence or a pair of sequences for sequence "
+"classification tasks by concatenating and add special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:4
+msgid "A ERNIE-CTM sequence has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:6
+msgid "single sequence:      [CLS0][CLS1]... X [SEP]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:7
+msgid "pair of sequences:        [CLS0][CLS1]... X [SEP] X [SEP]"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:9
+msgid "List of IDs to which the special tokens will be added."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:11
+msgid "Optional second list of IDs for sequence pairs. Defaults to ``None``."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.build_inputs_with_special_tokens:14
+msgid "The input_id with the appropriate special tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask:1
+msgid ""
+"Creates a special tokens mask from the input sequences. This method is "
+"called when adding special tokens using the tokenizer `encode` method."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:23
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask:4
+msgid "A list of `inputs_ids` for the first sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:25
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask:6
+msgid ""
+"Optional second list of `inputs_ids` for the second sequence. Defaults to"
+" `None`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask:9
+msgid ""
+"Whether or not the token list already contains special tokens for the "
+"model. Defaults to `False`."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask:13
+msgid ""
+"A list of integers which is either 0 or 1: 1 for a special token, 0 for a"
+" sequence token."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:1
+msgid "Creates a token_type mask from the input sequences."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:3
+msgid ""
+"If `token_ids_1` is not `None`, then a sequence pair token_type mask has "
+"the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:11
+msgid ""
+"Else if `token_ids_1` is `None`, then a single sequence token_type mask "
+"has the following format:"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:19
+msgid "0 stands for the segment id of **first segment tokens**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:20
+msgid "1 stands for the segment id of **second segment tokens**,"
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:21
+msgid "2 stands for the segment id of **cls_token**."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.create_token_type_ids_from_sequences:29
+msgid "List of token type IDs according to the given sequence(s)."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add:1
+msgid ""
+"Returns the number of added tokens when encoding a sequence with special "
+"tokens."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add:5
+msgid ""
+"This encodes inputs and checks the number of added tokens, and is "
+"therefore not efficient. Do not put this inside your training loop."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add:8
+msgid ""
+"Whether the input is a sequence pair or a single sequence. Defaults to "
+"`False` and the input is a single sequence."
+msgstr ""
+
+#: of
+#: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add:12
+msgid "Number of tokens added to sequences."
+msgstr ""
+

@@ -40,7 +40,7 @@ void ker_curand_setupLauncher(curandState_t* state,
                               cudaStream_t stream) {
   dim3 block(256);
   dim3 grid((int)(ceil(args.batch_size_ * 1.0 / 256)));
-  int seed = clock();
+  int seed = args.seed_ != -1 ? args.seed_ : clock() % INT_MAX;
   ker_curand_setup<<<grid, block, 0, stream>>>(state, args.batch_size_, seed);
 }
 
@@ -562,6 +562,88 @@ __global__ void topk_stage_2_opt3_sampling(
       rand_num = rand_num - (float)s_val2[s_id[i]];
       if (rand_num <= 0.0f || i == k - 1) {
         ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
+        break;
+      }
+    }
+    if (finished_buf != nullptr) {
+      if (sequence_length != nullptr) {
+        sequence_length[batch_id] = finished_buf[batch_id]
+                                        ? sequence_length[batch_id]
+                                        : sequence_length[batch_id] + 1;
+      }
+      finished_buf[batch_id] = ids[batch_id] == end_id ? 1 : 0;
+    }
+  }
+}
+
+template <typename T, int BLOCK_SIZE_, int BLOCKS_PER_BEAM_>
+__global__ void topk_stage_2_opt3_sampling_v2(
+    const int* __restrict topk_tmp_id_buf,
+    T* topk_tmp_val_buf,
+    T* topk_tmp2_val_buf,
+    int* ids,
+    int* sequence_length,
+    float* scores,
+    bool* finished_buf,
+    const int k,
+    curandState_t* curandstate,
+    const int end_id,
+    const int vocab_size) {
+  const int size = k * BLOCKS_PER_BEAM_;
+  const int tid = threadIdx.x;
+  const int batch_id = blockIdx.x;
+  const bool IS_FP16 = std::is_same<T, half>::value;
+  const T MAX_T_VAL = (IS_FP16) ? HALF_FLT_MAX : FLT_MAX;
+
+  typedef cub::BlockReduce<TopK_2<float>, BLOCK_SIZE_> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+  extern __shared__ char array[];
+  __shared__ float rand_num;
+  __shared__ float s_sum;
+  // __shared__ float s_max;
+  T* s_val = topk_tmp_val_buf + batch_id * size;
+  int* s_id = (int*)(array);
+  // s_max = (float)0.0f;
+  s_sum = (float)0.0f;
+  TopK_2<float> partial;
+
+  for (int index = tid; index < size; index += BLOCK_SIZE_) {
+    topk_tmp2_val_buf[batch_id * size + index] =
+        topk_tmp_val_buf[batch_id * size + index];
+  }
+  __syncthreads();
+  T* s_val2 = topk_tmp2_val_buf + batch_id * size;
+
+  for (int ite = 0; ite < k; ite++) {
+    partial.init();
+#pragma unroll
+    for (int i = tid; i < size; i += BLOCK_SIZE_) {
+      partial.insert((float)s_val[i], i);
+    }
+
+    TopK_2<float> total =
+        BlockReduce(temp_storage).Reduce(partial, reduce_topk_op_2<float>);
+
+    // if (ite == 0) s_max = total.u;
+
+    if (tid == 0) {
+      s_id[ite] = total.p;
+      s_val[total.p] = -MAX_T_VAL;
+      // total.u = __expf(total.u - s_max);
+      s_val2[total.p] = (T)total.u;
+      s_sum += total.u;
+    }
+    __syncthreads();
+  }
+  if (tid == 0) {
+    rand_num = (float)curand_uniform(curandstate + blockIdx.x) * s_sum;
+    for (int i = 0; i < k; i++) {
+      rand_num = rand_num - (float)s_val2[s_id[i]];
+      if (rand_num <= 0.0f || i == k - 1) {
+        ids[batch_id] = topk_tmp_id_buf[batch_id * size + s_id[i]] % vocab_size;
+        if (scores) {
+          scores[batch_id] += __logf((float)s_val2[s_id[i]]);
+        }
         break;
       }
     }
@@ -1512,6 +1594,100 @@ void topK_sampling_kernel_kernelLauncher_v2(void* workspace,
 #undef CASE_K
 
 
+#define CASE_K(K_MIN, K_MAX, BLOCK_SIZE_1_, BLOCK_SIZE_2_, BLOCKS_PER_BEAM_) \
+  case K_MIN... K_MAX:                                                       \
+    topk_stage_1_opt3<T,                                                     \
+                      BLOCK_SIZE_1_,                                         \
+                      BLOCKS_PER_BEAM_><<<batch_size * BLOCKS_PER_BEAM_,     \
+                                          BLOCK_SIZE_1_,                     \
+                                          0,                                 \
+                                          stream>>>(log_probs,               \
+                                                    temp_log_probs,          \
+                                                    topk_tmp_id_buf,         \
+                                                    topk_tmp_val_buf,        \
+                                                    finished_buf,            \
+                                                    candidate_num,           \
+                                                    vocab_size,              \
+                                                    end_id);                 \
+    topk_stage_2_opt3_sampling_v2<T,                                            \
+                               BLOCK_SIZE_2_,                                \
+                               BLOCKS_PER_BEAM_><<<batch_size,               \
+                                                   BLOCK_SIZE_2_,            \
+                                                   K_MAX * sizeof(int),      \
+                                                   stream>>>(                \
+        topk_tmp_id_buf,                                                     \
+        topk_tmp_val_buf,                                                    \
+        topk_tmp2_val_buf,                                                   \
+        ids,                                                                 \
+        sequence_length,                                                     \
+        scores,                                                              \
+        finished_buf,                                                        \
+        candidate_num,                                                       \
+        curandstate,                                                         \
+        end_id,                                                              \
+        vocab_size);                                                         \
+    break;
+
+
+template <typename T>
+void topK_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            T* log_probs,
+                                            int* ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments args,
+                                            cudaStream_t stream,
+                                            const int batch_size) {
+  // Here, we put batch size as an argument because the batch size of
+  // initialization
+  // and inference may be different due to pipelint parallelism.
+  const int candidate_num = args.candidate_num_;
+  const int vocab_size = args.vocab_size_padded_;
+  const int end_id = args.end_id_;
+
+  const int max_block_per_beam = 8;
+  int temp_log_probs_buf_size = batch_size * vocab_size;  // type float
+  int topk_tmp_ids_buf_size =
+      batch_size * candidate_num * max_block_per_beam;  // type int
+  int topk_tmp_val_buf_size =
+      batch_size * candidate_num * max_block_per_beam;  // type float
+
+  // prevent memory misalinged address
+  temp_log_probs_buf_size = (int)(ceil(temp_log_probs_buf_size / 4.)) * 4;
+  topk_tmp_ids_buf_size = (int)(ceil(topk_tmp_ids_buf_size / 4.)) * 4;
+  topk_tmp_val_buf_size = (int)(ceil(topk_tmp_val_buf_size / 4.)) * 4;
+
+  if (workspace == nullptr) {
+    workspace_size = sizeof(T) * temp_log_probs_buf_size +
+                     sizeof(int) * topk_tmp_ids_buf_size +
+                     2 * sizeof(T) * topk_tmp_val_buf_size;
+    return;
+  } else {
+    T* temp_log_probs = (T*)workspace;
+    int* topk_tmp_id_buf = (int*)(temp_log_probs + temp_log_probs_buf_size);
+    T* topk_tmp_val_buf = (T*)(topk_tmp_id_buf + topk_tmp_ids_buf_size);
+    T* topk_tmp2_val_buf = (T*)(topk_tmp_val_buf + topk_tmp_val_buf_size);
+
+    switch (candidate_num) {
+      CASE_K(1, 16, 128, 128, 8);
+      CASE_K(17, 32, 256, 128, 8);
+      CASE_K(33, 64, 256, 256, 8);
+      default:
+        printf("[ERROR] Topk kernel does not support candidate_num = %d \n",
+               candidate_num);
+        exit(0);
+        break;
+    }
+    return;
+  }
+}
+
+#undef CASE_K
+
+
 template void topK_sampling_kernel_kernelLauncher(
     void* workspace,
     size_t& workspace_size,
@@ -1560,6 +1736,29 @@ template void topK_sampling_kernel_kernelLauncher_v2(
     cudaStream_t stream,
     const int batch_size);
 
+template void topK_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            float* log_probs,
+                                            int* ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments args,
+                                            cudaStream_t stream,
+                                            const int batch_size);
+
+template void topK_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            half* log_probs,
+                                            int* ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments args,
+                                            cudaStream_t stream,
+                                            const int batch_size);
 
 __global__ void init_topp_id_val(int* topp_id_val_buf,
                                  int* topp_offset_buf,
@@ -1634,7 +1833,8 @@ __global__ void top_p_sampling_v2(T* sorted_log_probs,
                                   curandState_t* curandstate,
                                   const float prob_threshold,
                                   const int end_id,
-                                  const int batch_size) {
+                                  const int batch_size,
+                                  float* scores = nullptr) {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   if (tid < batch_size) {
     T rand_num = (T)curand_uniform(curandstate + tid) * (T)prob_threshold;
@@ -1643,6 +1843,9 @@ __global__ void top_p_sampling_v2(T* sorted_log_probs,
       rand_num = rand_num - sorted_log_probs[i];
       if (rand_num <= (T)0.0) {
         ids[tid] = sorted_id_vals[i];
+        if (scores) {
+          scores[tid] += __logf((float)sorted_log_probs[i]);
+        }
         break;
       }
     };
@@ -1941,6 +2144,103 @@ void topP_sampling_kernel_kernelLauncher_v2(void* workspace,
   }
 }
 
+template <typename T>
+void topP_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            const T* log_probs,
+                                            const int* id_vals,
+                                            int* offset_buf,
+                                            int* begin_offset_buf,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments& args,
+                                            int* output_ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            const int n,
+                                            cudaStream_t stream,
+                                            const int batch_size) {
+  // Here, we put batch size as an argument because the batch size of
+  // initialization
+  // and inference may be different due to pipelint parallelism.
+  const int vocab_size = args.vocab_size_padded_;
+  const int block_size = 256;
+
+  int sorted_log_prob_buf_size = batch_size * vocab_size;  // type T
+  int sorted_id_vals_buf_size = batch_size * vocab_size;   // type int
+  sorted_log_prob_buf_size = (int)(ceil(sorted_log_prob_buf_size / 4.)) * 4;
+  sorted_id_vals_buf_size = (int)(ceil(sorted_id_vals_buf_size / 4.)) * 4;
+
+  void* cub_temp_storage = workspace;
+  T* sorted_log_probs =
+      (T*)((char*)cub_temp_storage + args.cub_temp_storage_size_);
+  int* sorted_id_vals = (int*)(sorted_log_probs + sorted_log_prob_buf_size);
+
+
+  if (workspace == nullptr) {
+    cub::DeviceSegmentedRadixSort::SortPairsDescending(
+        nullptr,
+        args.cub_temp_storage_size_,
+        log_probs,
+        (T*)nullptr,
+        id_vals,
+        (int*)nullptr,
+        vocab_size * batch_size,
+        batch_size,
+        begin_offset_buf,
+        offset_buf + 1,
+        0,              // begin_bit
+        sizeof(T) * 8,  // end_bit = sizeof(KeyT) * 8
+        stream);        // cudaStream_t
+    args.cub_temp_storage_size_ =
+        (int)(ceil(args.cub_temp_storage_size_ / 4.)) * 4;
+    workspace_size = sizeof(T) * sorted_log_prob_buf_size +
+                     sizeof(int) * sorted_id_vals_buf_size +
+                     args.cub_temp_storage_size_;
+  } else {
+    beam_topK_kernel_for_topP<
+        T,
+        1,
+        block_size><<<batch_size, block_size, 0, stream>>>(
+        log_probs,
+        sorted_id_vals,
+        sorted_log_probs,
+        vocab_size,
+        offset_buf,
+        begin_offset_buf,
+        args.probability_threshold_);
+
+    cub::DeviceSegmentedRadixSort::SortPairsDescending(
+        cub_temp_storage,
+        args.cub_temp_storage_size_,
+        log_probs,
+        sorted_log_probs,
+        id_vals,
+        sorted_id_vals,
+        n * batch_size,
+        batch_size,
+        begin_offset_buf,
+        offset_buf + 1,
+        0,              // begin_bit
+        sizeof(T) * 8,  // end_bit = sizeof(KeyT) * 8
+        stream);        // cudaStream_t
+
+    dim3 block(256);
+    dim3 grid((int)(ceil(batch_size * 1.0 / 256)));
+    top_p_sampling_v2<<<grid, block, 0, stream>>>(sorted_log_probs,
+                                                  sorted_id_vals,
+                                                  output_ids,
+                                                  sequence_length,
+                                                  finished_buf,
+                                                  n,
+                                                  curandstate,
+                                                  args.probability_threshold_,
+                                                  args.end_id_,
+                                                  batch_size,
+                                                  scores);
+  }
+}
+
 template void topP_sampling_kernel_kernelLauncher_v2(
     void* workspace,
     size_t& workspace_size,
@@ -1972,6 +2272,38 @@ template void topP_sampling_kernel_kernelLauncher_v2(
     const int n,
     cudaStream_t stream,
     const int batch_size);
+
+template void topP_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            const float* log_probs,
+                                            const int* id_vals,
+                                            int* offset_buf,
+                                            int* begin_offset_buf,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments& args,
+                                            int* output_ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            const int n,
+                                            cudaStream_t stream,
+                                            const int batch_size);
+
+template void topP_sampling_kernel_kernelLauncher_v3(void* workspace,
+                                            size_t& workspace_size,
+                                            const half* log_probs,
+                                            const int* id_vals,
+                                            int* offset_buf,
+                                            int* begin_offset_buf,
+                                            bool* finished_buf,
+                                            curandState_t* curandstate,
+                                            DecodingSamplingArguments& args,
+                                            int* output_ids,
+                                            int* sequence_length,
+                                            float* scores,
+                                            const int n,
+                                            cudaStream_t stream,
+                                            const int batch_size);
 
 template <typename T, int MAX_K, int THREADBLOCK_SIZE>
 __launch_bounds__(THREADBLOCK_SIZE) __global__

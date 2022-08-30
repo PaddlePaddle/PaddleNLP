@@ -92,40 +92,44 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 
 ```python
 # 使用 ERNIE 预训练模型
+# ernie-3.0-medium-zh
+model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+
 # ernie-1.0
-model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0')
-tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+# model = AutoModel.from_pretrained('ernie-1.0-base-zh')
+# tokenizer = AutoTokenizer.from_pretrained('ernie-1.0-base-zh')
 
 # ernie-tiny
-# model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-tiny')
-# tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained('ernie-tiny')
+# model = AutoModel.Model.from_pretrained('ernie-tiny')
+# tokenizer = AutoTokenizer.from_pretrained('ernie-tiny')
 
 
 # 使用 BERT 预训练模型
 # bert-base-chinese
-# model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
-# tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
+# model = AutoModel.Model.from_pretrained('bert-base-chinese')
+# tokenizer = AutoTokenizer.from_pretrained('bert-base-chinese')
 
 # bert-wwm-chinese
-# model = ppnlp.transformers.BertModel.from_pretrained('bert-wwm-chinese')
-# tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-wwm-chinese')
+# model = AutoModel.from_pretrained('bert-wwm-chinese')
+# tokenizer = AutoTokenizer.from_pretrained('bert-wwm-chinese')
 
 # bert-wwm-ext-chinese
-# model = ppnlp.transformers.BertModel.from_pretrained('bert-wwm-ext-chinese')
-# tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-wwm-ext-chinese')
+# model = AutoModel.from_pretrained('bert-wwm-ext-chinese')
+# tokenizer = AutoTokenizer.from_pretrained('bert-wwm-ext-chinese')
 
 
 # 使用 RoBERTa 预训练模型
 # roberta-wwm-ext
-# model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
-# tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
+# model = AutoModel..from_pretrained('roberta-wwm-ext')
+# tokenizer = AutoTokenizer.from_pretrained('roberta-wwm-ext')
 
 # roberta-wwm-ext
-# model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext-large')
-# tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext-large')
+# model = AutoModel.from_pretrained('roberta-wwm-ext-large')
+# tokenizer = AutoTokenizer.from_pretrained('roberta-wwm-ext-large')
 
 ```
-更多预训练模型，参考[transformers](../../../docs/model_zoo/transformers.rst)
+更多预训练模型，参考[transformers](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：

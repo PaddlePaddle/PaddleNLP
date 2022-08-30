@@ -1,0 +1,84 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.taskflow.rst:2
+msgid "taskflow"
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:3
+msgid ""
+"The Taskflow is the end2end inferface that could convert the raw text to "
+"model result, and decode the model result to task result. The main "
+"functions as follows:"
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:2
+msgid "Convert the raw text to task result."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:3
+msgid "Convert the model to the inference model."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:4
+msgid "Offer the usage and help message."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:5
+msgid "The task name for the Taskflow, and get the task class from the name."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:7
+msgid "The model name in the task, if set None, will use the default model."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:9
+msgid ""
+"Select the mode of the task, only used in the tasks of word_segmentation "
+"and ner. If set None, will use the default mode."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:12
+msgid "The device id for the gpu, xpu and other devices, the defalut value is 0."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow:14
+msgid "Additional keyword arguments passed along to the specific task."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow.help:1
+msgid "Return the task usage message."
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow.task_path:1
+msgid "Return the path of current task"
+msgstr ""
+
+#: of paddlenlp.taskflow.taskflow.Taskflow.tasks:1
+msgid "Return the available task list."
+msgstr ""
+

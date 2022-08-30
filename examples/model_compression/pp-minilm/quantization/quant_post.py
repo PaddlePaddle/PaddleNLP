@@ -32,61 +32,64 @@ from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument(
-    "--task_name", type=str, default="afqmc", required=False, help="task_name")
-parser.add_argument(
-    "--input_dir",
-    type=str,
-    default="afqmc",
-    required=False,
-    help="Input task model directory.")
+parser.add_argument("--task_name", type=str, required=True, help="task_name")
+parser.add_argument("--input_dir",
+                    type=str,
+                    default="../pruning/pruned_models/",
+                    required=True,
+                    help="Input task model directory.")
+parser.add_argument("--output_dir",
+                    type=str,
+                    default="./",
+                    required=False,
+                    help="Output model directory.")
 
-parser.add_argument(
-    "--save_model_filename",
-    type=str,
-    default="int8.pdmodel",
-    required=False,
-    help="File name of quantified model.")
+parser.add_argument("--save_model_filename",
+                    type=str,
+                    default="int8.pdmodel",
+                    required=False,
+                    help="File name of quantified model.")
 
-parser.add_argument(
-    "--save_params_filename",
-    type=str,
-    default="int8.pdiparams",
-    required=False,
-    help="File name of quantified model's parameters.")
+parser.add_argument("--save_params_filename",
+                    type=str,
+                    default="int8.pdiparams",
+                    required=False,
+                    help="File name of quantified model's parameters.")
 
-parser.add_argument(
-    "--input_model_filename",
-    type=str,
-    default="float.pdmodel",
-    required=False,
-    help="File name of float model.")
+parser.add_argument("--input_model_filename",
+                    type=str,
+                    default="float.pdmodel",
+                    required=False,
+                    help="File name of float model.")
 
-parser.add_argument(
-    "--input_param_filename",
-    type=str,
-    default="float.pdiparams",
-    required=False,
-    help="File name of float model's parameters.")
+parser.add_argument("--input_param_filename",
+                    type=str,
+                    default="float.pdiparams",
+                    required=False,
+                    help="File name of float model's parameters.")
 parser.add_argument(
     "--max_seq_length",
     default=128,
     type=int,
-    help="The maximum total input sequence length after tokenization. Sequences longer "
-    "than this will be truncated, sequences shorter will be padded.", )
+    help=
+    "The maximum total input sequence length after tokenization. Sequences longer "
+    "than this will be truncated, sequences shorter will be padded.",
+)
 
 parser.add_argument(
     "--use_faster_tokenizer",
     type=distutils.util.strtobool,
     default=True,
-    help="Whether to use FasterTokenizer to accelerate training or further inference."
+    help=
+    "Whether to use FasterTokenizer to accelerate training or further inference."
 )
 
 parser.add_argument(
     "--model_name_or_path",
     default='ppminilm-6l-768h',
     type=str,
-    help="Model name or the directory of model directory.", )
+    help="Model name or the directory of model directory.",
+)
 
 args = parser.parse_args()
 
@@ -101,12 +104,11 @@ def quant_post(args, batch_size=8, algo='avg'):
         trans_func = partial(convert_example, label_list=dev_ds.label_list)
     else:
         tokenizer = PPMiniLMTokenizer.from_pretrained("ppminilm-6l-768h")
-        trans_func = partial(
-            convert_example,
-            label_list=dev_ds.label_list,
-            tokenizer=tokenizer,
-            max_seq_length=128,
-            is_test=True)
+        trans_func = partial(convert_example,
+                             label_list=dev_ds.label_list,
+                             tokenizer=tokenizer,
+                             max_seq_length=128,
+                             is_test=True)
     dev_ds = dev_ds.map(trans_func, lazy=True)
 
     def batch_generator_func():
@@ -141,7 +143,8 @@ def quant_post(args, batch_size=8, algo='avg'):
     paddleslim.quant.quant_post_static(
         exe,
         args.input_dir,
-        os.path.join(args.task_name + '_quant_models', algo + str(batch_size)),
+        os.path.join(args.output_dir, args.task_name + '_quant_models',
+                     algo + str(batch_size)),
         save_model_filename=args.save_model_filename,
         save_params_filename=args.save_params_filename,
         algo=algo,
@@ -155,7 +158,8 @@ def quant_post(args, batch_size=8, algo='avg'):
         quantizable_op_type=['matmul', 'matmul_v2'],
         weight_bits=8,
         weight_quantize_type='channel_wise_abs_max',
-        batch_nums=1, )
+        batch_nums=1,
+    )
 
 
 if __name__ == '__main__':

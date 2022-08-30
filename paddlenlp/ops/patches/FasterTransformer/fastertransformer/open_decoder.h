@@ -43,6 +43,13 @@
 namespace fastertransformer {
 
 template <typename T>
+std::vector<T> copy_data(const T *src, size_t num) {
+  std::vector<T> h_tmp(num, 0);
+  cudaMemcpy(h_tmp.data(), src, sizeof(T) * num, cudaMemcpyDeviceToHost);
+  return h_tmp;
+}
+
+template <typename T>
 class DecoderInitParam : public AbstractParam {
 public:
   /* weights for masked_multi_head_attention */
@@ -97,6 +104,7 @@ private:
   int hidden_units_;
   int memory_hidden_units_;
   int normalization_before_;
+  int inner_coeff_ = 4;
   ActivationType act_;
 
   DataType_ *norm_from_tensor_buf_, *query_buf_;
@@ -141,14 +149,16 @@ public:
               int memory_hidden_units,
               bool is_fuse_QKV_in_normal_gemm = false,
               bool normalization_before = true,
-              ActivationType act = ActivationType::GELU)
+              ActivationType act = ActivationType::GELU,
+              const int inner_coeff = 4)
       // Activation function default to GELU for GPT.
       : head_num_(head_num),
         size_per_head_(size_per_head),
         memory_hidden_units_(memory_hidden_units),
         is_fuse_QKV_in_normal_gemm_(is_fuse_QKV_in_normal_gemm),
         normalization_before_(normalization_before),
-        act_(act) {
+        act_(act),
+        inner_coeff_(inner_coeff) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -195,7 +205,7 @@ public:
 
   int getWorkspaceSize() {
     assert(max_batch_size_ != -1);
-    return 13 * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9;
+    return (9 + inner_coeff_) * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9;
   }
 
   void set_tensor_parallel_param(const TensorParallelParam param) {
@@ -240,9 +250,9 @@ public:
     norm_cross_output_buf_ =
         cross_output_buf_ + buf_size;  // norm(multi-head attention_output)
     ffn_inner_buf_ =
-        norm_cross_output_buf_ + buf_size;  // 4 buf size to store inner product
+        norm_cross_output_buf_ + buf_size;  // inner_coeff_(4) buf size to store inner product
 
-    qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + 4 * buf_size);
+    qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + inner_coeff_ * buf_size);
     qkv_input_ = qkv_kernel_ + 3;
     qkv_buf_ = qkv_input_ + 3;
 
@@ -276,8 +286,7 @@ public:
                const int step,
                const int decoder_max_seq_len,
                const bool is_cross_attention,
-               const bool *finished = nullptr,
-               const int memory_max_seq_len = -1) {
+               const bool *finished = nullptr) {
 #ifndef NDEBUG
 // PRINT_FUNC_NAME_();
 #endif
@@ -300,23 +309,13 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
         PUSH_RANGE("Transformer/slf_attn")
-        if (memory_max_seq_len == -1) {
-          masked_multi_head_attention(norm_from_tensor_buf_,
-                                      key_cache_,
-                                      value_cache_,
-                                      masked_output_buf_,
-                                      finished,
-                                      step,
-                                      decoder_max_seq_len);
-        } else {
-          self_multi_head_attention(norm_from_tensor_buf_,
-                                    memory_sequence_length,
+        masked_multi_head_attention(norm_from_tensor_buf_,
                                     key_cache_,
                                     value_cache_,
                                     masked_output_buf_,
-                                    step + memory_max_seq_len,
-                                    memory_max_seq_len);
-        }
+                                    finished,
+                                    step,
+                                    decoder_max_seq_len);
         POP_RANGE
 
 #ifndef NDEBUG
@@ -381,7 +380,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -415,7 +414,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -436,23 +435,13 @@ public:
 #endif
       } else {
         // post-normalization
-        if (memory_max_seq_len == -1) {
-          masked_multi_head_attention(from_tensor,
-                                      key_cache_,
-                                      value_cache_,
-                                      masked_output_buf_,
-                                      finished,
-                                      step,
-                                      decoder_max_seq_len);
-        } else {
-          self_multi_head_attention(from_tensor,
-                                    memory_sequence_length,
+        masked_multi_head_attention(from_tensor,
                                     key_cache_,
                                     value_cache_,
                                     masked_output_buf_,
-                                    step + memory_max_seq_len,
-                                    memory_max_seq_len);
-        }
+                                    finished,
+                                    step,
+                                    decoder_max_seq_len);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -513,7 +502,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 
@@ -546,7 +535,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -694,9 +683,9 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
-              ActivationType::RELU);
+              act_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -727,9 +716,9 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
-              ActivationType::GELU);
+              act_);
           POP_RANGE
 
 #ifndef NDEBUG
@@ -823,7 +812,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
 
@@ -857,7 +846,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              4 * t_parallel_param_.local_hidden_units_,
+              inner_coeff_ * t_parallel_param_.local_hidden_units_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -912,7 +901,7 @@ public:
         qk_buf_size +
         2 * m * t_parallel_param_.local_hidden_units_ /* trans_attn, attn */;
     return (m * hidden_units_ * 3 + attn_work_space_size +
-            m * t_parallel_param_.local_hidden_units_ * 4 /* ffn buffer */) *
+            m * t_parallel_param_.local_hidden_units_ * inner_coeff_ /* ffn buffer */) *
            sizeof(DataType_);
   }
 
@@ -927,7 +916,8 @@ public:
                        const int seq_len,
                        const int ite,
                        const int max_seq_len,
-                       const bool is_final) {
+                       const bool is_final,
+                       const int* memory_sequence_length = nullptr) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -946,75 +936,152 @@ public:
 
       // set workspace
       DataType_ *norm_from_tensor_buf = (DataType_ *)workspace;
+      DataType_ *ffn_out_buf = (DataType_ *)workspace;
       DataType_ *attention_workspace = norm_from_tensor_buf + m * hidden_units_;
       DataType_ *masked_output_buf = attention_workspace + attn_work_space_size;
       DataType_ *norm_masked_output_buf = masked_output_buf + m * hidden_units_;
       DataType_ *ffn_inner_buf = norm_masked_output_buf + m * hidden_units_;
 
-      layer_norm(from_tensor,
-                 param_.self_layernorm.gamma,
-                 param_.self_layernorm.beta,
-                 norm_from_tensor_buf,
-                 m,
-                 hidden_units_,
-                 param_.stream);
+      if (normalization_before_) {
+        layer_norm(from_tensor,
+                  param_.self_layernorm.gamma,
+                  param_.self_layernorm.beta,
+                  norm_from_tensor_buf,
+                  m,
+                  hidden_units_,
+                  param_.stream);
 
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-      PUSH_RANGE("Transformer/slf_attn")
-      unfused_masked_multi_head_attention(attention_workspace,
-                                          norm_from_tensor_buf,
-                                          key_cache_,
-                                          value_cache_,
-                                          masked_output_buf,
-                                          d_attn_mask,
-                                          local_batch_size,
-                                          seq_len,
-                                          ite,
-                                          max_seq_len,
-                                          is_final);
-      if (is_final) return;
-      POP_RANGE
+
+        PUSH_RANGE("Transformer/slf_attn")
+        unfused_masked_multi_head_attention(attention_workspace,
+                                            norm_from_tensor_buf,
+                                            key_cache_,
+                                            value_cache_,
+                                            masked_output_buf,
+                                            d_attn_mask,
+                                            local_batch_size,
+                                            seq_len,
+                                            ite,
+                                            max_seq_len,
+                                            is_final,
+                                            memory_sequence_length);
+        if (is_final) return;
+        POP_RANGE
+
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-      add_bias_input_layernorm_2_kernelLauncher(
-          from_tensor,
-          param_.ffn_layernorm.gamma,
-          param_.ffn_layernorm.beta,
-          param_.self_attention.attention_output_weight.bias,
-          masked_output_buf,
-          norm_masked_output_buf,
-          m,
-          hidden_units_,
-          param_.stream);
+
+        add_bias_input_layernorm_2_kernelLauncher(
+            from_tensor,
+            param_.ffn_layernorm.gamma,
+            param_.ffn_layernorm.beta,
+            param_.self_attention.attention_output_weight.bias,
+            masked_output_buf,
+            norm_masked_output_buf,
+            m,
+            hidden_units_,
+            param_.stream);
+
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-      // For GPT decoder
-      PUSH_RANGE("Transformer/MLP");
-      ffn(norm_masked_output_buf,
-          ffn_inner_buf,
-          decoder_output,
-          m,
-          4 * t_parallel_param_.local_hidden_units_,
-          hidden_units_,
-          ActivationType::GELU);
-      POP_RANGE
+
+        // For GPT decoder
+        PUSH_RANGE("Transformer/MLP");
+        ffn(norm_masked_output_buf,
+            ffn_inner_buf,
+            decoder_output,
+            m,
+            inner_coeff_ * t_parallel_param_.local_hidden_units_,
+            hidden_units_,
+            act_);
+        POP_RANGE
+
 #ifndef NDEBUG
-      cudaDeviceSynchronize();
-      check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
-      add_bias_input_kernelLauncher(decoder_output,
-                                    param_.ffn.output_weight.bias,
-                                    masked_output_buf,
-                                    m,
-                                    hidden_units_,
-                                    param_.stream);
+
+        add_bias_input_kernelLauncher(decoder_output,
+                                      param_.ffn.output_weight.bias,
+                                      masked_output_buf,
+                                      m,
+                                      hidden_units_,
+                                      param_.stream);
+      } else {
+
+        PUSH_RANGE("Transformer/slf_attn")
+        unfused_masked_multi_head_attention(attention_workspace,
+                                            from_tensor,
+                                            key_cache_,
+                                            value_cache_,
+                                            masked_output_buf,
+                                            d_attn_mask,
+                                            local_batch_size,
+                                            seq_len,
+                                            ite,
+                                            max_seq_len,
+                                            is_final,
+                                            memory_sequence_length);
+        if (is_final) return;
+        POP_RANGE
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        add_bias_input_layernorm_2_kernelLauncher(
+            from_tensor,
+            param_.self_layernorm.gamma,
+            param_.self_layernorm.beta,
+            param_.self_attention.attention_output_weight.bias,
+            masked_output_buf,
+            norm_masked_output_buf,
+            m,
+            hidden_units_,
+            param_.stream);
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        // For GPT decoder
+        PUSH_RANGE("Transformer/MLP");
+        ffn(norm_masked_output_buf,
+            ffn_inner_buf,
+            ffn_out_buf,
+            m,
+            inner_coeff_ * t_parallel_param_.local_hidden_units_,
+            hidden_units_,
+            act_);
+        POP_RANGE
+
+#ifndef NDEBUG
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
+#endif
+
+        add_bias_input_layernorm_2_kernelLauncher(
+            norm_masked_output_buf,
+            param_.ffn_layernorm.gamma,
+            param_.ffn_layernorm.beta,
+            param_.ffn.output_weight.bias,
+            ffn_out_buf,
+            decoder_output,
+            m,
+            hidden_units_,
+            param_.stream);
+
+      }
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -1025,171 +1092,6 @@ public:
     }
   }
 
-  void self_multi_head_attention(const DataType_ *from_tensor,
-                                 const int *memory_sequence_length,
-                                 DataType_ *key_cache_,
-                                 DataType_ *value_cache_,
-                                 DataType_ *decoder_output,
-                                 const int step,
-                                 const int memory_max_seq_len) {
-    int m = l_parallel_param_.local_batch_size;
-    int n = t_parallel_param_.local_hidden_units_;
-    int k = hidden_units_;
-
-
-    DataType_ alpha = (DataType_)1.0f, beta = (DataType_)0.0f;
-    if (is_fuse_QKV_in_batched_gemm_ == true) {
-      cublasGemmAlgo_t cublasAlgo =
-          static_cast<cublasGemmAlgo_t>(getAlgoIdFromMap(
-              cublasAlgoMap_,
-              3,
-              n,
-              m,
-              k,
-              std::is_same<float, DataType_>::value ? FLOAT_DATATYPE
-                                                    : HALF_DATATYPE));
-      check_cuda_error(cublasGemmBatchedEx(param_.cublas_handle,
-                                           CUBLAS_OP_N,
-                                           CUBLAS_OP_N,
-                                           n,
-                                           m,
-                                           k,
-                                           &alpha,
-                                           (const void *const *)qkv_kernel_,
-                                           AType_,
-                                           n,
-                                           (const void *const *)qkv_input_,
-                                           BType_,
-                                           k,
-                                           &beta,
-                                           (void *const *)qkv_buf_,
-                                           CType_,
-                                           n,
-                                           3,
-                                           computeType_,
-                                           cublasAlgo));
-    } else {
-      cublasMM_cublasLtMM_wrapper_decoder(
-          param_.cublaslt_handle,
-          param_.cublas_handle,
-          CUBLAS_OP_N,
-          CUBLAS_OP_N,
-          n,
-          m,
-          k,
-          &alpha,
-          param_.self_attention.query_weight.kernel,
-          AType_,
-          n,
-          from_tensor,
-          BType_,
-          k,
-          &beta,
-          query_buf_,
-          CType_,
-          n,
-          param_.stream,
-          cublasAlgoMap_,
-          cublas_workspace_);
-
-      cublasMM_cublasLtMM_wrapper_decoder(
-          param_.cublaslt_handle,
-          param_.cublas_handle,
-          CUBLAS_OP_N,
-          CUBLAS_OP_N,
-          n,
-          m,
-          k,
-          &alpha,
-          param_.self_attention.key_weight.kernel,
-          AType_,
-          n,
-          from_tensor,
-          BType_,
-          k,
-          &beta,
-          key_buf_,
-          CType_,
-          n,
-          param_.stream,
-          cublasAlgoMap_,
-          cublas_workspace_);
-
-      cublasMM_cublasLtMM_wrapper_decoder(
-          param_.cublaslt_handle,
-          param_.cublas_handle,
-          CUBLAS_OP_N,
-          CUBLAS_OP_N,
-          n,
-          m,
-          k,
-          &alpha,
-          param_.self_attention.value_weight.kernel,
-          AType_,
-          n,
-          from_tensor,
-          BType_,
-          k,
-          &beta,
-          value_buf_,
-          CType_,
-          n,
-          param_.stream,
-          cublasAlgoMap_,
-          cublas_workspace_);
-    }
-    self_attention_dispatch<DataType_>(memory_sequence_length,
-                                       key_buf_,
-                                       value_buf_,
-                                       query_buf_,
-                                       param_.self_attention.query_weight.bias,
-                                       key_cache_,
-                                       param_.self_attention.key_weight.bias,
-                                       value_cache_,
-                                       param_.self_attention.value_weight.bias,
-                                       context_buf_,
-                                       param_.request_batch_size,
-                                       head_num_,
-                                       size_per_head_,
-                                       step,
-                                       memory_max_seq_len,
-                                       param_.stream);
-
-
-    k = t_parallel_param_.local_hidden_units_;
-    n = hidden_units_;
-
-    cublasMM_cublasLtMM_wrapper_decoder(
-        param_.cublaslt_handle,
-        param_.cublas_handle,
-        CUBLAS_OP_N,
-        CUBLAS_OP_N,
-        n,
-        m,
-        k,
-        &alpha,
-        param_.self_attention.attention_output_weight.kernel,
-        AType_,
-        n,
-        context_buf_,
-        BType_,
-        k,
-        &beta,
-        decoder_output,
-        CType_,
-        n,
-        param_.stream,
-        cublasAlgoMap_,
-        cublas_workspace_);
-
-    PUSH_RANGE("Transformer/slf_attn/all2all_reduce")
-    all2all_reduce_sum(decoder_output,
-                       decoder_output,
-                       m * n,
-                       t_parallel_param_,
-                       param_.stream);
-    POP_RANGE
-  }
   void masked_multi_head_attention(const DataType_ *from_tensor,
                                    DataType_ *key_cache_,
                                    DataType_ *value_cache_,
@@ -1713,7 +1615,8 @@ public:
                                            const int seq_len,
                                            const int ite,
                                            const int max_seq_len,
-                                           const bool is_final) {
+                                           const bool is_final,
+                                           const int* memory_sequence_length = nullptr) {
     const DataType_ scalar = 1 / sqrtf(size_per_head_ * 1.0f);
     const int m = local_batch_size * seq_len;
 
@@ -1888,16 +1791,32 @@ public:
       // Use batch major
       // put k/v_buf from shape [B, H, L, Dh]
       // to cache [B, H, Dh/x, L, x]  and [B, H, L, Dh/x, x]
-      transpose_4d_batch_major_kernelLauncher(key_cache_,
-                                              value_cache_,
-                                              k_buf,
-                                              v_buf,
-                                              local_batch_size,
-                                              seq_len,
-                                              max_seq_len,
-                                              size_per_head_,
-                                              t_parallel_param_.local_head_num_,
-                                              param_.stream);
+      if (memory_sequence_length == nullptr) {
+        transpose_4d_batch_major_kernelLauncher(key_cache_,
+                                                value_cache_,
+                                                k_buf,
+                                                v_buf,
+                                                local_batch_size,
+                                                seq_len,
+                                                max_seq_len,
+                                                size_per_head_,
+                                                t_parallel_param_.local_head_num_,
+                                                param_.stream);
+      } else {
+        // Left pad to right pad. 
+        transpose_cache_batch_major_kernelLauncher(
+            key_cache_,
+            value_cache_,
+            k_buf,
+            v_buf,
+            memory_sequence_length,
+            local_batch_size,
+            seq_len,
+            max_seq_len,
+            size_per_head_,
+            t_parallel_param_.local_head_num_,
+            param_.stream);
+      }
     } else {
       printf("[ERROR] Can not decide on the cache config \n");
       exit(-1);
@@ -1982,13 +1901,13 @@ public:
         computeType_,
         cublasAlgo));
 
-    transpose_kernelLauncher(attn_out,
-                             attn_trans_out,
-                             local_batch_size,
-                             seq_len,
-                             t_parallel_param_.local_head_num_,
-                             size_per_head_,
-                             param_.stream);
+    transpose_general_kernelLauncher(attn_out,
+                                     attn_trans_out,
+                                     local_batch_size,
+                                     seq_len,
+                                     t_parallel_param_.local_head_num_,
+                                     size_per_head_,
+                                     param_.stream);
 
     {
       const int k = t_parallel_param_.local_hidden_units_;

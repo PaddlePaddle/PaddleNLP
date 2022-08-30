@@ -23,14 +23,13 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 
-import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.datasets import load_dataset
+from datasets import load_dataset
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
 from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 from paddlenlp.transformers import ErnieCtmForTokenClassification, ErnieCtmTokenizer
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -68,38 +67,18 @@ def evaluate(model, loss_fct, metric, data_loader, label_num, mode="valid"):
     metric.reset()
     avg_loss, precision, recall, f1_score = 0, 0, 0, 0
     for batch in data_loader:
-        input_ids, token_type_ids, length, labels = batch
-        logits = model(input_ids, token_type_ids)
-        loss = loss_fct(logits, labels)
+        logits = model(batch['input_ids'], batch['token_type_ids'])
+        loss = loss_fct(logits, batch['labels'])
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            length, preds, labels)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+            batch['seq_len'], preds, batch['labels'])
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
     print("%s: eval loss: %f, precision: %f, recall: %f, f1: %f" %
           (mode, avg_loss, precision, recall, f1_score))
     model.train()
-
-
-def tokenize_and_align_labels(example, tokenizer, no_entity_id,
-                              max_seq_len=512):
-    labels = example['labels']
-    example = example['tokens']
-    tokenized_input = tokenizer(
-        example,
-        return_length=True,
-        is_split_into_words=True,
-        max_seq_len=max_seq_len)
-
-    # -2 for [CLS] and [SEP]
-    if len(tokenized_input['input_ids']) - 2 < len(labels):
-        labels = labels[:len(tokenized_input['input_ids']) - 2]
-    tokenized_input['labels'] = [no_entity_id] + labels + [no_entity_id]
-    tokenized_input['labels'] += [no_entity_id] * (
-        len(tokenized_input['input_ids']) - len(tokenized_input['labels']))
-    return tokenized_input
 
 
 def do_train(args):
@@ -109,68 +88,88 @@ def do_train(args):
 
     # Create dataset, tokenizer and dataloader.
     if args.dataset == "peoples_daily_ner":
-        train_ds, dev_ds, test_ds = load_dataset(
-            args.dataset, splits=('train', 'dev', 'test'), lazy=False)
+        raw_datasets = load_dataset(args.dataset)
     else:
-        train_ds, test_ds = load_dataset(
-            args.dataset, splits=('train', 'test'), lazy=False)
+        raw_datasets = load_dataset(args.dataset)
 
     AutoForTokenClassification, AutoTokenizer = MODEL_CLASSES[args.model_type]
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    train_ds = raw_datasets['train']
 
-    label_list = train_ds.label_list
+    label_list = train_ds.features['ner_tags'].feature.names
     label_num = len(label_list)
-    no_entity_id = label_num - 1
+    no_entity_id = 0
 
-    trans_func = partial(
-        tokenize_and_align_labels,
-        tokenizer=tokenizer,
-        no_entity_id=no_entity_id,
-        max_seq_len=args.max_seq_length)
+    def tokenize_and_align_labels(examples):
+        tokenized_inputs = tokenizer(
+            examples['tokens'],
+            max_seq_len=args.max_seq_length,
+            # We use this argument because the texts in our dataset are lists of words (with a label for each word).
+            is_split_into_words=True,
+            return_length=True)
+        labels = []
 
-    train_ds = train_ds.map(trans_func)
+        for i, label in enumerate(examples['ner_tags']):
+            label_ids = label
+            if len(tokenized_inputs['input_ids'][i]) - 2 < len(label_ids):
+                label_ids = label_ids[:len(tokenized_inputs['input_ids'][i]) -
+                                      2]
+            label_ids = [no_entity_id] + label_ids + [no_entity_id]
+            label_ids += [no_entity_id] * (
+                len(tokenized_inputs['input_ids'][i]) - len(label_ids))
+
+            labels.append(label_ids)
+        tokenized_inputs["labels"] = labels
+        return tokenized_inputs
+
+    train_ds = train_ds.select(range(len(train_ds) - 1))
+    column_names = train_ds.column_names
+    train_ds = train_ds.map(tokenize_and_align_labels,
+                            batched=True,
+                            remove_columns=column_names)
 
     ignore_label = -100
 
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int32'),  # input
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int32'),  # segment
-        'seq_len': Stack(dtype='int64'),  # seq_len
-        'labels': Pad(axis=0, pad_val=ignore_label, dtype='int64')  # label
-    }): fn(samples)
+    batchify_fn = DataCollatorForTokenClassification(
+        tokenizer=tokenizer, label_pad_token_id=ignore_label)
 
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_sampler=train_batch_sampler,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   batch_sampler=train_batch_sampler,
+                                   return_list=True)
 
-    test_ds = test_ds.map(trans_func)
+    test_ds = raw_datasets['test']
+    test_ds = test_ds.select(range(len(test_ds) - 1))
+    test_ds = test_ds.map(tokenize_and_align_labels,
+                          batched=True,
+                          remove_columns=column_names)
 
-    test_data_loader = DataLoader(
-        dataset=test_ds,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        batch_size=args.batch_size,
-        return_list=True)
+    test_data_loader = DataLoader(dataset=test_ds,
+                                  collate_fn=batchify_fn,
+                                  num_workers=0,
+                                  batch_size=args.batch_size,
+                                  return_list=True)
 
     if args.dataset == "peoples_daily_ner":
-        dev_ds = dev_ds.map(trans_func)
+        dev_ds = raw_datasets['validation']
+        dev_ds = dev_ds.select(range(len(dev_ds) - 1))
+        dev_ds = dev_ds.map(tokenize_and_align_labels,
+                            batched=True,
+                            remove_columns=column_names)
 
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            batch_size=args.batch_size,
-            return_list=True)
+        dev_data_loader = DataLoader(dataset=dev_ds,
+                                     collate_fn=batchify_fn,
+                                     num_workers=0,
+                                     batch_size=args.batch_size,
+                                     return_list=True)
 
     # Define the model netword and its loss
-    model = AutoForTokenClassification.from_pretrained(
-        args.model_name_or_path, num_classes=label_num)
+    model = AutoForTokenClassification.from_pretrained(args.model_name_or_path,
+                                                       num_classes=label_num)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -204,15 +203,14 @@ def do_train(args):
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            input_ids, token_type_ids, _, labels = batch
-            logits = model(input_ids, token_type_ids)
-            loss = loss_fct(logits, labels)
+            logits = model(batch['input_ids'], batch['token_type_ids'])
+            loss = loss_fct(logits, batch['labels'])
             avg_loss = paddle.mean(loss)
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                    % (global_step, epoch, step, avg_loss,
-                       args.logging_steps / (time.time() - tic_train)))
+                    % (global_step, epoch, step, avg_loss, args.logging_steps /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
             avg_loss.backward()
             optimizer.step()
@@ -226,9 +224,10 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, test_data_loader,
                              label_num, "test")
 
-                    paddle.save(model.state_dict(),
-                                os.path.join(args.output_dir,
-                                             "model_%d.pdparams" % global_step))
+                    paddle.save(
+                        model.state_dict(),
+                        os.path.join(args.output_dir,
+                                     "model_%d.pdparams" % global_step))
             if global_step >= num_training_steps:
                 return
 

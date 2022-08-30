@@ -14,11 +14,17 @@
 import os
 import setuptools
 import sys
+import io
 import paddlenlp
-long_description = "PaddlePaddle NLP Model Core Library"
 
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
+
+
+def read(*names, **kwargs):
+    with io.open(os.path.join(os.path.dirname(__file__), *names),
+                 encoding=kwargs.get("encoding", "utf8")) as fp:
+        return fp.read()
 
 
 def get_package_data_files(package, data, package_dir=None):
@@ -46,21 +52,26 @@ def get_package_data_files(package, data, package_dir=None):
 setuptools.setup(
     name="paddlenlp",
     version=paddlenlp.__version__,
-    author="PaddlePaddle Speech and Language Team",
-    author_email="paddlesl@baidu.com",
-    description=long_description,
-    long_description=long_description,
-    long_description_content_type="text/plain",
+    author="PaddleNLP Team",
+    author_email="paddlenlp@baidu.com",
+    description=
+    "Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
+    long_description=read("README_en.md"),
+    long_description_content_type="text/markdown",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
-        where='.', exclude=('examples*', 'tests*')),
+        where='.',
+        exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizer*',
+                 'faster_generation*', 'model_zoo*')),
     package_data={
-        'paddlenlp.ops': get_package_data_files('paddlenlp.ops', [
+        'paddlenlp.ops':
+        get_package_data_files('paddlenlp.ops', [
             'CMakeLists.txt', 'README.md', 'cmake', 'faster_transformer',
             'patches', 'optimizer'
         ]),
-        'paddlenlp.transformers.layoutxlm': get_package_data_files(
-            'paddlenlp.transformers.layoutxlm', ['visual_backbone.yaml']),
+        'paddlenlp.transformers.layoutxlm':
+        get_package_data_files('paddlenlp.transformers.layoutxlm',
+                               ['visual_backbone.yaml']),
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
@@ -70,6 +81,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'License :: OSI Approved :: Apache Software License',
         'Operating System :: OS Independent',
     ],

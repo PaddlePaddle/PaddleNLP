@@ -84,7 +84,7 @@ class DDParserTask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "word_vocab": "vocab.json",
+        "word_vocab": "word_vocab.json",
         "rel_vocab": "rel_vocab.json",
     }
     resource_files_urls = {
@@ -192,6 +192,8 @@ class DDParserTask(Task):
         return inputs
 
     def from_segments(self, segmented_words):
+        # pos tag is not available for segmented inputs
+        self.use_pos = False
         segmented_words = self._check_segmented_words(segmented_words)
         inputs = {}
         inputs['words'] = segmented_words
@@ -205,10 +207,8 @@ class DDParserTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
         ]
 
     def _construct_vocabs(self):
@@ -230,7 +230,8 @@ class DDParserTask(Task):
             n_words=len(self.word_vocab),
             pad_index=self.word_pad_index,
             bos_index=self.word_bos_index,
-            eos_index=self.word_eos_index, )
+            eos_index=self.word_eos_index,
+        )
         model_path = os.path.join(self._task_path, "model_state.pdparams")
         # Load the model parameter for the predict
         state_dict = paddle.load(model_path)
@@ -248,8 +249,8 @@ class DDParserTask(Task):
         examples = []
         for text in inputs['words']:
             example = {"FORM": text}
-            example = convert_example(
-                example, vocabs=[self.word_vocab, self.rel_vocab])
+            example = convert_example(example,
+                                      vocabs=[self.word_vocab, self.rel_vocab])
             examples.append(example)
 
         batches = [
@@ -294,8 +295,9 @@ class DDParserTask(Task):
         if not self.use_pos:
             outputs['words'] = lac_results
         else:
-            outputs['words'], outputs[
-                'postags'] = [raw for raw in zip(*lac_results)]
+            outputs['words'], outputs['postags'] = [
+                raw for raw in zip(*lac_results)
+            ]
 
         outputs = self._preprocess_words(outputs)
         return outputs
@@ -335,7 +337,7 @@ class DDParserTask(Task):
         arcs = inputs['arcs']
         rels = inputs['rels']
         words = inputs['words']
-        arcs = [[s for s in seq] for seq in arcs]
+        arcs = [[s.item() for s in seq] for seq in arcs]
         rels = [self.rel_vocab.to_tokens(seq) for seq in rels]
 
         results = []
@@ -405,18 +407,18 @@ class DDParserTask(Task):
                     xy=xytext,
                     xycoords='data',
                     xytext=xytext,
-                    textcoords='data', )
+                    textcoords='data',
+                )
             else:
                 xy = (head[i - 1], 0)
                 rad = 0.5 if head[i - 1] < i else -0.5
                 # Set the word
-                ax.annotate(
-                    txt,
-                    xy=xy,
-                    xycoords='data',
-                    xytext=(xytext[0] - 0.1, xytext[1]),
-                    textcoords='data',
-                    fontproperties=self.font)
+                ax.annotate(txt,
+                            xy=xy,
+                            xycoords='data',
+                            xytext=(xytext[0] - 0.1, xytext[1]),
+                            textcoords='data',
+                            fontproperties=self.font)
                 # Draw the curve
                 ax.annotate(
                     "",
@@ -429,16 +431,17 @@ class DDParserTask(Task):
                         shrinkA=12,
                         shrinkB=12,
                         color='blue',
-                        connectionstyle="arc3,rad=%s" % rad, ), )
+                        connectionstyle="arc3,rad=%s" % rad,
+                    ),
+                )
                 # Set the deprel label. Calculate its position by the radius
                 text_x = min(i, head[i - 1]) + abs((i - head[i - 1])) / 2 - 0.2
                 text_y = abs((i - head[i - 1])) / 4
-                ax.annotate(
-                    deprel[i - 1],
-                    xy=xy,
-                    xycoords='data',
-                    xytext=[text_x, text_y],
-                    textcoords='data')
+                ax.annotate(deprel[i - 1],
+                            xy=xy,
+                            xycoords='data',
+                            xytext=[text_x, text_y],
+                            textcoords='data')
 
         # Control the axis
         self.plt.axis('equal')
@@ -447,8 +450,8 @@ class DDParserTask(Task):
         # Save to numpy array
         fig.canvas.draw()
         data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        data = data.reshape(fig.canvas.get_width_height()[::-1] + (
-            3, ))[:, :, ::-1]
+        data = data.reshape(fig.canvas.get_width_height()[::-1] +
+                            (3, ))[:, :, ::-1]
         return data
 
 
@@ -478,10 +481,8 @@ def convert_example(example, vocabs, fix_len=20):
              for word in example["FORM"]]
     words = [[word_bos_index]] + words + [[word_eos_index]]
     return [
-        pad_sequence(
-            [np.array(
-                ids[:fix_len], dtype=np.int64) for ids in words],
-            fix_len=fix_len)
+        pad_sequence([np.array(ids[:fix_len], dtype=np.int64) for ids in words],
+                     fix_len=fix_len)
     ]
 
 
@@ -684,10 +685,9 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
-    return np.lib.stride_tricks.as_strided(
-        x[offset[0]:, offset[1]:],
-        shape=[n, w] + list(x.shape[2:]),
-        strides=[m, k] + list(strides[2:]))
+    return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
+                                           shape=[n, w] + list(x.shape[2:]),
+                                           strides=[m, k] + list(strides[2:]))
 
 
 class Node:

@@ -53,8 +53,8 @@ def data_process(path, model="trigger", is_predict=False):
                     start = event["trigger_start_index"]
                     trigger = event["trigger"]
                     labels = label_data(labels, start, len(trigger), event_type)
-                output.append("{}\t{}".format('\002'.join(text_a), '\002'.join(
-                    labels)))
+                output.append("{}\t{}".format('\002'.join(text_a),
+                                              '\002'.join(labels)))
             elif model == u"role":
                 for event in d_json.get("event_list", []):
                     labels = ["O"] * len(text_a)
@@ -64,8 +64,8 @@ def data_process(path, model="trigger", is_predict=False):
                             continue
                         argument = arg["argument"]
                         start = arg["argument_start_index"]
-                        labels = label_data(labels, start,
-                                            len(argument), role_type)
+                        labels = label_data(labels, start, len(argument),
+                                            role_type)
                     output.append("{}\t{}".format('\002'.join(text_a),
                                                   '\002'.join(labels)))
     return output
@@ -163,8 +163,9 @@ def marked_doc_2_sentence(doc):
     if len(title) > 0:
         batch_sents = [[title]] + batch_sents
     for batch in batch_sents:
-        b_sent = " ".join(batch).replace("\n", " ").replace(
-            "\r\n", " ").replace("\r", " ").replace("\t", " ")
+        b_sent = " ".join(batch).replace("\n",
+                                         " ").replace("\r\n", " ").replace(
+                                             "\r", " ").replace("\t", " ")
         if b_sent in sent_mapping_event:
             continue
         sent_id = cal_md5(b_sent.encode("utf-8"))
@@ -217,7 +218,9 @@ if __name__ == "__main__":
     # schema process
     print("\n=================DUEE FINANCE DATASET==============")
     conf_dir = "./conf/DuEE-Fin"
-    schema_path = "{}/event_schema.json".format(conf_dir)
+    if not os.path.exists(conf_dir):
+        os.makedirs(conf_dir)
+    schema_path = "./data/DuEE-fin/duee_fin_event_schema.json"
     tags_trigger_path = "{}/trigger_tag.dict".format(conf_dir)
     tags_role_path = "{}/role_tag.dict".format(conf_dir)
     tags_enum_path = "{}/enum_tag.dict".format(conf_dir)
@@ -225,8 +228,8 @@ if __name__ == "__main__":
     print('input path {}'.format(schema_path))
     tags_trigger = schema_process(schema_path, "trigger")
     write_by_lines(tags_trigger_path, tags_trigger)
-    print("save trigger tag {} at {}".format(
-        len(tags_trigger), tags_trigger_path))
+    print("save trigger tag {} at {}".format(len(tags_trigger),
+                                             tags_trigger_path))
     tags_role = schema_process(schema_path, "role")
     write_by_lines(tags_role_path, tags_role)
     print("save trigger tag {} at {}".format(len(tags_role), tags_role_path))
@@ -245,14 +248,17 @@ if __name__ == "__main__":
     print("\n********** start document process **********")
     if not os.path.exists(sentence_dir):
         os.makedirs(sentence_dir)
-    train_sent = docs_data_process("{}/duee_fin_train.json".format(data_dir))
+    train_sent = docs_data_process(
+        "./data/DuEE-fin/duee_fin_train.json/duee_fin_train.json")
     write_by_lines("{}/train.json".format(sentence_dir), train_sent)
-    dev_sent = docs_data_process("{}/duee_fin_dev.json".format(data_dir))
+    dev_sent = docs_data_process(
+        "./data/DuEE-fin/duee_fin_dev.json/duee_fin_dev.json")
     write_by_lines("{}/dev.json".format(sentence_dir), dev_sent)
-    test_sent = docs_data_process("{}/duee_fin_test1.json".format(data_dir))
+    test_sent = docs_data_process(
+        "./data/DuEE-fin/duee_fin_test2.json/duee_fin_test2.json")
     write_by_lines("{}/test.json".format(sentence_dir), test_sent)
-    print("train {} dev {} test {}".format(
-        len(train_sent), len(dev_sent), len(test_sent)))
+    print("train {} dev {} test {}".format(len(train_sent), len(dev_sent),
+                                           len(test_sent)))
     print("********** end document process **********")
 
     print("\n********** start sentence process **********")
@@ -266,8 +272,8 @@ if __name__ == "__main__":
     write_by_lines("{}/dev.tsv".format(trigger_save_dir), dev_tri)
     test_tri = data_process("{}/test.json".format(sentence_dir), "trigger")
     write_by_lines("{}/test.tsv".format(trigger_save_dir), test_tri)
-    print("train {} dev {} test {}".format(
-        len(train_tri), len(dev_tri), len(test_tri)))
+    print("train {} dev {} test {}".format(len(train_tri), len(dev_tri),
+                                           len(test_tri)))
 
     print("\n----role------for dir {} to {}".format(sentence_dir,
                                                     role_save_dir))
@@ -279,8 +285,8 @@ if __name__ == "__main__":
     write_by_lines("{}/dev.tsv".format(role_save_dir), dev_role)
     test_role = data_process("{}/test.json".format(sentence_dir), "role")
     write_by_lines("{}/test.tsv".format(role_save_dir), test_role)
-    print("train {} dev {} test {}".format(
-        len(train_role), len(dev_role), len(test_role)))
+    print("train {} dev {} test {}".format(len(train_role), len(dev_role),
+                                           len(test_role)))
 
     print("\n----enum------for dir {} to {}".format(sentence_dir,
                                                     enum_save_dir))
@@ -292,7 +298,7 @@ if __name__ == "__main__":
     write_by_lines("{}/dev.tsv".format(enum_save_dir), dev_enum)
     test_enum = enum_data_process("{}/test.json".format(sentence_dir))
     write_by_lines("{}/test.tsv".format(enum_save_dir), test_enum)
-    print("train {} dev {} test {}".format(
-        len(trian_enum), len(dev_enum), len(test_enum)))
+    print("train {} dev {} test {}".format(len(trian_enum), len(dev_enum),
+                                           len(test_enum)))
     print("********** end sentence process **********")
     print("=================end data process==============")

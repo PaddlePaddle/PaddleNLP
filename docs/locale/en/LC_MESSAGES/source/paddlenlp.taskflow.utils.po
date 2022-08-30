@@ -1,0 +1,343 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../source/paddlenlp.taskflow.utils.rst:2
+msgid "utils"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:1
+msgid ""
+"Download the file from the url to specified directory. Check md5 value "
+"when the file is exists, if the md5 value is the same as the existed "
+"file, just use the older file, if not, will download the file from the "
+"url."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerNode
+#: paddlenlp.taskflow.utils.BurkhardKellerTree.add
+#: paddlenlp.taskflow.utils.BurkhardKellerTree.search_similar_word
+#: paddlenlp.taskflow.utils.TermTree.add_term
+#: paddlenlp.taskflow.utils.TermTree.build_from_dir
+#: paddlenlp.taskflow.utils.TermTree.find_term
+#: paddlenlp.taskflow.utils.TermTree.from_dir
+#: paddlenlp.taskflow.utils.TermTree.save paddlenlp.taskflow.utils.TermTreeNode
+#: paddlenlp.taskflow.utils.TermTreeNode.from_dict
+#: paddlenlp.taskflow.utils.TermTreeNode.from_json
+#: paddlenlp.taskflow.utils.TriedTree.search
+#: paddlenlp.taskflow.utils.download_check
+#: paddlenlp.taskflow.utils.download_file
+#: paddlenlp.taskflow.utils.levenstein_distance
+msgid "参数"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:5
+msgid "The specified directory saving the file."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:7
+msgid "The specified filename saving the file."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:9
+msgid "The url downling the file."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_file:11
+msgid "The md5 value that checking the version downloaded."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_check:1
+msgid "Check the resource statuc in the specified task."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.download_check:3
+msgid "The name of specified task."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.add_docstrings:1
+msgid "The function that add the doc string to doc of class."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.cut_chinese_sent:1
+msgid ""
+"Cut the Chinese sentences more precisely, reference to "
+"\"https://blog.csdn.net/blmoistawinde/article/details/82379256\"."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerNode:1
+#: paddlenlp.taskflow.utils.BurkhardKellerTree:1
+#: paddlenlp.taskflow.utils.Customization:1 paddlenlp.taskflow.utils.TermTree:1
+#: paddlenlp.taskflow.utils.TermTreeNode:1 paddlenlp.taskflow.utils.TriedTree:1
+msgid "基类：:class:`object`"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:1
+msgid ""
+"Defination of term node. All members are protected, to keep rigorism of "
+"data struct."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:3
+msgid "term id of node."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:5
+msgid "term, common name of this term."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:7
+msgid "`cb` indicates concept base, `eb` indicates entity base."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:9
+msgid "type of this term, constructs hirechical of `term` node. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:11
+msgid "parent type of a `type` node. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:13
+msgid "type statement of node, `type` or `term`. Defaults to \"term\"."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:13
+#: paddlenlp.taskflow.utils.TermTreeNode:15
+msgid "alias of this term. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:17
+msgid "extended alias of this term, CANNOT be used in matching. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:20
+msgid "grouped by some term. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:22
+msgid "some lower term. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode:24
+msgid "to sore full imformation of a term. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode.from_dict:1
+msgid "Build a node from dictionary data."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode.from_dict:3
+msgid "Dictionary data contain all k-v data."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.search_similar_word
+#: paddlenlp.taskflow.utils.TermTree.find_term
+#: paddlenlp.taskflow.utils.TermTree.from_dir
+#: paddlenlp.taskflow.utils.TermTreeNode.from_dict
+#: paddlenlp.taskflow.utils.TermTreeNode.from_json
+#: paddlenlp.taskflow.utils.TriedTree.search
+#: paddlenlp.taskflow.utils.levenstein_distance
+msgid "返回"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode.from_dict:6
+#: paddlenlp.taskflow.utils.TermTreeNode.from_json:6
+msgid "TermTree node object."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.search_similar_word
+#: paddlenlp.taskflow.utils.TermTree.find_term
+#: paddlenlp.taskflow.utils.TermTree.from_dir
+#: paddlenlp.taskflow.utils.TermTreeNode.from_dict
+#: paddlenlp.taskflow.utils.TermTreeNode.from_json
+#: paddlenlp.taskflow.utils.TriedTree.search
+#: paddlenlp.taskflow.utils.levenstein_distance
+msgid "返回类型"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode.from_json:1
+msgid "Build a node from JSON string."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTreeNode.from_json:3
+msgid "JSON string formatted by TermTree data."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree:1
+msgid "TermTree class."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:1
+msgid "Add a term into TermTree."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:3
+msgid "common name of name."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:5
+msgid "term is concept or entity."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:7
+msgid "term type of this term"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:9
+msgid "sub type of this term, must exists in TermTree. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:11
+msgid "sub terms of this term. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:15
+msgid ". Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.add_term:17
+msgid "[description]. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.find_term:1
+msgid ""
+"Find a term in Term Tree. If term not exists, return None. If `term_type`"
+" is not None, will find term with this type."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.find_term:4
+msgid "term to look up."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.find_term:6
+msgid "find term in this term_type. Defaults to None."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.build_from_dir:3
+#: paddlenlp.taskflow.utils.TermTree.find_term:9
+#: paddlenlp.taskflow.utils.TermTree.from_dir:3
+#: paddlenlp.taskflow.utils.TermTree.from_dir:6
+msgid "[description]"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.build_from_dir:1
+#: paddlenlp.taskflow.utils.TermTree.from_dir:1
+msgid ""
+"Build TermTree from a directory which should contain type schema and term"
+" data."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.save:1
+msgid "Save term tree to directory `save_dir`"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TermTree.save:3
+msgid "Directory."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.levenstein_distance:1
+msgid "Calculate minimal Levenstein distance between s1 and s2."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.levenstein_distance:3
+#: paddlenlp.taskflow.utils.levenstein_distance:5
+msgid "string"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.levenstein_distance:8
+msgid "the minimal distance."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerNode:1
+msgid ""
+"Node implementatation for BK-Tree. A BK-Tree node stores the information "
+"of current word, and its approximate words calculated by levenstein "
+"distance."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerNode:3
+msgid "word of current node."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree:1
+msgid "Implementataion of BK-Tree"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.add:1
+msgid "Insert a word into current tree. If tree is empty, set this word to root."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.add:3
+msgid "word to be inserted."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.search_similar_word:1
+msgid "Search the most similar (minimal levenstain distance) word between `s`."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.search_similar_word:3
+msgid "target word"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.BurkhardKellerTree.search_similar_word:6
+msgid "similar words."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree:1
+msgid "Implementataion of TriedTree"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree.add_word:1
+msgid "add single word into TriedTree"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree.search:1
+msgid "Backward maximum matching"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree.search:3
+msgid "string to be searched"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree.search:6
+msgid ""
+"list of maximum matching words, each element represents     the starting "
+"and ending position of the matching string."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree.search:8
+msgid "list of maximum matching words, each element represents"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.TriedTree.search:9
+msgid "the starting and ending position of the matching string."
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.Customization:1
+msgid "User intervention based on Aho-Corasick automaton"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.Customization.load_customization:1
+msgid "Load the custom vocab"
+msgstr ""
+
+#: of paddlenlp.taskflow.utils.Customization.parse_customization:1
+msgid "Use custom vocab to modify the lac results"
+msgstr ""
+

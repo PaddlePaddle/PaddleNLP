@@ -1,0 +1,1913 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../model_zoo/transformers.rst:2
+msgid "PaddleNLP Transformer API"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:4
+msgid ""
+"随着深度学习的发展，NLP领域涌现了一大批高质量的Transformer类预训练模型，多次刷新各种NLP任务SOTA（State of the "
+"Art）。 PaddleNLP为用户提供了常用的 "
+"``BERT``、``ERNIE``、``ALBERT``、``RoBERTa``、``XLNet`` 等经典结构预训练模型， "
+"让开发者能够方便快捷应用各类Transformer预训练模型及其下游任务。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:10
+msgid "Transformer预训练模型汇总"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:14
+msgid ""
+"下表汇总了介绍了目前PaddleNLP支持的各类预训练模型以及对应预训练权重。我们目前提供了 **32** 种网络结构， **136** "
+"种预训练的参数权重供用户使用， 其中包含了 **59** 种中文语言模型的预训练权重。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:18 ../model_zoo/transformers.rst:655
+msgid "Model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:18
+msgid "Pretrained Weight"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:18
+msgid "Language"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:18
+msgid "Details of the model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:20 ../model_zoo/transformers.rst:657
+msgid "ALBERT_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:20
+msgid "``albert-base-v1``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:20 ../model_zoo/transformers.rst:24
+#: ../model_zoo/transformers.rst:28 ../model_zoo/transformers.rst:32
+#: ../model_zoo/transformers.rst:36 ../model_zoo/transformers.rst:40
+#: ../model_zoo/transformers.rst:44 ../model_zoo/transformers.rst:48
+#: ../model_zoo/transformers.rst:76 ../model_zoo/transformers.rst:80
+#: ../model_zoo/transformers.rst:84 ../model_zoo/transformers.rst:88
+#: ../model_zoo/transformers.rst:92 ../model_zoo/transformers.rst:96
+#: ../model_zoo/transformers.rst:148 ../model_zoo/transformers.rst:196
+#: ../model_zoo/transformers.rst:200 ../model_zoo/transformers.rst:204
+#: ../model_zoo/transformers.rst:208 ../model_zoo/transformers.rst:212
+#: ../model_zoo/transformers.rst:216 ../model_zoo/transformers.rst:220
+#: ../model_zoo/transformers.rst:224 ../model_zoo/transformers.rst:228
+#: ../model_zoo/transformers.rst:232 ../model_zoo/transformers.rst:236
+#: ../model_zoo/transformers.rst:241 ../model_zoo/transformers.rst:246
+#: ../model_zoo/transformers.rst:252 ../model_zoo/transformers.rst:256
+#: ../model_zoo/transformers.rst:260 ../model_zoo/transformers.rst:264
+#: ../model_zoo/transformers.rst:296 ../model_zoo/transformers.rst:300
+#: ../model_zoo/transformers.rst:304 ../model_zoo/transformers.rst:312
+#: ../model_zoo/transformers.rst:316 ../model_zoo/transformers.rst:320
+#: ../model_zoo/transformers.rst:324 ../model_zoo/transformers.rst:342
+#: ../model_zoo/transformers.rst:346 ../model_zoo/transformers.rst:350
+#: ../model_zoo/transformers.rst:354 ../model_zoo/transformers.rst:358
+#: ../model_zoo/transformers.rst:362 ../model_zoo/transformers.rst:366
+#: ../model_zoo/transformers.rst:370 ../model_zoo/transformers.rst:378
+#: ../model_zoo/transformers.rst:382 ../model_zoo/transformers.rst:386
+#: ../model_zoo/transformers.rst:390 ../model_zoo/transformers.rst:394
+#: ../model_zoo/transformers.rst:398 ../model_zoo/transformers.rst:402
+#: ../model_zoo/transformers.rst:406 ../model_zoo/transformers.rst:411
+#: ../model_zoo/transformers.rst:416 ../model_zoo/transformers.rst:421
+#: ../model_zoo/transformers.rst:425 ../model_zoo/transformers.rst:445
+#: ../model_zoo/transformers.rst:448 ../model_zoo/transformers.rst:467
+#: ../model_zoo/transformers.rst:471 ../model_zoo/transformers.rst:475
+#: ../model_zoo/transformers.rst:479 ../model_zoo/transformers.rst:527
+#: ../model_zoo/transformers.rst:531 ../model_zoo/transformers.rst:540
+#: ../model_zoo/transformers.rst:545 ../model_zoo/transformers.rst:550
+#: ../model_zoo/transformers.rst:554 ../model_zoo/transformers.rst:558
+#: ../model_zoo/transformers.rst:562 ../model_zoo/transformers.rst:566
+#: ../model_zoo/transformers.rst:570 ../model_zoo/transformers.rst:574
+#: ../model_zoo/transformers.rst:579 ../model_zoo/transformers.rst:584
+#: ../model_zoo/transformers.rst:589 ../model_zoo/transformers.rst:628
+#: ../model_zoo/transformers.rst:632
+msgid "English"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:20
+msgid ""
+"12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters."
+" ALBERT base model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:24
+msgid "``albert-large-v1``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:24
+msgid ""
+"24 repeating layers, 128 embedding, 1024-hidden, 16-heads, 17M "
+"parameters. ALBERT large model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:28
+msgid "``albert-xlarge-v1``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:28
+msgid ""
+"24 repeating layers, 128 embedding, 2048-hidden, 16-heads, 58M "
+"parameters. ALBERT xlarge model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:32
+msgid "``albert-xxlarge-v1``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:32
+msgid ""
+"12 repeating layers, 128 embedding, 4096-hidden, 64-heads, 223M "
+"parameters. ALBERT xxlarge model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:36
+msgid "``albert-base-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:36
+msgid ""
+"12 repeating layers, 128 embedding, 768-hidden, 12-heads, 11M parameters."
+" ALBERT base model (version2)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:40
+msgid "``albert-large-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:40
+msgid ""
+"24 repeating layers, 128 embedding, 1024-hidden, 16-heads, 17M "
+"parameters. ALBERT large model (version2)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:44
+msgid "``albert-xlarge-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:44
+msgid ""
+"24 repeating layers, 128 embedding, 2048-hidden, 16-heads, 58M "
+"parameters. ALBERT xlarge model (version2)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:48
+msgid "``albert-xxlarge-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:48
+msgid ""
+"12 repeating layers, 128 embedding, 4096-hidden, 64-heads, 223M "
+"parameters. ALBERT xxlarge model (version2)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:52
+msgid "``albert-chinese-tiny``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:52 ../model_zoo/transformers.rst:56
+#: ../model_zoo/transformers.rst:60 ../model_zoo/transformers.rst:64
+#: ../model_zoo/transformers.rst:68 ../model_zoo/transformers.rst:72
+#: ../model_zoo/transformers.rst:112 ../model_zoo/transformers.rst:117
+#: ../model_zoo/transformers.rst:123 ../model_zoo/transformers.rst:129
+#: ../model_zoo/transformers.rst:133 ../model_zoo/transformers.rst:137
+#: ../model_zoo/transformers.rst:154 ../model_zoo/transformers.rst:159
+#: ../model_zoo/transformers.rst:164 ../model_zoo/transformers.rst:169
+#: ../model_zoo/transformers.rst:173 ../model_zoo/transformers.rst:268
+#: ../model_zoo/transformers.rst:272 ../model_zoo/transformers.rst:276
+#: ../model_zoo/transformers.rst:280 ../model_zoo/transformers.rst:284
+#: ../model_zoo/transformers.rst:288 ../model_zoo/transformers.rst:292
+#: ../model_zoo/transformers.rst:308 ../model_zoo/transformers.rst:329
+#: ../model_zoo/transformers.rst:333 ../model_zoo/transformers.rst:337
+#: ../model_zoo/transformers.rst:374 ../model_zoo/transformers.rst:429
+#: ../model_zoo/transformers.rst:433 ../model_zoo/transformers.rst:437
+#: ../model_zoo/transformers.rst:441 ../model_zoo/transformers.rst:451
+#: ../model_zoo/transformers.rst:456 ../model_zoo/transformers.rst:461
+#: ../model_zoo/transformers.rst:464 ../model_zoo/transformers.rst:483
+#: ../model_zoo/transformers.rst:487 ../model_zoo/transformers.rst:491
+#: ../model_zoo/transformers.rst:495 ../model_zoo/transformers.rst:499
+#: ../model_zoo/transformers.rst:503 ../model_zoo/transformers.rst:507
+#: ../model_zoo/transformers.rst:511 ../model_zoo/transformers.rst:515
+#: ../model_zoo/transformers.rst:519 ../model_zoo/transformers.rst:523
+#: ../model_zoo/transformers.rst:535 ../model_zoo/transformers.rst:594
+#: ../model_zoo/transformers.rst:599 ../model_zoo/transformers.rst:604
+#: ../model_zoo/transformers.rst:608 ../model_zoo/transformers.rst:612
+#: ../model_zoo/transformers.rst:616 ../model_zoo/transformers.rst:620
+#: ../model_zoo/transformers.rst:624 ../model_zoo/transformers.rst:636
+#: ../model_zoo/transformers.rst:640 ../model_zoo/transformers.rst:644
+msgid "Chinese"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:52
+msgid ""
+"4 repeating layers, 128 embedding, 312-hidden, 12-heads, 4M parameters. "
+"ALBERT tiny model (Chinese)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:56
+msgid "``albert-chinese-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:56
+msgid ""
+"6 repeating layers, 128 embedding, 384-hidden, 12-heads, _M parameters. "
+"ALBERT small model (Chinese)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:60
+msgid "``albert-chinese-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:60
+msgid ""
+"12 repeating layers, 128 embedding, 768-hidden, 12-heads, 12M parameters."
+" ALBERT base model (Chinese)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:64
+msgid "``albert-chinese-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:64
+msgid ""
+"24 repeating layers, 128 embedding, 1024-hidden, 16-heads, 18M "
+"parameters. ALBERT large model (Chinese)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:68
+msgid "``albert-chinese-xlarge``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:68
+msgid ""
+"24 repeating layers, 128 embedding, 2048-hidden, 16-heads, 60M "
+"parameters. ALBERT xlarge model (Chinese)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:72
+msgid "``albert-chinese-xxlarge``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:72
+msgid ""
+"12 repeating layers, 128 embedding, 4096-hidden, 16-heads, 235M "
+"parameters. ALBERT xxlarge model (Chinese)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:76 ../model_zoo/transformers.rst:659
+msgid "BART_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:76
+msgid "``bart-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:76
+msgid "12-layer, 768-hidden, 12-heads, 217M parameters. BART base model (English)"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:80
+msgid "``bart-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:80
+msgid ""
+"24-layer, 768-hidden, 16-heads, 509M parameters. BART large model "
+"(English)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:84 ../model_zoo/transformers.rst:661
+msgid "BERT_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:84
+msgid "``bert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:84
+msgid ""
+"12-layer, 768-hidden, 12-heads, 110M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:88
+msgid "``bert-large-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:88 ../model_zoo/transformers.rst:304
+#: ../model_zoo/transformers.rst:320
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:92
+msgid "``bert-base-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:92
+msgid ""
+"12-layer, 768-hidden, 12-heads, 109M parameters. Trained on cased English"
+" text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:96
+msgid "``bert-large-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:96
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 335M parameters. Trained on cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:100
+msgid "``bert-base-multilingual-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:100 ../model_zoo/transformers.rst:106
+#: ../model_zoo/transformers.rst:141
+msgid "Multilingual"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:100
+msgid ""
+"12-layer, 768-hidden, 12-heads, 168M parameters. Trained on lower-cased "
+"text in the top 102 languages with the largest Wikipedias."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:106
+msgid "``bert-base-multilingual-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:106
+msgid ""
+"12-layer, 768-hidden, 12-heads, 179M parameters. Trained on cased text in"
+" the top 104 languages with the largest Wikipedias."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:112
+msgid "``bert-base-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:112
+msgid ""
+"12-layer, 768-hidden, 12-heads, 108M parameters. Trained on cased Chinese"
+" Simplified and Traditional text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:117
+msgid "``bert-wwm-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:117
+msgid ""
+"12-layer, 768-hidden, 12-heads, 108M parameters. Trained on cased Chinese"
+" Simplified and Traditional text using Whole-Word-Masking."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:123
+msgid "``bert-wwm-ext-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:123
+msgid ""
+"12-layer, 768-hidden, 12-heads, 108M parameters. Trained on cased Chinese"
+" Simplified and Traditional text using Whole-Word-Masking with extented "
+"data."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:129
+msgid "``junnyu/ckiplab-bert-base-chinese-ner``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:129
+msgid "12-layer, 768-hidden, 12-heads, 102M parameters. Finetuned on NER task."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:133
+msgid "``junnyu/ckiplab-bert-base-chinese-pos``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:133
+msgid "12-layer, 768-hidden, 12-heads, 102M parameters. Finetuned on POS task."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:137
+msgid "``junnyu/ckiplab-bert-base-chinese-ws``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:137
+msgid "12-layer, 768-hidden, 12-heads, 102M parameters. Finetuned on WS task."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:141
+msgid "``junnyu/nlptown-bert-base-multilingual-uncased-sentiment``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:141
+msgid ""
+"12-layer, 768-hidden, 12-heads, 167M parameters. Finetuned for sentiment "
+"analysis on product reviews in six languages: English, Dutch, German, "
+"French, Spanish and Italian."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:148
+msgid "``junnyu/tbs17-MathBERT``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:148
+msgid ""
+"12-layer, 768-hidden, 12-heads, 110M parameters. Trained on pre-k to "
+"graduate math language (English) using a masked language modeling (MLM) "
+"objective."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:154
+msgid "``macbert-base-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:154
+msgid ""
+"12-layer, 768-hidden, 12-heads, 102M parameters. Trained with novel MLM "
+"as correction pre-training task."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:159
+msgid "``macbert-large-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:159
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 326M parameters. Trained with novel MLM "
+"as correction pre-training task."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:164
+msgid "``simbert-base-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:164
+msgid ""
+"12-layer, 768-hidden, 12-heads, 108M parameters. Trained on 22 million "
+"pairs of similar sentences crawed from Baidu Know."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:169
+msgid "``Langboat/mengzi-bert-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:169
+msgid ""
+"12-layer, 768-hidden, 12-heads, 102M parameters. Trained on 300G Chinese "
+"Corpus Datasets."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:173
+msgid "``Langboat/mengzi-bert-base-fin``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:173
+msgid ""
+"12-layer, 768-hidden, 12-heads, 102M parameters. Trained on 20G Finacial "
+"Corpus, based on ``Langboat/mengzi-bert-base``."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:178
+msgid "BERT-Japanese_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:178
+msgid "``iverxin/bert-base-japanese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:178 ../model_zoo/transformers.rst:182
+#: ../model_zoo/transformers.rst:187 ../model_zoo/transformers.rst:191
+msgid "Japanese"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:178
+msgid "12-layer, 768-hidden, 12-heads, 110M parameters. Trained on Japanese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:182
+msgid "``iverxin/bert-base-japanese-whole-word-masking``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:182
+msgid ""
+"12-layer, 768-hidden, 12-heads, 109M parameters. Trained on Japanese text"
+" using Whole-Word-Masking."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:187
+msgid "``iverxin/bert-base-japanese-char``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:187
+msgid ""
+"12-layer, 768-hidden, 12-heads, 89M parameters. Trained on Japanese char "
+"text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:191
+msgid "``iverxin/bert-base-japanese-char-whole-word-masking``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:191
+msgid ""
+"12-layer, 768-hidden, 12-heads, 89M parameters. Trained on Japanese char "
+"text using Whole-Word-Masking."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:196 ../model_zoo/transformers.rst:663
+msgid "BigBird_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:196
+msgid "``bigbird-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:196
+msgid ""
+"12-layer, 768-hidden, 12-heads, 127M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:200 ../model_zoo/transformers.rst:665
+msgid "Blenderbot_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:200
+msgid "``blenderbot-3B``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:200
+msgid "26-layer, 32-heads, 3B parameters. The Blenderbot base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:204
+msgid "``blenderbot-400M-distill``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:204
+msgid ""
+"14-layer, 384-hidden, 32-heads, 400M parameters. The Blenderbot distil "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:208
+msgid "``blenderbot-1B-distill``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:208
+msgid "14-layer, 32-heads, 1478M parameters. The Blenderbot Distil 1B model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:212 ../model_zoo/transformers.rst:667
+msgid "Blenderbot-Small_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:212
+msgid "``blenderbot_small-90M``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:212
+msgid "16-layer, 16-heads, 90M parameters. The Blenderbot small model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:216 ../model_zoo/transformers.rst:669
+msgid "ConvBert_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:216
+msgid "``convbert-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:216
+msgid "12-layer, 768-hidden, 12-heads, 106M parameters. The ConvBERT base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:220
+msgid "``convbert-medium-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:220
+msgid ""
+"12-layer, 384-hidden, 8-heads, 17M parameters. The ConvBERT medium small "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:224
+msgid "``convbert-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:224
+msgid "12-layer, 128-hidden, 4-heads, 13M parameters. The ConvBERT small model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:228 ../model_zoo/transformers.rst:671
+msgid "CTRL_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:228
+msgid "``ctrl``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:228
+msgid "48-layer, 1280-hidden, 16-heads, 1701M parameters. The CTRL base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:232
+msgid "``sshleifer-tiny-ctrl``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:232
+msgid "2-layer, 16-hidden, 2-heads, 5M parameters. The Tiny CTRL model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:236 ../model_zoo/transformers.rst:673
+msgid "DistilBert_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:236
+msgid "``distilbert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:236
+msgid ""
+"6-layer, 768-hidden, 12-heads, 66M parameters. The DistilBERT model "
+"distilled from the BERT model ``bert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:241
+msgid "``distilbert-base-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:241
+msgid ""
+"6-layer, 768-hidden, 12-heads, 66M parameters. The DistilBERT model "
+"distilled from the BERT model ``bert-base-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:246
+msgid "``distilbert-base-multilingual-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:246
+msgid ""
+"6-layer, 768-hidden, 12-heads, 200M parameters. The DistilBERT model "
+"distilled from the BERT model ``bert-base-multilingual-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:252
+msgid "``sshleifer-tiny-distilbert-base-uncase-finetuned-sst-2-english``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:252
+msgid "2-layer, 2-hidden, 2-heads, 50K parameters. The DistilBERT model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:256 ../model_zoo/transformers.rst:675
+msgid "ELECTRA_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:256
+msgid "``electra-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:256
+msgid ""
+"12-layer, 768-hidden, 4-heads, 14M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:260
+msgid "``electra-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:260
+msgid ""
+"12-layer, 768-hidden, 12-heads, 109M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:264
+msgid "``electra-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:264
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 334M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:268
+msgid "``chinese-electra-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:268
+msgid "12-layer, 768-hidden, 4-heads, 12M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:272
+msgid "``chinese-electra-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:272 ../model_zoo/transformers.rst:487
+msgid "12-layer, 768-hidden, 12-heads, 102M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:276
+msgid "``junnyu/hfl-chinese-electra-180g-base-discriminator``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:276
+msgid ""
+"Discriminator, 12-layer, 768-hidden, 12-heads, 102M parameters. Trained "
+"on 180g Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:280
+msgid "``junnyu/hfl-chinese-electra-180g-small-ex-discriminator``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:280
+msgid ""
+"Discriminator, 24-layer, 256-hidden, 4-heads, 24M parameters. Trained on "
+"180g Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:284
+msgid "``junnyu/hfl-chinese-legal-electra-small-generator``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:284
+msgid ""
+"Generator, 12-layer, 64-hidden, 1-heads, 3M parameters. Trained on "
+"Chinese legal corpus."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:288 ../model_zoo/transformers.rst:677
+msgid "ERNIE_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:288
+msgid "``ernie-3.0-medium-zh``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:288 ../model_zoo/transformers.rst:308
+#: ../model_zoo/transformers.rst:329 ../model_zoo/transformers.rst:429
+#: ../model_zoo/transformers.rst:604
+msgid "12-layer, 768-hidden, 12-heads, 108M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:292
+msgid "``ernie-tiny``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:292
+msgid "3-layer, 1024-hidden, 16-heads, _M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:296
+msgid "``ernie-2.0-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:296 ../model_zoo/transformers.rst:312
+msgid ""
+"12-layer, 768-hidden, 12-heads, 103M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:300
+msgid "``ernie-2.0-en-finetuned-squad``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:300
+msgid ""
+"12-layer, 768-hidden, 12-heads, 110M parameters. Trained on finetuned "
+"squad text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:304
+msgid "``ernie-2.0-large-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:308 ../model_zoo/transformers.rst:679
+msgid "ERNIE-DOC_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:308
+msgid "``ernie-doc-base-zh``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:312
+msgid "``ernie-doc-base-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:316 ../model_zoo/transformers.rst:681
+msgid "ERNIE-GEN_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:316
+msgid "``ernie-gen-base-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:316
+msgid ""
+"12-layer, 768-hidden, 12-heads, 108M parameters. Trained on lower-cased "
+"English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:320
+msgid "``ernie-gen-large-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:324
+msgid "``ernie-gen-large-en-430g``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:324
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on lower-cased "
+"English text. with extended data (430 GB)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:329 ../model_zoo/transformers.rst:683
+msgid "ERNIE-GRAM_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:329
+msgid "``ernie-gram-zh``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:333 ../model_zoo/transformers.rst:685
+msgid "GPT_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:333
+msgid "``gpt-cpm-large-cn``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:333
+msgid "32-layer, 2560-hidden, 32-heads, 2.6B parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:337
+msgid "``gpt-cpm-small-cn-distill``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:337
+msgid ""
+"12-layer, 768-hidden, 12-heads, 109M parameters. The model distilled from"
+" the GPT model ``gpt-cpm-large-cn``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:342
+msgid "``gpt2-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:342
+msgid "12-layer, 768-hidden, 12-heads, 117M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:346
+msgid "``gpt2-medium-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:346
+msgid "24-layer, 1024-hidden, 16-heads, 345M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:350
+msgid "``gpt2-large-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:350 ../model_zoo/transformers.rst:370
+msgid "36-layer, 1280-hidden, 20-heads, 774M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:354
+msgid "``gpt2-xl-en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:354
+msgid ""
+"48-layer, 1600-hidden, 25-heads, 1558M parameters. Trained on English "
+"text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:358
+msgid "``junnyu/distilgpt2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:358
+msgid "6-layer, 768-hidden, 12-heads, 81M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:362
+msgid "``junnyu/microsoft-DialoGPT-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:362 ../model_zoo/transformers.rst:467
+msgid "12-layer, 768-hidden, 12-heads, 124M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:366
+msgid "``junnyu/microsoft-DialoGPT-medium``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:366
+msgid "24-layer, 1024-hidden, 16-heads, 354M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:370
+msgid "``junnyu/microsoft-DialoGPT-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:374
+msgid "``junnyu/uer-gpt2-chinese-poem``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:374
+msgid ""
+"12-layer, 768-hidden, 12-heads, 103M parameters. Trained on Chinese "
+"poetry corpus."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:378 ../model_zoo/transformers.rst:687
+msgid "LayoutLM_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:378
+msgid "``layoutlm-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:378
+msgid ""
+"12-layer, 768-hidden, 12-heads, 339M parameters. LayoutLm base uncased "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:382
+msgid "``layoutlm-large-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:382
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 51M parameters. LayoutLm large Uncased "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:386 ../model_zoo/transformers.rst:689
+msgid "LayoutLMV2_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:386
+msgid "``layoutlmv2-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:386
+msgid ""
+"12-layer, 768-hidden, 12-heads, 200M parameters. LayoutLmv2 base uncased "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:390
+msgid "``layoutlmv2-large-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:390
+msgid ""
+"24-layer, 1024-hidden, 16-heads, _M parameters. LayoutLmv2 large uncased "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:394 ../model_zoo/transformers.rst:691
+msgid "LayoutXLM_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:394
+msgid "``layoutxlm-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:394
+msgid ""
+"12-layer, 768-hidden, 12-heads, 369M parameters. Layoutxlm base uncased "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:398
+msgid "MBart_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:398
+msgid "``mbart-large-cc25``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:398
+msgid ""
+"12-layer, 1024-hidden, 12-heads, 1123M parameters. The ``mbart-large-"
+"cc25`` model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:402
+msgid "``mbart-large-en-ro``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:402
+msgid ""
+"12-layer, 768-hidden, 16-heads, 1123M parameters. The ``mbart-large rn-"
+"ro`` model ."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:406
+msgid "``mbart-large-50-one-to-many-mmt``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:406
+msgid ""
+"12-layer, 1024-hidden, 16-heads, 1123M parameters. ``mbart-large-50-one-"
+"to-many-mmt`` model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:411
+msgid "``mbart-large-50-many-to-one-mmt``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:411
+msgid ""
+"12-layer, 1024-hidden, 16-heads, 1123M parameters. ``mbart-large-50-many-"
+"to-one-mmt`` model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:416
+msgid "``mbart-large-50-many-to-many-mmt``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:416
+msgid ""
+"12-layer, 1024-hidden, 16-heads, 1123M parameters. ``mbart-large-50-many-"
+"to-many-mmt`` model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:421
+msgid "Mobilebert_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:421
+msgid "``mobilebert-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:421
+msgid "24-layer, 512-hidden, 4-heads, 24M parameters. Mobilebert uncased Model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:425 ../model_zoo/transformers.rst:697
+msgid "MPNet_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:425
+msgid "``mpnet-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:425
+msgid "12-layer, 768-hidden, 12-heads, 109M parameters. MPNet Base Model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:429 ../model_zoo/transformers.rst:699
+msgid "NeZha_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:429
+msgid "``nezha-base-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:433
+msgid "``nezha-large-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:433 ../model_zoo/transformers.rst:441
+msgid "24-layer, 1024-hidden, 16-heads, 336M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:437
+msgid "``nezha-base-wwm-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:437
+msgid "12-layer, 768-hidden, 16-heads, 108M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:441
+msgid "``nezha-large-wwm-chinese``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:445
+msgid "Reformer_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:445
+msgid "``reformer-enwik8``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:445
+msgid "12-layer, 1024-hidden, 8-heads, 148M parameters."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:448
+msgid "``reformer-crime-and-punishment``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:448
+msgid "6-layer, 256-hidden, 2-heads, 3M parameters."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:451 ../model_zoo/transformers.rst:703
+msgid "RoBERTa_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:451
+msgid "``roberta-wwm-ext``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:451
+msgid ""
+"12-layer, 768-hidden, 12-heads, 102M parameters. Trained on English Text "
+"using Whole-Word-Masking with extended data."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:456
+msgid "``roberta-wwm-ext-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:456
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 325M parameters. Trained on English Text"
+" using Whole-Word-Masking with extended data."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:461
+msgid "``rbt3``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:461
+msgid "3-layer, 768-hidden, 12-heads, 38M parameters."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:464
+msgid "``rbtl3``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:464
+msgid "3-layer, 1024-hidden, 16-heads, 61M parameters."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:467
+msgid "``nosaydomore/deepset-roberta-base-squad2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:471
+msgid "``nosaydomore/roberta-en-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:471
+msgid "12-layer, 768-hidden, 12-heads, 163M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:475
+msgid "``nosaydomore/roberta-en-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:475
+msgid "24-layer, 1024-hidden, 16-heads, 408M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:479
+msgid "``nosaydomore/sshleifei-tiny-distilroberta-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:479
+msgid "2-layer, 2-hidden, 2-heads, 0.25M parameters. Trained on English text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:483
+msgid "``nosaydomore/uer-roberta-base-chn-extractive-qa``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:483 ../model_zoo/transformers.rst:491
+msgid "12-layer, 768-hidden, 12-heads, 101M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:487
+msgid "``nosaydomore/uer-roberta-base-ft-chinanews-chn``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:491
+msgid "``nosaydomore/uer-roberta-base-ft-cluener2020-chn``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:495 ../model_zoo/transformers.rst:705
+msgid "RoFormer_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:495
+msgid "``roformer-chinese-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:495
+msgid ""
+"6-layer, 384-hidden, 6-heads, 30M parameters. Roformer Small Chinese "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:499
+msgid "``roformer-chinese-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:499
+msgid ""
+"12-layer, 768-hidden, 12-heads, 124M parameters. Roformer Base Chinese "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:503
+msgid "``roformer-chinese-char-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:503
+msgid ""
+"6-layer, 384-hidden, 6-heads, 15M parameters. Roformer Chinese Char Small"
+" model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:507
+msgid "``roformer-chinese-char-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:507
+msgid ""
+"12-layer, 768-hidden, 12-heads, 95M parameters. Roformer Chinese Char "
+"Base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:511
+msgid "``roformer-chinese-sim-char-ft-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:511
+msgid ""
+"6-layer, 384-hidden, 6-heads, 15M parameters. Roformer Chinese Char Ft "
+"Small model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:515
+msgid "``roformer-chinese-sim-char-ft-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:515
+msgid ""
+"12-layer, 768-hidden, 12-heads, 95M parameters. Roformer Chinese Char Ft "
+"Base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:519
+msgid "``roformer-chinese-sim-char-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:519
+msgid ""
+"6-layer, 384-hidden, 6-heads, 15M parameters. Roformer Chinese Sim Char "
+"Small model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:523
+msgid "``roformer-chinese-sim-char-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:523
+msgid ""
+"12-layer, 768-hidden, 12-heads, 95M parameters. Roformer Chinese Sim Char"
+" Base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:527
+msgid "``roformer-english-small-discriminator``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:527
+msgid ""
+"12-layer, 256-hidden, 4-heads, 13M parameters. Roformer English Small "
+"Discriminator."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:531
+msgid "``roformer-english-small-generator``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:531
+msgid ""
+"12-layer, 64-hidden, 1-heads, 5M parameters. Roformer English Small "
+"Generator."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:535 ../model_zoo/transformers.rst:707
+msgid "SKEP_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:535
+msgid "``skep_ernie_1.0_large_ch``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:535
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 336M parameters. Trained using the Erine"
+" model ``ernie_1.0``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:540
+msgid "``skep_ernie_2.0_large_en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:540
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 336M parameters. Trained using the Erine"
+" model ``ernie_2.0_large_en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:545
+msgid "``skep_roberta_large_en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:545
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 355M parameters. Trained using the "
+"RoBERTa model ``roberta_large_en``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:550 ../model_zoo/transformers.rst:709
+msgid "SqueezeBert_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:550
+msgid "``squeezebert-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:550
+msgid "12-layer, 768-hidden, 12-heads, 51M parameters. SqueezeBert Uncased model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:554
+msgid "``squeezebert-mnli``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:554
+msgid "12-layer, 768-hidden, 12-heads, 51M parameters. SqueezeBert Mnli model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:558
+msgid "``squeezebert-mnli-headless``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:558
+msgid ""
+"12-layer, 768-hidden, 12-heads, 51M parameters. SqueezeBert Mnli Headless"
+" model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:562 ../model_zoo/transformers.rst:711
+msgid "T5_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:562
+msgid "``t5-small``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:562
+msgid "6-layer, 512-hidden, 8-heads, 93M parameters. T5 small model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:566
+msgid "``t5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:566
+msgid "12-layer, 768-hidden, 12-heads, 272M parameters. T5 base model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:570
+msgid "``t5-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:570
+msgid "24-layer, 1024-hidden, 16-heads, 803M parameters. T5 large model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:574 ../model_zoo/transformers.rst:713
+msgid "TinyBert_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:574
+msgid "``tinybert-4l-312d``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:574 ../model_zoo/transformers.rst:584
+#: ../model_zoo/transformers.rst:594
+msgid ""
+"4-layer, 312-hidden, 12-heads, 14.5M parameters. The TinyBert model "
+"distilled from the BERT model ``bert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:579
+msgid "``tinybert-6l-768d``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:579 ../model_zoo/transformers.rst:589
+#: ../model_zoo/transformers.rst:599
+msgid ""
+"6-layer, 768-hidden, 12-heads, 67M parameters. The TinyBert model "
+"distilled from the BERT model ``bert-base-uncased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:584
+msgid "``tinybert-4l-312d-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:589
+msgid "``tinybert-6l-768d-v2``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:594
+msgid "``tinybert-4l-312d-zh``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:599
+msgid "``tinybert-6l-768d-zh``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:604 ../model_zoo/transformers.rst:715
+msgid "UnifiedTransformer_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:604
+msgid "``unified_transformer-12L-cn``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:608
+msgid "``unified_transformer-12L-cn-luge``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:608
+msgid ""
+"12-layer, 768-hidden, 12-heads, 108M parameters. Trained on Chinese text "
+"(LUGE.ai)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:612
+msgid "``plato-mini``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:612
+msgid "6-layer, 768-hidden, 12-heads, 66M parameters. Trained on Chinese text."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:616
+msgid "UNIMO_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:616
+msgid "``unimo-text-1.0``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:616
+msgid "12-layer, 768-hidden, 12-heads, 99M parameters. UNIMO-text-1.0 model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:620
+msgid "``unimo-text-1.0-lcsts-new``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:620
+msgid ""
+"12-layer, 768-hidden, 12-heads, 99M parameters. Finetuned on lcsts_new "
+"dataset."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:624
+msgid "``unimo-text-1.0-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:624
+msgid ""
+"24-layer, 768-hidden, 16-heads, 316M parameters. UNIMO-text-1.0 large "
+"model."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:628 ../model_zoo/transformers.rst:717
+msgid "XLNet_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:628
+msgid "``xlnet-base-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:628
+msgid "12-layer, 768-hidden, 12-heads, 110M parameters. XLNet English model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:632
+msgid "``xlnet-large-cased``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:632
+msgid ""
+"24-layer, 1024-hidden, 16-heads, 340M parameters. XLNet Large English "
+"model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:636
+msgid "``chinese-xlnet-base``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:636
+msgid "12-layer, 768-hidden, 12-heads, 117M parameters. XLNet Chinese model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:640
+msgid "``chinese-xlnet-mid``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:640
+msgid ""
+"24-layer, 768-hidden, 12-heads, 209M parameters. XLNet Medium Chinese "
+"model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:644
+msgid "``chinese-xlnet-large``"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:644
+msgid "24-layer, 1024-hidden, 16-heads, _M parameters. XLNet Large Chinese model"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:652
+msgid "Transformer预训练模型适用任务汇总"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:655
+msgid "Sequence Classification"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:655
+msgid "Token Classification"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:655
+msgid "Question Answering"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:655
+msgid "Text Generation"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:655
+msgid "Multiple Choice"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:657 ../model_zoo/transformers.rst:659
+#: ../model_zoo/transformers.rst:661 ../model_zoo/transformers.rst:663
+#: ../model_zoo/transformers.rst:665 ../model_zoo/transformers.rst:667
+#: ../model_zoo/transformers.rst:669 ../model_zoo/transformers.rst:671
+#: ../model_zoo/transformers.rst:673 ../model_zoo/transformers.rst:675
+#: ../model_zoo/transformers.rst:677 ../model_zoo/transformers.rst:679
+#: ../model_zoo/transformers.rst:681 ../model_zoo/transformers.rst:683
+#: ../model_zoo/transformers.rst:685 ../model_zoo/transformers.rst:687
+#: ../model_zoo/transformers.rst:689 ../model_zoo/transformers.rst:691
+#: ../model_zoo/transformers.rst:693 ../model_zoo/transformers.rst:695
+#: ../model_zoo/transformers.rst:697 ../model_zoo/transformers.rst:699
+#: ../model_zoo/transformers.rst:701 ../model_zoo/transformers.rst:703
+#: ../model_zoo/transformers.rst:705 ../model_zoo/transformers.rst:707
+#: ../model_zoo/transformers.rst:709 ../model_zoo/transformers.rst:711
+#: ../model_zoo/transformers.rst:713 ../model_zoo/transformers.rst:715
+#: ../model_zoo/transformers.rst:717
+msgid "✅"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:657 ../model_zoo/transformers.rst:659
+#: ../model_zoo/transformers.rst:661 ../model_zoo/transformers.rst:663
+#: ../model_zoo/transformers.rst:665 ../model_zoo/transformers.rst:667
+#: ../model_zoo/transformers.rst:671 ../model_zoo/transformers.rst:673
+#: ../model_zoo/transformers.rst:675 ../model_zoo/transformers.rst:677
+#: ../model_zoo/transformers.rst:679 ../model_zoo/transformers.rst:681
+#: ../model_zoo/transformers.rst:683 ../model_zoo/transformers.rst:685
+#: ../model_zoo/transformers.rst:687 ../model_zoo/transformers.rst:689
+#: ../model_zoo/transformers.rst:691 ../model_zoo/transformers.rst:693
+#: ../model_zoo/transformers.rst:695 ../model_zoo/transformers.rst:697
+#: ../model_zoo/transformers.rst:699 ../model_zoo/transformers.rst:701
+#: ../model_zoo/transformers.rst:703 ../model_zoo/transformers.rst:705
+#: ../model_zoo/transformers.rst:707 ../model_zoo/transformers.rst:709
+#: ../model_zoo/transformers.rst:711 ../model_zoo/transformers.rst:713
+#: ../model_zoo/transformers.rst:715 ../model_zoo/transformers.rst:717
+msgid "❌"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:693
+msgid "Mbart_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:695
+msgid "MobileBert_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:701
+msgid "ReFormer_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:756
+msgid "预训练模型使用方法"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:758
+msgid ""
+"PaddleNLP Transformer API在提丰富预训练模型的同时，也降低了用户的使用门槛。 "
+"使用Auto模块，可以加载不同网络结构的预训练模型，无需查找 模型对应的类别。只需十几行代码，用户即可完成模型加载和下游任务Fine-"
+"tuning。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:797
+msgid ""
+"上面的代码给出使用预训练模型的简要示例，更完整详细的示例代码， 可以参考：`使用预训练模型Fine-tune完成中文文本分类任务 "
+"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_classification/pretrained_models/>`_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:800
+msgid "加载数据集：PaddleNLP内置了多种数据集，用户可以一键导入所需的数据集。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:801
+msgid ""
+"加载预训练模型：PaddleNLP的预训练模型可以很容易地通过 ``from_pretrained()`` 方法加载。 "
+"Auto模块（包括AutoModel, AutoTokenizer, 及各种下游任务类）提供了方便易用的接口， "
+"无需指定类别，即可调用不同网络结构的预训练模型。 第一个参数是汇总表中对应的 ``Pretrained Weight``，可加载对应的预训练权重。"
+" ``AutoModelForSequenceClassification`` 初始化 ``__init__`` 所需的其他参数，如 "
+"``num_classes`` 等， 也是通过 ``from_pretrained()`` 传入。``Tokenizer`` 使用同样的 "
+"``from_pretrained`` 方法加载。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:807
+msgid "通过 ``Dataset`` 的 ``map`` 函数，使用 ``tokenizer`` 将 ``dataset`` 从原始文本处理成模型的输入。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:808
+msgid "定义 ``BatchSampler`` 和 ``DataLoader``，shuffle数据、组合Batch。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:809
+msgid "定义训练所需的优化器，loss函数等，就可以开始进行模型fine-tune任务。"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:813
+msgid "Reference"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:814
+msgid ""
+"部分中文预训练模型来自： `brightmart/albert_zh "
+"<https://github.com/brightmart/albert_zh>`_, `ymcui/Chinese-BERT-wwm "
+"<https://github.com/ymcui/Chinese-BERT-wwm>`_, `huawei-noah/Pretrained-"
+"Language-Model/TinyBERT <https://github.com/huawei-noah/Pretrained-"
+"Language-Model/tree/master/TinyBERT>`_, `ymcui/Chinese-XLNet "
+"<https://github.com/ymcui/Chinese-XLNet>`_, "
+"`huggingface/xlnet_chinese_large "
+"<https://huggingface.co/clue/xlnet_chinese_large>`_, `Knover/luge-"
+"dialogue <https://github.com/PaddlePaddle/Knover/tree/luge-dialogue/luge-"
+"dialogue>`_, `huawei-noah/Pretrained-Language-Model/NEZHA-PyTorch/ "
+"<https://github.com/huawei-noah/Pretrained-Language-Model/tree/master"
+"/NEZHA-PyTorch>`_ `ZhuiyiTechnology/simbert "
+"<https://github.com/ZhuiyiTechnology/simbert>`_"
+msgstr ""
+
+#: ../model_zoo/transformers.rst:823
+msgid ""
+"Lan, Zhenzhong, et al. \"Albert: A lite bert for self-supervised learning"
+" of language representations.\" arXiv preprint arXiv:1909.11942 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:824
+msgid ""
+"Lewis, Mike, et al. \"BART: Denoising Sequence-to-Sequence Pre-training "
+"for Natural Language Generation, Translation, and Comprehension.\" arXiv "
+"preprint arXiv:1910.13461 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:825
+msgid ""
+"Devlin, Jacob, et al. \"Bert: Pre-training of deep bidirectional "
+"transformers for language understanding.\" arXiv preprint "
+"arXiv:1810.04805 (2018)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:826
+msgid ""
+"Zaheer, Manzil, et al. \"Big bird: Transformers for longer sequences.\" "
+"arXiv preprint arXiv:2007.14062 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:827
+msgid ""
+"Stephon, Emily, et al. \"Blenderbot: Recipes for building an open-domain "
+"chatbot.\" arXiv preprint arXiv:2004.13637 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:828
+msgid ""
+"Stephon, Emily, et al. \"Blenderbot-Small: Recipes for building an open-"
+"domain chatbot.\" arXiv preprint arXiv:2004.13637 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:829
+msgid ""
+"Jiang, Zihang, et al. \"ConvBERT: Improving BERT with Span-based Dynamic "
+"Convolution.\" arXiv preprint arXiv:2008.02496 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:830
+msgid ""
+"Nitish, Bryan, et al. \"CTRL: A Conditional Transformer Language Model "
+"for Controllable Generation.\" arXiv preprint arXiv:1909.05858 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:831
+msgid ""
+"Sanh, Victor, et al. \"DistilBERT, a distilled version of BERT: smaller, "
+"faster, cheaper and lighter.\" arXiv preprint arXiv:1910.01108 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:832
+msgid ""
+"Clark, Kevin, et al. \"Electra: Pre-training text encoders as "
+"discriminators rather than generators.\" arXiv preprint arXiv:2003.10555 "
+"(2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:833
+msgid ""
+"Sun, Yu, et al. \"Ernie: Enhanced representation through knowledge "
+"integration.\" arXiv preprint arXiv:1904.09223 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:834
+msgid ""
+"Xiao, Dongling, et al. \"Ernie-gen: An enhanced multi-flow pre-training "
+"and fine-tuning framework for natural language generation.\" arXiv "
+"preprint arXiv:2001.11314 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:835
+msgid ""
+"Xiao, Dongling, et al. \"ERNIE-Gram: Pre-Training with Explicitly N-Gram "
+"Masked Language Modeling for Natural Language Understanding.\" arXiv "
+"preprint arXiv:2010.12148 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:836
+msgid ""
+"Radford, Alec, et al. \"Language models are unsupervised multitask "
+"learners.\" OpenAI blog 1.8 (2019): 9."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:837
+msgid ""
+"Xu, Yiheng, et al. \"LayoutLM: Pre-training of Text and Layout for "
+"Document Image Understanding.\" arXiv preprint arXiv:1912.13318 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:838
+msgid ""
+"Xu, Yang, et al. \"LayoutLMv2: Multi-modal Pre-training for Visually-Rich"
+" Document Understanding\" arXiv preprint arXiv:2012.14740 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:839
+msgid ""
+"Xu, Yiheng, et al. \"LayoutXLM: Multimodal Pre-training for Multilingual "
+"Visually-rich Document Understanding\" arXiv preprint arXiv:2104.08836 "
+"(2021)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:840
+msgid ""
+"Liu, Yinhan, et al. \"MBart: Multilingual Denoising Pre-training for "
+"Neural Machine Translation\" arXiv preprint arXiv:2001.08210 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:841
+msgid ""
+"Sun, Zhiqing, et al. \"MobileBERT: a Compact Task-Agnostic BERT for "
+"Resource-Limited Devices\" arXiv preprint arXiv:2004.02984 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:842
+msgid ""
+"Song, Kaitao, et al. \"MPNet: Masked and Permuted Pre-training for "
+"Language Understanding.\" arXiv preprint arXiv:2004.09297 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:843
+msgid ""
+"Wei, Junqiu, et al. \"NEZHA: Neural contextualized representation for "
+"chinese language understanding.\" arXiv preprint arXiv:1909.00204 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:844
+msgid ""
+"Kitaev, Nikita, et al. \"Reformer: The efficient Transformer.\" arXiv "
+"preprint arXiv:2001.04451 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:845
+msgid ""
+"Liu, Yinhan, et al. \"Roberta: A robustly optimized bert pretraining "
+"approach.\" arXiv preprint arXiv:1907.11692 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:846
+msgid ""
+"Su Jianlin, et al. \"RoFormer: Enhanced Transformer with Rotary Position "
+"Embedding.\" arXiv preprint arXiv:2104.09864 (2021)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:847
+msgid ""
+"Tian, Hao, et al. \"SKEP: Sentiment knowledge enhanced pre-training for "
+"sentiment analysis.\" arXiv preprint arXiv:2005.05635 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:848
+msgid ""
+"Forrest, ALbert, et al. \"SqueezeBERT: What can computer vision teach NLP"
+" about efficient neural networks?\" arXiv preprint arXiv:2006.11316 "
+"(2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:849
+msgid ""
+"Raffel, Colin, et al. \"T5: Exploring the Limits of Transfer Learning "
+"with a Unified Text-to-Text Transformer.\" arXiv preprint "
+"arXiv:1910.10683 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:850
+msgid ""
+"Vaswani, Ashish, et al. \"Attention is all you need.\" arXiv preprint "
+"arXiv:1706.03762 (2017)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:851
+msgid ""
+"Jiao, Xiaoqi, et al. \"Tinybert: Distilling bert for natural language "
+"understanding.\" arXiv preprint arXiv:1909.10351 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:852
+msgid ""
+"Bao, Siqi, et al. \"Plato-2: Towards building an open-domain chatbot via "
+"curriculum learning.\" arXiv preprint arXiv:2006.16779 (2020)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:853
+msgid ""
+"Yang, Zhilin, et al. \"Xlnet: Generalized autoregressive pretraining for "
+"language understanding.\" arXiv preprint arXiv:1906.08237 (2019)."
+msgstr ""
+
+#: ../model_zoo/transformers.rst:854
+msgid ""
+"Cui, Yiming, et al. \"Pre-training with whole word masking for chinese "
+"bert.\" arXiv preprint arXiv:1906.08101 (2019)."
+msgstr ""
+

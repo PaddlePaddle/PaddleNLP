@@ -19,8 +19,9 @@ import unicodedata
 from shutil import copyfile
 from typing import List, Optional
 
-from paddle.utils import try_import
-from .. import PretrainedTokenizer
+import sentencepiece as spm
+
+from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['XLNetTokenizer']
 
@@ -130,27 +131,36 @@ class XLNetTokenizer(PretrainedTokenizer):
     padding_side = "left"
     pad_token_type_id = 3
 
-    def __init__(
-            self,
-            vocab_file,
-            do_lower_case=False,
-            remove_space=True,
-            keep_accents=False,
-            bos_token="<s>",
-            eos_token="</s>",
-            unk_token="<unk>",
-            sep_token="<sep>",
-            pad_token="<pad>",
-            cls_token="<cls>",
-            mask_token="<mask>",
-            additional_special_tokens=["<eop>", "<eod>"], ):
+    def __init__(self,
+                 vocab_file,
+                 do_lower_case=False,
+                 remove_space=True,
+                 keep_accents=False,
+                 bos_token="<s>",
+                 eos_token="</s>",
+                 unk_token="<unk>",
+                 sep_token="<sep>",
+                 pad_token="<pad>",
+                 cls_token="<cls>",
+                 mask_token="<mask>",
+                 additional_special_tokens=["<eop>", "<eod>"],
+                 sp_model_kwargs=None,
+                 **kwargs):
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
+
+        self._pad_token_type_id = 3
+        self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.vocab_file = vocab_file
-        spm = try_import("sentencepiece")
-        self.sp_model = spm.SentencePieceProcessor()
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(vocab_file)
 
     @property
@@ -162,6 +172,7 @@ class XLNetTokenizer(PretrainedTokenizer):
             self.convert_ids_to_tokens(i): i
             for i in range(self.vocab_size)
         }
+        vocab.update(self.added_tokens_encoder)
         return vocab
 
     def __getstate__(self):
@@ -171,8 +182,12 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def __setstate__(self, d):
         self.__dict__ = d
-        spm = try_import("sentencepiece")
-        self.sp_model = spm.SentencePieceProcessor()
+
+        # for backward compatibility
+        if not hasattr(self, "sp_model_kwargs"):
+            self.sp_model_kwargs = {}
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(self.vocab_file)
 
     def preprocess_text(self, inputs):
@@ -191,14 +206,10 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         return outputs
 
-    def _tokenize(self, text, sample=False):
+    def _tokenize(self, text):
         """Tokenize a string."""
         text = self.preprocess_text(text)
-
-        if not sample:
-            pieces = self.sp_model.EncodeAsPieces(text)
-        else:
-            pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
+        pieces = self.sp_model.encode(text, out_type=str)
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
@@ -245,8 +256,8 @@ class XLNetTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -297,9 +308,8 @@ class XLNetTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return offset_mapping_0 + [(0, 0)] + [(0, 0)]
 
-        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [
-            (0, 0)
-        ]
+        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)
+                                                                 ] + [(0, 0)]
 
     def get_special_tokens_mask(self,
                                 token_ids_0,
@@ -330,12 +340,14 @@ class XLNetTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
-            return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)
-                                                     ) + [1, 1]
+            return ([0] * len(token_ids_0)) + [1] + ([0] *
+                                                     len(token_ids_1)) + [1, 1]
         return ([0] * len(token_ids_0)) + [1, 1]
 
     def create_token_type_ids_from_sequences(self,
@@ -382,15 +394,13 @@ class XLNetTokenizer(PretrainedTokenizer):
                                                   sep) * [1] + cls_segment_id
 
     def save_resources(self, save_directory):
-        """
-        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
-        (ends with '.spm') under `save_directory`.
-
-        Args:
-            save_directory (str):
-                Directory to save files into.
-        """
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(self.vocab_file) != os.path.abspath(save_path):
+            if os.path.abspath(self.vocab_file) != os.path.abspath(
+                    save_path) and os.path.isfile(self.vocab_file):
                 copyfile(self.vocab_file, save_path)
+            elif not os.path.isfile(self.vocab_file):
+                with open(save_path, "wb") as fi:
+                    content_spiece_model = self.sp_model.serialized_model_proto(
+                    )
+                    fi.write(content_spiece_model)

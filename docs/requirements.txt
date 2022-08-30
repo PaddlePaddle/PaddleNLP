@@ -1,10 +1,12 @@
 # Defining the exact version will make sure things don't break
 
+jinja2==3.0.3
 sphinx==3.5.2
 sphinx_rtd_theme==0.5.2
 readthedocs-sphinx-search==0.1.0
 
+Markdown < 3.4
 sphinx-copybutton==0.3.1
 sphinx-markdown-tables==0.0.15
 
-paddlepaddle >= 2.0.1
+paddlepaddle>=2.2.2

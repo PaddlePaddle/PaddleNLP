@@ -584,10 +584,12 @@ class FewCLUE(DatasetBuilder):
                     os.path.join('fewclue_cluewsc', 'dev_few_all.json'),
                     '9d5e5066758ac6ff24534b13dd2ed1ba'
                 ],
-                'unlabeled': [
-                    os.path.join('fewclue_cluewsc', 'unlabeled.json'),
-                    'd41d8cd98f00b204e9800998ecf8427e'
-                ],
+                # Note: FewCLUE cluewsc unlabeled.json() is an empty file.
+                # https://github.com/CLUEbenchmark/FewCLUE/blob/main/datasets/cluewsc/unlabeled.json
+                #'unlabeled': [
+                #    os.path.join('fewclue_cluewsc', 'unlabeled.json'),
+                #    'd41d8cd98f00b204e9800998ecf8427e'
+                #],
                 'test': [
                     os.path.join('fewclue_cluewsc', 'test.json'),
                     '0e9e8ffd8ee90ddf1f58d6dc2e02de7b'

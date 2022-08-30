@@ -27,10 +27,9 @@ def convert_example(example,
                     pad_to_max_seq_len=False):
     result = []
     for text in example:
-        encoded_inputs = tokenizer(
-            text=text,
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -38,10 +37,10 @@ def convert_example(example,
 
 
 class ErnieOp(Op):
+
     def init_op(self):
-        import paddlenlp as ppnlp
-        self.tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            'ernie-1.0')
+        from paddlenlp.transformers import AutoTokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
@@ -55,8 +54,10 @@ class ErnieOp(Op):
                                                      self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+                ),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
         feed_dict = {}
@@ -66,12 +67,13 @@ class ErnieOp(Op):
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         new_dict = {}
-        new_dict["output_embedding"] = str(fetch_dict["output_embedding"]
-                                           .tolist())
+        new_dict["output_embedding"] = str(
+            fetch_dict["output_embedding"].tolist())
         return new_dict, None, ""
 
 
 class ErnieService(WebService):
+
     def get_pipeline_response(self, read_op):
         ernie_op = ErnieOp(name="ernie", input_ops=[read_op])
         return ernie_op

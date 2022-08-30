@@ -1,6 +1,12 @@
 jieba
-h5py
 colorlog
 colorama
 seqeval
-multiprocess
+dill<0.3.5
+multiprocess<=0.70.12.2
+datasets >= 2.0.0
+tqdm
+paddlefsl
+sentencepiece
+paddle2onnx
+protobuf>=3.1.0, <=3.20.0

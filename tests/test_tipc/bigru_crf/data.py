@@ -16,10 +16,12 @@ The file_reader converts raw corpus to input.
 """
 
 import os
+from functools import partial
 
 import numpy as np
 import paddle
 from paddlenlp.datasets import MapDataset
+from paddlenlp.data import Pad, Tuple, Stack
 
 # We use "\002" to separate sentence characters and sequence labels,
 # for example: 除\002了\002他\002续\002任\002十\002二\002届\002政\002协\002委\002员
@@ -28,6 +30,7 @@ CHAR_DELIMITER = "\002"
 
 
 def load_dataset(datafiles):
+
     def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as fp:
             if "infer" in data_path:
@@ -42,8 +45,9 @@ def load_dataset(datafiles):
                     words = words.split(CHAR_DELIMITER)
                     labels = labels.split(CHAR_DELIMITER)
                     assert len(words) == len(
-                        labels), "The word %s is not match with the label %s" % (
-                            words, labels)
+                        labels
+                    ), "The word %s is not match with the label %s" % (words,
+                                                                       labels)
                     yield [words, labels]
 
     if isinstance(datafiles, str):
@@ -111,16 +115,16 @@ def convert_example(example,
         tokens, labels = example[0], None
     tokens = tokens[:max_seq_len]
 
-    token_ids = convert_tokens_to_ids(
-        tokens,
-        word_vocab,
-        oov_replace_token="OOV",
-        normlize_vocab=normlize_vocab)
+    token_ids = convert_tokens_to_ids(tokens,
+                                      word_vocab,
+                                      oov_replace_token="OOV",
+                                      normlize_vocab=normlize_vocab)
     length = len(token_ids)
     if labels is not None:
         labels = labels[:max_seq_len]
-        label_ids = convert_tokens_to_ids(
-            labels, label_vocab, oov_replace_token="O")
+        label_ids = convert_tokens_to_ids(labels,
+                                          label_vocab,
+                                          oov_replace_token="O")
         return token_ids, length, label_ids
     else:
         return token_ids, length
@@ -166,3 +170,53 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
 
         batch_out.append([sent_out, tags_out])
     return batch_out
+
+
+def create_data_loader(args):
+    # Create dataset.
+    train_ds, test_ds = load_dataset(
+        datafiles=(os.path.join(args.data_dir, 'train.tsv'),
+                   os.path.join(args.data_dir, 'test.tsv')))
+
+    word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
+    label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
+    # q2b.dic is used to replace DBC case to SBC case
+    normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
+
+    trans_func = partial(convert_example,
+                         max_seq_len=args.max_seq_len,
+                         word_vocab=word_vocab,
+                         label_vocab=label_vocab,
+                         normlize_vocab=normlize_vocab)
+    train_ds.map(trans_func)
+    test_ds.map(trans_func)
+
+    batchify_fn = lambda samples, fn=Tuple(
+        Pad(axis=0, pad_val=word_vocab.get("[PAD]", 0), dtype='int64'
+            ),  # word_ids
+        Stack(dtype='int64'),  # length
+        Pad(axis=0, pad_val=label_vocab.get("O", 0), dtype='int64'
+            ),  # label_ids
+    ): fn(samples)
+
+    # Create sampler for dataloader
+    train_sampler = paddle.io.DistributedBatchSampler(
+        dataset=train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=True)
+    train_loader = paddle.io.DataLoader(dataset=train_ds,
+                                        batch_sampler=train_sampler,
+                                        return_list=True,
+                                        collate_fn=batchify_fn)
+
+    test_sampler = paddle.io.BatchSampler(dataset=test_ds,
+                                          batch_size=args.batch_size,
+                                          shuffle=False,
+                                          drop_last=False)
+    test_loader = paddle.io.DataLoader(dataset=test_ds,
+                                       batch_sampler=test_sampler,
+                                       return_list=True,
+                                       collate_fn=batchify_fn)
+
+    return word_vocab, label_vocab, train_loader, test_loader

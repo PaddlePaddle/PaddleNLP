@@ -21,6 +21,7 @@ __all__ = ["GraphDataLoader"]
 
 
 class GraphDataLoader(object):
+
     def __init__(self,
                  dataset,
                  batch_size=1,
@@ -28,13 +29,12 @@ class GraphDataLoader(object):
                  num_workers=1,
                  collate_fn=None,
                  **kwargs):
-        self.loader = DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            num_workers=num_workers,
-            collate_fn=collate_fn,
-            **kwargs)
+        self.loader = DataLoader(dataset=dataset,
+                                 batch_size=batch_size,
+                                 shuffle=shuffle,
+                                 num_workers=num_workers,
+                                 collate_fn=collate_fn,
+                                 **kwargs)
 
     def __iter__(self):
         func = self.__callback__()
@@ -54,17 +54,16 @@ class GraphDataLoader(object):
             """
             graph_num = 1
             start_len = 0
-            datas = []
+            data = []
             graph_list = []
             for graph in range(graph_num):
                 graph_list.append(
-                    pgl.Graph(
-                        num_nodes=tensors[start_len],
-                        edges=tensors[start_len + 1]))
+                    pgl.Graph(num_nodes=tensors[start_len],
+                              edges=tensors[start_len + 1]))
                 start_len += 2
 
             for i in range(start_len, len(tensors)):
-                datas.append(tensors[i])
-            return graph_list, datas
+                data.append(tensors[i])
+            return graph_list, data
 
         return construct

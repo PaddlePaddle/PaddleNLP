@@ -3,7 +3,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.layers.utils import map_structure
 
 __all__ = [
@@ -49,8 +48,8 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
                                (num_timescales - 1))
     inv_timescales = np.exp(
         np.arange(num_timescales) * -log_timescale_increment)
-    scaled_time = np.expand_dims(position, 1) * np.expand_dims(inv_timescales,
-                                                               0)
+    scaled_time = np.expand_dims(position, 1) * np.expand_dims(
+        inv_timescales, 0)
     signal = np.concatenate([np.sin(scaled_time), np.cos(scaled_time)], axis=1)
     signal = np.pad(signal, [[0, 0], [0, np.mod(channels, 2)]], 'constant')
     position_enc = signal
@@ -58,9 +57,8 @@ def position_encoding_init(n_position, d_pos_vec, dtype="float32"):
 
 
 class WordEmbedding(nn.Layer):
-    """
-    Word Embedding layer of Transformer. 
-
+    r"""
+    Word Embedding Layer of Transformer.
     This layer automatically constructs a 2D embedding matrix based on the
     input the size of vocabulary (`vocab_size`) and the size of each embedding
     vector (`emb_dim`). This layer lookups embeddings vector of ids provided
@@ -91,7 +89,7 @@ class WordEmbedding(nn.Layer):
             embedding_dim=emb_dim,
             padding_idx=bos_id,
             weight_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Normal(0., emb_dim**-0.5)))
+                initializer=nn.initializer.Normal(0., emb_dim**(-0.5))))
 
     def forward(self, word):
         r"""
@@ -255,14 +253,13 @@ class CrossEntropyCriterion(nn.Layer):
 
                 criterion(predict, label)
         """
-        weights = paddle.cast(
-            label != self.pad_idx, dtype=paddle.get_default_dtype())
+        weights = paddle.cast(label != self.pad_idx,
+                              dtype=paddle.get_default_dtype())
         if self.label_smooth_eps:
             label = paddle.squeeze(label, axis=[2])
-            label = F.label_smooth(
-                label=F.one_hot(
-                    x=label, num_classes=predict.shape[-1]),
-                epsilon=self.label_smooth_eps)
+            label = F.label_smooth(label=F.one_hot(
+                x=label, num_classes=predict.shape[-1]),
+                                   epsilon=self.label_smooth_eps)
 
         cost = F.cross_entropy(
             input=predict,
@@ -387,9 +384,8 @@ class TransformerDecodeCell(nn.Layer):
             word_emb = self.word_embedding(inputs[0])
             pos_emb = self.pos_embedding(inputs[1])
             word_emb = word_emb + pos_emb
-            inputs = F.dropout(
-                word_emb, p=self.dropout,
-                training=False) if self.dropout else word_emb
+            inputs = F.dropout(word_emb, p=self.dropout,
+                               training=False) if self.dropout else word_emb
 
             cell_outputs, new_states = self.decoder(inputs, memory, None,
                                                     trg_src_attn_bias, states)
@@ -434,12 +430,13 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         # Init length of cache is 0, and it increases with decoding carrying on,
         # thus need to reshape elaborately
         var_dim_in_state = self.var_dim_in_state + 1  # count in beam dim
-        c = paddle.transpose(c,
-                             list(range(var_dim_in_state, len(c.shape))) +
-                             list(range(0, var_dim_in_state)))
+        c = paddle.transpose(
+            c,
+            list(range(var_dim_in_state, len(c.shape))) +
+            list(range(0, var_dim_in_state)))
         c = paddle.reshape(
-            c, [0] * (len(c.shape) - var_dim_in_state
-                      ) + [self.batch_size * self.beam_size] +
+            c, [0] * (len(c.shape) - var_dim_in_state) +
+            [self.batch_size * self.beam_size] +
             [int(size) for size in c.shape[-var_dim_in_state + 2:]])
         c = paddle.transpose(
             c,
@@ -487,8 +484,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
                 TransformerBeamSearchDecoder.tile_beam_merge_with_batch(t, beam_size=4)
         """
         return map_structure(
-            lambda x: nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(x, beam_size),
-            t)
+            lambda x: nn.decode.BeamSearchDecoder.tile_beam_merge_with_batch(
+                x, beam_size), t)
 
     def step(self, time, inputs, states, **kwargs):
         """
@@ -529,8 +526,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
         # Squeeze to adapt to BeamSearchDecoder which use 2D logits
         cell_outputs = map_structure(
-            lambda x: paddle.squeeze(x, [1]) if len(x.shape) == 3 else x,
-            cell_outputs)
+            lambda x: paddle.squeeze(x, [1])
+            if len(x.shape) == 3 else x, cell_outputs)
         cell_outputs = map_structure(self._split_batch_beams, cell_outputs)
         next_cell_states = map_structure(self._split_batch_beams_with_var_dim,
                                          next_cell_states)
@@ -542,7 +539,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
             beam_state=states)
 
         if kwargs.get("trg_word", None) is not None:
-            if in_dygraph_mode():
+            if paddle.in_dynamic_mode():
                 if paddle.shape(kwargs.get("trg_word"))[1] > time:
                     beam_search_output, beam_search_state = self.force_decoding(
                         beam_search_output, beam_search_state,
@@ -557,17 +554,16 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
                 from functools import partial
                 beam_search_output, beam_search_state = paddle.static.nn.case(
-                    [(condition(kwargs.get("trg_word"), time), partial(
-                        self.force_decoding,
-                        beam_search_output=beam_search_output,
-                        beam_search_state=beam_search_state,
-                        trg_word=kwargs.get("trg_word"),
-                        trg_length=kwargs.get("trg_length"),
-                        time=time))],
-                    default=partial(
-                        default_fn,
-                        beam_search_output=beam_search_output,
-                        beam_search_state=beam_search_state))
+                    [(condition(kwargs.get("trg_word"), time),
+                      partial(self.force_decoding,
+                              beam_search_output=beam_search_output,
+                              beam_search_state=beam_search_state,
+                              trg_word=kwargs.get("trg_word"),
+                              trg_length=kwargs.get("trg_length"),
+                              time=time))],
+                    default=partial(default_fn,
+                                    beam_search_output=beam_search_output,
+                                    beam_search_state=beam_search_state))
 
         next_inputs, finished = (beam_search_output.predicted_ids,
                                  beam_search_state.finished)
@@ -582,12 +578,14 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         ids_dtype = beam_search_output.predicted_ids.dtype
         scores_dtype = beam_search_output.scores.dtype
         parent_ids = paddle.zeros(shape=[batch_size, 1], dtype=ids_dtype)
-        scores = paddle.ones(
-            shape=[batch_size, beam_size], dtype=scores_dtype) * -1e4
+        scores = paddle.ones(shape=[batch_size, beam_size],
+                             dtype=scores_dtype) * -1e4
         scores = paddle.scatter(
             scores.flatten(),
-            paddle.arange(
-                0, batch_size * beam_size, step=beam_size, dtype="int64"),
+            paddle.arange(0,
+                          batch_size * beam_size,
+                          step=beam_size,
+                          dtype="int64"),
             paddle.zeros([batch_size])).reshape([batch_size, beam_size])
 
         force_position = paddle.unsqueeze(trg_length > time, [1])
@@ -595,8 +593,10 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         # and enable static mode, its stop_gradient must be True .
         force_position.stop_gradient = True
         force_position = paddle.tile(force_position, [1, beam_size])
-        crt_trg_word = paddle.slice(
-            trg_word, axes=[1], starts=[time], ends=[time + 1])
+        crt_trg_word = paddle.slice(trg_word,
+                                    axes=[1],
+                                    starts=[time],
+                                    ends=[time + 1])
         crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
 
         predicted_ids = paddle.where(force_position, crt_trg_word,
@@ -681,10 +681,11 @@ class TransformerModel(nn.Layer):
         self.eos_id = eos_id
         self.dropout = dropout
 
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_length)
+        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
+                                                emb_dim=d_model,
+                                                bos_id=self.bos_id)
+        self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                     max_length=max_length)
         if weight_sharing:
             assert src_vocab_size == trg_vocab_size, (
                 "Vocabularies in source and target should be same for weight sharing."
@@ -692,10 +693,11 @@ class TransformerModel(nn.Layer):
             self.trg_word_embedding = self.src_word_embedding
             self.trg_pos_embedding = self.src_pos_embedding
         else:
-            self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length)
+            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
+                                                    emb_dim=d_model,
+                                                    bos_id=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                         max_length=max_length)
 
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
@@ -711,13 +713,13 @@ class TransformerModel(nn.Layer):
 
         if weight_sharing:
             self.linear = lambda x: paddle.matmul(x=x,
-                                                  y=self.trg_word_embedding.word_embedding.weight,
+                                                  y=self.trg_word_embedding.
+                                                  word_embedding.weight,
                                                   transpose_y=True)
         else:
-            self.linear = nn.Linear(
-                in_features=d_model,
-                out_features=trg_vocab_size,
-                bias_attr=False)
+            self.linear = nn.Linear(in_features=d_model,
+                                    out_features=trg_vocab_size,
+                                    bias_attr=False)
 
     def forward(self, src_word, trg_word):
         r"""
@@ -797,12 +799,11 @@ class TransformerModel(nn.Layer):
                 trg_emb, p=self.dropout,
                 training=self.training) if self.dropout else trg_emb
 
-            dec_output = self.transformer(
-                enc_input,
-                dec_input,
-                src_mask=src_slf_attn_bias,
-                tgt_mask=trg_slf_attn_bias,
-                memory_mask=trg_src_attn_bias)
+            dec_output = self.transformer(enc_input,
+                                          dec_input,
+                                          src_mask=src_slf_attn_bias,
+                                          tgt_mask=trg_slf_attn_bias,
+                                          memory_mask=trg_src_attn_bias)
 
             predict = self.linear(dec_output)
 
@@ -907,12 +908,16 @@ class InferTransformerModel(TransformerModel):
             self.rel_len = kwargs.get("rel_len", False)
         super(InferTransformerModel, self).__init__(**args)
 
-        cell = TransformerDecodeCell(
-            self.transformer.decoder, self.trg_word_embedding,
-            self.trg_pos_embedding, self.linear, self.dropout)
+        cell = TransformerDecodeCell(self.transformer.decoder,
+                                     self.trg_word_embedding,
+                                     self.trg_pos_embedding, self.linear,
+                                     self.dropout)
 
-        self.decode = TransformerBeamSearchDecoder(
-            cell, bos_id, eos_id, beam_size, var_dim_in_state=2)
+        self.decode = TransformerBeamSearchDecoder(cell,
+                                                   bos_id,
+                                                   eos_id,
+                                                   beam_size,
+                                                   var_dim_in_state=2)
 
     def forward(self, src_word, trg_word=None):
         r"""
@@ -962,8 +967,8 @@ class InferTransformerModel(TransformerModel):
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
         if trg_word is not None:
-            trg_length = paddle.sum(paddle.cast(
-                trg_word != self.bos_id, dtype="int32"),
+            trg_length = paddle.sum(paddle.cast(trg_word != self.bos_id,
+                                                dtype="int32"),
                                     axis=-1)
         else:
             trg_length = None
@@ -982,9 +987,8 @@ class InferTransformerModel(TransformerModel):
             src_emb = self.src_word_embedding(src_word)
             src_pos_emb = self.src_pos_embedding(src_pos)
             src_emb = src_emb + src_pos_emb
-            enc_input = F.dropout(
-                src_emb, p=self.dropout,
-                training=False) if self.dropout else src_emb
+            enc_input = F.dropout(src_emb, p=self.dropout,
+                                  training=False) if self.dropout else src_emb
             enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
 
             # Init states (caches) for transformer, need to be updated according to selected beam
@@ -1077,25 +1081,21 @@ class InferTransformerModel(TransformerModel):
         ### initialize states of beam search ###
         ## init for the alive ##
         initial_log_probs = paddle.assign(
-            np.array(
-                [[0.] + [-inf] * (beam_size - 1)], dtype="float32"))
+            np.array([[0.] + [-inf] * (beam_size - 1)], dtype="float32"))
         alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
 
         alive_seq = paddle.tile(
-            paddle.cast(
-                paddle.assign(np.array([[[self.bos_id]]])), src_word.dtype),
-            [batch_size, beam_size, 1])
+            paddle.cast(paddle.assign(np.array([[[self.bos_id]]])),
+                        src_word.dtype), [batch_size, beam_size, 1])
 
         ## init for the finished ##
         finished_scores = paddle.assign(
-            np.array(
-                [[-inf] * beam_size], dtype="float32"))
+            np.array([[-inf] * beam_size], dtype="float32"))
         finished_scores = paddle.tile(finished_scores, [batch_size, 1])
 
         finished_seq = paddle.tile(
-            paddle.cast(
-                paddle.assign(np.array([[[self.bos_id]]])), src_word.dtype),
-            [batch_size, beam_size, 1])
+            paddle.cast(paddle.assign(np.array([[[self.bos_id]]])),
+                        src_word.dtype), [batch_size, beam_size, 1])
         finished_flags = paddle.zeros_like(finished_scores)
 
         ### initialize inputs and states of transformer decoder ###
@@ -1112,40 +1112,39 @@ class InferTransformerModel(TransformerModel):
 
         if trg_word is not None:
             scores_dtype = finished_scores.dtype
-            scores = paddle.ones(
-                shape=[batch_size, beam_size * 2], dtype=scores_dtype) * -1e4
+            scores = paddle.ones(shape=[batch_size, beam_size * 2],
+                                 dtype=scores_dtype) * -1e4
             scores = paddle.scatter(
                 scores.flatten(),
-                paddle.arange(
-                    0,
-                    batch_size * beam_size * 2,
-                    step=beam_size * 2,
-                    dtype=finished_seq.dtype),
+                paddle.arange(0,
+                              batch_size * beam_size * 2,
+                              step=beam_size * 2,
+                              dtype=finished_seq.dtype),
                 paddle.zeros([batch_size]))
             scores = paddle.reshape(scores, [batch_size, beam_size * 2])
 
         def update_states(caches, topk_coordinates, beam_size, batch_size):
             new_caches = []
             for cache in caches:
-                k = gather_2d(
-                    cache[0].k,
-                    topk_coordinates,
-                    beam_size,
-                    batch_size,
-                    need_unmerge=True)
-                v = gather_2d(
-                    cache[0].v,
-                    topk_coordinates,
-                    beam_size,
-                    batch_size,
-                    need_unmerge=True)
+                k = gather_2d(cache[0].k,
+                              topk_coordinates,
+                              beam_size,
+                              batch_size,
+                              need_unmerge=True)
+                v = gather_2d(cache[0].v,
+                              topk_coordinates,
+                              beam_size,
+                              batch_size,
+                              need_unmerge=True)
                 new_caches.append((nn.MultiHeadAttention.Cache(k, v), cache[1]))
             return new_caches
 
-        def get_topk_coordinates(beam_idx, beam_size, batch_size,
+        def get_topk_coordinates(beam_idx,
+                                 beam_size,
+                                 batch_size,
                                  dtype="int64"):
-            batch_pos = paddle.arange(
-                batch_size * beam_size, dtype=dtype) // beam_size
+            batch_pos = paddle.arange(batch_size * beam_size,
+                                      dtype=dtype) // beam_size
             batch_pos = paddle.reshape(batch_pos, [batch_size, beam_size])
             topk_coordinates = paddle.stack([batch_pos, beam_idx], axis=2)
             return topk_coordinates
@@ -1194,39 +1193,37 @@ class InferTransformerModel(TransformerModel):
             curr_scores = log_probs / length_penalty
             flat_curr_scores = paddle.reshape(curr_scores, [batch_size, -1])
 
-            topk_scores, topk_ids = paddle.topk(
-                flat_curr_scores, k=beam_size * 2)
+            topk_scores, topk_ids = paddle.topk(flat_curr_scores,
+                                                k=beam_size * 2)
             if topk_ids.dtype != alive_seq.dtype:
                 topk_ids = paddle.cast(topk_ids, dtype=alive_seq.dtype)
 
             if trg_word is not None:
-                topk_ids, topk_scores = force_decoding_v2(topk_ids, topk_scores,
-                                                          i)
+                topk_ids, topk_scores = force_decoding_v2(
+                    topk_ids, topk_scores, i)
 
             topk_log_probs = topk_scores * length_penalty
 
             topk_beam_index = topk_ids // self.trg_vocab_size
             topk_ids = topk_ids % self.trg_vocab_size
 
-            topk_coordinates = get_topk_coordinates(
-                topk_beam_index,
-                beam_size * 2,
-                batch_size,
-                dtype=alive_seq.dtype)
+            topk_coordinates = get_topk_coordinates(topk_beam_index,
+                                                    beam_size * 2,
+                                                    batch_size,
+                                                    dtype=alive_seq.dtype)
             topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size,
                                  batch_size)
-            topk_seq = paddle.concat(
-                [
-                    topk_seq, paddle.reshape(topk_ids,
-                                             list(topk_ids.shape[:]) + [1])
-                ],
-                axis=2)
+            topk_seq = paddle.concat([
+                topk_seq,
+                paddle.reshape(topk_ids,
+                               list(topk_ids.shape[:]) + [1])
+            ],
+                                     axis=2)
             states = update_states(states, topk_coordinates, beam_size,
                                    batch_size)
-            eos = paddle.full(
-                shape=paddle.shape(topk_ids),
-                dtype=alive_seq.dtype,
-                fill_value=self.eos_id)
+            eos = paddle.full(shape=paddle.shape(topk_ids),
+                              dtype=alive_seq.dtype,
+                              fill_value=self.eos_id)
             topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
 
             # topk_seq: [batch_size, 2*beam_size, i+1]
@@ -1243,8 +1240,10 @@ class InferTransformerModel(TransformerModel):
             if topk_indexes.dtype != curr_seq.dtype:
                 topk_indexes = paddle.cast(topk_indexes, dtype=curr_seq.dtype)
 
-            topk_coordinates = get_topk_coordinates(
-                topk_indexes, beam_size, batch_size, dtype=curr_seq.dtype)
+            topk_coordinates = get_topk_coordinates(topk_indexes,
+                                                    beam_size,
+                                                    batch_size,
+                                                    dtype=curr_seq.dtype)
             alive_seq = gather_2d(curr_seq, topk_coordinates, beam_size,
                                   batch_size)
 
@@ -1261,26 +1260,27 @@ class InferTransformerModel(TransformerModel):
             Given sequences and scores, will gather the top k=beam size sequences.
             """
             # finished scores
-            finished_seq = paddle.concat(
-                [
-                    finished_seq, paddle.full(
-                        shape=[batch_size, beam_size, 1],
-                        dtype=finished_seq.dtype,
-                        fill_value=self.eos_id)
-                ],
-                axis=2)
+            finished_seq = paddle.concat([
+                finished_seq,
+                paddle.full(shape=[batch_size, beam_size, 1],
+                            dtype=finished_seq.dtype,
+                            fill_value=self.eos_id)
+            ],
+                                         axis=2)
             curr_scores += (1. - curr_finished) * -inf
             curr_finished_seq = paddle.concat([finished_seq, curr_seq], axis=1)
-            curr_finished_scores = paddle.concat(
-                [finished_scores, curr_scores], axis=1)
-            curr_finished_flags = paddle.concat(
-                [finished_flags, curr_finished], axis=1)
+            curr_finished_scores = paddle.concat([finished_scores, curr_scores],
+                                                 axis=1)
+            curr_finished_flags = paddle.concat([finished_flags, curr_finished],
+                                                axis=1)
             _, topk_indexes = paddle.topk(curr_finished_scores, k=beam_size)
             if topk_indexes.dtype != curr_seq.dtype:
                 topk_indexes = paddle.cast(topk_indexes, dtype=curr_seq.dtype)
 
-            topk_coordinates = get_topk_coordinates(
-                topk_indexes, beam_size, batch_size, dtype=curr_seq.dtype)
+            topk_coordinates = get_topk_coordinates(topk_indexes,
+                                                    beam_size,
+                                                    batch_size,
+                                                    dtype=curr_seq.dtype)
             finished_seq = gather_2d(curr_finished_seq, topk_coordinates,
                                      beam_size, batch_size)
             finished_scores = gather_2d(curr_finished_scores, topk_coordinates,
@@ -1297,8 +1297,10 @@ class InferTransformerModel(TransformerModel):
                 force_position.stop_gradient = True
                 force_position = paddle.tile(force_position, [1, beam_size])
 
-                crt_trg_word = paddle.slice(
-                    trg_word, axes=[1], starts=[time], ends=[time + 1])
+                crt_trg_word = paddle.slice(trg_word,
+                                            axes=[1],
+                                            starts=[time],
+                                            ends=[time + 1])
                 crt_trg_word = paddle.tile(crt_trg_word, [1, beam_size])
 
                 topk_ids = paddle.where(force_position, crt_trg_word, topk_ids)
@@ -1309,10 +1311,9 @@ class InferTransformerModel(TransformerModel):
 
         def inner_loop(i, pre_word, alive_seq, alive_log_probs, finished_seq,
                        finished_scores, finished_flags, caches):
-            trg_pos = paddle.full(
-                shape=paddle.shape(pre_word),
-                dtype=alive_seq.dtype,
-                fill_value=i)
+            trg_pos = paddle.full(shape=paddle.shape(pre_word),
+                                  dtype=alive_seq.dtype,
+                                  fill_value=i)
             trg_emb = self.trg_word_embedding(pre_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb
@@ -1320,8 +1321,9 @@ class InferTransformerModel(TransformerModel):
                 trg_emb, p=self.dropout,
                 training=self.training) if self.dropout else trg_emb
 
-            logits, caches = self.transformer.decoder(
-                dec_input, enc_output, None, trg_src_attn_bias, caches)
+            logits, caches = self.transformer.decoder(dec_input, enc_output,
+                                                      None, trg_src_attn_bias,
+                                                      caches)
             logits = self.linear(logits)
             topk_seq, topk_log_probs, topk_scores, topk_finished, states = grow_topk(
                 i, logits, alive_seq, alive_log_probs, caches)
@@ -1343,12 +1345,10 @@ class InferTransformerModel(TransformerModel):
                 early_finish(alive_log_probs, finished_scores, finished_flags))
 
         _, pre_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches = paddle.static.nn.while_loop(
-            is_not_finish,
-            inner_loop, [
-                paddle.zeros(
-                    shape=[1],
-                    dtype="int64"), pre_word, alive_seq, alive_log_probs,
-                finished_seq, finished_scores, finished_flags, caches
+            is_not_finish, inner_loop, [
+                paddle.zeros(shape=[1], dtype="int64"), pre_word, alive_seq,
+                alive_log_probs, finished_seq, finished_scores, finished_flags,
+                caches
             ])
 
         # (gongenlei) `paddle.where` doesn't support broadcast, so we need to use `paddle.unsqueeze`
@@ -1361,9 +1361,9 @@ class InferTransformerModel(TransformerModel):
                 alive_seq, neg_finished_flags.unsqueeze(-1))
         finished_scores = paddle.multiply(
             finished_scores,
-            paddle.cast(
-                finished_flags, dtype=finished_scores.dtype)) + paddle.multiply(
-                    alive_log_probs,
-                    paddle.cast(
-                        neg_finished_flags, dtype=alive_log_probs.dtype))
+            paddle.cast(finished_flags,
+                        dtype=finished_scores.dtype)) + paddle.multiply(
+                            alive_log_probs,
+                            paddle.cast(neg_finished_flags,
+                                        dtype=alive_log_probs.dtype))
         return finished_seq, finished_scores

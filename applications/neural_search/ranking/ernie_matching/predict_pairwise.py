@@ -22,9 +22,9 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from data import create_dataloader, read_text_pair
 from data import convert_pairwise_example as convert_example
@@ -60,11 +60,8 @@ def predict(model, data_loader):
         for batch_data in data_loader:
             input_ids, token_type_ids = batch_data
 
-            input_ids = paddle.to_tensor(input_ids)
-            token_type_ids = paddle.to_tensor(token_type_ids)
-
-            batch_prob = model.predict(
-                input_ids=input_ids, token_type_ids=token_type_ids).numpy()
+            batch_prob = model.predict(input_ids=input_ids,
+                                       token_type_ids=token_type_ids).numpy()
 
             batch_probs.append(batch_prob)
         if (len(batch_prob) == 1):
@@ -78,35 +75,29 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
-
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        phase="predict")
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         phase="predict")
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # segment_ids
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.input_file,
+                            lazy=False)
 
-    valid_data_loader = create_dataloader(
-        valid_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    valid_data_loader = create_dataloader(valid_ds,
+                                          mode='predict',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
     model = PairwiseMatching(pretrained_model)
 
@@ -120,8 +111,9 @@ if __name__ == "__main__":
 
     y_probs = predict(model, valid_data_loader)
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.input_file,
+                            lazy=False)
 
     for idx, prob in enumerate(y_probs):
         text_pair = valid_ds[idx]

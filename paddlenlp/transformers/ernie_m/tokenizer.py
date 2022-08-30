@@ -14,10 +14,12 @@
 
 import os
 
-from paddle.utils import try_import
+import sentencepiece as spm
+import unicodedata
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
+from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .. import PretrainedTokenizer
-from ..tokenizer_utils import _is_control, _is_whitespace
 
 __all__ = ['ErnieMTokenizer']
 
@@ -74,25 +76,28 @@ class ErnieMTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-m-base": {
-            "do_lower_case": True
+            "do_lower_case": False
         },
         "ernie-m-large": {
-            "do_lower_case": True
+            "do_lower_case": False
         }
     }
+    max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
+    # Ernie-M model doesn't have token_type embedding.
+    model_input_names: List[str] = ["input_ids"]
 
     def __init__(self,
                  vocab_file,
                  sentencepiece_model_file,
-                 do_lower_case=True,
+                 do_lower_case=False,
                  encoding="utf8",
                  unk_token="[UNK]",
                  sep_token="[SEP]",
                  pad_token="[PAD]",
                  cls_token="[CLS]",
-                 mask_token="[MASK]"):
-        mod = try_import('sentencepiece')
-        self.sp_model = mod.SentencePieceProcessor()
+                 mask_token="[MASK]",
+                 **kwargs):
+        self.sp_model = spm.SentencePieceProcessor()
 
         self.do_lower_case = do_lower_case
         self.encoding = encoding
@@ -100,29 +105,49 @@ class ErnieMTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'.".format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-
+        self.vocab_file = vocab_file
+        self.sentencepiece_model_file = sentencepiece_model_file
         if os.path.isfile(sentencepiece_model_file):
             self.sp_model.Load(sentencepiece_model_file)
 
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=True,
-                 return_token_type_ids=False,
-                 return_attention_mask=True,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
-        return super(ErnieMTokenizer, self).__call__(
-            text, text_pair, max_seq_len, stride, is_split_into_words,
-            pad_to_max_seq_len, truncation_strategy, return_position_ids,
-            return_token_type_ids, return_attention_mask, return_length,
-            return_overflowing_tokens, return_special_tokens_mask)
+        self.SP_CHAR_MAPPING = {}
+
+        for ch in range(65281, 65375):
+            if ch in [ord(u'～')]:
+                self.SP_CHAR_MAPPING[chr(ch)] = chr(ch)
+                continue
+            self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
+
+    def get_offset_mapping(self, text):
+        if text is None:
+            return None
+
+        split_tokens = self.tokenize(text)
+        normalized_text, char_mapping = '', []
+
+        for i, ch in enumerate(text):
+
+            if ch in self.SP_CHAR_MAPPING:
+                ch = self.SP_CHAR_MAPPING.get(ch)
+            else:
+                ch = unicodedata.normalize('NFKC', ch)
+            if self.is_whitespace(ch):
+                continue
+            normalized_text += ch
+            char_mapping.extend([i] * len(ch))
+
+        text, token_mapping, offset = normalized_text, [], 0
+
+        for token in split_tokens:
+            if token[:1] == '▁':
+                token = token[1:]
+            start = text[offset:].index(token) + offset
+            end = start + len(token)
+
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))
+            offset = end
+        return token_mapping
 
     @property
     def vocab_size(self):
@@ -132,62 +157,45 @@ class ErnieMTokenizer(PretrainedTokenizer):
         Returns:
             int: The size of vocabulary.
         """
-        return len(self.vocab)
+        return self.sp_model.vocab_size()
+
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
 
     def clean_text(self, text):
         """Performs invalid character removal and whitespace cleanup on text."""
-        text = text.replace(u"“", u'"')\
-                .replace(u'”', u'"')\
-                .replace(u'‘', "'")\
-                .replace(u'’', u"'")\
-                .replace(u'—', u'-')
-
-        output = []
-        for char in text:
-            if _is_control(char):
-                continue
-            if _is_whitespace(char):
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
+        return ''.join((self.SP_CHAR_MAPPING.get(c, c) for c in text))
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
-        text = self.clean_text(text)
-
         if not sample:
             pieces = self.sp_model.EncodeAsPieces(text)
         else:
             pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
         new_pieces = []
         for piece in pieces:
-            if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
-                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(
-                    SPIECE_UNDERLINE, ""))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][
-                        0] == SPIECE_UNDERLINE:
-                    if len(cur_pieces[0]) == 1:
-                        cur_pieces = cur_pieces[1:]
-                    else:
-                        cur_pieces[0] = cur_pieces[0][1:]
-                cur_pieces.append(piece[-1])
-                new_pieces.extend(cur_pieces)
-            else:
-                new_pieces.append(piece)
-
+            if piece == SPIECE_UNDERLINE:
+                continue
+            lst_i = 0
+            for i, c in enumerate(piece):
+                if c == SPIECE_UNDERLINE:
+                    continue
+                if self.is_ch_char(c) or self.is_punct(c):
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    new_pieces.append(c)
+                    lst_i = i + 1
+                elif c.isdigit() and i > 0 and not piece[i - 1].isdigit():
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    lst_i = i
+                elif not c.isdigit() and i > 0 and piece[i - 1].isdigit():
+                    if i > lst_i and piece[lst_i:i] != SPIECE_UNDERLINE:
+                        new_pieces.append(piece[lst_i:i])
+                    lst_i = i
+            if len(piece) > lst_i:
+                new_pieces.append(piece[lst_i:])
         return new_pieces
-
-    def tokenize(self, text):
-        r"""
-        Converts a string to a list of tokens.
-        
-        Args:
-            text (str): The text to be tokenized.
-        Returns:
-            List(str): A list of string representing converted tokens.
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
@@ -278,10 +286,75 @@ class ErnieMTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def create_token_type_ids_from_sequences(
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        """
+        Create the token type IDs corresponding to the sequences passed. [What are token type
+        IDs?](../glossary#token-type-ids)
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            token_ids_0 (`List[int]`): The first tokenized sequence.
+            token_ids_1 (`List[int]`, *optional*): The second tokenized sequence.
+
+        Returns:
+            `List[int]`: The token type ids.
+        """
+        # called when `add_special_tokens` is True, so align with `build_inputs_with_special_tokens` method
+        if token_ids_1 is None:
+            # [CLS] X [SEP]
+            return (len(token_ids_0) + 2) * [0]
+
+        # [CLS] A [SEP] [SEP] B [SEP]
+        return [0] * (len(token_ids_0) + 1) + [1] * (len(token_ids_1) + 3)
+
+    def is_ch_char(self, char):
+        """
+        is_ch_char
+        """
+        if u'\u4e00' <= char <= u'\u9fff':
+            return True
+        return False
+
+    def is_alpha(self, char):
+        """
+        is_alpha
+        """
+        if 'a' <= char <= 'z':
+            return True
+        if 'A' <= char <= 'Z':
+            return True
+        return False
+
+    def is_punct(self, char):
+        """
+        is_punct
+        """
+        if char in u",;:.?!~，；：。？！《》【】":
+            return True
+        return False
+
+    def is_whitespace(self, char):
+        """
+        is whitespace
+        """
+        if char == " " or char == "\t" or char == "\n" or char == "\r":
+            return True
+        if len(char) == 1:
+            cat = unicodedata.category(char)
+            if cat == "Zs":
+                return True
+        return False

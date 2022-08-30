@@ -48,8 +48,9 @@ class ErnieCtmEmbeddings(Layer):
                  padding_idx=0,
                  cls_num=2):
         super().__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, embedding_size, padding_idx=padding_idx)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            embedding_size,
+                                            padding_idx=padding_idx)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 embedding_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size,
@@ -65,9 +66,8 @@ class ErnieCtmEmbeddings(Layer):
 
             content_len = paddle.shape(input_ids)[1] - self.cls_num
             position_ids = paddle.concat([
-                paddle.zeros(
-                    shape=[self.cls_num], dtype="int64"), paddle.linspace(
-                        1, content_len, content_len, dtype="int64")
+                paddle.zeros(shape=[self.cls_num], dtype="int64"),
+                paddle.linspace(1, content_len, content_len, dtype="int64")
             ])
             position_ids.stop_gradient = True
         if token_type_ids is None:
@@ -187,8 +187,8 @@ class ErnieCtmPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
+                        std=self.initializer_range if hasattr(
+                            self, "initializer_range") else
                         self.ernie_ctm.config["initializer_range"],
                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -395,14 +395,19 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
         embedding_output = self.embedding_hidden_mapping_in(embedding_output)
 
         encoder_outputs = self.encoder(embedding_output, attention_mask)
@@ -419,10 +424,10 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                      sequence_output[:, self.content_summary_index].clone(
                      ).unsqueeze([1]).expand_as(sequence_output)), 2)
             else:
-                content_output = paddle.expand(
-                    content_output.unsqueeze([1]),
-                    shape=(sequence_output.shape[0], sequence_output.shape[1],
-                           sequence_output.shape[2]))
+                content_output = paddle.expand(content_output.unsqueeze([1]),
+                                               shape=(sequence_output.shape[0],
+                                                      sequence_output.shape[1],
+                                                      sequence_output.shape[2]))
 
                 sequence_output = paddle.concat(
                     (sequence_output, content_output), 2)
@@ -454,8 +459,9 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         self.ernie_ctm = ernie_ctm
         self.tag_classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
                                         self.num_tag)
-        self.crf = LinearChainCrf(
-            self.num_tag, crf_lr, with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_tag,
+                                  crf_lr,
+                                  with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
@@ -509,11 +515,10 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
                 logits = model(**inputs)
 
         """
-        outputs = self.ernie_ctm(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.ernie_ctm(input_ids=input_ids,
+                                 attention_mask=attention_mask,
+                                 token_type_ids=token_type_ids,
+                                 position_ids=position_ids)
         sequence_output = outputs[0]
         seq_logits = self.tag_classifier(sequence_output)
         if tag_labels is not None:
@@ -525,6 +530,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
 
 
 class ErnieCtmMLMHead(Layer):
+
     def __init__(self, embedding_size, vocab_size, hidden_size):
         super(ErnieCtmMLMHead, self).__init__()
         self.layer_norm = nn.LayerNorm(embedding_size)
@@ -605,11 +611,10 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
                 # [1, 45, 23000]
 
         """
-        outputs = self.ernie_ctm(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids)
+        outputs = self.ernie_ctm(input_ids=input_ids,
+                                 token_type_ids=token_type_ids,
+                                 attention_mask=attention_mask,
+                                 position_ids=position_ids)
         sequence_output = outputs[0]
         logits = self.predictions(sequence_output)
         return logits
@@ -635,8 +640,8 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
         super(ErnieCtmForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.ernie_ctm = ernie_ctm  # allow ernie_ctm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.ernie_ctm.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  ernie_ctm.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.ernie_ctm.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -676,11 +681,10 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
         """
 
-        sequence_output, _, _ = self.ernie_ctm(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, _, _ = self.ernie_ctm(input_ids,
+                                               token_type_ids=token_type_ids,
+                                               position_ids=position_ids,
+                                               attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)

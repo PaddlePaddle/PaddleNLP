@@ -1,0 +1,219 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-03-18 21:31+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.9.0\n"
+
+#: ../model_zoo/embeddings.md:1
+msgid "PaddleNLP Embedding API"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:3 ../model_zoo/embeddings.md:24
+msgid "介绍"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:4 ../model_zoo/embeddings.md:28
+msgid "用法"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:5 ../model_zoo/embeddings.md:30
+msgid "TokenEmbedding参数"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:6 ../model_zoo/embeddings.md:69
+msgid "初始化"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:7 ../model_zoo/embeddings.md:101
+msgid "查询embedding结果"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:8 ../model_zoo/embeddings.md:115
+msgid "可视化embedding结果"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:9 ../model_zoo/embeddings.md:140
+msgid "计算词向量cosine相似度"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:10 ../model_zoo/embeddings.md:147
+msgid "计算词向量内积"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:11 ../model_zoo/embeddings.md:155
+msgid "训练"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:12 ../model_zoo/embeddings.md:171
+msgid "切词"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:13 ../model_zoo/embeddings.md:183
+msgid "预训练模型"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:14 ../model_zoo/embeddings.md:189
+msgid "中文词向量"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:15 ../model_zoo/embeddings.md:343
+msgid "英文词向量"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:16 ../model_zoo/embeddings.md:345
+msgid "Word2Vec"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:17 ../model_zoo/embeddings.md:362
+msgid "GloVe"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:18 ../model_zoo/embeddings.md:395
+msgid "FastText"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:19 ../model_zoo/embeddings.md:416
+msgid "使用方式"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:20 ../model_zoo/embeddings.md:427
+msgid "模型信息"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:21 ../model_zoo/embeddings.md:751
+msgid "致谢"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:22 ../model_zoo/embeddings.md:756
+msgid "参考论文"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:26
+msgid "PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用paddlenlp.embeddings.TokenEmbedding时，指定预训练模型的名称，即可加载相对应的预训练模型。以下将介绍TokenEmbeddign详细用法，并列出PaddleNLP所支持的预训练Embedding模型。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:116
+msgid "使用深度学习可视化工具VisualDL的High Dimensional组件可以对embedding结果进行可视化展示，便于对其直观分析，步骤如下："
+msgstr ""
+
+#: ../model_zoo/embeddings.md:128
+msgid "执行完毕后会在当前路径下生成一个visualize目录，并将日志存放在其中，我们在命令行启动VisualDL即可进行查看，启动命令为："
+msgstr ""
+
+#: ../model_zoo/embeddings.md:132
+msgid "启动后打开浏览器即可看到可视化结果"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:138
+msgid "使用VisualDL除可视化embedding结果外，还可以对标量、图片、音频等进行可视化，有效提升训练调参效率。关于VisualDL更多功能和详细介绍，可参考VisualDL使用文档。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:157
+msgid ""
+"以下为TokenEmbedding简单的组网使用方法。有关更多TokenEmbedding训练流程相关的使用方法，请参考Word "
+"Embedding with PaddleNLP。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:185
+msgid "以下将列举PaddleNLP支持的Embedding预训练模型。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:186
+msgid "模型命名方式为：${训练模型}.${语料}.${词向量类型}.${co-occurrence type}.dim${维度}。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:187
+msgid "模型有三种，分别是Word2Vec(w2v, skip-gram), GloVe(glove)和FastText(fasttext)。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:191
+msgid "以下预训练词向量由Chinese-Word-Vectors提供。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:193
+msgid "根据不同类型的上下文为每个语料训练多个目标词向量，第二列开始表示不同类型的上下文。以下为上下文类别："
+msgstr ""
+
+#: ../model_zoo/embeddings.md:195
+msgid "Word表示训练时目标词预测的上下文是一个Word。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:196
+msgid ""
+"Word + "
+"N-gram表示训练时目标词预测的上下文是一个Word或者Ngram，其中bigram表示2-grams，ngram.1-2表示1-gram或者2-grams。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:197
+msgid ""
+"Word + Character表示训练时目标词预测的上下文是一个Word或者Character，其中word-"
+"character.char1-2表示上下文是1个或2个Character。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:198
+msgid ""
+"Word + Character + Ngram表示训练时目标词预测的上下文是一个Word、Character或者Ngram。bigram-"
+"char表示上下文是2-grams或者1个Character。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:284
+msgid "特别地，对于百度百科语料，在不同的 Co-occurrence类型下分别提供了目标词与上下文向量："
+msgstr ""
+
+#: ../model_zoo/embeddings.md:418
+msgid ""
+"以上所述的模型名称可直接以参数形式传入padddlenlp.embeddings.TokenEmbedding，加载相对应的模型。比如要加载语料为Wiki2017，通过FastText训练的预训练模型（fasttext"
+".wiki-news.target.word-word.dim300.en），只需执行以下代码："
+msgstr ""
+
+#: ../model_zoo/embeddings.md:752
+msgid "感谢 Chinese-Word-Vectors提供Word2Vec中文预训练词向量。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:753
+msgid "感谢 GloVe Project提供的GloVe英文预训练词向量。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:754
+msgid "感谢 FastText Project提供的英文预训练词向量。"
+msgstr ""
+
+#: ../model_zoo/embeddings.md:757
+msgid ""
+"Li, Shen, et al. \"Analogical reasoning on chinese morphological and "
+"semantic relations.\" arXiv preprint arXiv:1805.06504 (2018)."
+msgstr ""
+
+#: ../model_zoo/embeddings.md:758
+msgid ""
+"Qiu, Yuanyuan, et al. \"Revisiting correlations between intrinsic and "
+"extrinsic evaluations of word embeddings.\" Chinese Computational "
+"Linguistics and Natural Language Processing Based on Naturally Annotated "
+"Big Data. Springer, Cham, 2018. 209-221."
+msgstr ""
+
+#: ../model_zoo/embeddings.md:759
+msgid ""
+"Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. "
+"GloVe: Global Vectors for Word Representation."
+msgstr ""
+
+#: ../model_zoo/embeddings.md:760
+msgid ""
+"T. Mikolov, E. Grave, P. Bojanowski, C. Puhrsch, A. Joulin. Advances in "
+"Pre-Training Distributed Word Representations."
+msgstr ""
+

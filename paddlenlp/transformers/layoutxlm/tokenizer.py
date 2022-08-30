@@ -17,8 +17,9 @@
 import itertools
 from dataclasses import dataclass, field
 from collections import OrderedDict
-from paddle.utils import try_import
 from typing import List, Optional
+
+import sentencepiece as spm
 
 from .. import PretrainedTokenizer, AddedToken
 from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
@@ -30,16 +31,16 @@ def _is_end_of_word(text):
     """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
     last_char = text[-1]
     return bool(
-        _is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(
-            last_char))
+        _is_control(last_char) | _is_punctuation(last_char)
+        | _is_whitespace(last_char))
 
 
 def _is_start_of_word(text):
     """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
     first_char = text[0]
     return bool(
-        _is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(
-            first_char))
+        _is_control(first_char) | _is_punctuation(first_char)
+        | _is_whitespace(first_char))
 
 
 class LayoutXLMTokenizer(PretrainedTokenizer):
@@ -55,7 +56,9 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
     }
-    pretrained_positional_embedding_sizes = {"layoutxlm-base-uncased": 512, }
+    pretrained_positional_embedding_sizes = {
+        "layoutxlm-base-uncased": 512,
+    }
     max_model_input_sizes = pretrained_positional_embedding_sizes
     model_input_names = ["input_ids", "attention_mask"]
 
@@ -80,9 +83,9 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
         self._bos_token = bos_token
         self._eos_token = eos_token
         self._sep_token = sep_token
@@ -90,7 +93,6 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         self._unk_token = unk_token
         self._pad_token = pad_token
         self._mask_token = mask_token
-        spm = try_import("sentencepiece")
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
         self.vocab_file = vocab_file
@@ -104,8 +106,9 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         self.ids_to_tokens = {v: k for k, v in self.tokens_to_ids.items()}
 
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
         cls = [self.cls_token_id]
@@ -115,8 +118,8 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
     def get_special_tokens_mask(
             self,
             token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None,
-            already_has_special_tokens: bool=False) -> List[int]:
+            token_ids_1: Optional[List[int]] = None,
+            already_has_special_tokens: bool = False) -> List[int]:
         if already_has_special_tokens:
             if token_ids_1 is not None:
                 raise ValueError(
@@ -124,17 +127,20 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)
-                                                          ) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
+            [0] * len(token_ids_1)) + [1]
 
     def create_token_type_ids_from_sequences(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
@@ -181,5 +187,5 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))

@@ -1,0 +1,796 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../model_zoo/taskflow.md:1
+msgid "PaddleNLP一键预测功能：Taskflow API"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:23
+msgid "特性"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:24
+msgid "PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，一键预测。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:25
+msgid "最全的中文任务：覆盖自然语言理解与自然语言生成两大核心应用；"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:26
+msgid "极致的产业级效果：在多个中文场景上提供产业级的精度与预测性能；"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:27
+msgid "统一的应用范式：通过paddlenlp.Taskflow调用，简捷易用。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:167
+msgid "QuickStart"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:169
+msgid "环境依赖"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:170
+msgid "python >= 3.6"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:171
+msgid "paddlepaddle >= 2.2.0"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:172
+msgid "paddlenlp >= 2.2.5"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:174
+msgid "taskflow1"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:176
+msgid "可进入 Jupyter Notebook 环境，在线体验 👉🏻  进入在线运行环境"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:178
+msgid "PaddleNLP Taskflow API 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或问卷反馈给我们。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:180
+msgid "社区交流👬"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:182
+msgid "微信扫描二维码并填写问卷之后，加入交流群领取福利"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:183
+msgid "获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:184
+msgid "10G重磅NLP学习大礼包："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:190
+msgid "详细使用"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:192
+msgid "PART Ⅰ   一键预测"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:194
+msgid "中文分词"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:198
+msgid "三种分词模式，满足各类分词需求"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:220 ../model_zoo/taskflow.md:422
+#: ../model_zoo/taskflow.md:602 ../model_zoo/taskflow.md:1177
+#: ../model_zoo/taskflow.md:1209
+msgid "批量样本输入，平均速度更快"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:222
+msgid "输入为多个句子组成的list，平均速度会更快。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:231 ../model_zoo/taskflow.md:369
+#: ../model_zoo/taskflow.md:542
+msgid "自定义词典"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:233
+msgid ""
+"你可以通过传入user_dict参数，装载自定义词典来定制分词结果。 "
+"在默认模式和精确模式下，词典文件每一行由一个或多个自定义item组成。词典文件user_dict.txt示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:240
+msgid "在快速模式下，词典文件每一行为一个自定义item+\"\\t\"+词频（词频可省略，词频省略则自动计算能保证分出该词的词频），暂时不支持黑名单词典（即通过设置”年“、”末“，以达到切分”年末“的目的）。词典文件user_dict.txt示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:246
+msgid "加载自定义词典及输出结果示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:256
+msgid "参数说明"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:257
+msgid "mode：指定分词模式，默认为None。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:258 ../model_zoo/taskflow.md:393
+#: ../model_zoo/taskflow.md:572 ../model_zoo/taskflow.md:746
+#: ../model_zoo/taskflow.md:1073 ../model_zoo/taskflow.md:1092
+#: ../model_zoo/taskflow.md:1134 ../model_zoo/taskflow.md:1161
+#: ../model_zoo/taskflow.md:1186 ../model_zoo/taskflow.md:1217
+#: ../model_zoo/taskflow.md:1239 ../model_zoo/taskflow.md:1259
+#: ../model_zoo/taskflow.md:1278
+msgid "batch_size：批处理大小，请结合机器情况进行调整，默认为1。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:259
+msgid "user_dict：自定义词典文件路径，默认为None。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:260 ../model_zoo/taskflow.md:395
+#: ../model_zoo/taskflow.md:574 ../model_zoo/taskflow.md:753
+#: ../model_zoo/taskflow.md:1094 ../model_zoo/taskflow.md:1137
+#: ../model_zoo/taskflow.md:1162 ../model_zoo/taskflow.md:1188
+#: ../model_zoo/taskflow.md:1219
+msgid "task_path：自定义任务路径，默认为None。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:263
+msgid "词性标注"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:267
+msgid "支持单条和批量预测"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:280
+msgid "标签集合"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:371
+msgid "你可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为item/tag，如果不添加自定义标签，则使用模型默认标签n。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:373 ../model_zoo/taskflow.md:546
+msgid "词典文件user_dict.txt示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:381 ../model_zoo/taskflow.md:561
+msgid "装载自定义词典及输出结果示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:392 ../model_zoo/taskflow.md:571
+#: ../model_zoo/taskflow.md:745 ../model_zoo/taskflow.md:1072
+#: ../model_zoo/taskflow.md:1160 ../model_zoo/taskflow.md:1185
+#: ../model_zoo/taskflow.md:1216 ../model_zoo/taskflow.md:1238
+#: ../model_zoo/taskflow.md:1258
+msgid "可配置参数说明"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:394 ../model_zoo/taskflow.md:573
+#: ../model_zoo/taskflow.md:1095
+msgid "user_dict：用户自定义词典文件，默认为None。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:398 ../model_zoo/taskflow.md:763
+msgid "命名实体识别"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:402
+msgid "支持两种模式"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:430
+msgid "实体标签说明"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:432
+msgid "精确模式采用的标签集合"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:434
+msgid "包含66种词性及专名类别标签，标签集合如下表："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:453
+msgid "快速模式采用的标签集合"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:544
+msgid "你可以通过装载自定义词典来定制化命名实体识别结果。词典文件每一行表示一个自定义item，可以由一个term或者多个term组成，term后面可以添加自定义标签，格式为item/tag，如果不添加自定义标签，则使用模型默认标签。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:555
+msgid "以\"《长津湖》收尾，北美是最大海外票仓\"为例，原本的输出结果为："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:575
+msgid "entity_only：只返回实体/概念词及其对应标签。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:579
+msgid "依存句法分析"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:582
+msgid "支持多种形式输入"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:584
+msgid "未分词输入:"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:594
+msgid "使用分词结果来输入:"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:610
+msgid "多种模型选择，满足精度、速度需求"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:612
+msgid "使用ERNIE 1.0进行预测"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:620
+msgid ""
+"除ERNIE 1.0外，还可使用ERNIE-Gram预训练模型，其中model=ddparser（基于LSTM "
+"Encoder）速度最快，model=ddparser-ernie-gram-zh和model=ddparser-"
+"ernie-1.0效果更优（两者效果相当）。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:622
+msgid "输出方式"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:624
+msgid "输出概率值和词性标签:"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:632
+msgid "依存关系可视化"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:646
+msgid "依存句法分析标注关系集合"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:747
+msgid "model：选择任务使用的模型，可选有ddparser，ddparser-ernie-1.0和ddparser-ernie-gram-zh。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:748
+msgid "tree：确保输出结果是正确的依存句法树，默认为True。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:749
+msgid "prob：是否输出每个弧对应的概率值，默认为False。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:750
+msgid "use_pos：是否返回词性标签，默认为False。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:751
+msgid "use_cuda：是否使用GPU进行切词，默认为False。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:752
+msgid "return_visual：是否返回句法树的可视化结果，默认为False。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:756
+msgid "信息抽取"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:759
+msgid "开放域信息抽取是信息抽取的一种全新范式，主要思想是减少人工参与，利用单一模型支持多种类型的开放抽取任务，用户可以使用自然语言自定义抽取目标，在实体、关系类别等未定义的情况下抽取输入文本中的信息片段。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:761
+msgid "支持多场景信息抽取任务"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:765
+msgid ""
+"命名实体识别（Named Entity "
+"Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:767
+msgid "例如抽取的目标实体类型是\"时间\"、\"选手\"和\"赛事名称\", schema构造如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:773 ../model_zoo/taskflow.md:804
+#: ../model_zoo/taskflow.md:844 ../model_zoo/taskflow.md:899
+#: ../model_zoo/taskflow.md:923 ../model_zoo/taskflow.md:959
+#: ../model_zoo/taskflow.md:990
+msgid "预测："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:796
+msgid "例如抽取的目标实体类型是\"肿瘤的大小\"、\"肿瘤的个数\"、\"肝癌级别\"和\"脉管内癌栓分级\", schema构造如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:802
+msgid "在上例中我们已经实例化了一个Taskflow对象，这里可以通过set_schema方法重置抽取目标。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:828
+msgid "关系抽取"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:830
+msgid ""
+"关系抽取（Relation "
+"Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:832
+msgid "例如以\"竞赛名称\"作为抽取主体，抽取关系类型为\"主办方\"、\"承办方\"和\"已举办次数\", schema构造如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:880
+msgid "事件抽取"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:882
+msgid "事件抽取 (Event Extraction, 简称EE)，是指从自然语言文本中抽取预定义的事件触发词和事件要素，组合为相应的结构化信息。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:884
+msgid "例如抽取的目标是\"地震\"事件的\"地震强度\"、\"时间\"、\"震中位置\"和\"震源深度\"这些信息，schema构造如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:897
+msgid "触发词的格式统一为XX触发词，XX表示具体事件类型，上例中的事件类型是地震，则对应触发词为地震触发词。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:908
+msgid "评论观点抽取"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:910
+msgid "评论观点抽取，是指抽取文本中包含的评价维度、观点词。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:912
+msgid "例如抽取的目标是文本中包含的评价维度及其对应的观点词和情感倾向，schema构造如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:951
+msgid "情感倾向分类"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:953
+msgid "句子级情感倾向分类，即判断句子的情感倾向是“正向”还是“负向”，schema构造如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:968
+msgid "跨任务抽取"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:970
+msgid "例如在法律场景同时对文本进行实体抽取和关系抽取，schema可按照如下方式进行构造："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1019
+msgid "多模型选择，满足精度、速度要求"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1021
+msgid "模型选择"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1046
+msgid "使用UIE-Tiny进行预测"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1057
+msgid "定制训练"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1059
+msgid ""
+"对于简单的抽取目标可以直接使用paddlenlp.Taskflow实现零样本（zero-"
+"shot）抽取，对于细分场景我们推荐使用定制训练（标注少量数据进行模型微调）以进一步提升效果。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1061
+msgid "我们在互联网、医疗、金融三大垂类自建测试集上进行了实验："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1070
+msgid "0-shot表示无训练数据直接通过paddlenlp.Taskflow进行预测，5-shot表示基于5条标注数据进行模型微调。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1074
+msgid "model：选择任务使用的模型，默认为uie-base，可选有uie-tiny，uie-base和uie-medical-base。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1075
+msgid "schema：定义任务抽取目标，可参考示例中对于不同信息抽取任务的schema配置自定义抽取目标。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1076
+msgid "position_prob：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1079
+msgid "解语知识标注"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1082
+msgid "词类知识标注"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1091 ../model_zoo/taskflow.md:1133
+msgid "可配置参数说明："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1093
+msgid "linking：实现基于词类的linking，默认为True。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1098
+msgid "知识挖掘-词类知识标注任务共包含66种词性及专名类别标签，标签集合如下表："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1118
+msgid "名词短语标注"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1135
+msgid "max_seq_len：最大序列长度，默认为64。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1136
+msgid "linking：实现与WordTag类别标签的linking，默认为False。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1142
+msgid "文本纠错"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1146 ../model_zoo/taskflow.md:1225
+#: ../model_zoo/taskflow.md:1245
+msgid "支持单条、批量预测"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1165
+msgid "文本相似度"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1168
+msgid "单条输入"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1187
+msgid "max_seq_len：最大序列长度，默认为128。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1191
+msgid "情感倾向分析"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1194
+msgid "支持不同模型，速度快和精度高两种模式"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1218
+msgid "model：选择任务使用的模型，可选有bilstm和skep_ernie_1.0_large_ch。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1222
+msgid "生成式问答"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1242
+msgid "智能写诗"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1262
+msgid "开放域对话"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1265
+msgid "非交互模式"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1276
+msgid "可配置参数："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1279
+msgid "max_seq_len：最大序列长度，默认为512。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1281
+msgid "交互模式"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1299
+msgid "交互模式参数："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1300
+msgid "max_turn：任务能记忆的对话轮数，当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1304
+msgid "PART Ⅱ   定制化训练"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1308
+msgid "如果你有自己的业务数据集，可以对模型效果进一步调优，支持定制化训练的任务如下："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1397
+msgid "这里我们以命名实体识别Taskflow(\"ner\", mode=\"accurate\")为例，展示如何定制自己的模型。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1399
+msgid "调用Taskflow接口后，程序自动将相关文件下载到$HOME/.paddlenlp/taskflow/wordtag/，该默认路径包含以下文件:"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1408
+msgid "参考上表中对应示例准备数据集和标签文件tags.txt，执行相应训练脚本得到自己的model_state.pdparams和model_config.json。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1410
+msgid "根据自己数据集情况，修改标签文件tags.txt。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1412
+msgid "将以上文件保存到任意路径中，自定义路径下的文件需要和默认路径的文件一致:"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1420
+msgid "通过task_path指定自定义路径，使用Taskflow加载自定义模型进行一键预测："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1428
+msgid "模型算法"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1456
+msgid "FAQ"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1460
+msgid ""
+"A: "
+"Taskflow默认会将任务相关模型等文件保存到$HOME/.paddlenlp下，可以在任务初始化的时候通过home_path自定义修改保存路径。示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1466
+msgid "通过以上方式即可将ner任务相关文件保存至/workspace路径下。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1472
+msgid ""
+"A: "
+"Taskflow默认会将任务相关模型等文件保存到$HOME/.paddlenlp/taskflow下，如果下载或调用失败，可删除相应路径下的文件，重新尝试即可"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1478
+msgid "A: 可以结合设备情况适当调整batch_size，采用批量输入的方式来提升平均速率。示例："
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1489
+msgid "通过上述方式进行分词可以大幅提升预测速度。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1495
+msgid "A: Taskflow支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过Issue或问卷反馈给我们。"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1500
+msgid "附录"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1504
+msgid "fxsjy/jieba"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1505
+msgid "ZhuiyiTechnology/simbert"
+msgstr ""
+
+#: ../model_zoo/taskflow.md:1506
+msgid "CPM: A Large-scale Generative Chinese Pre-trained Language Model"
+msgstr ""
+
+#~ msgid "PaddleNLP Taskflow"
+#~ msgstr ""
+
+#~ msgid "介绍"
+#~ msgstr ""
+
+#~ msgid "任务清单"
+#~ msgstr ""
+
+#~ msgid "用法"
+#~ msgstr ""
+
+#~ msgid "查看使用示例"
+#~ msgstr ""
+
+#~ msgid "句法分析"
+#~ msgstr ""
+
+#~ msgid "情感分析"
+#~ msgstr ""
+
+#~ msgid "『解语』-词类知识标注"
+#~ msgstr ""
+
+#~ msgid "『解语』-名词短语标注"
+#~ msgstr ""
+
+#~ msgid "自定义任务"
+#~ msgstr ""
+
+#~ msgid "paddlenlp.Taskflow提供开箱即用的NLP预置任务，覆盖自然语言理解与自然语言生成两大核心应用，在中文场景上提供产业级的效果与极致的预测性能。"
+#~ msgstr ""
+
+#~ msgid "随着版本迭代会持续开放更多的应用场景。"
+#~ msgstr ""
+
+#~ msgid "安装"
+#~ msgstr ""
+
+#~ msgid "paddlenlp >= 2.2.0"
+#~ msgstr ""
+
+#~ msgid "支持三种模式分词"
+#~ msgstr ""
+
+#~ msgid "Base模式（默认）"
+#~ msgstr ""
+
+#~ msgid "快速模式"
+#~ msgstr ""
+
+#~ msgid "利用『结巴』中文分词工具，实现文本快速切分。"
+#~ msgstr ""
+
+#~ msgid "精确模式"
+#~ msgstr ""
+
+#~ msgid "试图将句子中的实体词完整切分，分词精确度高。"
+#~ msgstr ""
+
+#~ msgid "快速模式词典载入方式："
+#~ msgstr ""
+
+#~ msgid "用户可以在词典文件每一行有两个部分：词语、词频（可省略），用空格隔开。词频省略则自动计算能保证分出该词的词频。"
+#~ msgstr ""
+
+#~ msgid "\"国家卫健委修订完成了新冠肺炎诊疗方案\"原本的输出结果为："
+#~ msgstr ""
+
+#~ msgid "Base、精确模式词典载入方式："
+#~ msgstr ""
+
+#~ msgid "词典文件每一行表示一个自定义item。"
+#~ msgstr ""
+
+#~ msgid "以默认模型为例，\"平原上的火焰计划于年末上映\"原本的输出结果为："
+#~ msgstr ""
+
+#~ msgid "标签集合："
+#~ msgstr ""
+
+#~ msgid "用户可以通过装载自定义词典来定制化分词和词性标注结果。词典文件每一行表示一个自定义item，可以由一个单词或者多个单词组成，单词后面可以添加自定义标签，格式为item/tag，如果不添加自定义标签，则使用模型默认标签。"
+#~ msgstr ""
+
+#~ msgid "以\"赛里木湖是新疆海拔最高的高山湖泊\"为例，原本的输出结果为："
+#~ msgstr ""
+
+#~ msgid "精确模式（默认）"
+#~ msgstr ""
+
+#~ msgid "只返回实体/概念词："
+#~ msgstr ""
+
+#~ msgid "entity_only：是否返回所有词性标签；若设置为True，则只返回实体/概念词；默认为False。"
+#~ msgstr ""
+
+#~ msgid "使用ddparser-ernie-1.0进行预测:"
+#~ msgstr ""
+
+#~ msgid "依存关系可视化："
+#~ msgstr ""
+
+#~ msgid "标注关系说明："
+#~ msgstr ""
+
+#~ msgid "使用BiLSTM模型："
+#~ msgstr ""
+
+#~ msgid "使用SKEP情感分析预训练模型进行预测："
+#~ msgstr ""
+
+#~ msgid "知识挖掘-词类知识标注"
+#~ msgstr ""
+
+#~ msgid "知识挖掘-词类知识标注任务共包含66种词性及专名类别标签，标签集合如下表"
+#~ msgstr ""
+
+#~ msgid "知识挖掘-名词短语标注"
+#~ msgstr ""
+
+#~ msgid "非交互模式："
+#~ msgstr ""
+
+#~ msgid "交互模式："
+#~ msgstr ""
+
+#~ msgid "交互模式下，Taskflow具备多轮对话记忆功能。"
+#~ msgstr ""
+
+#~ msgid "max_turn：仅在交互模式有效，表示任务能记忆的对话轮数；当max_turn为1时，模型只能记住当前对话，无法获知之前的对话内容。"
+#~ msgstr ""
+
+#~ msgid "Taskflow提供了定制接口来使用自己的数据对模型进行微调/训练，适配任务如下："
+#~ msgstr ""
+
+#~ msgid "定制任务示例"
+#~ msgstr ""
+
+#~ msgid "任务的默认路径为$HOME/.paddlenlp/taskflow/ner/wordtag/，该默认路径包含以下文件:"
+#~ msgstr ""
+
+#~ msgid "参考表中对应示例准备数据集和标签文件tags.txt，执行相应训练脚本得到自己的model_state.pdparams和model_config.json。"
+#~ msgstr ""
+
+#~ msgid "通过task_path指定用户自定义路径，自定义路径下的文件需要和默认路径的文件一致:"
+#~ msgstr ""
+
+#~ msgid "使用Taskflow加载自定义模型进行一键预测："
+#~ msgstr ""
+
+#~ msgid "Q1 Taskflow如何修改任务保存路径？"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A: "
+#~ "Taskflow默认会将任务相关模型等文件保存到$HOME/.paddlenlp下，可以在任务初始化的时候通过home_path自定义修改保存路径。"
+#~ msgstr ""
+
+#~ msgid "示例："
+#~ msgstr ""
+
+#~ msgid "参考资料"
+#~ msgstr ""
+

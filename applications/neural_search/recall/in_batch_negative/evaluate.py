@@ -23,7 +23,7 @@ import time
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--similar_text_pair", type=str,
-                    default='', help="The full path of similat pair file")
+                    default='', help="The full path of similar pair file")
 parser.add_argument("--recall_result_file", type=str,
                     default='', help="The full path of recall result file")
 parser.add_argument("--recall_num", type=int, default=10,
@@ -72,8 +72,6 @@ if __name__ == "__main__":
                 relevance_labels = []
 
             text, recalled_text, cosine_sim = line.rstrip().split("\t")
-            if text == recalled_text:
-                continue
             if text2similar[text] == recalled_text:
                 relevance_labels.append(1)
             else:

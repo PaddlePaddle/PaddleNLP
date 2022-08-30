@@ -22,10 +22,9 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, AutoModel, AutoTokenizer
 
 from data import create_dataloader, gen_pair
 from data import convert_pairwise_example as convert_example
@@ -79,8 +78,8 @@ def evaluate(model, metric, data_loader, phase="dev"):
     for idx, batch in enumerate(data_loader):
         input_ids, token_type_ids, labels = batch
 
-        pos_probs = model.predict(
-            input_ids=input_ids, token_type_ids=token_type_ids)
+        pos_probs = model.predict(input_ids=input_ids,
+                                  token_type_ids=token_type_ids)
 
         neg_probs = 1.0 - pos_probs
 
@@ -119,60 +118,51 @@ def do_train():
 
     set_seed(args.seed)
 
-    # train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
-
     train_ds = load_dataset(read, src_path=args.train_file, lazy=False)
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
-    print(train_ds[0])
 
-    # train_ds = gen_pair(train_ds)
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained('ernie-1.0')
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    trans_func_train = partial(convert_example,
+                               tokenizer=tokenizer,
+                               max_seq_length=args.max_seq_length)
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
-
-    trans_func_train = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
-
-    trans_func_eval = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        phase="eval")
+    trans_func_eval = partial(convert_example,
+                              tokenizer=tokenizer,
+                              max_seq_length=args.max_seq_length,
+                              phase="eval")
 
     batchify_fn_train = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # pos_pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # pos_pair_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # neg_pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id)  # neg_pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # pos_pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # pos_pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # neg_pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            )  # neg_pair_segment
     ): [data for data in fn(samples)]
 
     batchify_fn_eval = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # pair_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # pair_segment
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn_train,
-        trans_fn=trans_func_train)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn_train,
+                                          trans_fn=trans_func_train)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn_eval,
-        trans_fn=trans_func_eval)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn_eval,
+                                        trans_fn=trans_func_eval)
 
     model = PairwiseMatching(pretrained_model, margin=args.margin)
 
@@ -205,18 +195,17 @@ def do_train():
         for step, batch in enumerate(train_data_loader, start=1):
             pos_input_ids, pos_token_type_ids, neg_input_ids, neg_token_type_ids = batch
 
-            loss = model(
-                pos_input_ids=pos_input_ids,
-                neg_input_ids=neg_input_ids,
-                pos_token_type_ids=pos_token_type_ids,
-                neg_token_type_ids=neg_token_type_ids)
+            loss = model(pos_input_ids=pos_input_ids,
+                         neg_input_ids=neg_input_ids,
+                         pos_token_type_ids=pos_token_type_ids,
+                         neg_token_type_ids=neg_token_type_ids)
 
             global_step += 1
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
             loss.backward()
