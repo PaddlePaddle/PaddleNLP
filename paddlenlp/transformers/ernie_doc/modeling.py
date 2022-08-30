@@ -11,13 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional, List, Tuple
 
 import paddle
+from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..attention_utils import _convert_param_attr_to_list
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    QuestionAnsweringModelOutput,
+    MultipleChoiceModelOutput,
+    MaskedLMOutput,
+    ModelOutput,
+)
 
 __all__ = [
     'ErnieDocModel',
@@ -26,6 +38,252 @@ __all__ = [
     'ErnieDocForTokenClassification',
     'ErnieDocForQuestionAnswering',
 ]
+
+
+@dataclass
+class ErnieDocModelOutput(ModelOutput):
+    """
+    Output type of [`ErnieDocModel`].
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, num_predict, hidden_size)`):
+            Sequence of hidden-states at the last layer of the model.
+
+            `num_predict` corresponds to `target_mapping.shape[1]`. If `target_mapping` is `None`, then `num_predict`
+            corresponds to `sequence_length`.
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    last_hidden_state: paddle.Tensor
+    mem: List[paddle.Tensor] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ErnieDocModelOutputWithPooling(ModelOutput):
+    """
+    Base class for model's outputs that also contains a pooling of the last hidden states.
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        pooler_output (`paddle.Tensor` of shape `(batch_size, hidden_size)`):
+            Last layer hidden-state of the first token of the sequence (classification token) after further processing
+            through the layers used for the auxiliary pretraining task. E.g. for BERT-family of models, this returns
+            the classification token after processing through a linear layer and a tanh activation function. The linear
+            layer weights are trained from the next sentence prediction (classification) objective during pretraining.
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    pooler_output: paddle.Tensor = None
+    mems: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ErnieDocSequenceClassifierOutput(ModelOutput):
+    """
+    Base class for outputs of sentence classification models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, config.num_labels)`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax).
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    mems: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ErnieDocTokenClassifierOutput(ModelOutput):
+    """
+    Base class for outputs of token classification models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided) :
+            Classification loss.
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.num_labels)`):
+            Classification scores (before SoftMax).
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    mems: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ErnieDocQuestionAnsweringModelOutput(ModelOutput):
+    """
+    Base class for outputs of question answering models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Total span extraction loss is the sum of a Cross-Entropy for the start and end positions.
+        start_logits (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+            Span-start scores (before SoftMax).
+        end_logits (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+            Span-end scores (before SoftMax).
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    start_logits: paddle.Tensor = None
+    end_logits: paddle.Tensor = None
+    mems: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ErnieDocMultipleChoiceModelOutput(ModelOutput):
+    """
+    Base class for outputs of multiple choice models.
+
+    Args:
+        loss (`paddle.Tensor` of shape *(1,)*, *optional*, returned when `labels` is provided):
+            Classification loss.
+        logits (`paddle.Tensor` of shape `(batch_size, num_choices)`):
+            *num_choices* is the second dimension of the input tensors. (see *input_ids* above).
+
+            Classification scores (before SoftMax).
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    mems: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ErnieDocMaskedLMOutput(ModelOutput):
+    """
+    Base class for masked language models outputs.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Masked language modeling (MLM) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        mem (`List[paddle.Tensor]` of length `config.n_layers`):
+            Contains pre-computed hidden-states. Can be used (see `mems` input) to speed up sequential decoding. The
+            token ids which have their past given to this model should not be passed as `input_ids` as they have
+            already been computed.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    mems: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
 
 
 class PointwiseFFN(nn.Layer):
@@ -131,7 +389,14 @@ class MultiHeadAttention(nn.Layer):
         # output shape: [B, N, T, T + M]
         return x[:, :, :, :klen]
 
-    def __scaled_dot_product_attention(self, q, k, v, r, t, attn_mask):
+    def __scaled_dot_product_attention(self,
+                                       q,
+                                       k,
+                                       v,
+                                       r,
+                                       t,
+                                       attn_mask,
+                                       output_attentions=False):
         q_w, q_r, q_t = q
         score_w = paddle.matmul(q_w, k, transpose_y=True)
         score_r = paddle.matmul(q_r, r, transpose_y=True)
@@ -145,7 +410,10 @@ class MultiHeadAttention(nn.Layer):
         if self.dropout:
             weights = self.dropout(weights)
         out = paddle.matmul(weights, v)
-        return out
+
+        if output_attentions:
+            return out, weights
+        return (out, )
 
     def __combine_heads(self, x):
         if len(x.shape) == 3: return x
@@ -156,8 +424,15 @@ class MultiHeadAttention(nn.Layer):
         # target shape:[B, T, H]
         return x.reshape([0, 0, x.shape[2] * x.shape[3]])
 
-    def forward(self, queries, keys, values, rel_pos, rel_task, memory,
-                attn_mask):
+    def forward(self,
+                queries,
+                keys,
+                values,
+                rel_pos,
+                rel_task,
+                memory,
+                attn_mask,
+                output_attentions=False):
         if memory is not None and len(memory.shape) > 1:
             cat = paddle.concat([memory, queries], 1)
         else:
@@ -182,12 +457,12 @@ class MultiHeadAttention(nn.Layer):
             map(lambda x: self.__split_heads(x, self.d_model, self.n_head),
                 [k, v, r, t]))
 
-        ctx_multiheads = self.__scaled_dot_product_attention([q_w, q_r, q_t], \
+        outputs = self.__scaled_dot_product_attention([q_w, q_r, q_t], \
                                     k, v, r, t, attn_mask)
 
-        out = self.__combine_heads(ctx_multiheads)
+        out = self.__combine_heads(outputs[0])
         out = self.out_proj(out)
-        return out
+        return (out, ) + outputs[1:]
 
 
 class ErnieDocEncoderLayer(nn.Layer):
@@ -250,12 +525,25 @@ class ErnieDocEncoderLayer(nn.Layer):
         self.epsilon = epsilon
         self.normalize_before = normalize_before
 
-    def forward(self, enc_input, memory, rel_pos, rel_task, attn_mask):
+    def forward(self,
+                enc_input,
+                memory,
+                rel_pos,
+                rel_task,
+                attn_mask,
+                output_attentions=False):
         residual = enc_input
         if self.normalize_before:
             enc_input = self.norm1(enc_input)
-        attn_output = self.attn(enc_input, enc_input, enc_input, rel_pos,
-                                rel_task, memory, attn_mask)
+        attn_outputs = self.attn(enc_input,
+                                 enc_input,
+                                 enc_input,
+                                 rel_pos,
+                                 rel_task,
+                                 memory,
+                                 attn_mask,
+                                 output_attentions=output_attentions)
+        attn_output = attn_outputs[0]
         attn_output = residual + self.dropout1(attn_output)
         if not self.normalize_before:
             attn_output = self.norm1(attn_output)
@@ -266,7 +554,7 @@ class ErnieDocEncoderLayer(nn.Layer):
         output = residual + self.dropout2(ffn_output)
         if not self.normalize_before:
             output = self.norm2(output)
-        return output
+        return (output, ) + attn_outputs[1:]
 
 
 class ErnieDocEncoder(nn.Layer):
@@ -292,16 +580,49 @@ class ErnieDocEncoder(nn.Layer):
         new_mem.stop_gradient = True
         return new_mem
 
-    def forward(self, enc_input, memories, rel_pos, rel_task, attn_mask):
+    def forward(self,
+                enc_input,
+                memories,
+                rel_pos,
+                rel_task,
+                attn_mask,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
+
+        all_hidden_states = () if output_hidden_states else None
+        all_attentions = () if output_attentions else None
         # no need to normalize enc_input, cause it's already normalized outside.
         new_mem = []
         for i, encoder_layer in enumerate(self.layers):
-            enc_input = encoder_layer(enc_input, memories[i], rel_pos, rel_task,
-                                      attn_mask)
+
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (enc_input, )
+
+            enc_output = encoder_layer(enc_input,
+                                       memories[i],
+                                       rel_pos,
+                                       rel_task,
+                                       attn_mask,
+                                       output_attentions=output_attentions)
+            enc_input = enc_output[0]
             new_mem += [self._cache_mem(enc_input, memories[i])]
             # free the old memories explicitly to save gpu memory
             memories[i] = None
-        return enc_input, new_mem
+
+            if output_attentions:
+                all_attentions = all_attentions + enc_output[-1]
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (enc_input, )
+
+        return tuple(v for v in [enc_input, all_hidden_states, all_attentions]
+                     if v is not None)
+
+        return ErnieDocModelOutput(last_hidden_states=enc_input,
+                                   new_mem=new_mem,
+                                   hidden_states=all_hidden_states,
+                                   attentions=all_attentions)
 
 
 class ErnieDocPretrainedModel(PretrainedModel):
@@ -567,8 +888,15 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         n_head_self_attn_mask.stop_gradient = True
         return n_head_self_attn_mask
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self,
+                input_ids,
+                memories,
+                token_type_ids,
+                position_ids,
+                attn_mask,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The ErnieDocModel forward method, overrides the `__call__()` special method.
 
@@ -605,6 +933,15 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple : Returns tuple (``encoder_output``, ``pooled_output``, ``new_mem``).
@@ -667,13 +1004,23 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         n_head_self_attn_mask = self._create_n_head_attn_mask(
             attn_mask, batch_size)
         # memories contains n_layer memory whose shape is [B, M, H]
-        encoder_output, new_mem = self.encoder(enc_input=input_embeddings,
-                                               memories=memories,
-                                               rel_pos=position_embeddings,
-                                               rel_task=token_embeddings,
-                                               attn_mask=n_head_self_attn_mask)
-        pooled_output = self.pooler(encoder_output)
-        return encoder_output, pooled_output, new_mem
+        outputs = self.encoder(enc_input=input_embeddings,
+                               memories=memories,
+                               rel_pos=position_embeddings,
+                               rel_task=token_embeddings,
+                               attn_mask=n_head_self_attn_mask,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
+
+        pooled_output = self.pooler(outptus[0])
+        if not return_dict:
+            return (encoder_output, pooled_output) + outputs[1:]
+        return ErnieDocModelOutput(last_hidden_state=outputs[0],
+                                   pooler_output=pooled_output,
+                                   mems=outputs.mems,
+                                   hidden_states=outputs.hidden_states,
+                                   attentions=outputs.attentions)
 
 
 class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
@@ -698,8 +1045,16 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self,
+                input_ids,
+                memories,
+                token_type_ids,
+                position_ids,
+                attn_mask,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The ErnieDocForSequenceClassification forward method, overrides the `__call__()` special method.
 
@@ -714,6 +1069,20 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 See :class:`ErnieDocModel`.
             attn_mask (Tensor):
                 See :class:`ErnieDocModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple : Returns tuple (`logits`, `mem`).
@@ -763,12 +1132,42 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
-        _, pooled_output, mem = self.ernie_doc(input_ids, memories,
-                                               token_type_ids, position_ids,
-                                               attn_mask)
-        pooled_output = self.dropout(pooled_output)
+        outputs = self.ernie_doc(input_ids,
+                                 memories,
+                                 token_type_ids,
+                                 position_ids,
+                                 attn_mask,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states,
+                                 return_dict=return_dict)
+        pooled_output = self.dropout(outputs[1])
         logits = self.linear(pooled_output)
-        return logits, mem
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return ErnieDocSequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            mems=outputs.mems,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
@@ -794,8 +1193,16 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                                 num_classes)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self,
+                input_ids,
+                memories,
+                token_type_ids,
+                position_ids,
+                attn_mask,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The ErnieDocForTokenClassification forward method, overrides the `__call__()` special method.
 
@@ -811,7 +1218,20 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 See :class:`ErnieDocModel`.
             attn_mask (Tensor):
                 See :class:`ErnieDocModel`.
-
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
         Returns:
             tuple : Returns tuple (`logits`, `mem`).
 
@@ -860,12 +1280,34 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
-        sequence_output, _, mem = self.ernie_doc(input_ids, memories,
-                                                 token_type_ids, position_ids,
-                                                 attn_mask)
-        sequence_output = self.dropout(sequence_output)
+        outputs = self.ernie_doc(input_ids,
+                                 memories,
+                                 token_type_ids,
+                                 position_ids,
+                                 attn_mask,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states,
+                                 return_dict=return_dict)
+        sequence_output = self.dropout(outputs[0])
         logits = self.linear(sequence_output)
-        return logits, mem
+
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return ErnieDocTokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            mems=outputs.mems,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
@@ -888,8 +1330,17 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self,
+                input_ids,
+                memories,
+                token_type_ids,
+                position_ids,
+                attn_mask,
+                start_positions=None,
+                end_positions=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The ErnieDocForQuestionAnswering forward method, overrides the `__call__()` special method.
 
@@ -904,6 +1355,23 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 See :class:`ErnieDocModel`.
             attn_mask (Tensor):
                 See :class:`ErnieDocModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple : Returns tuple (`start_logits`, `end_logits`, `mem`).
@@ -958,10 +1426,44 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 mem = outputs[2]
 
         """
-        sequence_output, _, mem = self.ernie_doc(input_ids, memories,
-                                                 token_type_ids, position_ids,
-                                                 attn_mask)
-        sequence_output = self.dropout(sequence_output)
+        outputs = self.ernie_doc(input_ids,
+                                 memories,
+                                 token_type_ids,
+                                 position_ids,
+                                 attn_mask,
+                                 output_attentions=output_attentions,
+                                 output_hidden_states=output_hidden_states,
+                                 return_dict=return_dict)
+        sequence_output = self.dropout(outputs[0])
         logits = self.linear(sequence_output)
         start_logits, end_logits = paddle.transpose(logits, perm=[2, 0, 1])
-        return start_logits, end_logits, mem
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return ErnieDocQuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            mems=outputs.mems,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
