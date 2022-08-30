@@ -156,6 +156,11 @@ def parse_args():
                         type=distutils.util.strtobool,
                         default=False,
                         help="Enable mixed precision training.")
+    parser.add_argument("--amp_level",
+                        type=str,
+                        default="O2",
+                        choices=["O1", "O2"],
+                        help="select O1 or O2 of amp level.")
     parser.add_argument("--scale_loss",
                         type=float,
                         default=2**15,
@@ -355,9 +360,6 @@ def do_train(args):
         logger.info(
             "Successfully to apply @to_static with specs: {}".format(specs))
 
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
@@ -380,8 +382,15 @@ def do_train(args):
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params)
+
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+        model = paddle.amp.decorate(models=model,
+                                    level=args.amp_level,
+                                    save_dtype='float32')
+
+    if paddle.distributed.get_world_size() > 1:
+        model = paddle.DataParallel(model)
 
     pool = ThreadPoolExecutor(1)
     global_step = 0
@@ -448,7 +457,8 @@ def do_train(args):
                                               "layer_norm", "softmax", "gelu",
                                               "fused_attention",
                                               "fused_feedforward"
-                                          ]):
+                                          ],
+                                          level=args.amp_level):
                     prediction_scores, seq_relationship_score = model(
                         input_ids=input_ids,
                         token_type_ids=segment_ids,
@@ -501,7 +511,7 @@ def do_train(args):
                         paddle.save(
                             optimizer.state_dict(),
                             os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:            
+                if global_step >= args.max_steps:
                     del train_data_loader
                     return
                 batch_start = time.time()

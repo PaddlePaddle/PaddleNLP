@@ -104,7 +104,6 @@ def _process_request(pipeline, request) -> Dict[str, Any]:
         result["documents"] = []
     if not "answers" in result:
         result["answers"] = []
-
     # if any of the documents contains an embedding as an ndarray the latter needs to be converted to list of float
     for document in result["documents"]:
         if isinstance(document.embedding, ndarray):
