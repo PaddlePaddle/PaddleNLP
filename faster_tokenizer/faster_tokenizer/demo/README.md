@@ -54,7 +54,7 @@ mkdir build
 cd build
 
 # 运行cmake，通过指定faster_tokenizer包的路径，构建Makefile
-cmake .. -DFASTER_TOKENIZER_LIB=/path/to/faster_tokenizer
+cmake .. -DFASTER_TOKENIZER_INSTALL_DIR=/path/to/faster_tokenizer
 
 # 编译
 make
