@@ -6,6 +6,7 @@
    * [环境准备](#环境准备)
    * [数据集准备](#数据集准备)
    * [模型训练](#模型训练)
+       * [训练评估与模型优化](#训练评估与模型优化)
        * [训练效果](#训练效果)
    * [模型预测](#模型预测)
    * [静态图导出](#静态图导出)
@@ -56,28 +57,33 @@ multi_class/
 ├── export_model.py # 静态图模型导出脚本
 ├── utils.py # 工具函数脚本
 ├── prune.py # 裁剪脚本
-├── prune_trainer.py # 裁剪API脚本
 └── README.md # 多分类使用说明
 ```
 
 ## 准备环境
+
 **文本分类所需用到的环境配置：**
 
 - python >= 3.6
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.3.4
+- scikit-learn >= 1.0.2
 
 **安装PaddlePaddle**
 
 环境中paddlepaddle-gpu或paddlepaddle版本应大于或等于2.3, 请参见[飞桨快速安装](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)根据自己需求选择合适的PaddlePaddle下载命令。
 
-
 **安装PaddleNLP**
+
 ```shell
 python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 ```
-安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭（删去 -i https://mirror.baidu.com/pypi/simple ），更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
+**安装sklearn**
+```shell
+pip install scikit-learn==1.0.2
+```
 
 ## 数据集准备
 训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](../doccano.md)进行文本分类数据标注。
@@ -92,6 +98,7 @@ data/
 ├── label.txt # 分类标签文件
 └── data.txt # 待预测数据文件
 ```
+
 **训练、开发、测试数据集**
 
 train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(测试数据集文件)，文件中文本与标签类别名用tab符`'\t'`分隔开。训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替；通常建议训练集、开发集、测试集的比例为8:1:1或6:2:2；只有训练集和开发集的情况时建议训练集：开发集比例为8:2或7:3。**注意文本中不能包含tab符**
@@ -145,20 +152,40 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 鱼油怎么吃咬破吃还是直接咽下去
 ...
 ```
+
 ## 模型训练
 
 接下来我们将以公开数据集KUAKE-QIC任务为示例，介绍如何在训练集上进行模型训练，并在开发集上使用准确率评估模型表现。
 
 下载KUAKE-QIC数据集：
+
 ```shell
 wget https://paddlenlp.bj.bcebos.com/datasets/KUAKE_QIC.tar.gz
 tar -zxvf KUAKE_QIC.tar.gz
 mv KUAKE_QIC data
+rm KUAKE_QIC.tar.gz
 ```
 
-使用CPU训练
+使用CPU/GPU训练：
 ```shell
 python train.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --save_dir "./checkpoint" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --learning_rate 3e-5 \
+    --epochs 100 \
+    --logging_steps 5 \
+    --train_file "train.txt"
+```
+默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
+如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
+```shell
+python -m paddle.distributed.launch --nproc_per_node=8 --backend='gloo' train.py \
     --device "cpu" \
     --dataset_dir "data" \
     --save_dir "./checkpoint" \
@@ -168,10 +195,12 @@ python train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
 
-使用GPU单卡/多卡训练
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练：
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
@@ -184,8 +213,10 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --early_stop \
     --learning_rate 3e-5 \
     --epochs 100 \
-    --logging_steps 5
+    --logging_steps 5 \
+    --train_file "train.txt"
 ```
+
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
@@ -194,7 +225,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en"；默认为"ernie-3.0-medium-zh"。
+* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-1.0-large-zh-cw"；默认为"ernie-3.0-medium-zh"。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
@@ -206,7 +237,9 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
 * `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
-
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
@@ -219,11 +252,60 @@ checkpoint/
 ```
 
 **NOTE:**
+
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
 
+### 训练评估与模型优化
+
+训练后的模型我们可以使用[评估脚本](analysis/evaluate.py)对每个类别分别进行评估，并输出预测错误样本（bad case）：
+
+```shell
+python analysis/evaluate.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --params_path "./checkpoint" \
+    --max_seq_length 128 \
+    --batch_size 32 \
+    --bad_case_path "./bad_case.txt"
+```
+
+默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
+
+输出打印示例：
+
+```text
+[2022-08-10 06:28:37,219] [    INFO] - -----Evaluate model-------
+[2022-08-10 06:28:37,219] [    INFO] - Train dataset size: 6931
+[2022-08-10 06:28:37,220] [    INFO] - Dev dataset size: 1955
+[2022-08-10 06:28:37,220] [    INFO] - Accuracy in dev dataset: 81.79%
+[2022-08-10 06:28:37,221] [    INFO] - Top-2 accuracy in dev dataset: 92.48%
+[2022-08-10 06:28:37,222] [    INFO] - Top-3 accuracy in dev dataset: 97.24%
+[2022-08-10 06:28:37,222] [    INFO] - Class name: 病情诊断
+[2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in train dataset: 877(12.7%) | precision: 97.14 | recall: 96.92 | F1 score 97.03
+[2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in dev dataset: 288(14.7%) | precision: 80.32 | recall: 86.46 | F1 score 83.28
+[2022-08-10 06:28:37,223] [    INFO] - ----------------------------
+[2022-08-10 06:28:37,223] [    INFO] - Class name: 治疗方案
+[2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in train dataset: 1750(25.2%) | precision: 96.84 | recall: 99.89 | F1 score 98.34
+[2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in dev dataset: 676(34.6%) | precision: 88.46 | recall: 94.08 | F1 score 91.18
+...
+```
+
+预测错误的样本保存在bad_case.txt文件中：
+
+```text
+Confidence	Prediction	Label	Text
+0.77	注意事项	其他	您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？
+0.94	就医建议	其他	输卵管粘连的基本检查
+0.78	病情诊断	其他	经常干呕恶心，这是生病了吗
+0.79	后果表述	其他	吃左旋肉碱后的不良反应
+...
+```
+
+模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 ### 训练效果
+
 PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们评测了不同预训练模型在KUAKE-QIC任务的表现，测试配置如下：
 
 1. 数据集：CBLUE数据集中医疗搜索检索词意图分类(KUAKE-QIC)任务开发集
@@ -259,6 +341,7 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 |"ernie-3.0-mini-zh" |6-layer, 384-hidden, 12-heads|79.80| 0.38|
 |"ernie-3.0-micro-zh" | 4-layer, 384-hidden, 12-heads|79.80| 0.26|
 |"ernie-3.0-nano-zh" |4-layer, 312-hidden, 12-heads|78.57|0.22|
+
 ## 模型预测
 
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行。
@@ -291,6 +374,8 @@ python predict.py \
 * `params_path`：待预测模型的目录；默认为"./checkpoint/"。
 * `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 ## 静态图导出
 
@@ -318,7 +403,7 @@ export/
 
 ## 模型裁剪
 
-如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用脚本`prune.py` 即可一键启动裁剪和并自动保存裁剪后的模型。
+**如果有模型部署上线的需求，需要进一步压缩模型体积**，可以使用 PaddleNLP 的 压缩(Compression API）, API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用脚本`prune.py` 即可一键启动裁剪和并自动保存裁剪后的模型参数。
 ### 环境准备
 
 使用裁剪功能需要安装 paddleslim 包
@@ -344,7 +429,7 @@ python prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 
 使用GPU单卡/多卡训练
@@ -363,12 +448,12 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
     --dataset_dir "data" \
     --max_seq_length 128 \
     --params_dir "./checkpoint" \
-    --width_mult '2/3'
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
 使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
 
 可支持配置的参数：
-* `TrainingArguments`
+* `CompressionArguments`
   * `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
   * `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
   * `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
@@ -378,7 +463,8 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
   * `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
   * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
   * `seed`：随机种子，默认为3。
-  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)。
+  * `CompressionArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[CompressionArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md)。
+  * `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是 ['3/4', '2/3', '1/2']。
 
 * `DataArguments`
   * `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
@@ -386,7 +472,6 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 * `ModelArguments`
   * `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
-  * `width_mult`：裁剪宽度保留的比例，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，默认是 '2/3'。
 
 以上参数都可通过 `python prune.py --dataset_dir xx --params_dir xx` 的方式传入）
 
@@ -394,7 +479,19 @@ python -m paddle.distributed.launch --gpus "0" prune.py \
 
 ```text
 prune/
-├── 0.6666666666666666
+├── width_mult_0.75
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.6666666666666666
+│   ├── float32.pdiparams
+│   ├── float32.pdiparams.info
+│   ├── float32.pdmodel
+│   ├── model_state.pdparams
+│   └── model_config.json
+├── width_mult_0.25
 │   ├── float32.pdiparams
 │   ├── float32.pdiparams.info
 │   ├── float32.pdmodel
@@ -413,6 +510,7 @@ prune/
 
 4. 导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
+5. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
 ### 裁剪效果
 本案例我们对ERNIE 3.0模型微调后的模型使用裁剪 API 进行裁剪，我们评测了不同裁剪保留比例在KUAKE-QIC任务的表现，测试配置如下：
@@ -449,7 +547,6 @@ prune/
 | ERNIE 3.0 Medium +裁剪(保留比例3/4)    | 81.79| 0.83   |
 | ERNIE 3.0 Medium +裁剪(保留比例2/3)    | 81.07  | 0.79  |
 | ERNIE 3.0 Medium +裁剪(保留比例1/2)    | 81.07 | 0.64  |
-
 
 ## 模型部署
 

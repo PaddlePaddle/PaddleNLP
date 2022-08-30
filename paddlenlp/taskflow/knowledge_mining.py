@@ -174,8 +174,8 @@ class WordTagTask(Task):
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.2/model_state.pdparams",
-                "d9d323d3c2ead54d18f517725c99e969"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.3/model_state.pdparams",
+                "32b4ed27e99d6b2c76e50a24d1a9fd56"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
@@ -580,26 +580,8 @@ class NPTagTask(Task):
         self._construct_dict_map()
 
         self._get_inference_model()
-        if paddle.get_device().startswith("gpu"):
-            inference_model_path = os.path.join(self._task_path, "static",
-                                                "inference")
-            model_file = inference_model_path + ".pdmodel"
-            params_file = inference_model_path + ".pdiparams"
-            self._config = paddle.inference.Config(model_file, params_file)
-            self._config.enable_use_gpu(100, 0)
-            self._config.switch_use_feed_fetch_ops(False)
-            self._config.disable_glog_info()
-            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
-            self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
-            self.predictor = paddle.inference.create_predictor(self._config)
-            self.input_handles = [
-                self.predictor.get_input_handle(name)
-                for name in self.predictor.get_input_names()
-            ]
-            self.output_handle = [
-                self.predictor.get_output_handle(name)
-                for name in self.predictor.get_output_names()
-            ]
+        # Disable IR optimization for NPTag
+        self._config.switch_ir_optim(False)
 
     @property
     def summary_num(self):

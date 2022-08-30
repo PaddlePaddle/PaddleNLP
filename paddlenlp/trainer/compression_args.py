@@ -50,13 +50,25 @@ class CompressionArguments(TrainingArguments):
         },
     )
     # dynabert
-    width_mult_list: Optional[List[float]] = field(
+    width_mult_list: Optional[List[str]] = field(
         default=None,
         metadata={
             "help":
             ("List of width multiplicator for pruning using DynaBERT strategy.")
         },
     )
+    logging_steps: int = field(default=100,
+                               metadata={"help": "Log every X updates steps."})
+
+    save_steps: int = field(
+        default=100,
+        metadata={"help": "Save checkpoint every X updates steps."})
+
+    warmup_ratio: float = field(
+        default=0.1,
+        metadata={
+            "help": "Linear warmup over warmup_ratio fraction of total steps."
+        })
     # ptq:
     algo_list: Optional[List[str]] = field(
         default=None,
