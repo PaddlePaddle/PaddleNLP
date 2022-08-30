@@ -21,8 +21,9 @@ PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了�
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统（用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案）
 * 快速搭建产品级**多模态信息抽取**系统（即将开放，敬请期待）
-* 快速搭建产品级 **FAQ 问答**系统（即将开放，敬请期待）
+
 
 |  |  |
 |-|-|
@@ -43,6 +44,7 @@ Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装
 - paddlepaddle >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
+- Docker 18.03 以上
 ### pip 安装
 ```
 pip install --upgrade pipelines
@@ -85,19 +87,57 @@ prediction = pipeline.run(query="亚马逊河流的相关介绍")
 
 您可以基于我们发布的 Docker 镜像一键部署智能文本流水线系统，通过 Web UI 快速体验。
 
+#### 启动 elastic search
+
+```
+docker network create elastic
+docker pull docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms256m -Xmx256m"\
+      -e xpack.security.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+```
+
 #### 部署 CPU 服务
 ```
-docker pull paddlepaddle/paddlenlp:2.4.0
-docker run -d --name paddlenlp_pipelines --net host -ti paddlepaddle/paddlenlp:2.4.0
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
+docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 ```
-CPU 镜像下载大概耗时 20 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
 
 #### 部署 GPU 服务
 ```
-docker pull paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
-nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti paddlepaddle/paddlenlp:2.4.0
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
+nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7
 ```
-GPU 镜像下载大概耗时 3 分钟左右，容器启动成功后，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
+
+对于国内用户，因为网络问题下载docker比较慢时，可使用百度提供的镜像：
+
+
+|  环境                         |   镜像 Tag               |    运行平台      |
+| :--------------------------: | :-------------------------------: | :-------------: |
+|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
+|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
+|  CUDA10.2 + cuDNN 7           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+
+如果您的机器不在中国大陆地区，我们推荐您使用DockerHub的镜像：
+
+|  环境                         |   镜像 Tag               |    运行平台      |
+| :--------------------------: | :-------------------------------: | :-------------: |
+|  CPU                         | paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
+|  CPU                         | paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
+|  CUDA10.2 + cuDNN 7           | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+
+对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 
 ## :man_office_worker: 用户案例
 
@@ -116,6 +156,7 @@ GPU 镜像下载大概耗时 3 分钟左右，容器启动成功后，通过浏�
 ## :mortar_board: Tutorials
 - Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
 - Tutorial 2 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
+- Tutorial 3 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/frequently-asked-question/dense_faq_example.py)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">
