@@ -49,6 +49,8 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
         if use_faster_wordpiece:
             model_kwargs[
                 "with_pretokenization"] = use_faster_wordpiece_with_pretokenization
+        else:
+            model_kwargs["handle_chinese_chars"] = handle_chinese_chars
         if vocab is not None:
             tokenizer = Tokenizer(tokenizer_model(vocab, **model_kwargs))
         else:
