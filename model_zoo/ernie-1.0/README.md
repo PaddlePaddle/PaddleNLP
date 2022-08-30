@@ -294,13 +294,13 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 **训练效果方面**，我们release了base、large两个模型。均取得了较好的预训练效果。
 
-- **ERNIE 3.0-Base-zh-CW** 模型：
-    - 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-3.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
+- **ERNIE 1.0-Base-zh-CW** 模型：
+    - 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-1.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
 Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
-ERNIE 3.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
+ERNIE 1.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
 ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
 ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
 
@@ -350,7 +350,7 @@ unset CUDA_VISIBLE_DEVICES
 
 ```shell
 trainer_id=${PADDLE_TRAINER_ID:-"0"}
-task_name="0809-ernie-3.0-base-cw-dp16-gb1024"
+task_name="0809-ernie-1.0-base-cw-dp16-gb1024"
 
 base_nfs="/path/to/your/nfs/mount/point"
 base_dir="${base_nfs}/ernie-cw/output/${task_name}"

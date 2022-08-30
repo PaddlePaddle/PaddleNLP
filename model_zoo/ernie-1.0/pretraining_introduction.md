@@ -20,17 +20,18 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
     - [2.3 英文字符词表](#英文字符词表)
     - [2.4 合并词表](#合并词表)
 * [3. **开始训练**](#开始训练)
-    - [3.1 训练样例](训练样例)
+    - [3.1 训练样例](#训练样例)
         - 环境准备
         - 启动训练
-    - [3.2 功能支持](功能支持)
+    - [3.2 功能支持](#功能支持)
+        - [网络配置](#网络配置)
         - 训练速度
         - 训练体验
-    - [3.3 观察评估](观察评估)
+    - [3.3 观察评估](#观察评估)
         - VisualDL 可视化
         - CLUE Benchmark 效果评估
 - [4. 训练效果](#训练效果)
-    - [ERNIE 3.0-Base-zh-CW 模型](#ernie-3.0-base-zh-cw)
+    - [ERNIE 1.0-Base-zh-CW 模型](#ernie-1.0-base-zh-cw)
     - [ERNIE 1.0-Large-zh-CW 模型](#ernie-1.0-large-zh-cw)
 * [5. 参考](#参考)
 
@@ -246,7 +247,7 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
 - SOP Loss
     - SOP (Sentence Order Predict) 损失，是 模型训练的常用损失。将文本中的句子顺序分为两段打乱，最后判断文本是否被打乱。下图是数据组织形式的展示：
     <p align="center">
-    <img src="https://user-images.githubusercontent.com/16911935/187140981-924fd21c-fb67-4ba8-a421-490fd293175c.png" align="middle"  width="500" />
+    <img src="https://user-images.githubusercontent.com/16911935/187140981-924fd21c-fb67-4ba8-a421-490fd293175c.png" align="middle"  width="600" />
     </p>
 
     - 此开关由 `binary_head` 选项开启，`binary_head=True`添加sop loss， `binary_head=False` 关闭 sop loss。
@@ -258,7 +259,7 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
 - Ngram MASK
     - 项目还支持了n-gram mask策略，如下图所示，在 WWM 进行词语级别MASK的基础上（如此处mask掉的`[模型]`词组），n-gram 可以MASK掉连续n个词组。下面例子中，连续mask了2个词组，`【[语言][模型]】`同时进行了mask。
     <p align="center">
-    <img src="https://user-images.githubusercontent.com/16911935/187145669-7c55386d-f57a-4589-9e6d-e4a36b93e24c.png" align="middle"  width="500" />
+    <img src="https://user-images.githubusercontent.com/16911935/187145669-7c55386d-f57a-4589-9e6d-e4a36b93e24c.png" align="middle"  width="600" />
     </p>
 
     - 用户通过`max_ngrams`设置最大的`ngram`长度。默认`max_ngrams=3`。
@@ -273,16 +274,39 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
 
 - **多卡多机**训练：
     - 基于飞桨Fleet分布式API，用户可以十分方便的通过数据并行的方法，将训练扩展到多机多卡。
+    - *<u>使用方法</u>*：
+        - 单机八卡
+        ```shell
+        python3 -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            run_pretrain.py
+        ```
+        - 多机，假设机器ip为 `192.168.1.101,192.168.1.102`
+        ```shell
+        python3 -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            --ips "192.168.1.101,192.168.1.102" \
+            run_pretrain.py
+        ```
 - **混合精度**训练：
     - 部分算子使用FP16计算kernel，加速计算过程。支持AMP混合精度O1，和Pure FP16全FP训练策略O2。
-- **梯度累积**训练：
-    - 用户可以指定梯度累积的步数，在梯度累积的step中，减少多卡之间梯度的通信，减少更新的次数，可以扩大训练的batch_size.
-- **重计算**训练：
-    - 通过重新计算前向的方式，减少前向网络中间变量的存储，可以显著减少显存占用。理论上，该方式以时间换空间，但在batch size显著扩大的情况下，速度下降幅度较少。
-    - 如图所示，训练过程中占用显存的中间变量，修改成了反向需要时，重新计算，避免常驻显存。
+    - 如下图所示，使用AMP O1时，一些参数自动从fp32 cast为FP16类型计算。使用`O2` pure fp16时，模型参数为 fp16。
+    - *<u>使用方法</u>*:  设置`use_amp=True`开启混合精度训练。设置`fp16_opt_level=O1`，切换pure_fp16请设置为`O2`。
     <p align="center">
-    <img src="https://user-images.githubusercontent.com/16911935/187176881-06103714-3061-42ab-8322-0b63422e7087.png" align="middle"  width="500" />
+    <img src="https://user-images.githubusercontent.com/16911935/187338824-8b522935-4d6e-48d4-a5f6-55695ed3b182.png" align="middle" width=600 />
     </p>
+- **梯度累积**训练：
+    - 用户可以指定梯度累积的步数，在梯度累积的step中。
+    - 减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size.
+    - <u>*使用方法*</u>：用户设置 `gobal_batch_size`为 `micro_batch_size*卡数`的倍数，即可开启梯度累积。如：单卡bs=16，8卡，此时如果设置`gobal_batch_size=512`，则梯度累积次数为`gobal_batch_size/bs/card_num=512/16/8=4`。
+- **重计算**训练：
+    - 通过重新计算前向的方式，减少前向网络中间变量的存储，可以显著减少显存占用。理论上，该方式以时间换空间，但在batch size显著扩大的情况下，速度下降幅度较小。
+    - 如图所示：原来训练过程中，中间变量需要常驻显存，等待反向计算。使用重计算之后，修改成了反向需要时，再重新计算一遍前向过程，生成中间变量。避免常驻显存，减小显存占用。
+    - <u>*使用方法*</u>：用户设置`use_recompute=True`即可使用。注意使用时，可同时扩大`micro_batch_size`参数。
+    <p align="center">
+    <img src="https://user-images.githubusercontent.com/16911935/187176881-06103714-3061-42ab-8322-0b63422e7087.png" align="middle"  width="600" />
+    </p>
+
 
 
 ### 3.3 训练体验
@@ -290,15 +314,21 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
 
 数据流
 - **多机扩展**
-    - 用户可以将数据放置到 NFS 服务器上，多机同时挂载数据即可。训练数据与计算资源分离。
+    - 用户可以将数据放置到 NFS 服务器上，多机同时挂载数据即可。
+    - 解析：当用户需要在多台机器之间，一起多机训练，或者切换到空闲的机器上训练时。由于数据集很大(数百GB)，迁移不方便。训练数据与计算资源分离，是非常适合的策略。
+    - <u>*使用方法*</u>：参考[NFS服务搭建教程](https://blog.csdn.net/eijiyey/article/details/123184529)，用户将制作好的数据，放到NFS机器，然后挂载到有训练资源的其他机器训练即可。
+    <p align="center">
+    <img src="https://user-images.githubusercontent.com/16911935/187355897-478e7aeb-560f-4ea7-a29c-4bea9d8a7712.png" align="middle"  width="500" />
+    </p>
+
 - **多数据混合**
-    - 训练数据集支持多个文件，即插即用，设置权重，传入参数即可data_dir="1.0  dateset_a  2.0 dataset_b"
+    - 训练数据集支持多个文件，即插即用，设置权重。
+    - <u>*使用方法*</u>：传入参数即可data_dir="1.0  dateset_a  2.0 dataset_b"
 - **稳定可复现**
     - MLM任务具有一定随机性，需要随机mask数据。本数据流通过固定每一个step数据的随机种子，实验数据流稳定可复现。
+    - <u>*使用方法*</u>： 传入`seed`参数即可，修改参数后会重新生成 index 数据，打乱数据顺序。
 - **快加载**
-    - 数据文件使用mmap读取，加载数百GB文件几乎不耗时。
-
-其他：
+    - 数据文件使用mmap读取，避免直接将数据加载到内存，加载数百GB文件几乎不耗时。
 - **断点重启**
     - 用户可以单独设置，checkpoints steps 参数可设置较小，重启训练默认加载最新checkpoint。
     - 断点数据自动恢复，学习率等参数也自动恢复。
@@ -314,23 +344,23 @@ VisualDL训练可视化
     - 对模型结构，配置参数，paddle版本信息进行记录，方便复现环境
 
 - CLUE Benchmark搜索评估参数效果
-pass
+    - 使用
 
 
 ## 训练效果
 
 **训练效果方面**，我们release了 base、large两个模型。均取得了较好的预训练效果。
 
-<a name="ernie-3.0-base-zh-cw"></a>
+<a name="ernie-1.0-base-zh-cw"></a>
 
-### **ERNIE 3.0-Base-zh-CW** 模型
+### **ERNIE 1.0-Base-zh-CW** 模型
 
-使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-3.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
+使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-1.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUEWSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
 Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc| Acc| Acc
-ERNIE 3.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
+ERNIE 1.0-Base-zh-CW | 12L768H | 76.44 | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
 ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
 ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
 
