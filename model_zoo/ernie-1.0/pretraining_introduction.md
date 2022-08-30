@@ -242,6 +242,116 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
   <img src="https://user-images.githubusercontent.com/16911935/187134299-72628dce-cc04-49d7-89ef-078fad487724.png" align="middle"  width="500" />
 </p>
 
+### 3.0 训练脚本
+
+训练脚本如下
+
+<b>环境配置</b>
+
+- PYTHONPATH 设置为当前目录（适合paddlenlp develop运行）
+- 设置了一些FLAGS，包括增强报错，动态图Flag，提高矩阵乘法精度。
+
+<details>
+<summary>环境配置脚本</summary>
+
+```shell
+set -x
+
+# cd PaddleNLP/model_zoo/ernie-1.0
+export PYTHONPATH=$PYTHONPATH:../../
+
+export FLAGS_call_stack_level=2
+# export NCCL_SOCKET_IFNAME=xgbe0
+export FLAGS_gemm_use_half_precision_compute_type=False
+export FLAGS_enable_eager_mode=1
+unset CUDA_VISIBLE_DEVICES
+```
+</details>
+
+<b>路径配置</b>
+
+- 主要配置输入输出目录
+
+<details>
+<summary>路径配置</summary>
+
+```shell
+trainer_id=${PADDLE_TRAINER_ID:-"0"}
+task_name="0809-ernie-1.0-base-cw-dp16-gb1024"
+
+base_nfs="/path/to/your/nfs/mount/point"
+base_dir="${base_nfs}/ernie-cw/output/${task_name}"
+data_dir="5.0 ${base_nfs}/clue_oscar/clue_corpus_oscar_0630 7.0 ${base_nfs}/clue_train/clue_corpus_train_0629 12.0 ${base_nfs}/wudao_200g/wudao_200g_0703"
+vocab_dir="${base_nfs}/"
+```
+</details>
+
+**启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512。加入两机训练，请设置dp_degree=16。
+```shell
+python3 -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "${base_dir}/log_${trainer_id}" \
+    run_pretrain.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-3.0-base-zh" \
+    --tokenizer_name_or_path "${vocab_dir}" \
+    --input_dir "${data_dir}" \
+    --output_dir "${base_dir}" \
+    --fp16_opt_level "O1" \
+    --max_seq_len 512 \
+    --binary_head true \
+    --micro_batch_size 64 \
+    --sharding_degree 1\
+    --dp_degree 8 \
+    --use_sharding false \
+    --use_amp true \
+    --use_recompute false \
+    --max_lr 0.0001 \
+    --min_lr 0.00001 \
+    --max_steps 4000000 \
+    --save_steps 100000 \
+    --checkpoint_steps 5000 \
+    --decay_steps 3900000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.01 \
+    --grad_clip 1.0 \
+    --logging_freq 20 \
+    --num_workers 3 \
+    --eval_freq 1000 \
+    --device "gpu"\
+    --share_folder true \
+    --hidden_dropout_prob 0.1 \
+    --attention_probs_dropout_prob 0.1 \
+    --seed 1234 \
+```
+
+
+其中参数释义如下：
+- `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `tokenizer_name_or_path` 模型词表文件所在的文件夹，或者PaddleNLP内置tokenizer的名字。
+- `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
+- `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
+- `output_dir` 指定输出文件。
+- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
+- `max_seq_len` 输入文本序列的长度。
+- `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
+- `use_amp` 开启混合精度策略。
+- `fp16_opt_level` 混合精度策略，支持O1 自动混合精度，O2 pure fp16精度训练。
+- `max_lr` 训练学习率。
+- `min_lr` 学习率衰减的最小值。
+- `max_steps` 最大训练步数。
+- `save_steps` 保存模型间隔。默认保存地址格式为`output_dir/model_50000`(5w 步时的权重)。
+- `checkpoint_steps` 模型checkpoint间隔，用于模型断点重启训练。默认地址为`output_dir/model_last`.
+- `weight_decay` 权重衰减参数。
+- `warmup_rate` 学习率warmup参数。
+- `grad_clip` 梯度裁剪范围。
+- `logging_freq` 日志输出间隔。
+- `num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
+- `eval_freq` 模型评估间隔。
+- `device` 训练设备，默认为GPU。
+- `share_folder` 多机训练时，如果多机input_dir为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。
+
+
 ### 3.1 网络配置
 
 - SOP Loss
@@ -281,11 +391,11 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
             --gpus "0,1,2,3,4,5,6,7" \
             run_pretrain.py
         ```
-        - 多机，假设机器ip为 `192.168.1.101,192.168.1.102`
+        - 多机，假设机器ip为 `192.168.1.101,192.168.1.102` **注**：多台机器启动的ips参数需要顺序一致。
         ```shell
         python3 -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3,4,5,6,7" \
-            --ips "192.168.1.101,192.168.1.102" \
+            --ips 192.168.1.101,192.168.1.102 \
             run_pretrain.py
         ```
 - **混合精度**训练：
@@ -322,29 +432,35 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
     </p>
 
 - **多数据混合**
-    - 训练数据集支持多个文件，即插即用，设置权重。
-    - <u>*使用方法*</u>：传入参数即可data_dir="1.0  dateset_a  2.0 dataset_b"
+    -  <u>*简介*</u>：训练数据集支持多个文件，即插即用，可设置不同数据集占比权重。上面的多机训练的架构，混合使用了四份数据集。
+    - <u>*使用方法*</u>：传入参数即可`input_dir="1.0  dateset_a/prefix  2.0 dataset_b/prefix"`
+    - **注意**：如果文件夹中只有一份数据如`data/wudao_200g_0703_ids.npy data/wudao_200g_0703_idx.npz`，可以直接设置`input_dir=./data`为输入目录即可。如果需要设定多份数据集，必须写上数据集前缀，如`input_dir="1.0 data/wudao_200g_0703 1.0 data2/clue_corpus_train_0629"`。写前缀即可，不要加上后面类似`_ids.npy _idx.npz`的尾缀。
 - **稳定可复现**
-    - MLM任务具有一定随机性，需要随机mask数据。本数据流通过固定每一个step数据的随机种子，实验数据流稳定可复现。
+    - <u>*简介*</u>：MLM任务具有一定随机性，需要随机mask数据。本数据流通过固定每一个step数据的随机种子，实验数据流稳定可复现。
     - <u>*使用方法*</u>： 传入`seed`参数即可，修改参数后会重新生成 index 数据，打乱数据顺序。
 - **快加载**
-    - 数据文件使用mmap读取，避免直接将数据加载到内存，加载数百GB文件几乎不耗时。
+    -  <u>*简介*</u>：数据文件使用mmap读取，避免直接将数据加载到内存，加载数百GB文件几乎不耗时。
 - **断点重启**
-    - 用户可以单独设置，checkpoints steps 参数可设置较小，重启训练默认加载最新checkpoint。
+    -  <u>*简介*</u>：用户可以单独设置，`checkpoint_steps` 参数可设置较小，重启训练默认加载最新checkpoint。
     - 断点数据自动恢复，学习率等参数也自动恢复。
+    - **注意：** 此`checkpoint_steps`参数仅保留最后一个`checkpoint`到`model_last`文件夹，默认每次覆盖。用户需要永久保存参数，请设置`save_steps`。建议可以设置`checkpoint_steps`为需要间隔训练半小时、一小时左右的时间，一旦环境故障，可以获取到最新的`checkpoint`。
 
 
-### 观察评估
+### 3.4 观察评估
 
-VisualDL训练可视化
-
-- **可视化日志记录**
+- **训练过程观察**：VisualDL可视化日志记录
     - 日志展示为全局loss，波动小。
     - 记录混合精度，loss_scaling等信息，方便用户debug。
     - 对模型结构，配置参数，paddle版本信息进行记录，方便复现环境
 
-- CLUE Benchmark搜索评估参数效果
-    - 使用
+<p align="center">
+<img src="https://user-images.githubusercontent.com/16911935/187404575-52d53892-4272-4c9d-b29d-064352628951.png" align="middle"  width="900" />
+</p>
+
+
+- **下游任务评估**：CLUE Benchmark搜索评估参数效果
+    - 使用[批量启动-grid-search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/clue#%E6%89%B9%E9%87%8F%E5%90%AF%E5%8A%A8-grid-search)，可以进行批量搜索任务
+    - 注意，这里使用的是训练中的checkpoint进行评估，可以直接试着 评估待评估的参数为，所在的路径地址，即如 `python grid_seach.py ouput/ernie-base-outdir/model_100000` 之类的checkpoint地址。
 
 
 ## 训练效果
@@ -359,7 +475,7 @@ VisualDL训练可视化
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
- Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1| Acc| Acc
+ Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1| Acc| Acc
 ERNIE 1.0-Base-zh-CW | 12L768H | <b>76.44</b> | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
 ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
 ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
@@ -369,7 +485,7 @@ ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |  
 
 ### **ERNIE 1.0-Large-zh-CW** 模型
 
-- 除了base模型外，我们还训练了放出了large模型。此模型参数采用的是词表与ernie-1.0相同，因此命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失：
+除了base模型外，我们还训练了large模型。命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失，使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |

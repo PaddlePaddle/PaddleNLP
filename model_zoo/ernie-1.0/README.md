@@ -299,7 +299,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
- Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1| Acc| Acc
+ Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1| Acc| Acc | Acc
 ERNIE 1.0-Base-zh-CW | 12L768H | <b>76.44</b> | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
 ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
 ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
