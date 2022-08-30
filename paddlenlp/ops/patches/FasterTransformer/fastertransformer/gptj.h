@@ -723,6 +723,7 @@ public:
 						    args_.vocab_size_padded_,
 						    args_.vocab_size_,
 						    decoding_params.stream,
+                            (DataType_*) nullptr,
                             (args_.min_length_ != 0 && step-input_len < args_.min_length_),
                             args_.end_id_,
                             embedding_bias_ptr);
