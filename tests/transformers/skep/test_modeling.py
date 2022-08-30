@@ -250,7 +250,6 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
 
     all_model_classes = (
         SkepModel,
-        # TODO(wj-Mcat): to activate this model later
         SkepCrfForTokenClassification,
         SkepForSequenceClassification,
         SkepForTokenClassification,

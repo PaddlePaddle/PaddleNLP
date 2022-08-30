@@ -389,21 +389,19 @@ class SkepModel(SkepPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if isinstance(encoder_outputs, type(embedding_output)):
-            sequence_output = encoder_outputs
-            pooled_output = self.pooler(sequence_output)
-            return (sequence_output, pooled_output)
-        else:
-            sequence_output = encoder_outputs[0]
-            pooled_output = self.pooler(sequence_output)
-            if not return_dict:
-                return (sequence_output, pooled_output) + encoder_outputs[1:]
-            return BaseModelOutputWithPoolingAndCrossAttentions(
-                last_hidden_state=sequence_output,
-                pooler_output=pooled_output,
-                past_key_values=encoder_outputs.past_key_values,
-                hidden_states=encoder_outputs.hidden_states,
-                attentions=encoder_outputs.attentions)
+        if paddle.is_tensor(encoder_outputs):
+            encoder_outputs = (encoder_outputs, )
+
+        sequence_output = encoder_outputs[0]
+        pooled_output = self.pooler(sequence_output)
+        if not return_dict:
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
+        return BaseModelOutputWithPoolingAndCrossAttentions(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            past_key_values=encoder_outputs.past_key_values,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions)
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get skep input word embedding
