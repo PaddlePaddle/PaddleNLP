@@ -123,3 +123,12 @@ FETCH_HEAD
 
 # vscode
 .vscode
+
+# temp
+applications/question_generation/drawer
+applications/question_generation/unimo
+applications/question_generation/zero_shot_question_answering
+applications/question_generation/nohup.out
+applications/question_generation/nohup.out
+applications/question_generation/predict.txt
+applications/question_generation/predict.txt.reference.txt

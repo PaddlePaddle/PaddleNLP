@@ -42,6 +42,8 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
+
 
 ## QuickStart
 
@@ -1384,6 +1386,56 @@ from paddlenlp import Taskflow
 * `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
+
+</div></details>
+
+### 问题生成
+<details><summary>&emsp; 通过UNIMO-Text模型来根据上下文和答案生成问题 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 Salesforce/codegen-350M-mono
+>>> question_generator = Taskflow("question_generation")
+# 单条输入
+>>> question_generation([
+  {"context": "平安银行95511电话按9转报案人工服务。 1.寿险 :95511转1 2.信用卡 95511转2 3.平安银行 95511转3 4.一账通 95511转4转8 5.产险 95511转5 6.养老险团体险 95511转6 7.健康险 95511转7 8.证券 95511转8 9.车险报案95511转9 0.重听",
+  "answer": "95511"}]])
+'''
+  ['平安银行人工服务电话']
+'''
+# 多条输入
+>>> Summarizer([
+  {"context": "年基准利率4.35%。 从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。",
+  "answer": "年基准利率4.35%", },
+  {"context": "平安银行95511电话按9转报案人工服务。 1.寿险 :95511转1 2.信用卡 95511转2 3.平安银行 95511转3 4.一账通 95511转4转8 5.产险 95511转5 6.养老险团体险 95511转6 7.健康险 95511转7 8.证券 95511转8 9.车险报案95511转9 0.重听",
+  "answer": "95511"}
+  ])
+'''
+  ['招商银行贷款利率',  '平安银行人工服务电话']
+'''
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为unimo-text-1.0-dureader_qg-template1，支持的模型支持的模型有["unimo-text-1.0", "unimo-text-1.0-dureader_qg-template1", ]。
+* `custom_model`：自定义模型路径，用于指定自己训练的预训练模型参数路径，默认为None。
+* `template`：模版，可选项有[0, 1, 2, 3]，默认为1，0表示不使用模版。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `device`：运行设备，默认为"gpu"。
+* `output_scores`：是否要输出解码得分，请默认为False。
+* `max_length`：生成代码的最大长度，默认为128。
+* `min_length`：生成代码的最小长度，默认为0。
+* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
+* `temperature`：解码参数temperature，默认为0.6。
+* `top_k`：解码参数top_k，默认为5。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：beam_search解码的beam size，默认为4。
+* `length_penalty`：解码长度控制值，默认为1.0。
+* `num_return_sequences`：解码返回序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1。
+* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为True。
 
 </div></details>
 

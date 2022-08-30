@@ -1,0 +1,23 @@
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "1,5,6,7" --log_dir ./unimo/pretrain/log pretrain.py \
+    --train_file=/root/project/data/dureader/acsg_pretrain/train.json \
+    --predict_file=/root/project/data/dureader/acsg_pretrain/dev_mini.json \
+    --model_name_or_path='unimo-text-1.0' \
+    --save_dir=./unimo/pretrain/checkpoints \
+    --output_path ./unimo/pretrain/predict.txt \
+    --logging_steps=1000 \
+    --save_steps=10000 \
+    --epochs=30 \
+    --batch_size=16 \
+    --learning_rate=5e-6 \
+    --warmup_propotion=0.02 \
+    --weight_decay=0.01 \
+    --max_seq_len=512 \
+    --max_target_len=80 \
+    --do_pretrain \
+    --do_predict \
+    --max_dec_len=80 \
+    --min_dec_len=3 \
+    --num_return_sequences=1 \
+    --adversarial_training=None \
+    --device=gpu

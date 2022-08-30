@@ -38,6 +38,7 @@ from .dialogue import DialogueTask
 from .information_extraction import UIETask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask
+from .question_generation import QuestionGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -381,7 +382,24 @@ TASKS = {
         "default": {
             "model": "pai-painter-painting-base-zh",
         }
-    }
+    },
+    'question_generation': {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question-generation-unimo-text-1.0",
+            },
+            "unimo-text-1.0-dureader_qg-template1": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question-generation-unimo-text-1.0-dureader_qg-template1",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-dureader_qg-template1"
+        }
+    },
 }
 
 support_schema_list = [
