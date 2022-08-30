@@ -864,6 +864,8 @@ class InferTransformerModel(TransformerModel):
             Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
         kwargs:
             The key word arguments can be `rel_len` and `alpha`:
 
@@ -896,6 +898,7 @@ class InferTransformerModel(TransformerModel):
                  max_out_len=256,
                  output_time_major=False,
                  beam_search_version='v1',
+                 activation="relu",
                  **kwargs):
         args = dict(locals())
         args.pop("self")
