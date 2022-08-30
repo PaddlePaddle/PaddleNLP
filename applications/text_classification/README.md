@@ -6,14 +6,20 @@
   - [2.1 文本分类场景全覆盖](#文本分类场景全覆盖)
   - [2.2 更懂中文的训练基座](#更懂中文的训练基座)
   - [2.3 多方案满足定制需求](#多方案满足定制需求)
-  - [2.4 高效模型调优](#高效模型调优)
+  - [2.4 高效模型调优方案](#高效模型调优方案)
   - [2.5 产业级全流程方案](#产业级全流程方案)
 - [3. 快速开始](#快速开始)
+
+<a name="文本分类应用简介"></a>
 
 ## 1. 文本分类应用简介
 文本分类应用针对**多分类、多标签、层次分类等高频场景开源了产业级分类应用方案**，打通数据标注-模型训练-模型调优-模型压缩-预测部署全流程，旨在解决细分场景应用的痛点和难点，快速实现文本分类产品落地。
 
 文本分类简单来说就是对给定的一个句子或一段文本使用分类模型分类。虽然文本分类在金融、医疗、法律、工业等领域都有广泛的成功实践应用，但学习开发成本高、数据质量差、效果调优困难、模型可解释性差、部署门槛高等问题使部分开发者望而却步。针对文本分类领域的痛点和难点，PaddleNLP文本分类应用提出了多种前沿解决方案，助力开发者简单高效实现文本分类数据标注、训练、调优、上线，降低文本分类落地技术门槛。
+
+<div align="center">
+    <img width="400" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187378339-73580caf-efe4-4d10-8435-bfa0f10b0a61.png">
+</div>
 
 **文本分类应用亮点：**
 
@@ -22,8 +28,11 @@
 - **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级模型作为训练基座，ERNIE 3.0 轻量级模型学习海量的中文数据与知识，具有广泛成熟的实践应用。
 - **低门槛操作👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，不再让技术成为文本分类的门槛。
 
+<a name="技术特色"></a>
 
 ## 2. 技术特色
+
+<a name="文本分类场景全覆盖"></a>
 
 ### 2.1 文本分类场景全覆盖
 
@@ -39,6 +48,9 @@
 
 - **层次分类👪 ：** 数据集的标签集具有多级标签且标签之间具有层级结构关系，输入句子/文本具有一个或多个标签。在文本层次分类任务中，我们需要预测输入句子/文本可能来自于不同级标签类别中的某一个或几个类别。以上图层次分类中新闻文本为例（新闻为根节点），该新闻一级分类标签为 `体育`，二级分类标签为 `足球`。快速开启层次分类任务参见 👉 [层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme) 。
 
+
+<a name="更懂中文的训练基座"></a>
+
 ### 2.2 更懂中文的训练基座
 
 近年来，大量的研究表明在超大规模的语料采用无监督或者弱监督的方式训练模型，模型能够获得语言相关的知识。预训练模型学习到的文本语义表示能够避免从零开始训练模型，同时有利于下游自然语言处理(NLP)任务。预训练模型与具体的文本分类任务的关系可以直观地理解为，**预训练模型已经懂得了相关句法、语义的语言知识，用具体任务数据训练使得预训练模型”更懂”这个任务**，在预训练过程中学到的知识基础使学习文本分类任务事半功倍。
@@ -48,6 +60,8 @@
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/186376051-6c3ca239-1e31-4c0a-bdbe-547439234ddb.png width="600"/>
 </div>
+
+<a name="多方案满足定制需求"></a>
 
 ### 2.3 多方案满足定制需求
 
@@ -63,6 +77,17 @@
 from paddlenlp.transformers import AutoModelForSequenceClassification
 model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh", num_classes=10)
 ```
+
+【方案效果】下表展示在多标签任务CAIL2019—婚姻家庭要素提取数据集中ERNIE 3.0 系列轻量级模型效果评测。
+
+
+|   | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
+| -------------------------- | ------------ | ------------ | ------------ |------------ |
+|ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|90.38|80.14| 2.70 |
+|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|90.57|79.36| 1.46|
+|ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|89.27|76.78| 0.56|
+|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|89.43|77.20| 0.34|
+|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|85.39|75.07|0.32|
 
 【快速开始】
 - 快速开启多分类任务参见 👉 [预训练模型微调-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#readme)
@@ -81,6 +106,16 @@ model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh",
     <img src=https://user-images.githubusercontent.com/25607475/183909263-6ead8871-699c-4c2d-951f-e33eddcfdd9c.png width=800 height=300 />
 </div>
 
+【方案效果】我们比较提示学习与预训练模型微调在小样本数据集[FewCLUE](https://github.com/CLUEbenchmark/FewCLUE)中tnews新闻分类训练集的效果，任务训练集共包含240条数据，总共15个分类。
+
+
+| model_name | 训练方式 | Accuracy |
+| ---------- | ------- | ---- |
+| ERNIE 3.0 Base | 预训练模型微调 | 0.5046 |
+| ERNIE 3.0 Base  | 提示学习 | 0.5521 |
+
+
+
 【快速开始】
 - 快速开启多分类任务参见 👉 [提示学习(小样本)-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/few-shot#readme)
 - 快速开启多标签分类任务参见 👉 [提示学习(小样本)-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/few-shot#readme)
@@ -97,15 +132,46 @@ model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh",
 - 快速开启多标签分类任务参见 👉 [语义索引-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/retrieval_based#readme)
 - 快速开启层次分类任务参见 👉 [语义索引-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/retrieval_based#readme)
 
-### 2.4 高效模型调优
+<a name="高效模型调优方案"></a>
+
+### 2.4 高效模型调优方案
 
 有这么一句话在业界广泛流传，"数据决定了机器学习的上限，而模型和算法只是逼近这个上限"，可见数据质量的重要性。文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)开源了模型分析模块，针对标注数据质量不高、训练数据覆盖不足、样本数量少等文本分类常见数据痛点，提供稀疏数据筛选、脏数据清洗、数据增强三种数据优化方案，解决训练数据缺陷问题，用低成本方式获得大幅度的效果提升。
 
+
+**1. 稀疏数据筛选**能够有效挖掘待预测数据中缺乏证据支持的数据，采用有选择的训练集数据增强或针对性筛选未标注数据进行标注两种策略有效提升模型表现。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们采用稀疏数据筛选方案分别在数据集应用数据增强策略和数据标注策略，稀疏数据筛选有效提高模型表现。
+
+|  | Micro F1(%)   | Macro F1(%) |
+| ---------- | ------- | ---- |
+| 基线 | 84.43|50.01|
+| 稀疏数据-数据增强 | 84.80|51.78|
+| 稀疏数据-数据标注 | 85.77|57.13|
+
+
+**2. 脏数据清洗**能够自动识别训练集中脏数据（也即标注质量差的数据），有效降低人力检查成本。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们随机在10%的数据中混入错误标签。
+
+|  | Micro F1(%)   | Macro F1(%) |
+| ---------- | ------- | ---- |
+| 基线 | 82.89|47.83|
+| 基线+脏数据清洗策略 | 84.50|51.28|
+
+**3. 数据增强**在数据量较少的情况下能够有效提升模型效果。PaddleNLP内置[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM预测）、TF-IDF等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
+
+|  |Micro F1(%)   | Macro F1(%) |
+| ---------| ------------ |------------ |
+|训练集(500)|84.43|50.01|
+|训练集(500)+词替换增强策略 |84.50|53.23|
+|训练集(500)+词插入增强策略 |85.03|53.54|
+|训练集(500)+词删除增强策略 |84.74| 55.89|
+|训练集(500)+词置换增强策略 |84.44|52.50|
+
 【快速开始】
+更多使用方法和测评结果详见各场景模型分析模块：
 - 体验模型分析模块 👉 [多分类-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/analysis)
 - 体验模型分析模块 👉 [多标签-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/analysis)
 - 体验模型分析模块 👉 [层次分类多-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/analysis)
 
+<a name="产业级全流程方案"></a>
 
 ### 2.5 产业级全流程方案
 
@@ -143,6 +209,16 @@ model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh",
 - 模型部署需要将保存的最佳模型参数（动态图参数）导出成静态图参数，用于后续的推理部署。p.s.模型裁剪之后会默认导出静态图模型
 
 - 文本分类应用提供了离线部署，并且支持在GPU设备使用FP16，在CPU设备使用动态量化的低精度加速推理；同时提供基于Paddle Serving的在线服务化部署，详见各分类场景文档中模型部署介绍。
+
+【效果展示】下表展示在多标签任务CAIL2019—婚姻家庭要素提取数据集中ERNIE 3.0 Medium 模型效果评测。
+| |Micro F1(%)   | Macro F1(%) | latency(ms) |
+| -------------------------- | ------------ | ------------ | ------------ |
+|ERNIE 3.0 Medium|90.57|79.36| 1.46|
+| ERNIE 3.0 Medium + FP16 | 90.57| 79.36| 0.49|
+| ERNIE 3.0 Medium + 裁剪| 89.99|79.37 | 0.75  |
+| ERNIE 3.0 Medium + 裁剪 + FP16| 89.99|79.37 | 0.27  |
+
+<a name="快速开始"></a>
 
 ## 3. 快速开始
 
