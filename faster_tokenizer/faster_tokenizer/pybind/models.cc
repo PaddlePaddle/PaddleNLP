@@ -14,9 +14,9 @@ limitations under the License. */
 
 #include "faster_tokenizer/models/models.h"
 #include <Python.h>
-#include "glog/logging.h"
 #include "faster_tokenizer/pybind/models.h"
 #include "faster_tokenizer/pybind/utils.h"
+#include "glog/logging.h"
 
 namespace py = pybind11;
 
@@ -227,11 +227,13 @@ void BindModels(pybind11::module* m) {
       .def(py::init<const core::Vocab&,
                     const std::string&,
                     size_t,
-                    const std::string&>(),
+                    const std::string&,
+                    bool>(),
            py::arg("vocab"),
            py::arg("unk_token") = "[UNK]",
            py::arg("max_input_chars_per_word") = 100,
-           py::arg("continuing_subword_prefix") = "##")
+           py::arg("continuing_subword_prefix") = "##",
+           py::arg("handle_chinese_chars") = true)
       .def("tokenize", &models::WordPiece::Tokenize)
       .def("token_to_id", &models::WordPiece::TokenToId)
       .def("id_to_token", &models::WordPiece::IdToToken)
