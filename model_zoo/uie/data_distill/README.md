@@ -34,7 +34,7 @@ python finetune.py --train_path ./data/train.txt --dev_path ./data/dev.txt --lea
 #### 通过训练好的UIE定制模型预测无监督数据的标签
 
 ```shell
-python data_generate.py --data_path ../data --save_dir student_data --task_type relation_extraction --synthetic_ratio 10 --model_path ../checkpoint/model_best
+python data_distill.py --data_path ../data --save_dir student_data --task_type relation_extraction --synthetic_ratio 10 --model_path ../checkpoint/model_best
 ```
 
 可配置参数说明：
@@ -51,7 +51,11 @@ python data_generate.py --data_path ../data --save_dir student_data --task_type 
 UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，不适合关系、事件等任务），可通过以下评估脚本针对原始标注格式数据评估模型效果
 
 ```shell
-python evaluate_teacher.py --test_path ./student_data/dev_data.json --task_type relation_extraction --label_maps_path ./student_data/label_maps.json --model_path ../re_ckpt/model_best
+python evaluate_teacher.py \
+    --task_type relation_extraction \
+    --test_path ./student_data/dev_data.json \
+    --label_maps_path ./student_data/label_maps.json \
+    --model_path ../checkpoint/model_best
 ```
 
 可配置参数说明：
@@ -67,7 +71,13 @@ python evaluate_teacher.py --test_path ./student_data/dev_data.json --task_type 
 #### 学生模型训练
 
 ```shell
-python train.py --task_type relation_extraction --train_path student_data/train_data.json --dev_path student_data/dev_data.json --label_maps_path student_data/label_maps.json --valid_steps 100 --num_epochs 1000 --encoder ernie-3.0-mini-zh
+python train.py \
+    --task_type relation_extraction \
+    --train_path student_data/train_data.json \
+    --dev_path student_data/dev_data.json \
+    --label_maps_path student_data/label_maps.json \
+    --num_epochs 200 \
+    --encoder ernie-3.0-mini-zh
 ```
 
 可配置参数说明：
@@ -98,7 +108,7 @@ python train.py --task_type relation_extraction --train_path student_data/train_
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 
->>> ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain infortion extraction
+>>> ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
 >>> pprint(ie("登革热@结果 升高 ### 血清白蛋白水平 检查 结果 检查 在资源匮乏地区和富足地区，对有症状患者均应早期检测。"))
 [{'疾病': [{'end': 3,
           'probability': 0.99952424,

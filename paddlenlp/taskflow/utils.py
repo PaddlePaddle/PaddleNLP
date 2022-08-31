@@ -1442,13 +1442,17 @@ def gp_decode(batch_outputs,
                                                        offset_mappings, texts):
             entity_output[:, [0, -1]] -= np.inf
             entity_output[:, :, [0, -1]] -= np.inf
+            entity_probs = F.softmax(paddle.to_tensor(entity_output),
+                                     axis=1).numpy()
             ent_list = []
             for l, start, end in zip(*np.where(entity_output > 0.)):
+                ent_prob = entity_probs[l, start, end]
                 start, end = (offset_mapping[start][0], offset_mapping[end][-1])
                 ent = {
                     "text": text[start:end],
                     "type": label_maps['id2entity'][str(l)],
-                    "start_index": start
+                    "start_index": start,
+                    "probability": ent_prob
                 }
                 ent_list.append(ent)
             batch_ent_results.append(ent_list)

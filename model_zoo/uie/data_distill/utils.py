@@ -280,3 +280,295 @@ def postprocess(batch_outputs,
                         rel_list.append(rel)
             batch_rel_results.append(rel_list)
         return (batch_ent_results, batch_rel_results)
+
+
+def set_seed(seed):
+    paddle.seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+def build_tree(schema, name='root'):
+    """
+    Build the schema tree.
+    """
+    schema_tree = SchemaTree(name)
+    for s in schema:
+        if isinstance(s, str):
+            schema_tree.add_child(SchemaTree(s))
+        elif isinstance(s, dict):
+            for k, v in s.items():
+                if isinstance(v, str):
+                    child = [v]
+                elif isinstance(v, list):
+                    child = v
+                else:
+                    raise TypeError(
+                        "Invalid schema, value for each key:value pairs should be list or string"
+                        "but {} received".format(type(v)))
+                schema_tree.add_child(build_tree(child, name=k))
+        else:
+            raise TypeError("Invalid schema, element should be string or dict, "
+                            "but {} received".format(type(s)))
+    return schema_tree
+
+
+def schema2label_maps(task_type, schema=None):
+    if schema and isinstance(schema, dict):
+        schema = [schema]
+
+    label_maps = {}
+    if task_type == "entity_extraction":
+        entity2id = {}
+        for s in schema:
+            entity2id[s] = len(entity2id)
+
+        label_maps["entity2id"] = entity2id
+    elif task_type == "opinion_extraction":
+        schema = ["观点词", {"评价维度": ["观点词", "情感倾向[正向,负向]"]}]
+        logger.info(
+            "Opinion extracion does not support custom schema, the schema is default to %s."
+            % schema)
+        label_maps["entity2id"] = {"评价维度": 0, "观点词": 1}
+        label_maps["sentiment2id"] = {"正向": 0, "负向": 1}
+    else:
+        entity2id = {}
+        relation2id = {}
+        schema_tree = build_tree(schema)
+        schema_list = schema_tree.children[:]
+        while len(schema_list) > 0:
+            node = schema_list.pop(0)
+
+            if node.name not in entity2id.keys() and len(node.children) != 0:
+                entity2id[node.name] = len(entity2id)
+
+            for child in node.children:
+                if child.name not in relation2id.keys():
+                    relation2id[child.name] = len(relation2id)
+                schema_list.append(child)
+
+        entity2id['object'] = len(entity2id)
+        label_maps["entity2id"] = entity2id
+        label_maps["relation2id"] = relation2id
+
+    label_maps["schema"] = schema
+    return label_maps
+
+
+def doccano2distill(json_lines, task_type, label_maps=None):
+    """Convert doccano to distill format"""
+    if task_type == "opinion_extraction":
+        outputs = []
+        for json_line in json_lines:
+            id2ent = {}
+            text = json_line['text']
+            output = {"text": text}
+
+            entity_list = []
+            entities = json_line['entities']
+            for entity in entities:
+                ent_text = text[entity['start_offset']:entity['end_offset']]
+
+                ent_type_gather = entity['label'].split("##")
+                if len(ent_type_gather) == 2:
+                    ent_type, ent_senti = ent_type_gather
+                else:
+                    ent_type = ent_type_gather[0]
+                    ent_senti = None
+
+                ent_start_idx = entity['start_offset']
+
+                id2ent[entity['id']] = {
+                    "text": ent_text,
+                    "type": ent_type,
+                    "start_index": ent_start_idx,
+                    "sentiment": ent_senti
+                }
+
+                ent = {
+                    "text": ent_text,
+                    "type": ent_type,
+                    "start_index": ent_start_idx
+                }
+
+                entity_list.append(ent)
+            output["entity_list"] = entity_list
+
+            aso_list = []
+            relations = json_line['relations']
+            for relation in relations:
+                _aspect = id2ent[relation["from_id"]]
+                if _aspect['sentiment']:
+                    _opinion = id2ent[relation["to_id"]]
+                    rel = {
+                        "aspect": _aspect['text'],
+                        "sentiment": _aspect['sentiment'],
+                        "opinion": _opinion['text'],
+                        "aspect_start_index": _aspect["start_index"],
+                        "opinion_start_index": _opinion["start_index"]
+                    }
+                    aso_list.append(rel)
+            output["aso_list"] = aso_list
+            outputs.append(output)
+    else:
+        outputs = []
+        for json_line in json_lines:
+            id2ent = {}
+            text = json_line['text']
+            output = {"text": text}
+
+            entity_list = []
+            entities = json_line['entities']
+            for entity in entities:
+                ent_text = text[entity['start_offset']:entity['end_offset']]
+                ent_type = "object" if entity['label'] not in label_maps[
+                    'entity2id'].keys() else entity['label']
+                ent_start_idx = entity['start_offset']
+
+                id2ent[entity['id']] = {
+                    "text": ent_text,
+                    "type": ent_type,
+                    "start_index": ent_start_idx
+                }
+
+                ent = {
+                    "text": ent_text,
+                    "type": ent_type,
+                    "start_index": ent_start_idx
+                }
+
+                entity_list.append(ent)
+            output["entity_list"] = entity_list
+
+            spo_list = []
+            relations = json_line['relations']
+            for relation in relations:
+                _subject = id2ent[relation["from_id"]]
+                _object = id2ent[relation["to_id"]]
+                rel = {
+                    "subject": _subject['text'],
+                    "predicate": relation['type'],
+                    "object": _object['text'],
+                    "subject_start_index": _subject["start_index"],
+                    "object_start_index": _object["start_index"]
+                }
+                spo_list.append(rel)
+            output["spo_list"] = spo_list
+            outputs.append(output)
+    return outputs
+
+
+def synthetic2distill(texts, infer_results, task_type, label_maps=None):
+    """Convert synthetic data to distill format"""
+    if task_type == "opinion_extraction":
+        outputs = []
+        for i, line in enumerate(infer_results):
+            pred = line
+            output = {"text": texts[i]}
+
+            entity_list = []
+            aso_list = []
+            for key1 in pred.keys():
+                for s in pred[key1]:
+                    ent = {
+                        "text": s["text"],
+                        "type": key1,
+                        "start_index": s["start"]
+                    }
+                    entity_list.append(ent)
+
+                    if "relations" in s.keys() and "观点词" in s["relations"].keys(
+                    ) and "情感倾向[正向,负向]" in s["relations"].keys():
+                        for o in s["relations"]["观点词"]:
+                            rel = {
+                                "aspect":
+                                s["text"],
+                                "sentiment":
+                                s["relations"]["情感倾向[正向,负向]"][0]["text"],
+                                "opinion":
+                                o["text"],
+                                "aspect_start_index":
+                                s["start"],
+                                "opinion_start_index":
+                                o["start"]
+                            }
+                            aso_list.append(rel)
+
+                            ent = {
+                                "text": o["text"],
+                                "type": "观点词",
+                                "start_index": o["start"]
+                            }
+                            entity_list.append(ent)
+            output["entity_list"] = entity_list
+            output["aso_list"] = aso_list
+            outputs.append(output)
+    else:
+        outputs = []
+        for i, line in enumerate(infer_results):
+            pred = line
+            output = {"text": texts[i]}
+
+            entity_list = []
+            spo_list = []
+            for key1 in pred.keys():
+                for s in pred[key1]:
+                    ent = {
+                        "text": s['text'],
+                        "type": key1,
+                        "start_index": s['start']
+                    }
+                    entity_list.append(ent)
+                    if "relations" in s.keys():
+                        for key2 in s['relations'].keys():
+                            for o1 in s['relations'][key2]:
+                                if 'start' in o1.keys():
+                                    rel = {
+                                        "subject": s['text'],
+                                        "predicate": key2,
+                                        "object": o1['text'],
+                                        "subject_start_index": s['start'],
+                                        "object_start_index": o1['start']
+                                    }
+                                    spo_list.append(rel)
+
+                                    if 'relations' not in o1.keys():
+                                        ent = {
+                                            "text": o1['text'],
+                                            "type": "object",
+                                            "start_index": o1['start']
+                                        }
+                                        entity_list.append(ent)
+                                    else:
+                                        ent = {
+                                            "text": o1['text'],
+                                            "type": key2,
+                                            "start_index": o1['start']
+                                        }
+                                        entity_list.append(ent)
+                                        for key3 in o1['relations'].keys():
+                                            for o2 in o1['relations'][key3]:
+                                                ent = {
+                                                    "text": o2['text'],
+                                                    "type": "object",
+                                                    "start_index": o2['start']
+                                                }
+                                                entity_list.append(ent)
+
+                                                rel = {
+                                                    "subject":
+                                                    o1['text'],
+                                                    "predicate":
+                                                    key3,
+                                                    "object":
+                                                    o2['text'],
+                                                    "subject_start_index":
+                                                    o1['start'],
+                                                    "object_start_index":
+                                                    o2['start']
+                                                }
+                                                spo_list.append(rel)
+            output["entity_list"] = entity_list
+            output["spo_list"] = spo_list
+            outputs.append(output)
+    return outputs
