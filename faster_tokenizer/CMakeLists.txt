@@ -140,7 +140,7 @@ if(WITH_PYTHON)
 
 add_subdirectory(python)
 
-if(WIN32)
+if(WIN32 or APPLE)
 add_custom_target(build_tokenizers_bdist_wheel ALL
     COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
     COMMENT "Packing whl packages------>>>"
