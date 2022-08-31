@@ -85,7 +85,7 @@
 【方案效果】我们比较预训练模型微调与提示学习在多分类、多标签、层次分类小样本场景的模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值），可以看到在样本较少的情况下，提示学习比预训练模型微调有明显优势。
 
 <div align="center">
-    <img width="500" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650189-18dc5d4c-66c6-459e-827e-8a8d67a24d42.jpeg">
+    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650189-18dc5d4c-66c6-459e-827e-8a8d67a24d42.jpeg">
 </div>
 
 
@@ -122,7 +122,6 @@
     <img src=https://user-images.githubusercontent.com/63761690/186376051-6c3ca239-1e31-4c0a-bdbe-547439234ddb.png width="600"/>
 </div>
 
-<a name="多方案满足定制需求"></a>
 
 
 <a name="高效模型调优方案"></a>
@@ -135,21 +134,21 @@
 - **稀疏数据筛选**通过挖掘待预测数据（通常为开发集或测试集）中缺乏证据支持的数据，基于基于特征相似度的实例级证据分析方法进行有选择的训练集数据增强或针对性筛选未标注数据进行标注两种策略有效提升模型表现。我们采用在多分类、多标签、层次分类场景中评测稀疏数据-数据增强策略和稀疏数据-数据标注策略，稀疏数据筛选方案有效提高模型表现。
 
 <div align="center">
-    <img width="550" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650173-c83afc31-a1f8-478b-a391-b977d5170825.jpeg">
+    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650173-c83afc31-a1f8-478b-a391-b977d5170825.jpeg">
 </div>
 
 
 - **脏数据清洗**基于表示点方法的实例级证据分析方法，能够自动识别训练集中脏数据（也即标注质量差的数据），有效降低人力检查成本。我们采用在多分类、多标签、层次分类场景中评测脏数据清洗方案，实验表明方案能够高效筛选出训练集中脏数据，提高模型表现。
 
 <div align="center">
-    <img width="550" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187652793-aec6dc9f-a709-431e-9d18-58e39719a1e5.jpeg">
+    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187652793-aec6dc9f-a709-431e-9d18-58e39719a1e5.jpeg">
 </div>
 
 
 - **数据增强**在数据量较少的情况下能够通过增加数据集多样性，提升模型效果。PaddleNLP内置[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM预测）、TF-IDF等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
 
 <div align="center">
-    <img width="480" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187666776-53abc345-da7f-4f7e-ada4-8040577c8720.png">
+    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187666776-53abc345-da7f-4f7e-ada4-8040577c8720.png">
 </div>
 
 
