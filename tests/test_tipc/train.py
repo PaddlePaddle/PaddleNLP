@@ -93,8 +93,8 @@ def do_train(args):
             if args.use_amp:
                 with paddle.amp.auto_cast(
                         custom_black_list=args.custom_black_list
-                        if amp_level == 'O2' else {},
-                        level=amp_level):
+                        if args.amp_level == 'O2' else {},
+                        level=args.amp_level):
                     loss, sample_per_cards = benchmark_model.forward(
                         model, args, input_data)
 
