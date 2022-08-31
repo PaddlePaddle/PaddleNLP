@@ -1,5 +1,5 @@
 # WINDOWS环境下搭建端到端语义检索系统
-以下的流程都是使用的Anaconda的环境进行的搭建，Anaconda安装好以后，进入 `Anaconda Powershell Prompt`，然后执行下面的流程。
+以下的流程都是使用的Anaconda的环境进行的搭建，Anaconda安装好以后，进入 `Anaconda Powershell Prompt`（由于环境变量设置不兼容的原因，暂不支持使用`cmd`执行下面的命令），然后执行下面的流程。
 
 ## 1. 快速开始: 快速搭建语义检索系统
 
@@ -8,14 +8,17 @@
 a. 依赖安装：
 首先需要安装PaddlePaddle，PaddlePaddle的安装请参考文档[官方安装文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，然后安装下面的依赖：
 ```bash
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+git clone https://github.com/tvst/htbuilder.git
+cd htbuilder/
+python setup install
 # 1) 安装 pipelines package
-cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
+cd ${HOME}/PaddleNLP/pipelines/
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 ### 1.2 数据说明
-语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本。
+语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
 ### 1.3 一键体验语义检索系统
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
@@ -58,7 +61,6 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder --doc_dir
 * `port`: Elasticsearch的端口号
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
-
 运行结束后，可使用Kibana查看数据
 
 #### 1.4.3 启动 RestAPI 模型服务
@@ -92,3 +94,5 @@ python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
 
 长期，继续聚焦科技创新的五大方向。1)新能源(新能源汽车、光伏、风电、特高压等)，2)新一代信息通信技术(人工智能、大数据、云计算、5G等)，3)高端制造(智能数控机床、机器人、先进轨交装备等)，4)生物医药(创新药、CXO、医疗器械和诊断设备等)，5)军工(导弹设备、军工电子元器件、空间站、航天飞机等)。
 ```
+
+如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
