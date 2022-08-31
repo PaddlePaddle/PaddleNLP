@@ -2,12 +2,11 @@
 
 **目录**
 - [1. 文本分类应用简介](#文本分类应用简介)
-- [2. 技术特色](#技术特色)
-  - [2.1 文本分类场景全覆盖](#文本分类场景全覆盖)
+- [2. 文本分类应用详解](#文本分类应用详解)
+  - [2.1 文本分类方案全覆盖](#文本分类方案全覆盖)
   - [2.2 更懂中文的训练基座](#更懂中文的训练基座)
-  - [2.3 多方案满足定制需求](#多方案满足定制需求)
-  - [2.4 高效模型调优方案](#高效模型调优方案)
-  - [2.5 产业级全流程方案](#产业级全流程方案)
+  - [2.3 高效模型调优方案](#高效模型调优方案)
+  - [2.4 产业级全流程方案](#产业级全流程方案)
 - [3. 快速开始](#快速开始)
 
 <a name="文本分类应用简介"></a>
@@ -15,26 +14,27 @@
 ## 1. 文本分类应用简介
 文本分类应用针对**多分类、多标签、层次分类等高频场景开源了产业级分类应用方案**，打通数据标注-模型训练-模型调优-模型压缩-预测部署全流程，旨在解决细分场景应用的痛点和难点，快速实现文本分类产品落地。
 
-文本分类简单来说就是对给定的一个句子或一段文本使用分类模型分类。虽然文本分类在金融、医疗、法律、工业等领域都有广泛的成功实践应用，但学习开发成本高、数据质量差、效果调优困难、模型可解释性差、部署门槛高等问题使部分开发者望而却步。针对文本分类领域的痛点和难点，PaddleNLP文本分类应用提出了多种前沿解决方案，助力开发者简单高效实现文本分类数据标注、训练、调优、上线，降低文本分类落地技术门槛。
+文本分类简单来说就是对给定的一个句子或一段文本使用分类模型分类。虽然文本分类在金融、医疗、法律、工业等领域都有广泛的成功实践应用，但如何选择合适的方案和预训练模型、数据标注质量差、效果调优困难、AI入门成本高、如何高效训练部署等问题使部分开发者望而却步。针对文本分类领域的痛点和难点，PaddleNLP文本分类应用提出了多种前沿解决方案，助力开发者简单高效实现文本分类数据标注、训练、调优、上线，降低文本分类落地技术门槛。
 
 <div align="center">
-    <img width="400" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187378339-73580caf-efe4-4d10-8435-bfa0f10b0a61.png">
+    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187667617-81567ba3-7f1f-4d72-9e89-cf6e8d68b906.png">
 </div>
 
-**文本分类应用亮点：**
+**文本分类应用技术特色：**
 
-- **方案全面🎓：** 涵盖多分类、多标签、层次分类等高频分类场景，提供预训练模型微调、提示学习（小样本学习）、语义索引三种端到端全流程分类方案，满足开发者多种分类落地需求。
-- **分析高效✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
-- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级模型作为训练基座，ERNIE 3.0 轻量级模型学习海量的中文数据与知识，具有广泛成熟的实践应用。
-- **低门槛操作👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，不再让技术成为文本分类的门槛。
+- **方案全面🎓：** 涵盖多分类、多标签、层次分类等高频分类场景，提供预训练模型微调、提示学习（小样本学习）、语义索引三种端到端全流程分类方案，满足开发者多样文本分类落地需求。
+- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
 
-<a name="技术特色"></a>
+<a name="文本分类应用详解"></a>
 
-## 2. 技术特色
+## 2. 文本分类应用详解
 
-<a name="文本分类场景全覆盖"></a>
+<a name="文本分类方案全覆盖"></a>
 
-### 2.1 文本分类场景全覆盖
+### 2.1 文本分类方案全覆盖
+#### 2.1.1 分类场景齐全
 
 文本分类应用涵盖多分类（multi class）、多标签（multi label）、层次分类（hierarchical）三种场景，接下来我们将以下图的新闻文本分类为例介绍三种分类场景的区别。
 
@@ -47,6 +47,67 @@
 - **多标签👫 ：** 数据集的标签集含有两个或两个以上的类别，输入句子/文本具有一个或多个标签。在文本多标签任务中，我们需要预测输入句子/文本可能来自 `n` 个标签类别中的哪几个类别。以上图多标签中新闻文本为例，该新闻文本具有 `相机` 和 `芯片` 两个标签。快速开启多标签任务参见  👉 [多标签指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#readme) 。
 
 - **层次分类👪 ：** 数据集的标签集具有多级标签且标签之间具有层级结构关系，输入句子/文本具有一个或多个标签。在文本层次分类任务中，我们需要预测输入句子/文本可能来自于不同级标签类别中的某一个或几个类别。以上图层次分类中新闻文本为例（新闻为根节点），该新闻一级分类标签为 `体育`，二级分类标签为 `足球`。快速开启层次分类任务参见 👉 [层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme) 。
+
+
+#### 2.1.2 多方案满足定制需求
+
+#### 方案一：预训练模型微调
+
+【方案选择】对于大多数任务，我们推荐使用**预训练模型微调作为首选的文本分类方案**，预训练模型微调提供了数据标注-模型训练-模型分析-模型压缩-预测部署全流程，有效减少开发时间，低成本迁移至实际应用场景。
+
+【方案介绍】ERNIE 3.0 轻量级模型不能直接在文本分类任务上使用，预训练模型微调在预训练模型 `[CLS]` 输出向量后接入线性层分类器，用具体任务数据进行微调训练文本分类器，使预训练模型”更懂”这个任务。
+
+【方案效果】下表展示在多标签任务CAIL2019—婚姻家庭要素提取数据集中ERNIE 3.0 系列轻量级模型效果评测。
+
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/63761690/187669557-20893b74-8ff6-43bf-9768-9b431be23895.png width=800 height=300 />
+</div>
+
+
+【快速开始】
+- 快速开启多分类任务参见 👉 [预训练模型微调-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#readme)
+- 快速开启多标签分类任务参见 👉 [预训练模型微调-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#readme)
+- 快速开启层次分类任务参见 👉 [预训练模型微调-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme)
+
+#### 方案二：提示学习
+
+【方案选择】提示学习（Prompt Learning）适用于**标注成本高、标注样本较少的文本分类场景**。在小样本场景中，相比于预训练模型微调学习，提示学习能取得更好的效果。对于标注样本充足、标注成本较低的场景，我们仍旧推荐使用充足的标注样本进行文本分类[预训练模型微调](#预训练模型微调)。
+
+【方案介绍】**提示学习的主要思想是将文本分类任务转换为构造提示中掩码 `[MASK]` 的分类预测任务**，也即在掩码 `[MASK]`向量后接入线性层分类器预测掩码位置可能的字或词。提示学习使用待预测字的预训练向量来初始化分类器参数（如果待预测的是词，则为词中所有字的预训练向量平均值），充分利用预训练语言模型学习到的特征和标签文本，从而降低样本需求。提示学习同时提供[ R-Drop](https://arxiv.org/abs/2106.14448) 和 [RGL](https://aclanthology.org/2022.findings-naacl.81/) 策略，帮助提示模型效果。
+
+我们以下图情感二分类任务为例来具体介绍提示学习流程，分类任务标签分为 `0:负向` 和 `1:正向` 。在文本加入构造提示 `我[MASK]喜欢。` ，将情感分类任务转化为预测掩码 `[MASK]` 的待预测字是 `不` 还是 `很`。具体实现方法是在掩码`[MASK]`的输出向量后接入线性分类器（二分类），然后用`不`和`很`的预训练向量来初始化分类器进行训练，分类器预测分类为 `0：不` 或 `1：很` 对应原始标签 `0:负向` 或 `1:正向`。而预训练模型微调则是在预训练模型`[CLS]`向量接入随机初始化线性分类器进行训练，分类器直接预测分类为 `0:负向` 或 `1:正向`。
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/25607475/183909263-6ead8871-699c-4c2d-951f-e33eddcfdd9c.png width=800 height=300 />
+</div>
+
+【方案效果】我们比较预训练模型微调与提示学习在多分类、多标签、层次分类小样本场景的模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值），可以看到在样本较少的情况下，提示学习比预训练模型微调有明显优势。
+
+<div align="center">
+    <img width="500" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650189-18dc5d4c-66c6-459e-827e-8a8d67a24d42.jpeg">
+</div>
+
+
+
+【快速开始】
+
+更多测评和使用细节详见各场景文档：
+- 快速开启多分类任务参见 👉 [提示学习(小样本)-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/few-shot#readme)
+- 快速开启多标签分类任务参见 👉 [提示学习(小样本)-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/few-shot#readme)
+- 快速开启层次分类任务参见 👉 [提示学习(小样本)-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/few-shot#readme)
+
+#### 方案三：语义索引
+
+【方案选择】基于语义索引的文本分类方案**适用于标签类别不固定的场景**，对于新增标签类别或新的相关分类任务无需重新训练，模型仍然能获得较好预测效果，方案具有良好的拓展性。
+
+【方案介绍】语义索引目标是从海量候选召回集中快速、准确地召回一批与输入文本语义相关的文本。基于语义索引的文本分类方法具体来说是将标签集作为召回目标集，召回与输入文本语义相似的标签作为文本的标签类别。
+
+【快速开始】
+- 快速开启多分类任务参见 👉 [语义索引-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/retrieval_based#readme)
+- 快速开启多标签分类任务参见 👉 [语义索引-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/retrieval_based#readme)
+- 快速开启层次分类任务参见 👉 [语义索引-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/retrieval_based#readme)
+
 
 
 <a name="更懂中文的训练基座"></a>
@@ -63,112 +124,48 @@
 
 <a name="多方案满足定制需求"></a>
 
-### 2.3 多方案满足定制需求
-
-#### 方案一：预训练模型微调
-
-【方案选择】对于大多数任务，我们推荐使用**预训练模型微调作为首选的文本分类方案**，预训练模型微调提供了数据标注-模型训练-模型分析-模型压缩-预测部署全流程，有效减少开发时间，低成本迁移至实际应用场景。
-
-【方案介绍】ERNIE 3.0 轻量级模型不能直接在文本分类任务上使用，预训练模型微调在预训练模型 `[CLS]` 输出向量后接入线性层分类器，用具体任务数据进行微调训练文本分类器，使预训练模型”更懂”这个任务。
-
-【方案效果】下表展示在多标签任务CAIL2019—婚姻家庭要素提取数据集中ERNIE 3.0 系列轻量级模型效果评测。
-
-
-|   | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
-| -------------------------- | ------------ | ------------ | ------------ |------------ |
-|ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|90.38|80.14| 2.70 |
-|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|90.57|79.36| 1.46|
-|ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|89.27|76.78| 0.56|
-|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|89.43|77.20| 0.34|
-|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|85.39|75.07|0.32|
-
-【快速开始】
-- 快速开启多分类任务参见 👉 [预训练模型微调-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#readme)
-- 快速开启多标签分类任务参见 👉 [预训练模型微调-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#readme)
-- 快速开启层次分类任务参见 👉 [预训练模型微调-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme)
-
-#### 方案二：提示学习
-
-【方案选择】提示学习（Prompt Learning）适用于**标注成本高、标注样本较少的小样本场景**文本分类任务。在小样本场景中，相比于预训练模型微调学习，提示学习能取得更好的效果。对于标注样本充足、标注成本较低的场景，我们仍旧推荐使用充足的标注样本进行文本分类[预训练模型微调](#预训练模型微调)。
-
-【方案介绍】**提示学习的主要思想是将文本分类任务转换为构造提示中掩码 `[MASK]` 的分类预测任务**，也即在掩码 `[MASK]`向量后接入线性层分类器预测掩码位置可能的字或词。提示学习使用待预测字的预训练向量来初始化分类器参数（如果待预测的是词，则为词中所有字的预训练向量平均值），充分利用预训练语言模型学习到的特征和标签文本，从而降低样本需求。提示学习同时提供[ R-Drop](https://arxiv.org/abs/2106.14448) 和 [RGL](https://aclanthology.org/2022.findings-naacl.81/) 策略，帮助提示模型效果。
-
-我们以下图情感二分类任务为例来具体介绍提示学习流程，分类任务标签分为 `0:负向` 和 `1:正向` 。在文本加入构造提示 `我[MASK]喜欢。` ，将情感分类任务转化为预测掩码 `[MASK]` 的待预测字是 `不` 还是 `很`。具体实现方法是在掩码`[MASK]`的输出向量后接入线性分类器（二分类），然后用`不`和`很`的预训练向量来初始化分类器进行训练，分类器预测分类为 `0：不` 或 `1：很` 对应原始标签 `0:负向` 或 `1:正向`。而预训练模型微调则是在预训练模型`[CLS]`向量接入随机初始化线性分类器进行训练，分类器直接预测分类为 `0:负向` 或 `1:正向`。
-
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/25607475/183909263-6ead8871-699c-4c2d-951f-e33eddcfdd9c.png width=800 height=300 />
-</div>
-
-【方案效果】我们比较提示学习与预训练模型微调在小样本数据集[FewCLUE](https://github.com/CLUEbenchmark/FewCLUE)中tnews新闻分类训练集的效果，任务训练集共包含240条数据，总共15个分类。
-
-
-| model_name | 训练方式 | Accuracy |
-| ---------- | ------- | ---- |
-| ERNIE 3.0 Base | 预训练模型微调 | 0.5046 |
-| ERNIE 3.0 Base  | 提示学习 | 0.5521 |
-
-
-
-【快速开始】
-- 快速开启多分类任务参见 👉 [提示学习(小样本)-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/few-shot#readme)
-- 快速开启多标签分类任务参见 👉 [提示学习(小样本)-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/few-shot#readme)
-- 快速开启层次分类任务参见 👉 [提示学习(小样本)-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/few-shot#readme)
-
-#### 方案三：语义索引
-
-【方案选择】基于语义索引的文本分类方案**适用于标签类别不固定的场景**，对于新增标签类别或新的相关分类任务无需重新训练，模型仍然能获得较好预测效果，方案具有良好的拓展性。
-
-【方案介绍】语义索引目标是从海量候选召回集中快速、准确地召回一批与输入文本语义相关的文本。基于语义索引的文本分类方法具体来说是将标签集作为召回目标集，召回与输入文本语义相似的标签作为文本的标签类别。
-
-【快速开始】
-- 快速开启多分类任务参见 👉 [语义索引-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/retrieval_based#readme)
-- 快速开启多标签分类任务参见 👉 [语义索引-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/retrieval_based#readme)
-- 快速开启层次分类任务参见 👉 [语义索引-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/retrieval_based#readme)
 
 <a name="高效模型调优方案"></a>
 
-### 2.4 高效模型调优方案
+### 2.3 高效模型调优方案
 
 有这么一句话在业界广泛流传，"数据决定了机器学习的上限，而模型和算法只是逼近这个上限"，可见数据质量的重要性。文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)开源了模型分析模块，针对标注数据质量不高、训练数据覆盖不足、样本数量少等文本分类常见数据痛点，提供稀疏数据筛选、脏数据清洗、数据增强三种数据优化方案，解决训练数据缺陷问题，用低成本方式获得大幅度的效果提升。
 
 
-**1. 稀疏数据筛选**能够有效挖掘待预测数据中缺乏证据支持的数据，采用有选择的训练集数据增强或针对性筛选未标注数据进行标注两种策略有效提升模型表现。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们采用稀疏数据筛选方案分别在数据集应用数据增强策略和数据标注策略，稀疏数据筛选有效提高模型表现。
+- **稀疏数据筛选**通过挖掘待预测数据（通常为开发集或测试集）中缺乏证据支持的数据，基于基于特征相似度的实例级证据分析方法进行有选择的训练集数据增强或针对性筛选未标注数据进行标注两种策略有效提升模型表现。我们采用在多分类、多标签、层次分类场景中评测稀疏数据-数据增强策略和稀疏数据-数据标注策略，稀疏数据筛选方案有效提高模型表现。
 
-|  | Micro F1(%)   | Macro F1(%) |
-| ---------- | ------- | ---- |
-| 基线 | 84.43|50.01|
-| 稀疏数据-数据增强 | 84.80|51.78|
-| 稀疏数据-数据标注 | 85.77|57.13|
+<div align="center">
+    <img width="550" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650173-c83afc31-a1f8-478b-a391-b977d5170825.jpeg">
+</div>
 
 
-**2. 脏数据清洗**能够自动识别训练集中脏数据（也即标注质量差的数据），有效降低人力检查成本。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们随机在10%的数据中混入错误标签。
+- **脏数据清洗**基于表示点方法的实例级证据分析方法，能够自动识别训练集中脏数据（也即标注质量差的数据），有效降低人力检查成本。我们采用在多分类、多标签、层次分类场景中评测脏数据清洗方案，实验表明方案能够高效筛选出训练集中脏数据，提高模型表现。
 
-|  | Micro F1(%)   | Macro F1(%) |
-| ---------- | ------- | ---- |
-| 基线 | 82.89|47.83|
-| 基线+脏数据清洗策略 | 84.50|51.28|
+<div align="center">
+    <img width="550" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187652793-aec6dc9f-a709-431e-9d18-58e39719a1e5.jpeg">
+</div>
 
-**3. 数据增强**在数据量较少的情况下能够有效提升模型效果。PaddleNLP内置[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM预测）、TF-IDF等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
 
-|  |Micro F1(%)   | Macro F1(%) |
-| ---------| ------------ |------------ |
-|训练集(500)|84.43|50.01|
-|训练集(500)+词替换增强策略 |84.50|53.23|
-|训练集(500)+词插入增强策略 |85.03|53.54|
-|训练集(500)+词删除增强策略 |84.74| 55.89|
-|训练集(500)+词置换增强策略 |84.44|52.50|
+- **数据增强**在数据量较少的情况下能够通过增加数据集多样性，提升模型效果。PaddleNLP内置[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM预测）、TF-IDF等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
+
+<div align="center">
+    <img width="480" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187666776-53abc345-da7f-4f7e-ada4-8040577c8720.png">
+</div>
+
 
 【快速开始】
-更多使用方法和测评结果详见各场景模型分析模块：
+
+更多使用方法和测评细节详见各场景模型分析模块：
+
 - 体验模型分析模块 👉 [多分类-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/analysis)
 - 体验模型分析模块 👉 [多标签-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/analysis)
 - 体验模型分析模块 👉 [层次分类多-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/analysis)
 
 <a name="产业级全流程方案"></a>
 
-### 2.5 产业级全流程方案
+### 2.4 产业级全流程方案
 
-文本分类应用提供了数据标注-模型训练-模型调优-模型压缩-预测部署全流程方案，我们将以预训练模型微调方案为例介绍文本分类应用的全流程：
+文本分类应用提供了简单易用的数据标注-模型训练-模型调优-模型压缩-预测部署全流程方案，我们将以预训练模型微调方案为例介绍文本分类应用的全流程：
 
 <div align="center">
     <img width="1238" alt="image" src="https://user-images.githubusercontent.com/63761690/186386181-7cdf3015-3e6c-4ffe-9512-95ba707fd00c.png">
@@ -203,13 +200,6 @@
 
 - 文本分类应用提供了离线部署，并且支持在GPU设备使用FP16，在CPU设备使用动态量化的低精度加速推理；同时提供基于Paddle Serving的在线服务化部署，详见各分类场景文档中模型部署介绍。
 
-【效果展示】下表展示在多标签任务CAIL2019—婚姻家庭要素提取数据集中ERNIE 3.0 Medium 模型效果评测。
-| |Micro F1(%)   | Macro F1(%) | latency(ms) |
-| -------------------------- | ------------ | ------------ | ------------ |
-|ERNIE 3.0 Medium|90.57|79.36| 1.46|
-| ERNIE 3.0 Medium + FP16 | 90.57| 79.36| 0.49|
-| ERNIE 3.0 Medium + 裁剪| 89.99|79.37 | 0.75  |
-| ERNIE 3.0 Medium + 裁剪 + FP16| 89.99|79.37 | 0.27  |
 
 <a name="快速开始"></a>
 
