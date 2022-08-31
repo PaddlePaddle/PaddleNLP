@@ -22,6 +22,7 @@ from tqdm import tqdm
 
 import numpy as np
 import paddle
+from paddlenlp.utils.log import logger
 
 from data_collator import DataCollator
 
@@ -280,12 +281,6 @@ def postprocess(batch_outputs,
                         rel_list.append(rel)
             batch_rel_results.append(rel_list)
         return (batch_ent_results, batch_rel_results)
-
-
-def set_seed(seed):
-    paddle.seed(seed)
-    random.seed(seed)
-    np.random.seed(seed)
 
 
 def build_tree(schema, name='root'):
