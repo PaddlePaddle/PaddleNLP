@@ -15,6 +15,8 @@
 
 import unittest
 from typing import Optional, Tuple, Dict, Any
+
+from parameterized import parameterized_class
 import paddle
 from paddle import Tensor
 
@@ -26,10 +28,9 @@ from paddlenlp.transformers import (
     ErnieDocForTokenClassification,
     ErnieDocForQuestionAnswering,
 )
-from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
-                                                     random_attention_mask,
-                                                     ModelTesterMixin)
-from tests.testing_utils import slow
+from ..test_modeling_common import (ids_tensor, floats_tensor,
+                                    random_attention_mask, ModelTesterMixin)
+from ...testing_utils import slow
 
 
 @dataclass
@@ -69,8 +70,13 @@ class ErnieDocTestConfig(ErnieDocTestModelConfig):
     is_training: bool = False
     use_input_mask: bool = False
     use_token_type_ids: bool = False
+    seq_length: int = 50
+
+    # seq_length + memeory_length
+    key_length: int = 100
 
     # used for sequence classification
+    type_sequence_label_size: int = 3
     num_classes: int = 3
 
 
@@ -100,23 +106,36 @@ class ErnieDocModelTester:
             token_type_ids = ids_tensor([config.batch_size, config.memory_len],
                                         config.type_vocab_size)
 
-        return config.model_kwargs, input_ids, token_type_ids, input_mask
+        sequence_labels = None
+        token_labels = None
+        if self.parent.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_classes)
 
-    def create_and_check_model(
-        self,
-        config,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        attn_mask: Tensor,
-    ):
+        config = self.get_config()
+        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels
+
+    def __getattr__(self, key: str):
+        if not hasattr(self.config, key):
+            raise AttributeError(f'attribute <{key}> not exist')
+        return getattr(self.config, key)
+
+    def create_and_check_model(self, config, input_ids, token_type_ids,
+                               input_mask, sequence_labels, token_labels):
         model = ErnieDocModel(**config)
         model.eval()
 
         result = model(input_ids,
-                       attn_mask=attn_mask,
-                       token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+                       attn_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
+
         self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.memory_len,
             self.config.hidden_size
@@ -124,60 +143,68 @@ class ErnieDocModelTester:
         self.parent.assertEqual(
             result[1].shape, [self.config.batch_size, self.config.hidden_size])
 
-    def create_and_check_for_sequence_classification(
-        self,
-        config,
-        input_ids: Tensor,
-        token_type_ids: Tensor,
-        input_mask: Tensor,
-    ):
+    def create_and_check_for_sequence_classification(self, config, input_ids,
+                                                     token_type_ids, input_mask,
+                                                     sequence_labels,
+                                                     token_labels):
         model = ErnieDocForSequenceClassification(
             ErnieDocModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result, _ = model(
-            input_ids,
-            attn_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
-        self.parent.assertEqual(
-            result.shape, [self.config.batch_size, self.config.num_classes])
+        result = model(input_ids,
+                       attn_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=sequence_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
 
-    def create_and_check_for_token_classification(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-    ):
+        self.parent.assertEqual(
+            result[0].shape, [self.config.batch_size, self.config.num_classes])
+
+    def create_and_check_for_token_classification(self, config, input_ids,
+                                                  token_type_ids, input_mask,
+                                                  sequence_labels,
+                                                  token_labels):
         model = ErnieDocForTokenClassification(
             ErnieDocModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result, _ = model(input_ids,
-                          attn_mask=input_mask,
-                          token_type_ids=token_type_ids)
-        self.parent.assertEqual(result.shape, [
+        result = model(input_ids,
+                       attn_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+
+        self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.memory_len,
             self.config.num_classes
         ])
 
     def create_and_check_for_question_answering(self, config, input_ids,
-                                                token_type_ids, input_mask):
+                                                token_type_ids, input_mask,
+                                                sequence_labels, token_labels):
         model = ErnieDocForQuestionAnswering(ErnieDocModel(**config))
         model.eval()
 
-        result = model(
-            input_ids,
-            position_ids=None,
-            attn_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       position_ids=None,
+                       attn_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.parent.return_dict)
+
+        if sequence_labels is not None:
+            result = result[1:]
+
         self.parent.assertEqual(
             result[0].shape, [self.config.batch_size, self.config.memory_len])
         self.parent.assertEqual(
             result[1].shape, [self.config.batch_size, self.config.memory_len])
 
     def prepare_config_and_inputs_for_common(self):
-        config, input_ids, token_type_ids, input_mask = self.prepare_config_and_inputs(
+        config, input_ids, token_type_ids, input_mask, _, _ = self.prepare_config_and_inputs(
         )
         inputs_dict = {
             "input_ids": input_ids,
@@ -195,8 +222,17 @@ class ErnieDocModelTester:
         return self.config.model_kwargs
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class ErnieDocModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ErnieDocModel
+
+    use_labels = False
+    return_dict = False
 
     all_model_classes = (
         ErnieDocModel,
@@ -236,10 +272,6 @@ class ErnieDocModelTest(ModelTesterMixin, unittest.TestCase):
                 ErnieDocPretrainedModel.pretrained_init_configuration)[:1]:
             model = ErnieDocModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
-
-    # def test_save_load(self):
-    #     # TODO(wj-Mcat): should be removed later
-    #     pass
 
 
 class ErnieDocModelIntegrationTest(unittest.TestCase):
