@@ -28,7 +28,7 @@ from paddlenlp.utils.log import logger
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path",
-                        default="checkpoint",
+                        default="unimo-text-1.0-summary",
                         type=str,
                         help="The model name to specify the UNIMOText to use. ")
     parser.add_argument("--inference_model_dir",
@@ -69,7 +69,7 @@ def parse_args():
                         action="store_true",
                         help="Whether to use fp16 decoding to predict. ")
     parser.add_argument("--decoding_strategy",
-                        default="sampling",
+                        default="beam_search",
                         choices=["sampling", "beam_search"],
                         type=str,
                         help="The main strategy to decode. ")

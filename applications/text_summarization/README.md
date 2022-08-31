@@ -1,7 +1,7 @@
-# 自动文本摘要
+# 生成式文本摘要应用
 
 **目录**
-- [自动文本摘要](#自动文本摘要)
+- [生成式文本摘要应用](#生成式文本摘要应用)
   - [简介](#简介)
     - [基于预训练语言模型的文本摘要](#基于预训练语言模型的文本摘要)
   - [效果展示](#效果展示)
@@ -24,8 +24,8 @@
 
 
 ## 简介
-自动文摘的目标是自动地将输入文本转换成简短摘要,为用户提供简明扼要的内容描述，是缓解文本信息过载的一个重要手段。
-自动文摘也是自然语言生成领域中的一个重要任务，有很多应用场景，如新闻摘要、论文摘要、财报摘要、传记摘要、专利摘要、对话摘要、评论摘要、观点摘要、电影摘要、文章标题生成、商品名生成、自动报告生成、搜索结果预览等。
+文本摘要的目标是自动地将输入文本转换成简短摘要,为用户提供简明扼要的内容描述，是缓解文本信息过载的一个重要手段。
+文本摘要也是自然语言生成领域中的一个重要任务，有很多应用场景，如新闻摘要、论文摘要、财报摘要、传记摘要、专利摘要、对话摘要、评论摘要、观点摘要、电影摘要、文章标题生成、商品名生成、自动报告生成、搜索结果预览等。
 
 本项目是基于预训练语言模型UNIMO-Text的文本摘要，具有以下优势：
 - 效果领先
@@ -38,8 +38,7 @@
 基于预训练语言模型（Pretrained Language Models, PLMs）范式的自动文本摘要是目前最常用、效果最好(SOTA)的方式。
 预训练模型是在超大规模的语料采用无监督（unsupervised）或者弱监督（weak-supervised）的方式进行预训练，能够学习如何准确地理解自然语言并以自然语言的形式流畅表达，这两项都是完成文本摘要任务的重要能力。
 
-PaddleNLP提供了方便易用的接口，可指定模型名或模型参数文件路径通过from_pretrained()方法加载不同网络结构的预训练模型，且相应预训练模型权重下载速度快速、稳定。
-Transformer预训练模型汇总包含了如 ERNIE、BERT、T5、UNIMO等40多个主流预训练模型，500多个模型权重。下面以中文unimo-text-1.0模型为例，演示如何加载预训练模型和分词器：
+PaddleNLP提供了方便易用的接口，可指定模型名或模型参数文件路径通过from_pretrained()方法加载不同网络结构的预训练模型，且相应预训练模型权重下载速度快速、稳定。下面以中文unimo-text-1.0模型为例，演示如何加载预训练模型和分词器：
 ```
 from paddlenlp.transformers import  UNIMOLMHeadModel, UNIMOTokenizer
 model_name = "unimo-text-1.0"
@@ -55,33 +54,22 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 ```python
 >>> from paddlenlp import Taskflow
-# 默认模型为 xxxx
->>> Summarizer = Taskflow("text_summarization")
+>>> summarizer = Taskflow("text_summarization")
 # 单条输入
->>> Summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
-xxxx
+>>> summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+# 输出：'雪后的景色可真美丽呀！'
+
 # 多条输入
->>> Summarizer([
+>>> summarizer([
   "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
   "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
   ])
-xxxx
+#输出：['雪后的景色可真美丽呀！', '成品油调价窗口8月23日24时开启']
 ```
 
 ### 可配置参数说明
-* `model`：可选模型，默认为unimo-text-1.0，支持的模型支持的模型有["unimo-text-1.0", ]。
+* `model`：可选模型，默认为`unimo-text-1.0-summary`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `output_scores`：是否要输出解码得分，请默认为False。
-* `max_length`：生成代码的最大长度，默认为128。
-* `min_length`：生成代码的最小长度，默认为0。
-* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
-* `temperature`：解码参数temperature，默认为0.6。
-* `top_k`：解码参数top_k，默认为5。
-* `top_p`：解码参数top_p，默认为1.0。
-* `num_beams`：beam_search解码的beam size，默认为4。
-* `length_penalty`：解码长度控制值，默认为1.0。
-* `num_return_sequences`：解码返回对序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
-* `repetition_penalty`：解码重复惩罚值，默认为1.1。
 
 
 ## 训练定制
@@ -151,7 +139,7 @@ data/
 └── test.json # 可选，待预测数据文件
 ```
 本地数据集文件格式如下：
-- train.json/test.json 文件格式：
+- train.json/test.json 文件每行格式：
 ```text
 {
 "title": "任志强抨击政府把土地作为投机品地产业被人为破坏",
@@ -224,7 +212,7 @@ python -m paddle.distributed.launch --gpus "1,3,6,7" --log_dir ${log_dir} train.
 - `do_eval` 是否进行预测，在验证集上会自动评估。
 - `device` 表示使用的设备，从gpu和cpu中选择。
 
-更多参数详情和参数的默认值请参考`args.py`。
+更多参数详情和参数的默认值请参考`train.py`。
 
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。
 如：
@@ -233,6 +221,7 @@ python -m paddle.distributed.launch --gpus "1,3,6,7" --log_dir ${log_dir} train.
 ├── model_8000
 │   ├── model_config.json
 │   ├── model_state.pdparams
+│   ├── special_tokens_map.json
 │   ├── tokenizer_config.json
 │   └── vocab.txt
 └── ...
@@ -263,31 +252,29 @@ python train.py \
 程序运行结束后会将预测结果保存在`output_path`中。
 
 
-Finetuned baseline的模型在xxx任务验证集上有如下结果(指标为BLEU-4)：
+Finetuned baseline的模型在[LCSTS](https://aclanthology.org/D15-1229/)测试集上有如下结果：
+|       model_name        | Rouge-1 | Rouge-2 |    Rouge-L    | BLEU-4 |
+| :-----------------------------: | :---: | :-----------: | :-------------------: |:-------------------: |
+|   finetuned unimo-text-1.0-summary    | 39.56 | 26.24 |     36.35     |     21.48     |
 
-|       model_name        | xxxx |
-| :-----------------------------: | :---: |
-|   finetuned unimo-text-1.0    | xxxx |
 
 ### 模型推理部署
 
 #### FasterTransformer加速及模型静态图导出
 
-使用动态图训练结束之后，可以通过[静态图导出脚本](export_model_unimo_text.py)实现基于FasterTransformer的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
+使用动态图训练结束之后，可以通过[静态图导出脚本](export_model.py)实现基于FasterTransformer的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
 python export_model.py \
-    --model_name_or_path ./checkpoint \
+    --model_name_or_path unimo-text-1.0-summary \
     --inference_model_dir ./export_checkpoint \
-    --max_out_len 64 \
-    --use_fp16_decoding
+    --max_out_len 30 \
 ```
 关键参数释义如下：
 
-* `model_name_or_path`：动态图训练保存的参数路径；默认为"./checkpoint"。
+* `model_name_or_path`：动态图训练保存的参数路径；默认为"unimo-text-1.0-summary"。
 * `inference_model_dir`：静态图图保存的参数路径；默认为"./export_checkpoint"。
 * `max_out_len`：最大输出长度。
-* `use_fp16_decoding`:是否使用fp16解码进行预测。
 
 执行命令后将会自动导出模型到指定的 `export_checkpoint` 中，保存模型文件结构如下所示：
 

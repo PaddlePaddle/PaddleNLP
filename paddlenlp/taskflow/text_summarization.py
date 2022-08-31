@@ -41,13 +41,6 @@ usage = r"""
            '''
          """
 
-URLS = {
-    "gpt-cpm-large-cn": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/text_generation/gpt-cpm/gpt-cpm-large-cn_params.tar",
-        "5aad6f81053cfdbba4797f044fcf66d1"
-    ],
-}
-
 
 class TextSummarizationTask(Task):
     """
@@ -68,7 +61,7 @@ class TextSummarizationTask(Task):
         # Hypter-parameter during generating.
         self._max_length = kwargs.get("max_length", 128)
         self._min_length = kwargs.get("min_length", 0)
-        self._decode_strategy = kwargs.get("decode_strategy", 'sampling')
+        self._decode_strategy = kwargs.get("decode_strategy", 'beam_search')
         self._temperature = kwargs.get("temperature", 0.6)
         self._top_k = kwargs.get("top_k", 5)
         self._top_p = kwargs.get("top_p", 1.)
@@ -227,14 +220,6 @@ class TextSummarizationTask(Task):
             ids_list, scores_list, self._max_length, self._num_return_sequences)
         output_tokens = [result[0] for result in results]
         output_scores = [result[1] for result in results]
-
-        # output_tokens = []
-        # output_scores = []
-        # for ids, scores in zip(ids_list, scores_list):
-        #     results = self._select_from_num_return_sequences(ids, scores, self._max_length,
-        #                     self._num_return_sequences)
-        #     output_tokens += [result[0] for result in results]
-        #     output_scores += [result[1] for result in results]
 
         if self._output_scores:
             return output_tokens, output_scores

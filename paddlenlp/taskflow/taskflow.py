@@ -225,14 +225,14 @@ TASKS = {
     },
     'text_summarization': {
         "models": {
-            "unimo-text-1.0": {
+            "unimo-text-1.0-summary": {
                 "task_class": TextSummarizationTask,
-                "task_flag": "text_summarization-unimo-text-1.0",
-                "task_priority_path": "unimo-text-1.0",
+                "task_flag": "text_summarization-unimo-text-1.0-summary",
+                "task_priority_path": "unimo-text-1.0-summary",
             },
         },
         "default": {
-            "model": "unimo-text-1.0"
+            "model": "unimo-text-1.0-summary"
         }
     },
     "word_segmentation": {
