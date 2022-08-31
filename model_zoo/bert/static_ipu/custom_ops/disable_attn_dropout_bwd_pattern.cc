@@ -25,6 +25,8 @@ limitations under the License. */
 #include <popart/op/softmax.hpp>
 #include <popart/logging.hpp>
 #include <popart/opidentifier.hpp>
+#include <popart/popx/opx.hpp>
+#include <popart/patterns/patterns.hpp>
 
 #include "utils.cc"
 

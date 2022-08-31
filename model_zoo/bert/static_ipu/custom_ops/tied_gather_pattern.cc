@@ -32,6 +32,9 @@ limitations under the License. */
 #include <popart/op/transpose.hpp>
 #include <popart/op/accumulate.hpp>
 #include <popart/op/collectives/replicatedallgather.hpp>
+#include <popart/popx/opx.hpp>
+#include <popart/patterns/patterns.hpp>
+#include <popart/ir.hpp>
 
 #include <map>
 

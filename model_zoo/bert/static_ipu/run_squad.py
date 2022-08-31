@@ -341,9 +341,17 @@ def main(args):
                                           epsilon=args.adam_epsilon)
         optimizer.minimize(loss)
 
+    amp_list = paddle.static.amp.CustomOpLists()
+    amp_list.unsupported_list = {}
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+        main_program, amp_list, use_fp16_guard=False)
+
     # Static executor
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
+
+    paddle.static.amp.cast_parameters_to_fp16(
+        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     # Set initial weights
     state_dict = main_program.state_dict()

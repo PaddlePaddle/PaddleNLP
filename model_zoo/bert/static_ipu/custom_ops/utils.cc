@@ -27,6 +27,8 @@ limitations under the License. */
 #include <popart/popx/op/matmulx.hpp>
 #include <popart/logging.hpp>
 #include <queue>
+#include <popart/popx/opx.hpp>
+#include <popart/ir.hpp>
 
 template <class T, popart::ExecutionContext Ctx = popart::ExecutionContext::Normal>
 static T *search_producers_for(popart::Tensor *t, int max_depth=-1) {

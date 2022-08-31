@@ -23,6 +23,9 @@ limitations under the License. */
 #include <popart/popx/opxmanager.hpp>
 #include <popart/popx/devicex.hpp>
 #include <popart/util.hpp>
+#include <popart/popx/opx.hpp>
+#include <popart/patterns/patterns.hpp>
+#include <popart/ir.hpp>
 
 #include <popops/DynamicSlice.hpp>
 #include <popops/ElementWise.hpp>

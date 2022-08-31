@@ -87,8 +87,10 @@ def reset_program_state_dict(state_dict, mean=0, scale=0.02):
             continue
 
         dtype_str = "float32"
-        if p._dtype == paddle.float64:
+        if p._dtype() == paddle.float64:
             dtype_str = "float64"
+        elif p._dtype() == paddle.float16:
+            dtype_str = "float16"
 
         if "layer_norm" in n and n.endswith('.w_0'):
             new_state_dict[n] = np.ones(p.shape()).astype(dtype_str)
@@ -276,9 +278,17 @@ def main(args):
                                       epsilon=args.adam_epsilon)
     optimizer.minimize(total_loss)
 
+    amp_list = paddle.static.amp.CustomOpLists()
+    amp_list.unsupported_list = {}
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+        main_program, amp_list, use_fp16_guard=False)
+
     # Static executor
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
+
+    paddle.static.amp.cast_parameters_to_fp16(
+        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     # Set initial weights
     state_dict = main_program.state_dict()
