@@ -31,8 +31,9 @@ from .sec_diff import alpha_sigma_to_t
 from .transforms import Normalize
 from .perlin_noises import create_perlin_noise, regen_perlin
 import random
+from ..image_utils import load_image
 
-__all__ = ["DiffusionMixin"]
+__all__ = ["DiscoDiffusionMixin"]
 
 
 def set_seed(seed):
@@ -41,38 +42,39 @@ def set_seed(seed):
     paddle.seed(seed)
 
 
-class DiffusionMixin(object):
+class DiscoDiffusionMixin:
 
-    def diffusion_generate(self,
-                           target_text_embeds,
-                           init_image=None,
-                           output_dir='outputs/',
-                           width_height=[1280, 768],
-                           skip_steps=0,
-                           cut_ic_pow=1,
-                           init_scale=1000,
-                           clip_guidance_scale=5000,
-                           tv_scale=0,
-                           range_scale=0,
-                           sat_scale=0,
-                           cutn_batches=4,
-                           perlin_init=False,
-                           perlin_mode='mixed',
-                           seed=None,
-                           eta=0.8,
-                           clamp_grad=True,
-                           clamp_max=0.05,
-                           cut_overview='[12]*400+[4]*600',
-                           cut_innercut='[4]*400+[12]*600',
-                           cut_icgray_p='[0.2]*400+[0]*600',
-                           save_rate=10,
-                           n_batches=1,
-                           batch_name="",
-                           use_secondary_model=True,
-                           randomize_class=True,
-                           clip_denoised=False,
-                           image_mean=[0.48145466, 0.4578275, 0.40821073],
-                           image_std=[0.26862954, 0.26130258, 0.27577711]):
+    def disco_diffusion_generate(self,
+                                 target_text_embeds,
+                                 init_image=None,
+                                 output_dir='outputs/',
+                                 width_height=[1280, 768],
+                                 skip_steps=0,
+                                 cut_ic_pow=1,
+                                 init_scale=1000,
+                                 clip_guidance_scale=5000,
+                                 tv_scale=0,
+                                 range_scale=0,
+                                 sat_scale=0,
+                                 cutn_batches=4,
+                                 perlin_init=False,
+                                 perlin_mode='mixed',
+                                 seed=None,
+                                 eta=0.8,
+                                 clamp_grad=True,
+                                 clamp_max=0.05,
+                                 cut_overview='[12]*400+[4]*600',
+                                 cut_innercut='[4]*400+[12]*600',
+                                 cut_icgray_p='[0.2]*400+[0]*600',
+                                 save_rate=10,
+                                 n_batches=1,
+                                 batch_name="",
+                                 use_secondary_model=True,
+                                 randomize_class=True,
+                                 clip_denoised=False,
+                                 image_mean=[0.48145466, 0.4578275, 0.40821073],
+                                 image_std=[0.26862954, 0.26130258,
+                                            0.27577711]):
         r'''
         The DiffusionMixin diffusion_generate method.
         
@@ -266,7 +268,7 @@ class DiffusionMixin(object):
 
         init = None
         if init_image:
-            d = Image.open(init_image)
+            d = load_image(init_image)
             init = T.to_tensor(d).unsqueeze(0) * 2 - 1
 
         if perlin_init:

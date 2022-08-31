@@ -18,17 +18,19 @@ from typing import Any, Tuple, Optional, Union
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ..model_outputs import ModelOutput
+
 from dataclasses import dataclass
+from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
 from .. import PretrainedModel, register_base_model
-from ..guided_diffusion_utils.diffusion_utils import DiffusionMixin
-from ..guided_diffusion_utils.model_diffusion import create_gaussian_diffusion, create_unet_model, create_secondary_model
-from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from ..stable_diffusion_utils import StableDiffusionMixin, AutoencoderKL, PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler, UNet2DConditionModel
+from ..guided_diffusion_utils import DiscoDiffusionMixin, create_gaussian_diffusion, create_unet_model, create_secondary_model
 
 __all__ = [
     'VisionTransformer',
     'TextTransformer',
-    'CLIPPreTrainedModel',
+    'CLIPTextModel',
+    'CLIPVisionModel',
+    'CLIPPretrainedModel',
     'CLIPModel',
     'CLIPForImageGeneration',
     'ModifiedResNet',
@@ -296,7 +298,7 @@ class AttentionPool2d(nn.Layer):
         return out[0]
 
 
-class CLIPPreTrainedModel(PretrainedModel):
+class CLIPPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained CLIP models. It provides CLIP related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
@@ -307,28 +309,6 @@ class CLIPPreTrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "openai/clip-vit-base-patch32": {
-            # vision
-            "image_resolution": 224,
-            "vision_layers": 12,
-            "vision_heads": 12,
-            "vision_mlp_ratio": 4,
-            "vision_embed_dim": 768,
-            "vision_patch_size": 32,
-            "vision_hidden_act": "quick_gelu",
-            # text
-            "max_text_length": 77,
-            "vocab_size": 49408,
-            "text_embed_dim": 512,
-            "text_heads": 8,
-            "text_layers": 12,
-            "text_hidden_act": "quick_gelu",
-            # others
-            "projection_dim": 512,
-            "initializer_range": 0.02,
-            "logit_scale_init_value": 2.6592
-        },
-        # for image dd generation
-        "openai/disco-diffusion-clip-vit-base-patch32": {
             # vision
             "image_resolution": 224,
             "vision_layers": 12,
@@ -418,19 +398,10 @@ class CLIPPreTrainedModel(PretrainedModel):
         "model_state": {
             "openai/clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/model_state.pdparams",
-            # for image dd generation
-            "openai/disco-diffusion-clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/model_state.pdparams",
             "openai/clip-rn50":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/model_state.pdparams",
-            # for image dd generation
-            "openai/disco-diffusion-clip-rn50":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn50/model_state.pdparams",
             "openai/clip-rn101":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/model_state.pdparams",
-            # for image dd generation
-            "openai/disco-diffusion-clip-rn101":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/model_state.pdparams",
             "openai/clip-vit-large-patch14":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/model_state.pdparams",
         }
@@ -445,16 +416,13 @@ class CLIPPreTrainedModel(PretrainedModel):
         factor = self.initializer_factor if hasattr(
             self,
             "initializer_factor") else self.clip.config["initializer_factor"]
-        vision_embed_dim = self.vision_embed_dim if hasattr(
-            self, "vision_embed_dim") else self.clip.config["vision_embed_dim"]
-        text_embed_dim = self.text_embed_dim if hasattr(
-            self, "text_embed_dim") else self.clip.config["text_embed_dim"]
-        vision_layers = self.vision_layers if hasattr(
-            self, "vision_layers") else self.clip.config["vision_layers"]
-        text_layers = self.text_layers if hasattr(
-            self, "text_layers") else self.clip.config["text_layers"]
 
         if isinstance(layer, VisionTransformer):
+            vision_embed_dim = self.vision_embed_dim if hasattr(
+                self,
+                "vision_embed_dim") else self.clip.config["vision_embed_dim"]
+            vision_layers = self.vision_layers if hasattr(
+                self, "vision_layers") else self.clip.config["vision_layers"]
             # vision embedding
             layer.class_embedding.set_value(
                 paddle.normal(
@@ -473,6 +441,10 @@ class CLIPPreTrainedModel(PretrainedModel):
                 ))
 
         elif isinstance(layer, TextTransformer):
+            text_embed_dim = self.text_embed_dim if hasattr(
+                self, "text_embed_dim") else self.clip.config["text_embed_dim"]
+            text_layers = self.text_layers if hasattr(
+                self, "text_layers") else self.clip.config["text_layers"]
             # text embedding
             layer.token_embedding.weight.set_value(
                 paddle.normal(
@@ -487,6 +459,15 @@ class CLIPPreTrainedModel(PretrainedModel):
                     shape=layer.positional_embedding.weight.shape,
                 ))
         elif isinstance(layer, CLIPModel):
+            vision_embed_dim = self.vision_embed_dim if hasattr(
+                self,
+                "vision_embed_dim") else self.clip.config["vision_embed_dim"]
+            vision_layers = self.vision_layers if hasattr(
+                self, "vision_layers") else self.clip.config["vision_layers"]
+            text_embed_dim = self.text_embed_dim if hasattr(
+                self, "text_embed_dim") else self.clip.config["text_embed_dim"]
+            text_layers = self.text_layers if hasattr(
+                self, "text_layers") else self.clip.config["text_layers"]
             layer.text_projection.set_value(
                 paddle.normal(
                     std=text_embed_dim**-0.5 * factor,
@@ -557,7 +538,7 @@ F.quick_gelu = quick_gelu
 NEG_INF = float("-inf")  # -1e4 -1e9
 
 
-class VisionTransformer(CLIPPreTrainedModel):
+class VisionTransformer(nn.Layer):
 
     def __init__(self,
                  input_resolution: int,
@@ -639,7 +620,7 @@ class VisionTransformer(CLIPPreTrainedModel):
             attentions=encoder_outputs.attentions)
 
 
-class TextTransformer(CLIPPreTrainedModel):
+class TextTransformer(nn.Layer):
 
     def __init__(self,
                  context_length,
@@ -734,7 +715,7 @@ class TextTransformer(CLIPPreTrainedModel):
 
 
 @register_base_model
-class CLIPModel(CLIPPreTrainedModel):
+class CLIPModel(CLIPPretrainedModel):
     r"""
     The bare CLIP Model outputting logits_per_image and logits_per_text.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
@@ -742,6 +723,7 @@ class CLIPModel(CLIPPreTrainedModel):
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
+    
     Args:
         image_resolution (int, optional):
             The size (resolution) of each image.
@@ -1072,41 +1054,528 @@ class CLIPModel(CLIPPreTrainedModel):
         )
 
 
-class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
+class CLIPTextPretrainedModel(CLIPPretrainedModel):
+    pass
+
+
+@register_base_model
+class CLIPTextModel(CLIPTextPretrainedModel):
+    r"""
+    The bare CLIPTextModel outputting :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+    
+    Args:
+        max_text_length (int, optional):
+            The maximum value of the dimensionality of text position encoding, which dictates the maximum supported length of the text 
+            input sequence. Defaults to `64`.
+        vocab_size (int, optional):
+            Vocabulary size of `inputs_ids` in `CLIPModel`. Also is the vocab size of text token embedding matrix.
+            Defaults to `49408`.
+        text_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in text model.
+            Defaults to `768`.
+        text_heads (int, optional):
+            Number of attention heads for each attention layer in the text attention.
+            Defaults to `8`.
+        text_layers (int, optional):
+            Number of hidden layers in the text model.
+            Defaults to `12`.
+        text_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the text model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+        initializer_factor (float, optional):
+            A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
+            testing). Default to `1.`.           
+        
+    """
+
+    def __init__(self,
+                 max_text_length=77,
+                 text_embed_dim=512,
+                 text_heads=8,
+                 text_layers=12,
+                 vocab_size=49408,
+                 text_hidden_act="quick_gelu",
+                 initializer_range=0.02,
+                 initializer_factor=1.0,
+                 **kwargs):
+        super().__init__()
+        self.initializer_range = initializer_range
+        self.initializer_factor = initializer_factor
+        self.text_embed_dim = text_embed_dim
+        self.text_layers = text_layers
+        self.text_model = TextTransformer(context_length=max_text_length,
+                                          transformer_width=text_embed_dim,
+                                          transformer_heads=text_heads,
+                                          transformer_layers=text_layers,
+                                          vocab_size=vocab_size,
+                                          activation=text_hidden_act,
+                                          normalize_before=True)
+        self.apply(self._init_weights)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        r"""
+        The CLIPTextModel forward method, overrides the `__call__()` special method.
+        
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide it.
+                Its data type should be `int64` and it has a shape of [text_batch_size, sequence_length].
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention (TextTransformer) to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
+                It is a tensor with shape `[batch_size, sequence_length`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings (TextTransformer). Selected in 
+                the range ``[0, max_text_length - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
+                                 
+        Returns:
+            An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors 
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
+            
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import CLIPTokenizer, CLIPTextModel
+                
+                model = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32")
+                tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+                
+                inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pd")
+                outputs = model(**inputs)
+                last_hidden_state = outputs.last_hidden_state
+                pooled_output = outputs.pooler_output
+                
+        """
+        return self.text_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+
+class CLIPVisionPretrainedModel(CLIPPretrainedModel):
+    pass
+
+
+@register_base_model
+class CLIPVisionModel(CLIPVisionPretrainedModel):
+    r"""
+    The bare CLIPVisionModel outputting :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+    
+    Args:
+        image_resolution (int, optional):
+            The size (resolution) of each image.
+            Defaults to `224`.
+        vision_layers (int, optional):
+            Number of hidden layers in the vision model.
+            Defaults to `12`.
+        vision_heads (int, optional):
+            Number of attention heads for each attention layer in the vision attention.
+            Defaults to `12`.
+        vision_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in vision model.
+            Defaults to `768`.
+        vision_patch_size(int, optional):
+            The size (resolution) of each patch.
+            Defaults to `32`.
+        vision_mlp_ratio(int, optional):
+            The ratio between dim_feedforward and vision_hidden_dim. `radio = dim_feedforward/vision_hidden_dim`
+            Defaults to `4`.
+        vision_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the vision model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+        initializer_factor (float, optional):
+            A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
+            testing). Default to `1.`.       
+        
+    """
+
+    def __init__(self,
+                 image_resolution=224,
+                 vision_patch_size=32,
+                 vision_embed_dim=768,
+                 vision_layers=12,
+                 vision_heads=12,
+                 vision_hidden_act="quick_gelu",
+                 vision_mlp_ratio=4,
+                 initializer_range=0.02,
+                 initializer_factor=1.0,
+                 **kwargs):
+        super().__init__()
+        self.initializer_range = initializer_range
+        self.initializer_factor = initializer_factor
+        self.vision_embed_dim = vision_embed_dim
+        self.vision_layers = vision_layers
+
+        if vision_heads is None:
+            vision_heads = vision_embed_dim // 64
+        self.vision_model = VisionTransformer(input_resolution=image_resolution,
+                                              patch_size=vision_patch_size,
+                                              width=vision_embed_dim,
+                                              layers=vision_layers,
+                                              heads=vision_heads,
+                                              activation=vision_hidden_act,
+                                              mlp_ratio=vision_mlp_ratio,
+                                              normalize_before=True)
+
+        self.apply(self._init_weights)
+
+    def forward(
+        self,
+        pixel_values=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        r'''
+        The CLIPVisionModel forward method, overrides the `__call__()` special method.
+        
+        Args:
+            pixel_values (Tensor):
+                Pixel values. Padding will be ignored by default should you provide it.
+                Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
+                                 
+        Returns:
+            An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors 
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
+            
+        Example:
+            .. code-block::
+            
+            from PIL import Image
+            import requests
+            from paddlenlp.transformers import CLIPProcessor, CLIPVisionModel
+            
+            model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32")
+            processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+            
+            url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            image = Image.open(requests.get(url, stream=True).raw)
+            inputs = processor(images=image, return_tensors="pd")
+            outputs = model(**inputs)
+            
+            last_hidden_state = outputs.last_hidden_state
+            pooled_output = outputs.pooler_output  # pooled CLS states
+                     
+        '''
+        return self.vision_model(
+            pixel_values=pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+
+class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin,
+                             StableDiffusionMixin):
     r"""
     CLIP Model with diffusion model on top.
     Args:
         clip (:class:`CLIPModel`):
             An instance of CLIPModel.
+        diffusion_type (str, optional):
+            The type of diffusion. Please choose in ['disco', 'stable'].
+            Defaults to `disco`.
+        scheduler_type  (str, optional):
+            The type of scheduler. Please choose in ['pndm', 'ddim', 'k-lms'].
+            Defaults to `pndm`.
     """
 
-    def __init__(self, clip):
+    def __init__(self, clip, diffusion_type="disco", scheduler_type="pndm"):
         super().__init__()
         self.clip = clip
-        self.unet_model = create_unet_model(
-            image_size=512,
-            num_channels=256,
-            num_res_blocks=2,
-            channel_mult="",
-            learn_sigma=True,
-            class_cond=False,
-            attention_resolutions='32, 16, 8',
-            num_heads=4,
-            num_head_channels=64,
-            num_heads_upsample=-1,
-            use_scale_shift_norm=True,
-            dropout=0.0,
-            resblock_updown=True,
-            use_new_attention_order=False,
-        )
-        self.secondary_model = create_secondary_model()
+        self.diffusion_type = diffusion_type
+
+        if diffusion_type == "disco":
+            self.unet_model = create_unet_model(
+                image_size=512,
+                num_channels=256,
+                num_res_blocks=2,
+                channel_mult="",
+                learn_sigma=True,
+                class_cond=False,
+                attention_resolutions='32, 16, 8',
+                num_heads=4,
+                num_head_channels=64,
+                num_heads_upsample=-1,
+                use_scale_shift_norm=True,
+                dropout=0.0,
+                resblock_updown=True,
+                use_new_attention_order=False,
+            )
+            self.secondary_model = create_secondary_model()
+
+        elif diffusion_type == "stable":
+            self.vae_model = AutoencoderKL(
+                in_channels=3,
+                out_channels=3,
+                down_block_types=(
+                    "DownEncoderBlock2D",
+                    "DownEncoderBlock2D",
+                    "DownEncoderBlock2D",
+                    "DownEncoderBlock2D",
+                ),
+                up_block_types=(
+                    "UpDecoderBlock2D",
+                    "UpDecoderBlock2D",
+                    "UpDecoderBlock2D",
+                    "UpDecoderBlock2D",
+                ),
+                block_out_channels=(128, 256, 512, 512),
+                layers_per_block=2,
+                act_fn="silu",
+                latent_channels=4,
+                sample_size=512,
+            )
+            if scheduler_type == "pndm":
+                self.scheduler = PNDMScheduler(
+                    beta_start=0.00085,
+                    beta_end=0.012,
+                    beta_schedule="scaled_linear",
+                    skip_prk_steps=True,
+                )
+            elif scheduler_type == "ddim":
+                self.scheduler = DDIMScheduler(beta_start=0.00085,
+                                               beta_end=0.012,
+                                               beta_schedule="scaled_linear",
+                                               clip_sample=False,
+                                               set_alpha_to_one=False)
+            elif scheduler_type == "k-lms":
+                self.scheduler = LMSDiscreteScheduler(
+                    beta_start=0.00085,
+                    beta_end=0.012,
+                    beta_schedule="scaled_linear")
+            else:
+                raise ValueError(
+                    'scheduler_type must be in ["pndm", "ddim", "k-lms"]')
+
+            self.unet_model = UNet2DConditionModel(
+                sample_size=64,
+                in_channels=4,
+                out_channels=4,
+                center_input_sample=False,
+                flip_sin_to_cos=True,
+                freq_shift=0,
+                down_block_types=(
+                    "CrossAttnDownBlock2D",
+                    "CrossAttnDownBlock2D",
+                    "CrossAttnDownBlock2D",
+                    "DownBlock2D",
+                ),
+                up_block_types=(
+                    "UpBlock2D",
+                    "CrossAttnUpBlock2D",
+                    "CrossAttnUpBlock2D",
+                    "CrossAttnUpBlock2D",
+                ),
+                block_out_channels=(320, 640, 1280, 1280),
+                layers_per_block=2,
+                downsample_padding=1,
+                mid_block_scale_factor=1,
+                act_fn="silu",
+                norm_num_groups=32,
+                norm_eps=1e-5,
+                cross_attention_dim=768,
+                attention_head_dim=8,
+            )
+            # input_ids_uncond
+            # [49406, 49407, 49407, 49407, 49407,...,49407]
+            input_ids_uncond = [
+                49406, 49407
+            ] + [49407] * (clip.config["max_text_length"] - 2)
+            self.register_buffer("input_ids_uncond",
+                                 paddle.to_tensor([input_ids_uncond],
+                                                  dtype="int64"),
+                                 persistable=False)
+        else:
+            raise ValueError(
+                "diffusion_type: Please choose in ['disco', 'stable']")
 
         # eval mode and stop all param's gradient
         self.eval()
         for param in self.parameters():
             param.stop_gradient = True
 
-    def generate(
+    def generate(self, *args, **kwargs):
+        if self.diffusion_type == "disco":
+            return self.disco_diffusion_generate(*args, **kwargs)
+        else:
+            return self.stable_diffusion_generate(*args, **kwargs)
+
+    def stable_diffusion_generate(self,
+                                  input_ids,
+                                  mode="text2image",
+                                  init_image=None,
+                                  mask_image=None,
+                                  seed=None,
+                                  strength=0.8,
+                                  height=512,
+                                  width=512,
+                                  num_inference_steps=50,
+                                  guidance_scale=7.5,
+                                  eta=0.0,
+                                  latents=None,
+                                  fp16=True,
+                                  **kwargs):
+        r"""
+        The CLIPForImageGeneration stable_diffusion_generate method.
+        
+        Args:
+            input_ids (Tensor):
+                See :class:`CLIPModel`.
+            mode (str, optional):
+                The mode of StableDiffusion. Support ["text2image", "image2image", "inpaint"].
+            init_image (Union[str, PIL.Image.Image], optional):
+                In `"image2image"` or `"inpaint"` mode, we must input the `init_image`.
+                Used in `"image2image"` and  `"inpaint"` mode.
+                Default to `None`.
+            mask_image (Union[str, PIL.Image], optional):
+                In `"inpaint"` mode, we must input the `mask_image`.
+                Used in `"inpaint"` mode.
+                Default to `None`. 
+            seed (int, optional):
+                A random number seed which is used as the basis for determining the initial.
+                Default to `None`.
+            strength (float, optional):
+                strength is a value between 0.0 and 1.0, that controls the amount of noise that is 
+                added to the input image. Values that approach 1.0 allow for lots of variations but 
+                will also produce images that are not semantically consistent with the input.
+                Used in `"image2image"` and  `"inpaint"` mode.
+                Default to `0.8`.
+            height (int, optional):
+                The height of the image you want to generate, in pixels.
+                `height` have to be divisible by 64. Used in `"text2image"` mode.
+                Default to `512`.
+            width (int, optional):
+                The height of the image you want to generate, in pixels. 
+                `width` have to be divisible by 64. Used in `"text2image"` mode.
+                Default to `512`.
+            num_inference_steps (int, optional):
+                Indicates the number of steps of inference. Generally speaking, the more steps, 
+                the better the result, but the more steps, the longer the generation time. 
+                Stable Diffusion gives good results with relatively few steps, so the default 
+                value is set to 50. If you want faster speed, you can reduce this value, 
+                if you want to generate better results, you can increase this value.
+                Default to `50`.
+            guidance_scale (float, optional):
+                `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+                of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+                corresponds to doing no classifier free guidance.
+                Default to `7.5`.
+            eta (float, optional):
+                eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+                eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502.
+                Default to `0.0`.
+            latents (paddle.Tensor, optional):
+                We can specify the latents. latents_shape should be `[batch_size, unet_model.in_channels, height // 8, width // 8]`
+                Default to `None`.
+            fp16 (bool, optional):
+                Whether to use fp16 for inference.
+                Default to `True`.
+                
+        """
+        assert input_ids is not None, "text2image/image2image/inpaint, please specify `input_ids`"
+        if mode == "text2image":
+            return self.stable_diffusion_text2image(
+                input_ids=input_ids,
+                seed=seed,
+                height=height,
+                width=width,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                eta=eta,
+                latents=latents,
+                fp16=fp16)
+        elif mode == "image2image":
+            assert init_image is not None, "image2image mode, please specify `init_image`"
+            # preprocess image
+            init_image = self.preprocess_image(init_image)
+            return self.stable_diffusion_image2image(
+                input_ids=input_ids,
+                init_image=init_image,
+                strength=strength,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                eta=eta,
+                seed=seed,
+                fp16=fp16)
+
+        elif mode == "inpaint":
+            assert init_image is not None, "inpaint mode, please specify `init_image`"
+            assert mask_image is not None, "inpaint mode, please specify `mask_image`"
+            # preprocess image
+            init_image = self.preprocess_image(init_image)
+            # preprocess mask
+            mask_image = self.preprocess_mask(mask_image)
+
+            return self.stable_diffusion_inpainting(
+                input_ids=input_ids,
+                init_image=init_image,
+                mask_image=mask_image,
+                strength=strength,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                eta=eta,
+                seed=seed,
+                fp16=fp16)
+        else:
+            raise ValueError(
+                'Mode must be in ["text2image", "image2image", "inpaint"]')
+
+    def disco_diffusion_generate(
         self,
         input_ids,
         attention_mask=None,
@@ -1140,7 +1609,7 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
         clip_denoised=False,
     ):
         r"""
-        The CLIPForImageGeneration generate method.
+        The CLIPForImageGeneration disco_diffusion_generate method.
         
         Args:
             input_ids (Tensor):
@@ -1366,7 +1835,7 @@ class CLIPForImageGeneration(CLIPPreTrainedModel, DiffusionMixin):
             attention_mask=attention_mask,
             position_ids=position_ids)
 
-        images_list = super().diffusion_generate(
+        images_list = super().disco_diffusion_generate(
             target_text_embeds=target_text_embeds,
             clamp_grad=clamp_grad,
             clamp_max=clamp_max,

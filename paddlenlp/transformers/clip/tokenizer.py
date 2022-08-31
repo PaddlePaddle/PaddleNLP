@@ -127,36 +127,20 @@ class CLIPTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "openai/clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/vocab.json",
-            "openai/disco-diffusion-clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/vocab.json",
-            # rn50
             "openai/clip-rn50":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/vocab.json",
-            "openai/disco-diffusion-clip-rn50":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn50/vocab.json",
-            # rn101
             "openai/clip-rn101":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/vocab.json",
-            "openai/disco-diffusion-clip-rn101":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/vocab.json",
             "openai/clip-vit-large-patch14":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/vocab.json",
         },
         "merges_file": {
             "openai/clip-vit-base-patch32":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/merges.txt",
-            "openai/disco-diffusion-clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-vit-base-patch32/merges.txt",
-            # rn50
             "openai/clip-rn50":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/merges.txt",
-            "openai/disco-diffusion-clip-rn50":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn50/merges.txt",
-            # rn101
             "openai/clip-rn101":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/merges.txt",
-            "openai/disco-diffusion-clip-rn101":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/disco-diffusion-clip-rn101/merges.txt",
             "openai/clip-vit-large-patch14":
             "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/merges.txt",
         }
@@ -165,19 +149,10 @@ class CLIPTokenizer(PretrainedTokenizer):
         "openai/clip-vit-base-patch32": {
             "max_len": 77
         },
-        "openai/disco-diffusion-clip-vit-base-patch32": {
-            "max_len": 77
-        },
         "openai/clip-rn50": {
             "max_len": 77
         },
-        "openai/disco-diffusion-clip-rn50": {
-            "max_len": 77
-        },
         "openai/clip-rn101": {
-            "max_len": 77
-        },
-        "openai/disco-diffusion-clip-rn101": {
             "max_len": 77
         },
         "openai/clip-vit-large-patch14": {
