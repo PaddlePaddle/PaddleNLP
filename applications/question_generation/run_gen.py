@@ -233,6 +233,7 @@ def evaluation(model, data_loader, args, tokenizer):
     print('\nEval begin...')
     model.eval()
     pred_ref = []
+    time_begin = time.time()
     total_time = 0.0
     start_time = time.time()
     for step, inputs in enumerate(data_loader, 1):
@@ -264,6 +265,7 @@ def evaluation(model, data_loader, args, tokenizer):
                              args.num_return_sequences)
         pred_ref.extend(results)
         start_time = time.time()
+    print('Generation cost time:', time.time() - time_begin)
 
     with open(args.output_path, 'w', encoding='utf-8') as fout:
         for ref in pred_ref:

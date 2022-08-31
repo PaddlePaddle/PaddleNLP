@@ -205,6 +205,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/fine
    | ernie-gen-large-en-430g | -->
 
 - `save_dir` 表示模型的保存路径。
+- `output_path` 表示预测结果的保存路径。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `seed` 表示随机数生成器的种子。
@@ -266,7 +267,7 @@ Finetuned baseline的模型在xxx任务验证集上有如下结果(指标为BLEU
 
 |       model_name        | DuReaderQG |
 | :-----------------------------: | :-----------: |
-|   finetuned unimo-text-1.0    | 39.78 |
+|   finetuned unimo-text-1.0    | 41.08 |
 
 ### 模型转换部署
 
@@ -288,10 +289,9 @@ python export_model_unimo_text.py \
 * `max_out_len`：最大输出长度。
 * `use_fp16_decoding`:是否使用fp16解码进行预测。
 
-执行命令后将会自动导出模型到指定的 `export_checkpoint` 中，保存模型文件结构如下所示：
+执行命令后将会自动导出模型到指定的 `inference_model_dir` 中，保存模型文件结构如下所示：
 
 ```text
-export/
 ├── unimo_text.pdiparams
 ├── unimo_text.pdiparams.info
 └── unimo_text.pdmodel
