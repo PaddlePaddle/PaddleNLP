@@ -15,9 +15,11 @@
 # limitations under the License.
 
 import math
+from typing import Optional, Tuple
 
 import numpy as np
 import paddle
+from paddle.tensor.tensor import Tensor
 
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -26,9 +28,8 @@ from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
 
 __all__ = [
-    'T5Model',
-    "T5PretrainedModel",
-    'T5ForConditionalGeneration',
+    'T5Model', "T5PretrainedModel", 'T5ForConditionalGeneration',
+    'T5EncoderModel'
 ]
 
 
@@ -1659,3 +1660,74 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+@register_base_model
+class T5EncoderModel(T5PretrainedModel):
+
+    def __init__(self,
+                 vocab_size=32128,
+                 d_model=768,
+                 d_kv=64,
+                 d_ff=3072,
+                 num_layers=12,
+                 num_heads=12,
+                 relative_attention_num_buckets=32,
+                 dropout_rate=0.1,
+                 layer_norm_epsilon=1e-06,
+                 feed_forward_proj="relu",
+                 is_decoder: bool = False,
+                 **kwargs):
+        super().__init__()
+        self.shared = nn.Embedding(vocab_size, d_model)
+
+        self.use_cache = False
+        self.is_encoder_decoder = False
+        self.encoder = T5Stack(d_model,
+                               num_layers,
+                               layer_norm_epsilon,
+                               dropout_rate,
+                               relative_attention_num_buckets,
+                               d_kv,
+                               num_heads,
+                               feed_forward_proj,
+                               d_ff,
+                               embed_tokens=self.shared,
+                               is_decoder=is_decoder)
+
+        # Initialize weights and apply final processing
+        self.init_weights()
+
+    def get_input_embeddings(self):
+        return self.shared
+
+    def set_input_embeddings(self, new_embeddings):
+        self.shared = new_embeddings
+        self.encoder.set_input_embeddings(new_embeddings)
+
+    def get_encoder(self):
+        return self.encoder
+
+    def forward(
+        self,
+        input_ids: Tensor = None,
+        attention_mask: Optional[Tensor] = None,
+        encoder_hidden_states: Optional[Tuple[Tensor]] = None,
+        encoder_attention_mask: Optional[Tensor] = None,
+        cache=None,
+        use_cache: Optional[bool] = False,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
+    ):
+        encoder_outputs = self.encoder(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            cache=cache,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+
+        return encoder_outputs
