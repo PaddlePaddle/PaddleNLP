@@ -187,7 +187,7 @@ class InfoXLMTokenizer(AlbertEnglishTokenizer):
                 new_pieces.extend(cur_pieces)
             else:
                 new_pieces.append(piece)
-
+        # the only difference between AlbertTokenizer and this
         if max_seq_len is not None:
             if len(new_pieces) > max_seq_len:
                 new_pieces = new_pieces[:max_seq_len]
