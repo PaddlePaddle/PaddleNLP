@@ -19,7 +19,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 import paddle
-from paddle.tensor.tensor import Tensor
+from paddle import Tensor
 
 import paddle.nn as nn
 import paddle.nn.functional as F
