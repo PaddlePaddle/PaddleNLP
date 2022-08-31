@@ -127,7 +127,7 @@ def chinese_segmentation_fn():
     lac_cws = LAC(mode='seg')
 
     def process(line):
-        words = lac.run(line)
+        words = lac_cws.run(line)
         return words
 
     return process
@@ -150,7 +150,7 @@ CHINESE_SEG_FUNC = {
 }
 
 
-def get_whole_word_mask_tokens(tokens, words, max_word_length=4):
+def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
     """
     Do whole word mask on Chinese word.
     First, we do Chinese word segmentation on the sequence of tokens, which are from the WordPiece tokenization.
@@ -235,6 +235,9 @@ class Converter(object):
     def initializer(self):
         Converter.tokenizer = getattr(
             tfs, self.args.tokenizer_name).from_pretrained(self.args.model_name)
+        if self.args.cn_whole_word_segment:
+            # Extend chinese char vocab for ErnieTokinzer
+            Converter.tokenizer.extend_chinese_char()
 
         # Split document to sentence.
         if self.args.split_sentences:

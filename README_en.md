@@ -323,8 +323,9 @@ To connect with other users and contributors, welcome to join our [Slack channel
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
  <div align="center">
- <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
+ <img src="https://user-images.githubusercontent.com/11793384/184784832-bb97930f-a738-4480-99be-517aeb65afac.png" width="150" height="150" />
  </div>
+
 
 ## Citation
 
@@ -340,7 +341,7 @@ If you find PaddleNLP useful in your research, please consider cite
 
 ## Acknowledge
 
-We have borrowed from Hugging Face's [Transformer](https://github.com/huggingface/transformers)🤗 excellent design on pretrained models usage, and we would like to express our gratitude to the authors of Hugging Face and its open source community.
+We have borrowed from Hugging Face's [Transformers](https://github.com/huggingface/transformers)🤗 excellent design on pretrained models usage, and we would like to express our gratitude to the authors of Hugging Face and its open source community.
 
 ## License
 
