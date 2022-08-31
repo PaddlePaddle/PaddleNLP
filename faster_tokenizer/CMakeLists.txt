@@ -140,14 +140,14 @@ if(WITH_PYTHON)
 
 add_subdirectory(python)
 
-if(WIN32 or APPLE)
+if(LINUX)
 add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
+    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
     COMMENT "Packing whl packages------>>>"
     DEPENDS copy_python_tokenizers)
 else()
 add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
+    COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
     COMMENT "Packing whl packages------>>>"
     DEPENDS copy_python_tokenizers)
 endif()
