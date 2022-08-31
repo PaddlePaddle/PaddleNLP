@@ -180,6 +180,13 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        return vocab
+
     def preprocess_text(self,
                         inputs,
                         remove_space=True,
