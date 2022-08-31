@@ -1359,6 +1359,7 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin,
             self.secondary_model = create_secondary_model()
 
         elif diffusion_type == "stable":
+            del self.clip.vision_model
             self.vae_model = AutoencoderKL(
                 in_channels=3,
                 out_channels=3,
@@ -1474,6 +1475,7 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin,
         The CLIPForImageGeneration stable_diffusion_generate method.
         
         Args:
+        
             input_ids (Tensor):
                 See :class:`CLIPModel`.
             mode (str, optional):
