@@ -13,15 +13,16 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <algorithm>
+#include <cctype>
 #include <codecvt>
 #include <fstream>
 #include <locale>
 #include <map>
 
-#include "glog/logging.h"
 #include "faster_tokenizer/models/wordpiece.h"
 #include "faster_tokenizer/utils/path.h"
 #include "faster_tokenizer/utils/utf8.h"
+#include "glog/logging.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
@@ -37,11 +38,13 @@ WordPiece::WordPiece()
 WordPiece::WordPiece(const core::Vocab& vocab,
                      const std::string& unk_token,
                      size_t max_input_chars_per_word,
-                     const std::string& continuing_subword_prefix)
+                     const std::string& continuing_subword_prefix,
+                     bool handle_chinese_chars)
     : vocab_(vocab),
       unk_token_(unk_token),
       max_input_chars_per_word_(max_input_chars_per_word),
-      continuing_subword_prefix_(continuing_subword_prefix) {
+      continuing_subword_prefix_(continuing_subword_prefix),
+      handle_chinese_chars_(handle_chinese_chars) {
   for (const auto& vocab_item : vocab) {
     vocab_reversed_[vocab_item.second] = vocab_item.first;
   }
@@ -52,11 +55,13 @@ WordPiece::WordPiece(const core::Vocab& vocab,
 WordPiece::WordPiece(core::Vocab&& vocab,
                      std::string&& unk_token,
                      size_t max_input_chars_per_word,
-                     std::string&& continuing_subword_prefix)
+                     std::string&& continuing_subword_prefix,
+                     bool handle_chinese_chars)
     : vocab_(std::move(vocab)),
       unk_token_(std::move(unk_token)),
       max_input_chars_per_word_(std::move(max_input_chars_per_word)),
-      continuing_subword_prefix_(std::move(continuing_subword_prefix)) {
+      continuing_subword_prefix_(std::move(continuing_subword_prefix)),
+      handle_chinese_chars_(handle_chinese_chars) {
   for (const auto& vocab_item : vocab) {
     vocab_reversed_[vocab_item.second] = vocab_item.first;
   }
@@ -108,6 +113,12 @@ std::vector<std::string> WordPiece::Save(
   return {filepath};
 }
 
+static bool CheckIfStringIsAlphaNum(const std::string& str) {
+  return std::count_if(str.begin(), str.end(), [](char ch) {
+           return std::isalnum(ch) > 0;
+         }) == str.length();
+}
+
 std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
   VLOG(6) << "Using WordPiece::Tokenize to tokenize sequence";
   std::vector<core::Token> all_tokens;
@@ -119,13 +130,15 @@ std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
   } else {
     bool found_token = true;
     uint32_t start = 0;
+
     while (start < sequence.length()) {
       uint32_t end = sequence.length();
       core::Token cur_token;
       bool match_cur_token = false;
       while (start < end) {
         std::string sub_str = sequence.substr(start, end - start);
-        if (start > 0) {
+        if (start > 0 &&
+            (handle_chinese_chars_ || CheckIfStringIsAlphaNum(sub_str))) {
           sub_str = continuing_subword_prefix_ + sub_str;
         }
         const auto& vocab_iter = vocab_.find(sub_str);
@@ -150,6 +163,7 @@ std::vector<core::Token> WordPiece::Tokenize(const std::string& sequence) {
       all_tokens.emplace_back(cur_token);
       start = end;
     }
+
     if (!found_token) {
       all_tokens.clear();
       all_tokens.emplace_back(vocab_.at(unk_token_),
