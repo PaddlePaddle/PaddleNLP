@@ -24,7 +24,7 @@
 **文本分类应用亮点：**
 
 - **方案全面🎓：** 涵盖多分类、多标签、层次分类等高频分类场景，提供预训练模型微调、提示学习（小样本学习）、语义索引三种端到端全流程分类方案，满足开发者多种分类落地需求。
-- **分析高效✊：** 文本分类应用依托[TrustAI](https://ithub.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **分析高效✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
 - **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级模型作为训练基座，ERNIE 3.0 轻量级模型学习海量的中文数据与知识，具有广泛成熟的实践应用。
 - **低门槛操作👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，不再让技术成为文本分类的门槛。
 
@@ -69,14 +69,7 @@
 
 【方案选择】对于大多数任务，我们推荐使用**预训练模型微调作为首选的文本分类方案**，预训练模型微调提供了数据标注-模型训练-模型分析-模型压缩-预测部署全流程，有效减少开发时间，低成本迁移至实际应用场景。
 
-【方案介绍】预训练模型不能直接在文本分类任务上使用，预训练模型微调在预训练模型 `[CLS]` 输出向量后接入线性层分类器，用具体任务数据进行微调训练文本分类器，使预训练模型”更懂”这个任务。
-
-[PaddleNLP预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)包含了 `ERNIE`、`BERT`、`RoBERTa`等40多个主流预训练模型，500多个模型权重，只需一行代码即可加载用于文本分类微调的多种预训练模型。下面以ERNIE 3.0 中文base模型为例，演示如何加载预训练模型：
-
-```shell
-from paddlenlp.transformers import AutoModelForSequenceClassification
-model = AutoModelForSequenceClassification.from_pretrained( "ernie-3.0-base-zh", num_classes=10)
-```
+【方案介绍】ERNIE 3.0 轻量级模型不能直接在文本分类任务上使用，预训练模型微调在预训练模型 `[CLS]` 输出向量后接入线性层分类器，用具体任务数据进行微调训练文本分类器，使预训练模型”更懂”这个任务。
 
 【方案效果】下表展示在多标签任务CAIL2019—婚姻家庭要素提取数据集中ERNIE 3.0 系列轻量级模型效果评测。
 
