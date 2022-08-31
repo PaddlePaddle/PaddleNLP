@@ -21,6 +21,7 @@ from paddle import inference
 
 from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from paddlenlp.ops.ext_utils import load
+from paddlenlp.data import Pad
 import os
 
 
@@ -31,35 +32,6 @@ def setup_args():
                         default="./infer_model",
                         type=str,
                         help="Path to save inference model of UNIMOText. ")
-    parser.add_argument("--device",
-                        default="gpu",
-                        choices=["gpu", "cpu", "xpu"],
-                        help="Device selected for inference.")
-    parser.add_argument(
-        "--use_tensorrt",
-        default=False,
-        type=eval,
-        choices=[True, False],
-        help="Whether to use inference engin TensorRT when using gpu.")
-    parser.add_argument('--enable_mkldnn',
-                        default=False,
-                        type=eval,
-                        choices=[True, False],
-                        help='Enable to use mkldnn to speed up when using cpu.')
-    parser.add_argument('--cpu_threads',
-                        default=10,
-                        type=int,
-                        help='Number of threads to predict when using cpu.')
-    parser.add_argument("--precision",
-                        default="fp32",
-                        type=str,
-                        choices=["fp32", "fp16", "int8"],
-                        help='The tensorrt precision.')
-    parser.add_argument("--batch_size",
-                        type=int,
-                        default=16,
-                        help="Batch size per GPU/CPU for training.")
-
     args = parser.parse_args()
     return args
 
@@ -75,43 +47,63 @@ def setup_predictor(args):
     if not os.path.exists(params_file):
         raise ValueError("not find params file path {}".format(params_file))
     config = inference.Config(model_file, params_file)
-    if args.device == "gpu":
-        config.enable_use_gpu(100, 0)
-        config.switch_ir_optim()
-        config.enable_memory_optim()
-        config.disable_glog_info()
-        # #### simulate pipeline_service
-        # config.enable_memory_optim()
-        # config.switch_ir_optim(False)
-        # config.switch_use_feed_fetch_ops(False)
-        # config.delete_pass("conv_transpose_eltwiseadd_bn_fuse_pass")
-        # config.set_cpu_math_library_num_threads(12)
-        # config.enable_use_gpu(100, 0)
-        # #### simulate pipeline_service
-        precision_map = {
-            "fp16": inference.PrecisionType.Half,
-            "fp32": inference.PrecisionType.Float32,
-            "int8": inference.PrecisionType.Int8
-        }
-        precision_mode = precision_map[args.precision]
-        if args.use_tensorrt:
-            config.enable_tensorrt_engine(max_batch_size=args.batch_size,
-                                          min_subgraph_size=30,
-                                          precision_mode=precision_mode)
-    elif args.device == "cpu":
-        config.disable_gpu()
-        if args.enable_mkldnn:
-            # cache 10 different shapes for mkldnn to avoid memory leak
-            # config.enable_oneDNN()
-            # config.set_oneDNN_cache_capacity(10)
-            config.enable_mkldnn()
-            config.set_mkldnn_cache_capacity(10)
+    config.enable_use_gpu(100, 0)
+    config.switch_ir_optim()
+    config.enable_memory_optim()
+    config.disable_glog_info()
 
-        config.set_cpu_math_library_num_threads(args.cpu_threads)
-    elif args.device == "xpu":
-        config.enable_xpu(100)
     predictor = inference.create_predictor(config)
     return predictor
+
+
+def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
+    """Convert all examples into necessary features."""
+    source = example
+    tokenized_example = tokenizer.gen_encode(source,
+                                             max_seq_len=max_seq_len,
+                                             add_start_token_for_decoding=True,
+                                             return_length=True,
+                                             is_split_into_words=False)
+    return tokenized_example
+
+
+def batchify_fn(batch_examples, pad_val, pad_right=False):
+    """Batchify a batch of examples."""
+
+    def pad_mask(batch_attention_mask):
+        """Pad attention_mask."""
+        batch_size = len(batch_attention_mask)
+        max_len = max(map(len, batch_attention_mask))
+        attention_mask = np.ones(
+            (batch_size, max_len, max_len), dtype='float32') * -1e9
+        for i, mask_data in enumerate(attention_mask):
+            seq_len = len(batch_attention_mask[i])
+            if pad_right:
+                mask_data[:seq_len:, :seq_len] = np.array(
+                    batch_attention_mask[i], dtype='float32')
+            else:
+                mask_data[-seq_len:,
+                          -seq_len:] = np.array(batch_attention_mask[i],
+                                                dtype='float32')
+        # In order to ensure the correct broadcasting mechanism, expand one
+        # dimension to the second dimension (n_head of Transformer).
+        attention_mask = np.expand_dims(attention_mask, axis=1)
+        return attention_mask
+
+    pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype='int32')
+    input_ids = pad_func([example['input_ids'] for example in batch_examples])
+    token_type_ids = pad_func(
+        [example['token_type_ids'] for example in batch_examples])
+    attention_mask = pad_mask(
+        [example['attention_mask'] for example in batch_examples])
+    seq_len = np.asarray([example['seq_len'] for example in batch_examples],
+                         dtype='int32')
+    input_dict = {}
+    input_dict["input_ids"] = input_ids
+    input_dict["token_type_ids"] = token_type_ids
+    input_dict["attention_mask"] = attention_mask
+    input_dict["seq_len"] = seq_len
+    return input_dict
 
 
 def postprocess_response(token_ids, tokenizer):
@@ -129,26 +121,20 @@ def postprocess_response(token_ids, tokenizer):
 
 def infer(args, predictor):
     """Use predictor to inference."""
-    tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
+    tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0-summary')
 
-    inputs = "深度学习是人工智能的核心技术领域。百度飞桨作为中国首个自主研发、功能丰富、开源开放的产业级深度学习平台,将从多层次技术产品、产业AI人才培养和强大的生态资源支持三方面全面护航企业实现快速AI转型升级。"
+    inputs = [
+        "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
+        "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+    ]
 
-    data = tokenizer.gen_encode(inputs,
-                                add_start_token_for_decoding=True,
-                                return_length=True,
-                                is_split_into_words=False)
+    examples = [convert_example(i, tokenizer) for i in inputs]
+    data = batchify_fn(examples, tokenizer.pad_token_id)
 
     input_handles = {}
     for name in predictor.get_input_names():
         input_handles[name] = predictor.get_input_handle(name)
-        if name == "attention_mask":
-            input_handles[name].copy_from_cpu(
-                np.expand_dims(np.asarray(data[name], dtype="float32"),
-                               axis=(0, 1)))
-        else:
-            input_handles[name].copy_from_cpu(
-                np.asarray(data[name], dtype="int32").reshape([1, -1]))
-            # print(name, np.asarray(data[name], dtype="int32").reshape([1, -1]))
+        input_handles[name].copy_from_cpu(data[name])
 
     output_handles = [
         predictor.get_output_handle(name)
@@ -159,9 +145,12 @@ def infer(args, predictor):
 
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
 
-    # print('output', output)
-    for sample in output[0].transpose([1, 0]).tolist():
-        print("".join(postprocess_response(sample, tokenizer)))
+    for idx, sample in enumerate(output[0].transpose([1, 2, 0])):
+        for beam_idx, beam in enumerate(sample):
+            if beam_idx > len(sample) // 2:
+                break
+            print(f"Example {idx} beam beam_idx {beam_idx}: ",
+                  "".join(postprocess_response(beam, tokenizer)))
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ op:
             model_config: ./export_checkpoint_server
 
             #Fetch结果列表，以client_config中fetch_var的alias_name为准，不设置默认取全部输出变量
-            # fetch_list: ["_generated_var_3", "slice_0.tmp_0"]
+            fetch_list: ["_generated_var_3", "gather_tree_0.tmp_0"]
             
             # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
             device_type: 1
@@ -46,14 +46,9 @@ op:
             #计算硬件ID，当devices为""或不写时为CPU预测；当devices为"0", "0,1,2"时为GPU预测，表示使用的GPU卡
             devices: "0"
 
-            #开启MKLDNN加速
-            use_mkldnn: False
-
             #thread_num
             thread_num: 12
 
             #ir_optim
             ir_optim: False
             
-            #开启tensorrt后，进行优化的子图包含的最少节点数
-            #min_subgraph_size: 10

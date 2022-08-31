@@ -24,14 +24,8 @@ Paddle Inference Python端预测部署主要包含两个步骤：
 
 在终端输入以下命令可在GPU上进行预测：
 ```shell
-python deploy/paddle_inference/inference_unimo_text.py --inference_model_dir ./export_checkpoint --device gpu
+python deploy/paddle_inference/inference_unimo_text.py --inference_model_dir ./export_checkpoint
 ```
 
 关键参数释义如下：
 * `inference_model_dir`：用于高性能推理的静态图模型参数路径；默认为"./export_checkpoint"。
-* `device`：推理时使用的设备，可选项["gpu", "cpu", "xpu"]，默认为"gpu"。
-* `enable_mkldnn`：当使用cpu时，选择是否使用MKL-DNN(oneDNN)进行加速推理，默认为False。
-* `cpu_threads`：当使用cpu时，推理所用的进程数，默认为10。
-* `use_tensorrt`：当使用gpu时，选择是否使用TensorRT进行加速推理，默认为False。
-* `precision`：当使用TensorRT进行加速推理时，所使用的TensorRT精度，可选项["fp32", "fp16", "int8"]，默认为"fp32"。
-* `batch_size`：进行推理时的批大小，默认为16。

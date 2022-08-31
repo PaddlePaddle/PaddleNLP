@@ -8,7 +8,6 @@
   - [背景介绍](#背景介绍)
   - [环境准备](#环境准备)
     - [安装Paddle Serving](#安装paddle-serving)
-    - [安装FasterTokenizer文本处理加速库（可选）](#安装fastertokenizer文本处理加速库可选)
   - [模型转换](#模型转换)
   - [pipeline部署](#pipeline部署)
     - [修改配置文件](#修改配置文件)
@@ -50,13 +49,6 @@ pip install paddle-serving-server-gpu==0.8.3.post112 # -i https://pypi.tuna.tsin
 - 如果要安装最新版本的PaddleServing参考[链接](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)。
 
 
-### 安装FasterTokenizer文本处理加速库（可选）
-如果部署环境是Linux，推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
-```shell
-pip install faster_tokenizer
-```
-
-
 ## 模型转换
 
 使用Paddle Serving做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
@@ -89,7 +81,8 @@ export_checkpoint_server/
 ├── unimo_text.pdmodel
 ├── serving_server_conf.prototxt
 └── serving_server_conf.stream.prototxt
-export_checkpoint_server/
+
+export_checkpoint_client/
 ├── serving_client_conf.prototxt
 └── serving_client_conf.stream.prototxt
 ```
@@ -99,9 +92,9 @@ export_checkpoint_server/
 paddle_serving目录包含启动pipeline服务和发送预测请求的代码，包括：
 ```
 paddle_serving/
-├──config.yml        # 启动服务端的配置文件
-├──pipeline_client.py     # 发送pipeline预测请求的脚本
-└──pipeline_service.py        # 启动pipeline服务端的脚本
+├──config.yml               # 启动服务端的配置文件
+├──pipeline_client.py       # 发送pipeline预测请求的脚本
+└──pipeline_service.py      # 启动pipeline服务端的脚本
 ```
 
 ### 修改配置文件
@@ -117,16 +110,16 @@ python pipeline_service.py
 成功启动服务后，log.txt中会打印类似如下日志
 ```
 --- Running analysis [ir_graph_to_program_pass]
-I0818 09:56:03.768963 56655 analysis_predictor.cc:1035] ======= optimize end =======
-I0818 09:56:03.769762 56655 naive_executor.cc:102] ---  skip [feed], feed -> seq_len
-I0818 09:56:03.769776 56655 naive_executor.cc:102] ---  skip [feed], feed -> attention_mask
-I0818 09:56:03.769781 56655 naive_executor.cc:102] ---  skip [feed], feed -> token_type_ids
-I0818 09:56:03.769786 56655 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
-I0818 09:56:03.770205 56655 naive_executor.cc:102] ---  skip [_generated_var_3], fetch -> fetch
-I0818 09:56:03.770215 56655 naive_executor.cc:102] ---  skip [slice_0.tmp_0], fetch -> fetch
-[2022-08-18 09:56:03,772] [    INFO] - Already cached /root/.paddlenlp/models/unimo-text-1.0/unimo-text-1.0-vocab.txt
-[2022-08-18 09:56:03,790] [    INFO] - tokenizer config file saved in /root/.paddlenlp/models/unimo-text-1.0/tokenizer_config.json
-[2022-08-18 09:56:03,791] [    INFO] - Special tokens file saved in /root/.paddlenlp/models/unimo-text-1.0/special_tokens_map.json
+I0831 12:29:41.132828 28269 analysis_predictor.cc:1035] ======= optimize end =======
+I0831 12:29:41.133375 28269 naive_executor.cc:102] ---  skip [feed], feed -> seq_len
+I0831 12:29:41.133384 28269 naive_executor.cc:102] ---  skip [feed], feed -> attention_mask
+I0831 12:29:41.133390 28269 naive_executor.cc:102] ---  skip [feed], feed -> token_type_ids
+I0831 12:29:41.133401 28269 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
+I0831 12:29:41.134040 28269 naive_executor.cc:102] ---  skip [_generated_var_3], fetch -> fetch
+I0831 12:29:41.134049 28269 naive_executor.cc:102] ---  skip [gather_tree_0.tmp_0], fetch -> fetch
+[2022-08-31 12:29:41,138] [    INFO] - Already cached /root/.paddlenlp/models/unimo-text-1.0-summary/unimo-text-1.0-vocab.txt
+[2022-08-31 12:29:41,161] [    INFO] - tokenizer config file saved in /root/.paddlenlp/models/unimo-text-1.0-summary/tokenizer_config.json
+[2022-08-31 12:29:41,162] [    INFO] - Special tokens file saved in /root/.paddlenlp/models/unimo-text-1.0-summary/special_tokens_map.json
 [PipelineServicer] succ init
 [OP Object] init success
 [OP Object] init success
@@ -139,7 +132,7 @@ I0818 09:56:03.770215 56655 naive_executor.cc:102] ---  skip [slice_0.tmp_0], fe
 [OP Object] init success
 [OP Object] init success
 [OP Object] init success
-2022/08/18 09:56:03 start proxy service
+2022/08/31 12:29:41 start proxy servic
 ```
 
 ### client发送服务请求

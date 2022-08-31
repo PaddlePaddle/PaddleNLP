@@ -34,7 +34,6 @@ def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
                                              add_start_token_for_decoding=True,
                                              return_length=True,
                                              is_split_into_words=False)
-    # Use to gather the logits corresponding to the labels during training
     return tokenized_example
 
 
@@ -71,7 +70,12 @@ def batchify_fn(batch_examples, pad_val, pad_right=False):
         [example['attention_mask'] for example in batch_examples])
     seq_len = np.asarray([example['seq_len'] for example in batch_examples],
                          dtype='int32')
-    return input_ids, token_type_ids, position_ids, attention_mask, seq_len
+    input_dict = {}
+    input_dict["input_ids"] = input_ids
+    input_dict["token_type_ids"] = token_type_ids
+    input_dict["attention_mask"] = attention_mask
+    input_dict["seq_len"] = seq_len
+    return input_dict
 
 
 def postprocess_response(token_ids, tokenizer):
@@ -91,7 +95,8 @@ class UnimoTextOp(Op):
     """Op for unimo_text."""
 
     def init_op(self):
-        self.tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
+        self.tokenizer = UNIMOTokenizer.from_pretrained(
+            'unimo-text-1.0-summary')
 
     def preprocess(self, input_dicts, data_id, log_id):
         # Convert input format
@@ -103,24 +108,25 @@ class UnimoTextOp(Op):
             _LOGGER.error("input value  {}is not supported.".format(data))
         data = [i.decode('utf-8') for i in data]
         examples = [convert_example(i, self.tokenizer) for i in data]
-        input_ids, token_type_ids, position_ids, attention_mask, seq_len = batchify_fn(
-            examples, self.tokenizer.pad_token_id)
-        new_dict = {}
-        new_dict['input_ids'] = input_ids
-        new_dict['token_type_ids'] = token_type_ids
-        new_dict['attention_mask'] = attention_mask
-        new_dict['seq_len'] = seq_len
+        input_dict = batchify_fn(examples, self.tokenizer.pad_token_id)
         # the first return must be a dict or a list of dict, the dict corresponding to a batch of model input
-        return new_dict, False, None, ""
+        return input_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
-        outputs = fetch_dict['slice_0.tmp_0'].tolist()
-        results = [
-            "".join(postprocess_response(sample, self.tokenizer))
-            for sample in outputs
-        ]
+        print(fetch_dict['gather_tree_0.tmp_0'])
+        outputs = fetch_dict['gather_tree_0.tmp_0'].transpose([1, 2,
+                                                               0]).tolist()
+        results = []
+        for sample in outputs:
+            result = []
+            for idx, beam in enumerate(sample):
+                if idx >= len(sample) // 2:
+                    break
+                res = "".join(postprocess_response(beam, self.tokenizer))
+                result.append(res)
+            results.append(result)
         new_dict = {}
-        new_dict["outputs"] = str(results)
+        new_dict["outputs"] = results
         # the first return must be a dict or a list of dict, the dict corresponding to a batch of model output
         return new_dict, None, ""
 
