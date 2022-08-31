@@ -190,7 +190,7 @@ class TextSummarizationTask(Task):
             position_ids = paddle.to_tensor(batch['position_ids'],
                                             dtype='int64')
             attention_mask = paddle.to_tensor(batch['attention_mask'],
-                                              dtype='int64')
+                                              dtype='float32')
             seq_len = paddle.to_tensor(batch['seq_len'], dtype='int64')
             ids, scores = self._model.generate(
                 input_ids=input_ids,
