@@ -368,7 +368,7 @@ def generate_cls_example(text, labels, prompt_prefix, options):
     result_list = []
     example = {"content": text, "result_list": result_list, "prompt": prompt}
     for label in labels:
-        start = prompt.rfind(label[0]) - len(prompt) - 1
+        start = prompt.rfind(label) - len(prompt) - 1
         end = start + len(label)
         result = {"text": label, "start": start, "end": end}
         example["result_list"].append(result)
