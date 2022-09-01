@@ -95,7 +95,8 @@ def do_predict(args):
     tokenizer = UNIMOTokenizer.from_pretrained(model_name_or_path)
 
     unimo_text = FasterUNIMOText(model=model,
-                                 use_fp16_decoding=args.use_fp16_decoding)
+                                 use_fp16_decoding=args.use_fp16_decoding,
+                                 trans_out=True)
 
     # Set evaluate mode
     unimo_text.eval()

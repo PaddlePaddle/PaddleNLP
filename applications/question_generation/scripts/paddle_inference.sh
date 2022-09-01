@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=5
+export CUDA_VISIBLE_DEVICES=3
 python deploy/paddle_inference/inference.py \
                --inference_model_dir unimo/static \
                --model_name_or_path "unimo-text-1.0" \

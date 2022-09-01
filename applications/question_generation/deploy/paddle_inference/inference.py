@@ -190,7 +190,8 @@ def infer_one(args, predictor, inputs=None):
 
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
 
-    for sample in output[0].transpose([1, 0, 2])[:, :, 0].tolist():
+    # for sample in output[0].transpose([1, 0, 2])[:, :, 0].tolist():
+    for sample in output[0][:, :, 0].tolist():
         print("".join(postprocess_response(sample, tokenizer)))
 
 
@@ -237,9 +238,9 @@ def infer(args, predictor, data_loader, tokenizer):
         ids = output[0]
         scores = output[1]
 
-        ids = paddle.to_tensor(ids, dtype='int32').transpose([1, 0, 2])[:, :, 0]
+        # ids = paddle.to_tensor(ids, dtype='int32').transpose([1, 0, 2])[:, :, 0]
+        ids = paddle.to_tensor(ids, dtype='int32')[:, 0, :]
         scores = paddle.to_tensor(scores, dtype='float32')
-        # seq_len = paddle.to_tensor(batch['seq_len'], dtype='int64')
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
