@@ -70,7 +70,7 @@ print("attention_mask: ", output.attention_mask)
 
 ### FasterTokenizer在PaddleNLP Tokenizer模块加速示例
 
-PaddleNLP Tokenizer模块可简单地应用在模型训练以及推理部署的文本预处理阶段，并通过`AutoTokenizer.from_pretrained`方式实例化相应的Tokenizer。其中`AutoTokenizer`默认加载得到的Tokenizer是常规Python实现的Tokenizer，其性能会低于C++实现的FasterTokenizer。为了提升PaddleNLP Tokenizer模块性能，目前PaddleNLP Tokenizer模块已经支持使用FasterTokenizer作为Tokenizer的后端加速切词阶段。使用方式十分简单，仅需在现有的Tokenizer加载接口添加`use_faster=True`这一关键词参数即可加载Faster版本的Tokenizer，代码示例如下：
+PaddleNLP Tokenizer模块可简单地应用在模型训练以及推理部署的文本预处理阶段，并通过`AutoTokenizer.from_pretrained`方式实例化相应的Tokenizer。其中`AutoTokenizer`默认加载得到的Tokenizer是常规Python实现的Tokenizer，其性能会低于C++实现的FasterTokenizer。为了提升PaddleNLP Tokenizer模块性能，目前PaddleNLP Tokenizer模块已经支持使用FasterTokenizer作为Tokenizer的后端加速切词阶段。在现有的Tokenizer加载接口中，仅需添加`use_faster=True`这一关键词参数，其余代码保持不变，即可加载Faster版本的Tokenizer，代码示例如下：
 
 ```python
 from paddlenlp.transformers import AutoTokenizer
@@ -83,9 +83,21 @@ faster_tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh', use_fast
 text1 = tokenizer('自然语言处理')
 text2 = faster_tokenizer('自然语言处理')
 
-assert text1==text2
+print(text1)
+print(text2)
 ```
 
 目前PaddleNLP已支持BERT、ERNIE、TinyBERT以及ERNIE-M 4种Tokenizer的Faster版本，其余模型的Tokenizer暂不支持Faster版本。
 
 ## 切词流水线
+
+## FAQ
+
+Q：我在AutoTokenizer.from_pretrained接口上已经打开`use_faster=True`开关，为什么文本预处理阶段性能上好像没有任何变化？
+
+A：在有三种情况下，打开`use_faster=True`开关可能无法提升性能：
+  1. 没有安装faster_tokenizer。若在没有安装faster_tokenizer库的情况下打开`use_faster`开关，PaddleNLP会给出以下warning："Can't find the faster_tokenizer package, please ensure install faster_tokenizer correctly. "。
+
+  2. 加载的Tokenizer类型暂不支持Faster版本。目前支持4种Tokenizer的Faster版本，分别是BERT、ERNIE、TinyBERT以及ERNIE-M Tokenizer。若加载不支持Faster版本的Tokenizer情况下打开`use_faster`开关，PaddleNLP会给出以下warning："The tokenizer XXX doesn't have the faster version. Please check the map paddlenlp.transformers.auto.tokenizer.FASTER_TOKENIZER_MAPPING_NAMES to see which faster tokenizers are currently supported."
+
+  3. 待切词文本长度过短（如文本平均长度小于5）。这种情况下切词开销可能不是整个文本预处理的性能瓶颈，导致在使用FasterTokenizer后仍无法提升整体性能。
