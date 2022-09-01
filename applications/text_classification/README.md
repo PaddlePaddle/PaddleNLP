@@ -44,7 +44,7 @@
 文本分类应用涵盖多分类（multi class）、多标签（multi label）、层次分类（hierarchical）三种场景，接下来我们将以下图的新闻文本分类为例介绍三种分类场景的区别。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/63761690/186378697-630d3590-4e67-49a0-8d5f-7cabd9daa894.png />
+    <img width="900" alt="image" src=https://user-images.githubusercontent.com/63761690/186378697-630d3590-4e67-49a0-8d5f-7cabd9daa894.png />
 </div>
 
 - **多分类🚶：** 数据集的标签集含有两个或两个以上的类别，所有输入句子/文本有且只有一个标签。在文本多分类场景中，我们需要预测输入句子/文本最可能来自 `n` 个标签类别中的哪一个类别。以上图多分类中新闻文本为例，该新闻文本的标签为 `娱乐`。快速开启多分类任务参见  👉 [多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#readme)
