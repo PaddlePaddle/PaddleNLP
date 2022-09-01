@@ -27,15 +27,13 @@
 
 **方案亮点：**
 
-- **分析高效✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
-
-- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0轻量级模型作为训练基座，ERNIE 3.0轻量级模型学习海量的中文数据与知识，具有广泛成熟的实践应用。
-
-- **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，高效完成从数据标注到部署全流程
+- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
 
 **更多选择：**
 
-对于大多数多分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，多分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术方案](../README.md)。
+对于大多数多分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，多分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
 
 - 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习多分类方案](./few-shot#readme)
 
@@ -56,7 +54,7 @@ rm KUAKE_QIC.tar.gz
 ```
 
 <div align="center">
-    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/186386181-7cdf3015-3e6c-4ffe-9512-95ba707fd00c.png">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187828356-e2f4f627-f5fe-4c83-8879-ed6951f7511e.png">
 </div>
 <div align="center">
     <font size ="2">

@@ -167,7 +167,7 @@
 文本分类应用提供了简单易用的数据标注-模型训练-模型调优-模型压缩-预测部署全流程方案，我们将以预训练模型微调方案为例介绍文本分类应用的全流程：
 
 <div align="center">
-    <img width="1238" alt="image" src="https://user-images.githubusercontent.com/63761690/186386181-7cdf3015-3e6c-4ffe-9512-95ba707fd00c.png">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187828356-e2f4f627-f5fe-4c83-8879-ed6951f7511e.png">
 </div>
 <div align="center">
     <font size ="2">
