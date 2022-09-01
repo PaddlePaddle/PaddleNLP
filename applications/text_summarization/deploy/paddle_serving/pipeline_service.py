@@ -13,17 +13,13 @@
 # limitations under the License.
 
 from paddle_serving_server.web_service import WebService, Op
-from numpy import array
-import logging
 import numpy as np
-from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.transformers import UNIMOTokenizer
 from paddlenlp.data import Pad
+from paddlenlp.utils.log import logger
 
 import paddle_serving_server.pipeline.operator
-
-_LOGGER = logging.getLogger(__name__)
 
 
 def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
@@ -64,8 +60,6 @@ def batchify_fn(batch_examples, pad_val, pad_right=False):
     input_ids = pad_func([example['input_ids'] for example in batch_examples])
     token_type_ids = pad_func(
         [example['token_type_ids'] for example in batch_examples])
-    position_ids = pad_func(
-        [example['position_ids'] for example in batch_examples])
     attention_mask = pad_mask(
         [example['attention_mask'] for example in batch_examples])
     seq_len = np.asarray([example['seq_len'] for example in batch_examples],
@@ -105,7 +99,7 @@ class UnimoTextOp(Op):
         if isinstance(data, str) and "array(" in data:
             data = eval(data)
         else:
-            _LOGGER.error("input value  {}is not supported.".format(data))
+            logger.error("input value  {}is not supported.".format(data))
         data = [i.decode('utf-8') for i in data]
         examples = [convert_example(i, self.tokenizer) for i in data]
         input_dict = batchify_fn(examples, self.tokenizer.pad_token_id)
@@ -113,9 +107,7 @@ class UnimoTextOp(Op):
         return input_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
-        print(fetch_dict['gather_tree_0.tmp_0'])
-        outputs = fetch_dict['gather_tree_0.tmp_0'].transpose([1, 2,
-                                                               0]).tolist()
+        outputs = fetch_dict['transpose_0.tmp_0']
         results = []
         for sample in outputs:
             result = []
@@ -125,10 +117,10 @@ class UnimoTextOp(Op):
                 res = "".join(postprocess_response(beam, self.tokenizer))
                 result.append(res)
             results.append(result)
-        new_dict = {}
-        new_dict["outputs"] = results
+        out_dict = {}
+        out_dict["outputs"] = str(results)
         # the first return must be a dict or a list of dict, the dict corresponding to a batch of model output
-        return new_dict, None, ""
+        return out_dict, None, ""
 
 
 class UnimoTextService(WebService):

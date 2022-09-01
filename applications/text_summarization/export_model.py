@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 import argparse
 
@@ -32,7 +31,7 @@ def parse_args():
                         type=str,
                         help="The model name to specify the UNIMOText to use. ")
     parser.add_argument("--inference_model_dir",
-                        default="./export_checkpoint",
+                        default="./inference_model",
                         type=str,
                         help="Path to save inference model of UNIMOText. ")
     parser.add_argument(
@@ -96,7 +95,8 @@ def do_predict(args):
     tokenizer = UNIMOTokenizer.from_pretrained(model_name_or_path)
 
     unimo_text = FasterUNIMOText(model=model,
-                                 use_fp16_decoding=args.use_fp16_decoding)
+                                 use_fp16_decoding=args.use_fp16_decoding,
+                                 trans_out=True)
 
     # Set evaluate mode
     unimo_text.eval()

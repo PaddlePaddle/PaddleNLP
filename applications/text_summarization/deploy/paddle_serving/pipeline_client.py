@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from paddle_serving_server.pipeline import PipelineClient
-from numpy import array, float32
 import time
 import numpy as np
+from paddlenlp.utils.log import logger
 
 
 class Runner(object):
@@ -31,15 +31,14 @@ class Runner(object):
         start_time = time.time()
         ret = self.client.predict(feed_dict={"inputs": inputs})
         end_time = time.time()
-        print("time cost :{} seconds".format(end_time - start_time))
+        logger.info("time cost :{} seconds".format(end_time - start_time))
         if not ret.value:
-            print('Fail to fetch summary.')
+            logger.warning('Fail to fetch summary.')
         # ret is special class but a dict
         for d, s in zip(data, eval(ret.value[0])):
-            print("input text: ", d)
-            print("inferenced summary: ", s)
-            print("--------------------")
-        return
+            print("Text: ", d)
+            print("Summary: ", s[0])
+            print("-" * 50)
 
 
 if __name__ == "__main__":

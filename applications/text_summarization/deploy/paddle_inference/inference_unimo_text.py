@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import argparse
 import numpy as np
 from pprint import pprint
@@ -145,7 +144,7 @@ def infer(args, predictor):
 
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
 
-    for idx, sample in enumerate(output[0].transpose([1, 2, 0])):
+    for idx, sample in enumerate(output[0]):
         for beam_idx, beam in enumerate(sample):
             if beam_idx > len(sample) // 2:
                 break

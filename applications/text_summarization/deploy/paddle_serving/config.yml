@@ -35,10 +35,10 @@ op:
             client_type: local_predictor
 
             #模型路径
-            model_config: ./export_checkpoint_server
+            model_config: ./inference_model_server
 
             #Fetch结果列表，以client_config中fetch_var的alias_name为准，不设置默认取全部输出变量
-            fetch_list: ["_generated_var_3", "gather_tree_0.tmp_0"]
+            fetch_list: ["_generated_var_3", "transpose_0.tmp_0"]
             
             # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
             device_type: 1

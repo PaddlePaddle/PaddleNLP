@@ -28,12 +28,8 @@ Paddle Serving Python端预测部署主要包含以下步骤：
 ```shell
 pip install paddle_serving_app paddle_serving_client
 ```
-安装server，用于启动服务，根据服务器设备选择安装CPU server或GPU server：
+安装GPU server，用于启动服务：
 
-- 安装CPU server
-```shell
-pip install paddle_serving_server
-```
 - 安装GPU server, 注意选择跟本地环境一致的命令
 ```shell
 # CUDA10.2 + Cudnn7 + TensorRT6
@@ -57,11 +53,11 @@ pip install paddle-serving-server-gpu==0.8.3.post112 # -i https://pypi.tuna.tsin
 
 模型转换命令如下：
 ```shell
-python -m paddle_serving_client.convert --dirname ./export_checkpoint \
+python -m paddle_serving_client.convert --dirname ./inference_model \
                                         --model_filename unimo_text.pdmodel \
                                         --params_filename unimo_text.pdiparams \
-                                        --serving_server ./deploy/paddle_serving/export_checkpoint_server \
-                                        --serving_client ./deploy/paddle_serving/export_checkpoint_client
+                                        --serving_server ./deploy/paddle_serving/inference_model_server \
+                                        --serving_client ./deploy/paddle_serving/inference_model_client
 ```
 关键参数释义如下：
 * `dirname`：模型文件夹地址。
@@ -74,15 +70,15 @@ python -m paddle_serving_client.convert --dirname ./export_checkpoint \
 ```shell
 python -m paddle_serving_client.convert --help
 ```
-模型转换完成后，会在./delopy/paddle_serving文件夹多出export_checkpoint_server和export_checkpoint_client的文件夹，文件夹目录格式如下：
+模型转换完成后，会在./delopy/paddle_serving文件夹多出inference_model_server和inference_model_client的文件夹，文件夹目录格式如下：
 ```
-export_checkpoint_server/
+inference_model_server/
 ├── unimo_text.pdiparams
 ├── unimo_text.pdmodel
 ├── serving_server_conf.prototxt
 └── serving_server_conf.stream.prototxt
 
-export_checkpoint_client/
+inference_model_client/
 ├── serving_client_conf.prototxt
 └── serving_client_conf.stream.prototxt
 ```
@@ -132,7 +128,7 @@ I0831 12:29:41.134049 28269 naive_executor.cc:102] ---  skip [gather_tree_0.tmp_
 [OP Object] init success
 [OP Object] init success
 [OP Object] init success
-2022/08/31 12:29:41 start proxy servic
+2022/08/31 12:29:41 start proxy service
 ```
 
 ### client发送服务请求
