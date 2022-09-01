@@ -101,13 +101,16 @@ set(${flag_var} "${${flag_var}} /NODEFAULTLIB:MSVCRT.LIB")
 endforeach()
 
 ELSE(WIN32)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
-set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
+    IF (LINUX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ldl -lpthread")
+    ENDIF()
+    set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
 # For OpenMP
 # openmp not support well for now on windows
-if (NOT WIN32)
+if (LINUX)
     find_package(OpenMP)
     if (OPENMP_FOUND)
         add_definitions(-DWITH_OMP)
