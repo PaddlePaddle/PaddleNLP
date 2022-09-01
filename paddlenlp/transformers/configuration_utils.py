@@ -22,7 +22,7 @@ import json
 import os
 import re
 import warnings
-from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar
+from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
 
 from packaging import version
 
@@ -32,14 +32,8 @@ from ..utils.downloader import is_url, get_path_from_url
 
 from paddlenlp.utils.log import logger
 
-PretrainedConfigClass = TypeVar("PretrainedConfigClass")
-
-# from ..utils import (
-#     EntryNotFoundError,
-#     RepositoryNotFoundError,
-#     RevisionNotFoundError,
-#     cached_path,
-# )
+if TYPE_CHECKING:
+    from paddlenlp.transformers.model_utils import PretrainedModel
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -952,24 +946,84 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     return configuration_file
 
 
-def parse_config(
-        kwargs: Dict[str, Any],
-        config_class: Type[PretrainedConfigClass],
-        config: Optional[PretrainedConfigClass] = None
-) -> PretrainedConfigClass:
+def _construct_kwargs(args, kwargs, fields):
+    args = args or ()
+    for index, arg in enumerate(args):
+        # if parameters is: (a,b,c), but args is (1, 2), kwargs is {b=3, c=4} -> (1, 2, b=3, c=4)
+        assert fields[
+            index] not in kwargs, f"{index}th field<{fields[index]}> is already in kwargs, but you have set it twice"
+        kwargs[fields[index]] = arg
+    return kwargs
+
+
+def parse_config(config: Optional[PretrainedConfig] = None,
+                 config_class: Type[PretrainedConfig] = None,
+                 args: Tuple[Any] = None,
+                 kwargs: Dict[str, Any] = None,
+                 fields: Optional[List[str]] = None) -> PretrainedConfig:
     """parse config from config & kwargs
 
     Args:
-        kwargs (Dict[str, Any]): the source of the parameters of initialization method
-        config_class (PretrainedConfigClass): the class of the target config class
         config (Optional[PretrainedConfig], optional): the new config instance. Defaults to None.
+        config_class (PretrainedConfig): the class of the target config class
+        args (Tuple[Any]): the source arg list
+        kwargs (Dict[str, Any]): the source of the parameters of initialization method
+        fields (Optional[List[str]], optional): the old fields of kwargs
     """
-
-    if config is None:
-        config = config_class(**kwargs)
-    else:
+    if config is not None and isinstance(config, config_class):
         if len(kwargs) > 0:
-            logger.warn(
-                "please use config<%s> to init model, and the following parameters will be ignored: %s",
-                config_class, ",".join(list(kwargs.keys())))
+            keys = ",".join(list(kwargs.keys()))
+            logger.warning(
+                f"please use config<{config_class}> to init model, and the following parameters will be ignored: {keys}",
+            )
+        return config
+
+    # if config is None, so parse `PretrainedConfig` from args,kwargs according to the fields
+    # 1. if args is not one, so it should
+    args = args or ()
+    if config is not None:
+        args = (config, ) + args
+    kwargs = _construct_kwargs(args, kwargs, fields)
+    config = config_class(**kwargs)
     return config
+
+
+def parse_config_and_model(
+        config_or_model: Optional[Union[PretrainedConfig,
+                                        PretrainedModel]] = None,
+        config_class: Type[PretrainedConfig] = None,
+        model_class: Type[PretrainedModel] = None,
+        args: Tuple[Any] = None,
+        kwargs: Dict[str, Any] = None,
+        fields: Optional[List[str]] = None) -> PretrainedConfig:
+    """parse config from config & kwargs
+
+    Args:
+        config (Optional[PretrainedConfig], optional): the new config instance. Defaults to None.
+        config_class (PretrainedConfig): the class of the target config class
+        args (Tuple[Any]): the source arg list
+        kwargs (Dict[str, Any]): the source of the parameters of initialization method
+        fields (Optional[List[str]], optional): the old fields of kwargs
+    """
+    # 1. if `config_or_model` is Model, so construct args and kwargs to init config
+    if isinstance(config_or_model, model_class):
+        kwargs = _construct_kwargs(args, kwargs, fields)
+        config = config_class(**kwargs)
+
+        return config, config_or_model
+
+    # 2. if `config_or_model` is Config, so construct args and kwargs to init model
+    if isinstance(config_or_model, config_class):
+        kwargs = _construct_kwargs(args, kwargs, fields)
+        model = model_class(config_or_model, **kwargs)
+        return config_or_model, model
+
+    # 3. create config and use it to init model
+    args = args or ()
+    if config_or_model is not None:
+        args = (config_or_model, ) + args
+    kwargs = _construct_kwargs(args, kwargs, fields)
+    config = config_class(**kwargs)
+
+    model = model_class(kwargs)
+    return config, model

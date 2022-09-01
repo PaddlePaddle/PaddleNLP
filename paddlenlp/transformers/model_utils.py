@@ -32,6 +32,7 @@ from paddlenlp.utils.log import logger
 
 from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch
+from .configuration_utils import PretrainedConfig
 
 __all__ = [
     'PretrainedModel',
@@ -225,6 +226,24 @@ class PretrainedModel(Layer, GenerationMixin):
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
+        cache_dir = kwargs.pop('cache_dir', None)
+        config = kwargs.pop("config", None)
+        force_download = kwargs.pop("force_download", None)
+        from_auto_class = kwargs.pop("_from_auto", None)
+        from_pipeline = kwargs.pop("_from_pipeline", None)
+
+        if not isinstance(config, PretrainedConfig):
+            config_path = config if config is not None else pretrained_model_name_or_path
+            config, model_kwargs = cls.config_class.from_pretrained(
+                config_path,
+                cache_dir=cache_dir,
+                return_unused_kwargs=True,
+                force_download=force_download,
+                _from_auto=from_auto_class,
+                _from_pipeline=from_pipeline,
+                **kwargs,
+            )
+
         track_download = True
         # From built-in pretrained models
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
