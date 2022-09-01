@@ -54,7 +54,7 @@ c. 依赖安装：
 ```bash
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 1) 安装 pipelines package
-cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
+cd ${HOME}/PaddleNLP/pipelines/
 python setup.py install
 ```
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
@@ -95,8 +95,6 @@ xpack.security.enabled: false
 3. 检查确保 ES 服务启动成功
 ```bash
 curl http://localhost:9200/_aliases?pretty=true
-# 打印几条数据
-curl http://localhost:9200/dureader_robust_query_encoder/_search
 ```
 备注：ES 服务默认开启端口为 9200
 
@@ -105,6 +103,12 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev
+```
+可以使用下面的命令来查看数据：
+
+```
+# 打印几条数据
+curl http://localhost:9200/dureader_robust_query_encoder/_search
 ```
 
 参数含义说明
@@ -160,51 +164,7 @@ sh examples/semantic-search/run_search_web.sh
 
 长期，继续聚焦科技创新的五大方向。1)新能源(新能源汽车、光伏、风电、特高压等)，2)新一代信息通信技术(人工智能、大数据、云计算、5G等)，3)高端制造(智能数控机床、机器人、先进轨交装备等)，4)生物医药(创新药、CXO、医疗器械和诊断设备等)，5)军工(导弹设备、军工电子元器件、空间站、航天飞机等)。
 ```
-
-## FAQ
-
-#### 语义检索系统可以跑通，但终端输出字符是乱码怎么解决？
-
-+ 通过如下命令设置操作系统默认编码为 zh_CN.UTF-8
-```bash
-export LANG=zh_CN.UTF-8
-```
-
-#### Linux上安装elasticsearch出现错误 `java.lang.RuntimeException: can not run elasticsearch as root`
-
-elasticsearch 需要在非root环境下运行，可以做如下的操作：
-
-```
-adduser est
-chown est:est -R ${HOME}/elasticsearch-8.3.2/
-cd ${HOME}/elasticsearch-8.3.2/
-su est
-./bin/elasticsearch
-```
-
-#### Mac OS上安装elasticsearch出现错误 `flood stage disk watermark [95%] exceeded on.... all indices on this node will be marked read-only`
-
-elasticsearch默认达到95％就全都设置只读，可以腾出一部分空间出来再启动，或者修改 `config/elasticsearch.pyml`。
-```
-cluster.routing.allocation.disk.threshold_enabled: false
-```
-
-#### nltk_data加载失败的错误 `[nltk_data] Error loading punkt: [Errno 60] Operation timed out`
-
-在命令行里面输入python,然后输入下面的命令进行下载：
-
-```
-import nltk
-nltk.download('punkt')
-```
-如果下载还是很慢，可以手动[下载](https://github.com/nltk/nltk_data/tree/gh-pages/packages/tokenizers)，然后放入本地的`~/nltk_data/tokenizers`进行解压即可。
-
-#### 服务端运行报端口占用的错误 `[Errno 48] error while attempting to bind on address ('0.0.0.0',8891): address already in use`
-
-```
-lsof -i:8891
-kill -9 PID # PID为8891端口的进程
-```
+如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137

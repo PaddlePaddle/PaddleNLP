@@ -6,6 +6,8 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
 </div>
 
+
+
 ## 智能文本产线特色
 * **全场景支持**：依托灵活的插拔式组件产线化设计，支持各类 NLP 场景任务，包括：信息抽取、情感倾向分析、阅读理解、检索系统、问答系统、文本分类、文本生成等。
 
@@ -14,6 +16,14 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
 * **高精度预测**：基于前沿的预训练模型、成熟的系统方案，可构建效果领先的产品级系统，如[智能文本产线库](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#智能文本产线库)中预置的语义检索系统、阅读理解式智能问答系统等。
 
 * **灵活可定制**：除深度兼容 PaddleNLP 模型组件外，还可嵌入飞桨生态下任意模型、[AI 开放平台算子](https://ai.baidu.com/)、其它开源项目如 Elasticsearch 等作为基础组件，快速扩展，从而实现任意复杂系统的灵活定制开发。
+
+## Benchmarks
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/187362675-f0818e77-a521-4479-8dd7-bcbf4a820f7d.png" width="500">
+</div>
+
+更多的Benchmarks的信息请参考文档[Benchmarks](./benchmarks/README.md)
 
 ## 智能文本产线库
 
@@ -106,11 +116,20 @@ docker run \
 ```
 
 #### 部署 CPU 服务
+
+对于Linux使用Docker的用户，使用下面的命令：
 ```
 docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 ```
+对于Windows&Macos上使用Docker的用户，用下面的命令：
+
+```
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin
+docker run -d --name paddlenlp_pipelines  -p 8891:8891 -p 8502:8502 -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin
+```
 CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
 
 #### 部署 GPU 服务
 ```

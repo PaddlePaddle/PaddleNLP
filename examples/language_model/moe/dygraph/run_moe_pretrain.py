@@ -34,7 +34,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_
 import types
 from utils import get_timers, set_timers
 from types import MethodType
-from paddle import _C_ops
+from paddle import _legacy_C_ops
 from paddle.fluid.framework import core, in_dygraph_mode
 import paddle.distributed as dist
 from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
@@ -181,11 +181,13 @@ def unscale_method(self, optimizer):
     temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool))
 
     if len(param_grads_fp16):
-        _C_ops.check_finite_and_unscale(param_grads_fp16, self._scale,
-                                        param_grads_fp16, temp_found_inf_fp16)
+        _legacy_C_ops.check_finite_and_unscale(param_grads_fp16, self._scale,
+                                               param_grads_fp16,
+                                               temp_found_inf_fp16)
     if len(param_grads_fp32):
-        _C_ops.check_finite_and_unscale(param_grads_fp32, self._scale,
-                                        param_grads_fp32, temp_found_inf_fp32)
+        _legacy_C_ops.check_finite_and_unscale(param_grads_fp32, self._scale,
+                                               param_grads_fp32,
+                                               temp_found_inf_fp32)
     self._found_inf = 1 if temp_found_inf_fp16 or temp_found_inf_fp32 else 0
 
     if dist.get_world_size() > 1:
