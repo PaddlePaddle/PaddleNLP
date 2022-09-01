@@ -86,7 +86,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
             doc_idx = _build_doc_idx(documents, num_epochs, np_rng,
                                      separate_last_epoch)
             np.save(doc_idx_filename, doc_idx, allow_pickle=True)
-            print(' > elasped time to build and save doc-idx mapping '
+            print(' > elapsed time to build and save doc-idx mapping '
                   '(seconds): {:4f}'.format(time.time() - start_time))
             # sample-idx. pos of each seq_len of data.
             start_time = time.time()
@@ -98,7 +98,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
             sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length,
                                                   num_epochs, tokens_per_epoch)
             np.save(sample_idx_filename, sample_idx, allow_pickle=True)
-            print(' > elasped time to build and save sample-idx mapping '
+            print(' > elapsed time to build and save sample-idx mapping '
                   '(seconds): {:4f}'.format(time.time() - start_time))
 
             # shuffle-idx.
@@ -113,7 +113,7 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
             shuffle_idx = _build_shuffle_idx(num_samples_,
                                              sample_idx.shape[0] - 1, np_rng)
             np.save(shuffle_idx_filename, shuffle_idx, allow_pickle=True)
-            print(' > elasped time to build and save shuffle-idx mapping'
+            print(' > elapsed time to build and save shuffle-idx mapping'
                   ' (seconds): {:4f}'.format(time.time() - start_time))
 
     else:
@@ -153,7 +153,7 @@ def _num_tokens(documents, lens):
 
 
 def _num_epochs(tokens_per_epoch, seq_length, num_samples):
-    """Based on number of samples and sequence lenght, calculate how many
+    """Based on number of samples and sequence length, calculate how many
     epochs will be needed."""
     num_epochs = 0
     total_tokens = 0
@@ -318,7 +318,7 @@ def create_pretrained_dataset(
         sample_ids = np.load(input_prefix + "_ids.npy",
                              mmap_mode="r",
                              allow_pickle=True)
-        # All documment ids, extend as 1-D array.
+        # All document ids, extend as 1-D array.
 
         process_datas = np.load(input_prefix + "_idx.npz")
         # The len(sample_lens) num of docs
@@ -373,7 +373,7 @@ def create_pretrained_dataset(
                                      return_list=False)
         return data_loader
 
-    # Note, data should be broardcast to all devices.
+    # Note, data should be broadcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
     train_data_loader = build_dataset(
         0, "train", args.micro_batch_size * args.max_steps * data_world_size)
@@ -431,7 +431,7 @@ class GPTDataset(paddle.io.Dataset):
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
-        # Attention mask for the attention calulate
+        # Attention mask for the attention calculate
         attention_mask = np.tri(seq_length, seq_length).reshape(
             (1, seq_length, seq_length))
 
