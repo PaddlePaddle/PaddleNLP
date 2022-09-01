@@ -443,13 +443,9 @@ class UIETask(Task):
                                                      limit=self._position_prob,
                                                      return_prob=True)
 
-            for start_ids, end_ids, ids, offset_map in zip(
-                    start_ids_list, end_ids_list, input_ids.tolist(),
-                    offset_maps.tolist()):
-                for i in reversed(range(len(ids))):
-                    if ids[i] != 0:
-                        ids = ids[:i]
-                        break
+            for start_ids, end_ids, offset_map in zip(start_ids_list,
+                                                      end_ids_list,
+                                                      offset_maps.tolist()):
                 span_set = get_span(start_ids, end_ids, with_prob=True)
                 sentence_id, prob = get_id_and_prob(span_set, offset_map)
                 sentence_ids.append(sentence_id)
