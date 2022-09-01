@@ -101,13 +101,16 @@ set(${flag_var} "${${flag_var}} /NODEFAULTLIB:MSVCRT.LIB")
 endforeach()
 
 ELSE(WIN32)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
-set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
+    IF (LINUX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ldl -lpthread")
+    ENDIF()
+    set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
 # For OpenMP
 # openmp not support well for now on windows
-if (NOT WIN32)
+if (LINUX)
     find_package(OpenMP)
     if (OPENMP_FOUND)
         add_definitions(-DWITH_OMP)
@@ -140,14 +143,14 @@ if(WITH_PYTHON)
 
 add_subdirectory(python)
 
-if(WIN32)
+if(LINUX)
 add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
+    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
     COMMENT "Packing whl packages------>>>"
     DEPENDS copy_python_tokenizers)
 else()
 add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
+    COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
     COMMENT "Packing whl packages------>>>"
     DEPENDS copy_python_tokenizers)
 endif()
