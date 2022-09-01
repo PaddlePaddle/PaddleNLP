@@ -1,6 +1,4 @@
-# ERNIE 中文预训练
-
-## 背景
+# ERNIE 中文预训练介绍
 
 ERNIE是百度提出的大规模预训练模型，曾在中文场景下取得了SOTA效果。
 PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布大规模开源语料预训练全流程。从零开始，轻松构建预训练模型。
@@ -10,37 +8,31 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
 
-* [1. **数据准备**](数据准备)
-    * [1.1 **大规模**中文数据](#大规模中文数据)
-    * [1.2 **高精准**中文分词](#高精准中文分词)
-    * [1.3 **快速**Token ID 转化](#快速TokenID转化)
-* [2. **全字符**中文词表制作](#中文中文词表制作)
+* [1. 数据准备](数据准备)
+    * [1.1 大规模中文数据](#大规模中文数据)
+    * [1.2 高精准中文分词](#高精准中文分词)
+    * [1.3 快速Token ID 转化](#快速TokenID转化)
+* [2. 全字符中文词表制作](#中文词表制作)
     - [2.1 分析准备](#分析准备)
     - [2.2 文本字符统计](#文本字符统计)
     - [2.3 英文字符词表](#英文字符词表)
     - [2.4 合并词表](#合并词表)
-* [3. **开始训练**](#开始训练)
-    - [3.1 训练样例](#训练样例)
-        - 环境准备
-        - 启动训练
-    - [3.2 功能支持](#功能支持)
-        - [网络配置](#网络配置)
-        - 训练速度
-        - 训练体验
-    - [3.3 观察评估](#观察评估)
-        - VisualDL 可视化
-        - CLUE Benchmark 效果评估
-- [4. 训练效果](#训练效果)
-    - [ERNIE 1.0-Base-zh-CW 模型](#ernie-1.0-base-zh-cw)
-    - [ERNIE 1.0-Large-zh-CW 模型](#ernie-1.0-large-zh-cw)
-* [5. 参考](#参考)
+* [3. 开始训练](#开始训练)
+    - [3.1 训练脚本](#训练脚本)
+    - [3.2 训练网络配置](#networks)
+    - [3.3 训练速度配置](#speed)
+    - [3.4 训练数据流配置](#data_pipe)
+    - [3.5 观察评估](#观察评估)
+- [4. 训练效果](#release_models)
+    - [4.1 ERNIE 1.0-Base-zh-CW 模型](#ernie-1.0-base-zh-cw)
+    - [4.2 ERNIE 1.0-Large-zh-CW 模型](#ernie-1.0-large-zh-cw)
+* [5. 参考](#references)
 
-整体全部流程图如下：
+全部流程介绍图如下：
 
 <p align="center">
   <img src="https://user-images.githubusercontent.com/16911935/187170152-0778a6c1-6510-4c01-84d0-8e0ea3c05231.png" align="middle"  width="500" />
 </p>
-
 
 <a name="数据准备"> </a>
 
@@ -125,15 +117,16 @@ python -u  ../data_tools/create_pretraining_data.py \
     --workers 40 \
     --log_interval 1000
 ```
-转化后的数据如下，使用这份数据，即可开始ERNIE预训练
+此处需要指定词表文件进行ID转化，用户可以使用paddlenlp内置的部分词表如`ernie-1.0-base-zh,ernie-3.0-base-zh`，设置`model_name`参数为对应参数名即可。
+也可以根据自己的需求，重新开始制作词表，然后`model_name`传入词表所在的文件夹目录即可。词表制作，请参考下一章节[全字符中文词表制作](#全字符中文词表制作)。
+
+转化后的数据如下，使用这份数据，即可开始ERNIE预训练：
 ```
 -rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_200g_0703_ids.npy
 -rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_200g_0703_idx.npz
 ```
 
-
-
-<a name="全字符中文词表制作"> </a>
+<a name="中文词表制作"> </a>
 
 ### 2. 全字符中文词表制作
 
@@ -242,7 +235,7 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
   <img src="https://user-images.githubusercontent.com/16911935/187134299-72628dce-cc04-49d7-89ef-078fad487724.png" align="middle"  width="500" />
 </p>
 
-### 3.0 训练脚本
+### 3.1 训练脚本
 
 训练脚本如下
 
@@ -250,6 +243,7 @@ python ./vocab/gen_vocab.py afer_basic_toknizer_corpus.txt
 
 - PYTHONPATH 设置为当前目录（适合paddlenlp develop运行）
 - 设置了一些FLAGS，包括增强报错，动态图Flag，提高矩阵乘法精度。
+- 多机情况下，可以设置`NCCL_SOCKET_IFNAME`指明NCCL使用的通信网口。
 
 <details>
 <summary>环境配置脚本</summary>
@@ -271,6 +265,8 @@ unset CUDA_VISIBLE_DEVICES
 <b>路径配置</b>
 
 - 主要配置输入输出目录
+- 这里的`vocab_dir`如果没有使用自定义词表的话，请设置为内置的tokenizer，如`ernie-1.0-base-zh,ernie-3.0-base-zh`等。
+- 这里的 `data_dir` 设置多份数据集，用户不使用多份数据集的话，直接`data_dir="./data"`即可。
 
 <details>
 <summary>路径配置</summary>
@@ -286,7 +282,7 @@ vocab_dir="${base_nfs}/"
 ```
 </details>
 
-**启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512。加入两机训练，请设置dp_degree=16。
+**启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512 (64*8)。如果指定ips参数，进行多机运行，如 `python3 -u  -m paddle.distributed.launch  --gpus "0,1,2,3,4,5,6,7" --ips 192.168.1.101,192.168.1.101 `
 ```shell
 python3 -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -297,14 +293,12 @@ python3 -u  -m paddle.distributed.launch \
     --tokenizer_name_or_path "${vocab_dir}" \
     --input_dir "${data_dir}" \
     --output_dir "${base_dir}" \
-    --fp16_opt_level "O1" \
+    --split 949,50,1 \
     --max_seq_len 512 \
     --binary_head true \
     --micro_batch_size 64 \
-    --sharding_degree 1\
-    --dp_degree 8 \
-    --use_sharding false \
     --use_amp true \
+    --fp16_opt_level "O1" \
     --use_recompute false \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
@@ -328,18 +322,19 @@ python3 -u  -m paddle.distributed.launch \
 
 其中参数释义如下：
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
-- `tokenizer_name_or_path` 模型词表文件所在的文件夹，或者PaddleNLP内置tokenizer的名字。
+- `tokenizer_name_or_path` 模型词表文件所在的文件夹(对于ernie，词表文件名一般命名为vocab.txt)，或者PaddleNLP内置tokenizer的名字。
 - `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
-- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
-- `max_seq_len` 输入文本序列的长度。
+- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认`split=949,50,1`, 使用1/1000的数据为test，当样本数太少时，增大测试的样本数目。
+- `max_seq_len` 输入文本序列的长度，默认值`512`。
+- `binary_head` 是否使用SOP(Sentences Order Predicet) loss，默认为 True，使用此loss。如果用户句子语料很短，无法组合成句子对，请设置此参数为`false`。
 - `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
 - `use_amp` 开启混合精度策略。
 - `fp16_opt_level` 混合精度策略，支持O1 自动混合精度，O2 pure fp16精度训练。
 - `max_lr` 训练学习率。
-- `min_lr` 学习率衰减的最小值。
-- `max_steps` 最大训练步数。
+- `min_lr` 学习率衰减到最小值后，学习率将一直保持为`min_lr`。
+- `max_steps` 最大训练步数。训练不支持通过`epoch`控制，第一次制造数据index时候，日志会显示数据会被计算的epoch数，请注意查看。
 - `save_steps` 保存模型间隔。默认保存地址格式为`output_dir/model_50000`(5w 步时的权重)。
 - `checkpoint_steps` 模型checkpoint间隔，用于模型断点重启训练。默认地址为`output_dir/model_last`.
 - `weight_decay` 权重衰减参数。
@@ -349,10 +344,14 @@ python3 -u  -m paddle.distributed.launch \
 - `num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
 - `eval_freq` 模型评估间隔。
 - `device` 训练设备，默认为GPU。
-- `share_folder` 多机训练时，如果多机input_dir为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。
+- `share_folder` 多机训练时，如果多机`input_dir`为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。（每次运行，会制作训练的index数据，如果为挂载的统一nfs位置，则一台机器制作数据即可，否则每台机器都需要制作）
 
 
-### 3.1 网络配置
+<a name="networks"> </a>
+
+### 3.2 训练网络配置
+
+本小节
 
 - SOP Loss
     - SOP (Sentence Order Predict) 损失，是 模型训练的常用损失。将文本中的句子顺序分为两段打乱，最后判断文本是否被打乱。下图是数据组织形式的展示：
@@ -360,11 +359,11 @@ python3 -u  -m paddle.distributed.launch \
     <img src="https://user-images.githubusercontent.com/16911935/187140981-924fd21c-fb67-4ba8-a421-490fd293175c.png" align="middle"  width="600" />
     </p>
 
-    - 此开关由 `binary_head` 选项开启，`binary_head=True`添加sop loss， `binary_head=False` 关闭 sop loss。
+    - *<u>使用方法</u>*: 此开关由 `binary_head` 选项开启，`binary_head=True`添加sop loss， `binary_head=False` 关闭 sop loss。
     - **注意：如果你使用的语料文本中，只有一句话，无法分为多个句子段落，请设置 `binary_head=False`。否则，不符合要求的数据默认被删去，导致可训练的数据过小。**
 - MASK
     -  MLM (Mask Language Model) 是通过随机将文本中的部分token，随机替换为`[MASK]` token，最后预测出真实的token值。ERNIE默认采用了Whole Word MASK方式，选定一些词语进行MASK。
-    - 用户可以设置 `masked_lm_prob` 控制mask的token占文本总token长度的比例。默认`masked_lm_prob=0.15` 随机mask 15% 的token数目。
+    - *<u>使用方法</u>*: 用户可以设置 `masked_lm_prob` 控制mask的token占文本总token长度的比例。默认`masked_lm_prob=0.15` 随机mask 15% 的token数目。
     - 设置`short_seq_prob`， 控制长度小于max_seq_length的样本比例，默认值`short_seq_prob=0.1`。制作数据时候，会有相应比例的数据 最大长度会设置为 一个小于 max_seq_length 的随机值。
 - Ngram MASK
     - 项目还支持了n-gram mask策略，如下图所示，在 WWM 进行词语级别MASK的基础上（如此处mask掉的`[模型]`词组），n-gram 可以MASK掉连续n个词组。下面例子中，连续mask了2个词组，`【[语言][模型]】`同时进行了mask。
@@ -372,12 +371,21 @@ python3 -u  -m paddle.distributed.launch \
     <img src="https://user-images.githubusercontent.com/16911935/187145669-7c55386d-f57a-4589-9e6d-e4a36b93e24c.png" align="middle"  width="600" />
     </p>
 
-    - 用户通过`max_ngrams`设置最大的`ngram`长度。默认`max_ngrams=3`。
+    - *<u>使用方法</u>*: 用户通过`max_ngrams`设置最大的`ngram`长度。默认`max_ngrams=3`。
+    - 注：
+        - ernie预训练使用的 dataset 代码文件在 `./data_tools/ernie_dataset.py`
+        - 数据集index生成，动态mask相关代码实现在`./data_tools/dataset_utils.py`
+
+        - 用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
+
 - Dropout
     - Dropout 是常用的防止过拟合策略。对于大规模数据集训练，如`ernie-3.0`系列4T文本语料，可以设置 `dropout=0`，不考虑过拟合。实际`ernie-3.0-base-zh`训练中，没有开启Dropout。
-    - 用户可以设置 `hidden_dropout_prob`，`attention_probs_dropout_prob`。默认值为 `0.1`。
+    - *<u>使用方法</u>*: 用户可以设置 `hidden_dropout_prob`，`attention_probs_dropout_prob`。默认值为 `0.1`。
 
-### 3.2 训练速度
+
+<a name="speed"> </a>
+
+### 3.3 训练速度配置
 
 **训练速度方面**，我们支持了如下策略，加
 速计算过程，减小显存占用，扩大batch_size：
@@ -401,7 +409,7 @@ python3 -u  -m paddle.distributed.launch \
 - **混合精度**训练：
     - 部分算子使用FP16计算kernel，加速计算过程。支持AMP混合精度O1，和Pure FP16全FP训练策略O2。
     - 如下图所示，使用AMP O1时，一些参数自动从fp32 cast为FP16类型计算。使用`O2` pure fp16时，模型参数为 fp16。
-    - *<u>使用方法</u>*:  设置`use_amp=True`开启混合精度训练。设置`fp16_opt_level=O1`，切换pure_fp16请设置为`O2`。
+    - *<u>使用方法</u>*: 设置`use_amp=True`开启混合精度训练。设置`fp16_opt_level=O1`，切换pure_fp16请设置为`O2`。
     <p align="center">
     <img src="https://user-images.githubusercontent.com/16911935/187338824-8b522935-4d6e-48d4-a5f6-55695ed3b182.png" align="middle" width=600 />
     </p>
@@ -418,9 +426,10 @@ python3 -u  -m paddle.distributed.launch \
     </p>
 
 
+<a name="data_pipe"> </a>
 
-### 3.3 训练体验
-**训练体验方面**，我们针对训练数据流、重启、可视化等方面做了针对性优化提升
+### 3.4 训练数据流配置
+**训练数据流方面**，我们针对训练数据流扩展、混合、重启等方面做了针对性优化提升
 
 数据流
 - **多机扩展**
@@ -463,13 +472,14 @@ python3 -u  -m paddle.distributed.launch \
     - 注意，这里使用的是训练中的checkpoint进行评估，可以直接试着 评估待评估的参数为，所在的路径地址，即如 `python grid_seach.py ouput/ernie-base-outdir/model_100000` 之类的checkpoint地址。
 
 
-## 训练效果
+<a name="release_models"></a>
+## 4. 训练效果
 
 **训练效果方面**，我们release了 base、large两个模型。均取得了较好的预训练效果。
 
 <a name="ernie-1.0-base-zh-cw"></a>
 
-### **ERNIE 1.0-Base-zh-CW** 模型
+### 4.1 ERNIE 1.0-Base-zh-CW 模型
 
 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-1.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
@@ -483,7 +493,7 @@ ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |  
 
 <a name="ernie-1.0-large-zh-cw"> </a>
 
-### **ERNIE 1.0-Large-zh-CW** 模型
+### 4.2 ERNIE 1.0-Large-zh-CW 模型
 
 除了base模型外，我们还训练了large模型。命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失，使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
@@ -494,7 +504,9 @@ ERNIE 1.0-Large-zh-CW| 24L1024H | <b>79.03</b> | 75.97 |    59.65 |    62.91 |  
 ERNIE 3.0-Xbase-zh| 20L1024H | 78.71 | 76.85 |    59.89 |    62.41 |    84.76 |    82.51 |    89.80 |    84.47 |    75.49/92.67 | 86.36 | 84.59
 RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    83.88 |    78.81 |    90.79 |    83.67 |    70.58/89.82 |    85.72 |    75.26
 
-## 6. 参考文献
+<a name="references"> </a>
+
+## 5. 参考文献
 
 感谢CLUE，WuDao提供的开源文本语料，参考资料：
 - Xu, L., Zhang, X. and Dong, Q., 2020. CLUECorpus2020: A large-scale Chinese corpus for pre-training language model. arXiv preprint arXiv:2003.01355.
