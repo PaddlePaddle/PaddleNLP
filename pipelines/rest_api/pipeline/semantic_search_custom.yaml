@@ -6,15 +6,16 @@ components:    # define all the building-blocks for Pipeline
     params:
       host: localhost
       port: 9200
-      index: dureader_robust_nano_encoder
-      embedding_dim: 312
+      index: dureader_robust_neural_search
+      embedding_dim: 256
   - name: Retriever
     type: DensePassageRetriever
     params:
       document_store: DocumentStore    # params can reference other components defined in the YAML
       top_k: 10
-      query_embedding_model: rocketqa-zh-nano-query-encoder
-      passage_embedding_model: rocketqa-zh-nano-para-encoder
+      query_embedding_model: rocketqa-zh-base-query-encoder
+      params_path: checkpoints/model_40/model_state.pdparams
+      output_emb_size: 256
       embed_title: False
   - name: Ranker       # custom-name for the component; helpful for visualization & debugging
     type: ErnieRanker    # pipelines Class name for the component
