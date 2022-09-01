@@ -83,6 +83,8 @@ def convert_example(example,
                 title = example['answer']
         else:
             assert False, "Source and title are not in the input dictionary, nor are context and answer."
+        if 'target' in example.keys():
+            target = example['target']
 
         if template == 1:
             ### use template 1

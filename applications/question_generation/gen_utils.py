@@ -43,18 +43,19 @@ def convert_example(example,
 
     elif mode == 'train' or mode == 'test':
         target = None
+        title = None
         if 'source' in example and 'title' in example:
             source = example['source']
-            title = None
             if 'title' in example.keys():
                 title = example['title']
         elif 'context' in example and 'answer' in example:
             source = example['context']
-            title = None
             if 'answer' in example.keys():
                 title = example['answer']
         else:
             assert False, "Source and title are not in the input dictionary, nor are context and answer."
+        if 'target' in example.keys():
+            target = example['target']
 
         if template == 1:
             ### use template 1

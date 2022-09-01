@@ -1,9 +1,9 @@
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "1,5,6,7" --log_dir ./unimo/finetune/log run_gen.py \
+python -m paddle.distributed.launch --gpus "1,5,6,7" --log_dir ./unimo/finetune/template2/log run_gen.py \
     --dataset_name=dureader_qg \
     --model_name_or_path='unimo-text-1.0' \
-    --save_dir=./unimo/finetune/checkpoints \
-    --output_path ./unimo/finetune/predict.txt \
+    --save_dir=./unimo/finetune/template2/checkpoints \
+    --output_path=./unimo/finetune/template2/predict.txt \
     --logging_steps=100 \
     --save_steps=400 \
     --epochs=10 \
@@ -12,12 +12,12 @@ python -m paddle.distributed.launch --gpus "1,5,6,7" --log_dir ./unimo/finetune/
     --warmup_propotion=0.02 \
     --weight_decay=0.01 \
     --max_seq_len=512 \
-    --max_target_len=30 \
+    --max_target_len=50 \
     --do_train \
     --do_predict \
-    --max_dec_len=20 \
+    --max_dec_len=40 \
     --min_dec_len=3 \
     --num_return_sequences=1 \
     --adversarial_training=None \
-    --template=1 \
+    --template=2 \
     --device=gpu
