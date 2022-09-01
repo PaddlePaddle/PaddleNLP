@@ -151,6 +151,14 @@ simcse/
 
 ## 5. 模型训练
 
+**语义索引预训练模型下载链接：**
+
+以下模型结构参数为: `TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
+
+|Model|训练参数配置|硬件|MD5|
+| ------------ | ------------ | ------------ |-----------|
+|[SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">ernie 1.0 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|7c46d9b15a214292e3897c0eb70d0c9f|
+
 ### 训练环境说明
 
 + NVIDIA Driver Version: 440.64.00

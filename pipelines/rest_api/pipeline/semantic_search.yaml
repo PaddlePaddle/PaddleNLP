@@ -6,7 +6,7 @@ components:    # define all the building-blocks for Pipeline
     params:
       host: localhost
       port: 9200
-      index: dureader_robust_nano_encoder
+      index: dureader_robust_query_encoder
       embedding_dim: 312
   - name: Retriever
     type: DensePassageRetriever

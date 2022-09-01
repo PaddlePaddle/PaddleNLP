@@ -55,7 +55,7 @@ parser.add_argument("--output_emb_size", default=None,
                     type=int, help="output_embedding_size")
 parser.add_argument("--recall_num", default=10, type=int,
                     help="Recall number for each query from Ann index.")
-parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="Select model to train, defaults to rocketqa-zh-base-query-encoder.")
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--hnsw_m", default=100, type=int,
                     help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_ef", default=100, type=int,
