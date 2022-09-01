@@ -13,3 +13,5 @@
 # limitations under the License.
 
 from .batch_sampler import *
+
+CONFIG_NAME = 'model_config.json'

@@ -34,6 +34,8 @@ from ..model_outputs import (
     MaskedLMOutput,
     ModelOutput,
 )
+from .configuration import PRETRAINED_INIT_CONFIGURATION, PRETRAINED_RESOURCE_FILES_MAP, BertConfig
+from ..configuration_utils import parse_config
 
 __all__ = [
     'BertModel',
@@ -54,19 +56,20 @@ class BertEmbeddings(Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16):
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
         super(BertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+
+        # TODO(wj-Mcat): parse with args & kwargs
+        config: BertConfig = parse_config(kwargs, BertConfig, config)
+
+        self.word_embeddings = nn.Embedding(config.vocab_size,
+                                            config.hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
+                                                config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size,
+                                                  config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self,
                 input_ids,
@@ -99,11 +102,19 @@ class BertPooler(Layer):
     Pool the result of BertEncoder.
     """
 
-    def __init__(self, hidden_size, pool_act="tanh"):
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
+        """init the bert pooler with config & args/kwargs
+
+        Args:
+            config (Optional[BertConfig], optional): _description_. Defaults to None.
+        """
         super(BertPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+
+        config: BertConfig = parse_config(kwargs, BertConfig, config)
+
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
-        self.pool_act = pool_act
+        self.pool_act = config.pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -125,302 +136,11 @@ class BertPretrainedModel(PretrainedModel):
     """
 
     model_config_file = "model_config.json"
-    pretrained_init_configuration = {
-        "bert-base-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-large-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-multilingual-uncased": {
-            "vocab_size": 105879,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-cased": {
-            "vocab_size": 28996,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-multilingual-cased": {
-            "vocab_size": 119547,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-large-cased": {
-            "vocab_size": 28996,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-wwm-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-wwm-ext-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "macbert-base-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "macbert-large-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "simbert-base-chinese": {
-            "vocab_size": 13685,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "uer/chinese-roberta-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-medium": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 512,
-            "initializer_range": 0.02,
-            "intermediate_size": 2048,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 8,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-6l-768h": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 6,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-small": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 512,
-            "initializer_range": 0.02,
-            "intermediate_size": 2048,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 4,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-mini": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 4,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-tiny": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 128,
-            "initializer_range": 0.02,
-            "intermediate_size": 512,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 2,
-            "num_hidden_layers": 2,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-    }
     resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {
-        "model_state": {
-            "bert-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams",
-            "bert-large-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bert-large-uncased.pdparams",
-            "bert-base-multilingual-uncased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert-base-multilingual-uncased.pdparams",
-            "bert-base-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-cased.pdparams",
-            "bert-base-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-chinese.pdparams",
-            "bert-base-multilingual-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-multilingual-cased.pdparams",
-            "bert-large-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-large-cased.pdparams",
-            "bert-wwm-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese.pdparams",
-            "bert-wwm-ext-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
-            "macbert-base-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-base-chinese.pdparams",
-            "macbert-large-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-large-chinese.pdparams",
-            "simbert-base-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
-            "uer/chinese-roberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_base.pdparams",
-            "uer/chinese-roberta-medium":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_medium.pdparams",
-            "uer/chinese-roberta-6l-768h":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_6l_768h.pdparams",
-            "uer/chinese-roberta-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_small.pdparams",
-            "uer/chinese-roberta-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_mini.pdparams",
-            "uer/chinese-roberta-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_tiny.pdparams",
-        }
-    }
     base_model_prefix = "bert"
+
+    pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -501,57 +221,44 @@ class BertModel(BertPretrainedModel):
 
     """
 
-    def __init__(self,
-                 vocab_size=30522,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 pool_act="tanh",
-                 fuse=False):
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
         super(BertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = BertEmbeddings(vocab_size, hidden_size,
-                                         hidden_dropout_prob,
-                                         max_position_embeddings,
-                                         type_vocab_size)
-        if fuse and FusedTransformerEncoderLayer is None:
+
+        config: BertConfig = parse_config(kwargs, BertConfig, config)
+
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.embeddings = BertEmbeddings(config)
+        if config.fuse and FusedTransformerEncoderLayer is None:
             warnings.warn(
                 "FusedTransformerEncoderLayer is not supported by the running Paddle. "
                 "The flag fuse_transformer will be ignored. Try Paddle >= 2.3.0"
             )
-        self.fuse = fuse and FusedTransformerEncoderLayer is not None
+        self.fuse = config.fuse and FusedTransformerEncoderLayer is not None
         if self.fuse:
             self.encoder = nn.LayerList([
                 FusedTransformerEncoderLayer(
-                    hidden_size,
-                    num_attention_heads,
-                    intermediate_size,
-                    dropout_rate=hidden_dropout_prob,
-                    activation=hidden_act,
-                    attn_dropout_rate=attention_probs_dropout_prob,
-                    act_dropout_rate=0.) for _ in range(num_hidden_layers)
+                    config.hidden_size,
+                    config.num_attention_heads,
+                    config.intermediate_size,
+                    dropout_rate=config.hidden_dropout_prob,
+                    activation=config.hidden_act,
+                    attn_dropout_rate=config.attention_probs_dropout_prob,
+                    act_dropout_rate=0.)
+                for _ in range(config.num_hidden_layers)
             ])
         else:
             encoder_layer = nn.TransformerEncoderLayer(
-                hidden_size,
-                num_attention_heads,
-                intermediate_size,
-                dropout=hidden_dropout_prob,
-                activation=hidden_act,
-                attn_dropout=attention_probs_dropout_prob,
+                config.hidden_size,
+                config.num_attention_heads,
+                config.intermediate_size,
+                dropout=config.hidden_dropout_prob,
+                activation=config.hidden_act,
+                attn_dropout=config.attention_probs_dropout_prob,
                 act_dropout=0)
             self.encoder = nn.TransformerEncoder(encoder_layer,
-                                                 num_hidden_layers)
-        self.pooler = BertPooler(hidden_size, pool_act)
+                                                 config.num_hidden_layers)
+        self.pooler = BertPooler(config)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self):

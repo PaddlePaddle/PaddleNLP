@@ -19,8 +19,11 @@ import paddle
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
 
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
-from ...testing_utils import slow
+from tests.transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+from tests.testing_utils import slow
+
+from paddlenlp.transformers.bert.configuration import BertConfig
+from tests.transformers.test_configuration_common import ConfigTester
 
 
 class BertModelTester:
@@ -375,6 +378,14 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
 
     def setUp(self):
         self.model_tester = BertModelTester(self)
+        self.config_tester = ConfigTester(self,
+                                          config_class=BertConfig,
+                                          vocab_size=256,
+                                          hidden_size=24)
+
+    def test_config(self):
+        # self.config_tester.create_and_test_config_from_and_save_pretrained()
+        self.config_tester.run_common_tests()
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -413,7 +424,7 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
-    @slow
+    # @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 BertPretrainedModel.pretrained_init_configuration)[:1]:
@@ -423,7 +434,7 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
 
 class BertModelIntegrationTest(unittest.TestCase):
 
-    @slow
+    # @slow
     def test_inference_no_attention(self):
         model = BertModel.from_pretrained("bert-base-uncased")
         model.eval()
@@ -441,7 +452,7 @@ class BertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
-    @slow
+    # @slow
     def test_inference_with_attention(self):
         model = BertModel.from_pretrained("bert-base-uncased")
         model.eval()
