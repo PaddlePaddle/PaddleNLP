@@ -81,9 +81,9 @@ python wudao_process.py \
 ```
 注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
 
-文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
+文本转化完成后。我们使用 `./preprocess/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
 ```shell
-python ../data_tools/trans_to_json.py  \
+python ./preprocess/trans_to_json.py  \
     --input_path ./wudao_lac_cut \
     --output_path wudao_corpus_200g_0623.jsonl \
     --workers 40 \
@@ -108,7 +108,7 @@ python ../data_tools/trans_to_json.py  \
 使用 Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz CPU测试，40线程，处理速度 8+MB/s，约7个小时左右，即可完成 200GB 文本转化为ID.
 
 ```
-python -u  ../data_tools/create_pretraining_data.py \
+python -u  ./preprocess/create_pretraining_data.py \
     --model_name ./vocab_path/vocab.txt \
     --tokenizer_name ErnieTokenizer \
     --input_path wudao_corpus_200g_0623.jsonl \
@@ -511,8 +511,9 @@ RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    8
 
 ## 5. 参考文献
 
-感谢CLUE，WuDao提供的开源文本语料，参考资料：
+感谢CLUE，WuDao提供的开源文本语料，主要数据流部分参考自[Megatron](https://github.com/NVIDIA/Megatron-LM)，参考资料：
 - Xu, L., Zhang, X. and Dong, Q., 2020. CLUECorpus2020: A large-scale Chinese corpus for pre-training language model. arXiv preprint arXiv:2003.01355.
 - Yuan, S., Zhao, H., Du, Z., Ding, M., Liu, X., Cen, Y., Zou, X., Yang, Z. and Tang, J., 2021. Wudaocorpora: A super large-scale chinese corpora for pre-training language models. AI Open, 2, pp.65-68.
 - https://github.com/CLUEbenchmark/CLUECorpus2020
 - https://resource.wudaoai.cn
+- https://github.com/NVIDIA/Megatron-LM

@@ -70,6 +70,11 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 │   ├── run_seq_cls.py  序列分类任务运行脚本
 │   └── utils.py
 ├── README.md  说明文档
+├── pretraining_introduction.md 中文预训练详细介绍文档
+├── preprocess
+│   ├── docs                部分数据制作文档，包括CLUECorpusSmall，WuDaoCorpusBase
+│   └── xxx.py              文件处理的python脚本。
+├── vocab                   全中文字符词表制作教程
 ├── run_gb512_s1m.sh        训练启动shell脚本，batch size 512. max steps 100w
 ├── run_gb512_s1m_static.sh
 ├── run_gb512_s1m_trainer.sh
@@ -82,16 +87,19 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 
 ### 1.2 环境依赖
 
+- tool_helpers
 - visualdl
 - pybind11
 
-安装命令 `pip install visualdl pybind11`
-
+安装命令 `pip install visualdl pybind11 tool_helpers`
 
 <a name="中文预训练"></a>
 
 ## 2. 中文预训练
+
 ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WWM（Whole Word Mask）方式，对于完整语义单元的Token，会同时进行Mask。整体的训练损失loss是mlm_loss + sop_loss。
+
+ERNIE 中文预训练更详细的介绍文档请可以参见[ERNIE 中文预训练介绍](./pretraining_introduction.md)。
 
 
 本样例为用户提供了高效的训练流程，
@@ -105,7 +113,7 @@ ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WW
 下面是使用CLUECorpusSmall 14G文本进行预训练的流程：
 
 <details>
-<summary><b>CLUECorpusSmall 数据集预训练</b></summary>
+<summary><b>CLUECorpusSmall 数据准备</b></summary>
 
 #### 数据准备
 数据下载部分请参考[data_tools](./data_tools)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
@@ -140,6 +148,13 @@ python -u  data_tools/create_pretraining_data.py \
 clue_corpus_small_14g_20220104_ids.npy
 clue_corpus_small_14g_20220104_idx.npz
 ```
+
+</details>
+
+
+<details>
+<summary><b>CLUECorpusSmall 开始训练</b></summary>
+
 
 ####  开始训练
 
@@ -205,7 +220,12 @@ python -u  -m paddle.distributed.launch \
 注：
 - 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint(`output_dir/model_last`)，开始重启训练。请确保重启的训练配置与之前相同。
 - visualdl的日志在 `./output/ernie-1.0-dp8-gb512/train_log/xxx` 中。
+</details>
 
+
+
+<details>
+<summary><b>CLUECorpusSmall 数据集训练效果</b></summary>
 
 #### CLUECorpusSmall 数据集训练效果
 
@@ -238,6 +258,7 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 注:
 - `ERNIE-1.0 Base`官方预训练参数，采用的训练配置是batch_size=1024、steps=100w，
 - `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
+
 </details>
 
 <a name="ERNIE-CW"></a>
@@ -246,7 +267,7 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 
 PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，提供大规模语料训练教程，让用户可以从零开始构建，基于大规模语料，训练预训练模型。
 
-本教程，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
+[ERNIE 中文预训练介绍](./pretraining_introduction.md)，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
 并训练发布开源最优的模型参数。
 
 #### 数据准备
@@ -255,16 +276,14 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 - [CLUECorpus2020数据处理](./preprocess/docs/CLUECorpus2020.md)
 - [WuDaoCorpusBase数据处理](./preprocess/docs/WuDaoCorpusBase.md)
 
-如果需要定制化词表，词表制作部分请参考[词表制作](./vocab/README.md)
+如果需要定制化词表，词表制作部分请参考[词表制作](./vocab/README.md)。
 
 
-###  开始训练
-
-### 3.1 训练脚本
+#### 训练脚本
 
 训练脚本如下
 
-<b>环境配置</b>
+**环境配置**
 
 - PYTHONPATH 设置为当前目录（适合paddlenlp develop运行）
 - 设置了一些FLAGS，包括增强报错，动态图Flag，提高矩阵乘法精度。
@@ -287,7 +306,7 @@ unset CUDA_VISIBLE_DEVICES
 ```
 </details>
 
-<b>路径配置</b>
+**路径配置**
 
 - 主要配置输入输出目录
 - 这里的`vocab_dir`如果没有使用自定义词表的话，请设置为内置的tokenizer，如`ernie-1.0-base-zh,ernie-3.0-base-zh`等。
@@ -307,7 +326,9 @@ vocab_dir="${base_nfs}/"
 ```
 </details>
 
-**启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512 (64*8)。如果指定ips参数，进行多机运行，如 `python3 -u  -m paddle.distributed.launch  --gpus "0,1,2,3,4,5,6,7" --ips 192.168.1.101,192.168.1.101 `
+**启动训练**：
+
+这里启动的是单机8卡任务，整体全局的batch_size 512 (64*8)。如果指定ips参数，进行多机运行，如 `python3 -u  -m paddle.distributed.launch  --gpus "0,1,2,3,4,5,6,7" --ips 192.168.1.101,192.168.1.101 `
 ```shell
 python3 -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
