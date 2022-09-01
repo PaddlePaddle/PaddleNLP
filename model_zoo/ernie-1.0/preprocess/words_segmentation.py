@@ -37,6 +37,16 @@ def get_args():
                         type=str,
                         default="./tmp",
                         help='Path to save the output json files.')
+    parser.add_argument('--data_format',
+                        type=str,
+                        default="jsonl",
+                        choices=["jsonl", "wudao"],
+                        help='Path to you raw files. Folder or file path.')
+    parser.add_argument('--cn_seg_func',
+                        type=str,
+                        default='jieba',
+                        choices=['lac', 'seg', 'jieba'],
+                        help='Words segment function for chinese words.')
     parser.add_argument('--log_interval',
                         type=int,
                         default=1,
@@ -83,34 +93,58 @@ CHINESE_SEG_FUNC = {
     'jieba': jieba_segmentation_fn(),
 }
 
-special_chars = ['\n', '。', '?', '？', ' ', ';', '；', '！', '!']
-split_chars = ['。', '?', '？', ';', '；', '!', '！']
 
-
-def text_to_text(output_path, path):
-    out_name = os.path.join(output_path, path[-20:])
+def read_wudao(path):
     print("Loading %s" % path)
     with open(path, "r") as f:
         try:
             contents = json.load(f)
         except Exception as e:
             print("Failed to load %s" % path)
-            return 0, None
+            raise StopIteration
+    for js in contents:
+        yield js["content"]
+
+
+def read_jsonl(path):
+    print("Loading %s" % path)
+    with open(path, "r") as f:
+        line = f.readline()
+        while line:
+            contents = json.load(f)
+            yield contents["text"]
+            line = f.readline()
+
+
+READFILE_FUNC = {
+    'jsonl': read_jsonl,
+    'wudao': read_wudao,
+}
+
+special_chars = ['\n', '。', '?', '？', ' ', ';', '；', '！', '!']
+split_chars = ['。', '?', '？', ';', '；', '!', '！']
+
+
+def text_to_text(path, output_path, read_func, seg_func):
+    out_name = os.path.join(output_path, path[-20:])
 
     print("Write into %s" % out_name)
     if os.path.exists(out_name):
         print("File exists %s" % out_name)
         return 0, None
 
-    seg_func = CHINESE_SEG_FUNC["seg"]
+    seg_func = CHINESE_SEG_FUNC[seg_func]
+    read_func = READFILE_FUNC[read_func]
+
     import time
     s = time.time()
     data_len = 0
     count = 0
     with open(out_name, "w") as f:
-        for js in contents:
+        for text in read_func(path):
+            # for js in contents:
             count += 1
-            text = js["content"]
+            # text = js["content"]
             data_len += len(text.encode("utf-8"))
             # make special char only once,
             # because of those token will be treat as sentence spliter.
@@ -154,7 +188,10 @@ def main():
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
 
-    trans_func = partial(text_to_text, output_path=args.output_path)
+    trans_func = partial(text_to_text,
+                         output_path=args.output_path,
+                         seg_func=args.cn_seg_func,
+                         read_func=args.data_format)
 
     encoded_files = pool.imap(trans_func, file_paths, 1)
 

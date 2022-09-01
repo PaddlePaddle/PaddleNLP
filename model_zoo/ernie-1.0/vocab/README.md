@@ -1,83 +1,43 @@
-# **大规模** **开源** **中文** 语料预训练-<small>从零开始构建预训练模型</small>
+# ERNIE 中文词表制作
 
 ERNIE是百度提出的大规模预训练模型，曾在中文场景下取得了SOTA效果。
-PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao 总共400GB，发布大规模开源语料预训练全流程。从零开始，轻松构建预训练模型。
+PaddleNLP致力于预训练开源工作，本文档提供了ERNIE词表的制作方法。
 
-本项目，从数据下载，词表制作，数据转化，模型训练，所有流程，完全开源开放，可复现。
-并训练发布开源最优的模型参数。
-
-接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
+预训练全部流程的整体详细介绍文档，请参考[ERNIE 中文预训练介绍](../pretraining_introduction.md)。
 
 **目录**
-* [1. **大规模**中文数据](#大规模中文数据)
-* [2. **高精准**中文分词](#高精准中文分词)
-* [3. **全字符**中文词表制作](#中文中文词表制作)
-    - [3.1 分析准备](#分析准备)
-    - [3.2 文本字符统计](#文本字符统计)
-    - [3.3 英文字符词表](#英文字符词表)
-    - [3.4 合并词表](#合并词表)
-* [4. **快速**Token ID 转化](#快速TokenID转化)
-* [5. 参考](#参考)
+* [1. 数据获取](#数据获取)
+* [2. 全字符中文词表制作](#中文词表制作)
+    - [2.1 分析准备](#分析准备)
+    - [2.2 文本字符统计](#文本字符统计)
+    - [2.3 英文字符词表](#英文字符词表)
+    - [2.4 合并词表](#合并词表)
+* [3. 词表使用](#vocab_usage)
+    - [3.1 转化为jsonl格式数据](#jsonl)
+    - [3.2 TokenID转化](#快速TokenID转化)
+* [4. 参考](#ref)
 
 
-<a name="大规模中文数据"> </a>
+<a name="数据获取"> </a>
 
-## 1. 大规模中文数据
+## 1. 数据获取
 
-**CLUECorpus2020 语料**
-
-CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载，方式如下：
-> 数据下载
-> 申请方式： 将使用语料研究目的和用途，计划、研究机构和申请者介绍，发送到邮箱，并承诺不向第三方提供。
->
-> 邮箱: CLUEbenchmark@163.com，标题是：CLUECorpus2020 200G语料库
 
 **WuDaoCorpus2.0 Base 语料**
 
-WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。
-用户微信登录[官网](https://resource.wudaoai.cn/home)，即可直接下载数据。下载好的压缩数据约 64GB
-```
-64GB WuDaoCorpus2.0_base_200G.rar
-```
+WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。用户请参考[这里](../preprocess/docs/WuDaoCorpusBase.md)获取原始文本数据。
 
-<a name="高精准中文分词"> </a>
 
-## 2. 高精准中文分词
+**CLUECorpus2020 语料**
 
-ERNIE 使用知识嵌入的方式进行预训练，如何尽可能精确的从原始文本中提取知识，直接关系预训练模型的效果。
-目前PaddleNLP常用的分词方式的有`jieba`，`lac`，`Wordtag`，
-效果、速度对比表格如下，假设CPU使用40线程，GPU使用16卡，处理200G文本：
+CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户参考[这里](./preprocess/docs/CLUECorpus2020.md)获取原始文本数据。
 
-| 切词方式 | 效果 | 速度 | 预估耗时
-|-|-|-|-|
-| jieba | 一般 | 607 KB/s |  2.5 h |
-| lac   | 好 | 106 KB/s | 13.9 h
-| wordtag| 最好 | 0.94 KB/s | 159 D (GPU)|
 
-综合考虑分词的效果与速度，我们选择百度的LAC作为我们的文本分词工具。
 
-本文档以WuDao数据为例，对数据进行分词：
-
-```shell
-python wudao_process.py \
-    --input_path WuDaoCorpus2.0_base_200G \
-    --workers 40  \
-    --ouput_path ./wudao_lac_cut \
-```
-注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
-
-文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
-```shell
-python ../data_tools/trans_to_json.py  \
-    --input_path ./wudao_lac_cut \
-    --output_path wudao_corpus_200g_0623.jsonl \
-    --workers 40 \
-    --no-shuffle
-```
 
 <a name="全字符中文词表制作"> </a>
 
-## 3. 全字符中文词表制作
+## 2. 全字符中文词表制作
 
 词表的制作有两种方案：
 
@@ -93,7 +53,7 @@ python ../data_tools/trans_to_json.py  \
 第二种方案需要对文本先使用`BasicTokenizer`切分一遍语料。
 第一种方案，自定义程度高，但存在一些局限性。本项目采用了第一种方案，详细介绍如下：
 
-### 3.1 分析准备
+### 2.1 分析准备
 词表大小： 这里我们考虑的因素主要有两个
 - 已有模型对照：
     - ERNIE 3.0系列模型的词表，词表大小为 40000 左右。
@@ -108,7 +68,7 @@ python ../data_tools/trans_to_json.py  \
 - 其他字符约 `2000` 左右
 
 
-### 3.2 文本字符统计
+### 2.2 文本字符统计
 首先第一步是对文本字符进行统计。字符统计的目的主要是添加常用的中文字符、特殊字符。
 
 由于语料文本过大，我们随机选取 10G 左右的原始文本进行了字符统计。
@@ -120,7 +80,7 @@ python gen_char.py path_to_corpus.txt
 wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/char_dict.pickle
 ```
 
-### 3.3 英文字符词表
+### 2.3 英文字符词表
 基于字符的词频统计，使得英文字符也切割为字母，为此我们需要添加英文词表。
 英文部分，我们使用了 [WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip)  数据集，来构造词表。
 下载解压数据，使用BPE切词
@@ -135,7 +95,7 @@ wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/eng.vocab
 ```
 
 
-### 3.4 合并词表
+### 2.4 合并词表
 
 目前我们得到了字符统计表，和英文字符词表。下一步，我们将词表进行合并。
 
@@ -149,7 +109,7 @@ python merge_vocab.py
 1. 对于一些日文、谚文文字字符，需要进行 normalize
 2. 添加special_tokens
 
-### 3.5 问题遗留
+### 2.5 问题遗留
 本项目采用的第一种方式，即拼接产出的词表，对连续非中、英文字符文本，会出现UNK的情况。
 如issue: [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927)、 [#2585](https://github.com/PaddlePaddle/PaddleNLP/issues/2585)。本项目做了两点改进:
 
@@ -159,7 +119,7 @@ python merge_vocab.py
 虽然有上述两点修复，任然无法避免 [#2927](https://github.com/PaddlePaddle/PaddleNLP/issues/2927) 现象。
 彻底解决的话，建议使用第二种方式制作vocab文件。
 
-### 3.6 方案二：预处理后直接生成
+### 2.6 方案二：预处理后直接生成
 此方案没有被采用，这里也简单说明一下具体的方案：
 1. 对语料使用 BasicTokenizer 转换
 ```python
@@ -176,42 +136,66 @@ python gen_vocab.py afer_basic_toknizer_corpus.txt
 对处理好的vocab文件手动替换一些`<pad> -> [PAD]`之类的special_tokens，即可产出词表。
 
 
+<a name="vocab_usage"></a>
+## 3. 词表使用
+
+<a name="josnl"> </a>
+
+## 3.1 转化为jsonl格式数据
+
+本文档以WuDao数据为例，对数据进行分词：
+
+```shell
+python ../preprocess/words_segmentation.py \
+    --input_path ./WuDaoCorpus2.0_base_200G \
+    --workers 40  \
+    --data_format wudao \
+    --cn_seg_func seg \
+    --output_path ./wudao_lac_cut \
+```
+
+文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
+```shell
+python ../preprocess/trans_to_json.py  \
+    --input_path ./wudao_lac_cut \
+    --output_path wudao_corpus_200g_0623.jsonl \
+    --workers 40 \
+```
+
 <a name="快速TokenID转化"> </a>
 
-## 4. 快速Token ID 转化
+## 3.2 Token ID 转化
 
-预料、词表准备妥当后，我们可以开始进行最后的数据ID转化。
-
-- 高效的 Multiprocessing 多进程实现
-- 使用内存BytesIO存储ID数据
-
-由于转换的逻辑复杂，需要定义`class Converter`对象来进行转化处理。如果每次处理新的文本，都实例化一次class对象，速度瓶颈会在处理函数的实例化。
-我们使用了提前multiprocessing.Pool的`initializer`，对处理函数进行提前实例化，提高处理效率。
-
-处理后的token id数量巨大，可以达到数百Billion，如果使用普通的数据结构，如python的list保存，会出现存储瓶颈，不仅占用空间大，list对象还需要重新分配内存空间。这里我们采用了 BytesIO 的方式，类似写入内存文件的方式，速度快，可以非常方便转化为numpy文件保存。
-
-使用 Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz CPU测试，40线程，处理速度 8+MB/s，约7个小时左右，即可完成 200GB 文本转化为ID.
+语料、新建的词表准备妥当后，我们可以开始进行最后的数据ID转化。
 
 ```
-python -u  ../data_tools/create_pretraining_data.py \
-    --model_name ./vocab_path/vocab.txt \
+python -u  ../preprocess/create_pretraining_data.py \
+    --model_name /path/to/your/vocab.txt \
     --tokenizer_name ErnieTokenizer \
     --input_path wudao_corpus_200g_0623.jsonl \
-    --split_sentences\
+    --split_sentences \
     --chinese \
-    --cn_splited \
     --cn_whole_word_segment \
-    --output_prefix wudao_200g_0703 \
-    --workers 40 \
-    --log_interval 1000
+    --cn_seg_func jieba \
+    --cn_splited \
+    --output_prefix wudao_corpus_200g_0623 \
+    --workers 48 \
+    --log_interval 10000
 ```
+
+- 我们提前分词好了，所以加上了 `cn_splited`，否则不需要使用此选项。
+- model_name 指定为我们准备的词表路径。也可以更换为其他 ERNIE 系列模型，如: `ernie-3.0-base-zh`
+- workers 表示转化的线程数目
+
 转化后的数据如下，使用这份数据，即可开始ERNIE预训练
 ```
 -rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_200g_0703_ids.npy
 -rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_200g_0703_idx.npz
 ```
 
-## 5. 参考
+<a name='ref'></a>
+## 4. 参考
+
 感谢CLUE，WuDao提供的开源文本语料，参考资料：
 - Xu, L., Zhang, X. and Dong, Q., 2020. CLUECorpus2020: A large-scale Chinese corpus for pre-training language model. arXiv preprint arXiv:2003.01355.
 - Yuan, S., Zhao, H., Du, Z., Ding, M., Liu, X., Cen, Y., Zou, X., Yang, Z. and Tang, J., 2021. Wudaocorpora: A super large-scale chinese corpora for pre-training language models. AI Open, 2, pp.65-68.
