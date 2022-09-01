@@ -89,8 +89,6 @@ print(text2)
 
 目前PaddleNLP已支持BERT、ERNIE、TinyBERT以及ERNIE-M 4种Tokenizer的Faster版本，其余模型的Tokenizer暂不支持Faster版本。
 
-## 切词流水线
-
 ## FAQ
 
 Q：我在AutoTokenizer.from_pretrained接口上已经打开`use_faster=True`开关，为什么文本预处理阶段性能上好像没有任何变化？
