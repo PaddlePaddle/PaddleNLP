@@ -37,6 +37,10 @@ parser.add_argument("--embedding_dim",
                     type=int,
                     help="The embedding_dim of index")
 
+parser.add_argument('--split_answers',
+                    action='store_true',
+                    help='whether to split lines into question and answers')
+
 parser.add_argument("--query_embedding_model",
                     default="rocketqa-zh-nano-query-encoder",
                     type=str,
@@ -69,6 +73,7 @@ def offline_ann(index_name, doc_dir):
     # 将每篇文档按照段落进行切分
     dicts = convert_files_to_dicts(dir_path=doc_dir,
                                    split_paragraphs=True,
+                                   split_answers=args.split_answers,
                                    encoding='utf-8')
 
     print(dicts[:3])
