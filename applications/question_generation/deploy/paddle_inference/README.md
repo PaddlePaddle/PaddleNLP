@@ -37,12 +37,12 @@ python deploy/paddle_inference/inference.py \
 ```shell
 python deploy/paddle_inference/inference_unimo_text.py --inference_model_dir ./export_checkpoint --device cpu
 ``` -->
-经静态图转换，FastTransformer性能优化，Paddle Inference加速后的部署模型在dureader_qg devset的预测时间为27.74秒。
+经静态图转换，FastTransformer性能优化，Paddle Inference加速后的部署模型在dureader_qg devset的预测时间为27.74秒，相较于未优化前169.24秒，耗时缩减为原来的16.39%。
 关键参数释义如下：
 * `inference_model_dir`：用于高性能推理的静态图模型参数路径，默认为"./export_checkpoint"。
 * `model_name_or_path`：tokenizer对应模型或路径，默认为"unimo-text-1.0"。
 * `dataset_name`：数据集名称，默认为`dureader_qg`。
-* `predict_file`：本地预测数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None，当为None时默认加载`dataset_name`当dev集。
+* `predict_file`：本地预测数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None，当为None时默认加载`dataset_name`的dev集。
 * `output_path`：表示预测结果的保存路径。
 * `device`：推理时使用的设备，可选项["gpu"]，默认为"gpu"。
 * `batch_size`：进行推理时的批大小，默认为16。
