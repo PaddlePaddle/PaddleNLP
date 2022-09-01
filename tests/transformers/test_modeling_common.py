@@ -24,13 +24,13 @@ import paddle
 global_rng = random.Random()
 
 
-def ids_tensor(shape, vocab_size):
+def ids_tensor(shape, vocab_size, dtype="int32"):
     #  Creates a random int32 tensor of the shape within the vocab size
-    return paddle.randint(low=0, high=vocab_size, dtype="int32", shape=shape)
+    return paddle.randint(low=0, high=vocab_size, dtype=dtype, shape=shape)
 
 
-def random_attention_mask(shape):
-    attn_mask = ids_tensor(shape, vocab_size=2)
+def random_attention_mask(shape, dtype="int32"):
+    attn_mask = ids_tensor(shape, vocab_size=2, dtype=dtype)
     # make sure that at least one token is attended to for each batch
     attn_mask[:, -1] = 1
     return attn_mask
@@ -430,7 +430,7 @@ class ModelTesterMixin:
 
     def test_resize_tokens_embeddings(self):
         (
-            config,
+            original_config,
             inputs_dict,
         ) = self.model_tester.prepare_config_and_inputs_for_common()
         if not self.test_resize_embeddings:
