@@ -1323,6 +1323,7 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin,
                              StableDiffusionMixin):
     r"""
     CLIP Model with diffusion model on top.
+    
     Args:
         clip (:class:`CLIPModel`):
             An instance of CLIPModel.
@@ -1475,7 +1476,6 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin,
         The CLIPForImageGeneration stable_diffusion_generate method.
         
         Args:
-        
             input_ids (Tensor):
                 See :class:`CLIPModel`.
             mode (str, optional):
