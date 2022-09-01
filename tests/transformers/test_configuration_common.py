@@ -188,12 +188,12 @@ class ConfigTester(object):
 
         self.parent.assertEqual(config_second.to_dict(), config_first.to_dict())
 
-    def create_and_test_config_with_num_labels(self):
-        config = self.config_class(**self.inputs_dict, num_labels=5)
+    def create_and_test_config_with_num_classes(self):
+        config = self.config_class(**self.inputs_dict, num_classes=5)
         self.parent.assertEqual(len(config.id2label), 5)
         self.parent.assertEqual(len(config.label2id), 5)
 
-        config.num_labels = 3
+        config.num_classes = 3
         self.parent.assertEqual(len(config.id2label), 3)
         self.parent.assertEqual(len(config.label2id), 3)
 
@@ -224,7 +224,7 @@ class ConfigTester(object):
         self.create_and_test_config_to_json_string()
         self.create_and_test_config_to_json_file()
         self.create_and_test_config_from_and_save_pretrained()
-        self.create_and_test_config_with_num_labels()
+        self.create_and_test_config_with_num_classes()
         self.check_config_can_be_init_without_params()
         self.check_config_arguments_init()
 

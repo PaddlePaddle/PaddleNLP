@@ -266,7 +266,7 @@ class PretrainedConfig:
         id2label (`Dict[int, str]`, *optional*):
             A map from index (for instance prediction index, or target index) to label.
         label2id (`Dict[str, int]`, *optional*): A map from label to index for the model.
-        num_labels (`int`, *optional*):
+        num_classes (`int`, *optional*):
             Number of labels to use in the last layer added to the model, typically for a classification task.
         task_specific_params (`Dict[str, Any]`, *optional*):
             Additional keyword arguments to store for the current task.
@@ -385,17 +385,17 @@ class PretrainedConfig:
         self.id2label = kwargs.pop("id2label", None)
         self.label2id = kwargs.pop("label2id", None)
         if self.id2label is not None:
-            num_labels = kwargs.pop("num_labels", None)
-            if num_labels is not None and len(self.id2label) != num_labels:
+            num_classes = kwargs.pop("num_classes", None)
+            if num_classes is not None and len(self.id2label) != num_classes:
                 logger.warning(
-                    f"You passed along `num_labels={num_labels}` with an incompatible id to label map: "
-                    f"{self.id2label}. The number of labels wil be overwritten to {self.num_labels}."
+                    f"You passed along `num_classes={num_classes}` with an incompatible id to label map: "
+                    f"{self.id2label}. The number of labels wil be overwritten to {self.num_classes}."
                 )
             self.id2label = dict(
                 (int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            self.num_labels = kwargs.pop("num_labels", 2)
+            self.num_classes = kwargs.pop("num_classes", 2)
 
         # Tokenizer arguments TODO: eventually tokenizer and models should share the same config
         self.tokenizer_class = kwargs.pop("tokenizer_class", None)
@@ -467,17 +467,17 @@ class PretrainedConfig:
         return self.return_dict
 
     @property
-    def num_labels(self) -> int:
+    def num_classes(self) -> int:
         """
         `int`: The number of labels for classification models.
         """
         return len(self.id2label)
 
-    @num_labels.setter
-    def num_labels(self, num_labels: int):
+    @num_classes.setter
+    def num_classes(self, num_classes: int):
         if not hasattr(self, "id2label") or self.id2label is None or len(
-                self.id2label) != num_labels:
-            self.id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
+                self.id2label) != num_classes:
+            self.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
             self.label2id = dict(
                 zip(self.id2label.values(), self.id2label.keys()))
 
@@ -715,13 +715,13 @@ class PretrainedConfig:
                 (int(key), value) for key, value in config.pruned_heads.items())
 
         # Update config with kwargs if needed
-        if "num_labels" in kwargs and "id2label" in kwargs:
-            num_labels = kwargs["num_labels"]
+        if "num_classes" in kwargs and "id2label" in kwargs:
+            num_classes = kwargs["num_classes"]
             id2label = kwargs["id2label"] if kwargs[
                 "id2label"] is not None else []
-            if len(id2label) != num_labels:
+            if len(id2label) != num_classes:
                 raise ValueError(
-                    f"You passed along `num_labels={num_labels }` with an incompatible id to label map: "
+                    f"You passed along `num_classes={num_classes }` with an incompatible id to label map: "
                     f"{kwargs['id2label']}. Since those arguments are inconsistent with each other, you should remove "
                     "one of them.")
         to_remove = []
