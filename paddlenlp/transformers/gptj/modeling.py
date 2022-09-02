@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The Salesforce authors, The Open AI Team Authors and The HuggingFace Inc. team
+# Copyright 2022 The EleutherAI Authors and The HuggingFace Inc. team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,11 @@ from paddle.nn import Layer, Embedding
 
 from ..nezha.modeling import ACT2FN
 from .. import PretrainedModel, register_base_model
+
+__all__ = [
+    "GPTJModel", "GPTJPretrainedModel", "GPTJForCausalLM",
+    "GPTJForSequenceClassification", "GPTJForQuestionAnswering"
+]
 
 
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
@@ -53,7 +58,7 @@ def apply_rotary_pos_emb(x, sincos, offset=0):
     return (x * cos) + (rotate_every_two(x) * sin)
 
 
-class CodeGenAttention(Layer):
+class GPTJAttention(Layer):
 
     def __init__(self, embed_dim, rotary_dim, num_attention_heads,
                  max_positions, attn_pdrop, resid_pdrop):
@@ -79,23 +84,34 @@ class CodeGenAttention(Layer):
                 f" `num_attention_heads`: {self.num_attention_heads}).")
         self.scale_attn = paddle.sqrt(
             paddle.to_tensor(self.head_dim, dtype="float32"))
-        self.qkv_proj = nn.Linear(self.embed_dim,
-                                  self.embed_dim * 3,
-                                  bias_attr=False)
+        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias_attr=False)
+        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim, bias_attr=False)
+        self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias_attr=False)
 
         self.out_proj = nn.Linear(self.embed_dim,
                                   self.embed_dim,
                                   bias_attr=False)
         self.rotary_dim = rotary_dim
 
-    def _split_heads(self, x, n_head, dim_head, mp_num):
-        reshaped = x.reshape(x.shape[:-1] + [n_head // mp_num, dim_head])
-        reshaped = reshaped.reshape(x.shape[:-2] + [-1] + reshaped.shape[-1:])
-        return reshaped
+    def _split_heads(self, tensor, num_attention_heads, attn_head_size, rotary):
+        new_shape = tensor.shape[:-1] + [num_attention_heads, attn_head_size]
+        tensor = tensor.reshape(new_shape)
+        if rotary:
+            return tensor
+        if len(tensor.shape) == 5:
+            # (batch, blocks, head, block_length, head_features)
+            return tensor.transpose([0, 1, 3, 2, 4])
+        elif len(tensor.shape) == 4:
+            # (batch, head, seq_length, head_features)
+            return tensor.transpose([0, 2, 1, 3])
+        else:
+            raise ValueError(
+                f"Input tensor rank should be one of [4, 5], but is: {len(tensor.shape)}"
+            )
 
     def _merge_heads(self, tensor, num_attention_heads, attn_head_size):
         """
-        Merges attn_head_size dim and num_attn_heads dim into n_ctx
+        Merges attn_head_size dim and num_attn_heads dim into hidden dim
         """
         if len(tensor.shape) == 5:
             tensor = tensor.transpose([0, 1, 3, 2, 4])
@@ -120,10 +136,10 @@ class CodeGenAttention(Layer):
         key = paddle.cast(key, "float32")
         attn_weights = paddle.matmul(query, key, transpose_y=True)
 
-        attn_weights = attn_weights / self.scale_attn
-        mask_value = paddle.to_tensor(-1e4, dtype=attn_weights.dtype)
+        mask_value = paddle.to_tensor(-1e9, dtype=attn_weights.dtype)
         # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
         attn_weights = paddle.where(causal_mask, attn_weights, mask_value)
+        attn_weights = attn_weights / self.scale_attn
 
         if attention_mask is not None:
             # Apply the attention mask
@@ -143,27 +159,16 @@ class CodeGenAttention(Layer):
         use_cache=False,
         cache=None,
     ):
-        qkv = self.qkv_proj(hidden_states)
-        mp_num = 4
-        qkv_split = qkv.reshape(qkv.shape[:-1] + [mp_num, -1])
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
 
-        local_dim = qkv_split.shape[-1] // (self.head_dim *
-                                            self.num_attention_heads // mp_num)
-        query, value, key = paddle.split(qkv_split, local_dim, axis=-1)
-        query = self._split_heads(query,
-                                  self.num_attention_heads,
-                                  self.head_dim,
-                                  mp_num=mp_num)
-        key = self._split_heads(key,
-                                self.num_attention_heads,
-                                self.head_dim,
-                                mp_num=mp_num)
-
-        value = self._split_heads(value,
-                                  self.num_attention_heads,
-                                  self.head_dim,
-                                  mp_num=mp_num)
-        value = value.transpose([0, 2, 1, 3])
+        query = self._split_heads(query, self.num_attention_heads,
+                                  self.head_dim, True)
+        key = self._split_heads(key, self.num_attention_heads, self.head_dim,
+                                True)
+        value = self._split_heads(value, self.num_attention_heads,
+                                  self.head_dim, False)
 
         seq_len = key.shape[1]
         offset = 0
@@ -216,7 +221,7 @@ class CodeGenAttention(Layer):
         return attn_output, present
 
 
-class CodeGenMLP(Layer):
+class GPTJMLP(Layer):
 
     def __init__(self, embed_dim, inner_dim, activation_function, resid_pdrop):
         super().__init__()
@@ -235,17 +240,17 @@ class CodeGenMLP(Layer):
         return hidden_states
 
 
-class CodeGenBlock(Layer):
+class GPTJBlock(Layer):
 
-    def __init__(self, embed_dim, rotary_dim, n_head, n_ctx, attn_pdrop,
+    def __init__(self, embed_dim, rotary_dim, n_head, n_positions, attn_pdrop,
                  resid_pdrop, activation_function, layer_norm_epsilon):
         super().__init__()
         inner_dim = 4 * embed_dim
         self.ln_1 = nn.LayerNorm(embed_dim, epsilon=layer_norm_epsilon)
-        self.attn = CodeGenAttention(embed_dim, rotary_dim, n_head, n_ctx,
-                                     attn_pdrop, resid_pdrop)
-        self.mlp = CodeGenMLP(embed_dim, inner_dim, activation_function,
-                              resid_pdrop)
+        self.attn = GPTJAttention(embed_dim, rotary_dim, n_head, n_positions,
+                                  attn_pdrop, resid_pdrop)
+        self.mlp = GPTJMLP(embed_dim, inner_dim, activation_function,
+                           resid_pdrop)
 
     def forward(
         self,
@@ -274,7 +279,7 @@ class CodeGenBlock(Layer):
         return outputs  # hidden_states, present, (attentions)
 
 
-class CodeGenPreTrainedModel(PretrainedModel):
+class GPTJPretrainedModel(PretrainedModel):
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
@@ -308,9 +313,9 @@ class CodeGenPreTrainedModel(PretrainedModel):
 
 
 @register_base_model
-class CodeGenModel(CodeGenPreTrainedModel):
+class GPTJModel(GPTJPretrainedModel):
     r"""
-    The bare CodeGen Model outputting raw hidden-states.
+    The bare GPTJ Model outputting raw hidden-states.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
@@ -318,8 +323,8 @@ class CodeGenModel(CodeGenPreTrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
     Args:
         vocab_size (int):
-            Vocabulary size of `inputs_ids` in `CodeGenModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `CodeGenModel`.
+            Vocabulary size of `inputs_ids` in `GPTJModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `GPTJModel`.
         bos_token_id (int, optional):
             The beginning of sequence token that was used during pretraining. Can be
             used a sequence classifier token.
@@ -337,9 +342,6 @@ class CodeGenModel(CodeGenPreTrainedModel):
         n_head (int, optional):
             Number of attention heads for each attention layer in the Transformer decoder.
             Defaults to `16`.
-        n_ctx (int, optional):
-            Dimensionality of the causal mask (usually same as n_positions).
-            Defaults to `2048`.
         n_positions (int, optional):
             The maximum sequence length that this model might ever be used with.
             Defaults to `2048`.
@@ -368,18 +370,17 @@ class CodeGenModel(CodeGenPreTrainedModel):
 
     def __init__(self,
                  vocab_size,
-                 bos_token_id=0,
+                 bos_token_id=50256,
                  pad_token_id=50256,
-                 eos_token_id=2,
-                 n_embd=1024,
-                 n_layer=20,
+                 eos_token_id=50256,
+                 n_embd=4096,
+                 n_layer=28,
                  n_head=16,
-                 n_ctx=2048,
                  n_positions=2048,
                  attn_pdrop=0.0,
                  resid_pdrop=0.0,
                  embd_pdrop=0.0,
-                 rotary_dim=32,
+                 rotary_dim=64,
                  activation_function="gelu_new",
                  layer_norm_epsilon=1e-05,
                  initializer_range=0.02):
@@ -394,12 +395,11 @@ class CodeGenModel(CodeGenPreTrainedModel):
         self.wte = nn.Embedding(vocab_size, self.embed_dim)
         self.drop = nn.Dropout(embd_pdrop)
         self.h = nn.LayerList([
-            CodeGenBlock(n_embd, rotary_dim, n_head, n_ctx, attn_pdrop,
-                         resid_pdrop, activation_function, layer_norm_epsilon)
+            GPTJBlock(n_embd, rotary_dim, n_head, n_positions, attn_pdrop,
+                      resid_pdrop, activation_function, layer_norm_epsilon)
             for _ in range(n_layer)
         ])
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=layer_norm_epsilon)
-        self.rotary_dim = min(rotary_dim, n_ctx // n_head)
 
         # Initialize weights and apply final processing
         self.apply(self.init_weights)
@@ -418,7 +418,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         cache=None,
     ):
         r'''
-        The CodeGenModel forward method, overrides the `__call__()` special method.
+        The GPTJModel forward method, overrides the `__call__()` special method.
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. They are
@@ -449,10 +449,10 @@ class CodeGenModel(CodeGenPreTrainedModel):
         Example:
             .. code-block::
                 import paddle
-                from paddlenlp.transformers import CodeGenModel, CodeGenTokenizer
-                tokenizer = CodeGenTokenizer.from_pretrained('Salesforce/codegen-350M-mono')
-                model = CodeGenModel.from_pretrained('Salesforce/codegen-350M-mono')
-                inputs = tokenizer("def hello_world():", return_token_type_ids=False)
+                from paddlenlp.transformers import GPTJModel, GPTJTokenizer
+                tokenizer = GPTJTokenizer.from_pretrained('EleutherAI/gpt-j-6B')
+                model = GPTJModel.from_pretrained('EleutherAI/gpt-j-6B')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
@@ -485,6 +485,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
             attention_mask.stop_gradient = True
 
         inputs_embeds = self.wte(input_ids)
+
         hidden_states = self.drop(inputs_embeds)
         output_shape = input_shape[:] + [hidden_states.shape[-1]]
 
@@ -508,16 +509,13 @@ class CodeGenModel(CodeGenPreTrainedModel):
         return last_hidden_state, new_cache
 
 
-class CodeGenForCausalLM(CodeGenPreTrainedModel):
+class GPTJForCausalLM(GPTJPretrainedModel):
     r"""
-    CodeGen Model with a `language modeling` head on top.
+    GPTJ Model with a `language modeling` head on top.
     Args:
-        bart (:class:`CodeGenModel`):
-            An instance of CodeGenModel.
+        GPTJ (:class:`GPTJModel`):
+            An instance of GPTJModel.
     """
-    _keys_to_ignore_on_load_missing = [
-        r"h\.\d+\.attn\.masked_bias", r"h\.\d+\.attn\.bias"
-    ]
 
     def __init__(self, transformer):
         super().__init__()
@@ -535,7 +533,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         self.lm_head = new_embeddings
 
     def prepare_faster_entry(self, kwargs):
-        from paddlenlp.ops import FasterCodeGen
+        from paddlenlp.ops import FasterGPTJ
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decoding_lib = kwargs.get('decoding_lib', None)
         decode_strategy = kwargs.get('decode_strategy')
@@ -555,7 +553,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
             raise AttributeError(
                 "'forced_bos_token_id != None' is not supported yet in the faster version"
             )
-        self._faster_entry = FasterCodeGen(
+        self._faster_entry = FasterGPTJ(
             self,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding).forward
@@ -584,16 +582,16 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                 use_cache=False,
                 cache=None):
         r"""
-        The CodeGenForCausalLM forward method, overrides the __call__() special method.
+        The GPTJForCausalLM forward method, overrides the __call__() special method.
         Args:
             input_ids (Tensor):
-                See :class:`CodeGenModel`.
+                See :class:`GPTJModel`.
             attention_mask (Tensor, optional):
-                See :class:`CodeGenModel`.
+                See :class:`GPTJModel`.
             use_cache (bool, optional):
-                See :class:`CodeGenModel`.
+                See :class:`GPTJModel`.
             cache (Tensor, optional):
-                See :class:`CodeGenModel`.
+                See :class:`GPTJModel`.
         Returns:
             Tensor or tuple: Returns Tensor `lm_logits` if `use_cache` is `False`, otherwise, returns tuple (`lm_logits`, `cache`).
             With the fields:
@@ -601,14 +599,14 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                 The generated sentence of the model.
                 Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
             - `cache` (Tensor):
-                See :class:`CodeGenModel`.
+                See :class:`GPTJModel`.
         Example:
             .. code-block::
                 import paddle
-                from paddlenlp.transformers import CodeGenForCausalLM, CodeGenTokenizer
-                tokenizer = CodeGenTokenizer.from_pretrained('Salesforce/codegen-350M-mono')
-                model = CodeGenForCausalLM.from_pretrained('Salesforce/codegen-350M-mono')
-                inputs = tokenizer("def hello_world():", return_token_type_ids=False)
+                from paddlenlp.transformers import GPTJForCausalLM, GPTJTokenizer
+                tokenizer = GPTJTokenizer.from_pretrained('EleutherAI/gpt-j-6B')
+                model = GPTJForCausalLM.from_pretrained('EleutherAI/gpt-j-6B')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 outputs = model(**inputs)
         """
@@ -639,3 +637,166 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class GPTJForSequenceClassification(GPTJPretrainedModel):
+    r"""
+    GPTJ Model with a linear layer on top of the pooled output,
+    designed for sequence classification/regression tasks like GLUE tasks.
+    Since it does classification on the last token, it requires to know the 
+    position of the last token. If a `pad_token_id` is defined in the configuration, 
+    it finds the last token that is not a padding token in each row. If no `pad_token_id` 
+    is defined, it simply takes the last value in each row of the batch.
+
+    Args:
+        GPTJ (:class:`GPTJModel`):
+            An instance of GPTJModel.
+        num_labels (int, optional):
+            The number of different labels. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of GPTJ.
+            If None, use the same value as `hidden_dropout_prob` of `GPTJModel`
+            instance `GPTJ`. Defaults to None.
+    """
+
+    def __init__(self, transformer, num_labels=2):
+        super().__init__()
+        self.transformer = transformer
+        self.classifier = nn.Linear(self.transformer.config["n_embd"],
+                                    num_labels,
+                                    bias_attr=False)
+        self.apply(self.init_weights)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        use_cache=False,
+        cache=None,
+    ):
+        r"""
+        The GPTJForSequenceClassification forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTJModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTJModel`.
+            use_cache (bool, optional):
+                See :class:`GPTJModel`.
+            cache (Tensor, optional):
+                See :class:`GPTJModel`.
+
+        Returns:
+            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            Shape as `[batch_size, num_labels]` and dtype as float32.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTJForSequenceClassification, GPTJTokenizer
+                tokenizer = GPTJTokenizer.from_pretrained('EleutherAI/gpt-j-6B')
+                model = GPTJForSequenceClassification.from_pretrained('EleutherAI/gpt-j-6B')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                logits = model(**inputs)
+        """
+        transformer_outputs = self.transformer(input_ids,
+                                               attention_mask=attention_mask,
+                                               use_cache=use_cache,
+                                               cache=cache)
+
+        hidden_states = transformer_outputs[0]
+        logits = self.classifier(hidden_states)
+        batch_size = input_ids.shape[0]
+
+        if self.transformer.config.get('pad_token_id',
+                                       None) is None and batch_size != 1:
+            raise ValueError(
+                "Cannot handle batch sizes > 1 if no padding token is defined.")
+
+        if self.transformer.config.get('pad_token_id', None) is None:
+            sequence_lengths = -1
+        else:
+            sequence_lengths = (
+                input_ids !=
+                self.transformer.config['pad_token_id']).sum(-1) - 1
+
+        pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
+
+        return pooled_logits
+
+
+class GPTJForQuestionAnswering(GPTJPretrainedModel):
+    r"""
+    GPTJ Model with a linear layer on top of the hidden-states output to
+    compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
+
+    Args:
+        GPTJ (:class:`GPTJModel`):
+            An instance of GPTJModel.
+    """
+
+    def __init__(self, transformer):
+        super().__init__()
+        self.transformer = transformer
+        self.classifier = nn.Linear(self.transformer.config['n_embd'], 2)
+        self.apply(self.init_weights)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        use_cache=False,
+        cache=None,
+    ):
+        r"""
+        The GPTJForQuestionAnswering forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`GPTJModel`.
+            attention_mask (Tensor, optional):
+                See :class:`GPTJModel`.
+            use_cache (bool, optional):
+                See :class:`GPTJModel`.
+            cache (Tensor, optional):
+                See :class:`GPTJModel`.
+
+        Returns:
+            tuple: Returns tuple (`start_logits`, `end_logits`).
+
+            With the fields:
+
+            - `start_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the start position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+            - `end_logits` (Tensor):
+                A tensor of the input token classification logits, indicates the end position of the labelled span.
+                Its data type should be float32 and its shape is [batch_size, sequence_length].
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTJForQuestionAnswering, GPTJTokenizer
+
+                tokenizer = GPTJTokenizer.from_pretrained('EleutherAI/gpt-j-6B')
+                model = GPTJForQuestionAnswering.from_pretrained('EleutherAI/gpt-j-6B')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                outputs = model(**inputs)
+                start_logits = outputs[0]
+                end_logits  =outputs[1]
+        """
+        transformer_outputs = self.transformer(input_ids,
+                                               attention_mask=attention_mask,
+                                               use_cache=use_cache,
+                                               cache=cache)
+
+        hidden_states = transformer_outputs[0]
+        logits = self.classifier(hidden_states)
+        logits = paddle.transpose(logits, perm=[2, 0, 1])
+        start_logits, end_logits = paddle.unstack(x=logits, axis=0)
+        return start_logits, end_logits
