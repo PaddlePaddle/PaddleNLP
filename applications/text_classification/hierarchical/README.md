@@ -9,6 +9,10 @@
     - [2.4 模型训练](#模型训练)
     - [2.5 模型部署](#模型部署)
     - [2.6 模型效果](#模型效果)
+
+
+<a name="层次分类简介"></a>
+
 ## 1. 层次分类简介
 
 本项目提供通用场景下**基于预训练模型微调的层次分类端到端应用方案**，打通数据标注-模型训练-模型调优-模型压缩-预测部署全流程，有效缩短开发周期，降低AI开发落地门槛。
@@ -22,19 +26,19 @@
 
 **方案亮点：**
 
-- **分析高效✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
-
-- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0轻量级模型作为训练基座，ERNIE 3.0轻量级模型学习海量的中文数据与知识，具有广泛成熟的实践应用。
-
-- **低门槛操作👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，高效完成从数据标注到部署全流程
+- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
 
 **更多选择：**
 
-对于大多数层次分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，层次分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术方案](../README.md#文本分类技术方案)。
+对于大多数层次分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，层次分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
 
 - 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习层次分类方案](./few-shot#readme)
 
 - 【标签类别不固定场景】 👉 [语义索引层次分类方案](./retrieval_based#readme)
+
+<a name="快速开始"></a>
 
 ## 2. 快速开始
 
@@ -46,13 +50,15 @@ mv baidu_extract_2020 data
 ```
 
 <div align="center">
-    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/186386181-7cdf3015-3e6c-4ffe-9512-95ba707fd00c.png">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187828356-e2f4f627-f5fe-4c83-8879-ed6951f7511e.png">
 </div>
 <div align="center">
     <font size ="2">
     层次分类数据标注-模型训练-模型分析-模型压缩-预测部署流程图
      </font>
 </div>
+
+<a name="运行环境"></a>
 
 ### 2.1 运行环境
 
@@ -79,10 +85,12 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 python3 -m  pip install scikit-learn==1.0.2
 ```
 
+<a name="代码结构"></a>
+
 ### 2.2 代码结构
 
 ```text
-multi_label/
+hierarchical/
 ├── deploy # 部署
 │   └── predictor # 离线部署
 │   │   ├── infer.py # 测试脚本
@@ -105,6 +113,8 @@ multi_label/
 ├── prune.py # 裁剪脚本
 └── README.md # 使用说明
 ```
+
+<a name="数据准备"></a>
 
 ### 2.3 数据准备
 
@@ -173,7 +183,11 @@ data/
 ...
 ```
 
+<a name="模型训练"></a>
+
 ### 2.4 模型训练
+
+
 
 #### 2.4.1 预训练模型微调
 
@@ -209,7 +223,6 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --batch_size 32 \
     --early_stop
 ```
-
 
 
 可支持配置的参数：
@@ -308,6 +321,8 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 
+<a name="模型部署"></a>
+
 ### 2.5 模型部署
 
 #### 2.5.1 静态图导出
@@ -334,7 +349,7 @@ export/
  导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 #### 2.5.2 模型裁剪
 
-如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 压缩(Compression API）, 一行命令即可启动模型裁剪。
+如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 [压缩API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md), 一行命令即可启动模型裁剪。
 
 使用裁剪功能需要安装 paddleslim：
 
@@ -342,7 +357,7 @@ export/
 pip install paddleslim==2.2.2
 ```
 
-开始模型裁剪训练：
+开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
 python prune.py \
     --device "gpu" \
@@ -352,7 +367,6 @@ python prune.py \
     --max_seq_length 128 \
     --width_mult_list '3/4' '2/3' '1/2'
 ```
-默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
 
 
 可支持配置的参数：
@@ -398,6 +412,8 @@ prune/
 
 - 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
 
+<a name="模型效果"></a>
+
 ### 2.6 模型效果
 
 我们在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)的多标签层次数据集评测模型表现，测试配置如下：
@@ -435,7 +451,6 @@ prune/
 |ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|94.72|93.03| 0.93|
 |ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.70|
 |ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|93.98|91.25|0.54|
-| ERNIE 3.0 Medium + FP16  | 6-layer, 768-hidden, 12-heads|95.26|93.22| 0.79|
 | ERNIE 3.0 Medium + 裁剪(保留比例3/4)|6-layer, 768-hidden, 9-heads| 95.45|93.40| 0.81   |
 | ERNIE 3.0 Medium + 裁剪(保留比例2/3)|6-layer, 768-hidden, 8-heads| 95.23|93.27 | 0.74  |
 | ERNIE 3.0 Medium + 裁剪(保留比例1/2)|6-layer, 768-hidden, 6-heads| 94.92 | 92.70| 0.61 |
