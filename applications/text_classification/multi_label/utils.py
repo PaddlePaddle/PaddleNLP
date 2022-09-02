@@ -76,8 +76,13 @@ def preprocess_function(examples, tokenizer, max_seq_length, label_nums):
 
 
 def read_local_dataset(path, label_list):
+    """
+    Read dataset
+    """
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
-            sentence, label = line.strip().split('\t')
+            items = line.strip().split('\t')
+            sentence = ''.join(items[:-1])
+            label = items[-1]
             labels = [label_list[l] for l in label.split(',')]
             yield {'sentence': sentence, 'label': labels}
