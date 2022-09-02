@@ -18,17 +18,17 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.distributed as dist
-from .. import PretrainedModel, register_base_model
 from dataclasses import dataclass
+
+from .. import PretrainedModel, register_base_model
 from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
 from ..ernie.modeling import ErnieModel
 from ..clip.modeling import VisionTransformer, clip_loss
-from ..guided_diffusion_utils.diffusion_utils import DiffusionMixin
-from ..guided_diffusion_utils.model_diffusion import create_gaussian_diffusion, create_unet_model, create_secondary_model
+from ..guided_diffusion_utils import DiscoDiffusionMixin, create_gaussian_diffusion, create_unet_model, create_secondary_model
 
 __all__ = [
     'ErnieViLModel',
-    'ErnieViLPreTrainedModel',
+    'ErnieViLPretrainedModel',
     'ErnieViLForImageGeneration',
 ]
 
@@ -78,7 +78,7 @@ class ErnieViLOutput(ModelOutput):
             for k in self.keys())
 
 
-class ErnieViLPreTrainedModel(PretrainedModel):
+class ErnieViLPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained ErnieViL models. It provides ErnieViL related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
@@ -182,7 +182,7 @@ class ErnieViLPreTrainedModel(PretrainedModel):
 
 
 @register_base_model
-class ErnieViLModel(ErnieViLPreTrainedModel):
+class ErnieViLModel(ErnieViLPretrainedModel):
     r"""
     The bare ErnieViL Model outputting logits_per_image and logits_per_text.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
@@ -558,7 +558,7 @@ class ErnieViLModel(ErnieViLPreTrainedModel):
         )
 
 
-class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
+class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
     r"""
     ErnieViLModel with diffusion model on top.
     Args:
@@ -854,7 +854,7 @@ class ErnieViLForImageGeneration(ErnieViLPreTrainedModel, DiffusionMixin):
             token_type_ids=token_type_ids,
             task_type_ids=task_type_ids)
 
-        images_list = super().diffusion_generate(
+        images_list = super().disco_diffusion_generate(
             target_text_embeds=target_text_embeds,
             clamp_grad=clamp_grad,
             clamp_max=clamp_max,
