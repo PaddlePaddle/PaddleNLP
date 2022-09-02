@@ -37,7 +37,7 @@ from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
 from .information_extraction import UIETask
 from .code_generation import CodeGenerationTask
-from .text2image_generation import Text2ImageGenerationTask
+from .text_to_image import TextToImageGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -192,9 +192,34 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-simbert-base-chinese"
             },
+            "rocketqa-zh-dureader-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag":
+                'text_similarity-rocketqa-zh-dureader-cross-encoder',
+            },
+            "rocketqa-base-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-base-cross-encoder',
+            },
+            "rocketqa-medium-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-medium-cross-encoder',
+            },
+            "rocketqa-mini-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-mini-cross-encoder',
+            },
+            "rocketqa-micro-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-micro-cross-encoder',
+            },
+            "rocketqa-nano-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-nano-cross-encoder',
+            },
         },
         "default": {
-            "model": "simbert-base-chinese"
+            "model": "rocketqa-zh-dureader-cross-encoder"
         }
     },
     "word_segmentation": {
@@ -320,39 +345,36 @@ TASKS = {
             "model": "Salesforce/codegen-350M-mono",
         },
     },
-    "text2image_generation": {
+    "text_to_image": {
         "models": {
             "dalle-mini": {
-                "task_class": Text2ImageGenerationTask,
-                "task_flag": "text2image_generation-dalle-mini",
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mini",
                 "task_priority_path": "dalle-mini",
             },
             "dalle-mega-v16": {
-                "task_class": Text2ImageGenerationTask,
-                "task_flag": "text2image_generation-dalle-mega-v16",
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega-v16",
                 "task_priority_path": "dalle-mega-v16",
             },
             "dalle-mega": {
-                "task_class": Text2ImageGenerationTask,
-                "task_flag": "text2image_generation-dalle-mega",
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega",
                 "task_priority_path": "dalle-mega",
             },
             "pai-painter-painting-base-zh": {
-                "task_class": Text2ImageGenerationTask,
-                "task_flag":
-                "text2image_generation-pai-painter-painting-base-zh",
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-painting-base-zh",
                 "task_priority_path": "pai-painter-painting-base-zh",
             },
             "pai-painter-scenery-base-zh": {
-                "task_class": Text2ImageGenerationTask,
-                "task_flag":
-                "text2image_generation-pai-painter-scenery-base-zh",
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-scenery-base-zh",
                 "task_priority_path": "pai-painter-scenery-base-zh",
             },
             "pai-painter-commercial-base-zh": {
-                "task_class": Text2ImageGenerationTask,
-                "task_flag":
-                "text2image_generation-pai-painter-commercial-base-zh",
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-commercial-base-zh",
                 "task_priority_path": "pai-painter-commercial-base-zh",
             },
         },

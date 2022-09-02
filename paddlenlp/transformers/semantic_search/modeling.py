@@ -27,13 +27,14 @@ class ErnieEncoder(ErniePretrainedModel):
         super(ErnieEncoder, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(768, num_classes)
+        self.classifier = nn.Linear(self.ernie.config["hidden_size"],
+                                    num_classes)
         self.apply(self.init_weights)
 
     def init_weights(self, layer):
         """ Initialization hook """
         if isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-5
+            layer._epsilon = 1e-12
 
     def forward(self,
                 input_ids,
@@ -75,7 +76,7 @@ class ErnieDualEncoder(nn.Layer):
     """
 
     def __init__(self,
-                 query_model_name_or_path,
+                 query_model_name_or_path=None,
                  title_model_name_or_path=None,
                  share_parameters=False,
                  dropout=None,
@@ -84,13 +85,16 @@ class ErnieDualEncoder(nn.Layer):
         super().__init__()
         self.query_ernie, self.title_ernie = None, None
         self.use_cross_batch = use_cross_batch
-        self.query_ernie = ErnieEncoder.from_pretrained(
-            query_model_name_or_path)
+        if query_model_name_or_path is not None:
+            self.query_ernie = ErnieEncoder.from_pretrained(
+                query_model_name_or_path)
         if share_parameters:
             self.title_ernie = self.query_ernie
         elif title_model_name_or_path is not None:
             self.title_ernie = ErnieEncoder.from_pretrained(
                 title_model_name_or_path)
+        assert (self.query_ernie is not None) or (self.title_ernie is not None), \
+            "At least one of query_ernie and title_ernie should not be None"
 
     def get_semantic_embedding(self, data_loader):
         self.eval()
@@ -166,12 +170,18 @@ class ErnieDualEncoder(nn.Layer):
                                                         query_attention_mask)
 
         pos_title_cls_embedding = self.get_pooled_embedding(
-            pos_title_input_ids, pos_title_token_type_ids,
-            pos_title_position_ids, pos_title_attention_mask)
+            pos_title_input_ids,
+            pos_title_token_type_ids,
+            pos_title_position_ids,
+            pos_title_attention_mask,
+            is_query=False)
 
         neg_title_cls_embedding = self.get_pooled_embedding(
-            neg_title_input_ids, neg_title_token_type_ids,
-            neg_title_position_ids, neg_title_attention_mask)
+            neg_title_input_ids,
+            neg_title_token_type_ids,
+            neg_title_position_ids,
+            neg_title_attention_mask,
+            is_query=False)
 
         all_title_cls_embedding = paddle.concat(
             x=[pos_title_cls_embedding, neg_title_cls_embedding], axis=0)
@@ -264,9 +274,10 @@ class ErnieCrossEncoder(nn.Layer):
                               position_ids=position_ids,
                               attention_mask=attention_mask,
                               return_prob_distributation=True)
-        accuracy = paddle.metric.accuracy(input=probs, label=labels)
-        loss = F.cross_entropy(input=logits, label=labels)
-
-        outputs = {"loss": loss, "accuracy": accuracy}
-
-        return outputs
+        if (labels is not None):
+            accuracy = paddle.metric.accuracy(input=probs, label=labels)
+            loss = F.cross_entropy(input=probs, label=labels)
+            outputs = {"loss": loss, "accuracy": accuracy}
+            return outputs
+        else:
+            return probs[:, 1]

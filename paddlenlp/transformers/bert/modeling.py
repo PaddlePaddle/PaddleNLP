@@ -619,14 +619,14 @@ class BertModel(BertPretrainedModel):
                 Whether to return the attentions tensors of all attention layers.
                 Defaults to `False`.
             return_dict (bool, optional):
-                Whether to return a `ModelOutput` object. If `False`, the output
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            An instance of `BaseModelOutputWithPoolingAndCrossAttentions` if
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
             `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
             to ordered and not None (depending on the input arguments) fields of
-            `BaseModelOutputWithPoolingAndCrossAttentions`.
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -744,6 +744,8 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                start_positions=None,
+                end_positions=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -755,19 +757,32 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 See :class:`BertModel`.
             token_type_ids (Tensor, optional):
                 See :class:`BertModel`.
+            position_ids(Tensor, optional):
+                See :class:`BertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`BertModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`start_logits`, `end_logits`).
-
-            With the fields:
-
-            - `start_logits` (Tensor):
-                A tensor of the input token classification logits, indicates the start position of the labelled span.
-                Its data type should be float32 and its shape is [batch_size, sequence_length].
-
-            - `end_logits` (Tensor):
-                A tensor of the input token classification logits, indicates the end position of the labelled span.
-                Its data type should be float32 and its shape is [batch_size, sequence_length].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput`.
 
         Example:
             .. code-block::
@@ -802,12 +817,28 @@ class BertForQuestionAnswering(BertPretrainedModel):
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
         total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
             return ((total_loss, ) +
                     output) if total_loss is not None else output
 
         return QuestionAnsweringModelOutput(
+            loss=total_loss,
             start_logits=start_logits,
             end_logits=end_logits,
             hidden_states=outputs.hidden_states,
@@ -846,6 +877,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -859,12 +891,27 @@ class BertForSequenceClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             position_ids(Tensor, optional):
                 See :class:`BertModel`.
-            attention_mask (list, optional):
+            attention_mask (Tensor, optional):
                 See :class:`BertModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput`.
 
         Example:
             .. code-block::
@@ -897,14 +944,26 @@ class BertForSequenceClassification(BertPretrainedModel):
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
-        # TODO(guosheng): Support loss
         loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
         if not return_dict:
             output = (logits, ) + outputs[2:]
             return ((loss, ) + output) if loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return SequenceClassifierOutput(
+            loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -942,6 +1001,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -957,10 +1017,22 @@ class BertForTokenClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             attention_mask (list, optional):
                 See :class:`BertModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
 
         Example:
             .. code-block::
@@ -993,14 +1065,18 @@ class BertForTokenClassification(BertPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        # TODO(guosheng): Support loss
         loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
         if not return_dict:
             output = (logits, ) + outputs[2:]
             return ((loss, ) + output) if loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return TokenClassifierOutput(
+            loss=loss,
             logits=logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -1169,6 +1245,8 @@ class BertForPretraining(BertPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 masked_positions=None,
+                labels=None,
+                next_sentence_label=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -1185,20 +1263,30 @@ class BertForPretraining(BertPretrainedModel):
                 See :class:`BertModel`.
             masked_positions(Tensor, optional):
                 See :class:`BertPretrainingHeads`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
+                vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked),
+                the loss is only computed for the tokens with labels in `[0, ..., vocab_size]`.
+            next_sentence_label (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the next sequence prediction (classification) loss. Input should be a sequence
+                pair (see `input_ids` docstring) Indices should be in `[0, 1]`:
+
+                - 0 indicates sequence B is a continuation of sequence A,
+                - 1 indicates sequence B is a random sequence.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (``prediction_scores``, ``seq_relationship_score``).
-
-            With the fields:
-
-            - `prediction_scores` (Tensor):
-                The scores of masked token prediction. Its data type should be float32.
-                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
-                Otherwise, its shape is [batch_size, mask_token_num, vocab_size].
-
-            - `seq_relationship_score` (Tensor):
-                The scores of next sentence prediction.
-                Its data type should be float32 and its shape is [batch_size, 2].
+            An instance of :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput`.
 
         """
         with paddle.static.amp.fp16_guard():
@@ -1214,6 +1302,16 @@ class BertForPretraining(BertPretrainedModel):
                 sequence_output, pooled_output, masked_positions)
 
             total_loss = None
+            if labels is not None and next_sentence_label is not None:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                masked_lm_loss = loss_fct(
+                    prediction_scores.reshape(
+                        (-1, prediction_scores.shape[-1])),
+                    labels.reshape((-1, )))
+                next_sentence_loss = loss_fct(
+                    seq_relationship_score.reshape((-1, 2)),
+                    next_sentence_label.reshape((-1, )))
+                total_loss = masked_lm_loss + next_sentence_loss
             if not return_dict:
                 output = (prediction_scores,
                           seq_relationship_score) + outputs[2:]
@@ -1221,6 +1319,7 @@ class BertForPretraining(BertPretrainedModel):
                         output) if total_loss is not None else output
 
             return BertForPreTrainingOutput(
+                loss=total_loss,
                 prediction_logits=prediction_scores,
                 seq_relationship_logits=seq_relationship_score,
                 hidden_states=outputs.hidden_states,
@@ -1315,6 +1414,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -1330,10 +1430,24 @@ class BertForMultipleChoice(BertPretrainedModel):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
                 See :class:`BertModel` and shape as [batch_size, num_choice, sequence_length].
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
-            Shape as `[batch_size, num_choice]` and dtype as `float32`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput`.
 
         Example:
             .. code-block::
@@ -1416,14 +1530,17 @@ class BertForMultipleChoice(BertPretrainedModel):
         reshaped_logits = logits.reshape(
             shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
-        # TODO(guosheng): Support loss
         loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
             return ((loss, ) + output) if loss is not None else (
                 output[0] if len(output) == 1 else output)
 
         return MultipleChoiceModelOutput(
+            loss=loss,
             logits=reshaped_logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
@@ -1471,6 +1588,7 @@ class BertForMaskedLM(BertPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -1485,10 +1603,24 @@ class BertForMaskedLM(BertPretrainedModel):
                 See :class:`BertModel`.
             attention_mask (Tensor, optional):
                 See :class:`BertModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
+                vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
+                loss is only computed for the tokens with labels in `[0, ..., vocab_size]`
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `prediction_scores`, The scores of masked token prediction.
-            Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput`.
 
         Example:
             .. code-block::
@@ -1518,8 +1650,13 @@ class BertForMaskedLM(BertPretrainedModel):
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
 
-        # TODO(guosheng): Support loss
         masked_lm_loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss(
+            )  # -100 index = padding token
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
+                labels.reshape((-1, )))
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
             return ((masked_lm_loss, ) +
@@ -1527,6 +1664,7 @@ class BertForMaskedLM(BertPretrainedModel):
                         output[0] if len(output) == 1 else output)
 
         return MaskedLMOutput(
+            loss=masked_lm_loss,
             logits=prediction_scores,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,

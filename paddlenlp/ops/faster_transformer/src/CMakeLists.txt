@@ -146,7 +146,7 @@ if(ON_INFER)
   endif()
 
   if (WITH_ONNXRUNTIME)
-    set(DEPS ${DEPS} ${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib/libonnxruntime.so.1.10.0 paddle2onnx)
+    set(DEPS ${DEPS} ${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib/libonnxruntime.so paddle2onnx)
   endif()
 
   if (NOT WIN32)
