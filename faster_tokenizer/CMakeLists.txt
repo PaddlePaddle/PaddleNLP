@@ -101,13 +101,16 @@ set(${flag_var} "${${flag_var}} /NODEFAULTLIB:MSVCRT.LIB")
 endforeach()
 
 ELSE(WIN32)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -ldl -lpthread")
-set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
+    IF (LINUX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ldl -lpthread")
+    ENDIF()
+    set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
 # For OpenMP
 # openmp not support well for now on windows
-if (NOT WIN32)
+if (LINUX)
     find_package(OpenMP)
     if (OPENMP_FOUND)
         add_definitions(-DWITH_OMP)
@@ -117,8 +120,8 @@ if (NOT WIN32)
 endif()
 
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-set(TOKENIZERS_INSTALL_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-set(TOKENIZERS_INSTALL_LIB_DIR ${PROJECT_SOURCE_DIR}/lib)
+set(TOKENIZERS_INSTALL_INCLUDE_DIR ${PROJECT_SOURCE_DIR})
+
 message("CMAKE_BUILD_TYPE = " ${CMAKE_BUILD_TYPE})
 message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
 message("CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
@@ -140,33 +143,35 @@ if(WITH_PYTHON)
 
 add_subdirectory(python)
 
-if(WIN32)
-add_custom_target(build_tokenizers_bdist_wheel ALL
-    COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
-    COMMENT "Packing whl packages------>>>"
-    DEPENDS copy_python_tokenizers)
-else()
+if(LINUX)
 add_custom_target(build_tokenizers_bdist_wheel ALL
     COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
     COMMENT "Packing whl packages------>>>"
     DEPENDS copy_python_tokenizers)
+else()
+add_custom_target(build_tokenizers_bdist_wheel ALL
+    COMMAND ${CMAKE_COMMAND} -E env ${py_env} ${PYTHON_EXECUTABLE} setup.py bdist_wheel
+    COMMENT "Packing whl packages------>>>"
+    DEPENDS copy_python_tokenizers)
 endif()
 
-else(WITH_PYTHON)
+else(WITH_PYTHON) # Pack faster_tokenizer cpp lib
 
 set(CPP_PACKAGE_DIR ${CMAKE_BINARY_DIR}/cpp/faster_tokenizer)
 add_custom_target(build_cpp_package_dir ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_PACKAGE_DIR}/lib ${CPP_PACKAGE_DIR}/include ${CPP_PACKAGE_DIR}/third_party/include ${CPP_PACKAGE_DIR}/third_party/lib
     DEPENDS core_tokenizers)
 
+# copy cmake
+file(COPY ${PROJECT_SOURCE_DIR}/FasterTokenizer.cmake DESTINATION ${CPP_PACKAGE_DIR}/)
+
 # copy headers
-add_custom_target(copy_headers ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory 
-    ${CMAKE_SOURCE_DIR}/faster_tokenizer/include ${CPP_PACKAGE_DIR}/include/faster_tokenizer
-    DEPENDS build_cpp_package_dir)
+file(COPY ${PROJECT_SOURCE_DIR}/faster_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/include/faster_tokenizer/
+    FILES_MATCHING PATTERN "*.h"
+    PATTERN "pybind" EXCLUDE)
 
 add_custom_target(copy_third_party_headers ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR}
     ${GLOG_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${RE2_INCLUDE_DIR}
     ${CPP_PACKAGE_DIR}/third_party/include
@@ -177,14 +182,9 @@ add_custom_target(copy_boost_headers ALL
     ${BOOST_INCLUDE_DIR}/boost ${CPP_PACKAGE_DIR}/third_party/include/boost
     DEPENDS build_cpp_package_dir)
 
-add_custom_target(remove_pybind_headers ALL
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CPP_PACKAGE_DIR}/include/pybind
-    DEPENDS copy_headers)
-
-
 # copy library
 set(TOKENIZER_CORE_NAME "core_tokenizers")
-set(TOKENIZER_CORE_PATH ${CMAKE_BINARY_DIR}/faster_tokenizer/src)
+set(TOKENIZER_CORE_PATH ${CMAKE_BINARY_DIR}/faster_tokenizer)
 if (WIN32)
     set(ICU_DLL_DIR ${CMAKE_BINARY_DIR}/third_party/icu/src/extern_icu/icu4c/bin64)
     set(ICU_LIB_DIR ${CMAKE_BINARY_DIR}/third_party/icu/src/extern_icu/icu4c/lib64)
