@@ -101,6 +101,10 @@ from .tinybert.tokenizer import *
 from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
+from .ernie_vil.modeling import *
+from .ernie_vil.procesing import *
+from .ernie_vil.tokenizer import *
+from .ernie_vil.procesing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
