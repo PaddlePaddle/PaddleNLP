@@ -121,6 +121,10 @@ from .artist.modeling import *
 from .artist.tokenizer import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
+from .clip.modeling import *
+from .clip.feature_extraction import *
+from .clip.tokenizer import *
+from .clip.procesing import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 
