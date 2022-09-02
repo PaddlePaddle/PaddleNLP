@@ -271,7 +271,7 @@ class Converter(object):
                 pre_dimer = False
                 for index, w in enumerate(words):
                     if pre_dimer and len(w) == 0:
-                        words[index] = " "
+                        words[index] = self.args.cn_split_dimer
                         pre_dimer = False
                     elif len(w) == 0:
                         pre_dimer = True
