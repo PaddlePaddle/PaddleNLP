@@ -10,7 +10,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddle.optimizer import AdamW
-
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
 
@@ -22,7 +21,7 @@ def parse_args():
     parser.add_argument(
         '--model_name_or_path',
         type=str,
-        default='unimo-text-1.0',
+        default='unimo-text-1.0-summary',
         help='The path or shortcut name of the pre-trained model.')
     parser.add_argument("--train_file",
                         type=str,
