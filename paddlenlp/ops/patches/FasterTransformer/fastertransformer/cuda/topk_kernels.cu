@@ -41,7 +41,7 @@ __global__ void ker_curand_setup_bsz_one(curandState_t* state,
   if (threadIdx.x + blockIdx.x * blockDim.x < size)
     curand_init(seed,
                 0,
-                0,
+                seed,
                 &state[blockIdx.x * blockDim.x + threadIdx.x]);
 }
 
