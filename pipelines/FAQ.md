@@ -64,3 +64,12 @@ conda install -c pytorch faiss-cpu
 # GPU(+CPU) version
 conda install -c pytorch faiss-gpu
 ```
+
+### 运行faiss examples出现了错误：`sqlalchemy.exec.OperationalError: (sqlite3.OperationalError) too many SQL variables`
+
+python 3.7版本引起的错误，修改如下代码：
+
+```
+# 增加batch_size参数，传入一个数值即可
+document_store.update_embeddings(retriever, batch_size=256)
+```
