@@ -47,7 +47,7 @@ class DensePassageRetriever(BaseRetriever):
             Path, str] = "rocketqa-zh-dureader-query-encoder",
         passage_embedding_model: Union[
             Path, str] = "rocketqa-zh-dureader-para-encoder",
-        params_path: Optional[str] = None,
+        params_path: Optional[str] = "",
         model_version: Optional[str] = None,
         output_emb_size=256,
         max_seq_len_query: int = 64,
