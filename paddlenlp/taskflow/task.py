@@ -202,7 +202,9 @@ class Task(metaclass=abc.ABCMeta):
             trans_model = float16.convert_float_to_float16(onnx_model,
                                                            keep_io_types=True)
             onnx.save_model(trans_model, fp16_model_file)
-        providers = ['CUDAExecutionProvider']
+        providers = [('CUDAExecutionProvider', {
+            'device_id': self.kwargs['device_id']
+        })]
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = self._num_threads
         sess_options.inter_op_num_threads = self._num_threads
