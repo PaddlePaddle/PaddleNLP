@@ -26,6 +26,11 @@ from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ['ErnieTokenizer', 'ErnieTinyTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "ernie-doc-base-en": 512,
+    "ernie-doc-base-zh": 512
+}
+
 
 class ErnieTokenizer(PretrainedTokenizer):
     r"""
@@ -319,6 +324,8 @@ class ErnieTokenizer(PretrainedTokenizer):
         "rocketqa-micro-cross-encoder": 2048,
         "rocketqa-nano-cross-encoder": 2048,
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
