@@ -155,6 +155,11 @@ struct GptArguments : public DecodingSamplingArguments {
   int min_gpu_num_{1};
 };
 
+
+struct GptJArguments : public GptArguments {
+  int rotary_embedding_dim_{0};
+};
+
 struct TransformerSamplingArguments : public DecodingSamplingArguments {
   int **start_ids_;
   int start_len_;

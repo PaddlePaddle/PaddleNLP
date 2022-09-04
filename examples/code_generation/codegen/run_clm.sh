@@ -1,0 +1,11 @@
+python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
+            --model_name_or_path Salesforce/codegen-350M-mono \
+            --output_dir output \
+            --train_file train.json \
+            --validation_file test.json \
+            --num_train_epochs 5 \
+            --logging_steps 10 \
+            --save_steps 1000 \
+            --train_batch_size 2 \
+            --eval_batch_size 2 \
+            --device gpu

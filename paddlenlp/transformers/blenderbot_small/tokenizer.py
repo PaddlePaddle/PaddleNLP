@@ -19,6 +19,8 @@ import re
 
 __all__ = ['BlenderbotSmallTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"blenderbot_small-90M": 512}
+
 
 # Copy from paddlenlp.transformers.gpt.tokenizer.get_pairs
 def get_pairs(word):
@@ -80,6 +82,7 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
         }
     }
     pretrained_init_configuration = {"blenderbot_small-90M": {}}
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
