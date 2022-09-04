@@ -53,7 +53,7 @@ lsof -i:8891
 kill -9 PID # PID为8891端口的进程
 ```
 
-### faiss 安装上了但还是显示找不到faiss怎么办？
+#### faiss 安装上了但还是显示找不到faiss怎么办？
 
 推荐您使用anaconda进行单独安装，安装教程请参考[faiss](https://github.com/facebookresearch/faiss/blob/main/INSTALL.md)
 
@@ -65,7 +65,7 @@ conda install -c pytorch faiss-cpu
 conda install -c pytorch faiss-gpu
 ```
 
-### 如何更换pipelines中预置的模型？
+#### 如何更换pipelines中预置的模型？
 
 更换系统预置的模型以后，由于模型不一样了，需要重新构建索引，并修改相关的配置文件。以语义索引为例，需要修改2个地方，第一个地方是`utils/offline_ann.py`,另一个是`rest_api/pipeline/semantic_search.yaml`，并重新运行：
 
@@ -113,4 +113,13 @@ components:    # define all the building-blocks for Pipeline
 export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
+```
+
+#### 运行faiss examples出现了错误：`sqlalchemy.exec.OperationalError: (sqlite3.OperationalError) too many SQL variables`
+
+python 3.7版本引起的错误，修改如下代码：
+
+```
+# 增加batch_size参数，传入一个数值即可
+document_store.update_embeddings(retriever, batch_size=256)
 ```

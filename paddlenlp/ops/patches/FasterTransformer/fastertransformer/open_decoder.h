@@ -588,7 +588,8 @@ public:
                   const bool is_cross_attention,
                   const bool *finished = nullptr,
                   const int max_input_len = 0,
-                  const int *input_lengths = nullptr) {
+                  const int *input_lengths = nullptr,
+                  const int rotary_embedding_dim = 0) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -618,7 +619,8 @@ public:
                                        step,
                                        decoder_max_seq_len,
                                        max_input_len,
-                                       input_lengths);
+                                       input_lengths,
+                                       rotary_embedding_dim);
         POP_RANGE
 
 #ifndef NDEBUG
@@ -697,7 +699,20 @@ public:
                                         hidden_units_,
                                         param_.stream);
         } else {
-          add_bias_input_layernorm_2_kernelLauncher(
+          if (rotary_embedding_dim > 0){
+            add_bias_input_layernorm_2_kernelLauncher(
+              from_tensor,
+              (DataType_*) nullptr,
+              (DataType_*) nullptr,
+              (DataType_*) nullptr,
+              masked_output_buf_,
+              norm_masked_output_buf_,
+              m,
+              hidden_units_,
+              param_.stream);
+
+          }else{
+            add_bias_input_layernorm_2_kernelLauncher(
               from_tensor,
               param_.ffn_layernorm.gamma,
               param_.ffn_layernorm.beta,
@@ -707,12 +722,14 @@ public:
               m,
               hidden_units_,
               param_.stream);
+          }
+         
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
 #endif
           PUSH_RANGE("Transformer/MLP")
-          ffn(norm_masked_output_buf_,
+          ffn(rotary_embedding_dim > 0 ? norm_from_tensor_buf_:norm_masked_output_buf_,
               ffn_inner_buf_,
               decoder_output,
               m,
@@ -917,7 +934,8 @@ public:
                        const int ite,
                        const int max_seq_len,
                        const bool is_final,
-                       const int* memory_sequence_length = nullptr) {
+                       const int* memory_sequence_length = nullptr,
+                       const int rotary_embedding_dim = 0) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -968,7 +986,8 @@ public:
                                             ite,
                                             max_seq_len,
                                             is_final,
-                                            memory_sequence_length);
+                                            memory_sequence_length,
+                                            rotary_embedding_dim);
         if (is_final) return;
         POP_RANGE
 
@@ -976,17 +995,30 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+        if (rotary_embedding_dim > 0){
+          add_bias_input_layernorm_2_kernelLauncher(
+              from_tensor,
+              (DataType_*) nullptr,
+              (DataType_*) nullptr,
+              (DataType_*) nullptr,
+              masked_output_buf,
+              norm_masked_output_buf,
+              m,
+              hidden_units_,
+              param_.stream);
+        }else{
+          add_bias_input_layernorm_2_kernelLauncher(
+              from_tensor,
+              param_.ffn_layernorm.gamma,
+              param_.ffn_layernorm.beta,
+              param_.self_attention.attention_output_weight.bias,
+              masked_output_buf,
+              norm_masked_output_buf,
+              m,
+              hidden_units_,
+              param_.stream);
+        }
 
-        add_bias_input_layernorm_2_kernelLauncher(
-            from_tensor,
-            param_.ffn_layernorm.gamma,
-            param_.ffn_layernorm.beta,
-            param_.self_attention.attention_output_weight.bias,
-            masked_output_buf,
-            norm_masked_output_buf,
-            m,
-            hidden_units_,
-            param_.stream);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -995,7 +1027,7 @@ public:
 
         // For GPT decoder
         PUSH_RANGE("Transformer/MLP");
-        ffn(norm_masked_output_buf,
+        ffn(rotary_embedding_dim > 0 ? norm_from_tensor_buf:norm_masked_output_buf,
             ffn_inner_buf,
             decoder_output,
             m,
@@ -1008,7 +1040,6 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-
         add_bias_input_kernelLauncher(decoder_output,
                                       param_.ffn.output_weight.bias,
                                       masked_output_buf,
@@ -1310,7 +1341,8 @@ public:
                                       const int step,
                                       const int max_seq_len,
                                       const int max_input_len,
-                                      const int *input_lengths) {
+                                      const int *input_lengths,
+                                      const int rotary_embedding_dim = 0) {
     assert(is_fuse_QKV_in_normal_gemm_ ==
            true);  // only support for is_fuse_QKV = True.
 
@@ -1361,6 +1393,7 @@ public:
         max_seq_len,
         max_input_len,
         input_lengths,
+        rotary_embedding_dim,
         param_.stream);
 
     k = t_parallel_param_.local_hidden_units_;
@@ -1616,7 +1649,8 @@ public:
                                            const int ite,
                                            const int max_seq_len,
                                            const bool is_final,
-                                           const int* memory_sequence_length = nullptr) {
+                                           const int* memory_sequence_length = nullptr,
+                                           const int rotary_embedding_dim = 0) {
     const DataType_ scalar = 1 / sqrtf(size_per_head_ * 1.0f);
     const int m = local_batch_size * seq_len;
 
@@ -1663,7 +1697,6 @@ public:
           param_.stream,
           cublasAlgoMap_,
           cublas_workspace_);
-
       add_fusedQKV_bias_transpose_kernelLauncher(
           q_buf,
           k_buf,
@@ -1674,6 +1707,7 @@ public:
           seq_len,
           t_parallel_param_.local_head_num_,
           size_per_head_,
+          rotary_embedding_dim,
           param_.stream);
     } else {
       const int n = t_parallel_param_.local_hidden_units_;
