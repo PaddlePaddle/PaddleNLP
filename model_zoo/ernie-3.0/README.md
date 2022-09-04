@@ -1294,72 +1294,75 @@ pip install paddleslim
 
 ### 模型压缩 API 使用
 
-本项目基于 PaddleNLP 的 Trainer API 发布提供了模型压缩 API。压缩 API 支持用户对 ERNIE、BERT 等 Transformers 类下游任务微调模型进行裁剪、量化。用户只需要简单地调用 `compress()` 即可一键启动裁剪和量化，并自动保存压缩后的模型。
+本项目使用压缩 API 对任务数据上微调后的模型进行裁剪和量化。用户在传入模型，以及相关的压缩超参数（可选，提供默认选项）后，只需要调用一行 `compress()` 即可一键启动裁剪和量化，并自动保存压缩后的模型进行后续部署。
 
-
-可以这样使用压缩 API (示例代码只提供了核心调用，如需跑通完整的例子可参考下方完整样例脚本):
+核心调用方法如下，如需跑通完整的例子可参考本目录下完整样例脚本:
 
 ```python
 
 trainer = Trainer(
-        model=model,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=train_dataset,
-        eval_dataset=eval_dataset,
-        tokenizer=tokenizer)
+    model=model,
+    args=compression_args,
+    data_collator=data_collator,
+    train_dataset=train_dataset,
+    eval_dataset=eval_dataset,
+    criterion=criterion)
 
-output_dir = os.path.join(model_args.model_name_or_path, "compress")
+trainer.compress()
 
-compress_config = CompressConfig(quantization_config=PTQConfig(
-        algo_list=['hist', 'mse'], batch_size_list=[4, 8, 16]),
-        DynabertConfig(width_mul_ist=[3/4]))
-
-trainer.compress(
-    output_dir,
-    pruning=True, # 开启裁剪
-    quantization=True, # 开启量化
-    compress_config=compress_config)
 ```
-由于压缩 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型压缩来说必要传入的参数如下：
+使用压缩 API 基于 Trainer 需要先初始化一个 Trainer 实例，然后调用 `compress()` 启动压缩。
 
-- `model`：ERNIE、BERT 等模型，是在下游任务中微调后的模型。以分类模型为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 来获取
-- `data_collator`：三类任务均可使用 PaddleNLP 预定义好的[DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考本项目中代码即可
-- `train_dataset`：裁剪训练需要使用的训练集
-- `eval_dataset`：裁剪训练使用的评估集，也是量化使用的校准数据
-- `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_name_or_path)` 来获取
-
-然后可以直接调用 `compress` 启动压缩，其中 `compress` 的参数释义如下：
-
-- `output_dir`：裁剪、量化后的模型保存目录
-- `pruning`：是否裁剪，默认为`True`
-- `quantization`：是否量化，默认为 `True`
-- `compress_config`：压缩配置，需要分别传入裁剪和量化的配置实例。目前裁剪和量化分别仅支持`DynabertConfig`和`PTQConfig`类。当默认参数不满足需求时，可通过传入参数对压缩过程进行特殊配置：
-
-其中，`DynabertConfig`中可以传的参数有：
-- `width_mult_list`：裁剪宽度保留的比例list，对 6 层模型推荐 `3/4` ，对 12 层模型推荐 `2/3`，表示对 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例。默认是 `[3/4]`
-- `output_filename_prefix`：裁剪导出模型的文件名前缀，默认是`"float32"`
-
-`PTQConfig`中可以传的参数有：
-- `algo_list`：量化策略列表，目前支持 `KL`, `abs_max`, `min_max`, `avg`, `hist`和`mse`，不同的策略计算量化比例因子的方法不同。建议传入多种策略，可批量得到由多种策略产出的多个量化模型，从中选择最优模型。推荐`hist`, `mse`, `KL`，默认是`["hist"]`
-- `batch_size_list`：校准样本数，默认是 `[4]`。并非越大越好，也是一个超参数，建议传入多种校准样本数，可从多个量化模型中选择最优模型。
-- `input_dir`：待量化模型的目录。如果是 `None`，当不启用裁剪时，表示待量化的模型是 `Trainer` 初始化的模型；当启用裁剪时，表示待量化的模型是裁剪后导出的模型。默认是`None`
-- `input_filename_prefix`：待量化模型文件名前缀，默认是 `"float32"`
-- `output_filename_prefix`：导出的量化模型文件名后缀，默认是`"int8"`
-
-
-本项目还提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
+假设上述代码位于脚本 compress.py 中，可这样调用：
 
 ```shell
-# --model_name_or_path 参数传入的是上面微调过程后得到的模型所在目录，压缩后的模型也会在该目录下
+python compress.py \
+    --dataset   "clue cluewsc2020"   \
+    --model_name_or_path best_models/CLUEWSC2020 \
+    --output_dir ./compress_models  \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --width_mult_list 0.75 \
+    --batch_size_list 4 8 16 \
+    --batch_num_list 1 \
+```
+
+可以通过传入命令行参数来控制模型压缩的一些超参数，压缩 API 可以传入的超参数可参考[文档](../../docs/compression.md)。
+
+本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
+
+```shell
 # 分类任务
-python compress_seq_cls.py --dataset "clue tnews"  --model_name_or_path best_models/TNEWS  --output_dir ./
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+python compress_seq_cls.py \
+    --dataset "clue tnews"  \
+    --model_name_or_path best_models/TNEWS  \
+    --output_dir ./
 
 # 序列标注任务
-python compress_token_cls.py --dataset "msra_ner"  --model_name_or_path best_models/MSRA_NER  --output_dir ./
+python compress_token_cls.py \
+    --dataset "msra_ner"  \
+    --model_name_or_path best_models/MSRA_NER \
+    --output_dir ./ \
+    --max_seq_length 128 \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --learning_rate 0.00005 \
+    --remove_unused_columns False \
+    --num_train_epochs 3
 
 # 阅读理解任务
-python compress_seq_cls.py --dataset "clue cmrc2018"  --model_name_or_path best_models/CMRC2018  --output_dir ./
+python compress_qa.py \
+    --dataset "clue cmrc2018" \
+    --model_name_or_path best_models/CMRC2018  \
+    --output_dir ./ \
+    --max_answer_length 50 \
+    --max_seq_length 512 \
+    --learning_rate 0.00003 \
+    --num_train_epochs 8 \
+    --per_device_train_batch_size 24 \
+    --per_device_eval_batch_size 24 \
+
 ```
 
 一行代码验证上面模型压缩后模型的精度：
@@ -1375,13 +1378,6 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 ```
 其中 --model_path 参数需要传入静态图模型的路径和前缀名。
 
-**压缩 API 使用 TIPS：**
-
-1. 模型压缩主要用于加速推理部署，因此压缩后的模型都是静态图模型，不能再通过 `from_pretrained()` API 导入继续训练。
-
-2. 压缩 API `compress()` 默认会启动裁剪和量化，但用户也可以通过在 `compress()` 中设置 pruning=False 或者 quantization=False 来关掉裁剪或者量化过程。目前裁剪策略有额外的训练的过程，需要下游任务的数据，其训练时间视下游任务数据量而定，且和微调的训练时间是一个量级。量化则不需要额外的训练，更快，量化的加速比比裁剪更明显，但是单独量化精度下降可能也更多；
-
-3. 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。如果想要进一步提升精度，可以对 `batch_size`、`learning_rate`、`epoch` 等超参进行 Grid Search；
 
 <a name="压缩效果"></a>
 
@@ -1508,20 +1504,20 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 
 ### Python 部署
 
-Python部署请参考：[Python部署指南](./deploy/python/README.md)
+Python部署请参考：[Python 部署指南](./deploy/python/README.md)
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
-- [Triton Inference Server服务化部署指南](./deploy/triton/README.md)
-- [Paddle Serving服务化部署指南](./deploy/serving/README.md)
+- [Triton Inference Server 服务化部署指南](./deploy/triton/README.md)
+- [Paddle Serving 服务化部署指南](./deploy/serving/README.md)
 
 <a name="Paddle2ONNX部署"></a>
 
 ### Paddle2ONNX 部署
 
-ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](./deploy/paddle2onnx/README.md)
+ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署指南](./deploy/paddle2onnx/README.md)
 
 
 ### Paddle Lite 移动端部署
@@ -1545,7 +1541,7 @@ ONNX 导出及 ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指�
 - [【快速上手ERNIE 3.0】机器阅读理解实战](https://aistudio.baidu.com/aistudio/projectdetail/2017189)
 
 - [【快速上手ERNIE 3.0】对话意图识别](https://aistudio.baidu.com/aistudio/projectdetail/2017202?contributionType=1)
-
+tangtang
 
 ## 参考文献
 

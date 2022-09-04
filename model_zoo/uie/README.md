@@ -567,6 +567,18 @@ python doccano.py \
 
 更多**不同类型任务（关系抽取、事件抽取、评价观点抽取等）的标注规则及参数说明**，请参考[doccano数据标注指南](doccano.md)。
 
+此外，也可以通过数据标注平台 [Label Studio](https://labelstud.io/) 进行数据标注。本示例提供了 [labelstudio2doccano.py](./labelstudio2doccano.py) 脚本，将 label studio 导出的 JSON 数据文件格式转换成 doccano 导出的数据文件格式，后续的数据转换与模型微调等操作不变。
+
+```shell
+python labelstudio2doccano.py --labelstudio_file label-studio.json
+```
+
+可配置参数说明：
+
+- ``labelstudio_file``: label studio 的导出文件路径（仅支持 JSON 格式）。
+- ``doccano_file``: doccano 格式的数据文件保存路径，默认为 "doccano_ext.jsonl"。
+- ``task_type``: 任务类型，可选有抽取（"ext"）和分类（"cls"）两种类型的任务，默认为 "ext"。
+
 <a name="模型微调"></a>
 
 #### 4.3 模型微调
@@ -787,7 +799,7 @@ python evaluate.py \
     在GPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16
+    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16 --device_id 0
     ```
 
     可配置参数说明：
@@ -797,6 +809,7 @@ python evaluate.py \
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
     - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
+    - `device_id`: GPU设备ID，默认为0。
 
 <a name="CCKS比赛"></a>
 

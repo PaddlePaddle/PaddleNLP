@@ -657,6 +657,8 @@ class TransformerModel(nn.Layer):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
     """
 
     def __init__(self,
@@ -673,7 +675,8 @@ class TransformerModel(nn.Layer):
                  attn_dropout=None,
                  act_dropout=None,
                  bos_id=0,
-                 eos_id=1):
+                 eos_id=1,
+                 activation="relu"):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
@@ -708,7 +711,7 @@ class TransformerModel(nn.Layer):
             dropout=dropout,
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
-            activation="relu",
+            activation=activation,
             normalize_before=True)
 
         if weight_sharing:
@@ -784,6 +787,7 @@ class TransformerModel(nn.Layer):
         trg_pos = paddle.cast(
             trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=trg_max_len, dtype=trg_word.dtype)
+
         with paddle.static.amp.fp16_guard():
             src_emb = self.src_word_embedding(src_word)
             src_pos_emb = self.src_pos_embedding(src_pos)
@@ -861,6 +865,8 @@ class InferTransformerModel(TransformerModel):
             Specify beam search version. It should be in one
             of [`v1`, `v2`]. If `v2`, need to set `alpha`(default to 0.6) for length
             penalty. Default to `v1`.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
         kwargs:
             The key word arguments can be `rel_len` and `alpha`:
 
@@ -893,6 +899,7 @@ class InferTransformerModel(TransformerModel):
                  max_out_len=256,
                  output_time_major=False,
                  beam_search_version='v1',
+                 activation="relu",
                  **kwargs):
         args = dict(locals())
         args.pop("self")
