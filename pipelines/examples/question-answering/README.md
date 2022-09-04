@@ -69,6 +69,7 @@ python examples/question-answering/dense_qa_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/question-answering/dense_qa_example.py --device cpu
 ```
+`dense_qa_example.py`中`DensePassageRetriever`，`ErnieRanker`和`ErnieReader`的模型介绍请参考[API介绍](../../API.md)
 
 ### 3.4 构建 Web 可视化问答系统
 
