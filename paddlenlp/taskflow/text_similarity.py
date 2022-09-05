@@ -220,9 +220,11 @@ class TextSimilarityTask(Task):
         ]
         if ("rocketqa" in self.model_name):
             batchify_fn = lambda samples, fn=Tuple(
-                Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input ids
-                Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id
-                    ),  # token type ids
+                Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                    ),  # input ids
+                Pad(axis=0,
+                    pad_val=self._tokenizer.pad_token_type_id,
+                    dtype='int64'),  # token type ids
             ): [data for data in fn(samples)]
         else:
             batchify_fn = lambda samples, fn=Tuple(
