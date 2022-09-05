@@ -1,7 +1,7 @@
-text2image\_generation
+text\_to\_image
 ================================================
 
-.. automodule:: paddlenlp.taskflow.text2image_generation
+.. automodule:: paddlenlp.taskflow.text_to_image
    :members:
    :no-undoc-members:
    :show-inheritance:
