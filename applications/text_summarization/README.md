@@ -28,20 +28,20 @@
 文本摘要也是自然语言生成领域中的一个重要任务，有很多应用场景，如新闻摘要、论文摘要、财报摘要、传记摘要、专利摘要、对话摘要、评论摘要、观点摘要、电影摘要、文章标题生成、商品名生成、自动报告生成、搜索结果预览等。
 
 本项目是基于预训练语言模型UNIMO-Text的文本摘要，具有以下优势：
-- 效果领先
-- 高性能。本项目基于FasterTransformer进行推理加速，能够提供更高性能的推理体验。
+- 效果领先。
 - 开箱即用。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
-- 全流程打通。本项目提供了全面的定制训练流程，从数据准备、模型训练预测，到模型推理部署，一应俱全。
+- 高性能推理。本项目基于FasterTransformer进行推理加速，能够提供更高性能的推理体验。
+- 训练推理全流程打通。本项目提供了全面的定制训练流程，从数据准备、模型训练预测，到模型推理部署，一应俱全。
 
 ### 基于预训练语言模型的文本摘要
 
 基于预训练语言模型（Pretrained Language Models, PLMs）范式的自动文本摘要是目前最常用、效果最好(SOTA)的方式。
 预训练模型是在超大规模的语料采用无监督（unsupervised）或者弱监督（weak-supervised）的方式进行预训练，能够学习如何准确地理解自然语言并以自然语言的形式流畅表达，这两项都是完成文本摘要任务的重要能力。
 
-PaddleNLP提供了方便易用的接口，可指定模型名或模型参数文件路径通过from_pretrained()方法加载不同网络结构的预训练模型，且相应预训练模型权重下载速度快速、稳定。下面以中文unimo-text-1.0模型为例，演示如何加载预训练模型和分词器：
+PaddleNLP提供了方便易用的接口，可指定模型名或模型参数文件路径通过from_pretrained()方法加载不同网络结构的预训练模型，且相应预训练模型权重下载速度快速、稳定。下面以中文unimo-text-1.0-summary模型为例，演示如何加载预训练模型和分词器：
 ```
 from paddlenlp.transformers import  UNIMOLMHeadModel, UNIMOTokenizer
-model_name = "unimo-text-1.0"
+model_name = "unimo-text-1.0-summary"
 model = UNIMOLMHeadModel.from_pretrained(model_name)
 tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 ```
@@ -81,7 +81,7 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 2. **模型训练**
 
-- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"unimo-text-1.0"模型，unimo-text-1.0还支持large模型，详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)，可以根据任务和设备需求进行选择。
+- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"unimo-text-1.0-summary"模型，unimo-text-1.0-summary还支持large模型，详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)，可以根据任务和设备需求进行选择。
 
 
 3. **模型预测**
@@ -104,21 +104,19 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 ```text
 text_summarization/
-├── checkpoint # 动态图模型参数目录
 ├── deploy # 部署
 │   ├── paddle_inference # PaddleInference高性能推理部署
 │   │   ├── inference_unimo_text.py # 推理部署脚本
 │   │   └── README.md # 说明文档
 │   └── paddle_serving
 │       ├── config.yml # 配置文件
-│       ├── export_checkpoint_client # 客户端模型文件和配置文件目录
-│       ├── export_checkpoint_server # 服务器模型文件和配置文件目录
 │       ├── pipeline_client.py # 客户端程序
 │       ├── pipeline_service.py # 服务器程序
 │       └── README.md # 说明文档
-├── export_checkpoint # 静态图模型参数目录
 ├── export_model.py # 动态图参数导出静态图参数脚本
+├── export_model.sh # 动态图参数导出静态图参数shell脚本
 ├── train.py # 训练评估脚本
+├── train.sh # 训练评估shell脚本
 ├── utils.py # 工具函数脚本
 └── README.md # 说明文档
 ```
@@ -129,7 +127,6 @@ text_summarization/
 #### 从本地文件创建数据集
 
 在许多情况，我们需要使用本地数据集来训练我们的文本摘要模型，本项目支持使用固定格式本地数据集文件进行训练。
-如果没有已标注的数据集，我们推荐[doccano](https://github.com/doccano/doccano)数据标注工具。
 
 本地数据集目录结构如下：
 
@@ -162,7 +159,7 @@ rm -rf ${log_dir}
 mkdir -p ${log_dir}
 
 python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} train.py \
-    --model_name_or_path=unimo-text-1.0 \
+    --model_name_or_path=unimo-text-1.0-summary \
     --train_file train.json \
     --eval_file test.json \
     --save_dir=${log_dir}/checkpoints \
@@ -186,12 +183,13 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} train.
 关键参数释义如下：
 - `gpus` 指示了训练所用的GPU卡号。
 - `dataset_name` 数据集名称。
-- `train_file` 本地训练数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
-- `eval_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同。
+- `train_file` 本地训练数据地址。
+- `eval_file` 本地测试数据地址。
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型（详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)），或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
 
    | PaddleNLP提供的预训练模型        |
    |---------------------------------|
+   | unimo-text-1.0-summary      |
    | unimo-text-1.0      |
    | unimo-text-1.0-large |
 
