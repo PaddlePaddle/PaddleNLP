@@ -466,22 +466,20 @@ class UIETask(Task):
                                                  pad_to_max_seq_len=True,
                                                  return_attention_mask=True,
                                                  return_position_ids=True,
-                                                 return_dict=False,
                                                  return_offsets_mapping=True)
-                encoded_inputs = encoded_inputs[0]
                 if self._multilingual:
                     tokenized_output = [
-                        encoded_inputs["input_ids"],
-                        encoded_inputs["position_ids"],
-                        encoded_inputs["offset_mapping"]
+                        encoded_inputs["input_ids"][0],
+                        encoded_inputs["position_ids"][0],
+                        encoded_inputs["offset_mapping"][0]
                     ]
                 else:
                     tokenized_output = [
-                        encoded_inputs["input_ids"],
-                        encoded_inputs["token_type_ids"],
-                        encoded_inputs["position_ids"],
-                        encoded_inputs["attention_mask"],
-                        encoded_inputs["offset_mapping"]
+                        encoded_inputs["input_ids"][0],
+                        encoded_inputs["token_type_ids"][0],
+                        encoded_inputs["position_ids"][0],
+                        encoded_inputs["attention_mask"][0],
+                        encoded_inputs["offset_mapping"][0]
                     ]
                 tokenized_output = [
                     np.array(x, dtype="int64") for x in tokenized_output

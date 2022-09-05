@@ -896,7 +896,7 @@ from paddlenlp import Taskflow
 
   >>> schema = ['Time', 'Player', 'Competition', 'Score']
   >>> ie = Taskflow('information_extraction', schema=schema, model="uie-m-base", schema_lang="en")
-  >>> pprint(ie(["2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！", "Rafael Nadal wins 14th French Open Final!"]))
+  >>> pprint(ie(["2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！", "Rafael Nadal wins French Open Final!"]))
   [{'Competition': [{'end': 23,
                     'probability': 0.9373889907291257,
                     'start': 6,
@@ -913,12 +913,12 @@ from paddlenlp import Taskflow
               'probability': 0.9784080036931151,
               'start': 0,
               'text': '2月8日上午'}]},
-  {'Competition': [{'end': 40,
-                    'probability': 0.8636661245058264,
-                    'start': 23,
+  {'Competition': [{'end': 35,
+                    'probability': 0.9851549932171295,
+                    'start': 18,
                     'text': 'French Open Final'}],
     'Player': [{'end': 12,
-                'probability': 0.922446651628249,
+                'probability': 0.9379371275888104,
                 'start': 0,
                 'text': 'Rafael Nadal'}]}]
   ```
@@ -947,7 +947,7 @@ from paddlenlp import Taskflow
 #### 可配置参数说明
 
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
-* `schema_lang`：设置schema的语言，因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
+* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`, `uie-medical-base`, `uie-base-en`。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
