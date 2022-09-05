@@ -123,3 +123,7 @@ python 3.7版本引起的错误，修改如下代码：
 # 增加batch_size参数，传入一个数值即可
 document_store.update_embeddings(retriever, batch_size=256)
 ```
+
+#### 运行后台程序出现了错误：`Exception: Failed loading pipeline component 'DocumentStore': RequestError(400, 'illegal_argument_exception', 'Mapper for [embedding] conflicts with existing mapper:\n\tCannot update parameter [dims] from [312] to [768]')`
+
+以语义检索为例，这是因为模型的维度不对造成的，请检查一下 `elastic search`中的文本的向量的维度和`semantic_search.yaml`里面`DocumentStore`设置的维度`embedding_dim`是否一致，如果不一致，请重新使用`utils/offline_ann.py`构建索引。总之，请确保构建索引所用到的模型和`semantic_search.yaml`设置的模型是一致的。
