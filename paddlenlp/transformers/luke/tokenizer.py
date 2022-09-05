@@ -39,6 +39,8 @@ except ImportError:
 __all__ = ['LukeTokenizer']
 _add_prefix_space = False
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"luke-base": 514, "luke-large": 514}
+
 
 def get_pairs(word):
     """Return set of symbol pairs in a word.
@@ -165,6 +167,8 @@ class LukeTokenizer(RobertaBPETokenizer):
             "do_lower_case": True
         }
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

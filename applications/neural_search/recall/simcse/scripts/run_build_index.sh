@@ -1,10 +1,11 @@
 # gpu
-python -u -m paddle.distributed.launch --gpus "6" --log_dir "recall_log/" \
+python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
         recall.py \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "checkpoints/model_20000/model_state.pdparams" \
+        --params_path "checkpoints/model_12000/model_state.pdparams" \
+        --model_name_or_path rocketqa-zh-base-query-encoder \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \

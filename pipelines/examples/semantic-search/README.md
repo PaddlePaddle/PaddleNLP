@@ -17,7 +17,7 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。
+本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想接入自己训练的模型，可以参考[Neural Search的流程](./Neural_Search.md)。
 
 ### 2.1 系统特色
 
@@ -76,6 +76,8 @@ python examples/semantic-search/semantic_search_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/semantic-search/semantic_search_example.py --device cpu
 ```
+`semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
+
 
 ### 3.4 构建 Web 可视化语义检索系统
 
