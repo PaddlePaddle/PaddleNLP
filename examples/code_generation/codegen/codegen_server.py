@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 
 class DefaultConfig:
-    model_name_or_path = "Salesforce/codegen-2B-mono"
+    model_name_or_path = "Salesforce/codegen-350M-mono"
     device = "gpu"
     temperature = 0.5
     top_k = 10
