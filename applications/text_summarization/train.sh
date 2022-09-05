@@ -5,7 +5,7 @@ log_dir=output
 rm -rf ${log_dir}
 mkdir -p ${log_dir}
 
-python -m paddle.distributed.launch --gpus "0,1,2" --log_dir ${log_dir} train.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} train.py \
     --model_name_or_path=unimo-text-1.0-summary \
     --train_file train.json \
     --eval_file test.json \

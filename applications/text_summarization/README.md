@@ -161,7 +161,7 @@ log_dir=output
 rm -rf ${log_dir}
 mkdir -p ${log_dir}
 
-python -m paddle.distributed.launch --gpus "1,3,6,7" --log_dir ${log_dir} train.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir ${log_dir} train.py \
     --model_name_or_path=unimo-text-1.0 \
     --train_file train.json \
     --eval_file test.json \
@@ -181,7 +181,7 @@ python -m paddle.distributed.launch --gpus "1,3,6,7" --log_dir ${log_dir} train.
     --do_eval \
     --device=gpu \
 ```
-也可以直接使用`train.sh`
+也可以直接使用`train.sh`.
 
 关键参数释义如下：
 - `gpus` 指示了训练所用的GPU卡号。
@@ -274,28 +274,19 @@ python export_model.py \
 关键参数释义如下：
 
 * `model_name_or_path`：动态图训练保存的参数路径；默认为"unimo-text-1.0-summary"。
-* `inference_model_dir`：静态图图保存的参数路径；默认为"./export_checkpoint"。
+* `inference_model_dir`：静态图图保存的参数路径；默认为"./inference_model"。
 * `max_out_len`：最大输出长度。
 
-执行命令后将会自动导出模型到指定的 `export_checkpoint` 中，保存模型文件结构如下所示：
+执行命令后将会自动导出模型到指定的 `inference_model` 中，保存模型文件结构如下所示：
 
 ```text
-export/
+inference_model/
 ├── unimo_text.pdiparams
 ├── unimo_text.pdiparams.info
 └── unimo_text.pdmodel
 ```
 
 #### 模型部署
-飞桨提供多种不同场景的部署方案，请根据实际情况进行选择：
-|部署方案|特色|场景|硬件|
-|-|-|-|-|
-|Paddle Inference<br>服务端／云端|通用性|模型算法复杂<br>硬件高性能|X86 CPU<br>NVIDIA 全系列 GPU<br>龙芯／飞腾等国产CPU<br>昆仑／昇腾／海光DCU等AI加速芯片
-|Paddle Lite<br>移动端／边缘端|轻量化|模型小<br>硬件杂、资源少、功耗低|Arm CPU<br>Arm／高通／苹果GPU<br>昆仑／昇腾／麒麟／瑞芯微／颖脉／寒武纪／比特大陆等AI加速硬件
-|Paddle Serving<br>服务化|高并发|大流量、高并发、低延时、高吞吐<br>资源弹性调控应对服务流量变化<br>支持模型组合、加密、热更新等|X86/Arm CPU<br>NVIDIA GPU<br>昆仑／昇腾等
-|Paddle.js<br>网页前端|浏览器推理|Chrome、Safari、Firefox 等浏览器<br>Node.js<br>小程序|
-|Paddle20NNX<br>开源开放|开放兼容|第三方推理框架<br>长尾硬件支持|地平线旭日X3<br>鲲云星空X3<br>全志R329<br>其它国产芯片
-
 文本摘要应用已打通多种场景部署方案，点击链接获取具体的使用教程。
 - [Paddle Inference 推理 (Python)](./deploy/paddle_inference/README.md)
 - [Paddle Serving 服务化部署（Python）](./deploy/paddle_serving/README.md)
