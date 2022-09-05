@@ -1345,31 +1345,116 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
-# 默认模型为 pai-painter-painting-base-zh
->>> text_to_image = Taskflow("text_to_image")
-# 单条输入
+# 默认模型为 pai-painter-painting-base-zh，
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-painting-base-zh", num_return_images=2)
+# 单条输入， 默认返回2张图片。
 >>> images = text_to_image("风阁水帘今在眼，且来先看早梅红")
-# [<PIL.Image.Image image mode=RGB size=2048x256>]
->>> images[0].save("painting-figure.png")
-# 多条输入
->>> images = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
-# [<PIL.Image.Image image mode=RGB size=2048x256>,
-#  <PIL.Image.Image image mode=RGB size=2048x256>]
->>> for i, image in enumerate(images):
->>>     image.save(f"painting-figure_{i}.png")
-# pai-painter-commercial-base-zh模型
->>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
-# 多条输入
->>> images = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
->>> for i, image in enumerate(images):
->>>     image.save(f"commercial-figure_{i}.png")
-# dalle-mini模型
->>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
-# 多条输入
->>> images = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
->>> for i, image in enumerate(images):
->>>     image.save(f"dalle-mini-figure_{i}.png")
+# [[<PIL.Image.Image image mode=RGB size=256x256>], [<PIL.Image.Image image mode=RGB size=256x256>]]
+>>> images[0][0].save("painting-figure-1.png")
+>>> images[0][1].save("painting-figure-2.png")
+>>> images[0][0].argument
+# argument表示生成该图片所使用的参数
+# {'input': '风阁水帘今在眼，且来先看早梅红',
+#  'batch_size': 1,
+#  'seed': 2414128200,
+#  'temperature': 1.0,
+#  'top_k': 32,
+#  'top_p': 1.0,
+#  'condition_scale': 10.0,
+#  'num_return_images': 2,
+#  'use_faster': False,
+#  'use_fp16_decoding': False,
+#  'image_index_in_returned_images': 0}
+#
+# 多条输入， 返回值解释：[[第一个文本返回的第一张图片, 第一个文本返回的第二张图片], [第二个文本返回的第一张图片, 第二个文本返回的第二张图片]]
+>>> image_list = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
+# [[<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>],
+#  [<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>]]
+>>> for batch_index, batch_image in enumerate(image_list):
+# len(batch_image) == 2 (num_return_images)
+>>>     for return_image_index, each_image in enumerate(batch_image):
+>>>         each_image.save(f"painting-figure_{batch_index}_{return_image_index}.png")
 ```
+
+#### 支持多种模型
+
+##### EasyNLP仓库中的pai-painter模型
+```python
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh", num_return_images=2)
+>>> image_list = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
+>>> for batch_index, batch_image in enumerate(image_list):
+>>>     # len(batch_image) == 2 (num_return_images)
+>>>     for return_image_index, each_image in enumerate(batch_image):
+>>>         each_image.save(f"commercial-figure_{batch_index}_{return_image_index}.png")
+```
+
+##### DALLE-mini模型
+```python
+>>> text_to_image = Taskflow("text_to_image", model="dalle-mini", num_return_images=2)
+>>> image_list = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
+>>> for batch_index, batch_image in enumerate(image_list):
+>>>     # len(batch_image) == 2 (num_return_images)
+>>>     for return_image_index, each_image in enumerate(batch_image):
+>>>         each_image.save(f"dalle-mini-figure_{batch_index}_{return_image_index}.png")
+```
+
+##### Disco Diffusion模型
+```python
+# 注意，该模型生成速度较慢，最好返回1张图片。
+>>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh", num_return_images=1)
+>>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
+>>> for batch_index, batch_image in enumerate(image_list):
+>>>     for return_image_index, each_image in enumerate(batch_image):
+>>>         each_image.save(f"disco_diffusion_ernie_vil-2.0-base-zh-figure_{batch_index}_{return_image_index}.png")
+```
+
+##### Stable Diffusion模型
+```python
+>>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4", mode="text2image", num_return_images=2)
+>>> prompt = [
+    "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
+    "clouds surround the mountains and Chinese palaces,sunshine,lake,overlook,overlook,unreal engine,light effect,Dream，Greg Rutkowski,James Gurney,artstation"
+    ]
+>>> image_list = text_to_image(prompt)
+>>> for batch_index, batch_image in enumerate(image_list):
+>>>     # len(batch_image) == 2 (num_return_images)
+>>>     for return_image_index, each_image in enumerate(batch_image):
+>>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{return_image_index}.png")
+```
+
+#### 支持复现生成结果 (以Stable Diffusion模型为例)
+```python
+>>> from paddlenlp import Taskflow
+>>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4", mode="text2image", num_return_images=2)
+>>> prompt = [
+    "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
+    ]
+>>> image_list = text_to_image(prompt)
+>>> for batch_index, batch_image in enumerate(image_list):
+>>>     # len(batch_image) == 2 (num_return_images)
+>>>     for return_image_index, each_image in enumerate(batch_image):
+>>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{return_image_index}.png")
+# 如果我们想复现promt[0]文本的第二张返回的结果，我们可以首先查看生成该图像所使用的参数信息。
+>>> each_image.argument
+# {'mode': 'text2image',
+#  'seed': 2389376819,
+#  'height': 512,
+#  'width': 512,
+#  'num_inference_steps': 50,
+#  'guidance_scale': 7.5,
+#  'latents': None,
+#  'num_return_images': 1,
+#  'input': 'In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation'}
+# 通过set_argument设置该参数。
+>>> text_to_image.set_argument(each_image.argument)
+>>> new_image = text_to_image(each_image.argument["input"])
+# 查看生成图片的结果，可以发现最终结果与之前的图片相一致。
+>>> new_image[0][0]
+```
+<p align="center">
+ <img src="https://user-images.githubusercontent.com/50394665/188396018-284336c0-f85e-442b-a4ff-4238720de121.png" align="middle">
+<p align="center">
+
 
 #### 图片生成效果展示
 <p align="center">
@@ -1379,11 +1464,14 @@ from paddlenlp import Taskflow
  <img src="https://user-images.githubusercontent.com/50394665/183386237-b0243ec5-09fe-47cc-9010-bd9b97fda862.png" align="middle">
  <img src="https://user-images.githubusercontent.com/50394665/183387833-0f9ef786-ea62-40e1-a48c-28680d418142.png" align="middle">
  <img src="https://user-images.githubusercontent.com/50394665/183387861-c4029b6c-f2e9-46d0-988f-6989f11a607d.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/188397647-5c3e1804-82dc-4f6e-b7ec-befc15eb1910.png" align="middle" width="35%" height="35%">
+ <img src="https://user-images.githubusercontent.com/50394665/188397725-d43f84e7-d9aa-4fe0-a16c-2be1dc8b5c1d.png" align="middle" width="35%" height="35%">
+ <img src="https://user-images.githubusercontent.com/50394665/188397881-f2a76c5e-d853-4db0-be83-8ac0c2e0a634.png" align="middle" width="35%" height="35%">
+ <img src="https://user-images.githubusercontent.com/50394665/188397927-281402f1-a7f5-404f-9e4c-dc0236ba45ed.png" align="middle" width="35%" height="35%">
 <p align="center">
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "disco_diffusion_ernie_vil-2.0-base-zh"]`。
 * `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
 
 </div></details>
