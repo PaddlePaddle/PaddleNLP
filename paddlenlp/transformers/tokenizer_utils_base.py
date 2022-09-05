@@ -2207,7 +2207,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                         text[0], (list, tuple))
         else:
             is_batched = isinstance(text, (list, tuple))
-
         if is_batched:
             if isinstance(text_pair, str):
                 raise TypeError(

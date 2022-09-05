@@ -356,7 +356,6 @@ class UIETask(Task):
         self._schema_tree = None
         self.set_schema(schema)
         self._check_task_files()
-        self._construct_tokenizer()
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
@@ -374,6 +373,9 @@ class UIETask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         self._num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
+        self.use_faster = self.kwargs[
+            'use_faster'] if 'use_faster' in self.kwargs else False
+        self._construct_tokenizer()
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -424,7 +426,8 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._task_path, use_faster=self.use_faster)
 
     def _preprocess(self, inputs):
         """
@@ -467,6 +470,7 @@ class UIETask(Task):
                                                  return_attention_mask=True,
                                                  return_position_ids=True,
                                                  return_offsets_mapping=True)
+<<<<<<< HEAD
                 if self._multilingual:
                     tokenized_output = [
                         encoded_inputs["input_ids"][0],
@@ -481,6 +485,15 @@ class UIETask(Task):
                         encoded_inputs["attention_mask"][0],
                         encoded_inputs["offset_mapping"][0]
                     ]
+=======
+                tokenized_output = [
+                    encoded_inputs["input_ids"][0],
+                    encoded_inputs["token_type_ids"][0],
+                    encoded_inputs["position_ids"][0],
+                    encoded_inputs["attention_mask"][0],
+                    encoded_inputs["offset_mapping"][0]
+                ]
+>>>>>>> Add use_faster flag for taskflow
                 tokenized_output = [
                     np.array(x, dtype="int64") for x in tokenized_output
                 ]
@@ -880,6 +893,7 @@ class GPTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
+        # TODO(zhoushunjie): Will set use_faster=True in future.
         self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):
