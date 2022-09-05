@@ -1,12 +1,21 @@
 # Gradient Cache策略 [DPR](https://arxiv.org/abs/2004.04906)
+
+
+### 实验结果
+
+`Gradient Cache` 的实验结果如下，使用的评估指标是`Accuracy`：
+
 |  DPR method | TOP-5  | TOP-10 | TOP-50| 说明 |
 | :-----: | :----: | :----: | :----: | :---- |
 |  Gradient_cache | 68.1 | 79.4| 86.2 | DPR结合GC策略训练
 | GC_Batch_size_512  | 67.3 | 79.6| 86.3| DPR结合GC策略训练，且batch_size设置为512|
 
+实验对应的超参数如下：
+
 | Hyper Parameter | batch_size| learning_rate| warmup_steps| epoches| chunk_size|max_grad_norm |
 | :----: | :----: | :----: | :----: | :---: | :----: | :----: |
 | \ | 128/512| 2e-05 | 1237 | 40 | 2| 16/8 |
+
 ## 数据准备
 我们使用Dense Passage Retrieval的[原始仓库](https://github.com/Elvisambition/DPR)
 中提供的数据集进行训练和评估。可以使用[download_data.py](https://github.com/Elvisambition/DPR/blob/main/dpr/data/download_data.py)
