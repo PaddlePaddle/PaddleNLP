@@ -42,6 +42,8 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
+
 
 ## QuickStart
 
@@ -1427,6 +1429,32 @@ from paddlenlp import Taskflow
 * `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
+
+</div></details>
+
+### 文本摘要
+<details><summary>&emsp; 通过UNIMO-Text模型来生成摘要 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+>>> summarizer = Taskflow("text_summarization")
+# 单条输入
+>>> summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+# 输出：'雪后的景色可真美丽呀！'
+
+# 多条输入
+>>> summarizer([
+  "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
+  "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+  ])
+#输出：['雪后的景色可真美丽呀！', '成品油调价窗口8月23日24时开启']
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为`unimo-text-1.0-summary`。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 
 </div></details>
 
