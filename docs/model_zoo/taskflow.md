@@ -874,8 +874,10 @@ from paddlenlp import Taskflow
   | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
   | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
   | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
+  | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
+  | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
 
-- `uie-nano`调用示例
+- `uie-nano`调用示例：
 
   ```python
   >>> from paddlenlp import Taskflow
@@ -884,6 +886,41 @@ from paddlenlp import Taskflow
   >>> ie = Taskflow('information_extraction', schema=schema, model="uie-nano")
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.6513581678349247}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.9819330659468051}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.4908131110420939}]}]
+  ```
+
+- `uie-m-base`和`uie-m-large`支持中英文混合抽取，调用示例：
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['Time', 'Player', 'Competition', 'Score']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-m-base", schema_lang="en")
+  >>> pprint(ie(["2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！", "Rafael Nadal wins 14th French Open Final!"]))
+  [{'Competition': [{'end': 23,
+                    'probability': 0.9373889907291257,
+                    'start': 6,
+                    'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+    'Player': [{'end': 31,
+                'probability': 0.6981119555336441,
+                'start': 28,
+                'text': '谷爱凌'}],
+    'Score': [{'end': 39,
+              'probability': 0.9888507878270296,
+              'start': 32,
+              'text': '188.25分'}],
+    'Time': [{'end': 6,
+              'probability': 0.9784080036931151,
+              'start': 0,
+              'text': '2月8日上午'}]},
+  {'Competition': [{'end': 40,
+                    'probability': 0.8636661245058264,
+                    'start': 23,
+                    'text': 'French Open Final'}],
+    'Player': [{'end': 12,
+                'probability': 0.922446651628249,
+                'start': 0,
+                'text': 'Rafael Nadal'}]}]
   ```
 
 #### 定制训练
@@ -895,19 +932,24 @@ from paddlenlp import Taskflow
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-base (12L768H)<td><b>46.43</b><td><b>70.92</b><td><b>71.83</b><td><b>85.72</b><td><b>78.33</b><td><b>81.86</b>
+<tr><td>uie-base (12L768H)<td>46.43<td>70.92<td><b>71.83</b><td>85.72<td>78.33<td>81.86
 <tr><td>uie-medium (6L768H)<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-mini (6L384H)<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
 <tr><td>uie-micro (4L384H)<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 </table>
+<tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td><b>78.49</b><td><b>83.02</b>
+<tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
+</table>
 
-0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
 
 #### 可配置参数说明
+
+* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
+* `schema_lang`：设置schema的语言，因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`, `uie-medical-base`, `uie-base-en`。
-* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖(主要是**确保安装onnxruntime-gpu**)。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
