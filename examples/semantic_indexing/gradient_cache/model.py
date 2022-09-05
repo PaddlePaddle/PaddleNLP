@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from base_model import SemanticIndexBase
 
+
 class SemanticIndexCacheNeg(SemanticIndexBase):
 
     def __init__(self,

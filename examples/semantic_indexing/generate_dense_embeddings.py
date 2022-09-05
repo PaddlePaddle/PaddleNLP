@@ -33,6 +33,7 @@ if (logger.hasHandlers()):
 console = logging.StreamHandler()
 logger.addHandler(console)
 
+
 class CtxDataset(Dataset):
 
     def __init__(self,
