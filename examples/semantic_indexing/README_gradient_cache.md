@@ -1,8 +1,8 @@
 # Gradient Cache策略 [DPR](https://arxiv.org/abs/2004.04906)
-|  DPR method | TOP-5  | TOP-10 | TOP-50|
-| :-----: | :----: | :----: | :----: |
-|  Gradient_cache | 68.1 | 79.4| 86.2 |
-| GC_Batch_size_512  | 67.3 | 79.6| 86.3|
+|  DPR method | TOP-5  | TOP-10 | TOP-50| 说明 |
+| :-----: | :----: | :----: | :----: | :---- |
+|  Gradient_cache | 68.1 | 79.4| 86.2 | DPR结合GC策略训练
+| GC_Batch_size_512  | 67.3 | 79.6| 86.3| DPR结合GC策略训练，且batch_size设置为512|
 
 | Hyper Parameter | batch_size| learning_rate| warmup_steps| epoches| chunk_size|max_grad_norm |
 | :----: | :----: | :----: | :----: | :---: | :----: | :----: |
