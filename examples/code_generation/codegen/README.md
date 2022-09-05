@@ -154,11 +154,12 @@ print(result)
 ```
 接下来就可以愉快地使用了😊。
 
-**注意**：如果要从本地访问服务器，`127.0.0.1`需要换成服务器的对外IP。
 
 #### 注意事项
 - 如果使用FasterGeneration，需要设置[codegen_server.py](#配置参数说明)中`use_faster=True`，第一次推理会涉及到编译，会耗费一些时间。FasterGeneration的环境依赖参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E)。
 - 如果要使用自己训练好的模型，可以设置[codegen_server.py](#配置参数说明)中`model_name_or_path`为本地模型路径。
+- 如果要从本地访问服务器，上述的`127.0.0.1`需要换成服务器的对外IP。
+
 
 ## 训练定制
 
