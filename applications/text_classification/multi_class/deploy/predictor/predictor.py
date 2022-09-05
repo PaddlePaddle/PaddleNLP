@@ -124,7 +124,6 @@ class Predictor(object):
         self.label_list = label_list
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
-
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               args.device, args.device_id,
                                               args.use_fp16, args.use_quantize,

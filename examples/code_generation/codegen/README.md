@@ -5,23 +5,20 @@
   - [简介](#简介)
     - [特色](#特色)
   - [效果展示](#效果展示)
-  - [开箱即用](#开箱即用)
-    - [支持单条、批量预测](#支持单条批量预测)
-    - [可配置参数说明](#可配置参数说明)
-  - [训练定制](#训练定制)
+  - [Github Copilot插件配置](#GithubCopilot插件配置)
     - [环境依赖](#环境依赖)
     - [代码结构说明](#代码结构说明)
-    - [数据准备](#数据准备)
-      - [从本地文件创建数据集](#从本地文件创建数据集)
-  - [Github Copilot插件配置](#GithubCopilot插件配置)
-    - [插件环境依赖](#插件环境依赖)
     - [启动服务](#启动服务)
-    - [配置参数](#配置参数说明)
+      - [配置参数](#配置参数说明)
     - [测试服务](#测试服务)
     - [配置插件](#配置插件)
     - [注意事项](#注意事项)
+  - [训练定制](#训练定制)
+    - [数据准备](#数据准备)
+      - [从本地文件创建数据集](#从本地文件创建数据集)
+    - [模型训练](#模型训练)
   - [TaskFlow调用](#TaskFlow调用)
-  - [使用案例](#使用案例)
+  - [更多使用案例](#更多使用案例)
   - [模型列表](#模型列表)
   - [References](#references)
 
@@ -41,12 +38,46 @@
 
 
 ## 效果展示
+- 解算法题。求解无重复字符的最长子串的长度
+```python
+from paddlenlp import Taskflow
 
-## 训练定制
+prompt = "def lengthOfLongestSubstring(self, s: str) -> int:"
+codegen = Taskflow("code_generation", model="Salesforce/codegen-2B-mono",decode_strategy="greedy_search", repetition_penalty=1.0)
+print(codegen(prompt))
+```
+结果输出为：
+```python
+        if not s:
+            return 0
+
+        start = 0
+        end = 0
+        max_len = 0
+
+        while end < len(s):
+            if s[end] not in s[start:end]:
+                max_len = max(max_len, end - start + 1)
+                end += 1
+            else:
+                start += 1
+
+        return max_len
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/24390500/182512164-946d959c-57b1-49e6-b9a5-be47281d1ee2.png"/> <br />
+</p>
+
+
+## GithubCopilot插件配置
+
+**以VS Code的插件为例**
 
 ### 环境依赖
 - PaddleNLP >= 2.4.0
 - PaddlePaddle >= 2.3.1
+
+其他依赖：`pip install -r requirements.txt`
 
 ### 代码结构说明
 
@@ -60,6 +91,77 @@ codegen/
 ├── run_clm.sh # 启动脚本
 └── README.md # 说明文档
 ```
+
+### 启动服务
+
+```python
+python codegen_server.py
+```
+
+##### 配置参数说明
+在codegen_server.py中配置如下参数：
+- `model_name_or_path`：模型名，默认为 "Salesforce/codegen-2B-mono"
+- `device`：运行设备，默认为"gpu"
+- `temperature`：解码参数temperature，默认为0.5
+- `top_k`：解码参数top_k，默认为10
+- `top_p`：解码参数top_p，默认为1.0
+- `repetition_penalty`：解码重复惩罚项，默认为1.0
+- `min_length`：生成的最小长度，默认为0
+- `max_length`：生成的最大长度，默认为16
+- `decode_strategy`：解码策略，默认为"sampling"
+- `load_state_as_np`：以numpy格式加载模型参数，可节省显存，默认为True
+- `use_faster`：是否使用Fastergeneration，可加速推理，默认为True
+- `use_fp16_decoding`：是否使用fp16推理，可节省显存和加速推理，默认为True
+
+### 测试服务
+```python
+import openai
+openai.api_key = 'dummy'
+openai.api_base = 'http://127.0.0.1:8978'
+result = openai.Completion.create(
+    engine='codegen', prompt='def hello', max_tokens=16, temperature=0.1)
+print(result)
+'''
+<OpenAIObject text_completion id=cmpl-dmhoeHmcw9DJ4NeqOJDQVKv3iivJ0 at 0x7fe7a81d42c0> JSON: {
+  "id": "cmpl-dmhoeHmcw9DJ4NeqOJDQVKv3iivJ0",
+  "choices": [
+    {
+      "text": "_world():\n    print(\"Hello World!\")\n\n\n#",
+      "index": 0,
+      "finish_reason": "stop",
+      "logprobs": null,
+    }
+  ],
+  "usage": {
+    "completion_tokens": null,
+    "prompt_tokens": null,
+    "total_tokens": null
+  }
+}
+'''
+```
+**注意**：如果要从本地访问服务器，`127.0.0.1`需要换成服务器的对外IP。
+
+
+### 配置插件
+打开用户设置（[settings.json](https://code.visualstudio.com/docs/getstarted/settings#_settings-file-locations)），增加一行配置
+```json
+    "github.copilot.advanced": {
+        "debug.overrideEngine": "codegen",
+        "debug.testOverrideProxyUrl": "http://127.0.0.1:8978",
+        "debug.overrideProxyUrl": "http://127.0.0.1:8978"
+    },
+```
+接下来就可以愉快地使用了😊。
+
+
+#### 注意事项
+- 如果使用FasterGeneration，需要设置[codegen_server.py](#配置参数说明)中`use_faster=True`，第一次推理会涉及到编译，会耗费一些时间。FasterGeneration的环境依赖参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E)。
+- 如果要使用自己训练好的模型，可以设置[codegen_server.py](#配置参数说明)中`model_name_or_path`为本地模型路径。
+- 如果要从本地访问服务器，上述的`127.0.0.1`需要换成服务器的对外IP。
+
+
+## 训练定制
 
 ### 数据准备
 
@@ -137,135 +239,11 @@ python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
 
 **NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
 
-## GithubCopilot插件配置
-以下以VS Code的插件为例
-### 插件环境依赖
-- PaddleNLP >= 2.4.0
-- PaddlePaddle >= 2.3.1
-
-其他依赖：`pip install -r requirements.txt`
-
-
-### 启动服务
-
-```python
-python codegen_server.py
-```
-
-##### 配置参数说明
-在codegen_server.py中配置如下参数：
-- `model_name_or_path`：模型名，默认为 "Salesforce/codegen-2B-mono"
-- `device`：运行设备，默认为"gpu"
-- `temperature`：解码参数temperature，默认为0.5
-- `top_k`：解码参数top_k，默认为10
-- `top_p`：解码参数top_p，默认为1.0
-- `repetition_penalty`：解码重复惩罚项，默认为1.0
-- `min_length`：生成的最小长度，默认为0
-- `max_length`：生成的最大长度，默认为16
-- `decode_strategy`：解码策略，默认为"sampling"
-- `load_state_as_np`：以numpy格式加载模型参数，可节省显存，默认为True
-- `use_faster`：是否使用Fastergeneration，可加速推理，默认为True
-- `use_fp16_decoding`：是否使用fp16推理，可节省显存和加速推理，默认为True
-
-### 测试服务
-`pip install --upgrade openai`
-
-```python
-import openai
-openai.api_key = 'dummy'
-openai.api_base = 'http://127.0.0.1:8000/v1'
-result = openai.Completion.create(
-    engine='codegen', prompt='def hello', max_tokens=16, temperature=0.1)
-print(result)
-'''
-<OpenAIObject text_completion id=cmpl-dmhoeHmcw9DJ4NeqOJDQVKv3iivJ0 at 0x7fe7a81d42c0> JSON: {
-  "id": "cmpl-dmhoeHmcw9DJ4NeqOJDQVKv3iivJ0",
-  "choices": [
-    {
-      "text": "_world():\n    print(\"Hello World!\")\n\n\n#",
-      "index": 0,
-      "finish_reason": "stop",
-      "logprobs": null,
-    }
-  ],
-  "usage": {
-    "completion_tokens": null,
-    "prompt_tokens": null,
-    "total_tokens": null
-  }
-}
-'''
-
-```
-
-### 配置插件
-打开用户设置（[settings.json](https://code.visualstudio.com/docs/getstarted/settings#_settings-file-locations)），增加一行配置
-```json
-    "github.copilot.advanced": {
-        "debug.overrideEngine": "codegen",
-        "debug.testOverrideProxyUrl": "http://127.0.0.1:8978",
-        "debug.overrideProxyUrl": "http://127.0.0.1:8978"
-    },
-```
-
-接下来就可以愉快地使用了😊。
-#### 注意事项
-- 如果使用FasterGeneration，需要设置[codegen_server.py](#配置参数说明)中`use_faster=True`，第一次推理会涉及到编译，会耗费一些时间。FasterGeneration的环境依赖参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E)。
-- 如果要使用自己训练好的模型，可以设置[codegen_server.py](#配置参数说明)中`model_name_or_path`为本地模型路径。
 
 ## TaskFlow调用
 参考[TaskFlow文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md)
 
-## 使用案例
-- 解算法题。求解无重复字符的最长子串的长度
-```python
-import re
-import paddle
-from paddlenlp.transformers import CodeGenTokenizer, CodeGenForCausalLM
-
-# The supported models are shown in the following table
-model_name = 'Salesforce/codegen-2B-mono'
-# Init tokenizer
-tokenizer = CodeGenTokenizer.from_pretrained(model_name)
-# Init model
-model = CodeGenForCausalLM.from_pretrained(model_name)
-
-prompt = "def lengthOfLongestSubstring(self, s: str) -> int:"
-inputs = tokenizer([prompt])
-inputs = {k: paddle.to_tensor(v) for (k, v) in inputs.items()}
-# Generate
-output, score = model.generate(inputs['input_ids'],
-                               max_length=256,
-                               decode_strategy='greedy_search')
-# Decode the result
-print(
-    re.split(
-        "\nclass|\ndef|\n#|\n@|\nprint|\nif",
-        tokenizer.decode(output[0],
-                         skip_special_tokens=True,
-                         spaces_between_special_tokens=False))[0].rstrip())
-```
-结果输出为：
-```python
-        if not s:
-            return 0
-
-        start = 0
-        end = 0
-        max_len = 0
-
-        while end < len(s):
-            if s[end] not in s[start:end]:
-                max_len = max(max_len, end - start + 1)
-                end += 1
-            else:
-                start += 1
-
-        return max_len
-```
-<p align="center">
-<img src="https://user-images.githubusercontent.com/24390500/182512164-946d959c-57b1-49e6-b9a5-be47281d1ee2.png"/> <br />
-</p>
+## 更多使用案例
 
 - 根据注释/功能描述写代码
 
