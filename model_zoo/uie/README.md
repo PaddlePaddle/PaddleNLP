@@ -799,7 +799,7 @@ python evaluate.py \
     在GPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16
+    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16 --device_id 0
     ```
 
     可配置参数说明：
@@ -809,6 +809,7 @@ python evaluate.py \
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
     - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
+    - `device_id`: GPU设备ID，默认为0。
 
 <a name="CCKS比赛"></a>
 
