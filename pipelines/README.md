@@ -57,7 +57,7 @@ Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装
 - Docker 18.03 以上
 ### pip 安装
 ```
-pip install --upgrade pipelines
+pip install --upgrade paddle-pipelines
 ```
 
 ### 源码安装
