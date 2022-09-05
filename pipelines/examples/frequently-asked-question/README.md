@@ -65,6 +65,7 @@ python examples/frequently-asked-question/dense_faq_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/frequently-asked-question/dense_faq_example.py --device cpu
 ```
+`dense_faq_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
 
 ### 3.4 构建 Web 可视化FAQ智能问答
 
