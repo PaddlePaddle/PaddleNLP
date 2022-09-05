@@ -46,10 +46,14 @@ def dataLoader_for_DPR(batch_size, source_data: list, epochs):
             continue
 
 
-question_encoder = BertModel.from_pretrained("bert-base-uncased")
-context_encoder = BertModel.from_pretrained("bert-base-uncased")
-model = BiEncoder(question_encoder=question_encoder,
-                  context_encoder=context_encoder)
+def get_model(model_name: str):
+    question_model = BertModel.from_pretrained(model_name)
+    context_model = BertModel.from_pretrained(model_name)
+    model = BiEncoder(question_model, context_model)
+    return model
+
+
+model = get_model('bert-base-uncased')
 
 
 def get_linear_scheduler(warmup_steps, training_steps):
@@ -73,11 +77,17 @@ scheduler = get_linear_scheduler(args.warmup_steps, training_steps)
 optimizer = paddle.optimizer.AdamW(learning_rate=scheduler,
                                    parameters=model.parameters())
 
+
+def get_dataset(data_path: str):
+    data = NQdataSetForDPR(data_path)
+    dataset = data.new_data
+    return dataset
+
+
 util = DataUtil()
 LOSS = BiEncoderNllLoss()
 batch_data = []
-data = NQdataSetForDPR(data_path)
-dataset = data.new_data
+dataset = get_dataset(data_path)
 
 
 def train():
