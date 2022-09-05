@@ -32,14 +32,14 @@ def query_by_id(gpu_id=2):
 
 
 def perf_pd(args):
-    start_mem = query_by_id()
+    start_mem = query_by_id(args.gpu_id)
     place = "gpu"
     place = paddle.set_device(place)
     tokenizer = CodeGenTokenizer.from_pretrained(args.model_name_or_path)
     model = CodeGenForCausalLM.from_pretrained(args.model_name_or_path,
                                                load_state_as_np=True)
     model.eval()
-    load_mem = query_by_id()
+    load_mem = query_by_id(args.gpu_id)
 
     input_ids_np = [
         np.random.choice(list(tokenizer.decoder.keys())[:-1], args.input_len)
@@ -63,7 +63,7 @@ def perf_pd(args):
                                        top_p=args.top_p,
                                        use_faster=args.use_faster,
                                        use_fp16_decoding=args.use_fp16_decoding)
-            generate_mem = query_by_id()
+            generate_mem = query_by_id(args.gpu_id)
         paddle.device.cuda.synchronize(place)
         pd_cost = (time.perf_counter() - start) / (num_loop -
                                                    num_loop // 2) * 1000
@@ -73,13 +73,13 @@ def perf_pd(args):
 def perf_hf(args):
     import torch
     from transformers import CodeGenTokenizer as hf_tokenizer, CodeGenForCausalLM as hf_codegen
-    start_mem = query_by_id()
+    start_mem = query_by_id(args.gpu_id)
     device = torch.device("cuda")
     tokenizer = hf_tokenizer.from_pretrained(args.model_name_or_path)
     model = hf_codegen.from_pretrained(args.model_name_or_path)
     model.to(device)
     model.eval()
-    load_mem = query_by_id()
+    load_mem = query_by_id(args.gpu_id)
 
     input_ids_np = [
         np.random.choice(list(tokenizer.decoder.keys()), args.input_len)
@@ -101,7 +101,7 @@ def perf_hf(args):
                 min_length=args.generate_len + input_ids.shape[-1],
                 top_k=args.top_k,
                 top_p=args.top_p)
-            generate_mem = query_by_id()
+            generate_mem = query_by_id(args.gpu_id)
         torch.cuda.synchronize()
         hf_cost = (time.perf_counter() - start) / (num_loop -
                                                    num_loop // 2) * 1000
@@ -148,6 +148,10 @@ def parse_args():
                         default=20,
                         type=int,
                         help="Length of output . ")
+    parser.add_argument("--gpu_id",
+                        default=2,
+                        type=int,
+                        help="The id of GPU . ")
     parser.add_argument(
         '--use_faster',
         action='store_true',
