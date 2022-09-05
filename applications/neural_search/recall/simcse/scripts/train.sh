@@ -1,5 +1,5 @@
 # simcse gpu
-python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
+python -u -m paddle.distributed.launch --gpus '1,2,3,4' \
 	train.py \
 	--device gpu \
 	--save_dir ./checkpoints/ \
@@ -14,7 +14,7 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--output_emb_size 256 \
 	--train_set_file "./recall/train_unsupervised.csv" \
 	--test_set_file "./recall/dev.csv" \
-	--model_name_or_path "ernie-3.0-medium-zh"
+	--model_name_or_path "rocketqa-zh-base-query-encoder"
 
 # simcse cpu
 # python 	train.py \
