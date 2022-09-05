@@ -21,7 +21,7 @@ import paddle
 from ..datasets import load_dataset
 from ..transformers import AutoTokenizer, AutoModel
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from .models import UIE
+from .models import UIE, UIEM
 from .task import Task
 from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc, gp_decode, DataCollatorGP
 
@@ -83,11 +83,12 @@ usage = r"""
             [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
             '''
 
-            schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
-            ie_en.set_schema(schema)
-            ie_en("overall i 'm happy with my toy.")
+            # Multilingual Model
+            schema = [{'Person': ['Company', 'Position']}]
+            ie_m = Taskflow('information_extraction', schema=schema, model='uie-m-base', schema_lang="en")
+            ie_m('In 1997, Steve was excited to become the CEO of Apple.')
             '''
-            
+            [{'Person': [{'text': 'Steve', 'start': 9, 'end': 14, 'probability': 0.9998436034905893, 'relations': {'Company': [{'text': 'Apple', 'start': 48, 'end': 53, 'probability': 0.9842775467359672}], 'Position': [{'text': 'CEO', 'start': 41, 'end': 44, 'probability': 0.9628799853543271}]}}]}]
             '''
          """
 
@@ -267,8 +268,8 @@ class UIETask(Task):
         },
         "uie-base-en": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.0/model_state.pdparams",
-                "d12e03c2bfe2824c876883b4b836d79d"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
+                "2baf0647774d6309e4b2be726ad4283a"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
@@ -287,10 +288,71 @@ class UIETask(Task):
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
+        "uie-m-base": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
+                "ed96cb17b4b3283a65ad0846ada7799e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
+                "05c4b9d050e1402a891b207e36d2e501"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/tokenizer_config.json",
+                "f144bd065ea90cc26eaa91197124bdcc"
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046"
+            ],
+        },
+        "uie-m-large": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
+                "75f3989c515f05f6842e314d3f75ee27"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
+                "22ad69618dc3f4c3fe756e3044c3056e"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/tokenizer_config.json",
+                "f144bd065ea90cc26eaa91197124bdcc"
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046"
+            ],
+        },
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+
+        if model in ['uie-m-base', 'uie-m-large']:
+            self._multilingual = True
+            self.resource_files_names[
+                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
+        else:
+            self._multilingual = False
+            if 'sentencepiece_model_file' in self.resource_files_names.keys():
+                del self.resource_files_names['sentencepiece_model_file']
         self._schema_tree = None
         self.set_schema(schema)
         self._check_task_files()
@@ -298,9 +360,8 @@ class UIETask(Task):
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
-        self._is_en = False if model not in [
-            "uie-base-en",
-        ] else True
+        self._is_en = True if model in ['uie-base-en'
+                                        ] or schema_lang == 'en' else False
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._batch_size = self.kwargs[
@@ -323,26 +384,39 @@ class UIETask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='token_type_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='pos_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='att_mask'),
-        ]
+        if self._multilingual:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+            ]
+        else:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='token_type_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='att_mask'),
+            ]
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UIE.from_pretrained(self._task_path)
+        if self._multilingual:
+            model_instance = UIEM.from_pretrained(self._task_path)
+        else:
+            model_instance = UIE.from_pretrained(self._task_path)
         self._model = model_instance
         self._model.eval()
 
@@ -392,16 +466,21 @@ class UIETask(Task):
                                                  pad_to_max_seq_len=True,
                                                  return_attention_mask=True,
                                                  return_position_ids=True,
-                                                 return_dict=False,
                                                  return_offsets_mapping=True)
-                encoded_inputs = encoded_inputs[0]
-                tokenized_output = [
-                    encoded_inputs["input_ids"],
-                    encoded_inputs["token_type_ids"],
-                    encoded_inputs["position_ids"],
-                    encoded_inputs["attention_mask"],
-                    encoded_inputs["offset_mapping"]
-                ]
+                if self._multilingual:
+                    tokenized_output = [
+                        encoded_inputs["input_ids"][0],
+                        encoded_inputs["position_ids"][0],
+                        encoded_inputs["offset_mapping"][0]
+                    ]
+                else:
+                    tokenized_output = [
+                        encoded_inputs["input_ids"][0],
+                        encoded_inputs["token_type_ids"][0],
+                        encoded_inputs["position_ids"][0],
+                        encoded_inputs["attention_mask"][0],
+                        encoded_inputs["offset_mapping"][0]
+                    ]
                 tokenized_output = [
                     np.array(x, dtype="int64") for x in tokenized_output
                 ]
@@ -420,22 +499,35 @@ class UIETask(Task):
         sentence_ids = []
         probs = []
         for batch in infer_data_loader:
-            input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
+            if self._multilingual:
+                input_ids, pos_ids, offset_maps = batch
+            else:
+                input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
             if self._predictor_type == "paddle-inference":
-                self.input_handles[0].copy_from_cpu(input_ids.numpy())
-                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-                self.input_handles[2].copy_from_cpu(pos_ids.numpy())
-                self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                if self._multilingual:
+                    self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                    self.input_handles[1].copy_from_cpu(pos_ids.numpy())
+                else:
+                    self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                    self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                    self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                    self.input_handles[3].copy_from_cpu(att_mask.numpy())
                 self.predictor.run()
                 start_prob = self.output_handle[0].copy_to_cpu().tolist()
                 end_prob = self.output_handle[1].copy_to_cpu().tolist()
             else:
-                input_dict = {
-                    "input_ids": input_ids.numpy(),
-                    "token_type_ids": token_type_ids.numpy(),
-                    "pos_ids": pos_ids.numpy(),
-                    "att_mask": att_mask.numpy()
-                }
+                if self._multilingual:
+                    input_dict = {
+                        "input_ids": input_ids.numpy(),
+                        "pos_ids": pos_ids.numpy(),
+                    }
+                else:
+                    input_dict = {
+                        "input_ids": input_ids.numpy(),
+                        "token_type_ids": token_type_ids.numpy(),
+                        "pos_ids": pos_ids.numpy(),
+                        "att_mask": att_mask.numpy()
+                    }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
                 start_prob = start_prob.tolist()
                 end_prob = end_prob.tolist()
