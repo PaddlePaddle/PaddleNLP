@@ -21,6 +21,9 @@ logger = logging.getLogger()
 
 
 class DenseIndexer(object):
+    """
+    Class for building, saving, and finding indexes
+    """
 
     def __init__(self, buffer_size: int = 50000):
         self.buffer_size = buffer_size

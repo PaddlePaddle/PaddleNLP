@@ -57,6 +57,9 @@ class BiEncoderSample(object):
 
 
 class NQdataSetForDPR(Dataset):
+    """
+    class for managing dataset
+    """
 
     def __init__(self, dataPath, query_special_suffix=None):
         super(NQdataSetForDPR, self).__init__()
@@ -117,6 +120,9 @@ class NQdataSetForDPR(Dataset):
 
 
 class DataUtil():
+    """
+    Class for working with datasets
+    """
 
     def __init__(self):
         self.tensorizer = BertTensorizer()

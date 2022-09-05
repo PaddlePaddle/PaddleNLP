@@ -18,6 +18,14 @@ import paddle.nn.functional as F
 
 
 class BiEncoder(nn.Layer):
+    """ dual-encoder model
+
+    Attributes:
+        state: for question or for context
+        question_encoder: used to code the problem
+        context_encoder: used to code the context
+
+    """
 
     def __init__(self, question_encoder, context_encoder, state=None):
         super(BiEncoder, self).__init__()
@@ -77,6 +85,9 @@ class BiEncoder(nn.Layer):
 
 
 class BiEncoderNllLoss(object):
+    """
+    calculate the nll loss for dual-encoder model
+    """
 
     def calc(self,
              q_vectors,
