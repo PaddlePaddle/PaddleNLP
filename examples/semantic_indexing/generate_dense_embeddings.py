@@ -11,7 +11,6 @@
 """
 import os
 import pathlib
-
 import argparse
 import csv
 import logging
@@ -33,7 +32,6 @@ if (logger.hasHandlers()):
     logger.handlers.clear()
 console = logging.StreamHandler()
 logger.addHandler(console)
-
 
 class CtxDataset(Dataset):
 
@@ -78,23 +76,15 @@ def gen_ctx_vectors(ctx_rows: List[Tuple[object, str, str]],
     for batch_id, batch_token_tensors in enumerate(tqdm(loader)):
         ctx_ids_batch = paddle.stack(batch_token_tensors, axis=0)
         ctx_seg_batch = paddle.zeros_like(ctx_ids_batch)
-
-        #ctx_attn_mask = move_to_device(tensorizer.get_attn_mask(ctx_ids_batch), args.device)
         with paddle.no_grad():
             out = model.get_context_pooled_embedding(ctx_ids_batch,
                                                      ctx_seg_batch)
 
         out = out.astype('float32').cpu()
-        print("out is:")
-        print(out)
-
         batch_start = batch_id * bsz
         ctx_ids = [r[0] for r in ctx_rows[batch_start:batch_start + bsz]]
-
         assert len(ctx_ids) == out.shape[0]
-
         total += len(ctx_ids)
-
         results.extend([(ctx_ids[i], out[i].reshape([-1]).numpy())
                         for i in range(out.shape[0])])
 
@@ -124,9 +114,7 @@ def main(args):
         'Producing encodings for passages range: %d to %d (out of total %d)',
         start_idx, end_idx, len(rows))
     rows = rows[start_idx:end_idx]
-
     data = gen_ctx_vectors(rows, model, tensorizer, True)
-
     file = args.out_file + '_' + str(args.shard_id) + '.pkl'
     pathlib.Path(os.path.dirname(file)).mkdir(parents=True, exist_ok=True)
     logger.info('Writing results to %s' % file)

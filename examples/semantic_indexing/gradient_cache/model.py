@@ -18,9 +18,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-
 from base_model import SemanticIndexBase
-
 
 class SemanticIndexCacheNeg(SemanticIndexBase):
 
@@ -31,7 +29,6 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
                  scale=30,
                  output_emb_size=None):
         super().__init__(pretrained_model, dropout, output_emb_size)
-
         self.margin = margin
         # Used scaling cosine similarity to ease converge
         self.sacle = scale
@@ -60,7 +57,6 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
             with paddle.no_grad():
                 encoder_outputs = self.ptm.encoder(embedding_output,
                                                    attention_mask)
-
             if self.use_fp16:
                 encoder_outputs = paddle.cast(encoder_outputs, 'float32')
             cls_embedding = self.ptm.pooler(encoder_outputs)
@@ -72,7 +68,6 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
             cls_embedding = self.emb_reduce_linear(cls_embedding)
         cls_embedding = self.dropout(cls_embedding)
         cls_embedding = F.normalize(cls_embedding, p=2, axis=-1)
-
         return cls_embedding
 
     def forward(self,

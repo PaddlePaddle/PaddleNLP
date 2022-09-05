@@ -15,13 +15,10 @@ import unicodedata
 from functools import partial
 from multiprocessing import Pool as ProcessPool
 from typing import Tuple, List, Dict
-
 import regex as re
-
 from tokenizers import SimpleTokenizer
 
 logger = logging.getLogger(__name__)
-
 QAMatchStats = collections.namedtuple('QAMatchStats',
                                       ['top_k_hits', 'questions_doc_hits'])
 
@@ -45,25 +42,17 @@ def calculate_matches(all_docs: Dict[object,
     """
     global dpr_all_documents
     dpr_all_documents = all_docs
-
     tok_opts = {}
     tokenizer = SimpleTokenizer(**tok_opts)
-    #这里需要重点关注
-
     processes = ProcessPool(processes=workers_num, )
-
     logger.info('Matching answers in top docs...')
-
     get_score_partial = partial(check_answer,
                                 match_type=match_type,
                                 tokenizer=tokenizer)
 
     questions_answers_docs = zip(answers, closest_docs)
-
     scores = processes.map(get_score_partial, questions_answers_docs)
-
     logger.info('Per question validation results len=%d', len(scores))
-
     n_docs = len(closest_docs[0][0])
     top_k_hits = [0] * n_docs
     for question_hits in scores:
@@ -77,10 +66,8 @@ def calculate_matches(all_docs: Dict[object,
 def check_answer(questions_answers_docs, tokenizer, match_type) -> List[bool]:
     """Search through all the top docs to see if they have any of the answers."""
     answers, (doc_ids, doc_scores) = questions_answers_docs
-
     global dpr_all_documents
     hits = []
-
     for i, doc_id in enumerate(doc_ids):
         doc = dpr_all_documents[doc_id]
         text = doc[0]
@@ -90,7 +77,6 @@ def check_answer(questions_answers_docs, tokenizer, match_type) -> List[bool]:
             logger.warning("no doc in db")
             hits.append(False)
             continue
-
         if has_answer(answers, text, tokenizer, match_type):
             answer_found = True
         hits.append(answer_found)
@@ -103,7 +89,6 @@ def has_answer(answers, text, tokenizer, match_type) -> bool:
     If `match_type` is regex, we search the whole text with the regex.
     """
     text = _normalize(text)
-
     if match_type == 'string':
         # Answer is a list of possible strings
         text = tokenizer.tokenize(text).words(uncased=True)
@@ -112,10 +97,6 @@ def has_answer(answers, text, tokenizer, match_type) -> bool:
             single_answer = _normalize(single_answer)
             single_answer = tokenizer.tokenize(single_answer)
             single_answer = single_answer.words(uncased=True)
-            """
-            这里重点关注一下
-            如果我不需要string的匹配方法，那直接删去就好
-            """
 
             for i in range(0, len(text) - len(single_answer) + 1):
                 if single_answer == text[i:i + len(single_answer)]:

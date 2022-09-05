@@ -63,22 +63,16 @@ class DenseRetriever(object):
                     self.tensorizer.text_to_tensor(q)
                     for q in questions[batch_start:batch_start + bsz]
                 ]
-
                 q_ids_batch = paddle.stack(batch_token_tensors, axis=0)
                 q_seg_batch = paddle.zeros_like(q_ids_batch)
-
                 out = self.question_encoder.get_question_pooled_embedding(
                     q_ids_batch, q_seg_batch)
-
                 query_vectors.extend(out)
-
                 if len(query_vectors) % 100 == 0:
                     logger.info('Encoded queries %d', len(query_vectors))
 
         query_tensor = paddle.to_tensor(query_vectors)
-
         logger.info('Total encoded queries tensor %s', query_tensor.shape[0])
-
         assert query_tensor.shape[0] == len(questions)
         return query_tensor
 
@@ -197,31 +191,24 @@ def main(args):
 
     tensorizer = BertTensorizer()
     question_model = BertModel.from_pretrained(args.que_model_path)
-
     context_model = BertModel.from_pretrained(args.con_model_path)
     model = BiEncoder(question_encoder=question_model,
                       context_encoder=context_model)
-
     model.eval()
-
     if args.hnsw_index:
         index = DenseHNSWFlatIndexer(768, args.index_buffer)
     else:
         index = DenseFlatIndexer(768, args.index_buffer)
 
     retriever = DenseRetriever(model, args.batch_size, tensorizer, index)
-
     # get questions & answers
     questions = []
     question_answers = []
-
     for ds_item in parse_qa_csv_file(args.qa_file):
         question, answers = ds_item
         questions.append(question)
         question_answers.append(answers)
-
     questions_tensor = retriever.generate_question_vectors(questions)
-
     # index all passages
     ctx_files_pattern = args.encoded_ctx_file
     input_paths = glob.glob(ctx_files_pattern)
@@ -232,17 +219,13 @@ def main(args):
     # get top k results
     top_ids_and_scores = retriever.get_top_docs(questions_tensor.numpy(),
                                                 args.n_docs)
-
     all_passages = load_passages(args.ctx_file)
-
     if len(all_passages) == 0:
         raise RuntimeError(
             'No passages data found. Please specify ctx_file param properly.')
-
     questions_doc_hits = validate(all_passages, question_answers,
                                   top_ids_and_scores, args.validation_workers,
                                   args.match)
-
     if args.out_file:
         save_results(all_passages, questions, question_answers,
                      top_ids_and_scores, questions_doc_hits, args.out_file)
@@ -250,7 +233,6 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
     parser.add_argument(
         '--qa_file',
         required=True,
@@ -304,9 +286,6 @@ if __name__ == '__main__':
         help='If enabled, use inference time efficient HNSW index')
     parser.add_argument('--que_model_path', required=True, type=str)
     parser.add_argument('--con_model_path', required=True, type=str)
-
-    #python dense_retriever.py --hnsw_index --out_file test_dense_retriever --encoded_ctx_file newnewnew_0.pkl  --ctx_file data/psgs_w100.tsv --qa_file nq-dev.qa.csv --que_model_path {que_model_path} --con_model_path {con_model_path}
-
     args = parser.parse_args()
 
     main(args)

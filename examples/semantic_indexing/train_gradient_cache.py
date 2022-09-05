@@ -120,11 +120,8 @@ def do_train():
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
         print("warmup from:{}".format(args.init_from_ckpt))
-
     model = paddle.DataParallel(model)
-
     num_training_steps = len(train_data_loader) * args.epochs
-
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
 
@@ -156,9 +153,7 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-
             chunked_x = [split(t, chunk_numbers, axis=0) for t in batch]
-
             sub_batchs = [list(s) for s in zip(*chunked_x)]
 
             all_reps = []
@@ -172,55 +167,41 @@ def do_train():
             all_title = []
 
             for sub_batch in sub_batchs:
-
                 all_reps = []
                 all_labels = []
-
                 sub_query_input_ids, sub_query_token_type_ids, sub_title_input_ids, sub_title_token_type_ids = sub_batch
-
                 with paddle.amp.auto_cast(
                         args.use_amp,
                         custom_white_list=["layer_norm", "softmax", "gelu"]):
 
                     with paddle.no_grad():
-
                         sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state(
                         )
-
                         all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
-
                         sub_cosine_sim, sub_label, query_embedding, title_embedding = model(
                             query_input_ids=sub_query_input_ids,
                             title_input_ids=sub_title_input_ids,
                             query_token_type_ids=sub_query_token_type_ids,
                             title_token_type_ids=sub_title_token_type_ids)
-
                         all_reps.append(sub_cosine_sim)
                         all_labels.append(sub_label)
                         all_title.append(title_embedding)
                         all_query.append(query_embedding)
 
                 model_reps = paddle.concat(all_reps, axis=0)
-
                 model_title = paddle.concat(all_title)
                 model_query = paddle.concat(all_query)
 
                 model_title = model_title.detach()
-
                 model_query = model_query.detach()
 
                 model_query.stop_gtadient = False
-
                 model_title.stop_gradient = False
-
                 model_reps.stop_gradient = False
 
                 model_label = paddle.concat(all_labels, axis=0)
-
                 loss = F.cross_entropy(input=model_reps, label=model_label)
-
                 loss.backward()
-
                 all_grads.append(model_reps.grad)
 
             for sub_batch, CUDA_state, grad in zip(sub_batchs,
@@ -228,15 +209,12 @@ def do_train():
                                                    all_grads):
 
                 sub_query_input_ids, sub_query_token_type_ids, sub_title_input_ids, sub_title_token_type_ids = sub_batch
-
                 paddle.framework.random.set_cuda_rng_state(CUDA_state)
-
                 cosine_sim, _ = model(
                     query_input_ids=sub_query_input_ids,
                     title_input_ids=sub_title_input_ids,
                     query_token_type_ids=sub_query_token_type_ids,
                     title_token_type_ids=sub_title_token_type_ids)
-
                 surrogate = paddle.dot(cosine_sim, grad)
 
                 if args.use_amp:
