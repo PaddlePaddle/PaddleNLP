@@ -35,7 +35,7 @@ from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
-from .information_extraction import UIETask
+from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask
 
@@ -288,6 +288,20 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-base-en"
             },
+            "uie-m-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-m-base"
+            },
+            "uie-m-large": {
+                "task_class": UIETask,
+                "hidden_size": 1024,
+                "task_flag": "information_extraction-uie-m-large"
+            },
+            "uie-data-distill-gp": {
+                "task_class": GPTask,
+                "task_flag": "information_extraction-uie-data-distill-gp"
+            },
         },
         "default": {
             "model": "uie-base"
@@ -386,7 +400,7 @@ TASKS = {
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "uie-base-en", "wordtag"
+    "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base"
 ]
 
 
