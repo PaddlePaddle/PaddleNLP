@@ -76,6 +76,8 @@ python examples/semantic-search/semantic_search_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/semantic-search/semantic_search_example.py --device cpu
 ```
+`semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
+
 
 ### 3.4 构建 Web 可视化语义检索系统
 
