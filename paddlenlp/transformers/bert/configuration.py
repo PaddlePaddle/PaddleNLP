@@ -397,6 +397,5 @@ class BertConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
-        self.pad_token_id = pad_token_id
         self.pool_act = pool_act
         self.fuse = fuse

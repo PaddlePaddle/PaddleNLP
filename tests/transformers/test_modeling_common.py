@@ -20,6 +20,7 @@ import tempfile
 import unittest
 import numpy as np
 import paddle
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 global_rng = random.Random()
 
@@ -66,10 +67,12 @@ class ModelTesterMixin:
         return inputs_dict
 
     def _make_model_instance(self, config, model_class):
+        if isinstance(config, PretrainedConfig):
+            return model_class(config)
         if model_class == self.base_model_class:
             return model_class(**config)
-        else:
-            return model_class(self.base_model_class(**config))
+
+        return model_class(self.base_model_class(**config))
 
     def test_save_load(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(

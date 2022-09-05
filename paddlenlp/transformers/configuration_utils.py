@@ -20,7 +20,9 @@ from __future__ import annotations
 import copy
 import json
 import os
+import os.path as osp
 import re
+import shutil
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
 
@@ -28,6 +30,8 @@ from packaging import version
 
 from requests import HTTPError
 from ..utils import CONFIG_NAME
+from paddle import nn
+from paddlenlp.utils.env import MODEL_HOME
 from ..utils.downloader import is_url, get_path_from_url
 
 from paddlenlp.utils.log import logger
@@ -104,19 +108,53 @@ def custom_object_save(obj, folder, config=None):
         shutil.copy(needed_file, dest_file)
 
 
-class RepositoryNotFoundError(HTTPError):
+def cached_path(
+    url_or_filename,
+    cache_dir=None,
+    force_download=False,
+    local_files_only=False,
+) -> Optional[str]:
     """
-    Raised when trying to access a hf.co URL with an invalid repository name, or with a private repo name the user does
-    not have access to.
+    Given something that might be a URL (or might be a local path), determine which. If it's a URL, download the file
+    and cache it, and return the path to the cached file. If it's already a local path, make sure the file exists and
+    then return the path
+
+    Args:
+        cache_dir: specify a cache directory to save the file to (overwrite the default cache dir).
+        force_download: if True, re-download the file even if it's already cached in the cache dir.
+        user_agent: Optional string or dict that will be appended to the user-agent on remote requests.
+
+    Return:
+        Local path (string) of file or if networking is off, last version of file cached on disk.
+
+    Raises:
+        In case of non-recoverable file (non-existent or inaccessible url + no cache on disk).
     """
+    if is_url(url_or_filename):
+        if cache_dir is None:
+            raise NotADirectoryError(
+                "when download from url<%s>, cache_dir is required, but receive None",
+                url_or_filename)
 
+        if force_download:
+            # remove the target file under cache_dir
+            file_path = osp.join(cache_dir, osp.split(url_or_filename)[-1])
+            shutil.rmtree(file_path, ignore_errors=True)
 
-class EntryNotFoundError(HTTPError):
-    """Raised when trying to access a hf.co URL with a valid repository and revision but an invalid filename."""
+        # URL, so get it from the cache (downloading if necessary)
+        output_path = get_path_from_url(
+            url_or_filename,
+            cache_dir=cache_dir,
+        )
+    elif os.path.exists(url_or_filename):
+        # File, and it exists.
+        output_path = url_or_filename
+    else:
+        raise FileNotFoundError(
+            "can't find the file<{%s}> which should be valid url or local file path",
+            url_or_filename)
 
-
-class RevisionNotFoundError(HTTPError):
-    """Raised when trying to access a hf.co URL with a valid repository but an invalid revision."""
+    return output_path
 
 
 class PretrainedConfig:
@@ -289,7 +327,7 @@ class PretrainedConfig:
         tie_word_embeddings (`bool`, *optional*, defaults to `True`):
             Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the
             model has a output word embedding layer.
-        torch_dtype (`str`, *optional*):
+        dtype (`str`, *optional*):
             The `dtype` of the weights. This attribute can be used to initialize the model to a non-default `dtype`
             (which is normally `float32`) and thus allow for optimal storage allocation. For example, if the saved
             model is `float16`, ideally we want to load it back using the minimal amount of memory needed to load
@@ -398,6 +436,8 @@ class PretrainedConfig:
         self.pad_token_id = kwargs.pop("pad_token_id", None)
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
+
+        self.dtype = kwargs.pop("dtype", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 
@@ -628,19 +668,10 @@ class PretrainedConfig:
                          **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         force_download = kwargs.pop("force_download", False)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
-        use_auth_token = kwargs.pop("use_auth_token", None)
-        local_files_only = kwargs.pop("local_files_only", False)
-        revision = kwargs.pop("revision", None)
 
-        # TODO: from_pipeline: there is no usage
-        from_pipeline = kwargs.pop("_from_pipeline", None)
         from_auto_class = kwargs.pop("_from_auto", False)
 
         user_agent = {"file_type": "config", "from_auto_class": from_auto_class}
-        if from_pipeline is not None:
-            user_agent["using_pipeline"] = from_pipeline
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -722,7 +753,7 @@ class PretrainedConfig:
         for key, value in kwargs.items():
             if hasattr(config, key):
                 setattr(config, key, value)
-                if key != "torch_dtype":
+                if key != "dtype":
                     to_remove.append(key)
         for key in to_remove:
             kwargs.pop(key, None)
@@ -946,21 +977,52 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     return configuration_file
 
 
-def _construct_kwargs(args, kwargs, fields):
+def _construct_kwargs(args, kwargs: Dict[str, Any],
+                      fields: List[Union[str, Tuple[str, Any]]]):
+    """construct kwargs with `args`, `kwargs` and `fields`
+
+    Examples:
+        fields = ["hidden_size", ("dropout", 0)]
+
+    Args:
+        args (tuple): args of method
+        kwargs (Dict[str, Any]): key-word args
+        fields (List[Union[str, Tuple[str, Any]]]): name of old method parameters, and can be with default value
+
+    Returns:
+        Dict[str, Any]: the final kwargs
+    """
     args = args or ()
+    # 1. convert args into kwargs
     for index, arg in enumerate(args):
         # if parameters is: (a,b,c), but args is (1, 2), kwargs is {b=3, c=4} -> (1, 2, b=3, c=4)
         assert fields[
             index] not in kwargs, f"{index}th field<{fields[index]}> is already in kwargs, but you have set it twice"
         kwargs[fields[index]] = arg
+
+    # 2. check that fields is with default values
+    fields = fields or []
+    for field in fields:
+        if isinstance(field, str):
+            continue
+        assert lens(
+            field
+        ) == 2, 'fields should be: `field` or (`field`, `field_default_value`)'
+
+        key, value = field
+        if key not in kwargs:
+            kwargs[key] = value
+
     return kwargs
 
 
-def parse_config(config: Optional[PretrainedConfig] = None,
+def parse_config(config_or_model: Optional[Union[PretrainedConfig,
+                                                 PretrainedModel]] = None,
                  config_class: Type[PretrainedConfig] = None,
                  args: Tuple[Any] = None,
                  kwargs: Dict[str, Any] = None,
-                 fields: Optional[List[str]] = None) -> PretrainedConfig:
+                 fields: Optional[List[str]] = None,
+                 return_model: bool = True) -> PretrainedConfig:
     """parse config from config & kwargs
 
     Args:
@@ -970,60 +1032,31 @@ def parse_config(config: Optional[PretrainedConfig] = None,
         kwargs (Dict[str, Any]): the source of the parameters of initialization method
         fields (Optional[List[str]], optional): the old fields of kwargs
     """
-    if config is not None and isinstance(config, config_class):
-        if len(kwargs) > 0:
-            keys = ",".join(list(kwargs.keys()))
-            logger.warning(
-                f"please use config<{config_class}> to init model, and the following parameters will be ignored: {keys}",
-            )
-        return config
+    # import locally to avoid circular reference
+    from paddlenlp.transformers.model_utils import PretrainedModel
 
-    # if config is None, so parse `PretrainedConfig` from args,kwargs according to the fields
-    # 1. if args is not one, so it should
-    args = args or ()
-    if config is not None:
-        args = (config, ) + args
-    kwargs = _construct_kwargs(args, kwargs, fields)
-    config = config_class(**kwargs)
-    return config
-
-
-def parse_config_and_model(
-        config_or_model: Optional[Union[PretrainedConfig,
-                                        PretrainedModel]] = None,
-        config_class: Type[PretrainedConfig] = None,
-        model_class: Type[PretrainedModel] = None,
-        args: Tuple[Any] = None,
-        kwargs: Dict[str, Any] = None,
-        fields: Optional[List[str]] = None) -> PretrainedConfig:
-    """parse config from config & kwargs
-
-    Args:
-        config (Optional[PretrainedConfig], optional): the new config instance. Defaults to None.
-        config_class (PretrainedConfig): the class of the target config class
-        args (Tuple[Any]): the source arg list
-        kwargs (Dict[str, Any]): the source of the parameters of initialization method
-        fields (Optional[List[str]], optional): the old fields of kwargs
-    """
     # 1. if `config_or_model` is Model, so construct args and kwargs to init config
-    if isinstance(config_or_model, model_class):
+    model = None
+    if isinstance(config_or_model, PretrainedModel):
+        kwargs = _construct_kwargs(args, kwargs, fields)
+        config = config_class(**kwargs)
+        model = config_or_model
+
+    # 2. if `config_or_model` is Config, so construct args and kwargs to init model
+    elif isinstance(config_or_model, config_class):
+        kwargs = _construct_kwargs(args, kwargs, fields)
+        for key, value in kwargs.items():
+            setattr(config_or_model, key, value)
+
+        config = config_or_model
+    else:
+        # 3. create config and use it to init model
+        args = args or ()
+        if config_or_model is not None:
+            args = (config_or_model, ) + args
         kwargs = _construct_kwargs(args, kwargs, fields)
         config = config_class(**kwargs)
 
-        return config, config_or_model
-
-    # 2. if `config_or_model` is Config, so construct args and kwargs to init model
-    if isinstance(config_or_model, config_class):
-        kwargs = _construct_kwargs(args, kwargs, fields)
-        model = model_class(config_or_model, **kwargs)
-        return config_or_model, model
-
-    # 3. create config and use it to init model
-    args = args or ()
-    if config_or_model is not None:
-        args = (config_or_model, ) + args
-    kwargs = _construct_kwargs(args, kwargs, fields)
-    config = config_class(**kwargs)
-
-    model = model_class(kwargs)
-    return config, model
+    if return_model:
+        return config, model
+    return config

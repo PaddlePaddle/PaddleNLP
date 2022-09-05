@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import copy
 import io
@@ -19,14 +20,17 @@ import os
 import six
 import logging
 import inspect
-from typing import Optional
+from typing import Optional, Type, Dict, List, Tuple, Union
+import shutil
 
 import paddle
+from paddle import Tensor
 import numpy as np
 import paddle.nn as nn
 from paddle.nn import Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import get_path_from_url, download_check, COMMUNITY_MODEL_PREFIX
+from paddle.utils.download import get_path_from_url, is_url
+from paddlenlp.utils.downloader import download_check, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -44,6 +48,26 @@ def unwrap_model(model, *args, **kwargs):
     raw_model = model._layers if isinstance(model,
                                             paddle.DataParallel) else model
     return raw_model
+
+
+def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
+    """get dtype of parameter which should be sub-class of nn.Layer
+
+    Args:
+        parameter (nn.Layer): the instance of layer
+
+    Returns:
+        paddle.dtype: the dtype of tensor
+    """
+
+    last_dtype = None
+    for t in parameter.parameters():
+        last_dtype = t.dtype
+        if t.is_floating_point():
+            return t.dtype
+
+    # TODO(wj-Mcat): get dtype of model when it's in DataParallel Mode.
+    return last_dtype
 
 
 def register_base_model(cls):
@@ -226,24 +250,6 @@ class PretrainedModel(Layer, GenerationMixin):
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
-        cache_dir = kwargs.pop('cache_dir', None)
-        config = kwargs.pop("config", None)
-        force_download = kwargs.pop("force_download", None)
-        from_auto_class = kwargs.pop("_from_auto", None)
-        from_pipeline = kwargs.pop("_from_pipeline", None)
-
-        if not isinstance(config, PretrainedConfig):
-            config_path = config if config is not None else pretrained_model_name_or_path
-            config, model_kwargs = cls.config_class.from_pretrained(
-                config_path,
-                cache_dir=cache_dir,
-                return_unused_kwargs=True,
-                force_download=force_download,
-                _from_auto=from_auto_class,
-                _from_pipeline=from_pipeline,
-                **kwargs,
-            )
-
         track_download = True
         # From built-in pretrained models
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
@@ -445,6 +451,7 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 state_to_load[k] = state_to_load[k].astype(dtype)
+
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
         import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
@@ -484,7 +491,7 @@ class PretrainedModel(Layer, GenerationMixin):
         model_config = get_config(self)
         return model_config
 
-    def save_model_config(self, save_dir):
+    def save_model_config(self, save_dir: str):
         """
         Saves model configuration to a file named "model_config.json" under `save_dir`.
 
@@ -497,7 +504,7 @@ class PretrainedModel(Layer, GenerationMixin):
         with io.open(model_config_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
-    def save_pretrained(self, save_dir):
+    def save_pretrained(self, save_dir: str):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -615,3 +622,639 @@ class PretrainedModel(Layer, GenerationMixin):
     def __setattr__(self, name, value):
         value = adapt_stale_fwd_patch(self, name, value)
         return super(PretrainedModel, self).__setattr__(name, value)
+
+
+class PretrainedModelNew(Layer, GenerationMixin):
+    """
+    The base class for all pretrained models. It mainly provides common methods
+    for loading (construction and loading) and saving pretrained models. Loading
+    and saving also rely on the following class attributes which should be overridden
+    by derived classes accordingly:
+
+    - **model_config_file** (str): Represents the file name of model configuration
+      for configuration saving and loading in local file system. The value is
+      `model_config.json`.
+    - **resource_files_names** (dict): Name of local file where the model configuration
+      can be saved and loaded locally. Currently, resources only include the model state,
+      thus the dict only includes `'model_state'` as key with corresponding
+      value `'model_state.pdparams'` for model weights saving and loading.
+    - **pretrained_init_configuration** (dict): Provides the model configurations
+      of built-in pretrained models (contrasts to models in local file system).
+      It has pretrained model names as keys (such as `bert-base-uncased`), and
+      the values are dict preserving corresponding configuration for model initialization.
+    - **pretrained_resource_files_map** (dict): Provides resource URLs of built-in
+      pretrained models (contrasts to models in local file system).
+      It has the same key as resource_files_names (that is "model_state"),
+      and the corresponding value is a dict with specific model name to model weights URL mapping
+      (such as "bert-base-uncased" ->
+      "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams").
+    - **base_model_prefix** (str): Represents the attribute associated to the
+      base model in derived classes of the same architecture adding layers on
+      top of the base model. Note: A base model class is pretrained model class
+      decorated by `register_base_model`, such as `BertModel`; A derived model
+      class is a pretrained model class adding layers on top of the base model,
+      and it has a base model as attribute, such as `BertForSequenceClassification`.
+
+    Methods common to models for text generation are defined in `GenerationMixin`
+    and also inherited here.
+
+    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
+    by which subclasses can track arguments for initialization automatically.
+    """
+    model_config_file = "model_config.json"
+    pretrained_init_configuration = {}
+    # TODO: more flexible resource handle, namedtuple with fields as:
+    # resource_name, saved_file, handle_name_for_load(None for used as __init__
+    # arguments), handle_name_for_save
+    resource_files_names = {"model_state": "model_state.pdparams"}
+    pretrained_resource_files_map = {}
+    base_model_prefix = ""
+
+    # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
+    # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
+    _keys_to_ignore_on_load_missing = None
+    # a list of `re` patterns of `state_dict` keys that should be removed from the list of
+    # unexpected keys we find (keys inside the checkpoint but not the model) and avoid unnecessary
+    # warnings.
+    _keys_to_ignore_on_load_unexpected = None
+    # a list of `state_dict` keys to ignore when saving the model (useful for keys that aren't
+    # trained, but which are either deterministic or tied variables)
+    _keys_to_ignore_on_save = None
+
+    def __init__(self, config: PretrainedConfig, *inputs, **kwargs):
+        super().__init__()
+        if not isinstance(config, PretrainedConfig):
+            raise ValueError(
+                f"Parameter config in `{self.__class__.__name__}(config)` should be an instance of class "
+                "`PretrainedConfig`. To create a model from a pretrained model use "
+                f"`model = {self.__class__.__name__}.from_pretrained(PRETRAINED_MODEL_NAME)`"
+            )
+        # Save config and origin of the pretrained weights if given in model
+        self.config = config
+        self.name_or_path = config.name_or_path
+        self.warnings_issued = {}
+
+    @property
+    def base_model(self):
+        """
+        PretrainedModel: The body of the same model architecture. It is the base
+            model itself for base model or the base model attribute for derived
+            model.
+        """
+        return getattr(self, self.base_model_prefix, self)
+
+    @property
+    def model_name_list(self):
+        """
+        list: Contains all supported built-in pretrained model names of the
+            current PretrainedModel class.
+        """
+        # Todo: return all model name
+        return list(self.pretrained_init_configuration.keys())
+
+    def get_input_embeddings(self):
+        """get the input embedding of the model.
+            if there is base model, so call the basic model
+
+        Raises:
+            NotImplementedError: 
+
+        Returns:
+            _type_: _description_
+        """
+        base_model = getattr(self, self.base_model_prefix, self)
+        if base_model is not self:
+            return base_model.get_input_embeddings()
+        else:
+            raise NotImplementedError(
+                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
+                ' or `set_input_embeddings` method')
+
+    def set_input_embeddings(self, value):
+        base_model = getattr(self, self.base_model_prefix, self)
+        if base_model is not self:
+            return base_model.set_input_embeddings(value)
+        else:
+            raise NotImplementedError(
+                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
+                ' or `set_input_embeddings` method')
+
+    def get_output_embeddings(self):
+        return None  # Overwrite for models with output embeddings
+
+    def resize_position_embeddings(self, new_num_position_embeddings):
+        raise NotImplementedError(
+            f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
+            f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
+        )
+
+    @classmethod
+    def _resolve_model_file_path(cls: Type[PretrainedModel],
+                                 pretrained_model_name_or_path: str,
+                                 cache_dir: Optional[str] = None) -> str:
+        """resolve model target file path from `` and `cache_dir`
+
+        0. when it is file path:
+            return the weight file
+
+        1. when it is model-name:
+            1.1 check default `MODEL_HOME` + `model-mame` + model_state.pdparams
+            1.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
+        
+        2. when it is url:
+            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-mame`)
+        
+        3. when it is local dir:
+            check whether the file<local_dir + weight_file> exist
+
+        Args:
+            cls (Type[PretrainedModel]): the inherited PretrainedModel class
+            pretrained_model_name_or_path (str): the model-name/url/local_dir/local_dir
+            cache_dir (Optional[str], optional): cache_dir is used when name_or_path is model-name/url. Defaults to None.
+
+        Returns:
+            str: the model weight file path
+        """
+        # 0. when it is local file
+        if os.path.isfile(pretrained_model_name_or_path):
+            return pretrained_model_name_or_path
+
+        cache_dir = cache_dir or os.path.join(MODEL_HOME,
+                                              pretrained_model_name_or_path)
+
+        # 1. when it is model-name
+        if pretrained_model_name_or_path in cls.pretrained_resource_files_map:
+            # check the cache_dir:
+            os.makedirs(cache_dir, exist_ok=True)
+
+            # check the state_dict file
+            weight_file_path = os.path.join(
+                cache_dir, cls.resource_files_names['model_state'])
+            if os.path.exists(weight_file_path):
+                return weight_file_path
+
+            # fetch the weight url from the `pretrained_resource_files_map`
+            pretrained_model_name_or_path = cls.pretrained_resource_files_map[
+                pretrained_model_name_or_path]['model_state']
+
+        # 2. when it is url
+        if is_url(pretrained_model_name_or_path):
+            weight_file_path = get_path_from_url(pretrained_model_name_or_path,
+                                                 cache_dir)
+
+            # check the downloaded weight file and registered weight file name
+            weight_file_dir, weight_file_name = None
+            registered_file_name = None
+
+            new_weight_file_path = os.path.join(
+                os.path.split(weight_file_path)[0],
+                cls.resource_files_names['model_state'])
+
+            if weight_file_path != new_weight_file_path:
+                # copy the weight file
+                shutil.copyfile(weight_file_path, new_weight_file_path)
+                shutil.rmtree(weight_file_path)
+                weight_file_path = new_weight_file_path
+
+            return weight_file_path
+
+        # 3. when it is local dir
+        if os.path.isdir(pretrained_model_name_or_path):
+            # in-order to compatible with old style:
+            # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
+            weight_file_path = os.path.join(
+                pretrained_model_name_or_path,
+                cls.resource_files_names['model_state'])
+            if os.path.exists(weight_file_path):
+                return weight_file_path
+
+            # try to load the exist `*.pdparams` file as the `model_state` file
+            model_state_files = [
+                file for file in os.listdir(pretrained_model_name_or_path)
+                if file.endswith('.pdparams')
+            ]
+            if not model_state_files:
+                raise FileNotFoundError(
+                    "can not find the `model_state` file under the directory<%s>",
+                    pretrained_model_name_or_path)
+
+            if len(model_state_files) > 1:
+                logger.warning(
+                    "detect more than one *.pdparams files which is not registered `model_state` files, so try to load the default first<%s> as the `model_state` file"
+                )
+
+            weight_file_path = os.path.join(pretrained_model_name_or_path,
+                                            model_state_files[0])
+            return weight_file_path
+
+        raise FileNotFoundError(
+            "can't resolve the model_state file according to the <%s>",
+            pretrained_model_name_or_path)
+
+    @classmethod
+    def _load_pretrained_model(
+        cls,
+        model: PretrainedModelNew,
+        state_dict: Dict[str, Tensor],
+        loaded_keys: List[str],
+        ignore_mismatched_sizes=False,
+        dtype=None,
+    ) -> Tuple[List[str]]:
+        """load the state_dict into model, and do the following things:
+
+            * check the 
+
+        Args:
+            model (PretrainedModelNew): the pretrained model instance
+            state_dict (Dict[str, Tensor]): the model state dict data
+            loaded_keys (List[str]): 
+            ignore_mismatched_sizes (bool, optional): whether ignore error when tensor size mismatched. Defaults to False.
+            dtype (_type_, optional): the dtype of model state dict. Defaults to None.
+
+        Returns:
+            Tuple[List[str]]: _description_
+        """
+
+        model_state_dict = model.state_dict()
+        expected_keys = list(model_state_dict.keys())
+        prefix = model.base_model_prefix
+
+        if len(prefix) > 0:
+            has_prefix_module = any(s.startswith(prefix) for s in loaded_keys)
+            expects_prefix_module = any(
+                s.startswith(prefix) for s in expected_keys)
+        else:
+            has_prefix_module = False
+            expects_prefix_module = False
+
+        # key re-naming operations are never done on the keys
+        # that are loaded, but always on the keys of the newly initialized model
+        remove_prefix_from_model = not has_prefix_module and expects_prefix_module
+        add_prefix_to_model = has_prefix_module and not expects_prefix_module
+
+        if remove_prefix_from_model:
+            expected_keys_not_prefixed = [
+                s for s in expected_keys if not s.startswith(prefix)
+            ]
+            expected_keys = [
+                ".".join(s.split(".")[1:]) if s.startswith(prefix) else s
+                for s in expected_keys
+            ]
+        elif add_prefix_to_model:
+            expected_keys = [".".join([prefix, s]) for s in expected_keys]
+
+        missing_keys = list(set(expected_keys) - set(loaded_keys))
+        unexpected_keys = list(set(loaded_keys) - set(expected_keys))
+
+        # Some models may have keys that are not in the state by design, removing them before needlessly warning
+        # the user.
+        if cls._keys_to_ignore_on_load_missing is not None:
+            for pat in cls._keys_to_ignore_on_load_missing:
+                missing_keys = [
+                    k for k in missing_keys if re.search(pat, k) is None
+                ]
+
+        if cls._keys_to_ignore_on_load_unexpected is not None:
+            for pat in cls._keys_to_ignore_on_load_unexpected:
+                unexpected_keys = [
+                    k for k in unexpected_keys if re.search(pat, k) is None
+                ]
+
+        # Make sure we are able to load base models as well as derived models (with heads)
+        start_prefix = ""
+        model_to_load = model
+        if len(cls.base_model_prefix) > 0 and not hasattr(
+                model, cls.base_model_prefix) and has_prefix_module:
+            start_prefix = cls.base_model_prefix + "."
+        if len(cls.base_model_prefix) > 0 and hasattr(
+                model, cls.base_model_prefix) and not has_prefix_module:
+            model_to_load = getattr(model, cls.base_model_prefix)
+            if any(key in expected_keys_not_prefixed for key in loaded_keys):
+                raise ValueError(
+                    "The state dictionary of the model you are trying to load is corrupted. Are you sure it was "
+                    "properly saved?")
+            if device_map is not None:
+                device_map = {
+                    k.replace(f"{cls.base_model_prefix}.", ""): v
+                    for k, v in device_map.items()
+                }
+
+        def _find_mismatched_keys(
+            state_dict,
+            model_state_dict,
+            loaded_keys,
+            add_prefix_to_model,
+            remove_prefix_from_model,
+            ignore_mismatched_sizes,
+        ):
+            mismatched_keys = []
+            if ignore_mismatched_sizes:
+                for checkpoint_key in loaded_keys:
+                    model_key = checkpoint_key
+                    if remove_prefix_from_model:
+                        # The model key starts with `prefix` but `checkpoint_key` doesn't so we add it.
+                        model_key = f"{prefix}.{checkpoint_key}"
+                    elif add_prefix_to_model:
+                        # The model key doesn't start with `prefix` but `checkpoint_key` does so we remove it.
+                        model_key = ".".join(checkpoint_key.split(".")[1:])
+
+                    if (model_key in model_state_dict
+                            and state_dict[checkpoint_key].shape !=
+                            model_state_dict[model_key].shape):
+                        mismatched_keys.append(
+                            (checkpoint_key, state_dict[checkpoint_key].shape,
+                             model_state_dict[model_key].shape))
+                        del state_dict[checkpoint_key]
+            return mismatched_keys
+
+        # Whole checkpoint
+        mismatched_keys = _find_mismatched_keys(
+            state_dict,
+            model_state_dict,
+            loaded_keys,
+            add_prefix_to_model,
+            remove_prefix_from_model,
+            ignore_mismatched_sizes,
+        )
+
+        # For model parallel if FasterGeneration
+        # To avoid recursive import temporarily.
+        import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
+        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(
+            model_to_load, state_dict)
+        if paddle.in_dynamic_mode():
+            model_to_load.set_state_dict(state_to_load)
+
+        #     if track_download:
+        #         download_check(pretrained_model_name_or_path, "from_pretrained")
+        # if track_download:
+        #     download_check(pretrained_model_name_or_path, "from_pretrained")
+
+        return model_to_load, missing_keys, unexpected_keys, mismatched_keys
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        """
+        Creates an instance of `PretrainedModel`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): Name of pretrained model or dir path
+                to load from. The string can be:
+
+                - Name of a built-in pretrained model
+                - Name of a community-contributed pretrained model.
+                - Local directory path which contains model weights file("model_state.pdparams")
+                  and model config file ("model_config.json").
+            *args (tuple): Position arguments for model `__init__`. If provided,
+                use these as position argument values for model initialization.
+            **kwargs (dict): Keyword arguments for model `__init__`. If provided,
+                use these to update pre-defined keyword argument values for model
+                initialization. If the keyword is in `__init__` argument names of
+                base model, update argument values of the base model; else update
+                argument values of derived model.
+            load_state_as_np (bool, optional): The weights read in can be choosed
+                to place on CPU or GPU though the model is on the default device.
+                If `True`, load the model weights as `numpy.ndarray` on CPU.
+                Otherwise, weights would be loaded as tensors on the default
+                device. Note that if on GPU, the latter would creates extra
+                temporary tensors in addition to the model weights, which
+                doubles the memory usage . Thus it is suggested to use `True`
+                for big models on GPU. Default to `False`.
+
+        Returns:
+            PretrainedModel: An instance of `PretrainedModel`.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import BertForSequenceClassification
+
+                # Name of built-in pretrained model
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+
+                # Name of community-contributed pretrained model
+                model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+
+                # Load from local directory path
+                model = BertForSequenceClassification.from_pretrained('./my_bert/')
+        """
+        resource_files = {}
+        init_configuration = {}
+        load_state_as_np = kwargs.pop("load_state_as_np", False)
+        cache_dir = kwargs.pop('cache_dir', None)
+        config = kwargs.pop("config", None)
+        force_download = kwargs.pop("force_download", None)
+        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
+        dtype = kwargs.pop("dtype", None)
+
+        model_kwargs = kwargs
+        # 1. get the PretrainedConfig to init model
+        if not isinstance(config, PretrainedConfig):
+            config_path = config if config is not None else pretrained_model_name_or_path
+            # 1.1 get configuration from `pretrained_init_configuration` field
+            if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+                config = cls.config_class(
+                    **cls.
+                    pretrained_init_configuration[pretrained_model_name_or_path]
+                )
+
+            # 1.2 get configuration from local_file/local_dir/remote_url
+            else:
+                config, model_kwargs = cls.config_class.from_pretrained(
+                    config_path,
+                    cache_dir=cache_dir,
+                    return_unused_kwargs=True,
+                    force_download=force_download,
+                    **kwargs,
+                )
+
+        # 2. init the model
+        model = cls(config=config, **model_kwargs)
+
+        # 3. resolve model_weight file
+        model_weight_file = cls._resolve_model_file_path(
+            pretrained_model_name_or_path, cache_dir=cache_dir)
+
+        # 4. loading the state dict
+        model_state_dict = paddle.load(model_weight_file,
+                                       return_numpy=load_state_as_np)
+
+        loaded_state_dict_keys = list(model_state_dict.keys())
+        # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
+        model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
+            model=model,
+            state_dict=model_state_dict,
+            loaded_keys=loaded_state_dict_keys,
+            ignore_mismatched_sizes=ignore_mismatched_sizes,
+            dtype=dtype)
+
+        if len(unexpected_keys) > 0:
+            logger.warning(
+                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
+                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
+                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
+                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
+                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
+                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
+                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
+            )
+        else:
+            logger.info(
+                f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n"
+            )
+
+        if len(missing_keys) > 0:
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
+                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
+            )
+        elif len(mismatched_keys) == 0:
+            logger.info(
+                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
+                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
+                " training.")
+        if len(mismatched_keys) > 0:
+            mismatched_warning = "\n".join([
+                f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
+                for key, shape1, shape2 in mismatched_keys
+            ])
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
+                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
+                " to use it for predictions and inference.")
+        return model
+
+    def save_pretrained(self, save_dir: str):
+        """
+        Saves model configuration and related resources (model state) as files
+        under `save_dir`. The model configuration would be saved into a file named
+        "model_config.json", and model state would be saved into a file
+        named "model_state.pdparams".
+
+        The `save_dir` can be used in `from_pretrained` as argument value
+        of `pretrained_model_name_or_path` to re-load the trained model.
+
+        Args:
+            save_dir (str): Directory to save files into.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import BertForSequenceClassification
+
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+                model.save_pretrained('./trained_model/')
+                # reload from save_directory
+                model = BertForSequenceClassification.from_pretrained('./trained_model/')
+        """
+        assert not os.path.isfile(
+            save_dir
+        ), "Saving directory ({}) should be a directory, not a file".format(
+            save_dir)
+        os.makedirs(save_dir, exist_ok=True)
+
+        # 1. retrieve the model related config
+
+        # save the string version of dtype to the config, e.g. convert torch.float32 => "float32"
+        # we currently don't use this setting automatically, but may start to use with v5
+        model_to_save = unwrap_model(self)
+        dtype = get_parameter_dtype(model_to_save)
+        model_to_save.config.dtype = str(dtype).split(".")[1]
+
+        # Attach architecture to the config
+        model_to_save.config.architectures = [model_to_save.__class__.__name__]
+
+        model_to_save.config.save_pretrained(save_dir)
+
+        # Save model
+        if paddle.in_dynamic_mode():
+            file_name = os.path.join(save_dir,
+                                     self.resource_files_names['model_state'])
+            paddle.save(self.state_dict(), file_name)
+        else:
+            logger.warning(
+                "Save pretrained model only supported dygraph mode for now!")
+
+    def resize_token_embeddings(self,
+                                new_num_tokens: Optional[int] = None
+                                ) -> nn.Embedding:
+        """
+        Resizes input token embeddings matrix of the model according to new_num_tokens.
+
+        Args:
+            new_num_tokens (Optional[int]):
+                The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
+                vectors at the end. Reducing the size will remove vectors from the end. If not provided or None, just
+                returns a pointer to the input tokens embedding module of the model without doing anything.
+
+        Returns:
+            paddle.nn.Embedding: The input tokens Embeddings Module of the model.
+        """
+        old_embeddings: nn.Embedding = self.get_input_embeddings()
+        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[
+                0]:
+            return old_embeddings
+
+        new_embeddings = self._get_resized_embeddings(old_embeddings,
+                                                      new_num_tokens)
+        self.set_input_embeddings(new_embeddings)
+
+        # 2. Update vocab_size
+        self.base_model.config['vocab_size'] = new_num_tokens
+        self.vocab_size = new_num_tokens
+
+        # TODO(westfish@126.com): add tie_weight.
+        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
+
+        return new_embeddings
+
+    def _get_resized_embeddings(
+            self,
+            old_embeddings: nn.Embedding,
+            new_num_tokens: Optional[int] = None) -> nn.Embedding:
+        """
+        Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
+        initialized vectors at the end. Reducing the size will remove vectors from the end
+        
+        Args:
+            old_embeddings (nn.Embedding):
+                Old embeddings to be resized.
+            new_num_tokens (Optional[int]):
+                New number of tokens in the embedding matrix.
+                Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
+                vectors from the end. 
+
+        Returns:
+            paddle.nn.Embedding: The resized Embedding Module or the old Embedding Module if new_num_tokens is None.
+        """
+        if new_num_tokens is None:
+            return old_embeddings
+
+        old_num_tokens, old_embedding_dim = old_embeddings.weight.shape
+        if old_num_tokens == new_num_tokens:
+            return old_embeddings
+
+        if not isinstance(old_embeddings, nn.Embedding):
+            raise TypeError(
+                f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
+                " should either use a different resize function or make sure that old_embeddings are an instance of"
+                f" {nn.Embedding}.")
+
+        # Build new embeddings
+        new_embeddings = nn.Embedding(new_num_tokens, old_embedding_dim)
+
+        # numbers of tokens to copy
+        n = min(old_num_tokens, new_num_tokens)
+        with paddle.no_grad():
+            new_embeddings.weight[:n, :] = old_embeddings.weight[:n, :]
+
+        return new_embeddings
+
+    def __setattr__(self, name, value):
+        value = adapt_stale_fwd_patch(self, name, value)
+        return super(PretrainedModelNew, self).__setattr__(name, value)

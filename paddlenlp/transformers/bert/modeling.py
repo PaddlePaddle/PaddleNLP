@@ -14,6 +14,7 @@
 import warnings
 
 import paddle
+from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
@@ -24,6 +25,7 @@ except ImportError:
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import PretrainedModelNew
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -56,11 +58,8 @@ class BertEmbeddings(Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
+    def __init__(self, config: BertConfig):
         super(BertEmbeddings, self).__init__()
-
-        # TODO(wj-Mcat): parse with args & kwargs
-        config: BertConfig = parse_config(kwargs, BertConfig, config)
 
         self.word_embeddings = nn.Embedding(config.vocab_size,
                                             config.hidden_size)
@@ -72,10 +71,11 @@ class BertEmbeddings(Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                past_key_values_length=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                past_key_values_length: Optional[int] = None):
+
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
@@ -102,15 +102,13 @@ class BertPooler(Layer):
     Pool the result of BertEncoder.
     """
 
-    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
+    def __init__(self, config: BertConfig):
         """init the bert pooler with config & args/kwargs
 
         Args:
-            config (Optional[BertConfig], optional): _description_. Defaults to None.
+            config (BertConfig): BertConfig instance. Defaults to None.
         """
         super(BertPooler, self).__init__()
-
-        config: BertConfig = parse_config(kwargs, BertConfig, config)
 
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
@@ -126,7 +124,7 @@ class BertPooler(Layer):
         return pooled_output
 
 
-class BertPretrainedModel(PretrainedModel):
+class BertPretrainedModel(PretrainedModelNew):
     """
     An abstract class for pretrained BERT models. It provides BERT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -136,8 +134,10 @@ class BertPretrainedModel(PretrainedModel):
     """
 
     model_config_file = "model_config.json"
+    config_class = BertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
+    _keys_to_ignore_on_load_missing = [r'position_ids']
 
     pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = PRETRAINED_RESOURCE_FILES_MAP
@@ -158,7 +158,6 @@ class BertPretrainedModel(PretrainedModel):
             layer._epsilon = 1e-12
 
 
-@register_base_model
 class BertModel(BertPretrainedModel):
     """
     The bare BERT Model transformer outputting raw hidden-states.
@@ -222,9 +221,22 @@ class BertModel(BertPretrainedModel):
     """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        super(BertModel, self).__init__()
+        # old bert model parameters
+        fields = [
+            "vocab_size", "hidden_size", "num_hidden_layers",
+            "num_attention_heads", "intermediate_size", "hidden_act",
+            "hidden_dropout_prob", "attention_probs_dropout_prob",
+            "max_position_embeddings", "type_vocab_size", "initializer_range",
+            "pad_token_id", "pool_act", "fuse"
+        ]
 
-        config: BertConfig = parse_config(kwargs, BertConfig, config)
+        config: BertConfig = parse_config(config,
+                                          config_class=BertConfig,
+                                          args=args,
+                                          kwargs=kwargs,
+                                          fields=fields,
+                                          return_model=False)
+        super(BertModel, self).__init__(config)
 
         self.pad_token_id = config.pad_token_id
         self.initializer_range = config.initializer_range
@@ -438,12 +450,21 @@ class BertForQuestionAnswering(BertPretrainedModel):
             instance `bert`. Defaults to `None`.
         """
 
-    def __init__(self, bert, dropout=None):
-        super(BertForQuestionAnswering, self).__init__()
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"], 2)
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
+
+        config, self.bert = parse_config(config_or_model=config,
+                                         config_class=BertConfig,
+                                         args=args,
+                                         kwargs=kwargs,
+                                         fields=['bert', ('dropout', 0)])
+        super(BertForQuestionAnswering, self).__init__(config)
+
+        if self.bert is None:
+            self.bert = BertModel(config)
+
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
+                                  else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -569,14 +590,25 @@ class BertForSequenceClassification(BertPretrainedModel):
             instance `bert`. Defaults to None.
     """
 
-    def __init__(self, bert, num_classes=2, dropout=None):
-        super(BertForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
-                                    num_classes)
+    def __init__(self,
+                 config: Optional[Union[BertModel, BertConfig]] = None,
+                 *args,
+                 **kwargs):
+        config, self.bert = parse_config(
+            config_or_model=config,
+            config_class=BertConfig,
+            args=args,
+            kwargs=kwargs,
+            fields=['bert', ("num_classes", 2), ('dropout', None)])
+        super(BertForSequenceClassification, self).__init__(config)
+
+        if self.bert is None:
+            self.bert = BertModel(config)
+
+        self.num_classes = config.num_classes
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
+                                  else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -693,14 +725,21 @@ class BertForTokenClassification(BertPretrainedModel):
             instance `bert`. Defaults to None.
     """
 
-    def __init__(self, bert, num_classes=2, dropout=None):
-        super(BertForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
-                                    num_classes)
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
+        config, self.bert = parse_config(
+            config_or_model=config,
+            config_class=BertConfig,
+            args=args,
+            kwargs=kwargs,
+            fields=['bert', ("num_classes", 2), ('dropout', None)])
+        super(BertForTokenClassification, self).__init__(config)
+        if self.bert is None:
+            self.bert = BertModel(config)
+
+        self.num_classes = config.num_classes
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
+                                  else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -795,21 +834,21 @@ class BertLMPredictionHead(Layer):
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, config: BertConfig, embedding_weights=None):
         super(BertLMPredictionHead, self).__init__()
-        self.transform = nn.Linear(hidden_size, hidden_size)
-        self.activation = getattr(nn.functional, activation)
-        self.layer_norm = nn.LayerNorm(hidden_size)
+
+        self.transform = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = getattr(nn.functional, config)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
         self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
+            shape=[vocab_size, config.hidden_size],
             dtype=self.transform.weight.dtype,
             is_bias=False) if embedding_weights is None else embedding_weights
+
         self.decoder_bias = self.create_parameter(
-            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+            shape=[config.vocab_size],
+            dtype=self.decoder_weight.dtype,
+            is_bias=True)
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -845,15 +884,13 @@ class BertPretrainingHeads(Layer):
 
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, config: BertConfig, embedding_weights=None):
         super(BertPretrainingHeads, self).__init__()
-        self.predictions = BertLMPredictionHead(hidden_size, vocab_size,
-                                                activation, embedding_weights)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = BertLMPredictionHead(config.hidden_size,
+                                                config.vocab_size,
+                                                config.activation,
+                                                embedding_weights)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
         """
@@ -935,13 +972,14 @@ class BertForPretraining(BertPretrainedModel):
 
     """
 
-    def __init__(self, bert):
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
         super(BertForPretraining, self).__init__()
-        self.bert = bert
+        config: BertConfig = parse_config(kwargs, BertConfig, config)
+        self.bert = BertModel(config)
         self.cls = BertPretrainingHeads(
-            self.bert.config["hidden_size"],
-            self.bert.config["vocab_size"],
-            self.bert.config["hidden_act"],
+            config.hidden_size,
+            config.vocab_size,
+            config.hidden_act,
             embedding_weights=self.bert.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
@@ -1107,13 +1145,19 @@ class BertForMultipleChoice(BertPretrainedModel):
             instance `bert`. Defaults to None.
     """
 
-    def __init__(self, bert, num_choices=2, dropout=None):
-        super(BertForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.bert = bert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"], 1)
+    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
+        config, self.bert = parse_config(
+            config_or_model=config,
+            config_class=BertConfig,
+            args=args,
+            kwargs=kwargs,
+            fields=['bert', ("num_choices", 2), ('dropout', None)])
+        super(BertForMultipleChoice, self).__init__(config)
+
+        self.num_choices = config.num_choices
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
+                                  else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -1256,13 +1300,10 @@ class BertForMultipleChoice(BertPretrainedModel):
 
 class BertOnlyMLMHead(nn.Layer):
 
-    def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
+    def __init__(self, config: BertConfig, embedding_weights=None):
         super().__init__()
         self.predictions = BertLMPredictionHead(
-            hidden_size=hidden_size,
-            vocab_size=vocab_size,
-            activation=activation,
-            embedding_weights=embedding_weights)
+            config=config, embedding_weights=embedding_weights)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -1279,13 +1320,21 @@ class BertForMaskedLM(BertPretrainedModel):
 
     """
 
-    def __init__(self, bert):
-        super(BertForMaskedLM, self).__init__()
-        self.bert = bert
+    def __init__(self,
+                 config: Optional[Union[BertModel, BertConfig]] = None,
+                 *args,
+                 **kwargs):
+        config, self.bert = parse_config(config_or_model=config,
+                                         config_class=BertConfig,
+                                         args=args,
+                                         kwargs=kwargs,
+                                         fields=['bert'])
+        super(BertForMaskedLM, self).__init__(config)
+        if self.bert is None:
+            self.bert = BertModel(config=config)
+
         self.cls = BertOnlyMLMHead(
-            self.bert.config["hidden_size"],
-            self.bert.config["vocab_size"],
-            self.bert.config["hidden_act"],
+            config=config,
             embedding_weights=self.bert.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
