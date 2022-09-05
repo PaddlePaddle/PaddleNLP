@@ -20,7 +20,7 @@ components:    # define all the building-blocks for Pipeline
   - name: Ranker       # custom-name for the component; helpful for visualization & debugging
     type: ErnieRanker    # pipelines Class name for the component
     params:
-      model_name_or_path: rocketqa-nano-cross-encoder
+      model_name_or_path: rocketqa-nano-cross-encoder # cross encoder model path with model_config.json, vocab.txt etc
       top_k: 3
   - name: TextFileConverter
     type: TextConverter
