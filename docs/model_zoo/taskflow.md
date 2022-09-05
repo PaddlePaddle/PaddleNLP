@@ -1389,14 +1389,14 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
-# 默认模型为 pai-painter-painting-base-zh，
->>> text_to_image = Taskflow("text_to_image", model="pai-painter-painting-base-zh", num_return_images=2)
+# 默认模型为 pai-painter-painting-base-zh
+>>> text_to_image = Taskflow("text_to_image")
 # 单条输入， 默认返回2张图片。
->>> images = text_to_image("风阁水帘今在眼，且来先看早梅红")
+>>> image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
 # [[<PIL.Image.Image image mode=RGB size=256x256>], [<PIL.Image.Image image mode=RGB size=256x256>]]
->>> images[0][0].save("painting-figure-1.png")
->>> images[0][1].save("painting-figure-2.png")
->>> images[0][0].argument
+>>> image_list[0][0].save("painting-figure-1.png")
+>>> image_list[0][1].save("painting-figure-2.png")
+>>> image_list[0][0].argument
 # argument表示生成该图片所使用的参数
 # {'input': '风阁水帘今在眼，且来先看早梅红',
 #  'batch_size': 1,
@@ -1416,45 +1416,45 @@ from paddlenlp import Taskflow
 #  [<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>]]
 >>> for batch_index, batch_image in enumerate(image_list):
 # len(batch_image) == 2 (num_return_images)
->>>     for return_image_index, each_image in enumerate(batch_image):
->>>         each_image.save(f"painting-figure_{batch_index}_{return_image_index}.png")
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"painting-figure_{batch_index}_{image_index_in_returned_images}.png")
 ```
 
 #### 支持多种模型
 
 ##### EasyNLP仓库中的pai-painter模型
 ```python
->>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh", num_return_images=2)
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
 >>> image_list = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
 >>> for batch_index, batch_image in enumerate(image_list):
 # len(batch_image) == 2 (num_return_images)
->>>     for return_image_index, each_image in enumerate(batch_image):
->>>         each_image.save(f"commercial-figure_{batch_index}_{return_image_index}.png")
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"commercial-figure_{batch_index}_{image_index_in_returned_images}.png")
 ```
 
 ##### DALLE-mini模型
 ```python
->>> text_to_image = Taskflow("text_to_image", model="dalle-mini", num_return_images=2)
+>>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
 >>> image_list = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
 >>> for batch_index, batch_image in enumerate(image_list):
 # len(batch_image) == 2 (num_return_images)
->>>     for return_image_index, each_image in enumerate(batch_image):
->>>         each_image.save(f"dalle-mini-figure_{batch_index}_{return_image_index}.png")
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"dalle-mini-figure_{batch_index}_{image_index_in_returned_images}.png")
 ```
 
 ##### Disco Diffusion模型
 ```python
-# 注意，该模型生成速度较慢，最好返回1张图片。
->>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh", num_return_images=1)
+# 注意，该模型生成速度较慢，在32G的V100上需要10分钟才能生成图片，因此默认返回1张图片。
+>>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh")
 >>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
 >>> for batch_index, batch_image in enumerate(image_list):
->>>     for return_image_index, each_image in enumerate(batch_image):
->>>         each_image.save(f"disco_diffusion_ernie_vil-2.0-base-zh-figure_{batch_index}_{return_image_index}.png")
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"disco_diffusion_ernie_vil-2.0-base-zh-figure_{batch_index}_{image_index_in_returned_images}.png")
 ```
 
 ##### Stable Diffusion模型
 ```python
->>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4", mode="text2image", num_return_images=2)
+>>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
 >>> prompt = [
     "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
     "clouds surround the mountains and Chinese palaces,sunshine,lake,overlook,overlook,unreal engine,light effect,Dream，Greg Rutkowski,James Gurney,artstation"
@@ -1462,22 +1462,22 @@ from paddlenlp import Taskflow
 >>> image_list = text_to_image(prompt)
 >>> for batch_index, batch_image in enumerate(image_list):
 # len(batch_image) == 2 (num_return_images)
->>>     for return_image_index, each_image in enumerate(batch_image):
->>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{return_image_index}.png")
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{image_index_in_returned_images}.png")
 ```
 
 #### 支持复现生成结果 (以Stable Diffusion模型为例)
 ```python
 >>> from paddlenlp import Taskflow
->>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4", mode="text2image", num_return_images=2)
+>>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
 >>> prompt = [
     "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
     ]
 >>> image_list = text_to_image(prompt)
 >>> for batch_index, batch_image in enumerate(image_list):
 # len(batch_image) == 2 (num_return_images)
->>>     for return_image_index, each_image in enumerate(batch_image):
->>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{return_image_index}.png")
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{image_index_in_returned_images}.png")
 # 如果我们想复现promt[0]文本的第二张返回的结果，我们可以首先查看生成该图像所使用的参数信息。
 >>> each_image.argument
 # {'mode': 'text2image',

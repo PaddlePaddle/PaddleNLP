@@ -21,13 +21,13 @@ from .task import Task
 usage = r"""
            from paddlenlp import Taskflow 
 
-           text_to_image = Taskflow("text_to_image", num_return_images=2)
+           text_to_image = Taskflow("text_to_image")
            image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
            
            for batch_index, batch_image in enumerate(image_list):
                # len(batch_image) == 2 (num_return_images)
-               for return_image_index, each_image in enumerate(batch_image):
-                    each_image.save(f"figure_{batch_index}_{return_image_index}.png")
+               for image_index_in_returned_images, each_image in enumerate(batch_image):
+                    each_image.save(f"figure_{batch_index}_{image_index_in_returned_images}.png")
            
          """
 
