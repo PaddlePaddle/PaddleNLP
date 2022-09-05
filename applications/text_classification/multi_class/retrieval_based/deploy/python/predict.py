@@ -270,23 +270,16 @@ if __name__ == "__main__":
     output_emb_size = 256
     tokenizer = AutoTokenizer.from_pretrained(
         "rocketqa-zh-dureader-query-encoder")
-    id2corpus = {
-        0: {
-            "sentence":
-            "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"
-        }
-    }
+    id2corpus = {0: {"sentence": "青岛有什么好一点的国际青旅推荐？离海近一点 外国人多一点 氛围好点的"}}
     res = predictor.extract_embedding(id2corpus, tokenizer)
     print(res.shape)
     print(res)
     corpus_list = [{
-        "sentence":
-        "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？",
-        'label': '电脑/网络,硬件'
+        "sentence": "青岛有什么好一点的国际青旅推荐？离海近一点 外国人多一点 氛围好点的？",
+        'label': '青岛'
     }, {
-        "sentence":
-        "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？",
-        'label': '商业/理财,股票'
+        "sentence": "青岛有什么好一点的国际青旅推荐？离海近一点 外国人多一点 氛围好点的",
+        'label': '单机游戏'
     }]
     res = predictor.predict(corpus_list, tokenizer)
     print(res)
