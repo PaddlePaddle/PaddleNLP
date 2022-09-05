@@ -1383,7 +1383,7 @@ from paddlenlp import Taskflow
 >>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh", num_return_images=2)
 >>> image_list = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
 >>> for batch_index, batch_image in enumerate(image_list):
->>>     # len(batch_image) == 2 (num_return_images)
+# len(batch_image) == 2 (num_return_images)
 >>>     for return_image_index, each_image in enumerate(batch_image):
 >>>         each_image.save(f"commercial-figure_{batch_index}_{return_image_index}.png")
 ```
@@ -1393,7 +1393,7 @@ from paddlenlp import Taskflow
 >>> text_to_image = Taskflow("text_to_image", model="dalle-mini", num_return_images=2)
 >>> image_list = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
 >>> for batch_index, batch_image in enumerate(image_list):
->>>     # len(batch_image) == 2 (num_return_images)
+# len(batch_image) == 2 (num_return_images)
 >>>     for return_image_index, each_image in enumerate(batch_image):
 >>>         each_image.save(f"dalle-mini-figure_{batch_index}_{return_image_index}.png")
 ```
@@ -1417,7 +1417,7 @@ from paddlenlp import Taskflow
     ]
 >>> image_list = text_to_image(prompt)
 >>> for batch_index, batch_image in enumerate(image_list):
->>>     # len(batch_image) == 2 (num_return_images)
+# len(batch_image) == 2 (num_return_images)
 >>>     for return_image_index, each_image in enumerate(batch_image):
 >>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{return_image_index}.png")
 ```
@@ -1431,7 +1431,7 @@ from paddlenlp import Taskflow
     ]
 >>> image_list = text_to_image(prompt)
 >>> for batch_index, batch_image in enumerate(image_list):
->>>     # len(batch_image) == 2 (num_return_images)
+# len(batch_image) == 2 (num_return_images)
 >>>     for return_image_index, each_image in enumerate(batch_image):
 >>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{return_image_index}.png")
 # 如果我们想复现promt[0]文本的第二张返回的结果，我们可以首先查看生成该图像所使用的参数信息。
@@ -1472,7 +1472,7 @@ from paddlenlp import Taskflow
 
 #### 可配置参数说明
 * `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "disco_diffusion_ernie_vil-2.0-base-zh"]`。
-* `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
+* `num_return_images`：返回图片的数量，默认为2。特例：disco_diffusion模型由于生成速度太慢，因此该模型默认值为1。
 
 </div></details>
 
