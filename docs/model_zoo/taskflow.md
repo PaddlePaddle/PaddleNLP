@@ -1396,35 +1396,22 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
-# 默认模型为 Salesforce/codegen-350M-mono
->>> Summarizer = Taskflow("text_summarization")
+>>> summarizer = Taskflow("text_summarization")
 # 单条输入
->>> Summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
-['\n    print("Hello World")']
+>>> summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+# 输出：'雪后的景色可真美丽呀！'
+
 # 多条输入
->>> Summarizer([
+>>> summarizer([
   "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
   "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
   ])
+#输出：['雪后的景色可真美丽呀！', '成品油调价窗口8月23日24时开启']
 ```
 
 #### 可配置参数说明
-* `model`：可选模型，默认为unimo-text-1.0，支持的模型支持的模型有["unimo-text-1.0", ]。
+* `model`：可选模型，默认为`unimo-text-1.0-summary`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `device`：运行设备，默认为"gpu"。
-* `output_scores`：是否要输出解码得分，请默认为False。
-* `max_length`：生成代码的最大长度，默认为128。
-* `min_length`：生成代码的最小长度，默认为0。
-* `decode_strategy`：解码策略，支持greedy_search，beam_search和sampling，默认为sampling。
-* `temperature`：解码参数temperature，默认为0.6。
-* `top_k`：解码参数top_k，默认为5。
-* `top_p`：解码参数top_p，默认为1.0。
-* `num_beams`：beam_search解码的beam size，默认为4。
-* `length_penalty`：解码长度控制值，默认为1.0。
-* `num_return_sequences`：解码返回序列数，当值不为一时则自动根据解码得分选择得分最高的序列最为最终结果，默认为1。
-* `repetition_penalty`：解码重复惩罚值，默认为1。
-* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
-* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为True。
 
 </div></details>
 
