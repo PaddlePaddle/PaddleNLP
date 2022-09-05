@@ -234,7 +234,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     ```python
     >>> schema = [{'Person': ['Company', 'Position']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+    >>> pprint(ie_en('In 1997, Steve was excited to become the CEO of Apple.'))
     [{'Person': [{'end': 14,
                   'probability': 0.999631971804547,
                   'relations': {'Company': [{'end': 53,
@@ -340,19 +340,15 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     调用示例：
 
     ```python
-    >>> schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+    >>> schema = [{'Aspect': ['Opinion', 'Sentiment classification [negative, positive]']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en("overall i 'm happy with my toy.")
-    [{'Comment object': [{'end': 30,
-                          'probability': 0.9774399346859042,
-                          'relations': {'Opinion': [{'end': 18,
-                                                    'probability': 0.6168918705033555,
-                                                    'start': 13,
-                                                    'text': 'happy'}],
-                                        'Sentiment classification [negative, positive]': [{'probability': 0.9999556545777182,
-                                                                                          'text': 'positive'}]},
-                          'start': 24,
-                          'text': 'my toy'}]}]
+    >>> pprint(ie_en("The mobile network is very fast."))
+    [{'Aspect': [{'end': 18,
+                  'probability': 0.6628551376928158,
+                  'relations': {'Sentiment classification [negative, positive]': [{'probability': 0.9999603036014548,
+                                                                                  'text': 'positive'}]},
+                  'start': 4,
+                  'text': 'mobile network'}]}]
     ```
 
 <a name="情感分类"></a>
@@ -383,7 +379,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     英文模型调用示例：
 
     ```python
-    >>> schema = [{'Person': ['Company', 'Position']}]
+    >>> schema = 'Sentiment classification [negative, positive]'
     >>> ie_en.set_schema(schema)
     >>> ie_en('I am sorry but this is the worst film I have ever seen in my life.')
     [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
