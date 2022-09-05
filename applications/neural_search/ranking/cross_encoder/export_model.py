@@ -19,21 +19,20 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from model import PairwiseMatching
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
-parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="The pretrained model used for training")
+parser.add_argument('--model_name_or_path', default="rocketqa-base-cross-encoder", help="The pretrained model used for training")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = PairwiseMatching(pretrained_model)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        args.model_name_or_path, num_classes=2)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
