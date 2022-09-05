@@ -16,6 +16,7 @@ import numpy as np
 import sys
 import json
 
+from scipy.special import expit
 from paddle_serving_server.web_service import WebService, Op
 
 
@@ -36,7 +37,8 @@ class ErnieOp(Op):
 
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            'rocketqa-base-cross-encoder')
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
@@ -63,7 +65,8 @@ class ErnieOp(Op):
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         new_dict = {}
-        new_dict["predict"] = str(fetch_dict["predict"].tolist())
+        sim_score = expit(fetch_dict["predict"])[:, 1]
+        new_dict["predict"] = str(sim_score)
         return new_dict, None, ""
 
 

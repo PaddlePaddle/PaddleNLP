@@ -24,11 +24,10 @@ import pandas as pd
 import paddle
 from paddle import inference
 import paddle.nn.functional as F
-
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModel
+from paddlenlp.transformers import AutoTokenizer
 
 sys.path.append('.')
 
@@ -37,6 +36,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
     help="The directory to static model.")
 
+parser.add_argument("--input_file", type=str, required=True,
+    help="The test set file.")
 parser.add_argument("--max_seq_length", default=128, type=int,
     help="The maximum total input sequence length after tokenization. Sequences "
     "longer than this will be truncated, sequences shorter will be padded.")
@@ -44,8 +45,7 @@ parser.add_argument("--batch_size", default=32, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--input_file", type=str, required=True,
-    help="The test set file.")
+
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
     help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
@@ -60,7 +60,8 @@ parser.add_argument("--benchmark", type=eval, default=False,
     help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/",
     help="The file path to save log.")
-parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="The pretrained model used for training")
+parser.add_argument('--model_name_or_path', default="rocketqa-base-cross-encoder", help="The pretrained model used for training")
+
 args = parser.parse_args()
 # yapf: enable
 
@@ -107,8 +108,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.predict.pdmodel"
-        params_file = model_dir + "/inference.predict.pdiparams"
+        model_file = model_dir + "/inference.pdmodel"
+        params_file = model_dir + "/inference.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -155,22 +156,21 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(model_name="ernie-tiny",
-                                               model_precision=precision,
-                                               batch_size=self.batch_size,
-                                               data_shape="dynamic",
-                                               save_path=args.save_log_path,
-                                               inference_config=config,
-                                               pids=pid,
-                                               process_name=None,
-                                               gpu_ids=0,
-                                               time_keys=[
-                                                   'preprocess_time',
-                                                   'inference_time',
-                                                   'postprocess_time'
-                                               ],
-                                               warmup=0,
-                                               logger=logger)
+            self.autolog = auto_log.AutoLogger(
+                model_name=args.model_name_or_path,
+                model_precision=precision,
+                batch_size=self.batch_size,
+                data_shape="dynamic",
+                save_path=args.save_log_path,
+                inference_config=config,
+                pids=pid,
+                process_name=None,
+                gpu_ids=0,
+                time_keys=[
+                    'preprocess_time', 'inference_time', 'postprocess_time'
+                ],
+                warmup=0,
+                logger=logger)
 
     def predict(self, data, tokenizer):
         """
@@ -213,7 +213,7 @@ class Predictor(object):
         sim_score = self.output_handle.copy_to_cpu()
         if args.benchmark:
             self.autolog.times.stamp()
-        sim_score = expit(sim_score)
+        sim_score = expit(sim_score)[:, 1]
 
         if args.benchmark:
             self.autolog.times.end(stamp=True)
