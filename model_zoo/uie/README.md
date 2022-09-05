@@ -342,13 +342,17 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     ```python
     >>> schema = [{'Aspect': ['Opinion', 'Sentiment classification [negative, positive]']}]
     >>> ie_en.set_schema(schema)
-    >>> pprint(ie_en("The mobile network is very fast."))
-    [{'Aspect': [{'end': 18,
-                  'probability': 0.6628551376928158,
-                  'relations': {'Sentiment classification [negative, positive]': [{'probability': 0.9999603036014548,
+    >>> pprint(ie_en("The teacher is very nice."))
+    [{'Aspect': [{'end': 11,
+                  'probability': 0.4301476415932193,
+                  'relations': {'Opinion': [{'end': 24,
+                                            'probability': 0.9072940447883724,
+                                            'start': 15,
+                                            'text': 'very nice'}],
+                                'Sentiment classification [negative, positive]': [{'probability': 0.9998571920670685,
                                                                                   'text': 'positive'}]},
                   'start': 4,
-                  'text': 'mobile network'}]}]
+                  'text': 'teacher'}]}]
     ```
 
 <a name="情感分类"></a>
