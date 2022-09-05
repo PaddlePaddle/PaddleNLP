@@ -47,6 +47,7 @@
 wget https://paddlenlp.bj.bcebos.com/datasets/baidu_extract_2020.tar.gz
 tar -zxvf baidu_extract_2020.tar.gz
 mv baidu_extract_2020 data
+rm baidu_extract_2020.tar.gz
 ```
 
 <div align="center">
@@ -194,6 +195,7 @@ data/
 使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
 python train.py \
+    --dataset_dir "data" \
     --device "gpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
@@ -205,6 +207,7 @@ python train.py \
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
 ```shell
 python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
+    --dataset_dir "data" \
     --device "gpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
@@ -217,6 +220,7 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
+    --dataset_dir "data" \
     --device "gpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
@@ -260,13 +264,13 @@ checkpoint/
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `--init_from_ckpt checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
-
+* 英文和中文以外文本分类任务建议使用多语言预训练模型"ernie-m-base","ernie-m-large"， 多语言模型暂不支持文本分类模型部署，相关功能正在加速开发中。
 #### 2.4.2 训练评估与模型优化
 
 训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt"
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
 ```
 
 输出打印示例：
@@ -307,7 +311,7 @@ Prediction    Label    Text
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
 
 ```shell
-python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
+python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_dir "data"
 ```
 
 可支持配置的参数：
@@ -361,10 +365,14 @@ pip install paddleslim==2.2.2
 ```shell
 python prune.py \
     --device "gpu" \
+    --dataset_dir "data" \
+    --output_dir "prune" \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --num_train_epochs 10 \
     --max_seq_length 128 \
+    --logging_steps 5 \
+    --save_steps 100 \
     --width_mult_list '3/4' '2/3' '1/2'
 ```
 
@@ -376,7 +384,7 @@ python prune.py \
 * `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
-* `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
+* `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
 * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
 * `seed`：随机种子，默认为3。
 * `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
