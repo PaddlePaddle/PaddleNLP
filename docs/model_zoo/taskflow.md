@@ -41,7 +41,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
-| [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 
 
