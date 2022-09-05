@@ -54,7 +54,7 @@ print(feed_names)
 print(fetch_names)
 
 # 创建tokenizer
-tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+tokenizer = AutoTokenizer.from_pretrained('rocketqa-zh-base-query-encoder')
 max_seq_len = 64
 
 # 数据预处理
