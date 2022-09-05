@@ -37,6 +37,7 @@ parser.add_argument("--max_seq_length", default=512, type=int,
                     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int,
                     help="Batch size per GPU/CPU for training.")
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--output_emb_size", default=256,
                     type=int, help="output_embedding_size")
 parser.add_argument("--learning_rate", default=5E-5, type=float,
@@ -172,9 +173,9 @@ def do_train():
                             data_path=args.train_set_file,
                             lazy=False)
 
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
