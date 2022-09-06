@@ -218,7 +218,6 @@ def do_train(args):
             train_reader_cost = time.time() - batch_start
             (src_word, trg_word, lbl_word) = input_data
 
-            token_num = 0
             if args.use_amp:
                 with paddle.amp.auto_cast(custom_black_list={
                         'scale', 'reduce_sum', 'elementwise_div'
