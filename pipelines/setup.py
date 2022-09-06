@@ -22,7 +22,7 @@ long_description = "PIPELINES: An End to End Natural Language Proceessing Develo
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
 
-setuptools.setup(name="pipelines",
+setuptools.setup(name="paddle-pipelines",
                  version=pipelines.__version__,
                  author="PaddlePaddle Speech and Language Team",
                  author_email="paddlenlp@baidu.com",
