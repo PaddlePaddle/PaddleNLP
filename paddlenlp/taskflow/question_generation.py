@@ -201,6 +201,8 @@ class QuestionGenerationTask(Task):
                     title = example['answer']
             else:
                 assert False, "Source and title are not in the input dictionary, nor are context and answer."
+            if 'target' in example.keys():
+                target = example['target']
         elif isinstance(example, list):
             source = example[0]
             title = example[1]

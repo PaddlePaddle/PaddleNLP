@@ -125,6 +125,7 @@ train_ds, dev_ds = load_dataset('dureader_qg', splits=('train', 'dev'))
 
 #### 从本地文件创建数据集（可选）
 在许多情况下，我们需要使用本地数据集来训练我们的文本分类模型，本项目支持使用固定格式本地数据集文件进行训练。
+使用本地文件，只需要在模型训练时指定`train_file` 为本地训练数据地址，`predict_file` 为本地测试数据地址即可。
 
 本地数据集目录结构如下：
 
@@ -273,10 +274,10 @@ Finetuned baseline的模型在xxx任务验证集上有如下结果(指标为BLEU
 
 #### FasterTransformer加速及模型静态图导出
 
-使用动态图训练结束之后，可以通过[静态图导出脚本](export_model_unimo_text.py)实现基于FasterTransformer的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
+使用动态图训练结束之后，可以通过[静态图导出脚本](export_model.py)实现基于FasterTransformer的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model_unimo_text.py \
+python export_model.py \
     --model_name_or_path ./checkpoint \
     --inference_model_dir ./export_checkpoint \
     --max_out_len 64 \
