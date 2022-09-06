@@ -15,3 +15,4 @@
 from .sequence import sequence_mask
 from .tcn import TCN, TemporalBlock
 from .crf import LinearChainCrf, LinearChainCrfLoss, ViterbiDecoder
+from .globalpointer import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction, GPLinkerForEventExtraction

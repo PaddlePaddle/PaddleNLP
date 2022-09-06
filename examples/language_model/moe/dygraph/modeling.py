@@ -456,7 +456,7 @@ class TransformerDecoderLayer(nn.Layer):
             }
             self.moe_mlp = MoeLayer(d_model=d_model,
                                     experts=experts_list,
-                                    gate_config=gate_config,
+                                    gate=gate_config,
                                     moe_group=moe_group,
                                     mp_group=mp_group,
                                     recompute_interval=self.recompute_interval)
