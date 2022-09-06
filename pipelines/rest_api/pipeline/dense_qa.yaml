@@ -6,14 +6,15 @@ components:    # define all the building-blocks for Pipeline
     params:
       host: localhost
       index: baike_cities
+      embedding_dim: 312
       port: 9200
   - name: Retriever
     type: DensePassageRetriever
     params:
       document_store: DocumentStore    # params can reference other components defined in the YAML
       top_k: 10
-      query_embedding_model: rocketqa-zh-dureader-query-encoder
-      passage_embedding_model: rocketqa-zh-dureader-query-encoder
+      query_embedding_model: rocketqa-zh-nano-query-encoder
+      passage_embedding_model: rocketqa-zh-nano-query-encoder
       embed_title: False
   - name: Ranker       # custom-name for the component; helpful for visualization & debugging
     type: ErnieRanker    # pipelines Class name for the component

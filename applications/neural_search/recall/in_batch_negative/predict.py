@@ -37,6 +37,7 @@ parser.add_argument("--params_path", type=str, required=True,
                     help="The path to model parameters to be loaded.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. "
                     "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--batch_size", default=32, type=int,
                     help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None,
@@ -83,7 +84,7 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
@@ -91,10 +92,14 @@ if __name__ == "__main__":
                          pad_to_max_seq_len=args.pad_to_max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+            ),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+            ),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # tilte_segment
     ): [data for data in fn(samples)]
 
     valid_ds = load_dataset(read_text_pair,
@@ -107,7 +112,7 @@ if __name__ == "__main__":
                                           batchify_fn=batchify_fn,
                                           trans_fn=trans_func)
 
-    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
     model = SemanticIndexBase(pretrained_model,
                               output_emb_size=args.output_emb_size)

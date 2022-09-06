@@ -14,7 +14,6 @@
 
 import argparse
 import os
-from functools import partial
 
 import numpy as np
 import paddle
@@ -28,6 +27,7 @@ from model import SimCSE
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
+parser.add_argument("--model_name_or_path",default='rocketqa-zh-base-query-encoder',type=str,help='The pretrained model used for training')
 args = parser.parse_args()
 # yapf: enable
 
@@ -35,9 +35,9 @@ if __name__ == "__main__":
     # If you want to use ernie1.0 model, plesace uncomment the following code
     output_emb_size = 256
 
-    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):

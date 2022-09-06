@@ -6,6 +6,8 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
 </div>
 
+
+
 ## 智能文本产线特色
 * **全场景支持**：依托灵活的插拔式组件产线化设计，支持各类 NLP 场景任务，包括：信息抽取、情感倾向分析、阅读理解、检索系统、问答系统、文本分类、文本生成等。
 
@@ -15,14 +17,23 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
 
 * **灵活可定制**：除深度兼容 PaddleNLP 模型组件外，还可嵌入飞桨生态下任意模型、[AI 开放平台算子](https://ai.baidu.com/)、其它开源项目如 Elasticsearch 等作为基础组件，快速扩展，从而实现任意复杂系统的灵活定制开发。
 
+## Benchmarks
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/187362675-f0818e77-a521-4479-8dd7-bcbf4a820f7d.png" width="500">
+</div>
+
+更多的Benchmarks的信息请参考文档[Benchmarks](./benchmarks/README.md)
+
 ## 智能文本产线库
 
 PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了经过充分打磨的产品级系统，并会不断开放其它场景的产品级系统，用户可以基于智能文本产线库提供的系统能力快速开发出适配业务数据的产品。
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统（用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案）
 * 快速搭建产品级**多模态信息抽取**系统（即将开放，敬请期待）
-* 快速搭建产品级 **FAQ 问答**系统（即将开放，敬请期待）
+
 
 |  |  |
 |-|-|
@@ -43,9 +54,10 @@ Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装
 - paddlepaddle >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
+- Docker 18.03 以上
 ### pip 安装
 ```
-pip install --upgrade pipelines
+pip install --upgrade paddle-pipelines
 ```
 
 ### 源码安装
@@ -104,11 +116,20 @@ docker run \
 ```
 
 #### 部署 CPU 服务
+
+对于Linux使用Docker的用户，使用下面的命令：
 ```
 docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 ```
+对于Windows&Macos上使用Docker的用户，用下面的命令：
+
+```
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin
+docker run -d --name paddlenlp_pipelines  -p 8891:8891 -p 8502:8502 -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin
+```
 CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
 
 #### 部署 GPU 服务
 ```
@@ -154,6 +175,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 ## :mortar_board: Tutorials
 - Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
 - Tutorial 2 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
+- Tutorial 3 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/frequently-asked-question/dense_faq_example.py)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">
