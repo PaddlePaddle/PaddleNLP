@@ -2206,11 +2206,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 "or `List[List[str]]` (batch of pretokenized examples).")
 
         # check `split_into_words` value
-        if isinstance(is_split_into_words, str) and is_split_into_words != 'token':
+        if isinstance(is_split_into_words,
+                      str) and is_split_into_words != 'token':
             raise ValueError(
                 "the value of `is_split_into_words` should be one of: {True, False, 'token'} but receive: <%s>",
-                is_split_into_words
-            )
+                is_split_into_words)
 
         if is_split_into_words:
             is_batched = isinstance(text,

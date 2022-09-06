@@ -258,7 +258,7 @@ def run(args):
 
             new_data = tokenizer(tokens_t_list,
                                  text_pair=tokens_c_list,
-                                 is_split_into_words=True)
+                                 is_split_into_words='token')
 
             # Pad each new example for axis=2 of [batch_size, num_choices, seq_len],
             # because length of each choice could be different.
@@ -291,6 +291,8 @@ def run(args):
 
     train_ds, dev_ds, test_ds = load_dataset(
         "clue", "c3", split=["train", "validation", "test"])
+
+    train_ds, dev_ds, test_ds = train_ds[:200], dev_ds[:200], test_ds[:200]
 
     if args.do_train:
         args.batch_size = int(args.batch_size /
