@@ -14,80 +14,74 @@
 
 import os
 import argparse
-
+import functools
 import numpy as np
 
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.utils.log import logger
-from paddlenlp.data import Tuple, Pad
+from paddle.io import DataLoader, BatchSampler
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--device',
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--dataset_dir",
-                    required=True,
-                    default=None,
-                    type=str,
-                    help="Local dataset directory should"
-                    " include data.txt and label.txt")
-parser.add_argument("--params_path",
-                    default="./checkpoint/",
-                    type=str,
-                    help="The path to model parameters to be loaded.")
-parser.add_argument("--max_seq_length",
-                    default=128,
-                    type=int,
-                    help="The maximum total input sequence length "
-                    "after tokenization. Sequences longer than this"
-                    "will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size",
-                    default=32,
-                    type=int,
-                    help="Batch size per GPU/CPU for training.")
+from utils import preprocess_function, read_local_dataset
 
+# yapf: disable
+parser = argparse.ArgumentParser()
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--dataset_dir", required=True, default=None, type=str, help="Local dataset directory should include data.txt and label.txt")
+parser.add_argument("--params_path", default="./checkpoint/", type=str, help="The path to model parameters to be loaded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--data_file", type=str, default="data.txt", help="Unlabeled data file name")
+parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
 args = parser.parse_args()
+# yapf: enable
 
 
 @paddle.no_grad()
-def predict(data, label_list):
+def predict():
     """
-    Predicts the data labels.
-    Args:
-
-        data (obj:`List`): The processed data whose each element is one sequence.
-        label_map(obj:`List`): The label id (key) to label str (value) map.
- 
+    Predicts the data labels. 
     """
     paddle.set_device(args.device)
     model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
     tokenizer = AutoTokenizer.from_pretrained(args.params_path)
 
-    examples = []
-    for text in data:
-        result = tokenizer(text=text, max_seq_len=args.max_seq_length)
-        examples.append((result['input_ids'], result['token_type_ids']))
+    label_list = []
+    label_path = os.path.join(args.dataset_dir, args.label_file)
+    with open(label_path, 'r', encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            label_list.append(line.strip())
 
-    # Seperates data into some batches.
-    batches = [
-        examples[i:i + args.batch_size]
-        for i in range(0, len(examples), args.batch_size)
-    ]
+    data_ds = load_dataset(read_local_dataset,
+                           path=os.path.join(args.dataset_dir, args.data_file),
+                           is_test=True,
+                           lazy=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-    ): fn(samples)
+    trans_func = functools.partial(preprocess_function,
+                                   tokenizer=tokenizer,
+                                   max_seq_length=args.max_seq_length,
+                                   label_nums=len(label_list),
+                                   is_test=True)
+
+    data_ds = data_ds.map(trans_func)
+
+    # batchify dataset
+    collate_fn = DataCollatorWithPadding(tokenizer)
+    data_batch_sampler = BatchSampler(data_ds,
+                                      batch_size=args.batch_size,
+                                      shuffle=False)
+
+    data_data_loader = DataLoader(dataset=data_ds,
+                                  batch_sampler=data_batch_sampler,
+                                  collate_fn=collate_fn)
 
     results = []
     model.eval()
-    for batch in batches:
-        input_ids, token_type_ids = batchify_fn(batch)
-        input_ids = paddle.to_tensor(input_ids)
-        token_type_ids = paddle.to_tensor(token_type_ids)
-        logits = model(input_ids, token_type_ids)
+    for batch in data_data_loader:
+        logits = model(**batch)
         probs = F.sigmoid(logits).numpy()
         for prob in probs:
             labels = []
@@ -96,9 +90,9 @@ def predict(data, label_list):
                     labels.append(label_list[i])
             results.append(labels)
 
-    for text, labels in zip(data, results):
+    for t, labels in zip(data_ds.data, results):
         hierarchical_labels = {}
-        logger.info("text: {}".format(text))
+        logger.info("text: {}".format(t["sentence"]))
         logger.info("prediction result: {}".format(",".join(labels)))
         for label in labels:
             for i, l in enumerate(label.split('##')):
@@ -115,22 +109,4 @@ def predict(data, label_list):
 
 if __name__ == "__main__":
 
-    data_dir = os.path.join(args.dataset_dir, "data.txt")
-    label_dir = os.path.join(args.dataset_dir, "label.txt")
-
-    data = []
-    label_list = []
-
-    with open(data_dir, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-        for i, line in enumerate(lines):
-            data.append(line.strip())
-    f.close()
-
-    with open(label_dir, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-        for i, line in enumerate(lines):
-            label_list.append(line.strip())
-    f.close()
-
-    predict(data, label_list)
+    predict()

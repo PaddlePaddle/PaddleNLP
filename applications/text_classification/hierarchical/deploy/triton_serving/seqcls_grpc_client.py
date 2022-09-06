@@ -99,8 +99,8 @@ if __name__ == "__main__":
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
 
-    texts = [["请问木竭胶囊能同高血压药、氨糖同时服吗？"], ["低压100*高压140*头涨，想吃点降压药。谢谢！"],
-             ["脑穿通畸形易发人群有哪些"]]
+    texts = [["消失的“外企光环”，5月份在华裁员900余人，香饽饽变“臭”了"], ["卡车超载致使跨桥侧翻，没那么简单"],
+             ["金属卡扣安装不到位，上海乐扣乐扣贸易有限公司将召回捣碎器1162件"]]
 
     for text in texts:
         # input format:[input1, input2 ... inputn], n = len(self._input_names)

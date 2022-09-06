@@ -34,7 +34,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = BertTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
-    test_seq2seq = True
+    test_seq2seq = False
 
     def setUp(self):
         super().setUp()
