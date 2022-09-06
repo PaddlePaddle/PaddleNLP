@@ -292,8 +292,6 @@ def run(args):
     train_ds, dev_ds, test_ds = load_dataset(
         "clue", "c3", split=["train", "validation", "test"])
 
-    train_ds, dev_ds, test_ds = train_ds[:200], dev_ds[:200], test_ds[:200]
-
     if args.do_train:
         args.batch_size = int(args.batch_size /
                               args.gradient_accumulation_steps)
