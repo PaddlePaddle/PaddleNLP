@@ -29,6 +29,18 @@ __all__ = [
     'GPTChineseTokenizer',
 ]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "gpt-cpm-large-cn": 1024,
+    "gpt-cpm-small-cn-distill": 1024,
+    "gpt3-13B-en": 1024,
+    "gpt3-1.3B-en": 1024,
+    "gpt2-xl-en": 1024,
+    "gpt2-large-en": 1024,
+    "gpt2-medium-en": 1024,
+    "gpt2-en": 1024,
+    "gpt2-small-en": 1024
+}
+
 
 @lru_cache()
 def bytes_to_unicode():

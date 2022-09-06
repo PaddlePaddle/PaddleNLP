@@ -152,7 +152,7 @@ ernie_matching/
 训练的命令如下：
 
 ```
-python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
+python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_pairwise.py \
         --device gpu \
         --save_dir ./checkpoints \
         --batch_size 32 \
@@ -250,7 +250,9 @@ sh scripts/predict_pairwise.sh
 首先把动态图模型转换为静态图：
 
 ```
-python export_model.py --params_path checkpoints/model_30000/model_state.pdparams --output_path=./output
+python export_model.py --params_path checkpoints/model_30000/model_state.pdparams \
+                       --output_path=./output \
+                       --model_name_or_path ernie-3.0-medium-zh
 ```
 也可以运行下面的bash脚本：
 
@@ -260,21 +262,17 @@ sh scripts/export_model.sh
 
 ### Paddle Inference
 
-修改预测文件路径：
+使用PaddleInference：
 
 ```
-input_file='../../sort/test_pairwise.csv'
-```
-
-然后使用PaddleInference
-
-```
-python predict.py --model_dir=../../output
+python deploy/python/predict.py --model_dir ./output \
+                                --input_file sort/test_pairwise.csv \
+                                --model_name_or_path ernie-3.0-medium-zh
 ```
 也可以运行下面的bash脚本：
 
 ```
-sh deploy.sh
+sh deploy/python/deploy.sh
 ```
 得到下面的输出，输出的是样本的query，title以及对应的概率：
 
@@ -317,6 +315,12 @@ sh scripts/export_to_serving.sh
 Paddle Serving的部署有两种方式，第一种方式是Pipeline的方式，第二种是C++的方式，下面分别介绍这两种方式的用法：
 
 #### Pipeline方式
+
+修改`Tokenizer`
+
+```
+self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+```
 
 启动 Pipeline Server:
 
