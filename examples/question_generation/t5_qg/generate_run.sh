@@ -1,5 +1,5 @@
 python generate.py \
-    --model_name_or_path=t5-base-finetuned-question-generation-ap \
+    --model_name_or_path=mrm8488/t5-base-finetuned-question-generation-ap \
     --dataset_name=squad \
     --output_path=generate.txt \
     --max_source_length=1024 \
@@ -11,6 +11,5 @@ python generate.py \
     --length_penalty=0.0 \
     --batch_size=64 \
     --seed=42 \
-    --ignore_pad_token_for_loss=True \
     --logging_steps=20 \
     --device=gpu

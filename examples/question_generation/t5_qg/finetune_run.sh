@@ -12,5 +12,4 @@ python -m paddle.distributed.launch --gpus 4,5,6,7 finetune.py \
     --train_batch_size=8 \
     --eval_batch_size=64 \
     --warmup_proportion=0.1 \
-    --ignore_pad_token_for_loss=True \
     --device=gpu
