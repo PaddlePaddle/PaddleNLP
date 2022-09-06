@@ -305,7 +305,6 @@ def run(args):
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
                 desc="Running tokenizer on train dataset")
-
         batchify_fn = lambda samples, fn=Dict({
             'input_ids':
             Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
