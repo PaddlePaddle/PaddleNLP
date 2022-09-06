@@ -8,11 +8,12 @@
 a. 依赖安装：
 我们预置了基于[ 8000 多条保险行业问答数据](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/baoxianzhidao/intro.ipynb)搭建保险FAQ智能问答的代码示例，您可以通过如下命令快速体验智能问答的效果
 ```bash
-
 git clone https://github.com/tvst/htbuilder.git
 cd htbuilder/
 python setup install
-# 1) 安装 pipelines package
+# pip 一键安装
+pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 或者源码进行安装最新版本
 cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
