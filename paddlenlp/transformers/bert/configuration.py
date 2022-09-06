@@ -1,8 +1,8 @@
 """ BERT model configuration"""
-from collections import OrderedDict
-from typing import Mapping
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.utils.log import logger
+from __future__ import annotations
+
+from typing import Dict
+from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
 PRETRAINED_INIT_CONFIGURATION = {
     "bert-base-uncased": {
@@ -355,7 +355,7 @@ class BertConfig(PretrainedConfig):
     Examples:
 
     ```python
-    >>> from transformers import BertModel, BertConfig
+    >>> from paddlenlp.transformers import BertModel, BertConfig
 
     >>> # Initializing a BERT bert-base-uncased style configuration
     >>> configuration = BertConfig()
@@ -367,23 +367,25 @@ class BertConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "bert"
+    attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
     def __init__(self,
-                 vocab_size=30522,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 pool_act="tanh",
-                 fuse=False,
+                 vocab_size: int = 30522,
+                 hidden_size: int = 768,
+                 num_hidden_layers: int = 12,
+                 num_attention_heads: int = 12,
+                 intermediate_size: int = 3072,
+                 hidden_act: str = "gelu",
+                 hidden_dropout_prob: float = 0.1,
+                 attention_probs_dropout_prob: float = 0.1,
+                 max_position_embeddings: int = 512,
+                 type_vocab_size: int = 16,
+                 initializer_range: float = 0.02,
+                 pad_token_id: int = 0,
+                 pool_act: str = "tanh",
+                 fuse: bool = False,
                  **kwargs):
+        attribute_map(self, kwargs)
         super().__init__(pad_token_id=pad_token_id, **kwargs)
 
         self.vocab_size = vocab_size

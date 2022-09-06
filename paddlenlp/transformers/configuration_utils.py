@@ -24,20 +24,19 @@ import os.path as osp
 import re
 import shutil
 import warnings
+import copy
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
 
 from packaging import version
 
-from requests import HTTPError
 from ..utils import CONFIG_NAME
-from paddle import nn
-from paddlenlp.utils.env import MODEL_HOME
 from ..utils.downloader import is_url, get_path_from_url
 
 from paddlenlp.utils.log import logger
 
 if TYPE_CHECKING:
     from paddlenlp.transformers.model_utils import PretrainedModel
+    from paddlenlp.transformers.model_utils import PretrainedModelNew
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -155,6 +154,22 @@ def cached_path(
             url_or_filename)
 
     return output_path
+
+
+def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]):
+    """map the <old-attr> to <new-attr> with configuration
+
+    Args:
+        config (PretrainedConfig): the instance of PretrainedConfig
+        kwargs (Dict[str, Any]): the kwargs of attribute
+    """
+    for old_key, new_key in config.attribute_map.items():
+        if old_key in kwargs:
+            if new_key in kwargs:
+                logger.warning(
+                    'receive param<%s> and param<%s>, but the first one will be adopt'
+                )
+            kwargs[new_key] = kwargs.pop(old_key)
 
 
 class PretrainedConfig:
@@ -298,7 +313,7 @@ class PretrainedConfig:
         id2label (`Dict[int, str]`, *optional*):
             A map from index (for instance prediction index, or target index) to label.
         label2id (`Dict[str, int]`, *optional*): A map from label to index for the model.
-        num_classes (`int`, *optional*):
+        num_labels (`int`, *optional*):
             Number of labels to use in the last layer added to the model, typically for a classification task.
         task_specific_params (`Dict[str, Any]`, *optional*):
             Additional keyword arguments to store for the current task.
@@ -356,6 +371,7 @@ class PretrainedConfig:
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
         super().__setattr__(key, value)
+        assert hasattr(self, key)
 
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__(
@@ -363,8 +379,18 @@ class PretrainedConfig:
             key = super().__getattribute__("attribute_map")[key]
         return super().__getattribute__(key)
 
+    def __getitem__(self, key):
+        return getattr(self, key, None)
+
+    def __setitem__(self, key, value):
+        if hasattr(self, key):
+            setattr(self, key, value)
+
     def __init__(self, **kwargs):
         # Attributes with defaults
+
+        # map the old attr to new atr, eg: num_classes -> num_labels
+
         self.return_dict = kwargs.pop("return_dict", True)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
@@ -417,17 +443,17 @@ class PretrainedConfig:
         self.id2label = kwargs.pop("id2label", None)
         self.label2id = kwargs.pop("label2id", None)
         if self.id2label is not None:
-            num_classes = kwargs.pop("num_classes", None)
-            if num_classes is not None and len(self.id2label) != num_classes:
+            num_labels = kwargs.pop("num_labels", None)
+            if num_labels is not None and len(self.id2label) != num_labels:
                 logger.warning(
-                    f"You passed along `num_classes={num_classes}` with an incompatible id to label map: "
-                    f"{self.id2label}. The number of labels wil be overwritten to {self.num_classes}."
+                    f"You passed along `num_labels={num_labels}` with an incompatible id to label map: "
+                    f"{self.id2label}. The number of labels wil be overwritten to {self.num_labels}."
                 )
             self.id2label = dict(
                 (int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            self.num_classes = kwargs.pop("num_classes", 2)
+            self.num_labels = kwargs.pop("num_labels", 2)
 
         # Tokenizer arguments TODO: eventually tokenizer and models should share the same config
         self.tokenizer_class = kwargs.pop("tokenizer_class", None)
@@ -501,17 +527,17 @@ class PretrainedConfig:
         return self.return_dict
 
     @property
-    def num_classes(self) -> int:
+    def num_labels(self) -> int:
         """
         `int`: The number of labels for classification models.
         """
         return len(self.id2label)
 
-    @num_classes.setter
-    def num_classes(self, num_classes: int):
+    @num_labels.setter
+    def num_labels(self, num_labels: int):
         if not hasattr(self, "id2label") or self.id2label is None or len(
-                self.id2label) != num_classes:
-            self.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
+                self.id2label) != num_labels:
+            self.id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
             self.label2id = dict(
                 zip(self.id2label.values(), self.id2label.keys()))
 
@@ -679,7 +705,7 @@ class PretrainedConfig:
 
         # 1. get the configuration file from local file, eg: /cache/path/model_config.json
         if os.path.isfile(pretrained_model_name_or_path):
-            resolved_config_file = config_file
+            resolved_config_file = pretrained_model_name_or_path
 
         # 2. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
@@ -740,13 +766,13 @@ class PretrainedConfig:
                 (int(key), value) for key, value in config.pruned_heads.items())
 
         # Update config with kwargs if needed
-        if "num_classes" in kwargs and "id2label" in kwargs:
-            num_classes = kwargs["num_classes"]
+        if "num_labels" in kwargs and "id2label" in kwargs:
+            num_labels = kwargs["num_labels"]
             id2label = kwargs["id2label"] if kwargs[
                 "id2label"] is not None else []
-            if len(id2label) != num_classes:
+            if len(id2label) != num_labels:
                 raise ValueError(
-                    f"You passed along `num_classes={num_classes }` with an incompatible id to label map: "
+                    f"You passed along `num_labels={num_labels }` with an incompatible id to label map: "
                     f"{kwargs['id2label']}. Since those arguments are inconsistent with each other, you should remove "
                     "one of them.")
         to_remove = []
@@ -1005,7 +1031,7 @@ def _construct_kwargs(args, kwargs: Dict[str, Any],
     for field in fields:
         if isinstance(field, str):
             continue
-        assert lens(
+        assert len(
             field
         ) == 2, 'fields should be: `field` or (`field`, `field_default_value`)'
 
@@ -1016,13 +1042,18 @@ def _construct_kwargs(args, kwargs: Dict[str, Any],
     return kwargs
 
 
-def parse_config(config_or_model: Optional[Union[PretrainedConfig,
-                                                 PretrainedModel]] = None,
-                 config_class: Type[PretrainedConfig] = None,
-                 args: Tuple[Any] = None,
-                 kwargs: Dict[str, Any] = None,
-                 fields: Optional[List[str]] = None,
-                 return_model: bool = True) -> PretrainedConfig:
+PretrainedConfigClass = TypeVar("PretrainedConfigClass")
+
+
+def parse_config(
+    config_or_model: Optional[Union[PretrainedConfig, PretrainedModel]] = None,
+    config_class: Type[PretrainedConfigClass] = None,
+    args: Tuple[Any] = None,
+    kwargs: Dict[str, Any] = None,
+    fields: Optional[List[str]] = None,
+    return_model: bool = True,
+    return_unused_kwargs: bool = False
+) -> Tuple[PretrainedConfigClass, PretrainedModelNew]:
     """parse config from config & kwargs
 
     Args:
@@ -1031,32 +1062,51 @@ def parse_config(config_or_model: Optional[Union[PretrainedConfig,
         args (Tuple[Any]): the source arg list
         kwargs (Dict[str, Any]): the source of the parameters of initialization method
         fields (Optional[List[str]], optional): the old fields of kwargs
+    
+    Returns:
+        [config, [PretrainedModel], [unsed_kwargs]]
     """
     # import locally to avoid circular reference
-    from paddlenlp.transformers.model_utils import PretrainedModel
+    from paddlenlp.transformers.model_utils import PretrainedModelNew
+    # 0. pop config and pretrained model
+    for index in range(len(args)):
+        if isinstance(args[index], (PretrainedConfig, PretrainedModelNew)):
+            config_or_model = args[index]
+            args = args[0:index] + args[index + 1:]
+            break
+
+    for key in list(kwargs.keys()):
+        if isinstance(kwargs[key], (PretrainedConfig, PretrainedModelNew)):
+            config_or_model = kwargs.pop(key)
+            break
 
     # 1. if `config_or_model` is Model, so construct args and kwargs to init config
     model = None
-    if isinstance(config_or_model, PretrainedModel):
-        kwargs = _construct_kwargs(args, kwargs, fields)
-        config = config_class(**kwargs)
+    unused_kwargs = {}
+
+    if isinstance(config_or_model, PretrainedModelNew):
+        unused_kwargs = _construct_kwargs(args, kwargs, fields)
+        config = config_or_model.config
         model = config_or_model
 
     # 2. if `config_or_model` is Config, so construct args and kwargs to init model
     elif isinstance(config_or_model, config_class):
-        kwargs = _construct_kwargs(args, kwargs, fields)
-        for key, value in kwargs.items():
-            setattr(config_or_model, key, value)
-
+        unused_kwargs = _construct_kwargs(args, kwargs, fields)
         config = config_or_model
     else:
         # 3. create config and use it to init model
         args = args or ()
         if config_or_model is not None:
             args = (config_or_model, ) + args
+
+        # TODO(wj-Mcat): return unused_kwargs
         kwargs = _construct_kwargs(args, kwargs, fields)
         config = config_class(**kwargs)
 
+    outputs = (config, )
     if return_model:
-        return config, model
-    return config
+        outputs = outputs + (model, )
+    if return_unused_kwargs:
+        outputs = outputs + (unused_kwargs, )
+
+    return outputs[0] if len(outputs) == 1 else outputs

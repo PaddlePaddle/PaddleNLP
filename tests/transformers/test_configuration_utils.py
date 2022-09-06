@@ -1,10 +1,13 @@
+from re import S
 import unittest
-from typing import Optional, Union
-from paddlenlp.transformers.configuration_utils import parse_config, PretrainedConfig, parse_config_and_model
+from typing import Optional, Union, Dict
+from paddlenlp.transformers.configuration_utils import attribute_map, parse_config, PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 
 
-class FakePretrainedModelConfig(PretrainedConfig):
+class FakeSimplePretrainedModelConfig(PretrainedConfig):
+    """simple fake Pretrained Model Config
+    """
 
     def __init__(self, a=0, b=1, c=2):
         self.a = a
@@ -12,17 +15,30 @@ class FakePretrainedModelConfig(PretrainedConfig):
         self.c = c
 
 
+class FakePretrainedModelConfig(PretrainedConfig):
+    """Fake Pretrained Model which is similar with actual situation
+    """
+    attribute_map: Dict[str, str] = {
+        "num_classes": "num_labels",
+    }
+
+    def __init__(self, hidden_dropout_prob: float, **kwargs):
+        attribute_map(self, kwargs=kwargs)
+        super().__init__(**kwargs)
+        self.hidden_dropout_prob = hidden_dropout_prob
+
+
 class FakeLayer:
 
     def __init__(self,
-                 config: Optional[FakePretrainedModelConfig] = None,
+                 config: Optional[FakeSimplePretrainedModelConfig] = None,
                  *args,
                  **kwargs):
         super(FakeLayer, self).__init__()
 
-        config: FakePretrainedModelConfig = parse_config(
-            config=config,
-            config_class=FakePretrainedModelConfig,
+        config: FakeSimplePretrainedModelConfig = parse_config(
+            config_or_model=config,
+            config_class=FakeSimplePretrainedModelConfig,
             args=args,
             kwargs=kwargs,
             fields=["a", "b", "c"],
@@ -35,12 +51,11 @@ class FakeLayer:
 
 class FakeModel(PretrainedModel):
 
-    def __init__(
-            self,
-            config_or_model: Optional[Union[FakeLayer,
-                                            FakePretrainedModelConfig]] = None,
-            *args,
-            **kwargs):
+    def __init__(self,
+                 config_or_model: Optional[Union[
+                     FakeLayer, FakeSimplePretrainedModelConfig]] = None,
+                 *args,
+                 **kwargs):
         """fake `__init__`, the source of parameters is:
 
             def __init__(self, model, a, b):
@@ -49,17 +64,16 @@ class FakeModel(PretrainedModel):
                 self.b = b
 
         Args:
-            config_or_model (Optional[Union[FakeLayer, FakePretrainedModelConfig]], optional): config or model instance. Defaults to None.
+            config_or_model (Optional[Union[FakeLayer, FakeSimplePretrainedModelConfig]], optional): config or model instance. Defaults to None.
         """
         super().__init__()
 
-        config, model = parse_config_and_model(
+        config, model = parse_config(
             config_or_model=config_or_model,
-            config_class=FakePretrainedModelConfig,
-            model_class=FakeLayer,
+            config_class=FakeSimplePretrainedModelConfig,
             args=args,
             kwargs=kwargs,
-            fields=["a", "b"],
+            fields=["a", ("b", 2)],
         )
 
         self.model: FakeLayer = model
@@ -71,7 +85,7 @@ class ConfigurationUtilsTest(unittest.TestCase):
 
     def test_parse_config_with_single_config(self):
         # 1. single config
-        config = FakePretrainedModelConfig(a=10, b=11, c=12)
+        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
         model = FakeLayer(config)
         assert model.a == 10
         assert model.b == 11
@@ -92,13 +106,13 @@ class ConfigurationUtilsTest(unittest.TestCase):
         assert model.b == 11
 
     def test_parse_config_and_model_with_single_config(self):
-        config = FakePretrainedModelConfig(a=10, b=11, c=12)
+        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
         model = FakeModel(config)
         assert model.a == 10
         assert model.b == 11
 
     def test_parse_config_and_model_with_model_and_args(self):
-        config = FakePretrainedModelConfig(a=10, b=11, c=12)
+        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
         fake_layer = FakeLayer(config)
         model = FakeModel(fake_layer, 100, 110)
         assert model.a == 100
@@ -108,7 +122,7 @@ class ConfigurationUtilsTest(unittest.TestCase):
         assert model.model.b == 11
 
     def test_parse_config_and_model_with_model_and_kwargs(self):
-        config = FakePretrainedModelConfig(a=10, b=11, c=12)
+        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
         fake_layer = FakeLayer(config)
         model = FakeModel(fake_layer, a=100, b=110)
 
@@ -119,7 +133,7 @@ class ConfigurationUtilsTest(unittest.TestCase):
         assert model.model.b == 11
 
     def test_parse_config_and_model_with_model_and_kwargs_and_args(self):
-        config = FakePretrainedModelConfig(a=10, b=11, c=12)
+        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
         fake_layer = FakeLayer(config)
         model = FakeModel(fake_layer, 100, b=110)
 

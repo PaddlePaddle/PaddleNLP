@@ -152,7 +152,7 @@ class BertPretrainedModel(PretrainedModelNew):
                     paddle.tensor.normal(mean=0.0,
                                          std=self.initializer_range if hasattr(
                                              self, "initializer_range") else
-                                         self.bert.config["initializer_range"],
+                                         self.config.initializer_range,
                                          shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
@@ -451,19 +451,18 @@ class BertForQuestionAnswering(BertPretrainedModel):
         """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-
-        config, self.bert = parse_config(config_or_model=config,
-                                         config_class=BertConfig,
-                                         args=args,
-                                         kwargs=kwargs,
-                                         fields=['bert', ('dropout', 0)])
+        config, bert, kwargs = parse_config(config_or_model=config,
+                                            config_class=BertConfig,
+                                            args=args,
+                                            kwargs=kwargs,
+                                            fields=['bert', ('dropout', 0)],
+                                            return_unused_kwargs=True)
         super(BertForQuestionAnswering, self).__init__(config)
+        self.bert = bert if bert is not None else BertModel(config)
 
-        if self.bert is None:
-            self.bert = BertModel(config)
-
-        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
-                                  else config.hidden_dropout_prob)
+        dropout = kwargs.pop("dropout", None)
+        self.dropout = nn.Dropout(
+            dropout if dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
@@ -582,7 +581,7 @@ class BertForSequenceClassification(BertPretrainedModel):
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of BERT.
@@ -594,21 +593,23 @@ class BertForSequenceClassification(BertPretrainedModel):
                  config: Optional[Union[BertModel, BertConfig]] = None,
                  *args,
                  **kwargs):
-        config, self.bert = parse_config(
+        config, bert, kwargs = parse_config(
             config_or_model=config,
             config_class=BertConfig,
             args=args,
             kwargs=kwargs,
-            fields=['bert', ("num_classes", 2), ('dropout', None)])
+            fields=['bert', ("num_labels", 2), ('dropout', None)],
+            return_unused_kwargs=True)
         super(BertForSequenceClassification, self).__init__(config)
 
-        if self.bert is None:
-            self.bert = BertModel(config)
+        self.bert = bert if bert is not None else BertModel(config)
 
-        self.num_classes = config.num_classes
-        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
-                                  else config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
+        self.num_labels = config.num_labels
+
+        dropout = kwargs.pop("dropout", None)
+        self.dropout = nn.Dropout(
+            dropout if dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -634,8 +635,8 @@ class BertForSequenceClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -660,7 +661,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForSequenceClassification.from_pretrained('bert-base-cased', num_classes=2)
+                model = BertForSequenceClassification.from_pretrained('bert-base-cased', num_labels=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -685,12 +686,12 @@ class BertForSequenceClassification(BertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                loss = loss_fct(logits.reshape((-1, self.num_labels)),
                                 labels.reshape((-1, )))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
@@ -717,7 +718,7 @@ class BertForTokenClassification(BertPretrainedModel):
     Args:
         bert (:class:`BertModel`):
             An instance of BertModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of BERT.
@@ -726,20 +727,22 @@ class BertForTokenClassification(BertPretrainedModel):
     """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        config, self.bert = parse_config(
+        config, bert, kwargs = parse_config(
             config_or_model=config,
             config_class=BertConfig,
             args=args,
             kwargs=kwargs,
-            fields=['bert', ("num_classes", 2), ('dropout', None)])
+            fields=['bert', ("num_labels", 2), ('dropout', None)],
+            return_unused_kwargs=True)
         super(BertForTokenClassification, self).__init__(config)
-        if self.bert is None:
-            self.bert = BertModel(config)
 
-        self.num_classes = config.num_classes
-        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
-                                  else config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, config.num_classes)
+        self.bert = bert if bert is not None else BertModel(config)
+        dropout = kwargs.pop('dropout', None)
+
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            dropout if dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -764,7 +767,7 @@ class BertForTokenClassification(BertPretrainedModel):
             attention_mask (list, optional):
                 See :class:`BertModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -788,7 +791,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForTokenClassification.from_pretrained('bert-base-cased', num_classes=2)
+                model = BertForTokenClassification.from_pretrained('bert-base-cased', num_labels=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -814,7 +817,7 @@ class BertForTokenClassification(BertPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+            loss = loss_fct(logits.reshape((-1, self.num_labels)),
                             labels.reshape((-1, )))
         if not return_dict:
             output = (logits, ) + outputs[2:]
@@ -838,10 +841,10 @@ class BertLMPredictionHead(Layer):
         super(BertLMPredictionHead, self).__init__()
 
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
-        self.activation = getattr(nn.functional, config)
+        self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
         self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, config.hidden_size],
+            shape=[config.vocab_size, config.hidden_size],
             dtype=self.transform.weight.dtype,
             is_bias=False) if embedding_weights is None else embedding_weights
 
@@ -886,10 +889,7 @@ class BertPretrainingHeads(Layer):
 
     def __init__(self, config: BertConfig, embedding_weights=None):
         super(BertPretrainingHeads, self).__init__()
-        self.predictions = BertLMPredictionHead(config.hidden_size,
-                                                config.vocab_size,
-                                                config.activation,
-                                                embedding_weights)
+        self.predictions = BertLMPredictionHead(config, embedding_weights)
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -973,13 +973,17 @@ class BertForPretraining(BertPretrainedModel):
     """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        super(BertForPretraining, self).__init__()
-        config: BertConfig = parse_config(kwargs, BertConfig, config)
-        self.bert = BertModel(config)
+        config, bert = parse_config(config_or_model=config,
+                                    config_class=BertConfig,
+                                    args=args,
+                                    kwargs=kwargs,
+                                    fields=['bert'])
+        super(BertForPretraining, self).__init__(config)
+
+        self.bert = bert if bert is not None else BertModel(config)
+
         self.cls = BertPretrainingHeads(
-            config.hidden_size,
-            config.vocab_size,
-            config.hidden_act,
+            config,
             embedding_weights=self.bert.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
@@ -1143,20 +1147,34 @@ class BertForMultipleChoice(BertPretrainedModel):
             The dropout probability for output of Bert.
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
             instance `bert`. Defaults to None.
+
+    Examples:
+        >>> model = BertForMultipleChoice(bert_config, dropout=0.1)
+        >>> # or
+        >>> model = BertForMultipleChoice(bert, dropout=0.1)
+        >>> # or
+        >>> bert_config.hidden_dropout_prob = 0.1
+        >>> model = BertForMultipleChoice(bert_config)
     """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        config, self.bert = parse_config(
+        config, bert, kwargs = parse_config(
             config_or_model=config,
             config_class=BertConfig,
             args=args,
             kwargs=kwargs,
-            fields=['bert', ("num_choices", 2), ('dropout', None)])
+            fields=['bert', ("num_choices", 2), ('dropout', None)],
+            return_unused_kwargs=True)
         super(BertForMultipleChoice, self).__init__(config)
 
+        self.bert = bert if bert is not None else BertModel(config)
+
+        # dropout is from `__init__` and is not in `BertConfig`. the suggested parameter name is: `hidden_dropout_prob` which is align with BertConfig attr
+        dropout = kwargs.get('dropout', None)
+
         self.num_choices = config.num_choices
-        self.dropout = nn.Dropout(config.dropout if config.dropout is not None
-                                  else config.hidden_dropout_prob)
+        self.dropout = nn.Dropout(
+            dropout if dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
@@ -1324,14 +1342,15 @@ class BertForMaskedLM(BertPretrainedModel):
                  config: Optional[Union[BertModel, BertConfig]] = None,
                  *args,
                  **kwargs):
-        config, self.bert = parse_config(config_or_model=config,
-                                         config_class=BertConfig,
-                                         args=args,
-                                         kwargs=kwargs,
-                                         fields=['bert'])
+        config, bert = parse_config(config_or_model=config,
+                                    config_class=BertConfig,
+                                    args=args,
+                                    kwargs=kwargs,
+                                    fields=['bert'])
         super(BertForMaskedLM, self).__init__(config)
-        if self.bert is None:
-            self.bert = BertModel(config=config)
+        if bert is None:
+            bert = BertModel(config=config)
+        self.bert = bert
 
         self.cls = BertOnlyMLMHead(
             config=config,
@@ -1395,7 +1414,6 @@ class BertForMaskedLM(BertPretrainedModel):
                 # [1, 13, 30522]
 
         """
-
         outputs = self.bert(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,

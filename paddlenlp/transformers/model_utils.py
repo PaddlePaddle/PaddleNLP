@@ -14,11 +14,11 @@
 from __future__ import annotations
 
 import copy
+import re
 import io
 import json
 import os
 import six
-import logging
 import inspect
 from typing import Optional, Type, Dict, List, Tuple, Union
 import shutil
@@ -68,6 +68,42 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
     # TODO(wj-Mcat): get dtype of model when it's in DataParallel Mode.
     return last_dtype
+
+
+def _find_weight_file_path(cache_dir: str,
+                           model_class: Type[PretrainedModelNew],
+                           resource_uri: Optional[str] = None) -> str:
+    """find the target weight file under the cache dir, because there are some conflicts about weight file names.
+
+    Args:
+        cache_dir (str): the cache dir of pretrained weighted files
+        model_class (Type[PretrainedModelNew]): the class of pretrained model
+        resource_uri (Optional[str], optional): the weight file resource file uri to help find the target file name. Defaults to None.
+    """
+    # 1. if the weight file is the name of resource_uri, eg: 'bert-base-uncased.pdparams'
+    if resource_uri is not None:
+        resouce_uri_file_name = os.path.split(resource_uri)[-1]
+        weight_file_path = os.path.join(cache_dir, resouce_uri_file_name)
+        if os.path.isfile(weight_file_path):
+            return weight_file_path
+
+    # 2. find the target weight file name under the `resource_files_names` attribute of `PretrainedModelNew`
+    resource_weight_file_name = model_class.resource_files_names.get(
+        'model_state', None)
+    weight_file_path = os.path.join(cache_dir, resource_weight_file_name)
+    if os.path.isfile(weight_file_path):
+        return weight_file_path
+
+    # 3. find the target weight file if there is only one weight file
+    weight_file_names = [
+        file for file in os.listdir(cache_dir) if file.endswith('.pdparams')
+    ]
+    if len(weight_file_names) == 1:
+        return os.path.join(cache_dir, weight_file_names[0])
+
+    raise ValueError(
+        'can"t find the target weight files<%s> or <%s> under the cache_dir<%s>',
+        resouce_uri_file_name, resource_weight_file_name, cache_dir)
 
 
 def register_base_model(cls):
@@ -783,7 +819,7 @@ class PretrainedModelNew(Layer, GenerationMixin):
                                               pretrained_model_name_or_path)
 
         # 1. when it is model-name
-        if pretrained_model_name_or_path in cls.pretrained_resource_files_map:
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # check the cache_dir:
             os.makedirs(cache_dir, exist_ok=True)
 
@@ -795,26 +831,33 @@ class PretrainedModelNew(Layer, GenerationMixin):
 
             # fetch the weight url from the `pretrained_resource_files_map`
             pretrained_model_name_or_path = cls.pretrained_resource_files_map[
-                pretrained_model_name_or_path]['model_state']
+                'model_state'][pretrained_model_name_or_path]
 
         # 2. when it is url
         if is_url(pretrained_model_name_or_path):
             weight_file_path = get_path_from_url(pretrained_model_name_or_path,
                                                  cache_dir)
+            # # check the downloaded weight file and registered weight file name
 
-            # check the downloaded weight file and registered weight file name
-            weight_file_dir, weight_file_name = None
-            registered_file_name = None
-
+            # make sure that
             new_weight_file_path = os.path.join(
                 os.path.split(weight_file_path)[0],
                 cls.resource_files_names['model_state'])
 
+            # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
+            # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
                 # copy the weight file
                 shutil.copyfile(weight_file_path, new_weight_file_path)
-                shutil.rmtree(weight_file_path)
+                os.remove(weight_file_path)
+                # shutil.rmtree(weight_file_path)
                 weight_file_path = new_weight_file_path
+
+            # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
+            weight_file_path = _find_weight_file_path(
+                cache_dir=cache_dir,
+                model_class=cls,
+                resource_uri=pretrained_model_name_or_path)
 
             return weight_file_path
 
@@ -822,30 +865,19 @@ class PretrainedModelNew(Layer, GenerationMixin):
         if os.path.isdir(pretrained_model_name_or_path):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
-            weight_file_path = os.path.join(
-                pretrained_model_name_or_path,
-                cls.resource_files_names['model_state'])
+
+            weight_file_path = _find_weight_file_path(
+                cache_dir=pretrained_model_name_or_path, model_class=cls)
+
             if os.path.exists(weight_file_path):
                 return weight_file_path
-
-            # try to load the exist `*.pdparams` file as the `model_state` file
-            model_state_files = [
-                file for file in os.listdir(pretrained_model_name_or_path)
-                if file.endswith('.pdparams')
-            ]
-            if not model_state_files:
-                raise FileNotFoundError(
-                    "can not find the `model_state` file under the directory<%s>",
+        else:
+            # assume that the community-based models, name format: community/model-name
+            if len(pretrained_model_name_or_path.split('/')) == 2:
+                pretrained_model_name_or_path = os.path.join(
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path)
+                return cls.pretrained_resource_files_map(
                     pretrained_model_name_or_path)
-
-            if len(model_state_files) > 1:
-                logger.warning(
-                    "detect more than one *.pdparams files which is not registered `model_state` files, so try to load the default first<%s> as the `model_state` file"
-                )
-
-            weight_file_path = os.path.join(pretrained_model_name_or_path,
-                                            model_state_files[0])
-            return weight_file_path
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>",
@@ -976,6 +1008,12 @@ class PretrainedModelNew(Layer, GenerationMixin):
             remove_prefix_from_model,
             ignore_mismatched_sizes,
         )
+
+        # remove the prefix
+        if start_prefix:
+            for key in list(state_dict.keys()):
+                if key.startswith(start_prefix):
+                    state_dict[key.replace(start_prefix, '')] = state_dict[key]
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
