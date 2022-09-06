@@ -1,4 +1,4 @@
-# Ernie 1.0: Enhanced Representation through kNowledge IntEgration
+# ERNIE: Enhanced Representation through kNowledge IntEgration
 
 ERNIE是百度开创性提出的基于知识增强的持续学习语义理解框架，它将大数据预训练与多源丰富知识相结合，通过持续学习技术，不断吸收海量文本数据中词汇、结构、语义等方面的知识，实现模型效果不断进化。
 
@@ -62,9 +62,9 @@ ERNIE预训练采用的是MLM（Mask Language Model）的训练方式，采用WW
 解压文件
 ```shell
 unzip comment2019zh_corpus.zip -d  clue_corpus_small_14g/comment2019zh_corpus
-unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus  
+unzip news2016zh_corpus.zip    -d  clue_corpus_small_14g/news2016zh_corpus
 unzip webText2019zh_corpus.zip -d  clue_corpus_small_14g/webText2019zh_corpus
-unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus  
+unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```
@@ -73,7 +73,7 @@ python data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --outpu
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
 python -u  data_tools/create_pretraining_data.py \
-    --model_name ernie-1.0 \
+    --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
     --split_sentences\
@@ -100,12 +100,15 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/ernie-1.0-dp8-gb512/log" \
     run_pretrain.py \
     --model_type "ernie" \
-    --model_name_or_path "ernie-1.0" \
+    --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
+    --split 949,50,1 \
     --max_seq_len 512 \
     --micro_batch_size 64 \
     --use_amp true \
+    --fp16_opt_level O2 \
     --max_lr 0.0001 \
     --min_lr 0.00001 \
     --max_steps 1000000 \
@@ -115,19 +118,24 @@ python -u  -m paddle.distributed.launch \
     --weight_decay 0.01 \
     --warmup_rate 0.01 \
     --grad_clip 1.0 \
-    --logging_freq 20\
+    --logging_freq 20 \
     --num_workers 2 \
     --eval_freq 1000 \
-    --device "gpu"\
+    --device "gpu" \
+    --share_folder false \
 ```
 
 其中参数释义如下：
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `tokenizer_name_or_path` 模型词表文件所在的文件夹，或者PaddleNLP内置tokenizer的名字。
+- `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
+- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
 - `max_seq_len` 输入文本序列的长度。
 - `micro_batch_size` 单卡batch size大小，比如此处单卡bs=64, 采用8卡训练`global_batch_size=64*8=512`。
 - `use_amp` 开启混合精度策略。
+- `fp16_opt_level` 混合精度策略，支持O1 自动混合精度，O2 pure fp16精度训练。
 - `max_lr` 训练学习率。
 - `min_lr` 学习率衰减的最小值。
 - `max_steps` 最大训练步数。
@@ -139,11 +147,12 @@ python -u  -m paddle.distributed.launch \
 - `logging_freq` 日志输出间隔。
 - `num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
 - `eval_freq` 模型评估间隔。
-- `device` 训练设备。
+- `device` 训练设备，默认为GPU。
+- `share_folder` 多机训练时，如果多机input_dir为挂载的同一个nfs网络位置，可以开启次选项，多机共享同一份数据。
 
 
 注：
-- 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint，开始重启训练。请确保重启的训练配置与之前相同。
+- 训练支持断点重启，直接启动即可，程序会找到最新的checkpoint(`output_dir/model_last`)，开始重启训练。请确保重启的训练配置与之前相同。
 - visualdl的日志在 `./output/ernie-1.0-dp8-gb512/train_log/xxx` 中。
 
 
@@ -180,8 +189,11 @@ ERINE-1.0-cluecorpussmall | 12L768H | 73.24(-0.54) | 74.26 | 57.24 | 60.79 | 81.
 - `ERINE-1.0-cluecorpussmall`复现版本，采用的是batch_size=512、steps=100w。
 
 ### 预训练模型贡献
-PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community)模块，用户可以上传自己训练的模型，开源给其他用户使用。
-使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到[zhui/ernie-1.0-cluecorpussmall](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/community/zhui/ernie-1.0-cluecorpussmall)参数，点击链接即可使用。
+PaddleNLP为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+使用本文档给出的参数配置，在CLUECorpusSmall数据集上训练，可以得到`zhui/ernie-1.0-cluecorpussmall`参数，可直接使用。
+```python
+model = AutoModelForMaskedLM.from_pretrained('zhui/ernie-1.0-cluecorpussmall')
+```
 
 贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 
@@ -201,7 +213,7 @@ python run_seq_cls.py \
     --do_train \
     --do_eval \
     --do_predict \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
@@ -214,7 +226,7 @@ python run_ner.py \
     --do_train \
     --do_eval \
     --do_predict \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
@@ -226,7 +238,7 @@ dataset="cmrc2018"
 python run_qa.py \
     --do_train \
     --do_eval \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset
 ```
@@ -251,7 +263,7 @@ python run_seq_cls.py \
     --do_eval \
     --do_predict \
     --do_export \
-    --model_name_or_path ernie-1.0 \
+    --model_name_or_path ernie-1.0-base-zh \
     --dataset $dataset \
     --output_dir ./tmp/$dataset \
     --eval_steps 200 \

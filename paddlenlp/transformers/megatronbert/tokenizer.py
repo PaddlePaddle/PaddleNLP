@@ -18,6 +18,11 @@ from .. import BertTokenizer
 
 __all__ = ['MegatronBertTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "megatronbert-cased": 512,
+    "megatronbert-uncased": 512
+}
+
 
 class MegatronBertTokenizer(BertTokenizer):
     """
@@ -80,6 +85,7 @@ class MegatronBertTokenizer(BertTokenizer):
             "do_lower_case": False
         }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
@@ -90,11 +96,10 @@ class MegatronBertTokenizer(BertTokenizer):
                  cls_token="[CLS]",
                  mask_token="[MASK]",
                  **kwargs):
-        super(MegatronBertTokenizer, self).__init__(
-            vocab_file,
-            do_lower_case=do_lower_case,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            pad_token=pad_token,
-            cls_token=cls_token,
-            mask_token=mask_token)
+        super(MegatronBertTokenizer, self).__init__(vocab_file,
+                                                    do_lower_case=do_lower_case,
+                                                    unk_token=unk_token,
+                                                    sep_token=sep_token,
+                                                    pad_token=pad_token,
+                                                    cls_token=cls_token,
+                                                    mask_token=mask_token)

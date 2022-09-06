@@ -19,7 +19,7 @@ cd PaddleNLP/tests/
 无需额外准备数据，`${shell_name}.sh` 脚本里面已经加上了 prepare.sh 的调用。
 
 ```shell
-bash test_tipc/static/${model_item}/benchmark_common/prepare.sh
+bash test_tipc/static/dp/${model_item}/benchmark_common/prepare.sh
 ```
 
 # 运行模型
@@ -28,12 +28,12 @@ bash test_tipc/static/${model_item}/benchmark_common/prepare.sh
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-bash  test_tipc/static/${model_item}/N1C1/${shell_name}.sh
+bash  test_tipc/static/dp/${model_item}/N1C1/${shell_name}.sh
 ```
 
 ## 多卡
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-bash test_tipc/static/${model_item}/N1C8/${shell_name}.sh
+bash test_tipc/static/dp/${model_item}/N1C8/${shell_name}.sh
 ```

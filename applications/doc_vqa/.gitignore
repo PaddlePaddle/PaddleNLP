@@ -1,0 +1,17 @@
+OCR_process/*.json
+*.png
+*.json
+answers/*
+checkpoints/*
+__pycache__/*
+OCR_process/demo_pics/*
+Rerank/log/*
+Rerank/checkpoints/*
+Rerank/data/*
+Rerank/output/*
+Rerank/__pycache__/*
+Extraction/log/*
+Extraction/checkpoints/*
+Extraction/data/*
+Extraction/output/*
+Extraction/__pycache__/*

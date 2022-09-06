@@ -23,7 +23,6 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 
-import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
@@ -91,7 +90,7 @@ def do_train(args):
     # Load model and train from scratch
     # model = RobertaForMaskedLM(
     #     RobertaModel(**RobertaForMaskedLM.pretrained_init_configuration[
-    #         args.model_name_or_path])) 
+    #         args.model_name_or_path]))
     model = RobertaForMaskedLM(RobertaModel(**roberta_arch))
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

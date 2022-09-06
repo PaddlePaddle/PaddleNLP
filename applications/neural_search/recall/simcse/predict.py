@@ -22,7 +22,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
@@ -40,6 +40,8 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween pos_sample and neg_samples.")
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
 parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embedding_size, 0 means use hidden_size as output embedding size.")
+parser.add_argument("--model_name_or_path",default='rocketqa-zh-base-query-encoder',type=str,help='The pretrained model used for training')
+
 
 args = parser.parse_args()
 # yapf: enable
@@ -64,11 +66,6 @@ def predict(model, data_loader):
         for batch_data in data_loader:
             query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch_data
 
-            query_input_ids = paddle.to_tensor(query_input_ids)
-            query_token_type_ids = paddle.to_tensor(query_token_type_ids)
-            title_input_ids = paddle.to_tensor(title_input_ids)
-            title_token_type_ids = paddle.to_tensor(title_token_type_ids)
-
             batch_cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 title_input_ids=title_input_ids,
@@ -85,12 +82,11 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -99,24 +95,23 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.text_pair_file, lazy=False, is_test=True)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.text_pair_file,
+                            lazy=False,
+                            is_test=True)
 
-    valid_data_loader = create_dataloader(
-        valid_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    valid_data_loader = create_dataloader(valid_ds,
+                                          mode='predict',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
-    model = SimCSE(
-        pretrained_model,
-        margin=args.margin,
-        scale=args.scale,
-        output_emb_size=args.output_emb_size)
+    model = SimCSE(pretrained_model,
+                   margin=args.margin,
+                   scale=args.scale,
+                   output_emb_size=args.output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

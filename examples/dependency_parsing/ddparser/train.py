@@ -20,7 +20,7 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers.optimization import LinearDecayWithWarmup
 from paddlenlp.datasets import load_dataset
 
@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser()
 # Train
 parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
-parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
+parser.add_argument("--encoding_model", choices=["lstm", "lstm-pe", "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-3.0-medium-zh", help="Select the encoding model.")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epoches for training.")
 parser.add_argument("--save_dir", type=str, default='model_file/', help="Directory to save model parameters.")
 parser.add_argument("--batch_size", type=int, default=1000, help="Numbers of examples a batch for training.")
@@ -65,13 +65,14 @@ def set_seed(seed):
 
 @paddle.no_grad()
 def batch_evaluate(
-        model,
-        metric,
-        criterion,
-        data_loader,
-        word_pad_index,
-        word_bos_index,
-        word_eos_index, ):
+    model,
+    metric,
+    criterion,
+    data_loader,
+    word_pad_index,
+    word_bos_index,
+    word_eos_index,
+):
     model.eval()
     metric.reset()
     losses = []
@@ -88,7 +89,8 @@ def batch_evaluate(
         mask = paddle.logical_and(
             paddle.logical_and(words != word_pad_index,
                                words != word_bos_index),
-            words != word_eos_index, )
+            words != word_eos_index,
+        )
 
         loss = criterion(s_arc, s_rel, arcs, rels, mask)
 
@@ -111,14 +113,11 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     if args.encoding_model == "ernie-gram-zh":
-        tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-            args.encoding_model)
+        tokenizer = AutoTokenizer.from_pretrained(args.encoding_model)
     elif args.encoding_model.startswith("ernie"):
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            args.encoding_model)
+        tokenizer = AutoTokenizer.from_pretrained(args.encoding_model)
     elif args.encoding_model == "lstm-pe":
-        tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(
-            "ernie-1.0")
+        tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     else:
         tokenizer = None
 
@@ -139,7 +138,8 @@ def do_train(args):
         train_corpus,
         tokenizer,
         encoding_model=args.encoding_model,
-        feat=args.feat, )
+        feat=args.feat,
+    )
     word_vocab, feat_vocab, rel_vocab = vocabs
 
     if not os.path.exists(args.save_dir):
@@ -167,28 +167,29 @@ def do_train(args):
         convert_example,
         vocabs=vocabs,
         encoding_model=args.encoding_model,
-        feat=args.feat, )
+        feat=args.feat,
+    )
 
     train_data_loader, _ = create_dataloader(
         train_ds,
         batch_size=args.batch_size,
         mode="train",
         n_buckets=args.n_buckets,
-        trans_fn=trans_fn, )
+        trans_fn=trans_fn,
+    )
     dev_data_loader, _ = create_dataloader(
         dev_ds,
         batch_size=args.batch_size,
         mode="dev",
         n_buckets=args.n_buckets,
-        trans_fn=trans_fn, )
+        trans_fn=trans_fn,
+    )
 
-    # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-        pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-            args.encoding_model)
-    elif args.encoding_model == "ernie-gram-zh":
-        pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-            args.encoding_model)
+    # Load pretrained model if encoding model is ernie-3.0-medium-zh, ernie-1.0, ernie-tiny or ernie-gram-zh
+    if args.encoding_model in [
+            "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"
+    ]:
+        pretrained_model = AutoModel.from_pretrained(args.encoding_model)
     else:
         pretrained_model = None
 
@@ -201,7 +202,8 @@ def do_train(args):
         n_words=n_words,
         pad_index=word_pad_index,
         eos_index=word_eos_index,
-        pretrained_model=pretrained_model, )
+        pretrained_model=pretrained_model,
+    )
 
     # Define learning rate
     if args.encoding_model.startswith("ernie"):
@@ -229,7 +231,8 @@ def do_train(args):
             learning_rate=lr_scheduler,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            grad_clip=grad_clip, )
+            grad_clip=grad_clip,
+        )
     else:
         optimizer = paddle.optimizer.Adam(
             learning_rate=lr,
@@ -237,7 +240,8 @@ def do_train(args):
             beta2=0.9,
             epsilon=1e-12,
             parameters=model.parameters(),
-            grad_clip=grad_clip, )
+            grad_clip=grad_clip,
+        )
 
     # Load metric and criterion
     best_las = 0
@@ -261,7 +265,8 @@ def do_train(args):
             mask = paddle.logical_and(
                 paddle.logical_and(words != word_pad_index,
                                    words != word_bos_index),
-                words != word_eos_index, )
+                words != word_eos_index,
+            )
 
             loss = criterion(s_arc, s_rel, arcs, rels, mask)
             loss.backward()
@@ -273,8 +278,8 @@ def do_train(args):
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss.numpy().item(),
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, loss.numpy().item(), 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
         if rank == 0:
@@ -286,7 +291,8 @@ def do_train(args):
                 dev_data_loader,
                 word_pad_index,
                 word_bos_index,
-                word_eos_index, )
+                word_eos_index,
+            )
             print("eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" %
                   (loss, uas * 100, las * 100))
             # Save model parameter of last epoch

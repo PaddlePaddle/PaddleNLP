@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import paddle
 import argparse
-from ernie_predictor import ErniePredictor, token_cls_print_ret
+from ernie_predictor import ErniePredictor
 
 
 def parse_args():
@@ -24,38 +24,53 @@ def parse_args():
         "--task_name",
         default='seq_cls',
         type=str,
-        help="The name of the task to perform predict, selected in: seq_cls and token_cls"
+        help=
+        "The name of the task to perform predict, selected in: seq_cls and token_cls"
     )
     parser.add_argument(
         "--model_name_or_path",
         default="ernie-3.0-medium-zh",
         type=str,
-        help="The directory or name of model.", )
+        help="The directory or name of model.",
+    )
     parser.add_argument(
         "--model_path",
-        default='tnews_quant_models/mse4/int8',
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size for predict.", )
+        help="Batch size for predict.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--set_dynamic_shape",
         action='store_true',
-        help="Whether to automatically set dynamic shape.", )
+        help="Whether to automatically set dynamic shape.",
+    )
     parser.add_argument(
-        "--use_fp16",
-        action='store_true',
-        help="Whether to use fp16 inference.", )
+        "--shape_info_file",
+        default="shape_info.txt",
+        type=str,
+        help="The collected dynamic shape info file.",
+    )
+    parser.add_argument(
+        "--precision_mode",
+        type=str,
+        default="fp32",
+        choices=["fp32", "fp16", "int8"],
+        help="Inference precision.",
+    )
     args = parser.parse_args()
     return args
 
@@ -69,15 +84,9 @@ def main():
     if args.task_name == 'seq_cls':
         text = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
     elif args.task_name == 'token_cls':
-        text = [
-            "古老的文明，使我们引以为豪，彼此钦佩。",
-            "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
-        ]
+        text = ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"]
 
     outputs = predictor.predict(text)
-
-    if args.task_name == 'token_cls':
-        token_cls_print_ret(outputs, text)
 
 
 if __name__ == "__main__":

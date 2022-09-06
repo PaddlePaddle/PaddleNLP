@@ -31,15 +31,15 @@ class THUCNews(DatasetBuilder):
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     LABEL_PATH = os.path.join('thucnews', 'label.txt')
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('thucnews', 'train.txt'),
-            "beda43dfb4f7bd9bd3d465edb35fbb7f"),
-        'dev': META_INFO(
-            os.path.join('thucnews', 'val.txt'),
-            "1abe8fe2c75dde701407a9161dcd223a"),
-        'test': META_INFO(
-            os.path.join('thucnews', 'test.txt'),
-            "201f558b7d0b3419ddebcd695f3070f0")
+        'train':
+        META_INFO(os.path.join('thucnews', 'train.txt'),
+                  "beda43dfb4f7bd9bd3d465edb35fbb7f"),
+        'dev':
+        META_INFO(os.path.join('thucnews', 'val.txt'),
+                  "1abe8fe2c75dde701407a9161dcd223a"),
+        'test':
+        META_INFO(os.path.join('thucnews', 'test.txt'),
+                  "201f558b7d0b3419ddebcd695f3070f0")
     }
 
     def _get_data(self, mode, **kwargs):

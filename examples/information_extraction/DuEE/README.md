@@ -89,9 +89,9 @@ test_ds = DuEventExtraction(args.test_data, args.vocab_path, args.tag_path)
 **PaddleNLP提供了ERNIE预训练模型常用序列标注模型，可以通过指定模型名字完成一键加载**：
 
 ```python
-from paddlenlp.transformers import ErnieForTokenClassification
+from paddlenlp.transformers import AutoModelForTokenClassification
 
-model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(label_map))
 ```
 
 同时，对于枚举分类数据采用的是基于ERNIE的文本分类模型，枚举角色类型为环节。模型原理图如下：
@@ -106,7 +106,9 @@ model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=len
 **同样地，PaddleNLP提供了ERNIE预训练模型常用文本分类模型，可以通过指定模型名字完成一键加载**：
 
 ```python
-model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=len(label_map))
+from paddlenlp.transformers import AutoModelForSequenceClassification
+
+model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(label_map))
 ```
 
 ### 快速复现基线Step3：数据处理
@@ -115,9 +117,9 @@ model = ErnieForSequenceClassification.from_pretrained("ernie-1.0", num_classes=
 文本token化，转token ID，文本长度截断等操作。与加载模型类似地，也可以一键加载。
 
 ```python
-from paddlenlp.transformers import ErnieTokenizer
+from paddlenlp.transformers import AutoTokenizer
 
-tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 ```
 
 文本数据处理直接调用tokenizer即可输出模型所需输入数据。
@@ -213,7 +215,7 @@ f1_score = (2 * P * R) / (P + R)，其中
 ## 进阶优化基线效果
 
 基线采用的预训练模型为ERNIE，PaddleNLP提供了丰富的预训练模型，如BERT，RoBERTa，Electra，XLNet等
-参考[PaddleNLP预训练模型介绍](../../../docs/model_zoo/transformers.rst)
+参考[PaddleNLP预训练模型介绍](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
 
 如可以选择RoBERTa large中文模型优化模型效果，只需更换模型和tokenizer即可无缝衔接。
 

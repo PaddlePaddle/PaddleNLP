@@ -20,9 +20,19 @@ from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['MBartTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "mbart-large-cc25": 1024,
+    "mbart-large-en-ro": 1024,
+    "mbart-large-50-one-to-many-mmt": 1024,
+    "mbart-large-50-many-to-one-mmt": 1024,
+    "mbart-large-50-many-to-many-mmt": 1024
+}
+
 
 class MBartTokenizer(PretrainedTokenizer):
-    resource_files_names = {"vocab_file": "sentencepiece.bpe.model", }
+    resource_files_names = {
+        "vocab_file": "sentencepiece.bpe.model",
+    }
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-en-ro":
@@ -54,6 +64,7 @@ class MBartTokenizer(PretrainedTokenizer):
             "mbart_type": "mbart50"
         }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
@@ -72,13 +83,15 @@ class MBartTokenizer(PretrainedTokenizer):
         self.tgt_lang = tgt_lang
 
         if mbart_type == "mbart":
-            self.tokenizer = _MBartTokenizer(
-                vocab_file, src_lang, tgt_lang, bos_token, eos_token, sep_token,
-                cls_token, unk_token, pad_token, mask_token, **kwargs)
+            self.tokenizer = _MBartTokenizer(vocab_file, src_lang, tgt_lang,
+                                             bos_token, eos_token, sep_token,
+                                             cls_token, unk_token, pad_token,
+                                             mask_token, **kwargs)
         elif mbart_type == "mbart50":
-            self.tokenizer = _MBart50Tokenizer(
-                vocab_file, src_lang, tgt_lang, bos_token, eos_token, sep_token,
-                cls_token, unk_token, pad_token, mask_token, **kwargs)
+            self.tokenizer = _MBart50Tokenizer(vocab_file, src_lang, tgt_lang,
+                                               bos_token, eos_token, sep_token,
+                                               cls_token, unk_token, pad_token,
+                                               mask_token, **kwargs)
         self.lang_code_to_id = self.tokenizer.lang_code_to_id
 
     def __call__(self,
@@ -167,8 +180,8 @@ class MBartTokenizer(PretrainedTokenizer):
         BOS is never used. Pairs of sequences are not the expected use case, but they will be handled without a
         separator.
         """
-        return self.tokenizer.build_inputs_with_special_tokens(token_ids_0,
-                                                               token_ids_1)
+        return self.tokenizer.build_inputs_with_special_tokens(
+            token_ids_0, token_ids_1)
 
     @contextmanager
     def as_target_tokenizer(self):
@@ -182,7 +195,9 @@ class MBartTokenizer(PretrainedTokenizer):
 
 
 class _MBartTokenizer(PretrainedTokenizer):
-    resource_files_names = {"vocab_file": "sentencepiece.bpe.model", }
+    resource_files_names = {
+        "vocab_file": "sentencepiece.bpe.model",
+    }
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-en-ro":
@@ -236,9 +251,9 @@ class _MBartTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
@@ -356,8 +371,8 @@ class _MBartTokenizer(PretrainedTokenizer):
         suffix_ones = [1] * len(self.suffix_tokens)
         if token_ids_1 is None:
             return prefix_ones + ([0] * len(token_ids_0)) + suffix_ones
-        return prefix_ones + ([0] * len(token_ids_0)) + ([0] * len(token_ids_1)
-                                                         ) + suffix_ones
+        return prefix_ones + ([0] * len(token_ids_0)) + (
+            [0] * len(token_ids_1)) + suffix_ones
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -389,7 +404,9 @@ class _MBartTokenizer(PretrainedTokenizer):
 
 
 class _MBart50Tokenizer(PretrainedTokenizer):
-    resource_files_names = {"vocab_file": "sentencepiece.bpe.model", }
+    resource_files_names = {
+        "vocab_file": "sentencepiece.bpe.model",
+    }
     pretrained_resource_files_map = {
         "vocab_file": {
             "mbart-large-50-one-to-many-mmt":
@@ -428,9 +445,9 @@ class _MBart50Tokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  **kwargs):
-        mask_token = AddedToken(
-            mask_token, lstrip=True,
-            rstrip=False) if isinstance(mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(str(vocab_file))
@@ -548,8 +565,8 @@ class _MBart50Tokenizer(PretrainedTokenizer):
         suffix_ones = [1] * len(self.suffix_tokens)
         if token_ids_1 is None:
             return prefix_ones + ([0] * len(token_ids_0)) + suffix_ones
-        return prefix_ones + ([0] * len(token_ids_0)) + ([0] * len(token_ids_1)
-                                                         ) + suffix_ones
+        return prefix_ones + ([0] * len(token_ids_0)) + (
+            [0] * len(token_ids_1)) + suffix_ones
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """

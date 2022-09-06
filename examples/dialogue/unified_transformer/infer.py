@@ -2,9 +2,9 @@ import time
 import argparse
 
 import paddle
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from paddlenlp.metrics import BLEU, Distinct
+from datasets import load_dataset
 
 from utils import print_args, set_seed, create_data_loader, select_response
 
@@ -76,7 +76,7 @@ def infer(args):
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(
         args.model_name_or_path)
 
-    test_ds = load_dataset('duconv', splits='test_1')
+    test_ds = load_dataset('duconv', split='test_1')
     test_ds, test_data_loader = create_data_loader(test_ds, tokenizer, args,
                                                    'test')
 
@@ -86,24 +86,23 @@ def infer(args):
     pred_responses = []
     for step, inputs in enumerate(test_data_loader, 1):
         input_ids, token_type_ids, position_ids, attention_mask, seq_len = inputs
-        output = model.generate(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            seq_len=seq_len,
-            max_length=args.max_dec_len,
-            min_length=args.min_dec_len,
-            decode_strategy=args.decode_strategy,
-            temperature=args.temperature,
-            top_k=args.top_k,
-            top_p=args.top_p,
-            num_beams=args.num_beams,
-            length_penalty=args.length_penalty,
-            early_stopping=args.early_stopping,
-            num_return_sequences=args.num_return_sequences,
-            use_fp16_decoding=args.use_fp16_decoding,
-            use_faster=args.faster)
+        output = model.generate(input_ids=input_ids,
+                                token_type_ids=token_type_ids,
+                                position_ids=position_ids,
+                                attention_mask=attention_mask,
+                                seq_len=seq_len,
+                                max_length=args.max_dec_len,
+                                min_length=args.min_dec_len,
+                                decode_strategy=args.decode_strategy,
+                                temperature=args.temperature,
+                                top_k=args.top_k,
+                                top_p=args.top_p,
+                                num_beams=args.num_beams,
+                                length_penalty=args.length_penalty,
+                                early_stopping=args.early_stopping,
+                                num_return_sequences=args.num_return_sequences,
+                                use_fp16_decoding=args.use_fp16_decoding,
+                                use_faster=args.faster)
 
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:

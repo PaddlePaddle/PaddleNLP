@@ -39,7 +39,10 @@ class T5BertTokenizer(BertTokenizer):
             mask_token=mask_token,
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
-            **kwargs, )
+            **kwargs,
+        )
+        if space_token not in self._additional_special_tokens:
+            self._additional_special_tokens += [space_token]
 
         self._space_token = space_token
 
@@ -51,7 +54,7 @@ class T5BertTokenizer(BertTokenizer):
         vocab.update(self.added_tokens_encoder)
         return vocab
 
-    def tokenize(self, text):
+    def tokenize(self, text, **kwargs):
         import re
         # Remove space between <extra_id_*> <spot> <asoc>
         split_bracket = re.compile(
@@ -59,12 +62,12 @@ class T5BertTokenizer(BertTokenizer):
 
         if len(split_bracket.split(text)) > 1:
             new_text_list = [split_bracket.split(text)[0]]
-            for item in zip(
-                    split_bracket.findall(text), split_bracket.split(text)[1:]):
+            for item in zip(split_bracket.findall(text),
+                            split_bracket.split(text)[1:]):
                 new_text_list += [item[0].strip(), item[1]]
             text = "".join(new_text_list)
         text = text.replace(' ', self._space_token)
-        return super().tokenize(text)
+        return super().tokenize(text, **kwargs)
 
     def _add_eos_if_not_present(self, token_ids: List[int]) -> List[int]:
         """Do not add eos again if user already added it."""
@@ -77,8 +80,9 @@ class T5BertTokenizer(BertTokenizer):
             return token_ids + [self.eos_token_id]
 
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. A sequence has the following format:
@@ -104,7 +108,7 @@ class T5BertTokenizer(BertTokenizer):
 
     def _decode(self,
                 token_ids: Union[List[int], Tensor],
-                skip_special_tokens: bool=False,
+                skip_special_tokens: bool = False,
                 **kwargs) -> str:
         if isinstance(token_ids, Tensor):
             tokens = self.convert_ids_to_tokens(
@@ -123,7 +127,7 @@ class T5BertTokenizer(BertTokenizer):
 
     def decode(self,
                token_ids: Union[List[int], Tensor],
-               skip_special_tokens: bool=False,
+               skip_special_tokens: bool = False,
                **kwargs) -> str:
         return self._decode(token_ids, skip_special_tokens)
 

@@ -12,7 +12,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── dataset.py              # 数据处理
 ├── deploy/                 # 模型部署的inference脚本
 ├── export_model.py         # 导出预测部署的模型脚本
-├── faster_gpt/             # 使用 FasterGPT 高性能预测 sample  
+├── faster_gpt/             # 使用 FasterGPT 高性能预测 sample
 ├── lr.py                   # 学习率控制
 ├── predict.py              # 生成文本示例demo
 ├── README.md               # 文档
@@ -52,7 +52,7 @@ wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
-然后使用[data_tools](./data_tools)工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[data_tools](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/../ernie-1.0/data_tools) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name gpt2-en \

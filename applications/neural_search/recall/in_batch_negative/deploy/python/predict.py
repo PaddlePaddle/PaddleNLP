@@ -18,10 +18,10 @@ import sys
 
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
 from scipy import spatial
 from paddle import inference
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
@@ -40,7 +40,7 @@ parser.add_argument("--batch_size", default=15, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
-
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="model name.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
     help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
@@ -85,10 +85,9 @@ def convert_example(example,
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(
-            text=text,
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -96,6 +95,7 @@ def convert_example(example,
 
 
 class Predictor(object):
+
     def __init__(self,
                  model_dir,
                  device="gpu",
@@ -128,10 +128,9 @@ class Predictor(object):
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(
-                    max_batch_size=batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                config.enable_tensorrt_engine(max_batch_size=batch_size,
+                                              min_subgraph_size=30,
+                                              precision_mode=precision_mode)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -158,7 +157,7 @@ class Predictor(object):
             import auto_log
             pid = os.getpid()
             self.autolog = auto_log.AutoLogger(
-                model_name="ernie-1.0",
+                model_name=args.model_name_or_path,
                 model_precision=precision,
                 batch_size=self.batch_size,
                 data_shape="dynamic",
@@ -232,9 +231,8 @@ class Predictor(object):
         examples = []
         for idx, text in enumerate(data):
             input_ids, segment_ids = convert_example({idx: text[0]}, tokenizer)
-            title_ids, title_segment_ids = convert_example({
-                idx: text[1]
-            }, tokenizer)
+            title_ids, title_segment_ids = convert_example({idx: text[1]},
+                                                           tokenizer)
             examples.append(
                 (input_ids, segment_ids, title_ids, title_segment_ids))
 
@@ -280,7 +278,7 @@ if __name__ == "__main__":
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     output_emb_size = 256
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     res = predictor.extract_embedding(corpus_list, tokenizer)

@@ -20,6 +20,7 @@ import paddlenlp as ppnlp
 
 
 class QuestionMatching(nn.Layer):
+
     def __init__(self, pretrained_model, dropout=None, rdrop_coef=0.0):
         super().__init__()
         self.ptm = pretrained_model

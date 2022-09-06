@@ -49,10 +49,10 @@ F1 = (2 * P * R) / (P + R)，其中
 **PaddleNLP提供了ERNIE预训练模型常用序列标注模型，可以通过指定模型名字完成一键加载.PaddleNLP为了方便用户处理数据，内置了对于各个预训练模型对应的Tokenizer，可以完成文本token化，转token ID，文本长度截断等操作。**
 
 ```python
-from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
 
-model = ErnieForTokenClassification.from_pretrained("ernie-1.0", num_classes=(len(label_map) - 2) * 2 + 2)
-tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=(len(label_map) - 2) * 2 + 2)
+tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 ```
 
 文本数据处理直接调用tokenizer即可输出模型所需输入数据。
@@ -125,7 +125,7 @@ python re_official_evaluation.py --golden_file=dev_data.json  --predict_file=pre
 ## 进阶优化基线效果
 
 基线采用的预训练模型为ERNIE，PaddleNLP提供了丰富的预训练模型，如BERT，RoBERTa，Electra，XLNet等
-参考[PaddleNLP预训练模型介绍](../../../docs/model_zoo/transformers.rst)
+参考[PaddleNLP预训练模型介绍](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)
 
 如可以选择RoBERTa large中文模型优化模型效果，只需更换模型和tokenizer即可无缝衔接。
 

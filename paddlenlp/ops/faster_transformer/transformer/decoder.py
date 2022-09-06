@@ -18,11 +18,16 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddle.fluid.layer_helper import LayerHelper
+from paddle.common_ops_import import LayerHelper
 from paddlenlp.transformers import WordEmbedding, PositionalEmbedding, position_encoding_init
 from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops import transfer_param
+
+if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
+    from paddle.framework import core
+
+from .decoding import run_custom
 
 
 def infer_transformer_decoder(from_tensor,
@@ -62,66 +67,43 @@ def infer_transformer_decoder(from_tensor,
                               size_per_head,
                               memory_hidden_dim,
                               is_fuse_qkv=False):
-    helper = LayerHelper('fusion_decoder', **locals())
+    inputs_names = [
+        "FromTensor", "MemoryTensor", "MemSeqLen", "SelfLayernormWeight",
+        "SelfLayernormBias", "SelfQueryWeight", "SelfQueryBias",
+        "SelfKeyWeight", "SelfKeyBias", "SelfValueWeight", "SelfValueBias",
+        "SelfOutWeight", "SelfOutBias", "CrossLayernormWeight",
+        "CrossLayernormBias", "CrossQueryWeight", "CrossQueryBias",
+        "CrossKeyWeight", "CrossKeyBias", "CrossValueWeight", "CrossValueBias",
+        "CrossOutWeight", "CrossOutBias", "FFNLayernormWeight",
+        "FFNLayernormBias", "FFNInterWeight", "FFNInterBias", "FFNOutWeight",
+        "FFNOutBias", "OldSelfCacheKey", "OldSelfCacheValue"
+    ]
 
-    inputs = {
-        "FromTensor": from_tensor,
-        "MemoryTensor": memory_tensor,
-        "MemSeqLen": mem_seq_len,
-        "SelfLayernormWeight": self_ln_weight,
-        "SelfLayernormBias": self_ln_bias,
-        "SelfQueryWeight": self_q_weight,
-        "SelfQueryBias": self_q_bias,
-        "SelfKeyWeight": self_k_weight,
-        "SelfKeyBias": self_k_bias,
-        "SelfValueWeight": self_v_weight,
-        "SelfValueBias": self_v_bias,
-        "SelfOutWeight": self_out_weight,
-        "SelfOutBias": self_out_bias,
-        "CrossLayernormWeight": cross_ln_weight,
-        "CrossLayernormBias": cross_ln_bias,
-        "CrossQueryWeight": cross_q_weight,
-        "CrossQueryBias": cross_q_bias,
-        "CrossKeyWeight": cross_k_weight,
-        "CrossKeyBias": cross_k_bias,
-        "CrossValueWeight": cross_v_weight,
-        "CrossValueBias": cross_v_bias,
-        "CrossOutWeight": cross_out_weight,
-        "CrossOutBias": cross_out_bias,
-        "FFNLayernormWeight": ffn_ln_weight,
-        "FFNLayernormBias": ffn_ln_bias,
-        "FFNInterWeight": ffn_inter_weight,
-        "FFNInterBias": ffn_inter_bias,
-        "FFNOutWeight": ffn_out_weight,
-        "FFNOutBias": ffn_out_bias,
-        "OldSelfCacheKey": old_self_cache_key,
-        "OldSelfCacheValue": old_self_cache_value,
-        "OldMemCache": old_mem_cache
-    }
-    attrs = {
-        'step': step,
-        'n_head': n_head,
-        'size_per_head': size_per_head,
-        'memory_hidden_dim': memory_hidden_dim,
-        'is_fuse_qkv': is_fuse_qkv
-    }
+    inputs_var = [
+        from_tensor, memory_tensor, mem_seq_len, self_ln_weight, self_ln_bias,
+        self_q_weight, self_q_bias, self_k_weight, self_k_bias, self_v_weight,
+        self_v_bias, self_out_weight, self_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, old_self_cache_key,
+        old_self_cache_value, old_mem_cache
+    ]
 
-    decoder_output = helper.create_variable(dtype=memory_tensor.dtype)
-    new_self_cache_key = helper.create_variable(dtype=memory_tensor.dtype)
-    new_self_cache_value = helper.create_variable(dtype=memory_tensor.dtype)
-    new_mem_cache = helper.create_variable(dtype=memory_tensor.dtype)
+    attrs_names = [
+        'step', 'n_head', 'size_per_head', 'memory_hidden_dim', 'is_fuse_qkv'
+    ]
 
-    outputs = {
-        'DecoderOutput': decoder_output,
-        'NewSelfCacheKey': new_self_cache_key,
-        'NewSelfCacheValue': new_self_cache_value,
-        'NewMemCache': new_mem_cache
-    }
+    attrs_val = [step, n_head, size_per_head, memory_hidden_dim, is_fuse_qkv]
 
-    helper.append_op(
-        type='fusion_decoder', inputs=inputs, outputs=outputs, attrs=attrs)
+    outputs_names = [
+        'DecoderOutput', 'NewSelfCacheKey', 'NewSelfCacheValue', 'NewMemCache'
+    ]
 
-    return decoder_output, new_self_cache_key, new_self_cache_value, new_mem_cache
+    outputs_dtype = [memory_tensor.dtype] * len(outputs_names)
+
+    return run_custom("fusion_decoder", inputs_names, inputs_var, attrs_names,
+                      attrs_val, outputs_names, outputs_dtype)
 
 
 def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):
@@ -219,11 +201,11 @@ class InferTransformerDecoder(nn.Layer):
                 mod.norm3.weight = transfer_param(mod.norm3.weight)
                 mod.norm3.bias = transfer_param(mod.norm3.bias, is_bias=True)
                 mod.linear1.weight = transfer_param(mod.linear1.weight)
-                mod.linear1.bias = transfer_param(
-                    mod.linear1.bias, is_bias=True)
+                mod.linear1.bias = transfer_param(mod.linear1.bias,
+                                                  is_bias=True)
                 mod.linear2.weight = transfer_param(mod.linear2.weight)
-                mod.linear2.bias = transfer_param(
-                    mod.linear2.bias, is_bias=True)
+                mod.linear2.bias = transfer_param(mod.linear2.bias,
+                                                  is_bias=True)
 
         self.weights = []
         for idx, mod in enumerate(decoder.layers):
@@ -264,28 +246,26 @@ class InferTransformerDecoder(nn.Layer):
         self_caches_value = []
         mem_caches = []
         if not self.use_batch_major_op_cache:
-            self_cache_key = paddle.concat(
-                [
-                    self_cache_key, paddle.zeros(
-                        shape=[
-                            len(self.weights), 1,
-                            paddle.shape(memory_tensor)[0],
-                            self.n_head * self.size_per_head
-                        ],
-                        dtype=self_cache_key.dtype)
+            self_cache_key = paddle.concat([
+                self_cache_key,
+                paddle.zeros(shape=[
+                    len(self.weights), 1,
+                    paddle.shape(memory_tensor)[0],
+                    self.n_head * self.size_per_head
                 ],
-                axis=1)
-            self_cache_value = paddle.concat(
-                [
-                    self_cache_value, paddle.zeros(
-                        shape=[
-                            len(self.weights), 1,
-                            paddle.shape(memory_tensor)[0],
-                            self.n_head * self.size_per_head
-                        ],
-                        dtype=self_cache_value.dtype)
+                             dtype=self_cache_key.dtype)
+            ],
+                                           axis=1)
+            self_cache_value = paddle.concat([
+                self_cache_value,
+                paddle.zeros(shape=[
+                    len(self.weights), 1,
+                    paddle.shape(memory_tensor)[0],
+                    self.n_head * self.size_per_head
                 ],
-                axis=1)
+                             dtype=self_cache_value.dtype)
+            ],
+                                             axis=1)
         for idx in range(len(self.weights)):
             weight = self.weights[idx]
             decoder_output, new_self_cache_key, new_self_cache_value, new_mem_cache = infer_transformer_decoder(
@@ -408,11 +388,12 @@ class FasterDecoder(nn.Layer):
         self.use_batch_major_op_cache, self.x = get_op_cache_config(
             use_batch_major_op_cache, self.size_per_head, use_fp16_decoder)
 
-        self.src_word_embedding = WordEmbedding(
-            vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
+        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
+                                                emb_dim=d_model,
+                                                bos_id=self.bos_id)
         # print(self.src_word_embedding.word_embedding.weight)
-        self.src_pos_embedding = PositionalEmbedding(
-            emb_dim=d_model, max_length=max_length)
+        self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                     max_length=max_length)
         if weight_sharing:
             assert src_vocab_size == trg_vocab_size, (
                 "Vocabularies in source and target should be same for weight sharing."
@@ -420,10 +401,11 @@ class FasterDecoder(nn.Layer):
             self.trg_word_embedding = self.src_word_embedding
             self.trg_pos_embedding = self.src_pos_embedding
         else:
-            self.trg_word_embedding = WordEmbedding(
-                vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(
-                emb_dim=d_model, max_length=max_length)
+            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
+                                                    emb_dim=d_model,
+                                                    bos_id=self.bos_id)
+            self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                         max_length=max_length)
 
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
@@ -445,18 +427,18 @@ class FasterDecoder(nn.Layer):
 
         if weight_sharing:
             self.linear = lambda x: paddle.matmul(x=x,
-                                                  y=self.trg_word_embedding.word_embedding.weight,
+                                                  y=self.trg_word_embedding.
+                                                  word_embedding.weight,
                                                   transpose_y=True)
         else:
-            self.linear = nn.Linear(
-                in_features=d_model,
-                out_features=trg_vocab_size,
-                bias_attr=False)
+            self.linear = nn.Linear(in_features=d_model,
+                                    out_features=trg_vocab_size,
+                                    bias_attr=False)
 
     def forward(self, src_word):
         src_max_len = paddle.shape(src_word)[-1]
-        mem_seq_lens = paddle.sum(paddle.cast(
-            src_word != self.bos_id, dtype="int32"),
+        mem_seq_lens = paddle.sum(paddle.cast(src_word != self.bos_id,
+                                              dtype="int32"),
                                   axis=-1,
                                   keepdim=True,
                                   dtype="int32")
@@ -467,9 +449,9 @@ class FasterDecoder(nn.Layer):
 
         src_slf_attn_bias.stop_gradient = True
 
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
+        src_pos = paddle.cast(src_word != self.bos_id,
+                              dtype="int64") * paddle.arange(start=0,
+                                                             end=src_max_len)
 
         src_emb = self.src_word_embedding(src_word)
 
@@ -478,18 +460,21 @@ class FasterDecoder(nn.Layer):
         enc_input = F.dropout(
             src_emb, p=self.dropout,
             training=self.training) if self.dropout else src_emb
-        enc_output = self.transformer.encoder(
-            enc_input, src_mask=src_slf_attn_bias)
+        enc_output = self.transformer.encoder(enc_input,
+                                              src_mask=src_slf_attn_bias)
 
         batch_size, _, memory_hidden_dim = enc_output.shape
-        end_token_tensor = paddle.full(
-            shape=[batch_size, 1], fill_value=self.eos_id, dtype="int64")
+        end_token_tensor = paddle.full(shape=[batch_size, 1],
+                                       fill_value=self.eos_id,
+                                       dtype="int64")
 
         predict_ids = []
-        log_probs = paddle.full(
-            shape=[batch_size, 1], fill_value=0, dtype="float32")
-        trg_word = paddle.full(
-            shape=[batch_size, 1], fill_value=self.bos_id, dtype="int64")
+        log_probs = paddle.full(shape=[batch_size, 1],
+                                fill_value=0,
+                                dtype="float32")
+        trg_word = paddle.full(shape=[batch_size, 1],
+                               fill_value=self.bos_id,
+                               dtype="int64")
 
         if self.use_fp16_decoder:
             enc_output = paddle.cast(enc_output, "float16")
@@ -503,27 +488,24 @@ class FasterDecoder(nn.Layer):
                 shape=[self.num_decoder_layers, 0, batch_size, self.d_model],
                 dtype=enc_output.dtype)
         else:
-            self_cache_key = paddle.zeros(
-                shape=[
-                    self.num_decoder_layers, batch_size, self.n_head,
-                    self.size_per_head // self.x, self.max_out_len, self.x
-                ],
-                dtype=enc_output.dtype)
-            self_cache_value = paddle.zeros(
-                shape=[
-                    self.num_decoder_layers, batch_size, self.n_head,
-                    self.max_out_len, self.size_per_head
-                ],
-                dtype=enc_output.dtype)
-        mem_cache = paddle.zeros(
-            shape=[
-                self.num_decoder_layers, 2, batch_size, src_max_len,
-                self.d_model
+            self_cache_key = paddle.zeros(shape=[
+                self.num_decoder_layers, batch_size, self.n_head,
+                self.size_per_head // self.x, self.max_out_len, self.x
             ],
-            dtype=enc_output.dtype)
+                                          dtype=enc_output.dtype)
+            self_cache_value = paddle.zeros(shape=[
+                self.num_decoder_layers, batch_size, self.n_head,
+                self.max_out_len, self.size_per_head
+            ],
+                                            dtype=enc_output.dtype)
+        mem_cache = paddle.zeros(shape=[
+            self.num_decoder_layers, 2, batch_size, src_max_len, self.d_model
+        ],
+                                 dtype=enc_output.dtype)
         for i in range(self.max_out_len):
-            trg_pos = paddle.full(
-                shape=trg_word.shape, fill_value=i, dtype="int64")
+            trg_pos = paddle.full(shape=trg_word.shape,
+                                  fill_value=i,
+                                  dtype="int64")
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb
@@ -548,8 +530,8 @@ class FasterDecoder(nn.Layer):
             if self.use_fp16_decoder:
                 dec_output = paddle.cast(dec_output, "float32")
 
-            dec_output = paddle.reshape(
-                dec_output, shape=[-1, dec_output.shape[-1]])
+            dec_output = paddle.reshape(dec_output,
+                                        shape=[-1, dec_output.shape[-1]])
 
             logits = self.linear(dec_output)
             step_log_probs = paddle.log(F.softmax(logits, axis=-1))

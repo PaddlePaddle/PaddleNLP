@@ -34,6 +34,7 @@ METRIC_CLASSES = {
 
 
 class TeacherModel(object):
+
     def __init__(self, teacher_dir):
         self.model = BertForSequenceClassification.from_pretrained(teacher_dir)
         self.model.eval()
@@ -55,14 +56,14 @@ def evaluate(task_name, model, metric, data_loader):
         metric.update(correct)
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
-        print(
-            "acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, " % (
-                res[0],
-                res[1],
-                res[2],
-                res[3],
-                res[4], ),
-            end='')
+        print("acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, " % (
+            res[0],
+            res[1],
+            res[2],
+            res[3],
+            res[4],
+        ),
+              end='')
     else:
         print("acc: %s, " % (res), end='')
     model.train()
@@ -86,11 +87,12 @@ def do_train(agrs):
                    args.embedding_name)
 
     if args.optimizer == 'adadelta':
-        optimizer = paddle.optimizer.Adadelta(
-            learning_rate=args.lr, rho=0.95, parameters=model.parameters())
+        optimizer = paddle.optimizer.Adadelta(learning_rate=args.lr,
+                                              rho=0.95,
+                                              parameters=model.parameters())
     else:
-        optimizer = paddle.optimizer.Adam(
-            learning_rate=args.lr, parameters=model.parameters())
+        optimizer = paddle.optimizer.Adam(learning_rate=args.lr,
+                                          parameters=model.parameters())
 
     ce_loss = nn.CrossEntropyLoss()
     mse_loss = nn.MSELoss()
@@ -139,8 +141,8 @@ def do_train(agrs):
             if global_step % args.log_freq == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.4f step/s"
-                    % (global_step, epoch, i, loss,
-                       args.log_freq / (time.time() - tic_train)))
+                    % (global_step, epoch, i, loss, args.log_freq /
+                       (time.time() - tic_train)))
                 tic_eval = time.time()
                 acc = evaluate(args.task_name, model, metric, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
@@ -151,9 +153,10 @@ def do_train(agrs):
                     model.state_dict(),
                     os.path.join(args.output_dir,
                                  "step_" + str(global_step) + ".pdparams"))
-                paddle.save(optimizer.state_dict(),
-                            os.path.join(args.output_dir,
-                                         "step_" + str(global_step) + ".pdopt"))
+                paddle.save(
+                    optimizer.state_dict(),
+                    os.path.join(args.output_dir,
+                                 "step_" + str(global_step) + ".pdopt"))
 
 
 if __name__ == '__main__':

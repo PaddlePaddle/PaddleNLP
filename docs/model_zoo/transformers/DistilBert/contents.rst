@@ -22,13 +22,21 @@ DistilBERT模型汇总
 |                                                                                  |              | The DistilBERT model distilled from                                              |
 |                                                                                  |              | the BERT model ``bert-base-cased``.                                              |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``renmada/distilbert-base-multilingual-cased``                                    | English      | 6-layer, 768-hidden, 12-heads,                                                   |
+|``distilbert-base-multilingual-cased``                                            | English      | 6-layer, 768-hidden, 12-heads,                                                   |
 |                                                                                  |              | 200M parameters. The DistilBERT model                                            |
 |                                                                                  |              | distilled from the BERT model                                                    |
 |                                                                                  |              | ``bert-base-multilingual-cased``.                                                |
+|                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `distilbert-base-multilingual-cased`_                                            |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``renmada/sshleifer-tiny-distilbert-base-uncase-finetuned-sst-2-english``         | English      | 2-layer, 2-hidden,                                                               |
+|``sshleifer/tiny-distilbert-base-uncased-finetuned-sst-2-english``                | English      | 2-layer, 2-hidden,                                                               |
 |                                                                                  |              | 2-heads, 50K parameters.                                                         |
 |                                                                                  |              | The DistilBERT model.                                                            |
 |                                                                                  |              |                                                                                  |
+|                                                                                  |              | Please refer to:                                                                 |
+|                                                                                  |              | `sshleifer/tiny-distilbert-base-uncased-finetuned-sst-2-english`_                |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+
+.. _distilbert-base-multilingual-cased: https://huggingface.co/distilbert-base-multilingual-cased
+.. _sshleifer/tiny-distilbert-base-uncased-finetuned-sst-2-english: https://huggingface.co/sshleifer/tiny-distilbert-base-uncased-finetuned-sst-2-english

@@ -4,7 +4,7 @@
 * [背景介绍](#背景介绍)
 * [ERNIE-Gram](#ERNIE-Gram)
     * [1. 技术方案和评估指标](#技术方案)
-    * [2. 环境依赖](#环境依赖)  
+    * [2. 环境依赖](#环境依赖)
     * [3. 代码结构](#代码结构)
     * [4. 数据准备](#数据准备)
     * [5. 模型训练](#模型训练)
@@ -63,15 +63,24 @@
 ```
 ernie_matching/
 ├── deply # 部署
+    ├── cpp
+        ├── rpc_client.py # RPC 客户端的bash脚本
+        ├── http_client.py # http 客户端的bash文件
+        └── start_server.sh # 启动C++服务的脚本
     └── python
         ├── deploy.sh # 预测部署bash脚本
+        ├── config_nlp.yml # Pipeline 的配置文件
+        ├── web_service.py # Pipeline 服务端的脚本
+        ├── rpc_client.py # Pipeline RPC客户端的脚本
         └── predict.py # python 预测部署示例
 |—— scripts
     ├── export_model.sh # 动态图参数导出静态图参数的bash文件
+    ├── export_to_serving.sh # 导出 Paddle Serving 模型格式的bash文件
     ├── train_pairwise.sh # Pair-wise 单塔匹配模型训练的bash文件
     ├── evaluate.sh # 评估验证文件bash脚本
     ├── predict_pairwise.sh # Pair-wise 单塔匹配模型预测脚本的bash文件
 ├── export_model.py # 动态图参数导出静态图参数脚本
+├── export_to_serving.py # 导出 Paddle Serving 模型格式的脚本
 ├── model.py #  Pair-wise 匹配模型组网
 ├── data.py #  Pair-wise 训练样本的转换逻辑 、Pair-wise 生成随机负例的逻辑
 ├── train_pairwise.py # Pair-wise 单塔匹配模型训练脚本
@@ -143,7 +152,7 @@ ernie_matching/
 训练的命令如下：
 
 ```
-python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
+python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_pairwise.py \
         --device gpu \
         --save_dir ./checkpoints \
         --batch_size 32 \
@@ -241,7 +250,9 @@ sh scripts/predict_pairwise.sh
 首先把动态图模型转换为静态图：
 
 ```
-python export_model.py --params_path checkpoints/model_30000/model_state.pdparams --output_path=./output
+python export_model.py --params_path checkpoints/model_30000/model_state.pdparams \
+                       --output_path=./output \
+                       --model_name_or_path ernie-3.0-medium-zh
 ```
 也可以运行下面的bash脚本：
 
@@ -251,21 +262,17 @@ sh scripts/export_model.sh
 
 ### Paddle Inference
 
-修改预测文件路径：
+使用PaddleInference：
 
 ```
-input_file='../../sort/test_pairwise.csv'
-```
-
-然后使用PaddleInference
-
-```
-python predict.py --model_dir=../../output
+python deploy/python/predict.py --model_dir ./output \
+                                --input_file sort/test_pairwise.csv \
+                                --model_name_or_path ernie-3.0-medium-zh
 ```
 也可以运行下面的bash脚本：
 
 ```
-sh deploy.sh
+sh deploy/python/deploy.sh
 ```
 得到下面的输出，输出的是样本的query，title以及对应的概率：
 
@@ -276,6 +283,126 @@ Data: {'query': '中西方语言与文化的差异', 'title': '从中西方民�
 Data: {'query': '中西方语言与文化的差异', 'title': '中英文化差异对翻译的影响中英文化,差异,翻译的影响'}   prob: [0.8601747]
 Data: {'query': '中西方语言与文化的差异', 'title': '浅谈文化与语言习得文化,语言,文化与语言的关系,文化与语言习得意识,跨文化交际'}     prob: [0.8944413]
 ```
+
+### Paddle Serving部署
+
+Paddle Serving 的详细文档请参考 [Pipeline_Design](https://github.com/PaddlePaddle/Serving/blob/v0.7.0/doc/Python_Pipeline/Pipeline_Design_CN.md)和[Serving_Design](https://github.com/PaddlePaddle/Serving/blob/v0.7.0/doc/Serving_Design_CN.md),首先把静态图模型转换成Serving的格式：
+
+```
+python export_to_serving.py \
+    --dirname "output" \
+    --model_filename "inference.predict.pdmodel" \
+    --params_filename "inference.predict.pdiparams" \
+    --server_path "serving_server" \
+    --client_path "serving_client" \
+    --fetch_alias_names "predict"
+
+```
+
+参数含义说明
+* `dirname`: 需要转换的模型文件存储路径，Program 结构文件和参数文件均保存在此目录。
+* `model_filename`： 存储需要转换的模型 Inference Program 结构的文件名称。如果设置为 None ，则使用 `__model__` 作为默认的文件名
+* `params_filename`: 存储需要转换的模型所有参数的文件名称。当且仅当所有模型参数被保>存在一个单独的二进制文件中，它才需要被指定。如果模型参数是存储在各自分离的文件中，设置它的值为 None
+* `server_path`: 转换后的模型文件和配置文件的存储路径。默认值为 serving_server
+* `client_path`: 转换后的客户端配置文件存储路径。默认值为 serving_client
+* `fetch_alias_names`: 模型输出的别名设置，比如输入的 input_ids 等，都可以指定成其他名字，默认不指定
+* `feed_alias_names`: 模型输入的别名设置，比如输出 pooled_out 等，都可以重新指定成其他模型，默认不指定
+
+也可以运行下面的 bash 脚本：
+```
+sh scripts/export_to_serving.sh
+```
+Paddle Serving的部署有两种方式，第一种方式是Pipeline的方式，第二种是C++的方式，下面分别介绍这两种方式的用法：
+
+#### Pipeline方式
+
+修改`Tokenizer`
+
+```
+self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+```
+
+启动 Pipeline Server:
+
+```
+python web_service.py
+```
+
+启动客户端调用 Server。
+
+首先修改rpc_client.py中需要预测的样本：
+
+```
+list_data = [{"query":"中西方语言与文化的差异","title":"第二语言习得的一大障碍就是文化差异。"}]`
+```
+然后运行：
+```
+python rpc_client.py
+```
+模型的输出为：
+
+```
+PipelineClient::predict pack_data time:1656912047.5986433
+PipelineClient::predict before time:1656912047.599081
+time to cost :0.012039899826049805 seconds
+(1, 1)
+[[0.85112208]]
+```
+可以看到客户端发送了1条文本，这条文本的相似的概率值。
+
+#### C++的方式
+
+启动C++的Serving：
+
+```
+python -m paddle_serving_server.serve --model serving_server --port 8600 --gpu_id 0 --thread 5 --ir_optim True
+```
+也可以使用脚本：
+
+```
+sh deploy/cpp/start_server.sh
+```
+Client 可以使用 http 或者 rpc 两种方式，rpc 的方式为：
+
+```
+python deploy/cpp/rpc_client.py
+```
+运行的输出为：
+
+```
+I0704 05:19:00.443437  1987 general_model.cpp:490] [client]logid=0,client_cost=8.477ms,server_cost=6.458ms.
+time to cost :0.008707761764526367 seconds
+{'predict': array([[0.8511221]], dtype=float32)}
+```
+可以看到服务端返回了相似度结果
+
+或者使用 http 的客户端访问模式：
+
+```
+python deploy/cpp/http_client.py
+```
+运行的输出为：
+```
+time to cost :0.006819009780883789 seconds
+[0.8511220812797546]
+```
+可以看到服务端返回了相似度结果
+
+也可以使用curl方式发送Http请求：
+
+```
+curl -XPOST http://0.0.0.0:8600/GeneralModelService/inference -d  ' {"tensor":[{"int64_data":[    1,    12,   213,    58,   405,   545,    54,    68,    73,
+            5,   859,   712,     2,   131,   177,   405,   545,   489,
+          116,     5,     7,    19,   843,  1767,   113,    10,    68,
+           73,   859,   712, 12043,     2],"elem_type":0,"name":"input_ids","alias_name":"input_ids","shape":[1,32]},
+    {"int64_data":[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1],"elem_type":0,"name":"token_type_ids","alias_name":"token_type_ids","shape":[1,32]}
+        ],
+"fetch_var_names":["sigmoid_2.tmp_0"],
+"log_id":0
+}'
+```
+
 
 ## Reference
 

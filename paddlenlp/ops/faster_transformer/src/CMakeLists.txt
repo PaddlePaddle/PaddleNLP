@@ -52,12 +52,20 @@ if(ON_INFER)
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/include")
+  if (WITH_ONNXRUNTIME)
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/include")
+    include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}paddle2onnx/include")
+  endif()
 
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/lib")
   link_directories("${PADDLE_LIB}/paddle/lib")
+  if (WITH_ONNXRUNTIME)
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib")
+    link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}paddle2onnx/lib")
+  endif()
 
   if (WIN32)
     add_definitions("/DGOOGLE_GLOG_DLL_DECL=")
@@ -137,6 +145,10 @@ if(ON_INFER)
     endif()
   endif()
 
+  if (WITH_ONNXRUNTIME)
+    set(DEPS ${DEPS} ${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib/libonnxruntime.so paddle2onnx)
+  endif()
+
   if (NOT WIN32)
     set(EXTERNAL_LIB "-lrt -ldl -lpthread")
     set(DEPS ${DEPS}
@@ -207,6 +219,16 @@ else(ON_INFER)
     set(PYTHON_PATH "python" CACHE STRING "Python path")
   else()
     set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
+  endif()
+
+  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.__version__)"
+                RESULT_VARIABLE _INC_PYTHON_SUCCESS
+                OUTPUT_VARIABLE _INC_PYTHON_VALUES)
+  message(STATUS "PADDLE_VERSION: ${_INC_PYTHON_VALUES}")
+
+  # TODO(gongenlei): support PADDLE_NEW_ALLOCATOR for ON_INFER
+  if(_INC_PYTHON_VALUES VERSION_GREATER_EQUAL "2.3.0")
+      add_definitions(-DPADDLE_NEW_ALLOCATOR)
   endif()
 
   execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"

@@ -1,0 +1,458 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2021, PaddleNLP
+# This file is distributed under the same license as the PaddleNLP package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PaddleNLP \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-05-19 14:17+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../model_zoo/transformers/T5/contents.rst:5
+msgid "T5模型汇总"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:9
+msgid "下表汇总介绍了目前PaddleNLP支持的T5模型对应预训练权重。 关于模型的具体细节可以参考对应链接。"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:13
+msgid "Pretrained Weight"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:13
+msgid "Language"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:13
+msgid "Details of the model"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:15
+msgid "``t5-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:15
+#: ../model_zoo/transformers/T5/contents.rst:19
+#: ../model_zoo/transformers/T5/contents.rst:23
+#: ../model_zoo/transformers/T5/contents.rst:27
+#: ../model_zoo/transformers/T5/contents.rst:30
+#: ../model_zoo/transformers/T5/contents.rst:36
+#: ../model_zoo/transformers/T5/contents.rst:39
+#: ../model_zoo/transformers/T5/contents.rst:42
+#: ../model_zoo/transformers/T5/contents.rst:45
+#: ../model_zoo/transformers/T5/contents.rst:48
+#: ../model_zoo/transformers/T5/contents.rst:51
+#: ../model_zoo/transformers/T5/contents.rst:54
+#: ../model_zoo/transformers/T5/contents.rst:57
+#: ../model_zoo/transformers/T5/contents.rst:60
+#: ../model_zoo/transformers/T5/contents.rst:63
+#: ../model_zoo/transformers/T5/contents.rst:66
+#: ../model_zoo/transformers/T5/contents.rst:72
+#: ../model_zoo/transformers/T5/contents.rst:75
+#: ../model_zoo/transformers/T5/contents.rst:78
+#: ../model_zoo/transformers/T5/contents.rst:81
+#: ../model_zoo/transformers/T5/contents.rst:84
+#: ../model_zoo/transformers/T5/contents.rst:87
+#: ../model_zoo/transformers/T5/contents.rst:90
+#: ../model_zoo/transformers/T5/contents.rst:93
+#: ../model_zoo/transformers/T5/contents.rst:96
+#: ../model_zoo/transformers/T5/contents.rst:99
+#: ../model_zoo/transformers/T5/contents.rst:102
+#: ../model_zoo/transformers/T5/contents.rst:105
+#: ../model_zoo/transformers/T5/contents.rst:111
+#: ../model_zoo/transformers/T5/contents.rst:114
+#: ../model_zoo/transformers/T5/contents.rst:117
+#: ../model_zoo/transformers/T5/contents.rst:120
+#: ../model_zoo/transformers/T5/contents.rst:123
+#: ../model_zoo/transformers/T5/contents.rst:126
+#: ../model_zoo/transformers/T5/contents.rst:129
+#: ../model_zoo/transformers/T5/contents.rst:132
+#: ../model_zoo/transformers/T5/contents.rst:135
+#: ../model_zoo/transformers/T5/contents.rst:138
+#: ../model_zoo/transformers/T5/contents.rst:144
+#: ../model_zoo/transformers/T5/contents.rst:147
+#: ../model_zoo/transformers/T5/contents.rst:150
+msgid "English"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:15
+msgid "6-layer, 512-hidden, 8-heads, 93M parameters. T5 small model."
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:19
+msgid "``t5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:19
+msgid "12-layer, 768-hidden, 12-heads, 272M parameters. T5 base model."
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:23
+msgid "``t5-large``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:23
+msgid "24-layer, 1024-hidden, 16-heads, 803M parameters. T5 large model."
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:27
+msgid "``t5-v1_1-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:27
+msgid "Please refer to: t5-v1_1-base_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:30
+msgid "``t5-v1_1-large``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:30
+msgid "Please refer to: t5-v1_1-large_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:33
+msgid "``Langboat/mengzi-t5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:33
+msgid "Chinese"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:33
+msgid "Please refer to: `Langboat/mengzi-t5-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:36
+msgid "``deep-learning-analytics/wikihow-t5-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:36
+msgid "Please refer to: `deep-learning-analytics/wikihow-t5-small`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:39
+msgid "``sberbank-ai/ruT5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:39
+msgid "Please refer to: `sberbank-ai/ruT5-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:42
+msgid "``Michau/t5-base-en-generate-headline``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:42
+msgid "Please refer to: `Michau/t5-base-en-generate-headline`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:45
+msgid "``google/t5-v1_1-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:45
+msgid "Please refer to: `google/t5-v1_1-small`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:48
+msgid "``prithivida/parrot_paraphraser_on_T5``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:48
+msgid "Please refer to: `prithivida/parrot_paraphraser_on_T5`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:51
+msgid "``prithivida/grammar_error_correcter_v1``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:51
+msgid "Please refer to: `prithivida/grammar_error_correcter_v1`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:54
+msgid "``valhalla/t5-small-qg-hl``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:54
+msgid "Please refer to: `valhalla/t5-small-qg-hl`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:57
+msgid "``valhalla/t5-small-qa-qg-hl``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:57
+msgid "Please refer to: `valhalla/t5-small-qa-qg-hl`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:60
+msgid "``ramsrigouthamg/t5-large-paraphraser-diverse-high-quality``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:60
+msgid ""
+"Please refer to: `ramsrigouthamg/t5-large-paraphraser-diverse-high-"
+"quality`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:63
+msgid "``mrm8488/t5-base-finetuned-common_gen``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:63
+msgid "Please refer to: `mrm8488/t5-base-finetuned-common_gen`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:66
+msgid "``valhalla/t5-small-e2e-qg``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:66
+msgid "Please refer to: `valhalla/t5-small-e2e-qg`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:69
+msgid "``sonoisa/t5-base-japanese``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:69
+msgid "japanese"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:69
+msgid "Please refer to: `sonoisa/t5-base-japanese`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:72
+msgid "``google/t5-base-lm-adapt``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:72
+msgid "Please refer to: `google/t5-base-lm-adapt`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:75
+msgid "``google/t5-small-lm-adapt``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:75
+msgid "Please refer to: `google/t5-small-lm-adapt`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:78
+msgid "``valhalla/t5-small-qg-prepend``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:78
+msgid "Please refer to: `valhalla/t5-small-qg-prepend`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:81
+msgid "``prithivida/informal_to_formal_styletransfer``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:81
+msgid "Please refer to: `prithivida/informal_to_formal_styletransfer`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:84
+msgid "``KETI-AIR/ke-t5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:84
+msgid "Please refer to: `KETI-AIR/ke-t5-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:87
+msgid "``nielsr/nt5-small-rc1``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:87
+msgid "Please refer to: `nielsr/nt5-small-rc1`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:90
+msgid "``snrspeaks/t5-one-line-summary``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:90
+msgid "Please refer to: `snrspeaks/t5-one-line-summary`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:93
+msgid "``mrm8488/t5-small-finetuned-quora-for-paraphrasing``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:93
+msgid "Please refer to: `mrm8488/t5-small-finetuned-quora-for-paraphrasing`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:96
+msgid "``p-christ/12412fsasf``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:96
+msgid "Please refer to: `p-christ/12412fsasf`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:99
+msgid "``tscholak/3vnuv1vf``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:99
+msgid "Please refer to: `tscholak/3vnuv1vf`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:102
+msgid "``tennessejoyce/titlewave-t5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:102
+msgid "Please refer to: `tennessejoyce/titlewave-t5-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:105
+msgid "``vennify/t5-base-grammar-correction``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:105
+msgid "Please refer to: `vennify/t5-base-grammar-correction`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:108
+msgid "``megagonlabs/t5-base-japanese-web``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:108
+#: ../model_zoo/transformers/T5/contents.rst:141
+msgid "Japanese"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:108
+msgid "Please refer to: `megagonlabs/t5-base-japanese-web`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:111
+msgid "``sberbank-ai/ruT5-large``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:111
+msgid "Please refer to: `sberbank-ai/ruT5-large`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:114
+msgid "``tscholak/t5.1.1.lm100k.base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:114
+msgid "Please refer to: `tscholak/t5.1.1.lm100k.base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:117
+msgid "``deep-learning-analytics/GrammarCorrector``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:117
+msgid "Please refer to: `deep-learning-analytics/GrammarCorrector`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:120
+msgid "``ThomasNLG/t5-qa_squad2neg-en``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:120
+msgid "Please refer to: `ThomasNLG/t5-qa_squad2neg-en`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:123
+msgid "``flexudy/t5-small-wav2vec2-grammar-fixer``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:123
+msgid "Please refer to: `flexudy/t5-small-wav2vec2-grammar-fixer`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:126
+msgid "``KETI-AIR/ke-t5-small``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:126
+msgid "Please refer to: `KETI-AIR/ke-t5-small`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:129
+msgid "``razent/SciFive-large-Pubmed_PMC``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:129
+msgid "Please refer to: `razent/SciFive-large-Pubmed_PMC`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:132
+msgid "``google/t5-large-ssm-nq``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:132
+msgid "Please refer to: `google/t5-large-ssm-nq`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:135
+msgid "``ozcangundes/T5-base-for-BioQA``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:135
+msgid "Please refer to: `ozcangundes/T5-base-for-BioQA`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:138
+msgid "``Rostlab/prot_t5_base_mt_uniref50``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:138
+msgid "Please refer to: `Rostlab/prot_t5_base_mt_uniref50`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:141
+msgid "``sonoisa/t5-base-japanese-question-generation``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:141
+msgid "Please refer to: `sonoisa/t5-base-japanese-question-generation`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:144
+msgid "``Wikidepia/IndoT5-base``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:144
+msgid "Please refer to: `Wikidepia/IndoT5-base`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:147
+msgid "``razent/SciFive-base-Pubmed_PMC``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:147
+msgid "Please refer to: `razent/SciFive-base-Pubmed_PMC`_"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:150
+msgid "``google/t5-small-ssm-nq``"
+msgstr ""
+
+#: ../model_zoo/transformers/T5/contents.rst:150
+msgid "Please refer to: `google/t5-small-ssm-nq`_"
+msgstr ""
+

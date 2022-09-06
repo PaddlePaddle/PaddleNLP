@@ -23,12 +23,20 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = [
-    "AutoModel", "AutoModelForPretraining",
-    "AutoModelForSequenceClassification", "AutoModelForTokenClassification",
-    "AutoModelForQuestionAnswering", "AutoModelForMultipleChoice",
-    "AutoModelForMaskedLM", "AutoModelForCausalLM", "AutoEncoder",
-    "AutoDecoder", "AutoGenerator", "AutoDiscriminator",
-    "AutoModelForConditionalGeneration"
+    "AutoModel",
+    "AutoModelForPretraining",
+    "AutoModelForSequenceClassification",
+    "AutoModelForTokenClassification",
+    "AutoModelForQuestionAnswering",
+    "AutoModelForMultipleChoice",
+    "AutoModelForMaskedLM",
+    "AutoModelForCausalLM",
+    "AutoEncoder",
+    "AutoDecoder",
+    "AutoGenerator",
+    "AutoDiscriminator",
+    "AutoModelForConditionalGeneration",
+    "AutoModelForImageGeneration",
 ]
 
 MAPPING_NAMES = OrderedDict([
@@ -41,6 +49,7 @@ MAPPING_NAMES = OrderedDict([
     ("ConvBert", "convbert"),
     ("CTRL", "ctrl"),
     ("DistilBert", "distilbert"),
+    ("DalleBart", "dallebart"),
     ("Electra", "electra"),
     ("ErnieCtm", "ernie_ctm"),
     ("ErnieDoc", "ernie_doc"),
@@ -62,19 +71,27 @@ MAPPING_NAMES = OrderedDict([
     ("PPMiniLM", "ppminilm"),
     ("ProphetNet", "prophetnet"),
     ("Reformer", "reformer"),
+    ("RemBert", "rembert"),
     ("Roberta", "roberta"),
-    ("RoFormer", "roformer"),
     ("RoFormerv2", "roformerv2"),
+    ("RoFormer", "roformer"),
     ("Skep", "skep"),
     ("SqueezeBert", "squeezebert"),
     ("TinyBert", "tinybert"),
     ("UnifiedTransformer", "unified_transformer"),
     ("UNIMO", "unimo"),
     ("XLNet", "xlnet"),
+    ("XLM", "xlm"),
     ("GPT", "gpt"),
     ("T5", 't5'),
     ("Bert", "bert"),
     ("Bart", "bart"),
+    ("GAUAlpha", "gau_alpha"),
+    ("CodeGen", "codegen"),
+    ("CLIP", "clip"),
+    ("Artist", "artist"),
+    ("OPT", 'opt'),
+    ("ErnieViL", 'ernie_vil'),
 ])
 
 MAPPING_TASKS = OrderedDict([
@@ -91,6 +108,7 @@ MAPPING_TASKS = OrderedDict([
     ("Generator", "AutoGenerator"),
     ("Discriminator", "AutoDiscriminator"),
     ("ForConditionalGeneration", "AutoModelForConditionalGeneration"),
+    ("ForImageGeneration", "AutoModelForImageGeneration"),
 ])
 
 
@@ -98,7 +116,7 @@ def get_name_mapping(task='Model'):
     """
     Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
     'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
-    'Generator', 'Discriminator', 'ForConditionalGeneration'.
+    'Generator', 'Discriminator', 'ForConditionalGeneration', 'ForImageGeneration'.
     """
     NAME_MAPPING = OrderedDict()
     for key, value in MAPPING_NAMES.items():
@@ -189,9 +207,9 @@ class _BaseAutoModelClass:
                             raise AttributeError(
                                 f"module '{import_class.__name__}' only supports the following classes: "
                                 + ", ".join(m for m in all_model_classes) + "\n"
-                                "Hint: you can use interface " + "or ".join(
-                                    task + ".from_pretrained"
-                                    for task in all_tasks) +
+                                "Hint: you can use interface " +
+                                " or ".join(task + ".from_pretrained"
+                                            for task in all_tasks) +
                                 f" to load '{pretrained_model_name_or_path}'\n")
                         logger.info(
                             "We are using %s to load '%s'." %
@@ -208,6 +226,8 @@ class _BaseAutoModelClass:
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
+                init_class = init_class[:-5] if init_class.endswith(
+                    "Model") else init_class
                 if init_class:
                     for model_flag, name in MAPPING_NAMES.items():
                         if model_flag in init_class:
@@ -236,8 +256,9 @@ class _BaseAutoModelClass:
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes) + "\n"
-                        "Hint: you can use interface " + "or ".join(
-                            task + ".from_pretrained" for task in all_tasks) +
+                        "Hint: you can use interface " +
+                        " or ".join(task + ".from_pretrained"
+                                    for task in all_tasks) +
                         f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -298,8 +319,9 @@ class _BaseAutoModelClass:
                     raise AttributeError(
                         f"module '{import_class.__name__}' only supports the following classes: "
                         + ", ".join(m for m in all_model_classes) + "\n"
-                        "Hint: you can use interface " + "or ".join(
-                            task + ".from_pretrained" for task in all_tasks) +
+                        "Hint: you can use interface " +
+                        " or ".join(task + ".from_pretrained"
+                                    for task in all_tasks) +
                         f" to load '{pretrained_model_name_or_path}'\n")
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
@@ -940,6 +962,50 @@ class AutoModelForConditionalGeneration(_BaseAutoModelClass):
                 model = AutoModelForConditionalGeneration.from_pretrained('./my_bart/')
                 print(type(model))
                 # <class 'paddlenlp.transformers.bart.modeling.BartForConditionalGeneration'>
+        """
+        return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
+                                    **kwargs)
+
+
+class AutoModelForImageGeneration(_BaseAutoModelClass):
+    """
+    AutoModelForImageGeneration.
+    """
+    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
+    _name_mapping = get_name_mapping('ForImageGeneration')
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
+                        **kwargs):
+        """
+        Creates an instance of `AutoModelForImageGeneration`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): See :class:`AutoModel`.
+            *args (tuple): See :class:`AutoModel`.
+            **kwargs (dict): See :class:`AutoModel`.
+
+        Returns:
+            PretrainedModel: An instance of `AutoModelForImageGeneration`.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import AutoModelForImageGeneration
+
+                # Name of built-in pretrained model
+                model = AutoModelForImageGeneration.from_pretrained('dalle-mini')
+                print(type(model))
+                # <class 'paddlenlp.transformers.dallebart.modeling.DalleBartForImageGeneration'>
+
+
+                # Load from local directory path
+                model = AutoModelForImageGeneration.from_pretrained('./my_dalle_mini/')
+                print(type(model))
+                # <class 'paddlenlp.transformers.dallebart.modeling.DalleBartForImageGeneration'>
         """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args,
                                     **kwargs)

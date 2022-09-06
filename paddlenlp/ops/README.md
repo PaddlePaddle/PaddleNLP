@@ -45,7 +45,7 @@
 * `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../model_zoo/gpt/faster_gpt/)。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/) 以及 PLATO-XL 的使用示例可以参考 [PLATO-XL 11B 使用示例](../../examples/dialogue/plato-xl/)。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。
-  * 使用示例可以参考 [UNIMOText 预测加速使用示例](../../examples/faster/faster_generation/samples/unimo_text_sample.py)。
+  * 使用示例可以参考 [UNIMOText 预测加速使用示例](../../faster_generation/samples/unimo_text_sample.py)。
   * 同样，我们提供了动转静以及 Paddle Inference 使用的示例，详细可以参考 [动转静导出](./faster_transformer/sample/unimo_text_export_model_sample.py) 和 [Paddle Inference 使用示例](./faster_transformer/sample/unimo_text_inference.py)。
 * `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例-sample](./faster_transformer/sample/bart_decoding_sample.py)，[BART 预测加速使用示例-文本摘要](../../examples/text_summarization/bart)。
 
@@ -238,7 +238,7 @@ cd PaddleNLP/paddlenlp/ops/
 ``` sh
 mkdir build
 cd build/
-cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=/path/to/paddle_inference_lib/ -DDEMO=./demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=OFF
 make -j
 cd ../
 ```
@@ -263,7 +263,8 @@ cd ../
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
-* `-DWITH_MKL`: 若当前是使用的 mkl 的 Paddle lib，那么需要打开 MKL 以引入 MKL 相关的依赖。
+* `-DWITH_MKL`: 若当前是使用的带有 MKL 的 Paddle lib，那么需要在编译时打开 MKL 以引入 MKL 相关的依赖。
+* `-DWITH_ONNXRUNTIME`: 若当前使用的是带有 ONNX 支持的 Paddle lib，那么需要在编译时打开 ONNX Runtime 以引入相关依赖。
 * `-DON_INFER`: 是否编译 paddle inference 预测库。
 * **当使用预测库的自定义 op 的时候，请务必开启 `-DON_INFER=ON` 选项，否则，不会得到预测库的可执行文件。**
 

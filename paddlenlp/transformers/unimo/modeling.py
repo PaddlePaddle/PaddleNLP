@@ -77,6 +77,25 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
+        "unimo-text-1.0-summary": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
         "unimo-text-1.0-large": {
             "vocab_size": 12800,
             "hidden_size": 1024,
@@ -106,6 +125,8 @@ class UNIMOPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-lcsts-new.pdparams",
             "unimo-text-1.0-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large.pdparams",
+            "unimo-text-1.0-summary":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-summary.pdparams",
         }
     }
     base_model_prefix = "unimo"
@@ -117,12 +138,11 @@ class UNIMOPretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.unimo.config["initializer_range"],
-                        shape=layer.weight.shape))
+                    paddle.tensor.normal(mean=0.0,
+                                         std=self.initializer_range if hasattr(
+                                             self, "initializer_range") else
+                                         self.unimo.config["initializer_range"],
+                                         shape=layer.weight.shape))
 
 
 class UNIMOEmbeddings(nn.Layer):
@@ -226,24 +246,25 @@ class UNIMOModel(UNIMOPretrainedModel):
     """
 
     def __init__(
-            self,
-            vocab_size,
-            hidden_size=768,
-            num_hidden_layers=12,
-            num_attention_heads=12,
-            intermediate_size=3072,
-            hidden_act='relu',
-            hidden_dropout_prob=0.1,
-            attention_probs_dropout_prob=0.1,
-            normalize_before=False,
-            max_position_embeddings=513,
-            type_vocab_size=4,
-            initializer_range=0.02,
-            unk_token_id=17963,
-            pad_token_id=0,
-            bos_token_id=1,
-            eos_token_id=3,
-            mask_token_id=3, ):
+        self,
+        vocab_size,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act='relu',
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        normalize_before=False,
+        max_position_embeddings=513,
+        type_vocab_size=4,
+        initializer_range=0.02,
+        unk_token_id=17963,
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=3,
+        mask_token_id=3,
+    ):
         super(UNIMOModel, self).__init__()
         self.unk_token_id = unk_token_id
         self.pad_token_id = pad_token_id
@@ -252,9 +273,10 @@ class UNIMOModel(UNIMOPretrainedModel):
         self.mask_token_id = mask_token_id
         self.initializer_range = initializer_range
 
-        self.embeddings = UNIMOEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size)
+        self.embeddings = UNIMOEmbeddings(vocab_size, hidden_size,
+                                          hidden_dropout_prob,
+                                          max_position_embeddings,
+                                          type_vocab_size)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -269,7 +291,8 @@ class UNIMOModel(UNIMOPretrainedModel):
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.encoder = nn.TransformerEncoder(
             encoder_layer,
-            num_hidden_layers, )
+            num_hidden_layers,
+        )
 
         self.apply(self.init_weights)
 
@@ -362,6 +385,7 @@ class UNIMOModel(UNIMOPretrainedModel):
 
 
 class UNIMOLMHead(nn.Layer):
+
     def __init__(self,
                  hidden_size,
                  vocab_size,
@@ -387,9 +411,9 @@ class UNIMOLMHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        logits = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
+        logits = paddle.tensor.matmul(hidden_states,
+                                      self.decoder_weight,
+                                      transpose_y=True) + self.decoder_bias
         return logits
 
 

@@ -82,8 +82,9 @@ class Schema:
         id = 1
         for key, vals in schema.items():
             for val in vals:
-                idMap[key.lower() + "." + val.lower()] = "__" + key.lower(
-                ) + "." + val.lower() + "__"
+                idMap[
+                    key.lower() + "." +
+                    val.lower()] = "__" + key.lower() + "." + val.lower() + "__"
                 id += 1
 
         for key in schema:
@@ -292,7 +293,10 @@ def parse_table_unit(toks, start_idx, tables_with_alias, schema):
     return idx, schema.idMap[key], key
 
 
-def parse_value(toks, start_idx, tables_with_alias, schema,
+def parse_value(toks,
+                start_idx,
+                tables_with_alias,
+                schema,
                 default_tables=None):
     idx = start_idx
     len_ = len(toks)
@@ -366,8 +370,8 @@ def parse_condition(toks,
 
         conds.append((not_op, op_id, val_unit, val1, val2))
 
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                           (")", ";") or toks[idx] in JOIN_KEYWORDS):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx]
+                           in (")", ";") or toks[idx] in JOIN_KEYWORDS):
             break
 
         if idx < len_ and toks[idx] in COND_OPS:
@@ -446,8 +450,8 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
         if isBlock:
             assert toks[idx] == ')'
             idx += 1
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or
-                           toks[idx] in (")", ";")):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS
+                           or toks[idx] in (")", ";")):
             break
 
     return idx, table_units, conds, default_tables
@@ -478,8 +482,8 @@ def parse_group_by(toks, start_idx, tables_with_alias, schema, default_tables):
     assert toks[idx] == 'by'
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                              (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
+                              or toks[idx] in (")", ";")):
         idx, col_unit = parse_col_unit(toks, idx, tables_with_alias, schema,
                                        default_tables)
         col_units.append(col_unit)
@@ -504,8 +508,8 @@ def parse_order_by(toks, start_idx, tables_with_alias, schema, default_tables):
     assert toks[idx] == 'by'
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                              (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
+                              or toks[idx] in (")", ";")):
         idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema,
                                        default_tables)
         val_units.append(val_unit)

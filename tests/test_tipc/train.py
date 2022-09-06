@@ -47,8 +47,8 @@ def do_train(args):
     # Define data loader
     train_loader, eval_loader = benchmark_model.create_data_loader(args)
 
-    if args.max_steps is None or (args.max_steps is not None and
-                                  args.max_steps < 0):
+    if args.max_steps is None or (args.max_steps is not None
+                                  and args.max_steps < 0):
         args.max_steps = len(train_loader) * args.epoch
 
     # Define model
@@ -64,10 +64,11 @@ def do_train(args):
 
     # for amp training
     if args.use_amp:
-        scaler = paddle.amp.GradScaler(
-            enable=True, init_loss_scaling=args.scale_loss)
-        model = paddle.amp.decorate(
-            models=model, level=args.amp_level, save_dtype='float32')
+        scaler = paddle.amp.GradScaler(enable=True,
+                                       init_loss_scaling=args.scale_loss)
+        model = paddle.amp.decorate(models=model,
+                                    level=args.amp_level,
+                                    save_dtype='float32')
 
     # for distributed training
     if trainer_count > 1:
@@ -92,8 +93,8 @@ def do_train(args):
             if args.use_amp:
                 with paddle.amp.auto_cast(
                         custom_black_list=args.custom_black_list
-                        if amp_level == 'O2' else {},
-                        level=amp_level):
+                        if args.amp_level == 'O2' else {},
+                        level=args.amp_level):
                     loss, sample_per_cards = benchmark_model.forward(
                         model, args, input_data)
 
@@ -107,24 +108,38 @@ def do_train(args):
                 else:
                     optimizer.clear_grad()
             else:
-                loss, sample_per_cards = benchmark_model.forward(model, args,
-                                                                 input_data)
+                loss, sample_per_cards = benchmark_model.forward(
+                    model, args, input_data)
 
                 loss.backward()
 
                 optimizer.step()
                 optimizer.clear_grad()
 
-            train_batch_cost = time.time() - batch_start
-            reader_cost_avg.record(train_reader_cost)
-            batch_cost_avg.record(train_batch_cost)
-            batch_ips_avg.record(train_batch_cost, sample_per_cards)
-
             if args.profiler_options is not None:
                 profiler.add_profiler_step(args.profiler_options)
 
+            if args.max_steps and step_id == args.max_steps:
+                if args.save_model and rank == 0:
+                    model_dir = args.save_model
+                    if not os.path.exists(model_dir):
+                        os.makedirs(model_dir)
+                    paddle.save(model.state_dict(),
+                                os.path.join(model_dir, "model.pdparams"))
+                    paddle.save(optimizer.state_dict(),
+                                os.path.join(model_dir, "model.pdopt"))
+                return
+
+            if args.lr_scheduler is not None and not args.scheduler_update_by_epoch:
+                lr.step()
+
             if step_id % args.logging_steps == 0:
                 total_avg_loss = loss.numpy()
+
+                train_batch_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
+                batch_cost_avg.record(train_batch_cost)
+                batch_ips_avg.record(train_batch_cost, sample_per_cards)
 
                 benchmark_model.logger(
                     args,
@@ -140,22 +155,16 @@ def do_train(args):
                 reader_cost_avg.reset()
                 batch_cost_avg.reset()
                 batch_ips_avg.reset()
+            else:
+                train_batch_cost = time.time() - batch_start
+                reader_cost_avg.record(train_reader_cost)
+                batch_cost_avg.record(train_batch_cost)
+                batch_ips_avg.record(train_batch_cost, sample_per_cards)
 
-            if args.max_steps and step_id == args.max_steps:
-                if args.save_model and rank == 0:
-                    model_dir = args.save_model
-                    if not os.path.exists(model_dir):
-                        os.makedirs(model_dir)
-                    paddle.save(model.state_dict(),
-                                os.path.join(model_dir, "model.pdparams"))
-                    paddle.save(optimizer.state_dict(),
-                                os.path.join(model_dir, "model.pdopt"))
-                return
+            batch_start = time.time()
+
             batch_id += 1
             step_id += 1
-            if args.lr_scheduler is not None and not args.scheduler_update_by_epoch:
-                lr.step()
-            batch_start = time.time()
 
         if args.lr_scheduler is not None and args.scheduler_update_by_epoch:
             lr.step()
@@ -188,12 +197,11 @@ def do_hapi(args):
 
     optimizer = benchmark_optimizer.build_optimizer(args, lr, model)
 
-    benchmark_model.forward(
-        model,
-        args,
-        optimizer=optimizer,
-        train_loader=train_loader,
-        eval_loader=eval_loader)
+    benchmark_model.forward(model,
+                            args,
+                            optimizer=optimizer,
+                            train_loader=train_loader,
+                            eval_loader=eval_loader)
 
 
 if __name__ == '__main__':

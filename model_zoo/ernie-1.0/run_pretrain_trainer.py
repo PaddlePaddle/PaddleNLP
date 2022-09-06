@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer
+from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer, ErnieForMaskedLM
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
@@ -41,11 +41,13 @@ MODEL_CLASSES = {
         ErnieModel,
         ErnieForPretraining,
         ErniePretrainingCriterion,
-        ErnieTokenizer, ),
+        ErnieTokenizer,
+    ),
 }
 
 
 def add_start_docstrings(*docstr):
+
     def docstring_decorator(fn):
         fn.__doc__ = "".join(docstr) + (fn.__doc__
                                         if fn.__doc__ is not None else "")
@@ -59,13 +61,15 @@ def add_start_docstrings(*docstr):
 class PreTrainingArguments(TrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
-        metadata={"help": "Minimum learning rate deacyed to."}, )
+        metadata={"help": "Minimum learning rate deacyed to."},
+    )
     decay_steps: float = field(
         default=None,
         metadata={
             "help":
             "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
-        }, )
+        },
+    )
 
 
 @dataclass
@@ -81,8 +85,8 @@ class DataArguments:
         metadata={
             "help": "The name of the dataset to use (via the datasets library)."
         })
-    split: str = field(
-        default='949,50,1', metadata={"help": "Train/valid/test data split."})
+    split: str = field(default='949,50,1',
+                       metadata={"help": "Train/valid/test data split."})
 
     max_seq_length: int = field(
         default=512,
@@ -90,19 +94,23 @@ class DataArguments:
             "help":
             "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
-        }, )
+        },
+    )
     masked_lm_prob: float = field(
         default=0.15,
-        metadata={"help": "Mask token prob."}, )
+        metadata={"help": "Mask token prob."},
+    )
     short_seq_prob: float = field(
         default=0.1,
-        metadata={"help": "Short sequence prob."}, )
+        metadata={"help": "Short sequence prob."},
+    )
     share_folder: bool = field(
         default=False,
         metadata={
             "help":
             "Use share folder for data dir and output dir on multi machine."
-        }, )
+        },
+    )
 
 
 @dataclass
@@ -120,8 +128,8 @@ class ModelArguments:
             "help":
             "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         })
-    binary_head: Optional[bool] = field(
-        default=True, metadata={"help": "True for NSP task."})
+    binary_head: Optional[bool] = field(default=True,
+                                        metadata={"help": "True for NSP task."})
     hidden_dropout_prob: float = field(
         default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(
@@ -132,7 +140,7 @@ class ModelArguments:
             "help":
             "Pretrained config name or path if not the same as model_name"
         })
-    tokenizer_name: Optional[str] = field(
+    tokenizer_name_or_path: Optional[str] = field(
         default=None,
         metadata={
             "help":
@@ -140,7 +148,13 @@ class ModelArguments:
         })
 
 
-def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
+def create_pretrained_dataset(
+    data_args,
+    training_args,
+    data_file,
+    tokenizer,
+    binary_head=True,
+):
 
     train_valid_test_num_samples = [
         training_args.per_device_train_batch_size * training_args.world_size *
@@ -162,9 +176,25 @@ def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
         short_seq_prob=data_args.short_seq_prob,
         seed=training_args.seed,
         skip_warmup=True,
-        binary_head=True,
+        binary_head=binary_head,
         max_seq_length_dec=None,
         dataset_type='ernie')
+
+    def print_dataset(data, mode="train"):
+        logger.info(f"Sample data for {mode} mode")
+        input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels = data
+        if tokenizer.pad_token_id in input_ids:
+            input_ids = input_ids[0:list(input_ids).index(tokenizer.pad_token_id
+                                                          )]
+        logger.info(tokenizer._decode(input_ids))
+        for pos, label in zip(masked_lm_positions, masked_lm_labels):
+            input_ids[pos] = label
+        logger.info(tokenizer._decode(input_ids))
+        logger.info(tokenizer.convert_ids_to_tokens(masked_lm_labels))
+
+    print_dataset(train_ds[0], "train")
+    print_dataset(valid_ds[0], "valid")
+    print_dataset(test_ds[0], "test")
 
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
@@ -206,12 +236,26 @@ def create_pretrained_dataset(data_args, training_args, data_file, tokenizer):
 
 
 def get_train_data_file(args):
-    files = [
-        os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in
-            str(f))
-    ]
-    files = [x.replace("_idx.npz", "") for x in files]
+    if len(args.input_dir.split()) > 1:
+        # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
+        return args.input_dir.split()
+    else:
+        files = [
+            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f))
+                and "_idx.npz" in str(f))
+        ]
+        files = [x.replace("_idx.npz", "") for x in files]
+
+        if len(files) > 1:
+            ret = []
+            logger.info("You are using multi-dataset:")
+            for x in files:
+                ret.append(1.0)
+                ret.append(x)
+                logger.info("    > set weight of %s dataset to 1.0" % x)
+            return ret
+
     return files
 
 
@@ -226,13 +270,14 @@ def set_seed(args):
 
 
 class PretrainingTrainer(Trainer):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def evaluate(self,
                  eval_dataset=None,
                  ignore_keys=None,
-                 metric_key_prefix: str="eval"):
+                 metric_key_prefix: str = "eval"):
         eval_dataloader = getattr(self, "eval_dataloader", None)
         if eval_dataloader is None:
             eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
@@ -253,7 +298,8 @@ class PretrainingTrainer(Trainer):
             prediction_loss_only=True if compute_metrics is None else None,
             ignore_keys=ignore_keys,
             # Only evaluate max_eval_iters
-            max_eval_iters=self.args.eval_iters, )
+            max_eval_iters=self.args.eval_iters,
+        )
 
         total_batch_size = self.args.eval_batch_size * self.args.world_size
         output.metrics.update(
@@ -261,7 +307,8 @@ class PretrainingTrainer(Trainer):
                 metric_key_prefix,
                 start_time,
                 num_samples=output.num_samples,
-                num_steps=math.ceil(output.num_samples / total_batch_size), ))
+                num_steps=math.ceil(output.num_samples / total_batch_size),
+            ))
 
         self.log(output.metrics)
 
@@ -292,6 +339,9 @@ def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, PreTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if model_args.tokenizer_name_or_path is None:
+        model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
     set_seed(training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -330,22 +380,32 @@ def main():
 
     base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
         model_args.model_type]
+
+    if model_args.binary_head is False:
+        model_class = ErnieForMaskedLM
+
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
 
-    if model_args.model_name_or_path in pretrained_models_list:
+    if model_args.model_name_or_path in pretrained_models_list and not args.continue_training:
+        logger.warning(
+            f"Your model {args.model_name_or_path} is training from scratch !!!"
+        )
         model_config = model_class.pretrained_init_configuration[
             model_args.model_name_or_path]
         model_config["hidden_dropout_prob"] = model_args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = model_args.attention_probs_dropout_prob
         model = model_class(base_class(**model_config))
+        # model_config["enable_recompute"] = args.use_recompute
     else:
+        logger.warning(
+            f"Your model is continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             hidden_dropout_prob=model_args.hidden_dropout_prob,
-            attention_probs_dropout_prob=model_args.
-            attention_probs_dropout_prob)
+            attention_probs_dropout_prob=model_args.attention_probs_dropout_prob
+        )
 
     class CriterionWrapper(paddle.nn.Layer):
         """
@@ -355,7 +415,8 @@ def main():
             """CriterionWrapper
             """
             super(CriterionWrapper, self).__init__()
-            self.criterion = criterion_class()
+            self.criterion = criterion_class(
+                with_nsp_loss=model_args.binary_head)
 
         def forward(self, output, labels):
             """forward function
@@ -367,14 +428,21 @@ def main():
             Returns:
                 Tensor: final loss.
             """
-            prediction_scores, seq_relationship_score = output
             masked_lm_labels, next_sentence_labels = labels
+            if model_args.binary_head:
+                prediction_scores, seq_relationship_score = output
 
-            lm_loss, sop_loss = self.criterion(
-                prediction_scores, seq_relationship_score, masked_lm_labels,
-                next_sentence_labels)
+                lm_loss, sop_loss = self.criterion(prediction_scores,
+                                                   seq_relationship_score,
+                                                   masked_lm_labels,
+                                                   next_sentence_labels)
 
-            loss = lm_loss + sop_loss
+                loss = lm_loss + sop_loss
+
+            else:
+                prediction_scores = output
+                loss = self.criterion(prediction_scores, None, masked_lm_labels)
+
             return loss
 
     # Create the learning_rate sheduler and optimizer
@@ -389,10 +457,12 @@ def main():
         decay_step=training_args.decay_steps)
 
     data_file = get_train_data_file(data_args)
-    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(
+        model_args.tokenizer_name_or_path)
+    tokenizer.extend_chinese_char()
 
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer)
+        data_args, training_args, data_file, tokenizer, model_args.binary_head)
 
     trainer = PretrainingTrainer(
         model=model,
@@ -402,7 +472,8 @@ def main():
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
-        tokenizer=tokenizer, )
+        tokenizer=tokenizer,
+    )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:

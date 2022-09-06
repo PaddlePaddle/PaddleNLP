@@ -22,28 +22,29 @@ __all__ = ['ErnieDualEncoder', 'ErnieCrossEncoder']
 
 
 class ErnieEncoder(ErniePretrainedModel):
+
     def __init__(self, ernie, dropout=None, num_classes=2):
         super(ErnieEncoder, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(768, num_classes)
+        self.classifier = nn.Linear(self.ernie.config["hidden_size"],
+                                    num_classes)
         self.apply(self.init_weights)
 
     def init_weights(self, layer):
         """ Initialization hook """
         if isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-5
+            layer._epsilon = 1e-12
 
     def forward(self,
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-        sequence_output, pool_output = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, pool_output = self.ernie(input_ids,
+                                                  token_type_ids=token_type_ids,
+                                                  position_ids=position_ids,
+                                                  attention_mask=attention_mask)
         return sequence_output, pool_output
 
 
@@ -75,7 +76,7 @@ class ErnieDualEncoder(nn.Layer):
     """
 
     def __init__(self,
-                 query_model_name_or_path,
+                 query_model_name_or_path=None,
                  title_model_name_or_path=None,
                  share_parameters=False,
                  dropout=None,
@@ -84,13 +85,16 @@ class ErnieDualEncoder(nn.Layer):
         super().__init__()
         self.query_ernie, self.title_ernie = None, None
         self.use_cross_batch = use_cross_batch
-        self.query_ernie = ErnieEncoder.from_pretrained(
-            query_model_name_or_path)
+        if query_model_name_or_path is not None:
+            self.query_ernie = ErnieEncoder.from_pretrained(
+                query_model_name_or_path)
         if share_parameters:
             self.title_ernie = self.query_ernie
         elif title_model_name_or_path is not None:
             self.title_ernie = ErnieEncoder.from_pretrained(
                 title_model_name_or_path)
+        assert (self.query_ernie is not None) or (self.title_ernie is not None), \
+            "At least one of query_ernie and title_ernie should not be None"
 
     def get_semantic_embedding(self, data_loader):
         self.eval()
@@ -131,16 +135,16 @@ class ErnieDualEncoder(nn.Layer):
                    title_token_type_ids=None,
                    title_position_ids=None,
                    title_attention_mask=None):
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, query_position_ids,
-            query_attention_mask)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids,
+                                                        query_attention_mask)
 
-        title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids,
-            title_token_type_ids,
-            title_position_ids,
-            title_attention_mask,
-            is_query=False)
+        title_cls_embedding = self.get_pooled_embedding(title_input_ids,
+                                                        title_token_type_ids,
+                                                        title_position_ids,
+                                                        title_attention_mask,
+                                                        is_query=False)
 
         cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
                                 axis=-1)
@@ -160,17 +164,24 @@ class ErnieDualEncoder(nn.Layer):
                 neg_title_token_type_ids=None,
                 neg_title_position_ids=None,
                 neg_title_attention_mask=None):
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, query_position_ids,
-            query_attention_mask)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids,
+                                                        query_attention_mask)
 
         pos_title_cls_embedding = self.get_pooled_embedding(
-            pos_title_input_ids, pos_title_token_type_ids,
-            pos_title_position_ids, pos_title_attention_mask)
+            pos_title_input_ids,
+            pos_title_token_type_ids,
+            pos_title_position_ids,
+            pos_title_attention_mask,
+            is_query=False)
 
         neg_title_cls_embedding = self.get_pooled_embedding(
-            neg_title_input_ids, neg_title_token_type_ids,
-            neg_title_position_ids, neg_title_attention_mask)
+            neg_title_input_ids,
+            neg_title_token_type_ids,
+            neg_title_position_ids,
+            neg_title_attention_mask,
+            is_query=False)
 
         all_title_cls_embedding = paddle.concat(
             x=[pos_title_cls_embedding, neg_title_cls_embedding], axis=0)
@@ -190,15 +201,15 @@ class ErnieDualEncoder(nn.Layer):
             all_title_cls_embedding = paddle.concat(x=tensor_list, axis=0)
 
         # multiply
-        logits = paddle.matmul(
-            query_cls_embedding, all_title_cls_embedding, transpose_y=True)
+        logits = paddle.matmul(query_cls_embedding,
+                               all_title_cls_embedding,
+                               transpose_y=True)
 
         batch_size = query_cls_embedding.shape[0]
 
-        labels = paddle.arange(
-            batch_size * self.rank * 2,
-            batch_size * (self.rank * 2 + 1),
-            dtype='int64')
+        labels = paddle.arange(batch_size * self.rank * 2,
+                               batch_size * (self.rank * 2 + 1),
+                               dtype='int64')
         labels = paddle.reshape(labels, shape=[-1, 1])
 
         accuracy = paddle.metric.accuracy(input=logits, label=labels)
@@ -223,12 +234,14 @@ class ErnieCrossEncoder(nn.Layer):
             inputs = tokenizer("你们好", text_pair="你好")
             inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
-            # Get similarity probability of text pair.
+            # Get embedding of text pair.
             embedding = model.matching(**inputs)
 
     """
 
-    def __init__(self, pretrain_model_name_or_path, num_classes=2,
+    def __init__(self,
+                 pretrain_model_name_or_path,
+                 num_classes=2,
                  dropout=None):
         super().__init__()
         self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path)
@@ -239,11 +252,10 @@ class ErnieCrossEncoder(nn.Layer):
                  position_ids=None,
                  attention_mask=None,
                  return_prob_distributation=False):
-        _, pooled_output = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        _, pooled_output = self.ernie(input_ids,
+                                      token_type_ids=token_type_ids,
+                                      position_ids=position_ids,
+                                      attention_mask=attention_mask)
         pooled_output = self.ernie.dropout(pooled_output)
         cls_embedding = self.ernie.classifier(pooled_output)
         probs = F.softmax(cls_embedding, axis=1)
@@ -257,15 +269,15 @@ class ErnieCrossEncoder(nn.Layer):
                 position_ids=None,
                 attention_mask=None,
                 labels=None):
-        probs = self.matching(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            return_prob_distributation=True)
-        accuracy = paddle.metric.accuracy(input=probs, label=labels)
-        loss = F.cross_entropy(input=logits, label=labels)
-
-        outputs = {"loss": loss, "accuracy": accuracy}
-
-        return outputs
+        probs = self.matching(input_ids,
+                              token_type_ids=token_type_ids,
+                              position_ids=position_ids,
+                              attention_mask=attention_mask,
+                              return_prob_distributation=True)
+        if (labels is not None):
+            accuracy = paddle.metric.accuracy(input=probs, label=labels)
+            loss = F.cross_entropy(input=probs, label=labels)
+            outputs = {"loss": loss, "accuracy": accuracy}
+            return outputs
+        else:
+            return probs[:, 1]

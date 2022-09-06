@@ -201,12 +201,20 @@ if(BUILD_PD)
     include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
     include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/include")
     include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/include")
+    if (WITH_ONNXRUNTIME)
+      include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/include")
+      include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}paddle2onnx/include")
+    endif()
 
     link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/lib")
     link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/lib")
     link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/lib")
     link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/lib")
     link_directories("${PADDLE_LIB}/paddle/lib")
+    if (WITH_ONNXRUNTIME)
+      include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib")
+      include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}paddle2onnx/lib")
+    endif()
 
     if(WITH_MKL)
       set(FLAG_OPENMP "-fopenmp")
@@ -388,7 +396,6 @@ endforeach()
 add_executable(gpt sample/cpp/gpt_sample.cc )
 target_link_libraries(gpt PUBLIC -lcublas -lcublasLt -lcudart -lcurand -lnccl -lmpi transformer-static)
 # target_link_libraries(gpt PUBLIC -lcublas -lcublasLt -lcudart -lcurand -lnccl -lmpi decoder decoding)
-
 export(
   EXPORT
     transformer-shared-targets

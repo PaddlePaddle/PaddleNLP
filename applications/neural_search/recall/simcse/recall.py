@@ -25,9 +25,9 @@ import numpy as np
 import hnswlib
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
+from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.utils.log import logger
 
 from model import SimCSE
@@ -47,11 +47,10 @@ parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum 
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument("--recall_num", default=10, type=int, help="Recall number for each query from Ann index.")
-
 parser.add_argument("--hnsw_m", default=100, type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_ef", default=100, type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_max_elements", default=1000000, type=int, help="Recall number for each query from Ann index.")
-
+parser.add_argument("--model_name_or_path",default='rocketqa-zh-base-query-encoder',type=str,help='The pretrained model used for training')
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
 # yapf: enable
@@ -62,20 +61,20 @@ if __name__ == "__main__":
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(
-        convert_example_test,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example_test,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # text_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
     model = SimCSE(pretrained_model, output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
@@ -95,12 +94,11 @@ if __name__ == "__main__":
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(
-        corpus_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(corpus_ds,
+                                           mode='predict',
+                                           batch_size=args.batch_size,
+                                           batchify_fn=batchify_fn,
+                                           trans_fn=trans_func)
 
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
@@ -108,16 +106,14 @@ if __name__ == "__main__":
     final_index = build_index(args, corpus_data_loader, inner_model)
 
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
-    # print(text_list[:5])
 
     query_ds = MapDataset(text_list)
 
-    query_data_loader = create_dataloader(
-        query_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    query_data_loader = create_dataloader(query_ds,
+                                          mode='predict',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
 
@@ -136,6 +132,6 @@ if __name__ == "__main__":
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(text_list[text_index][
-                        "text"], id2corpus[doc_idx], 1.0 - cosine_sims[
-                            row_index][idx]))
+                    f.write("{}\t{}\t{}\n".format(
+                        text_list[text_index]["text"], id2corpus[doc_idx],
+                        1.0 - cosine_sims[row_index][idx]))

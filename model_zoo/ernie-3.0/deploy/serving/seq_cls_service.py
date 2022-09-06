@@ -22,9 +22,16 @@ _LOGGER = logging.getLogger()
 
 
 class ErnieSeqClsOp(Op):
+
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
+                                                       use_faster=True)
+        # Output nodes may differ from model to model
+        # You can see the output node name in the conf.prototxt file of serving_server
+        self.fetch_names = [
+            "linear_113.tmp_1",
+        ]
 
     def preprocess(self, input_dicts, data_id, log_id):
         # convert input format
@@ -37,17 +44,17 @@ class ErnieSeqClsOp(Op):
         data = [i.decode('utf-8') for i in data]
 
         # tokenizer + pad
-        data = self.tokenizer(
-            data, max_length=128, padding=True, truncation=True)
+        data = self.tokenizer(data,
+                              max_length=128,
+                              padding=True,
+                              truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         # print("input_ids:", input_ids)
         # print("token_type_ids", token_type_ids)
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
@@ -64,16 +71,19 @@ class ErnieSeqClsOp(Op):
                           It is handled in the same way as exception.
             prod_errinfo: "" default
         """
-        result = fetch_dict["linear_75.tmp_1"]
-        # np.argpartition
+        result = fetch_dict[self.fetch_names[0]]
+        max_value = np.max(result, axis=1, keepdims=True)
+        exp_data = np.exp(result - max_value)
+        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
         out_dict = {
             "label": result.argmax(axis=-1),
-            "confidence": result.max(axis=-1)
+            "confidence": probs.max(axis=-1)
         }
         return out_dict, None, ""
 
 
 class ErnieSeqClsService(WebService):
+
     def get_pipeline_response(self, read_op):
         return ErnieSeqClsOp(name="seq_cls", input_ops=[read_op])
 
