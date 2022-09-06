@@ -77,21 +77,29 @@ python setup.py install
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import DensePassageRetriever, ErnieRanker
 
-# Step1: Initialize a FaissDocumentStore to store texts of documents
+# Step1: Preparing the data
+documents = [
+  {'content': '金钱龟不分品种,只有生长地之分,在我国主要分布于广东、广西、福建、海南、香港、澳门等地,在国外主要分布于越南等亚热带国家和地区。',
+  'meta': {'name': 'test1.txt'}},
+  {'content': '衡量酒水的价格的因素很多的，酒水的血统(也就是那里产的，采用什么工艺等）；存储的时间等等，酒水是一件很难标准化得商品，只要你敢要价，有买的那就值那个钱。',
+  'meta': {'name': 'test2.txt'}}
+]
+
+# Step2: Initialize a FaissDocumentStore to store texts of documents
 document_store = FAISSDocumentStore(embedding_dim=768)
 document_store.write_documents(documents)
 
-# Step2: Initialize a DenseRetriever and build ANN index
-retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-dureader-query-encoder")
+# Step3: Initialize a DenseRetriever and build ANN index
+retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-base-query-encoder",embed_title=False)
 document_store.update_embeddings(retriever)
 
-# Step3: Initialize a Ranker
-ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder")
+# Step4: Initialize a Ranker
+ranker = ErnieRanker(model_name_or_path="rocketqa-base-cross-encoder")
 
-# Step4: Initialize a SemanticSearchPipeline and ask questions
+# Step5: Initialize a SemanticSearchPipeline and ask questions
 from pipelines import SemanticSearchPipeline
 pipeline = SemanticSearchPipeline(retriever, ranker)
-prediction = pipeline.run(query="亚马逊河流的相关介绍")
+prediction = pipeline.run(query="衡量酒水的价格的因素有哪些?")
 ```
 ### 快速部署
 
