@@ -123,3 +123,6 @@ FETCH_HEAD
 
 # vscode
 .vscode
+
+# temp
+applications/question_generation
