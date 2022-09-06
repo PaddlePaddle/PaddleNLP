@@ -126,13 +126,6 @@ def parse_args():
         type=str,
         choices=["cpu", "gpu", "xpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument(
-        "--ignore_pad_token_for_loss",
-        default=True,
-        type=bool,
-        help="Whether to ignore the tokens corresponding to "
-        "padded labels in the loss computation or not.",
-    )
     parser.add_argument("--logging_steps",
                         type=int,
                         default=100,

@@ -148,13 +148,6 @@ def parse_args():
                         default=2**15,
                         type=float,
                         help="The value of scale_loss for fp16.")
-    parser.add_argument(
-        "--ignore_pad_token_for_loss",
-        default=True,
-        type=bool,
-        help="Whether to ignore the tokens corresponding to "
-        "padded labels in the loss computation or not.",
-    )
     args = parser.parse_args()
     return args
 

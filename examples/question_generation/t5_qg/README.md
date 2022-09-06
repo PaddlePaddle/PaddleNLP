@@ -2,7 +2,7 @@
 
 ## 简介
 
-Question Generation（QG），即问题生成，指的是给定一段上下文（passage或sentence），自动生成一个流畅且符合上下文主题的问句。问题生成通常可以分为两个分支，即无答案问题生成和有答案问题生成。
+Question Generation（QG），即问题生成，指的是给定一段上下文（passage或sentence），自动生成一个流畅且符合上下文主题的问句。问题生成通常可以分为两个分支，即无答案问题生成（answer-agnostic question generation）和有答案问题生成（answer-aware question generation）。
 
 本项目是T5在 PaddlePaddle上开源实现的有答案问题生成的例子，包含了在SQuAD数据集上微调和生成的代码。
 
@@ -32,7 +32,7 @@ Question Generation（QG），即问题生成，指的是给定一段上下文�
 ### 数据准备
 
 #### 数据加载
-**SQuAD**数据集是一个英文问答数据集，现有的问题生成研究主要在该数据集上进行评价。**SQuAD**中的数据由段落、问题、答案3个主要部分组成，其中段落和问题从维基百科中获取，答案由人工标注。
+**SQuAD**（Stanford Question Answering Dataset）数据集是一个英文问答数据集，现有的问题生成研究主要在该数据集上进行评价。**SQuAD**中的数据由段落、问题、答案3个主要部分组成，其中段落从维基百科中获取，问题和答案通过众包的方式由人工标注。
 
 为了方便用户快速测试，PaddleNLP Dataset API内置了Squad数据集，一键即可完成数据集加载，示例代码如下：
 
@@ -42,10 +42,16 @@ train_set, dev_set, test_set = load_dataset("squad",  splits=["train_v1", "dev_v
 ```
 
 #### 数据处理
-针对**SQuAD**数据集，我们需要将QA任务格式的数据进行转换从而得到text2text形式的数据
+针对**SQuAD**数据集，我们需要将QA任务格式的数据进行转换从而得到text2text形式的数据，默认构造方式如下，其他形式输入数据用户可以在convert_example函数中自行定义
 ```text
 answer: {answer_text} context: {context_text}
 question: {question_text}
+```
+具体案例如下，
+```text
+answer: the Miller–Rabin primality test context: The property of being prime (or not) is called primality. A simple but slow method of verifying the primality of a given number n is known as trial division. It consists of testing whether n is a multiple of any integer between 2 and . Algorithms much more efficient than trial division have been devised to test the primality of large numbers. These include the Miller–Rabin primality test, which is fast but has a small probability of error, and the AKS primality test, which always produces the correct answer in polynomial time but is too slow to be practical. Particularly fast methods are available for numbers of special forms, such as Mersenne numbers. As of January 2016[update], the largest known prime number has 22,338,618 decimal digits.
+
+question: What is the name of the process which confirms the primality of a number n?
 ```
 
 ### 模型训练
@@ -104,13 +110,11 @@ python -m paddle.distributed.launch --gpus 1,2 finetune.py \
 
 - `seed` 表示随机数生成器的种子。
 
-- `train_batch_size` 表示训练**每张卡**上的样本数目。
+- `train_batch_size` 表示训练每张卡上的样本数目。
 
-- `eval_batch_size` 表示预测**单卡**上的样本数目。
+- `eval_batch_size` 表示预测单卡上的样本数目。
 
 - `warmup_proportion` 表示warmup_steps所占总步数的比例。学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数。
-
-- `ignore_pad_token_for_loss` 表示计算loss时忽略padding。
 
 - `device` 表示使用的设备。
 
@@ -185,13 +189,11 @@ python generate.py \
 
 - `seed` 表示随机数生成器的种子。
 
-- `ignore_pad_token_for_loss` 表示训练时计算loss时忽略padding。如果训练时设置为True，那么预测时的label需要还原来计算评估指标。
-
 - `logging_steps` 表示日志打印间隔。
 
 - `device` 表示使用的设备。
 
-程序运行结束后会将预测生成的摘要保存在`output_path`中。同时终端中会输出评估结果。
+程序运行结束后会将预测生成的问题保存在`output_path`中。同时终端中会输出评估结果。
 
 采用社区微调模型mrm8488/t5-base-finetuned-question-generation-ap在验证集上有如下结果：
 
