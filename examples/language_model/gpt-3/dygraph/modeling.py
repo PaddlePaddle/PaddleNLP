@@ -1178,6 +1178,4 @@ class GPTForPretrainingPipe(PipelineLayer):
                          loss_fn=GPTPretrainingCriterionPipe(),
                          topology=topology,
                          seg_method="layer:TransformerDecoderLayer",
-                         recompute_interval=1 if use_recompute else 0,
-                         recompute_partition=False,
-                         recompute_offload=False)
+                         recompute_interval=1 if use_recompute else 0)
