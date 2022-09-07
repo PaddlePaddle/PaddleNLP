@@ -20,7 +20,7 @@ from paddle.static import Variable
 from paddle.fluid.dygraph import base as imperative_base
 from collections.abc import Callable
 import paddle
-from paddle import _C_ops
+from paddle import _C_ops, _legacy_C_ops
 
 __all__ = []
 
@@ -292,13 +292,13 @@ class AdamW(Adam):
             lr = paddle.cast(lr, dtype="float32")
             if framework.in_dygraph_mode():
                 found_inf = self._get_auxiliary_var('found_inf')
-                _, _, _, _, _, _ = _C_ops.final_state_adamw_(
+                _, _, _, _, _, _ = _C_ops.adamw_(
                     param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
                     beta1_pow_acc, beta2_pow_acc, master_weight, found_inf,
                     _beta1, _beta2, self._epsilon, lr_ratio_, self._coeff,
                     with_decay, self._lazy_mode, 1000, find_master, False)
             else:
-                _, _, _, _, _, _ = _C_ops.adamw(
+                _, _, _, _, _, _ = _legacy_C_ops.adamw(
                     param_and_grad[0], param_and_grad[1], lr, moment1, moment2,
                     beta1_pow_acc, beta2_pow_acc, master_weight,
                     param_and_grad[0], moment1, moment2, beta1_pow_acc,
