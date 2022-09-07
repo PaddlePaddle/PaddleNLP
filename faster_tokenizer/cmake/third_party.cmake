@@ -18,7 +18,9 @@ set(THIRD_PARTY_PATH  "${CMAKE_BINARY_DIR}/third_party" CACHE STRING
     "A path setting third party libraries download & build directories.")
 
 include(external/icu)
-include(external/gtest)
+if(WITH_TESTING)
+    include(external/gtest)
+endif()
 include(external/gflags)
 include(external/glog)
 include(external/re2)
