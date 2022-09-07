@@ -188,37 +188,37 @@
                 <span style="font-size:18px">ERNIE 3.0-Xbase-zh</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>78.71</b></span>
+                <span style="font-size:18px"><b>78.39</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>76.85</b></span>
+                <span style="font-size:18px"><b>76.16</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>59.89</b></span>
+                <span style="font-size:18px"><b>59.55</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>62.41</b></span>
+                <span style="font-size:18px"><b>61.87</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.76</b></span>
+                <span style="font-size:18px"><b>84.40</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>82.51</b></span>
+                <span style="font-size:18px"><b>81.73</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>89.80</b></span>
+                <span style="font-size:18px"><b>88.82</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.47</b></span>
+                <span style="font-size:18px"><b>83.60</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>75.49/92.67</b></span>
+                <span style="font-size:18px"><b>75.99/93.00</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>86.36</b></span>
+                <span style="font-size:18px"><b>86.78</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.59</b></span>
+                <span style="font-size:18px"><b>84.98</b></span>
             </td>
         </tr>
         <tr>
@@ -307,31 +307,31 @@
                 <span style="font-size:18px">ERNIE 2.0-Base-zh</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">74.95</span>
+                <span style="font-size:18px">74.32</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">76.25</span>
+                <span style="font-size:18px">75.65</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">58.53</span>
+                <span style="font-size:18px">58.25</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">61.72</span>
+                <span style="font-size:18px">61.64</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">83.07</span>
+                <span style="font-size:18px">82.62</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">78.81</span>
+                <span style="font-size:18px">78.71</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">84.21</span>
+                <span style="font-size:18px">81.91</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">82.77</span>
+                <span style="font-size:18px">82.33</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">68.22/88.71</span>
+                <span style="font-size:18px">66.08/87.46</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">82.78</span>
