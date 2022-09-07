@@ -53,7 +53,7 @@ def _optional_component_not_installed(component: str, dep_group: str,
     raise ImportError(
         f"Failed to import '{component}', "
         "which is an optional component in pipelines.\n"
-        f"Run 'pip install farm-pipelines[{dep_group}]' "
+        f"Run 'pip install -r requirements.txt' "
         "to install the required dependencies and make this component available."
     ) from source_error
 
