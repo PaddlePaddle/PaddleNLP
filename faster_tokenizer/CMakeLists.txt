@@ -168,6 +168,8 @@ file(COPY ${PROJECT_SOURCE_DIR}/FasterTokenizer.cmake DESTINATION ${CPP_PACKAGE_
 # copy headers
 file(COPY ${PROJECT_SOURCE_DIR}/faster_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/include/faster_tokenizer/
     FILES_MATCHING PATTERN "*.h"
+    PATTERN "test" EXCLUDE
+    PATTERN "demo" EXCLUDE
     PATTERN "pybind" EXCLUDE)
 
 add_custom_target(copy_third_party_headers ALL
