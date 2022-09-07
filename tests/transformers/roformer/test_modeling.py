@@ -16,9 +16,10 @@
 import unittest
 from typing import Optional, Tuple
 from dataclasses import dataclass, fields, Field
+from parameterized import parameterized_class
 
 import paddle
-from parameterized import parameterized_class
+from paddle import Tensor
 
 from paddlenlp.transformers import (RoFormerModel, RoFormerPretrainedModel,
                                     RoFormerForSequenceClassification,
@@ -69,7 +70,7 @@ class RoFormerModelTestConfig(RoFormerModelTestModelConfig):
     is_training: bool = False
     use_input_mask: bool = False
     use_token_type_ids: bool = True
-    type_sequence_label_size: int = 2
+    type_sequence_label_size = 3
 
     # used for sequence classification
     num_classes: int = 3
@@ -105,6 +106,16 @@ class RoFormerModelTester:
         if self.config.use_token_type_ids:
             token_type_ids = ids_tensor([config.batch_size, config.seq_length],
                                         config.type_vocab_size)
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
+
+        if self.parent.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_classes)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
         sequence_labels = None
         token_labels = None
@@ -128,16 +139,10 @@ class RoFormerModelTester:
             raise AttributeError(f'attribute <{key}> not exist')
         return getattr(self.config, key)
 
-    def create_and_check_model(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
+    def create_and_check_model(self, config, input_ids: Tensor,
+                               token_type_ids: Tensor, input_mask: Tensor,
+                               sequence_labels: Tensor, token_labels: Tensor,
+                               choice_labels: Tensor):
         model = RoFormerModel(**config)
         model.eval()
         result = model(input_ids,
@@ -156,16 +161,12 @@ class RoFormerModelTester:
         self.parent.assertEqual(
             result[1].shape, [self.config.batch_size, self.config.hidden_size])
 
-    def create_and_check_for_multiple_choice(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
+    def create_and_check_for_multiple_choice(self, config, input_ids: Tensor,
+                                             token_type_ids: Tensor,
+                                             input_mask: Tensor,
+                                             sequence_labels: Tensor,
+                                             token_labels: Tensor,
+                                             choice_labels: Tensor):
         model = RoFormerForMultipleChoice(RoFormerModel(**config),
                                           num_choices=self.config.num_choices)
         model.eval()
@@ -183,59 +184,46 @@ class RoFormerModelTester:
         result = model(multiple_choice_inputs_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       labels=choice_labels)
+                       labels=choice_labels,
+                       return_dict=self.parent.return_dict)
 
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
+        if paddle.is_tensor(result):
             result = [result]
+        elif choice_labels is not None:
+            result = result[1:]
 
         self.parent.assertEqual(
             result[0].shape, [self.config.batch_size, self.config.num_choices])
 
-    def create_and_check_for_question_answering(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
+    def create_and_check_for_question_answering(self, config, input_ids: Tensor,
+                                                token_type_ids: Tensor,
+                                                input_mask: Tensor,
+                                                sequence_labels: Tensor,
+                                                token_labels: Tensor,
+                                                choice_labels: Tensor):
         model = RoFormerForQuestionAnswering(RoFormerModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-            return_dict=self.parent.return_dict,
-            start_positions=sequence_labels,
-            end_positions=sequence_labels,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.parent.return_dict)
 
-        if sequence_labels is not None:
-            start_logits, end_logits = result[1], result[2]
-        else:
-            start_logits, end_logits = result[0], result[1]
+        if paddle.is_tensor(result):
+            result = [result]
+        elif choice_labels is not None:
+            result = result[1:]
 
         self.parent.assertEqual(
-            start_logits.shape,
-            [self.config.batch_size, self.config.seq_length])
+            result[0].shape, [self.config.batch_size, self.config.seq_length])
         self.parent.assertEqual(
-            end_logits.shape, [self.config.batch_size, self.config.seq_length])
+            result[1].shape, [self.config.batch_size, self.config.seq_length])
 
     def create_and_check_for_token_classification(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
+            self, config, input_ids: Tensor, token_type_ids: Tensor,
+            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
+            choice_labels: Tensor):
         model = RoFormerForTokenClassification(RoFormerModel(**config),
                                                num_classes=self.num_classes)
         model.eval()
@@ -244,27 +232,22 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
-
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
+        if paddle.is_tensor(result):
             result = [result]
+        elif choice_labels is not None:
+            result = result[1:]
 
         self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.num_classes
         ])
 
-    def create_and_check_for_masked_lm(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
+    def create_and_check_for_masked_lm(self, config, input_ids: Tensor,
+                                       token_type_ids: Tensor,
+                                       input_mask: Tensor,
+                                       sequence_labels: Tensor,
+                                       token_labels: Tensor,
+                                       choice_labels: Tensor):
         model = RoFormerForMaskedLM(RoFormerModel(**config))
         model.eval()
         result = model(input_ids,
@@ -272,11 +255,10 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
-
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
+        if paddle.is_tensor(result):
             result = [result]
+        elif choice_labels is not None:
+            result = result[1:]
 
         self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.seq_length,
@@ -284,15 +266,9 @@ class RoFormerModelTester:
         ])
 
     def create_and_check_for_sequence_classification(
-        self,
-        config,
-        input_ids,
-        token_type_ids,
-        input_mask,
-        sequence_labels,
-        token_labels,
-        choice_labels,
-    ):
+            self, config, input_ids: Tensor, token_type_ids: Tensor,
+            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
+            choice_labels: Tensor):
         model = RoFormerForSequenceClassification(
             RoFormerModel(**config), num_classes=self.config.num_classes)
         model.eval()
@@ -301,26 +277,17 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
-
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
+        if paddle.is_tensor(result):
             result = [result]
-
+        elif choice_labels is not None:
+            result = result[1:]
         self.parent.assertEqual(
             result[0].shape, [self.config.batch_size, self.config.num_classes])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
-        (
-            config,
-            input_ids,
-            token_type_ids,
-            input_mask,
-            sequence_labels,
-            token_labels,
-            choice_labels,
-        ) = config_and_inputs
+        (config, input_ids, token_type_ids, input_mask, _, _,
+         _) = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
@@ -337,8 +304,8 @@ class RoFormerModelTester:
 ])
 class RoFormerModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RoFormerModel
-    return_dict: bool = False
-    use_labels: bool = False
+    use_labels = False
+    return_dict = False
 
     all_model_classes = (RoFormerModel, RoFormerForSequenceClassification,
                          RoFormerForTokenClassification,
