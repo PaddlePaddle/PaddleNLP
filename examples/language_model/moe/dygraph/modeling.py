@@ -456,7 +456,7 @@ class TransformerDecoderLayer(nn.Layer):
             }
             self.moe_mlp = MoeLayer(d_model=d_model,
                                     experts=experts_list,
-                                    gate_config=gate_config,
+                                    gate=gate_config,
                                     moe_group=moe_group,
                                     mp_group=mp_group,
                                     recompute_interval=self.recompute_interval)
@@ -1165,5 +1165,9 @@ class GPTForPretrainingPipe(PipelineLayer):
                          topology=topology,
                          seg_method="layer:TransformerDecoderLayer",
                          recompute_interval=recompute_interval,
-                         recompute_partition=False,
-                         recompute_offload=False)
+                         recompute_ctx={
+                             "mp_group":
+                             fleet.fleet._hcg.get_model_parallel_group(),
+                             "offload": False,
+                             "partition": False
+                         })

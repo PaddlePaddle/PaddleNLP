@@ -335,6 +335,7 @@ class Trainer:
             num_samples_per_epoch % args.train_batch_size > 0)
         num_update_steps_per_epoch //= args.gradient_accumulation_steps
         num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+        args.num_update_steps_per_epoch = num_update_steps_per_epoch
 
         if args.max_steps > 0:
             args.num_training_steps = args.max_steps
@@ -447,10 +448,10 @@ class Trainer:
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)):
             self.state = TrainerState.load_from_json(
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
-            epochs_trained = self.state.global_step // num_update_steps_per_epoch
+            epochs_trained = self.state.global_step // args.num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (
-                    num_update_steps_per_epoch)
+                    args.num_update_steps_per_epoch)
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
