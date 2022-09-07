@@ -279,9 +279,7 @@ class CodeGenPreTrainedModel(PretrainedModel):
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {}
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {"model_state": {}}
 
     base_model_prefix = "transformer"

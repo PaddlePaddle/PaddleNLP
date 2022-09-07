@@ -37,7 +37,6 @@ class UNIMOPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "unimo-text-1.0": {
             "vocab_size": 18000,
@@ -97,7 +96,6 @@ class UNIMOPretrainedModel(PretrainedModel):
             "mask_token_id": 3,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "unimo-text-1.0":

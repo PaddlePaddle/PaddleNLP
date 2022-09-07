@@ -601,7 +601,6 @@ class T5PretrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "t5"
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "t5-small": {
@@ -695,7 +694,6 @@ class T5PretrainedModel(PretrainedModel):
             "feed_forward_proj": "gated-gelu",
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "t5-small":

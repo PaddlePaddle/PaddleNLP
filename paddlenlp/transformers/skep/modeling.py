@@ -113,7 +113,6 @@ class SkepPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "skep_ernie_1.0_large_ch": {
             "attention_probs_dropout_prob": 0.1,
@@ -158,7 +157,6 @@ class SkepPretrainedModel(PretrainedModel):
             "pad_token_id": 1,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "skep_ernie_1.0_large_ch":
