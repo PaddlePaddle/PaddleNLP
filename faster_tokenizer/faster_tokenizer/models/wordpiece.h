@@ -26,12 +26,14 @@ struct FASTERTOKENIZER_DECL WordPiece : public Model {
   WordPiece(const core::Vocab& vocab,
             const std::string& unk_token = "[UNK]",
             size_t max_input_chars_per_word = 100,
-            const std::string& continuing_subword_prefix = "##");
+            const std::string& continuing_subword_prefix = "##",
+            bool handle_chinese_chars = true);
   // Move version
   WordPiece(core::Vocab&& vocab,
             std::string&& unk_token,
             size_t max_input_chars_per_word,
-            std::string&& continuing_subword_prefix);
+            std::string&& continuing_subword_prefix,
+            bool handle_chinese_chars);
   virtual std::vector<core::Token> Tokenize(
       const std::string& sequence) override;
   virtual bool TokenToId(const std::string& token, uint32_t* id) const override;
@@ -56,6 +58,7 @@ protected:
   uint32_t unk_token_id_;
   size_t max_input_chars_per_word_;
   std::string continuing_subword_prefix_;
+  bool handle_chinese_chars_;
   friend void to_json(nlohmann::json& j, const WordPiece& model);
   friend void from_json(const nlohmann::json& j, WordPiece& model);
 };
