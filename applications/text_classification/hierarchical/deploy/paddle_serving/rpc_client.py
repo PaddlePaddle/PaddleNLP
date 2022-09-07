@@ -37,7 +37,7 @@ class Runner(object):
 
 
 if __name__ == "__main__":
-    server_url = "127.0.0.1:18090"
+    server_url = "127.0.0.1:7688"
     runner = Runner(server_url)
     texts = [
         "消失的“外企光环”，5月份在华裁员900余人，香饽饽变“臭”了？", "卡车超载致使跨桥侧翻，没那么简单",

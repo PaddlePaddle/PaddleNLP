@@ -36,7 +36,7 @@ python infer.py \
 可支持配置的参数：
 
 * `model_path_prefix`：必须，待推理模型路径前缀。
-* `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-medium-zh"。
+* `model_name_or_path`：选择预训练模型,可选"ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"；默认为"ernie-3.0-medium-zh",根据实际使用的预训练模型选择。
 * `max_seq_length`：ERNIE/BERT模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为128。
 * `use_fp16`：选择是否开启FP16进行加速；默认为False。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
