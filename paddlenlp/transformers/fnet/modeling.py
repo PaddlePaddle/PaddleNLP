@@ -353,7 +353,6 @@ class FNetPretrainedModel(PretrainedModel):
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models. See `PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "fnet-base": {
             "vocab_size": 32000,
@@ -386,7 +385,6 @@ class FNetPretrainedModel(PretrainedModel):
             "eos_token_id": 2,
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "fnet-base":
