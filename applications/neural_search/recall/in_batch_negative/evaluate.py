@@ -76,8 +76,6 @@ if __name__ == "__main__":
                 relevance_labels.append(1)
             else:
                 relevance_labels.append(0)
-        # print(len(rs))
-        # print(rs[:50])
 
     recall_N = []
     recall_num = [1, 5, 10, 20, 50]
@@ -92,4 +90,3 @@ if __name__ == "__main__":
         print('recall@{}={}'.format(key, val))
         res.append(str(val))
     result.write('\t'.join(res) + '\n')
-    # print("\t".join(recall_N))

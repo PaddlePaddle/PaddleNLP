@@ -134,7 +134,7 @@ parser.add_argument(
     default=-1,
     type=int,
     help=
-    "If > 0: set total number of training steps to perform. Override num_train_epochs."
+    "If > 0: set total number of training steps to perform. Override num_epochs."
 )
 
 args = parser.parse_args()
@@ -270,7 +270,7 @@ def train():
         train_model = paddle.DataParallel(train_model)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.num_train_epochs
+        train_data_loader) * args.num_epochs
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
                                          args.warmup_proportion)
