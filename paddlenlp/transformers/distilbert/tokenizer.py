@@ -17,6 +17,11 @@ from ..bert.tokenizer import BertTokenizer
 
 __all__ = ['DistilBertTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "distilbert-base-uncased": 512,
+    "distilbert-base-cased": 512
+}
+
 
 class DistilBertTokenizer(BertTokenizer):
     """
@@ -41,6 +46,7 @@ class DistilBertTokenizer(BertTokenizer):
             "do_lower_case": False
         },
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __call__(self,
                  text,

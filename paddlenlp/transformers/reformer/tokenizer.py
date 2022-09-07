@@ -18,6 +18,11 @@ from ..albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ['ReformerTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "reformer-enwik8": 65536,
+    "reformer-crime-and-punishment": 524288
+}
+
 
 class ReformerTokenizer(AlbertEnglishTokenizer):
     """
@@ -64,6 +69,8 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
             "do_lower_case": False
         },
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  sentencepiece_model_file,
