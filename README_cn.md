@@ -32,10 +32,10 @@
 ## News 📢
 
 * 🔥 **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
-  * 💎 NLP工具: **[NLP 流水线系统 Pipelines](./pipelines)** 发布，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 😊 产业应用: 新增[文本分类应用](./applications/text_classification)**多分类、多标签、层次分类**的全流程方案，支持 **小样本学习** 和 **TrustAI** 可信计算模型训练与调优；[UIE信息抽取](./model_zoo/uie)发布**UIE-M**，支持中英文混合抽取，新增**UIE 数据蒸馏**方案，打破UIE推理瓶颈，推理速度提升100倍以上；
-  * 🍭 AIGC内容生成: 新增代码生成SOTA模型[**CodeGen**](./examples/code_generation/codegen)，支持多种编程语言代码生成；集成[文图生成潮流模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) **DALL-E-mini**、**Disco Diffusion**、**Stable Diffusion**，更多趣玩模型等你来玩；新增[中文文本摘要应用](./applications/text_summarization)，基于大规模语料的中文摘要模型首次发布，可支持Taskflow一键调用；
-  * 💪 框架升级: [**模型自动压缩API**](./docs/compression.md)发布，自动对模型进行裁减和量化，大幅提升模型部署效率；[**小样本Prompt框架发布**](./applications/text_classification/multi_class/few-shot)，支持PET、P-Tuning、RGL等经典模型的快速实现；
+  * 💎 NLP工具：**[NLP 流水线系统 Pipelines](./pipelines)** 发布，支持快速搭建搜索引擎、问答系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
+  * 😊 产业应用：新增[文本分类](./applications/text_classification)**多分类、多标签、层次分类**的全流程应用方案，支持 **小样本学习** 和 **TrustAI** 可信计算模型训练与调优；[UIE信息抽取](./model_zoo/uie)发布**UIE-M**，支持中英文混合抽取，新增**UIE 数据蒸馏**方案，打破UIE推理瓶颈，推理速度提升100倍以上；
+  * 🍭 AIGC内容生成：新增代码生成SOTA模型[**CodeGen**](./examples/code_generation/codegen)，支持多种编程语言代码生成；集成[文图生成潮流模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) **DALL·E Mini**、**Disco Diffusion**、**Stable Diffusion**，更多趣玩模型等你来玩；新增[中文文本摘要应用](./applications/text_summarization)，基于大规模语料的中文摘要模型首次发布，可支持Taskflow一键调用；
+  * 💪 框架升级：[**模型自动压缩API**](./docs/compression.md)发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用成本；[**小样本Prompt框架发布**](./applications/text_classification/multi_class/few-shot)，支持PET、P-Tuning、RGL等经典模型的快速实现；
 
 
 * 👀 **2022.9.6 飞桨智慧金融行业系列直播课**
