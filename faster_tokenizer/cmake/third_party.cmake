@@ -22,7 +22,6 @@ include(external/gtest)
 include(external/gflags)
 include(external/glog)
 include(external/re2)
-include(external/boost)
 include(external/nlohmann_json)
 include(external/dart) # For trie
 if (WITH_PYTHON)
