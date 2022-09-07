@@ -707,10 +707,17 @@ class GPTModel(GPTPretrainedModel):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
+        self.eos_token_id = eos_token_id
+        self.bos_token_id = bos_token_id
+        self.eol_token_id = eol_token_id
         self.initializer_range = initializer_range
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
+        self.bias = paddle.tril(
+            paddle.ones(
+                [1, 1, max_position_embeddings, max_position_embeddings],
+                dtype="int64"))
 
         self.embeddings = GPTEmbeddings(vocab_size, hidden_size,
                                         hidden_dropout_prob,
@@ -744,6 +751,12 @@ class GPTModel(GPTPretrainedModel):
         self.apply(self.init_weights)
         self.checkpoints = []
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
                 position_ids=None,
@@ -769,8 +782,8 @@ class GPTModel(GPTPretrainedModel):
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Its data type should be float32.
-                The `masked` tokens have `-1e-9` values, and the `unmasked` tokens have `0` values.
+                Its data type should be int64.
+                The `masked` tokens have `0` values, and the `unmasked` tokens have `1` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
@@ -816,16 +829,22 @@ class GPTModel(GPTPretrainedModel):
                                            position_ids=position_ids)
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(paddle.ones(
-            (paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4,
-                                         diagonal=1)
+        length = paddle.shape(input_ids)[-1]
+        if cache is not None:
+            cache_length = paddle.shape(cache[0].k)[2]
+            length = length + cache_length
+        else:
+            cache_length = 0
+        casual_mask = self.bias[:, :, cache_length:length, :length]
 
         if attention_mask is not None:
+            if attention_mask.dtype != paddle.int64:
+                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
-            attention_mask = attention_mask + causal_mask
+            attention_mask = (1.0 - (attention_mask & casual_mask)) * -1e4
         else:
-            attention_mask = causal_mask
+            attention_mask = (1.0 - casual_mask) * -1e4
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -1111,7 +1130,6 @@ class GPTLMHeadModel(GPTPretrainedModel):
             `cache_kvs` is the cache output of gpt model if `use_cache` is True.
 
         """
-
         outputs = self.gpt(input_ids,
                            position_ids=position_ids,
                            attention_mask=attention_mask,
@@ -1166,12 +1184,8 @@ class GPTLMHeadModel(GPTPretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None:
-            if len(attention_mask.shape) == 4:
-                attention_mask = attention_mask[:, -1, -1, :]
-            if "int" in paddle.common_ops_import.convert_dtype(
-                    attention_mask.dtype):
-                attention_mask = (1.0 - attention_mask) * -1e4
+        if attention_mask is not None and len(attention_mask.shape) == 4:
+            attention_mask = attention_mask[:, -1:, -1:, :]
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
@@ -1183,6 +1197,19 @@ class GPTLMHeadModel(GPTPretrainedModel):
             "use_cache": use_cache,
             "cache": cache
         }
+
+    @staticmethod
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id,
+                                              eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
+            input_ids == pad_token_id).numpy().item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id))
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            attention_mask = (input_ids != pad_token_id).astype("int64")
+        else:
+            attention_mask = paddle.ones_like(input_ids, dtype="int64")
+        return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
     def __getattr__(self, name):
         try:

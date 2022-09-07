@@ -41,9 +41,11 @@ b. 硬件环境：
 c. 依赖安装：
 首先需要安装PaddlePaddle，PaddlePaddle的安装请参考文档[官方安装文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，然后安装下面的依赖：
 ```bash
+# pip 一键安装
+pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 或者源码进行安装最新版本
+cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-# 1) 安装 pipelines package
-cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
 ```
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
@@ -65,6 +67,7 @@ python examples/frequently-asked-question/dense_faq_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/frequently-asked-question/dense_faq_example.py --device cpu
 ```
+`dense_faq_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
 
 ### 3.4 构建 Web 可视化FAQ智能问答
 
@@ -161,6 +164,8 @@ sh examples/frequently-asked-question/run_faq_web.sh
 我想买保险，可以买哪些？    人身保障的保险，主要可以分为四大险种——即意外险、重疾险、医疗险和寿险。意外险——像过马路被车撞、被开水烫伤等等意外，意外险皆可赔付。医疗险——花多少钱报销多少钱，一般建议买百万医疗险。重疾险——得了重疾，按比例一次性赔付你约定保额。寿险——身故即赔。
 选保险产品时，保险公司很重要吗？    重要，但不是第一重要，也不是最重要。产品应该是优先于公司的，毕竟产品的保障才是最直接和我们的利益挂钩的。在保险产品的保障差不多的情况下，知名度更高的保险公司会更好。
 ```
+
+如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137

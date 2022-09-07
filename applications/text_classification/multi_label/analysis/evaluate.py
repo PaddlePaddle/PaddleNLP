@@ -135,9 +135,8 @@ def evaluate():
     probs = []
     labels = []
     for batch in train_data_loader:
-        input_ids, token_type_ids, label = batch['input_ids'], batch[
-            'token_type_ids'], batch['labels']
-        logits = model(input_ids, token_type_ids)
+        label = batch.pop("labels")
+        logits = model(**batch)
         labels.extend(label.numpy())
         probs.extend(F.sigmoid(logits).numpy())
     probs = np.array(probs)
@@ -151,9 +150,8 @@ def evaluate():
     probs = []
     labels = []
     for batch in dev_data_loader:
-        input_ids, token_type_ids, label = batch['input_ids'], batch[
-            'token_type_ids'], batch['labels']
-        logits = model(input_ids, token_type_ids)
+        label = batch.pop("labels")
+        logits = model(**batch)
         labels.extend(label.numpy())
         probs.extend(F.sigmoid(logits).numpy())
     probs = np.array(probs)

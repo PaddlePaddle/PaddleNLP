@@ -6,6 +6,8 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
     <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
 </div>
 
+
+
 ## 智能文本产线特色
 * **全场景支持**：依托灵活的插拔式组件产线化设计，支持各类 NLP 场景任务，包括：信息抽取、情感倾向分析、阅读理解、检索系统、问答系统、文本分类、文本生成等。
 
@@ -14,6 +16,14 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
 * **高精度预测**：基于前沿的预训练模型、成熟的系统方案，可构建效果领先的产品级系统，如[智能文本产线库](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#智能文本产线库)中预置的语义检索系统、阅读理解式智能问答系统等。
 
 * **灵活可定制**：除深度兼容 PaddleNLP 模型组件外，还可嵌入飞桨生态下任意模型、[AI 开放平台算子](https://ai.baidu.com/)、其它开源项目如 Elasticsearch 等作为基础组件，快速扩展，从而实现任意复杂系统的灵活定制开发。
+
+## Benchmarks
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/187362675-f0818e77-a521-4479-8dd7-bcbf4a820f7d.png" width="500">
+</div>
+
+更多的Benchmarks的信息请参考文档[Benchmarks](./benchmarks/README.md)
 
 ## 智能文本产线库
 
@@ -47,7 +57,7 @@ Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装
 - Docker 18.03 以上
 ### pip 安装
 ```
-pip install --upgrade pipelines
+pip install --upgrade paddle-pipelines
 ```
 
 ### 源码安装
@@ -67,21 +77,29 @@ python setup.py install
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import DensePassageRetriever, ErnieRanker
 
-# Step1: Initialize a FaissDocumentStore to store texts of documents
+# Step1: Preparing the data
+documents = [
+  {'content': '金钱龟不分品种,只有生长地之分,在我国主要分布于广东、广西、福建、海南、香港、澳门等地,在国外主要分布于越南等亚热带国家和地区。',
+  'meta': {'name': 'test1.txt'}},
+  {'content': '衡量酒水的价格的因素很多的，酒水的血统(也就是那里产的，采用什么工艺等）；存储的时间等等，酒水是一件很难标准化得商品，只要你敢要价，有买的那就值那个钱。',
+  'meta': {'name': 'test2.txt'}}
+]
+
+# Step2: Initialize a FaissDocumentStore to store texts of documents
 document_store = FAISSDocumentStore(embedding_dim=768)
 document_store.write_documents(documents)
 
-# Step2: Initialize a DenseRetriever and build ANN index
-retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-dureader-query-encoder")
+# Step3: Initialize a DenseRetriever and build ANN index
+retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-base-query-encoder",embed_title=False)
 document_store.update_embeddings(retriever)
 
-# Step3: Initialize a Ranker
-ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder")
+# Step4: Initialize a Ranker
+ranker = ErnieRanker(model_name_or_path="rocketqa-base-cross-encoder")
 
-# Step4: Initialize a SemanticSearchPipeline and ask questions
+# Step5: Initialize a SemanticSearchPipeline and ask questions
 from pipelines import SemanticSearchPipeline
 pipeline = SemanticSearchPipeline(retriever, ranker)
-prediction = pipeline.run(query="亚马逊河流的相关介绍")
+prediction = pipeline.run(query="衡量酒水的价格的因素有哪些?")
 ```
 ### 快速部署
 
@@ -106,11 +124,20 @@ docker run \
 ```
 
 #### 部署 CPU 服务
+
+对于Linux使用Docker的用户，使用下面的命令：
 ```
 docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 docker run -d --name paddlenlp_pipelines --net host -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0
 ```
+对于Windows&Macos上使用Docker的用户，用下面的命令：
+
+```
+docker pull registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin
+docker run -d --name paddlenlp_pipelines  -p 8891:8891 -p 8502:8502 -ti registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin
+```
 CPU 镜像下载大概耗时 10 分钟左右，容器启动成功后，等待3分钟左右，通过浏览器访问 [http://127.0.0.1:8502](http://127.0.0.1:8502) 快速体验产品级语义检索服务。
+
 
 #### 部署 GPU 服务
 ```
@@ -151,7 +178,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 
 #### 查询精度大幅提升
 
-市面已有的工程规范查询系统解决方案一直延续着传统关键字词匹配的方式，依赖用户对对查询结果进行自行排序、筛选，甚至要再次人工查阅工程规范文件后，才能最终确认是否为想要查询的规范条款。传统规范查询系统至少需要进行 3~5 次查询才能找到用户想要的规范条款，而寻规系统是基于强大预训练模型构建起来的语义检索系统，针对 80% 的规范查询需求仅 **1 次查询** 就能精确命中查询意图，并返回查询条款的结果！
+市面现已有的工程规范查询系统解决方案一直延续着传统关键字词匹配的查询方式，依赖用户对查询结果进行自行排序、筛选、鉴别，有时甚至还要再次由工程设计人员耗费一定时间精力人工查阅工程规范文件后，才能最终确认是否为想要查询的规范条款。传统规范查询系统至少需要进行 3~5 次查询才能找到用户想要的规范条款，而寻规系统是基于强大预训练模型构建起来的语义检索系统，针对 80% 的规范查询需求仅 **1 次查询** 就能精确命中查询意图，并返回真正符合工程设计人员查询意图的结果！
 
 ## :mortar_board: Tutorials
 - Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)

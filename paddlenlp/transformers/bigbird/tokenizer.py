@@ -26,6 +26,8 @@ from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['BigBirdTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"bigbird-base-uncased": 4096}
+
 
 class BigBirdTokenizer(PretrainedTokenizer):
     """
@@ -78,6 +80,8 @@ class BigBirdTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  sentencepiece_model_file,
