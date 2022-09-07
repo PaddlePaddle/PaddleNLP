@@ -32,10 +32,10 @@
 ## News 📢
 
 * 🔥 **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
-  * 💎 **[NLP 流水线系统 Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines)** 发布，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 😊 新增文本分类**多分类、多标签、层次分类**的全流程方案，基于多样的数据增强策略、前沿的 TrustAI 可信计算等，解决分类任务调优难题。
-  * 🍭 新增**文图生成、代码生成、文本摘要**功能，支持 Taskflow 一键调用，打通 FasterGeneration 高性能推理；
-  * 💪 新增多语言模型 **UIE-M**，支持中英文混合抽取；新增基于封闭域模型 GlobalPointer 的 **UIE 数据蒸馏**方案，推理速度提升100倍以上！
+  * 💎 NLP工具: **[NLP 流水线系统 Pipelines](./pipelines)** 发布，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
+  * 😊 产业应用: 新增[文本分类应用](./applications/text_classification)**多分类、多标签、层次分类**的全流程方案，支持 **小样本学习** 和 **TrustAI** 可信计算模型调优；[UIE信息抽取](./model_zoo/uie)发布**UIE-M**，支持中英文混合抽取，新增**UIE 数据蒸馏**方案，推理速度提升100倍以上；
+  * 🍭 AIGC内容生成: 新增代码生成SOTA模型[**CodeGen**](./examples/code_generation/codegen)，支持多种编程语言代码生成；集成[文图生成潮流模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) **DALL-E-mini**、**Disco Diffusion**、**Stable Diffusion**，更多趣玩模型等你来玩；新增[中文文本摘要应用](./applications/text_summarization)，基于大规模语料的中文摘要模型首次发布，可支持Taskflow一键调用；
+  * 💪 框架升级: [**模型自动压缩API**](./docs/compression.md)发布，自动对模型进行裁减和量化，大幅提升模型部署效率；[**小样本Prompt框架发布**](./applications/text_classification/multi_class/few-shot)，支持PET、P-Tuning、RGL等经典模型的快速实现；
 
 
 * 👀 **2022.9.6 飞桨智慧金融行业系列直播课**
@@ -49,17 +49,6 @@
     <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/188596360-264415d4-5462-43ad-8517-5b7e690061ce.jpg" width="150" height="150" />
     </div>
-
-* 📝 **2022.8.1  发布[PaddleNLP v2.3.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.5)**
-
-  * 新增 [**CodeGen**](./examples/code_generation/codegen) 对话式程序生成大模型，支持 Taskflow 一键调用，自动补全、生成代码；
-  * UIE 英文模型 [**UIE-en**](./model_zoo/uie) 正式发布，支持英文文本信息抽取；
-  * 集成 Findings of NAACL 2022 前沿 Prompt-based tuning 小样本学习算法 [**RGL**](./examples/few_shot/RGL)。
-
-* 🍭 **2022.6.29 发布 [PaddleNLP v2.3.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.4)**
-
-  * [**ERNIE Tiny**](./model_zoo/ernie-3.0) 全系列中文预训练小模型发布，又准又快；
-  * 通用信息抽取技术[**UIE Tiny**](./model_zoo/uie) 系列模型全新升级，支持速度更快效果更好的UIE小模型。
 
 * 🔥 **2022.5.16  发布 [PaddleNLP v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)**
   * 💎 发布通用信息抽取技术 [**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**零样本抽取**与全流程**小样本**高效定制开发；
