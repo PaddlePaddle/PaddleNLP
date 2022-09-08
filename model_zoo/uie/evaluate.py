@@ -27,20 +27,25 @@ from utils import convert_example, reader, unify_prompt_name
 
 
 @paddle.no_grad()
-def evaluate(model, metric, data_loader):
+def evaluate(model, metric, data_loader, multilingual=False):
     """
     Given a dataset, it evals model and computes the metric.
     Args:
         model(obj:`paddle.nn.Layer`): A model to classify texts.
         metric(obj:`paddle.metric.Metric`): The evaluation metric.
         data_loader(obj:`paddle.io.DataLoader`): The dataset loader which generates batches.
+        multilingual(bool): Whether is the multilingual model.
     """
     model.eval()
     metric.reset()
     for batch in data_loader:
-        input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
-        start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
-                                     pos_ids)
+        if multilingual:
+            input_ids, pos_ids, start_ids, end_ids = batch
+            start_prob, end_prob = model(input_ids, pos_ids)
+        else:
+            input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
+            start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
+                                         pos_ids)
         start_ids = paddle.cast(start_ids, 'float32')
         end_ids = paddle.cast(end_ids, 'float32')
         num_correct, num_infer, num_label = metric.compute(
@@ -53,7 +58,10 @@ def evaluate(model, metric, data_loader):
 
 def do_eval():
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    model = UIE.from_pretrained(args.model_path)
+    if args.multilingual:
+        model = UIEM.from_pretrained(args.model_path)
+    else:
+        model = UIE.from_pretrained(args.model_path)
 
     test_ds = load_dataset(reader,
                            data_path=args.test_path,
@@ -76,7 +84,8 @@ def do_eval():
         test_ds = test_ds.map(
             partial(convert_example,
                     tokenizer=tokenizer,
-                    max_seq_len=args.max_seq_len))
+                    max_seq_len=args.max_seq_len,
+                    multilingual=args.multilingual))
         test_batch_sampler = paddle.io.BatchSampler(dataset=test_ds,
                                                     batch_size=args.batch_size,
                                                     shuffle=False)
@@ -84,7 +93,8 @@ def do_eval():
             dataset=test_ds, batch_sampler=test_batch_sampler, return_list=True)
 
         metric = SpanEvaluator()
-        precision, recall, f1 = evaluate(model, metric, test_data_loader)
+        precision, recall, f1 = evaluate(model, metric, test_data_loader,
+                                         args.multilingual)
         logger.info("-----------------------------")
         logger.info("Class Name: %s" % key)
         logger.info("Evaluation Precision: %.5f | Recall: %.5f | F1: %.5f" %
@@ -100,7 +110,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--debug", action='store_true', help="Precision, recall and F1 score are calculated for each class separately if this option is enabled.")
-
+    parser.add_argument("--multilingual", action='store_true', help="Whether is the multilingual model.")
     args = parser.parse_args()
     # yapf: enable
 
