@@ -57,7 +57,7 @@ def convert_example(example,
     tokens = list(example["text"]) + ["是"] + ["[MASK]"] * max_cls_len
     inputs = tokenzier(tokens,
                        return_length=True,
-                       is_split_into_words=True,
+                       is_split_into_words='token',
                        max_length=max_seq_len)
 
     label_indices = list(

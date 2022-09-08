@@ -26,6 +26,13 @@ from ...transformers import GPTTokenizer, AddedToken
 
 __all__ = ['DalleBartTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "dalle-mini": 64,
+    "dalle-mega-v16": 64,
+    "dalle-mega-v26": 64,
+    "dalle-mega": 64
+}
+
 # based on wiki word occurrence
 person_token = [("a person", 282265), ("someone", 121194), ("somebody", 12219)]
 temp_token = "xtokx"  # avoid repeating chars
@@ -383,6 +390,7 @@ class DalleBartTokenizer(GPTTokenizer):
             "normalize_text": True
         },
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
