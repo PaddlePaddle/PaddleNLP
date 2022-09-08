@@ -1,6 +1,6 @@
 # 基于Paddle Serving的服务化部署
 
-本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具实线文本分类pipeline在线服务。
+本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具搭建层次分类在线服务部署。
 
 ## 目录
 - [环境准备](#环境准备)

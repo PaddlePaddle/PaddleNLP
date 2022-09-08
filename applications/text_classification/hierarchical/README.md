@@ -188,8 +188,6 @@ data/
 
 ### 2.4 模型训练
 
-
-
 #### 2.4.1 预训练模型微调
 
 使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
@@ -208,7 +206,7 @@ python train.py \
 ```shell
 python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
     --dataset_dir "data" \
-    --device "gpu" \
+    --device "cpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
@@ -266,7 +264,7 @@ checkpoint/
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `--init_from_ckpt checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
-* 英文和中文以外文本分类任务建议使用多语言预训练模型"ernie-m-base"、"ernie-m-large"。
+* 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 #### 2.4.2 训练评估与模型优化
 
 训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
@@ -420,7 +418,7 @@ prune/
 
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
-4. 压缩API暂不支持多语言预训练模型ERNIE M，相关功能正在加紧开发中。
+4. **压缩API暂不支持多语言预训练模型ERNIE-M**，相关功能正在加紧开发中。
 
 #### 2.5.3 部署方案
 
@@ -462,7 +460,8 @@ prune/
 
 |   | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |------------ |
-|ERNIE 3.0 Xbase |16-layer, 1024-hidden, 16-heads|96.21|94.13| 5.51 |
+|ERNIE 1.0 Large Cw  |24-layer, 1024-hidden, 20-heads|96.24|94.24 |5.59 |
+|ERNIE 3.0 Xbase |20-layer, 1024-hidden, 16-heads|96.21|94.13| 5.51 |
 |ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|95.68|93.39| 2.01 |
 |ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|95.26|93.22| 1.01|
 |ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|94.72|93.03| 0.36|

@@ -45,8 +45,16 @@ def read_local_dataset(path, label_list):
     label_list_dict = {label_list[i]: i for i in range(len(label_list))}
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
-            sentence, label = line.strip().split('\t')
-            labels = [label_list_dict[l] for l in label.split(',')]
+            items = line.strip().split('\t')
+            if len(items) == 0:
+                continue
+            elif len(items) == 1:
+                sentence = items[0]
+                labels = []
+            else:
+                sentence = ''.join(items[:-1])
+                label = items[-1]
+                labels = [label_list_dict[l] for l in label.split(',')]
             yield {'sentence': sentence, 'label': labels}
 
 

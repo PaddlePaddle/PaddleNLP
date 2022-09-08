@@ -1,6 +1,6 @@
 # 基于Paddle Serving的服务化部署
 
-本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具部署基于ERNIE 3.0的多分类部署pipeline在线服务。
+本文档将介绍如何使用[Paddle Serving](https://github.com/PaddlePaddle/Serving/blob/develop/README_CN.md)工具搭建多分类在线服务部署。
 
 ## 目录
 - [环境准备](#环境准备)
