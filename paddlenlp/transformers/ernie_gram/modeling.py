@@ -18,14 +18,10 @@ import paddle.nn as nn
 from ..ernie.modeling import ErniePooler
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    BaseModelOutputWithPoolingAndCrossAttentions,
+    BaseModelOutputWithPooling,
     SequenceClassifierOutput,
     TokenClassifierOutput,
     QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    ModelOutput,
 )
 
 __all__ = [
@@ -355,10 +351,10 @@ class ErnieGramModel(ErnieGramPretrainedModel):
 
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
-        return BaseModelOutputWithPoolingAndCrossAttentions(
+
+        return BaseModelOutputWithPooling(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
-            past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions)
 
@@ -562,7 +558,7 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                                   position_ids=position_ids,
                                   attention_mask=attention_mask)
 
-        logits = self.classifier(sequence_output[0])
+        logits = self.classifier(outputs[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
@@ -582,6 +578,7 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
             start_loss = loss_fct(start_logits, start_positions)
             end_loss = loss_fct(end_logits, end_positions)
             total_loss = (start_loss + end_loss) / 2
+
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
             return ((total_loss, ) +

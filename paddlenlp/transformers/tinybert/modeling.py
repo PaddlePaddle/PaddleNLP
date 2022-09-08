@@ -20,13 +20,10 @@ from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 
 from ..model_outputs import (
-    BaseModelOutputWithPoolingAndCrossAttentions,
+    BaseModelOutputWithPooling,
     SequenceClassifierOutput,
-    TokenClassifierOutput,
     QuestionAnsweringModelOutput,
     MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
 )
 
 __all__ = [
@@ -390,17 +387,16 @@ class TinyBertModel(TinyBertPretrainedModel):
             sequence_output = encoder_outputs
             pooled_output = self.pooler(sequence_output)
             return (sequence_output, pooled_output)
-        else:
-            sequence_output = encoder_outputs[0]
-            pooled_output = self.pooler(sequence_output)
-            if not return_dict:
-                return (sequence_output, pooled_output) + encoder_outputs[1:]
-            return BaseModelOutputWithPoolingAndCrossAttentions(
-                last_hidden_state=sequence_output,
-                pooler_output=pooled_output,
-                past_key_values=encoder_outputs.past_key_values,
-                hidden_states=encoder_outputs.hidden_states,
-                attentions=encoder_outputs.attentions)
+
+        sequence_output = encoder_outputs[0]
+        pooled_output = self.pooler(sequence_output)
+        if not return_dict:
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
+        return BaseModelOutputWithPooling(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions)
 
 
 class TinyBertForPretraining(TinyBertPretrainedModel):

@@ -23,12 +23,10 @@ from paddle.nn import TransformerEncoderLayer, TransformerEncoder
 from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
-                             BaseModelOutputWithPastAndCrossAttentions,
-                             SequenceClassifierOutput, TokenClassifierOutput,
+from ..model_outputs import (BaseModelOutput, SequenceClassifierOutput,
+                             TokenClassifierOutput,
                              QuestionAnsweringModelOutput,
-                             MultipleChoiceModelOutput, MaskedLMOutput,
-                             CausalLMOutputWithCrossAttentions, ModelOutput)
+                             MultipleChoiceModelOutput, MaskedLMOutput)
 
 __all__ = [
     'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
@@ -175,7 +173,7 @@ class TransformerEncoderPro(TransformerEncoder):
 
             return output if cache is None else (output, new_caches)
 
-        return BaseModelOutputWithPastAndCrossAttentions(
+        return BaseModelOutput(
             last_hidden_state=output,
             hidden_states=all_hidden_states,
             attentions=all_attentions,
@@ -699,7 +697,6 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                                                      attention_mask)
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
-
         return logits
 
 

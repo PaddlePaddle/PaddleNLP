@@ -23,9 +23,9 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
+    BaseModelOutput,
     ModelOutput,
-    BaseModelOutputWithPastAndCrossAttentions,
-    BaseModelOutputWithPoolingAndCrossAttentions,
+    BaseModelOutputWithPooling,
     MaskedLMOutput,
     MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
@@ -467,10 +467,9 @@ class AlbertTransformer(Layer):
             return tuple(
                 v for v in [hidden_states, all_hidden_states, all_attentions]
                 if v is not None)
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            hidden_states=all_hidden_states,
-            attentions=all_attentions)
+        return BaseModelOutput(last_hidden_state=hidden_states,
+                               hidden_states=all_hidden_states,
+                               attentions=all_attentions)
 
 
 class AlbertPretrainedModel(PretrainedModel):
@@ -1054,7 +1053,6 @@ class AlbertModel(AlbertPretrainedModel):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `False`.
 
-
          Returns:
              tuple or Dict: Returns tuple (`sequence_output`, `pooled_output`) or a dict with
              `last_hidden_state`, `pooled_output`, `all_hidden_states`, `all_attentions` fields.
@@ -1144,7 +1142,7 @@ class AlbertModel(AlbertPretrainedModel):
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
 
-        return BaseModelOutputWithPoolingAndCrossAttentions(
+        return BaseModelOutputWithPooling(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
             hidden_states=encoder_outputs.hidden_states,
