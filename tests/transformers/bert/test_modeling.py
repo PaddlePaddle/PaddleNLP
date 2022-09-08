@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import shutil
+import tempfile
 import unittest
 import paddle
 
@@ -21,10 +24,15 @@ from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForS
 
 from paddlenlp.transformers.bert.configuration import BertConfig
 
-from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
-from ...testing_utils import slow
+# from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+# from ...testing_utils import slow
 
-from ..test_configuration_common import ConfigTester
+# from ..test_configuration_common import ConfigTester
+
+from tests.transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+from tests.testing_utils import slow
+
+from tests.transformers.test_configuration_common import ConfigTester
 
 
 class BertModelTester:
@@ -516,11 +524,54 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
             *config_and_inputs)
 
     @slow
+    def test_model_from_pretrained_with_cache_dir(self):
+        for model_name in list(
+                BertPretrainedModel.pretrained_init_configuration)[:1]:
+            with tempfile.TemporaryDirectory() as tempdir:
+                tempdir = str(tempdir)
+
+                model: BertModel = BertModel.from_pretrained(model_name,
+                                                             cache_dir=tempdir)
+                self.assertIsNotNone(model)
+
+                self.assertTrue(
+                    os.path.isfile(
+                        os.path.join(
+                            tempdir, BertPretrainedModel.
+                            resource_files_names['model_state'])))
+
+    @slow
     def test_model_from_pretrained(self):
         for model_name in list(
                 BertPretrainedModel.pretrained_init_configuration)[:1]:
-            model = BertModel.from_pretrained(model_name)
+            model: BertModel = BertModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+            with tempfile.TemporaryDirectory() as tempdir:
+                tempdirname = str(tempdir)
+                model.save_pretrained(tempdirname)
+
+                saved_model_state_file = os.path.join(
+                    tempdirname, BertModel.resource_files_names['model_state'])
+
+                self.assertTrue(os.path.isfile(saved_model_state_file))
+
+                # rename it to the old style: name of url
+                url = BertModel.pretrained_resource_files_map['model_state'][
+                    model_name]
+                pretrained_resource_file_name = os.path.split(url)[-1]
+                target_file_path = os.path.join(tempdirname,
+                                                pretrained_resource_file_name)
+
+                shutil.copyfile(saved_model_state_file, target_file_path)
+                os.remove(saved_model_state_file)
+
+                new_model = BertModel.from_pretrained(tempdirname)
+            first_key = list(model.state_dict().keys())[0]
+
+            self.assertEqual(
+                (model.state_dict()[first_key] -
+                 new_model.state_dict()[first_key]).sum().numpy().item(), 0)
 
     def test_model_name_list(self):
         config = self.model_tester.get_config()
