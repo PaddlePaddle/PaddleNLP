@@ -23,6 +23,7 @@ from tqdm import tqdm
 import numpy as np
 import paddle
 from paddlenlp.utils.log import logger
+from paddlenlp.taskflow.utils import SchemaTree
 
 from data_collator import DataCollator
 
@@ -458,7 +459,7 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
     if task_type == "opinion_extraction":
         outputs = []
         for i, line in enumerate(infer_results):
-            pred = line
+            pred = line[0]
             output = {"text": texts[i]}
 
             entity_list = []
@@ -501,7 +502,7 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
     else:
         outputs = []
         for i, line in enumerate(infer_results):
-            pred = line
+            pred = line[0]
             output = {"text": texts[i]}
 
             entity_list = []

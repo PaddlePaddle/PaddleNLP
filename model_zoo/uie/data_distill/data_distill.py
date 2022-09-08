@@ -23,7 +23,6 @@ from tqdm import tqdm
 import numpy as np
 import paddle
 from paddlenlp import Taskflow
-from paddlenlp.taskflow.utils import SchemaTree
 from paddlenlp.utils.log import logger
 
 from utils import set_seed, build_tree, schema2label_maps, doccano2distill, synthetic2distill
