@@ -14,6 +14,10 @@
 
 本项目中从CMeIE数据集中采样少量数据展示了UIE数据蒸馏流程，[示例数据下载](https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip)，解压后放在``../data``目录下。
 
+```shell
+wget https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip && unzip data.zip -d ../
+```
+
 示例数据包含以下两部分：
 
 | 名称 |  数量  |
