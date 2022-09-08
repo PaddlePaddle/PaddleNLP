@@ -25,6 +25,12 @@ from .. import BasicTokenizer, PretrainedTokenizer
 
 __all__ = ['ErnieCtmTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "ernie-ctm": 512,
+    "wordtag": 512,
+    "nptag": 512
+}
+
 
 class ErnieCtmTokenizer(PretrainedTokenizer):
     r"""
@@ -101,6 +107,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             "cls_num": 2
         },
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

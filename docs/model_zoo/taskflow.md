@@ -41,7 +41,9 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
-| [文图生成](#文图生成)          | `Taskflow("text2image_generation")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
+| [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
+
 
 ## QuickStart
 
@@ -668,7 +670,7 @@ from paddlenlp import Taskflow
     ```python
     >>> schema = [{'Person': ['Company', 'Position']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+    >>> pprint(ie_en('In 1997, Steve was excited to become the CEO of Apple.'))
     [{'Person': [{'end': 14,
                   'probability': 0.999631971804547,
                   'relations': {'Company': [{'end': 53,
@@ -711,7 +713,7 @@ from paddlenlp import Taskflow
     [{'地震触发词': [{'text': '地震', 'start': 56, 'end': 58, 'probability': 0.9987181623528585, 'relations': {'地震强度': [{'text': '3.5级', 'start': 52, 'end': 56, 'probability': 0.9962985320905915}], '时间': [{'text': '5月16日06时08分', 'start': 11, 'end': 22, 'probability': 0.9882578028575182}], '震中位置': [{'text': '云南临沧市凤庆县(北纬24.34度，东经99.98度)', 'start': 23, 'end': 50, 'probability': 0.8551415716584501}], '震源深度': [{'text': '10千米', 'start': 63, 'end': 67, 'probability': 0.999158304648045}]}}]}]
     ```
 
-  - 英文模型**暂不支持事件抽取**
+  - 英文模型zero-shot方式**暂不支持事件抽取**，如有英文事件抽取相关语料请进行训练定制。
 
 #### 评论观点抽取
 
@@ -770,19 +772,19 @@ from paddlenlp import Taskflow
     英文模型调用示例：
 
     ```python
-    >>> schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+    >>> schema = [{'Aspect': ['Opinion', 'Sentiment classification [negative, positive]']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en("overall i 'm happy with my toy.")
-    [{'Comment object': [{'end': 30,
-                          'probability': 0.9774399346859042,
-                          'relations': {'Opinion': [{'end': 18,
-                                                    'probability': 0.6168918705033555,
-                                                    'start': 13,
-                                                    'text': 'happy'}],
-                                        'Sentiment classification [negative, positive]': [{'probability': 0.9999556545777182,
-                                                                                          'text': 'positive'}]},
-                          'start': 24,
-                          'text': 'my toy'}]}]
+    >>> pprint(ie_en("The teacher is very nice."))
+    [{'Aspect': [{'end': 11,
+                  'probability': 0.4301476415932193,
+                  'relations': {'Opinion': [{'end': 24,
+                                            'probability': 0.9072940447883724,
+                                            'start': 15,
+                                            'text': 'very nice'}],
+                                'Sentiment classification [negative, positive]': [{'probability': 0.9998571920670685,
+                                                                                  'text': 'positive'}]},
+                  'start': 4,
+                  'text': 'teacher'}]}]
     ```
 
 #### 情感分类
@@ -811,7 +813,7 @@ from paddlenlp import Taskflow
     英文模型调用示例：
 
     ```python
-    >>> schema = [{'Person': ['Company', 'Position']}]
+    >>> schema = 'Sentiment classification [negative, positive]'
     >>> ie_en.set_schema(schema)
     >>> ie_en('I am sorry but this is the worst film I have ever seen in my life.')
     [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
@@ -874,8 +876,10 @@ from paddlenlp import Taskflow
   | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
   | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
   | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
+  | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
+  | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
 
-- `uie-nano`调用示例
+- `uie-nano`调用示例：
 
   ```python
   >>> from paddlenlp import Taskflow
@@ -884,6 +888,41 @@ from paddlenlp import Taskflow
   >>> ie = Taskflow('information_extraction', schema=schema, model="uie-nano")
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.6513581678349247}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.9819330659468051}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.4908131110420939}]}]
+  ```
+
+- `uie-m-base`和`uie-m-large`支持中英文混合抽取，调用示例：
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['Time', 'Player', 'Competition', 'Score']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-m-base", schema_lang="en")
+  >>> pprint(ie(["2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！", "Rafael Nadal wins French Open Final!"]))
+  [{'Competition': [{'end': 23,
+                    'probability': 0.9373889907291257,
+                    'start': 6,
+                    'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+    'Player': [{'end': 31,
+                'probability': 0.6981119555336441,
+                'start': 28,
+                'text': '谷爱凌'}],
+    'Score': [{'end': 39,
+              'probability': 0.9888507878270296,
+              'start': 32,
+              'text': '188.25分'}],
+    'Time': [{'end': 6,
+              'probability': 0.9784080036931151,
+              'start': 0,
+              'text': '2月8日上午'}]},
+  {'Competition': [{'end': 35,
+                    'probability': 0.9851549932171295,
+                    'start': 18,
+                    'text': 'French Open Final'}],
+    'Player': [{'end': 12,
+                'probability': 0.9379371275888104,
+                'start': 0,
+                'text': 'Rafael Nadal'}]}]
   ```
 
 #### 定制训练
@@ -895,19 +934,24 @@ from paddlenlp import Taskflow
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-base (12L768H)<td><b>46.43</b><td><b>70.92</b><td><b>71.83</b><td><b>85.72</b><td><b>78.33</b><td><b>81.86</b>
+<tr><td>uie-base (12L768H)<td>46.43<td>70.92<td><b>71.83</b><td>85.72<td>78.33<td>81.86
 <tr><td>uie-medium (6L768H)<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-mini (6L384H)<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
 <tr><td>uie-micro (4L384H)<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 </table>
+<tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td><b>78.49</b><td><b>83.02</b>
+<tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
+</table>
 
-0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
 
 #### 可配置参数说明
+
+* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
+* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`, `uie-medical-base`, `uie-base-en`。
-* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖(主要是**确保安装onnxruntime-gpu**)。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 </div></details>
@@ -1347,29 +1391,114 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 # 默认模型为 pai-painter-painting-base-zh
 >>> text_to_image = Taskflow("text_to_image")
-# 单条输入
->>> images = text_to_image("风阁水帘今在眼，且来先看早梅红")
-# [<PIL.Image.Image image mode=RGB size=2048x256>]
->>> images[0].save("painting-figure.png")
-# 多条输入
->>> images = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
-# [<PIL.Image.Image image mode=RGB size=2048x256>,
-#  <PIL.Image.Image image mode=RGB size=2048x256>]
->>> for i, image in enumerate(images):
->>>     image.save(f"painting-figure_{i}.png")
-# pai-painter-commercial-base-zh模型
->>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
-# 多条输入
->>> images = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
->>> for i, image in enumerate(images):
->>>     image.save(f"commercial-figure_{i}.png")
-# dalle-mini模型
->>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
-# 多条输入
->>> images = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
->>> for i, image in enumerate(images):
->>>     image.save(f"dalle-mini-figure_{i}.png")
+# 单条输入， 默认返回2张图片。
+>>> image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
+# [[<PIL.Image.Image image mode=RGB size=256x256>], [<PIL.Image.Image image mode=RGB size=256x256>]]
+>>> image_list[0][0].save("painting-figure-1.png")
+>>> image_list[0][1].save("painting-figure-2.png")
+>>> image_list[0][0].argument
+# argument表示生成该图片所使用的参数
+# {'input': '风阁水帘今在眼，且来先看早梅红',
+#  'batch_size': 1,
+#  'seed': 2414128200,
+#  'temperature': 1.0,
+#  'top_k': 32,
+#  'top_p': 1.0,
+#  'condition_scale': 10.0,
+#  'num_return_images': 2,
+#  'use_faster': False,
+#  'use_fp16_decoding': False,
+#  'image_index_in_returned_images': 0}
+#
+# 多条输入， 返回值解释：[[第一个文本返回的第一张图片, 第一个文本返回的第二张图片], [第二个文本返回的第一张图片, 第二个文本返回的第二张图片]]
+>>> image_list = text_to_image(["风阁水帘今在眼，且来先看早梅红", "见说春风偏有贺，露花千朵照庭闹"])
+# [[<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>],
+#  [<PIL.Image.Image image mode=RGB size=256x256>, <PIL.Image.Image image mode=RGB size=256x256>]]
+>>> for batch_index, batch_image in enumerate(image_list):
+# len(batch_image) == 2 (num_return_images)
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"painting-figure_{batch_index}_{image_index_in_returned_images}.png")
 ```
+
+#### 支持多种模型
+
+##### EasyNLP仓库中的pai-painter模型
+```python
+>>> text_to_image = Taskflow("text_to_image", model="pai-painter-commercial-base-zh")
+>>> image_list = text_to_image(["女童套头毛衣打底衫秋冬针织衫童装儿童内搭上衣", "春夏真皮工作鞋女深色软皮久站舒适上班面试职业皮鞋"])
+>>> for batch_index, batch_image in enumerate(image_list):
+# len(batch_image) == 2 (num_return_images)
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"commercial-figure_{batch_index}_{image_index_in_returned_images}.png")
+```
+
+##### DALLE-mini模型
+```python
+>>> text_to_image = Taskflow("text_to_image", model="dalle-mini")
+>>> image_list = text_to_image(["New York Skyline with 'Google Research Pizza Cafe' written with fireworks on the sky.", "Dali painting of WALL·E"])
+>>> for batch_index, batch_image in enumerate(image_list):
+# len(batch_image) == 2 (num_return_images)
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"dalle-mini-figure_{batch_index}_{image_index_in_returned_images}.png")
+```
+
+##### Disco Diffusion模型
+```python
+# 注意，该模型生成速度较慢，在32G的V100上需要10分钟才能生成图片，因此默认返回1张图片。
+>>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh")
+>>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
+>>> for batch_index, batch_image in enumerate(image_list):
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"disco_diffusion_ernie_vil-2.0-base-zh-figure_{batch_index}_{image_index_in_returned_images}.png")
+```
+
+##### Stable Diffusion模型
+```python
+>>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
+>>> prompt = [
+    "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
+    "clouds surround the mountains and Chinese palaces,sunshine,lake,overlook,overlook,unreal engine,light effect,Dream，Greg Rutkowski,James Gurney,artstation"
+    ]
+>>> image_list = text_to_image(prompt)
+>>> for batch_index, batch_image in enumerate(image_list):
+# len(batch_image) == 2 (num_return_images)
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{image_index_in_returned_images}.png")
+```
+
+#### 支持复现生成结果 (以Stable Diffusion模型为例)
+```python
+>>> from paddlenlp import Taskflow
+>>> text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
+>>> prompt = [
+    "In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation",
+    ]
+>>> image_list = text_to_image(prompt)
+>>> for batch_index, batch_image in enumerate(image_list):
+# len(batch_image) == 2 (num_return_images)
+>>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
+>>>         each_image.save(f"stable-diffusion-figure_{batch_index}_{image_index_in_returned_images}.png")
+# 如果我们想复现promt[0]文本的第二张返回的结果，我们可以首先查看生成该图像所使用的参数信息。
+>>> each_image.argument
+# {'mode': 'text2image',
+#  'seed': 2389376819,
+#  'height': 512,
+#  'width': 512,
+#  'num_inference_steps': 50,
+#  'guidance_scale': 7.5,
+#  'latents': None,
+#  'num_return_images': 1,
+#  'input': 'In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation'}
+# 通过set_argument设置该参数。
+>>> text_to_image.set_argument(each_image.argument)
+>>> new_image = text_to_image(each_image.argument["input"])
+# 查看生成图片的结果，可以发现最终结果与之前的图片相一致。
+>>> new_image[0][0]
+```
+<p align="center">
+ <img src="https://user-images.githubusercontent.com/50394665/188396018-284336c0-f85e-442b-a4ff-4238720de121.png" align="middle">
+<p align="center">
+
 
 #### 图片生成效果展示
 <p align="center">
@@ -1379,12 +1508,41 @@ from paddlenlp import Taskflow
  <img src="https://user-images.githubusercontent.com/50394665/183386237-b0243ec5-09fe-47cc-9010-bd9b97fda862.png" align="middle">
  <img src="https://user-images.githubusercontent.com/50394665/183387833-0f9ef786-ea62-40e1-a48c-28680d418142.png" align="middle">
  <img src="https://user-images.githubusercontent.com/50394665/183387861-c4029b6c-f2e9-46d0-988f-6989f11a607d.png" align="middle">
+ <img src="https://user-images.githubusercontent.com/50394665/188397647-5c3e1804-82dc-4f6e-b7ec-befc15eb1910.png" align="middle" width="35%" height="35%">
+ <img src="https://user-images.githubusercontent.com/50394665/188397725-d43f84e7-d9aa-4fe0-a16c-2be1dc8b5c1d.png" align="middle" width="35%" height="35%">
+ <img src="https://user-images.githubusercontent.com/50394665/188397881-f2a76c5e-d853-4db0-be83-8ac0c2e0a634.png" align="middle" width="35%" height="35%">
+ <img src="https://user-images.githubusercontent.com/50394665/188397927-281402f1-a7f5-404f-9e4c-dc0236ba45ed.png" align="middle" width="35%" height="35%">
 <p align="center">
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "dalle-mini", "dalle-mega-v16", "dalle-mega"]`。
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "disco_diffusion_ernie_vil-2.0-base-zh"]`。
+* `num_return_images`：返回图片的数量，默认为2。特例：disco_diffusion模型由于生成速度太慢，因此该模型默认值为1。
+
+</div></details>
+
+### 文本摘要
+<details><summary>&emsp; 通过UNIMO-Text模型来生成摘要 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+>>> summarizer = Taskflow("text_summarization")
+# 单条输入
+>>> summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+# 输出：'雪后的景色可真美丽呀！'
+
+# 多条输入
+>>> summarizer([
+  "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
+  "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+  ])
+#输出：['雪后的景色可真美丽呀！', '成品油调价窗口8月23日24时开启']
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为`unimo-text-1.0-summary`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `num_return_images`：返回图片的数量，默认为8，即8张图片水平拼接形成一张长图。
 
 </div></details>
 
