@@ -19,7 +19,7 @@ limitations under the License. */
 #include "faster_tokenizer/core/added_vocabulary.h"
 #include "faster_tokenizer/core/base.h"
 #include "faster_tokenizer/utils/utils.h"
-#include "boost/variant.hpp"
+#include "faster_tokenizer/utils/variant.h"
 #include "nlohmann/json.hpp"
 
 namespace paddlenlp {
@@ -56,9 +56,9 @@ namespace core {
 class AddedVocabulary;
 class Encoding;
 
-using InputString = boost::variant<std::string, std::vector<std::string>>;
+using InputString = paddlenlp::variant<std::string, std::vector<std::string>>;
 using EncodeInput =
-    boost::variant<InputString, std::pair<InputString, InputString>>;
+    paddlenlp::variant<InputString, std::pair<InputString, InputString>>;
 
 class FASTERTOKENIZER_DECL Tokenizer {
 public:
