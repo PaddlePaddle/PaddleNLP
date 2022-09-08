@@ -316,7 +316,6 @@ class MPNetPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "mpnet-base": {
             "vocab_size": 30527,
@@ -334,7 +333,6 @@ class MPNetPretrainedModel(PretrainedModel):
             "pad_token_id": 1,
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "mpnet-base":

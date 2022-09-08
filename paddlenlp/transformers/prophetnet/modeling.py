@@ -135,7 +135,6 @@ class ProphetNetPretrainedModel(PretrainedModel):
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "prophetnet-large-uncased": {
             "activation_dropout": 0.1,
@@ -171,7 +170,6 @@ class ProphetNetPretrainedModel(PretrainedModel):
             "vocab_size": 30522
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "prophetnet-large-uncased":
