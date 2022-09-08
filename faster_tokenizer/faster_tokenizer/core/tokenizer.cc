@@ -163,7 +163,7 @@ bool Tokenizer::DoPreTokenize(
   return true;
 }
 
-struct InputStringVisitor : public boost::static_visitor<> {
+struct InputStringVisitor {
   InputStringVisitor(const Tokenizer* tokenizer,
                      uint32_t type_id,
                      OffsetType offset_type,
@@ -190,8 +190,8 @@ void Tokenizer::EncodeSingleString(const InputString& input_string,
                                    uint32_t type_id,
                                    OffsetType offset_type,
                                    Encoding* encodings) const {
-  boost::apply_visitor(
-      InputStringVisitor(this, type_id, offset_type, encodings), input_string);
+  paddlenlp::visit(InputStringVisitor(this, type_id, offset_type, encodings),
+                   input_string);
 }
 
 void Tokenizer::PostProcess(Encoding* encoding,
@@ -234,13 +234,13 @@ void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
                                   bool add_special_tokens) const {
   Encoding encoding;
   if (encode_input.type() == typeid(InputString)) {
-    const auto& input_string = boost::get<InputString>(encode_input);
+    const auto& input_string = paddlenlp::get<InputString>(encode_input);
     EncodeSingleString(input_string, 0, OffsetType::CHAR, &encoding);
     PostProcess(&encoding, nullptr, add_special_tokens, encodings);
   } else {
     Encoding pair_encoding;
     const auto& input_string_pair =
-        boost::get<std::pair<InputString, InputString>>(encode_input);
+        paddlenlp::get<std::pair<InputString, InputString>>(encode_input);
     EncodeSingleString(input_string_pair.first, 0, OffsetType::CHAR, &encoding);
     EncodeSingleString(
         input_string_pair.second, 1, OffsetType::CHAR, &pair_encoding);
@@ -273,9 +273,9 @@ void Tokenizer::EncodeBatchStrings(
 void Tokenizer::EncodePairStringsCharOffsets(const EncodeInput& encode_input,
                                              Encoding* encodings,
                                              bool add_special_tokens) const {
-  const auto& input_string = boost::get<InputString>(&encode_input);
+  const auto& input_string = paddlenlp::get_if<InputString>(&encode_input);
   const auto& input_string_pair =
-      boost::get<std::pair<InputString, InputString>>(&encode_input);
+      paddlenlp::get_if<std::pair<InputString, InputString>>(&encode_input);
   Encoding encoding;
   Encoding pair_encoding;
   if (input_string != nullptr) {
