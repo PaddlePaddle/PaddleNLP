@@ -16,8 +16,8 @@
 #include <string>
 
 #include "faster_tokenizer/core/encoding.h"
-#include "glog/logging.h"
 #include "faster_tokenizer/postprocessors/template.h"
+#include "glog/logging.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
@@ -27,7 +27,7 @@ void ParseIdFromString(const std::string& template_id_string,
                        TemplatePiece* template_piece) {
   if (template_id_string.find_first_of("$") == 0) {
     *template_piece = TemplateSequence();
-    auto& seq = boost::get<TemplateSequence>(*template_piece);
+    auto& seq = paddlenlp::get<TemplateSequence>(*template_piece);
     std::string rest =
         template_id_string.substr(template_id_string.find_first_not_of("$"));
     if (rest == "" || rest == "A" || rest == "a") {
@@ -48,15 +48,16 @@ void ParseIdFromString(const std::string& template_id_string,
     }
   } else {
     *template_piece = TemplateSpecialToken();
-    boost::get<TemplateSpecialToken>(*template_piece) = {template_id_string, 0};
+    paddlenlp::get<TemplateSpecialToken>(*template_piece) = {template_id_string,
+                                                             0};
   }
 }
 
 void SetTypeId(uint32_t type_id, TemplatePiece* template_piece) {
-  if (boost::get<TemplateSequence>(template_piece) != nullptr) {
-    boost::get<TemplateSequence>(*template_piece).second = type_id;
+  if (paddlenlp::get_if<TemplateSequence>(template_piece) != nullptr) {
+    paddlenlp::get<TemplateSequence>(*template_piece).second = type_id;
   } else {
-    boost::get<TemplateSpecialToken>(*template_piece).second = type_id;
+    paddlenlp::get<TemplateSpecialToken>(*template_piece).second = type_id;
   }
 }
 
@@ -84,8 +85,8 @@ void GetTemplatePieceFromString(const std::string& template_string,
 }
 
 void to_json(nlohmann::json& j, const TemplatePiece& template_piece) {
-  if (boost::get<TemplateSequence>(&template_piece) != nullptr) {
-    auto& template_sequence = boost::get<TemplateSequence>(template_piece);
+  if (paddlenlp::get_if<TemplateSequence>(&template_piece) != nullptr) {
+    auto& template_sequence = paddlenlp::get<TemplateSequence>(template_piece);
     j = {
         {"Sequence",
          {
@@ -95,7 +96,7 @@ void to_json(nlohmann::json& j, const TemplatePiece& template_piece) {
     };
   } else {
     auto& template_special_token =
-        boost::get<TemplateSpecialToken>(template_piece);
+        paddlenlp::get<TemplateSpecialToken>(template_piece);
     j = {
         {"SpecialToken",
          {
@@ -135,7 +136,7 @@ size_t TemplatePostProcessor::CountAdded(
   size_t count = 0;
   for (auto& piece : template_->pieces_) {
     TemplateSpecialToken* special_token =
-        boost::get<TemplateSpecialToken>(&piece);
+        paddlenlp::get_if<TemplateSpecialToken>(&piece);
     if (special_token != nullptr) {
       auto token_iter =
           special_tokens_map.tokens_map_.find(special_token->first);
@@ -244,8 +245,8 @@ void TemplatePostProcessor::ApplyTemplate(
     core::Encoding* result_encoding) const {
   size_t new_size = 0;
   for (auto&& piece : pieces.pieces_) {
-    if (boost::get<TemplateSequence>(&piece) != nullptr) {
-      auto seq_type = boost::get<TemplateSequence>(piece).first;
+    if (paddlenlp::get_if<TemplateSequence>(&piece) != nullptr) {
+      auto seq_type = paddlenlp::get<TemplateSequence>(piece).first;
       if (seq_type == SequenceType::SEQ_A) {
         new_size += encoding->GetLen();
       } else {
@@ -257,7 +258,8 @@ void TemplatePostProcessor::ApplyTemplate(
       }
     } else {
       if (add_special_tokens) {
-        auto&& special_token = boost::get<TemplateSpecialToken>(piece).first;
+        auto&& special_token =
+            paddlenlp::get<TemplateSpecialToken>(piece).first;
         if (special_tokens_map_.tokens_map_.find(special_token) !=
             special_tokens_map_.tokens_map_.end()) {
           new_size +=
@@ -330,8 +332,8 @@ void TemplatePostProcessor::ApplyTemplate(
   }
   VLOG(6) << "Template pieces num: " << pieces.pieces_.size();
   for (auto& piece : pieces.pieces_) {
-    if (boost::get<TemplateSequence>(&piece) != nullptr) {
-      auto& template_sequence = boost::get<TemplateSequence>(piece);
+    if (paddlenlp::get_if<TemplateSequence>(&piece) != nullptr) {
+      auto& template_sequence = paddlenlp::get<TemplateSequence>(piece);
       if (template_sequence.first == SequenceType::SEQ_A) {
         auto seq_start = ids.size();
         auto seq_end = seq_start + encoding->GetLen();
@@ -385,7 +387,7 @@ void TemplatePostProcessor::ApplyTemplate(
                               pair_encoding->GetAttentionMask().end());
       }
     } else {
-      auto& special_token = boost::get<TemplateSpecialToken>(piece);
+      auto& special_token = paddlenlp::get<TemplateSpecialToken>(piece);
       if (add_special_tokens) {
         const std::string& id = special_token.first;
         uint32_t type_id = special_token.second;
