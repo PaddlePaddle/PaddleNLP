@@ -1135,10 +1135,10 @@ class T5Stack(nn.Layer):
     def invert_attention_mask(self, encoder_attention_mask):
         if encoder_attention_mask.ndim == 4:
             encoder_extended_attention_mask = encoder_attention_mask
-        if encoder_attention_mask.ndim == 3:
+        elif encoder_attention_mask.ndim == 3:
             encoder_extended_attention_mask = encoder_attention_mask.unsqueeze(
                 1)
-        if encoder_attention_mask.ndim == 2:
+        elif encoder_attention_mask.ndim == 2:
             encoder_extended_attention_mask = encoder_attention_mask.unsqueeze(
                 [1, 2])
         encoder_extended_attention_mask = encoder_extended_attention_mask.astype(
