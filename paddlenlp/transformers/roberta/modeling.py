@@ -810,9 +810,13 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
             loss = loss_fct(logits.reshape((-1, self.num_classes)),
                             labels.reshape((-1, )))
         if not return_dict:
+
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            if loss is not None:
+                return (loss, ) + output
+            if len(output) == 1:
+                return output[0]
+            return output
 
         return TokenClassifierOutput(
             loss=loss,

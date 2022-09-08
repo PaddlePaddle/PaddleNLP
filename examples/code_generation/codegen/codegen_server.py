@@ -32,7 +32,7 @@ class DefaultConfig:
     repetition_penalty = 1.0
     min_length = 0
     max_length = 16
-    decode_strategy = "sampling"
+    decode_strategy = "greedy_search"
     load_state_as_np = True
     use_faster = True
     use_fp16_decoding = True
@@ -104,9 +104,7 @@ async def gen(item: Input):
     logger.info("Finish generating code")
     end_time = time.time()
     logger.info(f"Time cost: {end_time - start_time}")
-    output = tokenizer.decode(output[0],
-                              skip_special_tokens=True,
-                              spaces_between_special_tokens=False)
+    output = tokenizer.decode(output[0], skip_special_tokens=True)
     logger.info(f"Generated code: {output}")
     output_json = Output(
         id=random_completion_id(),
