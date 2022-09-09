@@ -455,7 +455,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=[('dropout', 0)],
+                                            fields=['dropout'],
                                             return_unused_kwargs=True)
         super(BertForQuestionAnswering, self).__init__(config)
         self.bert = bert if bert is not None else BertModel(config)
@@ -597,8 +597,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=[("num_labels", 2),
-                                                    ('dropout', None)],
+                                            fields=["num_labels", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForSequenceClassification, self).__init__(config)
 
@@ -731,8 +730,7 @@ class BertForTokenClassification(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=[("num_labels", 2),
-                                                    ('dropout', None)],
+                                            fields=["num_labels", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForTokenClassification, self).__init__(config)
 
@@ -1161,8 +1159,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=[("num_choices", 2),
-                                                    ('dropout', None)],
+                                            fields=["num_choices", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForMultipleChoice, self).__init__(config)
 

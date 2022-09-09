@@ -172,6 +172,21 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]):
             kwargs[new_key] = kwargs.pop(old_key)
 
 
+def is_community_model_name(model_name: str) -> Optional[bool]:
+    """check if the model_name is community-contributed pretrained model
+
+    Args:
+        model_name (str): model name, which can be: bert-base-uncased, facebook/opt-125m
+
+    Returns:
+        Optional[bool]: if the model name is community-contributed based. if it's None, it means can not detect the type
+    """
+    if os.path.isdir(model_name) or is_url(model_name):
+        return None
+
+    return len(model_name.split('/')) == 2
+
+
 class PretrainedConfig:
     r"""
     Base class for all configuration classes. Handles a few parameters common to all models' configurations as well as
@@ -365,6 +380,7 @@ class PretrainedConfig:
     model_type: str = ""
     is_composition: bool = False
     attribute_map: Dict[str, str] = {}
+    pretrained_init_configuration = {}
     _auto_class: Optional[str] = None
 
     def __setattr__(self, key, value):
@@ -712,28 +728,25 @@ class PretrainedConfig:
             resolved_config_file = get_path_from_url(
                 pretrained_model_name_or_path, cache_dir)
         else:
-
             # 3. get the configuration file from local dir with default name, eg: /local/path
-            configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             if os.path.isdir(pretrained_model_name_or_path):
+                configuration_file = kwargs.pop("_configuration_file",
+                                                CONFIG_NAME)
                 configuration_file = os.path.join(pretrained_model_name_or_path,
                                                   configuration_file)
                 if os.path.isfile(configuration_file):
                     resolved_config_file = configuration_file
 
-        if resolved_config_file is None:
-            raise ValueError("can not resolve model config file<%>",
-                             pretrained_model_name_or_path)
-
-        try:
-            # Load config dict
-            config_dict = cls._dict_from_json_file(resolved_config_file)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            raise EnvironmentError(
-                f"It looks like the config file at '{resolved_config_file}' is not a valid JSON file."
-            )
-
-        logger.info(f"loading configuration file {resolved_config_file}")
+        if resolved_config_file is not None:
+            try:
+                logger.info(
+                    f"loading configuration file {resolved_config_file}")
+                # Load config dict
+                config_dict = cls._dict_from_json_file(resolved_config_file)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                raise EnvironmentError(
+                    f"It looks like the config file at '{resolved_config_file}' is not a valid JSON file."
+                )
 
         return config_dict, kwargs
 

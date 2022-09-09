@@ -22,18 +22,14 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
+from paddlenlp.utils.env import MODEL_HOME
 
 from paddlenlp.transformers.bert.configuration import BertConfig
 
-# from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
-# from ...testing_utils import slow
+from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
+from ...testing_utils import slow
 
-# from ..test_configuration_common import ConfigTester
-
-from tests.transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
-from tests.testing_utils import slow
-
-from tests.transformers.test_configuration_common import ConfigTester
+from ..test_configuration_common import ConfigTester
 
 
 class BertModelTester:
@@ -411,7 +407,7 @@ class BertModelTester:
                            token_type_ids=token_type_ids,
                            labels=sequence_labels)
             self.parent.assertEqual(result[1].shape,
-                                    [self.batch_size, self.num_labels + 1])
+                                    [self.batch_size, self.num_labels])
 
     def create_and_check_for_token_classification(
         self,
@@ -521,6 +517,8 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
+        super().setUp()
+
         self.model_tester = BertModelTester(self)
         self.config_tester = ConfigTester(self,
                                           config_class=BertConfig,
@@ -572,72 +570,22 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.test_addition_params(*config_and_inputs)
 
-    @slow
-    def test_model_from_pretrained_with_cache_dir(self):
-        for model_name in list(
-                BertPretrainedModel.pretrained_init_configuration)[:1]:
-            with tempfile.TemporaryDirectory() as tempdir:
-                tempdir = str(tempdir)
-
-                model: BertModel = BertModel.from_pretrained(model_name,
-                                                             cache_dir=tempdir)
-                self.assertIsNotNone(model)
-
-                self.assertTrue(
-                    os.path.isfile(
-                        os.path.join(
-                            tempdir, BertPretrainedModel.
-                            resource_files_names['model_state'])))
-
-    @slow
-    def test_model_from_pretrained(self):
-        for model_name in list(
-                BertPretrainedModel.pretrained_init_configuration)[:1]:
-            model: BertModel = BertModel.from_pretrained(model_name)
-            self.assertIsNotNone(model)
-
-            with tempfile.TemporaryDirectory() as tempdir:
-                tempdirname = str(tempdir)
-                model.save_pretrained(tempdirname)
-
-                saved_model_state_file = os.path.join(
-                    tempdirname, BertModel.resource_files_names['model_state'])
-
-                self.assertTrue(os.path.isfile(saved_model_state_file))
-
-                # rename it to the old style: name of url
-                url = BertModel.pretrained_resource_files_map['model_state'][
-                    model_name]
-                pretrained_resource_file_name = os.path.split(url)[-1]
-                target_file_path = os.path.join(tempdirname,
-                                                pretrained_resource_file_name)
-
-                shutil.copyfile(saved_model_state_file, target_file_path)
-                os.remove(saved_model_state_file)
-
-                new_model = BertModel.from_pretrained(tempdirname)
-            first_key = list(model.state_dict().keys())[0]
-
-            self.assertEqual(
-                (model.state_dict()[first_key] -
-                 new_model.state_dict()[first_key]).sum().numpy().item(), 0)
-
     def test_model_name_list(self):
         config = self.model_tester.get_config()
         model = self.base_model_class(config)
         self.assertTrue(len(model.model_name_list) != 0)
 
+
+class BertModelPretrainedTest(unittest.TestCase):
+
     def test_model_config_mapping(self):
-        config = BertConfig(num_labels=22, dropout=0.99)
-        assert config.num_labels == 22
-
-        config = BertConfig(num_classes=22, dropout=0.99)
-        assert config.num_labels == 22
-        assert config.hidden_dropout_prob == 0.99
-        assert len(config.label2id) == 22
+        config = BertConfig(num_labels=22, hidden_dropout_prob=0.99)
+        self.assertEqual(config.hidden_dropout_prob, 0.99)
+        self.assertEqual(config.num_labels, 22)
 
 
-class BertModelIntegrationTest(unittest.TestCase):
+class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
+    base_model_class = BertModel
 
     @slow
     def test_inference_no_attention(self):

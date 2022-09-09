@@ -106,6 +106,29 @@ def _find_weight_file_path(cache_dir: str,
         resouce_uri_file_name, resource_weight_file_name, cache_dir)
 
 
+def _resolve_cache_dir(pretrained_model_name_or_path: str,
+                       cache_dir: Optional[str] = None):
+    """resolve cache dir which can be: official model and community model
+
+    Args:
+        pretrained_model_name_or_path (_type_): the source of pretarined model_name or path
+        cache_dir (Optional[str], optional): cache dir. Defaults to None.
+
+    Returns:
+        cache_dir (Optional[str]): the final cache dir
+    """
+    if cache_dir is not None:
+        return cache_dir
+
+    if os.path.isdir(pretrained_model_name_or_path):
+        return pretrained_model_name_or_path
+
+    if is_url(pretrained_model_name_or_path):
+        return None
+
+    return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+
+
 def register_base_model(cls):
     """
     A decorator for `PretrainedModel` class. It first retrieves the parent class
@@ -815,9 +838,6 @@ class PretrainedModelNew(Layer, GenerationMixin):
         if os.path.isfile(pretrained_model_name_or_path):
             return pretrained_model_name_or_path
 
-        cache_dir = cache_dir or os.path.join(MODEL_HOME,
-                                              pretrained_model_name_or_path)
-
         # 1. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # check the cache_dir:
@@ -1087,9 +1107,12 @@ class PretrainedModelNew(Layer, GenerationMixin):
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
 
+        cache_dir = _resolve_cache_dir(pretrained_model_name_or_path, cache_dir)
+
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
+
             config_path = config if config is not None else pretrained_model_name_or_path
             # 1.1 get configuration from `pretrained_init_configuration` field
             if pretrained_model_name_or_path in cls.pretrained_init_configuration:
@@ -1097,13 +1120,24 @@ class PretrainedModelNew(Layer, GenerationMixin):
                     **cls.
                     pretrained_init_configuration[pretrained_model_name_or_path]
                 )
-
-            # 1.2 get configuration from local_file/local_dir/remote_url
-            else:
+                config.save_pretrained(cache_dir)
+            elif os.path.isdir(pretrained_model_name_or_path):
+                # 1.2 get configuration from local_dir
                 config, model_kwargs = cls.config_class.from_pretrained(
                     config_path,
                     cache_dir=cache_dir,
                     return_unused_kwargs=True,
+                    force_download=force_download,
+                    **kwargs,
+                )
+            else:
+                # community-contributed model
+                config_path = cls.config_class.from_pretrained(
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                    cls.model_config_file)
+                config = cls.config_class.from_pretrained(
+                    config_path,
+                    cache_dir=cache_dir,
                     force_download=force_download,
                     **kwargs,
                 )

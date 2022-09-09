@@ -368,6 +368,7 @@ class BertConfig(PretrainedConfig):
     ```"""
     model_type = "bert"
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
+    pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
 
     def __init__(self,
                  vocab_size: int = 30522,
