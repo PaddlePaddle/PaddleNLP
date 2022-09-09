@@ -1024,7 +1024,13 @@ def _construct_kwargs(args, kwargs: Dict[str, Any],
         # if parameters is: (a,b,c), but args is (1, 2), kwargs is {b=3, c=4} -> (1, 2, b=3, c=4)
         assert fields[
             index] not in kwargs, f"{index}th field<{fields[index]}> is already in kwargs, but you have set it twice"
-        kwargs[fields[index]] = arg
+
+        field = fields[index]
+        # field can be str or list/tuple, eg: [("num_labels", 2), ("dropout", 0.3)]
+        if isinstance(field, (list, tuple)):
+            field = field[0]
+
+        kwargs[field] = arg
 
     # 2. check that fields is with default values
     fields = fields or []
@@ -1092,6 +1098,11 @@ def parse_config(
     # 2. if `config_or_model` is Config, so construct args and kwargs to init model
     elif isinstance(config_or_model, config_class):
         unused_kwargs = _construct_kwargs(args, kwargs, fields)
+        # map the valid attr into the config, eg: num_labels
+        for key in list(unused_kwargs.keys()):
+            if hasattr(config_or_model, key):
+                setattr(config_or_model, key, unused_kwargs[key])
+
         config = config_or_model
     else:
         # 3. create config and use it to init model

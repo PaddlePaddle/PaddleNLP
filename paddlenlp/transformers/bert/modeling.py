@@ -455,7 +455,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=['bert', ('dropout', 0)],
+                                            fields=[('dropout', 0)],
                                             return_unused_kwargs=True)
         super(BertForQuestionAnswering, self).__init__(config)
         self.bert = bert if bert is not None else BertModel(config)
@@ -593,13 +593,13 @@ class BertForSequenceClassification(BertPretrainedModel):
                  config: Optional[Union[BertModel, BertConfig]] = None,
                  *args,
                  **kwargs):
-        config, bert, kwargs = parse_config(
-            config_or_model=config,
-            config_class=BertConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=['bert', ("num_labels", 2), ('dropout', None)],
-            return_unused_kwargs=True)
+        config, bert, kwargs = parse_config(config_or_model=config,
+                                            config_class=BertConfig,
+                                            args=args,
+                                            kwargs=kwargs,
+                                            fields=[("num_labels", 2),
+                                                    ('dropout', None)],
+                                            return_unused_kwargs=True)
         super(BertForSequenceClassification, self).__init__(config)
 
         self.bert = bert if bert is not None else BertModel(config)
@@ -727,13 +727,13 @@ class BertForTokenClassification(BertPretrainedModel):
     """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        config, bert, kwargs = parse_config(
-            config_or_model=config,
-            config_class=BertConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=['bert', ("num_labels", 2), ('dropout', None)],
-            return_unused_kwargs=True)
+        config, bert, kwargs = parse_config(config_or_model=config,
+                                            config_class=BertConfig,
+                                            args=args,
+                                            kwargs=kwargs,
+                                            fields=[("num_labels", 2),
+                                                    ('dropout', None)],
+                                            return_unused_kwargs=True)
         super(BertForTokenClassification, self).__init__(config)
 
         self.bert = bert if bert is not None else BertModel(config)
@@ -976,8 +976,7 @@ class BertForPretraining(BertPretrainedModel):
         config, bert = parse_config(config_or_model=config,
                                     config_class=BertConfig,
                                     args=args,
-                                    kwargs=kwargs,
-                                    fields=['bert'])
+                                    kwargs=kwargs)
         super(BertForPretraining, self).__init__(config)
 
         self.bert = bert if bert is not None else BertModel(config)
@@ -1158,13 +1157,13 @@ class BertForMultipleChoice(BertPretrainedModel):
     """
 
     def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        config, bert, kwargs = parse_config(
-            config_or_model=config,
-            config_class=BertConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=['bert', ("num_choices", 2), ('dropout', None)],
-            return_unused_kwargs=True)
+        config, bert, kwargs = parse_config(config_or_model=config,
+                                            config_class=BertConfig,
+                                            args=args,
+                                            kwargs=kwargs,
+                                            fields=[("num_choices", 2),
+                                                    ('dropout', None)],
+                                            return_unused_kwargs=True)
         super(BertForMultipleChoice, self).__init__(config)
 
         self.bert = bert if bert is not None else BertModel(config)
@@ -1345,8 +1344,7 @@ class BertForMaskedLM(BertPretrainedModel):
         config, bert = parse_config(config_or_model=config,
                                     config_class=BertConfig,
                                     args=args,
-                                    kwargs=kwargs,
-                                    fields=['bert'])
+                                    kwargs=kwargs)
         super(BertForMaskedLM, self).__init__(config)
         if bert is None:
             bert = BertModel(config=config)
