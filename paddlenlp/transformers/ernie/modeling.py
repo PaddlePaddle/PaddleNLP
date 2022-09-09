@@ -149,7 +149,6 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         # Deprecated, alias for ernie-1.0-base-zh
         "ernie-1.0": {

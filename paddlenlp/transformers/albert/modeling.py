@@ -432,7 +432,6 @@ class AlbertPretrainedModel(PretrainedModel):
     loading pretrained models. See `PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "albert-base-v1": {
             "attention_probs_dropout_prob": 0.1,
@@ -716,7 +715,6 @@ class AlbertPretrainedModel(PretrainedModel):
         },
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "albert-base-v1":

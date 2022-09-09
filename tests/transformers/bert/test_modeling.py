@@ -18,6 +18,7 @@ import shutil
 import tempfile
 import unittest
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
@@ -64,6 +65,7 @@ class BertModelTester:
         num_labels=3,
         num_choices=4,
         scope=None,
+        return_dict=False,
     ):
         self.parent = parent
         self.batch_size = batch_size
@@ -90,6 +92,7 @@ class BertModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -211,8 +214,9 @@ class BertModelTester:
         outputs = model(input_ids,
                         attention_mask=input_mask,
                         use_cache=True,
-                        return_dict=True)
-        past_key_values = outputs.past_key_values
+                        return_dict=self.return_dict)
+        past_key_values = outputs.past_key_values if self.return_dict else outputs[
+            2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
@@ -222,15 +226,20 @@ class BertModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids,
-                                    attention_mask=next_attention_mask,
-                                    output_hidden_states=True,
-                                    return_dict=True)["hidden_states"][0]
-        output_from_past = model(next_tokens,
-                                 attention_mask=next_attention_mask,
-                                 past_key_values=past_key_values,
-                                 output_hidden_states=True,
-                                 return_dict=True)["hidden_states"][0]
+        outputs = model(next_input_ids,
+                        attention_mask=next_attention_mask,
+                        output_hidden_states=True,
+                        return_dict=self.return_dict)
+
+        output_from_no_past = outputs[2][0]
+
+        outputs = model(next_tokens,
+                        attention_mask=next_attention_mask,
+                        past_key_values=past_key_values,
+                        output_hidden_states=True,
+                        return_dict=self.return_dict)
+
+        output_from_past = outputs[2][0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
@@ -462,8 +471,16 @@ class BertModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class BertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = BertModel
+    return_dict = False
+    use_labels = False
 
     all_model_classes = (
         BertModel,
