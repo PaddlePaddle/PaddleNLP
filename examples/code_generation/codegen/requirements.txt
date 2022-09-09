@@ -1,0 +1,6 @@
+fastapi==0.79.0
+pydantic==1.9.1
+python-dotenv==0.20.0
+sse_starlette==0.10.3
+uvicorn==0.17.6
+openai==0.8.0

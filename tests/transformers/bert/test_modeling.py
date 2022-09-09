@@ -15,49 +15,52 @@
 
 import unittest
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
-from tests.transformers.test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
-from tests.testing_utils import slow
+
+from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
+from ...testing_utils import slow
 
 
 class BertModelTester:
 
-    def __init__(
-        self,
-        parent,
-        batch_size=13,
-        seq_length=7,
-        is_training=True,
-        use_input_mask=True,
-        use_token_type_ids=True,
-        vocab_size=99,
-        hidden_size=32,
-        num_hidden_layers=5,
-        num_attention_heads=4,
-        intermediate_size=37,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        initializer_range=0.02,
-        pad_token_id=0,
-        pool_act="tanh",
-        fuse=False,
-        type_sequence_label_size=2,
-        num_labels=3,
-        num_choices=4,
-        num_classes=3,
-        scope=None,
-    ):
+    def __init__(self,
+                 parent,
+                 batch_size=13,
+                 seq_length=7,
+                 is_training=True,
+                 use_input_mask=True,
+                 use_token_type_ids=True,
+                 use_labels=True,
+                 vocab_size=99,
+                 hidden_size=32,
+                 num_hidden_layers=5,
+                 num_attention_heads=4,
+                 intermediate_size=37,
+                 hidden_act="gelu",
+                 hidden_dropout_prob=0.1,
+                 attention_probs_dropout_prob=0.1,
+                 max_position_embeddings=512,
+                 type_vocab_size=16,
+                 initializer_range=0.02,
+                 pad_token_id=0,
+                 pool_act="tanh",
+                 fuse=False,
+                 type_sequence_label_size=2,
+                 num_labels=3,
+                 num_choices=4,
+                 num_classes=3,
+                 scope=None,
+                 return_dict=False):
         self.parent = parent
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
         self.use_input_mask = use_input_mask
         self.use_token_type_ids = use_token_type_ids
+        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -77,6 +80,7 @@ class BertModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -92,8 +96,18 @@ class BertModelTester:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length],
                                         self.type_vocab_size)
 
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
+        if self.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_labels)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
+
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask
+        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
         return {
@@ -119,14 +133,19 @@ class BertModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = BertModel(**config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids)
-        result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        result = model(input_ids, return_dict=self.return_dict)
         self.parent.assertEqual(
             result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
@@ -139,14 +158,107 @@ class BertModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = BertForMaskedLM(BertModel(**config))
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
+
+    def create_and_check_model_past_large_inputs(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BertModel(**config)
+        model.eval()
+
+        # first forward pass
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.return_dict)
+        past_key_values = outputs.past_key_values if self.return_dict else outputs[
+            2]
+
+        # create hypothetical multiple next token and extent to next_input_ids
+        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
+        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2)
+
+        # append to next input_ids and
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
+
+        outputs = model(next_input_ids,
+                        attention_mask=next_attention_mask,
+                        output_hidden_states=True,
+                        return_dict=self.return_dict)
+
+        output_from_no_past = outputs[2][0]
+
+        outputs = model(next_tokens,
+                        attention_mask=next_attention_mask,
+                        past_key_values=past_key_values,
+                        output_hidden_states=True,
+                        return_dict=self.return_dict)
+
+        output_from_past = outputs[2][0]
+
+        # select random slice
+        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:,
+                                                        random_slice_idx].detach(
+                                                        )
+        output_from_past_slice = output_from_past[:, :,
+                                                  random_slice_idx].detach()
+
+        self.parent.assertTrue(
+            output_from_past_slice.shape[1] == next_tokens.shape[1])
+
+        # test that outputs are equal for slice
+        self.parent.assertTrue(
+            paddle.allclose(output_from_past_slice,
+                            output_from_no_past_slice,
+                            atol=1e-3))
+
+    def create_and_check_for_pretraining(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BertForPretraining(BertModel(**config))
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       return_dict=self.return_dict)
+        self.parent.assertEqual(
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, 2])
 
     def create_and_check_for_multiple_choice(
         self,
@@ -154,6 +266,9 @@ class BertModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = BertForMultipleChoice(BertModel(**config),
                                       num_choices=self.num_choices)
@@ -164,26 +279,45 @@ class BertModelTester:
             [-1, self.num_choices, -1])
         multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
             [-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
-        )
-        self.parent.assertEqual(result.shape,
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=multiple_choice_input_mask,
+                       token_type_ids=multiple_choice_token_type_ids,
+                       labels=choice_labels,
+                       return_dict=self.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_choices])
 
-    def create_and_check_for_question_answering(self, config, input_ids,
-                                                token_type_ids, input_mask):
+    def create_and_check_for_question_answering(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
         model = BertForQuestionAnswering(BertModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
-        self.parent.assertEqual(result[0].shape,
-                                [self.batch_size, self.seq_length])
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.return_dict)
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(result[1].shape,
+                                [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result[2].shape,
                                 [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
@@ -192,16 +326,19 @@ class BertModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = BertForSequenceClassification(BertModel(**config),
                                               num_classes=self.num_classes)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
-        self.parent.assertEqual(result.shape,
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=sequence_labels,
+                       return_dict=self.return_dict)
+        self.parent.assertEqual(result[1].shape,
                                 [self.batch_size, self.num_classes])
 
     def create_and_check_for_token_classification(
@@ -210,15 +347,21 @@ class BertModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
     ):
         model = BertForTokenClassification(BertModel(**config),
                                            num_classes=self.num_classes)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.return_dict)
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.num_classes])
+            result[1].shape,
+            [self.batch_size, self.seq_length, self.num_classes])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -227,6 +370,9 @@ class BertModelTester:
             input_ids,
             token_type_ids,
             input_mask,
+            sequence_labels,
+            token_labels,
+            choice_labels,
         ) = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
@@ -236,8 +382,16 @@ class BertModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class BertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = BertModel
+    return_dict = False
+    use_labels = False
 
     all_model_classes = (
         BertModel,
@@ -250,7 +404,7 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
-        self.model_tester = BertModelTester(self)
+        self.model_tester = BertModelTester(self, return_dict=self.return_dict)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -260,10 +414,19 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_masked_lm(*config_and_inputs)
 
+    def test_decoder_model_past_with_large_inputs(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_past_large_inputs(
+            *config_and_inputs)
+
     def test_for_multiple_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_multiple_choice(
             *config_and_inputs)
+
+    def test_for_pretraining(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_pretraining(*config_and_inputs)
 
     def test_for_question_answering(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

@@ -21,6 +21,19 @@ from ..tokenizer_utils import PretrainedTokenizer
 
 __all__ = ["RoFormerTokenizer", "JiebaBasicTokenizer"]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "roformer-chinese-small": 512,
+    "roformer-chinese-base": 1536,
+    "roformer-chinese-char-small": 512,
+    "roformer-chinese-char-base": 512,
+    "roformer-chinese-sim-char-ft-small": 512,
+    "roformer-chinese-sim-char-ft-base": 512,
+    "roformer-chinese-sim-char-small": 512,
+    "roformer-chinese-sim-char-base": 512,
+    "roformer-english-small-discriminator": 128,
+    "roformer-english-small-generator": 128
+}
+
 
 class JiebaBasicTokenizer(BasicTokenizer):
     """
@@ -35,10 +48,18 @@ class JiebaBasicTokenizer(BasicTokenizer):
             Defaults to `True`.
     """
 
-    def __init__(self, vocab, do_lower_case=True):
+    def __init__(self,
+                 vocab,
+                 do_lower_case=True,
+                 never_split=None,
+                 tokenize_chinese_chars=True,
+                 strip_accents=None):
         """Constructs a JiebaBasicTokenizer."""
+        super().__init__(never_split=never_split,
+                         do_lower_case=do_lower_case,
+                         tokenize_chinese_chars=tokenize_chinese_chars,
+                         strip_accents=strip_accents)
         self.vocab = vocab
-        self.do_lower_case = do_lower_case
 
     def _tokenize_chinese_chars(self, text):
         output = []
@@ -140,6 +161,18 @@ class RoFormerTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-generator/vocab.txt",
         }
     }
+    max_model_input_sizes = {
+        "roformer-chinese-small": 512,
+        "roformer-chinese-base": 1536,
+        "roformer-chinese-char-small": 512,
+        "roformer-chinese-char-base": 512,
+        "roformer-chinese-sim-char-ft-small": 512,
+        "roformer-chinese-sim-char-ft-base": 512,
+        "roformer-chinese-sim-char-small": 512,
+        "roformer-chinese-sim-char-base": 512,
+        "roformer-english-small-discriminator": 128,
+        "roformer-english-small-generator": 128,
+    }
     pretrained_init_configuration = {
         "roformer-chinese-small": {
             "do_lower_case": True,
@@ -183,6 +216,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
         },
     }
     padding_side = "right"
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
@@ -397,3 +431,6 @@ class RoFormerTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)

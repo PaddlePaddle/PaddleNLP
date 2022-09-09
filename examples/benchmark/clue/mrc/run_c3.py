@@ -27,12 +27,11 @@ import contextlib
 import paddle
 import paddle.nn as nn
 
-from datasets import load_dataset
-
 from paddlenlp.data import Stack, Dict, Pad, Tuple
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
 from paddlenlp.utils.log import logger
+from datasets import load_dataset
 
 
 def parse_args():
@@ -259,7 +258,7 @@ def run(args):
 
             new_data = tokenizer(tokens_t_list,
                                  text_pair=tokens_c_list,
-                                 is_split_into_words=True)
+                                 is_split_into_words='token')
 
             # Pad each new example for axis=2 of [batch_size, num_choices, seq_len],
             # because length of each choice could be different.
@@ -306,6 +305,7 @@ def run(args):
                 remove_columns=column_names,
                 load_from_cache_file=not args.overwrite_cache,
                 desc="Running tokenizer on train dataset")
+
         batchify_fn = lambda samples, fn=Dict({
             'input_ids':
             Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input

@@ -234,7 +234,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     ```python
     >>> schema = [{'Person': ['Company', 'Position']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+    >>> pprint(ie_en('In 1997, Steve was excited to become the CEO of Apple.'))
     [{'Person': [{'end': 14,
                   'probability': 0.999631971804547,
                   'relations': {'Company': [{'end': 53,
@@ -340,19 +340,19 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     调用示例：
 
     ```python
-    >>> schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+    >>> schema = [{'Aspect': ['Opinion', 'Sentiment classification [negative, positive]']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en("overall i 'm happy with my toy.")
-    [{'Comment object': [{'end': 30,
-                          'probability': 0.9774399346859042,
-                          'relations': {'Opinion': [{'end': 18,
-                                                    'probability': 0.6168918705033555,
-                                                    'start': 13,
-                                                    'text': 'happy'}],
-                                        'Sentiment classification [negative, positive]': [{'probability': 0.9999556545777182,
-                                                                                          'text': 'positive'}]},
-                          'start': 24,
-                          'text': 'my toy'}]}]
+    >>> pprint(ie_en("The teacher is very nice."))
+    [{'Aspect': [{'end': 11,
+                  'probability': 0.4301476415932193,
+                  'relations': {'Opinion': [{'end': 24,
+                                            'probability': 0.9072940447883724,
+                                            'start': 15,
+                                            'text': 'very nice'}],
+                                'Sentiment classification [negative, positive]': [{'probability': 0.9998571920670685,
+                                                                                  'text': 'positive'}]},
+                  'start': 4,
+                  'text': 'teacher'}]}]
     ```
 
 <a name="情感分类"></a>
@@ -383,7 +383,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     英文模型调用示例：
 
     ```python
-    >>> schema = [{'Person': ['Company', 'Position']}]
+    >>> schema = 'Sentiment classification [negative, positive]'
     >>> ie_en.set_schema(schema)
     >>> ie_en('I am sorry but this is the worst film I have ever seen in my life.')
     [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
@@ -450,9 +450,11 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
   | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
   | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
+  | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
+  | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
 
 
-- `uie-nano`调用示例
+- `uie-nano`调用示例：
 
   ```python
   >>> from paddlenlp import Taskflow
@@ -461,6 +463,41 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   >>> ie = Taskflow('information_extraction', schema=schema, model="uie-nano")
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.6513581678349247}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.9819330659468051}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.4908131110420939}]}]
+  ```
+
+- `uie-m-base`和`uie-m-large`支持中英文混合抽取，调用示例：
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['Time', 'Player', 'Competition', 'Score']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-m-base", schema_lang="en")
+  >>> pprint(ie(["2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！", "Rafael Nadal wins French Open Final!"]))
+  [{'Competition': [{'end': 23,
+                    'probability': 0.9373889907291257,
+                    'start': 6,
+                    'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+    'Player': [{'end': 31,
+                'probability': 0.6981119555336441,
+                'start': 28,
+                'text': '谷爱凌'}],
+    'Score': [{'end': 39,
+              'probability': 0.9888507878270296,
+              'start': 32,
+              'text': '188.25分'}],
+    'Time': [{'end': 6,
+              'probability': 0.9784080036931151,
+              'start': 0,
+              'text': '2月8日上午'}]},
+  {'Competition': [{'end': 35,
+                    'probability': 0.9851549932171295,
+                    'start': 18,
+                    'text': 'French Open Final'}],
+    'Player': [{'end': 12,
+                'probability': 0.9379371275888104,
+                'start': 0,
+                'text': 'Rafael Nadal'}]}]
   ```
 
 <a name="更多配置"></a>
@@ -472,6 +509,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 
 >>> ie = Taskflow('information_extraction',
                   schema="",
+                  schema_lang="zh",
                   batch_size=1,
                   model='uie-base',
                   position_prob=0.5,
@@ -479,6 +517,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 ```
 
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
+* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
@@ -566,6 +605,18 @@ python doccano.py \
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
 更多**不同类型任务（关系抽取、事件抽取、评价观点抽取等）的标注规则及参数说明**，请参考[doccano数据标注指南](doccano.md)。
+
+此外，也可以通过数据标注平台 [Label Studio](https://labelstud.io/) 进行数据标注。本示例提供了 [labelstudio2doccano.py](./labelstudio2doccano.py) 脚本，将 label studio 导出的 JSON 数据文件格式转换成 doccano 导出的数据文件格式，后续的数据转换与模型微调等操作不变。
+
+```shell
+python labelstudio2doccano.py --labelstudio_file label-studio.json
+```
+
+可配置参数说明：
+
+- ``labelstudio_file``: label studio 的导出文件路径（仅支持 JSON 格式）。
+- ``doccano_file``: doccano 格式的数据文件保存路径，默认为 "doccano_ext.jsonl"。
+- ``task_type``: 任务类型，可选有抽取（"ext"）和分类（"cls"）两种类型的任务，默认为 "ext"。
 
 <a name="模型微调"></a>
 
@@ -714,14 +765,16 @@ python evaluate.py \
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-base (12L768H)<td><b>46.43</b><td><b>70.92</b><td><b>71.83</b><td><b>85.72</b><td><b>78.33</b><td><b>81.86</b>
+<tr><td>uie-base (12L768H)<td>46.43<td>70.92<td><b>71.83</b><td>85.72<td>78.33<td>81.86
 <tr><td>uie-medium (6L768H)<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-mini (6L384H)<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
 <tr><td>uie-micro (4L384H)<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
+<tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td><b>78.49</b><td><b>83.02</b>
+<tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
 </table>
 
-0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
 
 <a name="模型部署"></a>
 
@@ -787,7 +840,7 @@ python evaluate.py \
     在GPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16
+    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16 --device_id 0
     ```
 
     可配置参数说明：
@@ -797,6 +850,7 @@ python evaluate.py \
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
     - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
+    - `device_id`: GPU设备ID，默认为0。
 
 <a name="CCKS比赛"></a>
 

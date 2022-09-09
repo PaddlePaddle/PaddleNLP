@@ -205,7 +205,6 @@ class CTRLPreTrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "ctrl"
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "ctrl": {
@@ -237,7 +236,6 @@ class CTRLPreTrainedModel(PretrainedModel):
             "pad_token_id": None
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ctrl":

@@ -1,0 +1,45 @@
+version: "3"
+services:
+  elasticsearch:
+    # This will start an empty elasticsearch instance (so you have to add your documents yourself)
+    #image: "elasticsearch:8.3.3"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:8.3.3"
+    container_name: es02
+    ports:
+      - 9200:9200
+    restart: on-failure
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - xpack.security.enabled=false
+  pipelines-gpu-serving:
+    build:
+      context: .
+      dockerfile: Dockerfile-GPU
+    image: paddlepaddle/paddlenlp:pipelines-1.0-gpu-cuda10.2-cudnn7
+    container_name: pip02
+    runtime: nvidia
+    network_mode: host
+    restart: on-failure
+    environment:
+      - API_ENDPOINT=http://127.0.0.1:8891
+      - PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
+      - NVIDIA_VISIBLE_DEVICES=all
+    depends_on:
+      - elasticsearch
+    volumes:
+      # Docker directory
+      - .:/paddle
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: "/bin/bash -c 'nvidia-smi && sleep 10 && cd /paddle && sh start_compose.sh && tail -f /dev/null'"
+  
+networks:
+  default:
+    name: elastic

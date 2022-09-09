@@ -240,7 +240,6 @@ class ElectraPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     base_model_prefix = "electra"
-    model_config_file = "model_config.json"
 
     # pretrained general configuration
     gen_weight = 1.0
@@ -343,7 +342,6 @@ class ElectraPretrainedModel(PretrainedModel):
             "layer_norm_eps": 1e-5
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "electra-small":
@@ -700,6 +698,9 @@ class ElectraGenerator(ElectraPretrainedModel):
 
     def get_input_embeddings(self):
         return self.electra.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.electra.embeddings.word_embeddings = value
 
     def forward(self,
                 input_ids=None,
