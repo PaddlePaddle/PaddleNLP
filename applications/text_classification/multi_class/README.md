@@ -205,15 +205,6 @@ python train.py \
     --batch_size 32 \
     --early_stop \
     --epochs 100
-python train.py \
-    --dataset_dir "data" \
-    --device "gpu:3" \
-    --max_seq_length 128 \
-    --model_name "ernie-m-large" \
-    --batch_size 32 \
-    --early_stop \
-    --epochs 100 \
-    --save_dir "3"
 ```
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
