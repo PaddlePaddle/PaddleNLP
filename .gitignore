@@ -133,3 +133,5 @@ applications/question_generation/nohup.out
 applications/question_generation/predict.txt
 applications/question_generation/predict.txt.reference.txt
 applications/question_generation/deploy/paddle_serving/PipelineServingLogs
+applications/question_generation/deploy/paddle_serving/log.txt
+applications/question_generation/adversarial_utils.py
