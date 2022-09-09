@@ -20,6 +20,14 @@ from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['MBartTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "mbart-large-cc25": 1024,
+    "mbart-large-en-ro": 1024,
+    "mbart-large-50-one-to-many-mmt": 1024,
+    "mbart-large-50-many-to-one-mmt": 1024,
+    "mbart-large-50-many-to-many-mmt": 1024
+}
+
 
 class MBartTokenizer(PretrainedTokenizer):
     resource_files_names = {
@@ -56,6 +64,7 @@ class MBartTokenizer(PretrainedTokenizer):
             "mbart_type": "mbart50"
         }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

@@ -83,7 +83,6 @@ class ErnieMPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-m-base": {
             "attention_probs_dropout_prob": 0.1,
@@ -110,7 +109,6 @@ class ErnieMPretrainedModel(PretrainedModel):
             "pad_token_id": 1
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-m-base":
@@ -324,8 +322,6 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         Args:
             input_ids (Tensor):
                 See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
-                See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             attention_mask (Tensor, optional):
@@ -379,8 +375,6 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
@@ -456,8 +450,6 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         r"""
         Args:
             input_ids (Tensor):
-                See :class:`ErnieMModel`.
-            token_type_ids (Tensor, optional):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
                 See :class:`ErnieMModel`.

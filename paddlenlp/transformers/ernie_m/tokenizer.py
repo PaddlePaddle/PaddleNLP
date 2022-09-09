@@ -76,17 +76,20 @@ class ErnieMTokenizer(PretrainedTokenizer):
     }
     pretrained_init_configuration = {
         "ernie-m-base": {
-            "do_lower_case": True
+            "do_lower_case": False
         },
         "ernie-m-large": {
-            "do_lower_case": True
+            "do_lower_case": False
         }
     }
+    max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
+    # Ernie-M model doesn't have token_type embedding.
+    model_input_names: List[str] = ["input_ids"]
 
     def __init__(self,
                  vocab_file,
                  sentencepiece_model_file,
-                 do_lower_case=True,
+                 do_lower_case=False,
                  encoding="utf8",
                  unk_token="[UNK]",
                  sep_token="[SEP]",
@@ -115,54 +118,11 @@ class ErnieMTokenizer(PretrainedTokenizer):
                 continue
             self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
 
-    def __call__(self,
-                 text: Union[str, List[str], List[List[str]]],
-                 text_pair: Optional[Union[str, List[str],
-                                           List[List[str]]]] = None,
-                 max_length: Optional[int] = None,
-                 stride: int = 0,
-                 is_split_into_words: bool = False,
-                 padding: Union[bool, str, PaddingStrategy] = False,
-                 truncation: Union[bool, str, TruncationStrategy] = False,
-                 return_position_ids: bool = True,
-                 return_token_type_ids: bool = False,
-                 return_attention_mask: bool = True,
-                 return_length: bool = False,
-                 return_overflowing_tokens: bool = False,
-                 return_special_tokens_mask: bool = False,
-                 return_dict: bool = True,
-                 return_offsets_mapping: bool = False,
-                 add_special_tokens: bool = True,
-                 pad_to_multiple_of: Optional[int] = None,
-                 return_tensors: Optional[Union[str, TensorType]] = None,
-                 verbose: bool = True,
-                 **kwargs):
-        return super(ErnieMTokenizer, self).__call__(
-            text=text,
-            text_pair=text_pair,
-            max_length=max_length,
-            stride=stride,
-            is_split_into_words=is_split_into_words,
-            padding=padding,
-            truncation=truncation,
-            return_position_ids=return_position_ids,
-            # Ernie-M model doesn't have token_type embedding.
-            # So set "return_token_type_ids" to False.
-            return_token_type_ids=False,
-            return_attention_mask=return_attention_mask,
-            return_length=return_length,
-            return_overflowing_tokens=return_overflowing_tokens,
-            return_special_tokens_mask=return_special_tokens_mask,
-            return_dict=return_dict,
-            return_offsets_mapping=return_offsets_mapping,
-            add_special_tokens=add_special_tokens,
-            pad_to_multiple_of=pad_to_multiple_of,
-            return_tensors=return_tensors,
-            verbose=verbose,
-            **kwargs)
-
     def get_offset_mapping(self, text):
-        split_tokens = self._tokenize(text)
+        if text is None:
+            return None
+
+        split_tokens = self.tokenize(text)
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
@@ -177,6 +137,10 @@ class ErnieMTokenizer(PretrainedTokenizer):
             char_mapping.extend([i] * len(ch))
 
         text, token_mapping, offset = normalized_text, [], 0
+
+        if self.do_lower_case:
+            text = text.lower()
+
         for token in split_tokens:
             if token[:1] == '▁':
                 token = token[1:]
@@ -196,7 +160,10 @@ class ErnieMTokenizer(PretrainedTokenizer):
         Returns:
             int: The size of vocabulary.
         """
-        return len(self.vocab)
+        return self.sp_model.vocab_size()
+
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
 
     def clean_text(self, text):
         """Performs invalid character removal and whitespace cleanup on text."""
@@ -232,17 +199,6 @@ class ErnieMTokenizer(PretrainedTokenizer):
             if len(piece) > lst_i:
                 new_pieces.append(piece[lst_i:])
         return new_pieces
-
-    def tokenize(self, text, **kwargs):
-        r"""
-        Converts a string to a list of tokens.
-        
-        Args:
-            text (str): The text to be tokenized.
-        Returns:
-            List(str): A list of string representing converted tokens.
-        """
-        return self._tokenize(text)
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
@@ -342,6 +298,31 @@ class ErnieMTokenizer(PretrainedTokenizer):
             return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
                 [0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def create_token_type_ids_from_sequences(
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        """
+        Create the token type IDs corresponding to the sequences passed. [What are token type
+        IDs?](../glossary#token-type-ids)
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            token_ids_0 (`List[int]`): The first tokenized sequence.
+            token_ids_1 (`List[int]`, *optional*): The second tokenized sequence.
+
+        Returns:
+            `List[int]`: The token type ids.
+        """
+        # called when `add_special_tokens` is True, so align with `build_inputs_with_special_tokens` method
+        if token_ids_1 is None:
+            # [CLS] X [SEP]
+            return (len(token_ids_0) + 2) * [0]
+
+        # [CLS] A [SEP] [SEP] B [SEP]
+        return [0] * (len(token_ids_0) + 1) + [1] * (len(token_ids_1) + 3)
 
     def is_ch_char(self, char):
         """

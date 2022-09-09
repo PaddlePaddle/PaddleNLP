@@ -37,6 +37,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ChineseBertTokenizer", "chinesebert"),
     ("ConvBertTokenizer", "convbert"),
     ("CTRLTokenizer", "ctrl"),
+    ("DalleBartTokenizer", "dallebart"),
     ("DistilBertTokenizer", "distilbert"),
     ("ElectraTokenizer", "electra"),
     ("ErnieCtmTokenizer", "ernie_ctm"),
@@ -78,6 +79,9 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BartTokenizer", "bart"),
     ("GAUAlphaTokenizer", "gau_alpha"),
     ("CodeGenTokenizer", "codegen"),
+    ("CLIPTokenizer", "clip"),
+    ("ArtistTokenizer", "artist"),
+    ("ErnieViLTokenizer", "ernie_vil"),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
@@ -285,6 +289,9 @@ class AutoTokenizer():
                     init_kwargs = json.load(f)
                 # class name corresponds to this configuration
                 init_class = init_kwargs.pop("init_class", None)
+                if not init_class:
+                    init_class = init_kwargs.pop("tokenizer_class", None)
+
                 if init_class:
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(

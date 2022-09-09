@@ -33,7 +33,7 @@ class TritonPythonModel(object):
           * model_version: Model version
           * model_name: Model name
         """
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-2.0-base-en",
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
                                                        use_faster=True)
         # You must parse model_config. JSON string is not parsed here
         self.model_config = json.loads(args['model_config'])
@@ -72,7 +72,6 @@ class TritonPythonModel(object):
           be the same as `requests`
         """
         responses = []
-        # print("num:", len(requests), flush=True)
         for request in requests:
             data = pb_utils.get_input_tensor_by_name(request,
                                                      self.input_names[0])
@@ -85,9 +84,6 @@ class TritonPythonModel(object):
             input_ids = np.array(data["input_ids"], dtype=self.output_dtype[0])
             token_type_ids = np.array(data["token_type_ids"],
                                       dtype=self.output_dtype[1])
-
-            # print("input_ids:", input_ids)
-            # print("token_type_ids:", token_type_ids)
 
             out_tensor1 = pb_utils.Tensor(self.output_names[0], input_ids)
             out_tensor2 = pb_utils.Tensor(self.output_names[1], token_type_ids)

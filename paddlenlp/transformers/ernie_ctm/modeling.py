@@ -111,7 +111,6 @@ class ErnieCtmPretrainedModel(PretrainedModel):
      and loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-ctm": {
             "vocab_size": 23000,
@@ -165,7 +164,6 @@ class ErnieCtmPretrainedModel(PretrainedModel):
             "cls_num": 2,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-ctm":
