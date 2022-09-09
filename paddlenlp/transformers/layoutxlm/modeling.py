@@ -223,7 +223,6 @@ class LayoutXLMEmbeddings(Layer):
 
 
 class LayoutXLMPretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "layoutxlm-base-uncased": {
             "attention_probs_dropout_prob": 0.1,
@@ -257,7 +256,7 @@ class LayoutXLMPretrainedModel(PretrainedModel):
             "type_vocab_size": 1,
             "vocab_size": 250002,
         },
-        "layoutxlm-wo-backbone-base-uncased": {
+        "vi-layoutxlm-base-uncased": {
             "attention_probs_dropout_prob": 0.1,
             "bos_token_id": 0,
             "coordinate_size": 128,
@@ -291,13 +290,12 @@ class LayoutXLMPretrainedModel(PretrainedModel):
             "vocab_size": 250002,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "layoutxlm-base-uncased":
             "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/model_state.pdparams",
-            "layoutxlm-wo-backbone-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_wo_backbone_base/model_state.pdparams",
+            "vi-layoutxlm-base-uncased":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/vi-layoutxlm-base-uncased/model_state.pdparams",
         }
     }
     base_model_prefix = "layoutxlm"

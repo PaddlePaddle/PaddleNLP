@@ -83,7 +83,6 @@ class ErnieMPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-m-base": {
             "attention_probs_dropout_prob": 0.1,
@@ -110,7 +109,6 @@ class ErnieMPretrainedModel(PretrainedModel):
             "pad_token_id": 1
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-m-base":

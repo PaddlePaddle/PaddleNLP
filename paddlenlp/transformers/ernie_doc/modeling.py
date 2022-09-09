@@ -312,7 +312,6 @@ class ErnieDocPretrainedModel(PretrainedModel):
     and loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-doc-base-en": {
             "attention_dropout_prob": 0.0,
@@ -347,7 +346,6 @@ class ErnieDocPretrainedModel(PretrainedModel):
             "pad_token_id": 0
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-doc-base-en":

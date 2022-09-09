@@ -25,7 +25,8 @@ from predictor import Predictor
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
-parser.add_argument("--model_name_or_path", default="ernie-3.0-medium-zh", type=str, help="The directory or name of model.")
+parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="Select model to train, defaults to ernie-3.0-medium-zh.",
+                    choices=["ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"])
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
 parser.add_argument("--use_quantize", action='store_true', help="Whether to use quantization for acceleration, only takes effect when deploying on cpu.")

@@ -22,10 +22,11 @@ from pathlib import Path
 import streamlit as st
 from annotated_text import annotation
 from markdown import markdown
+import socket
 
 sys.path.append('ui')
 from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink
-
+from utils import pipelines_files
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
                                         "衡量酒水的价格的因素有哪些?")
@@ -133,7 +134,6 @@ def main():
 
     # Run button
     run_pressed = col1.button("运行")
-
     # Get next random question from the CSV
     if col2.button("随机生成"):
         reset_results()
@@ -191,13 +191,19 @@ def main():
     if st.session_state.results:
 
         st.write("## 返回结果:")
-
         for count, result in enumerate(st.session_state.results):
             context = result["context"]
             st.write(
                 markdown(context),
                 unsafe_allow_html=True,
             )
+            for image_path in result['images']:
+                image_url = pipelines_files(image_path)
+                st.image(
+                    image_url,
+                    width=
+                    400,  # Manually Adjust the width of the image as per requirement
+                )
             st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")

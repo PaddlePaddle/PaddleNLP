@@ -586,7 +586,6 @@ def auto_model_forward(self,
         )
     elif input_ids is not None:
         input_shape = paddle.shape(input_ids)
-    # elif inputs_embeds is not None:
     elif "inputs_embeds" in kwargs and kwargs["inputs_embeds"] is not None:
         input_shape = paddle.shape(inputs_embeds)[:-1]
     else:

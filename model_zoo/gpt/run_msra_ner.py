@@ -76,7 +76,7 @@ def tokenize_and_align_labels(example,
     example = example['tokens']
     tokenized_input = tokenizer(example,
                                 return_length=True,
-                                is_split_into_words=True,
+                                is_split_into_words='token',
                                 max_seq_len=max_seq_len,
                                 return_token_type_ids=False)
 

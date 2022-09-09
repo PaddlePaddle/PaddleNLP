@@ -248,7 +248,6 @@ class RoFormerv2PretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "roformer_v2_chinese_char_small": {
             "vocab_size": 12000,
@@ -297,7 +296,6 @@ class RoFormerv2PretrainedModel(PretrainedModel):
         },
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "roformer_v2_chinese_char_small":
@@ -521,6 +519,12 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
         outputs = encoder_outputs if output_hidden_states else sequence_output
 
         return outputs
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
 
 
 class RoFormerv2ForQuestionAnswering(RoFormerv2PretrainedModel):

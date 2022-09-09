@@ -1559,7 +1559,7 @@ ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署�
 - [【快速上手ERNIE 3.0】机器阅读理解实战](https://aistudio.baidu.com/aistudio/projectdetail/2017189)
 
 - [【快速上手ERNIE 3.0】对话意图识别](https://aistudio.baidu.com/aistudio/projectdetail/2017202?contributionType=1)
-tangtang
+
 
 ## 参考文献
 

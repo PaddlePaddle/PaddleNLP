@@ -201,6 +201,7 @@ def do_train(args):
                                        (args.trg_vocab_size - 1) + 1e-20))
 
     step_idx = 0
+    tokens_sum = 0
 
     # For benchmark
     reader_cost_avg = AverageStatistical()
@@ -225,7 +226,6 @@ def do_train(args):
                     logits = transformer(src_word=src_word, trg_word=trg_word)
                     sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
 
-                tokens_per_cards = token_num.numpy()
                 scaled = scaler.scale(avg_cost)  # scale the loss
                 scaled.backward()  # do backward
 
@@ -238,7 +238,6 @@ def do_train(args):
             else:
                 logits = transformer(src_word=src_word, trg_word=trg_word)
                 sum_cost, avg_cost, token_num = criterion(logits, lbl_word)
-                tokens_per_cards = token_num.numpy()
 
                 avg_cost.backward()
 
@@ -248,7 +247,9 @@ def do_train(args):
             train_batch_cost = time.time() - batch_start
             reader_cost_avg.record(train_reader_cost)
             batch_cost_avg.record(train_batch_cost)
-            batch_ips_avg.record(train_batch_cost, tokens_per_cards)
+            batch_ips_avg.record(train_batch_cost, 0)
+
+            tokens_sum += token_num
 
             # Profile for model benchmark
             if args.profiler_options is not None:
@@ -258,6 +259,9 @@ def do_train(args):
             if step_idx % args.print_step == 0 and (args.benchmark
                                                     or rank == 0):
                 total_avg_cost = avg_cost.numpy()
+                tokens_sum_val = tokens_sum.numpy()
+                batch_ips_avg.record(0, tokens_sum_val)
+                tokens_sum = 0
 
                 if step_idx == 0:
                     logger.info(
