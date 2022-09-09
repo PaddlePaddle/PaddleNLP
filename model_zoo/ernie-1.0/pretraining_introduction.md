@@ -422,7 +422,7 @@ python3 -u  -m paddle.distributed.launch \
     --split 949,50,1 \
     --max_seq_len 512 \
     --binary_head true \
-    --micro_batch_size 8 \
+    --micro_batch_size 64 \
     --use_amp true \
     --fp16_opt_level "O1" \
     --use_recompute false \

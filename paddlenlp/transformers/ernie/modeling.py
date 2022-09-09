@@ -187,7 +187,9 @@ class ErniePretrainedModel(PretrainedModel):
             "max_position_embeddings": 512,
             "num_attention_heads": 12,
             "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
             "type_vocab_size": 4,
+            "use_task_id": True,
             "vocab_size": 40000
         },
         "ernie-1.0-large-zh-cw": {
