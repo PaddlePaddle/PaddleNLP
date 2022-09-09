@@ -127,3 +127,28 @@ document_store.update_embeddings(retriever, batch_size=256)
 #### 运行后台程序出现了错误：`Exception: Failed loading pipeline component 'DocumentStore': RequestError(400, 'illegal_argument_exception', 'Mapper for [embedding] conflicts with existing mapper:\n\tCannot update parameter [dims] from [312] to [768]')`
 
 以语义检索为例，这是因为模型的维度不对造成的，请检查一下 `elastic search`中的文本的向量的维度和`semantic_search.yaml`里面`DocumentStore`设置的维度`embedding_dim`是否一致，如果不一致，请重新使用`utils/offline_ann.py`构建索引。总之，请确保构建索引所用到的模型和`semantic_search.yaml`设置的模型是一致的。
+
+#### 安装后出现错误：`cannot import name '_registerMatType' from 'cv2'`
+
+opencv版本不匹配的原因，可以对其进行升级到最新版本，保证opencv系列的版本一致。
+
+```
+pip install opencv-contrib-python --upgrade
+pip install opencv-contrib-python-headless --upgrade
+pip install opencv-python --upgrade
+```
+
+#### 安装运行出现 `RuntimeError: Can't load weights for 'rocketqa-zh-nano-query-encoder'`
+
+rocketqa模型2.3.7之后才添加，paddlenlp版本需要升级：
+```
+pip install paddlenlp --upgrade
+```
+
+#### 安装出现问题 `The repository located at mirrors.aliyun.com is not a trusted or secure host and is being ignored.`
+
+设置pip源为清华源，然后重新安装，可运行如下命令进行设置：
+
+```
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
