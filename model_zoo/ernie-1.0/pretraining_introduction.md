@@ -72,7 +72,7 @@ WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目�
 
 为了方便用户测试，我们提供了少量part的WuDao数据供大家使用，（如有侵权，请联系我们删除）
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/WuDaoCorpus2.0_base_200G_sample.tar.gz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/WuDaoCorpus2.0_base_200G_sample.tar.gz
 tar -xvf WuDaoCorpus2.0_base_200G_sample.tar.gz
 ```
 用户可以用这份数据跑完后续全程。数据量约为2GB。
@@ -121,7 +121,7 @@ python ./preprocess/trans_to_json.py  \
 ```
 使用 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据可以得到jsonl文本为:
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_corpus_200g_sample.jsonl
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample.jsonl
 ```
 用户可以下载处理好的数据，进行tokenizer转换。
 
@@ -167,8 +167,8 @@ python -u  ./preprocess/create_pretraining_data.py \
 同样，对于 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据，使用`ernie-3.0-bash-zh`的tokenizer，可以得到数据。
 ```
 mkdir data && cd data
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-bash-zh_ids.npy
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-bash-zh_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
 cd -
 ```
 
@@ -222,7 +222,7 @@ python ./vocab/gen_char.py path_to_corpus.txt
 ```
 可以在本地文件夹得到`char_dict.pickle`字符频率文件。同时我们也提供了自己统计的词频文件，方便用户复现：
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/char_dict.pickle
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/char_dict.pickle
 ```
 
 ### 2.3 英文字符词表
@@ -236,7 +236,7 @@ python ./vocab/gen_vocab.py ./wikitext-103-raw/wiki.train.raw
 ```
 即可产生英文部分的词表。这里我们也提供了处理好的 vocab 方便用户验证。
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/eng.vocab
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/eng.vocab
 ```
 
 
