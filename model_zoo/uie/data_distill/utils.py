@@ -459,7 +459,7 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
     if task_type == "opinion_extraction":
         outputs = []
         for i, line in enumerate(infer_results):
-            pred = line[0]
+            pred = line
             output = {"text": texts[i]}
 
             entity_list = []
@@ -502,7 +502,7 @@ def synthetic2distill(texts, infer_results, task_type, label_maps=None):
     else:
         outputs = []
         for i, line in enumerate(infer_results):
-            pred = line[0]
+            pred = line
             output = {"text": texts[i]}
 
             entity_list = []

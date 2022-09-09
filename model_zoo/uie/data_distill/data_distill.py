@@ -83,7 +83,7 @@ def do_data_distill():
 
         infer_results = []
         for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
-            infer_results.append(uie(text))
+            infer_results.extend(uie(text))
 
         train_synthetic_lines = synthetic2distill(texts, infer_results,
                                                   args.task_type)
