@@ -451,6 +451,7 @@ def do_train(args):
             max_seq_len=args.max_seq_len,
             places=paddle.static.cuda_places(),
             data_holders=data_holders,
+            binary_head=args.binary_head,
             current_step=global_step)
         fleet.init(is_collective=True)
 
