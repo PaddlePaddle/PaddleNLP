@@ -64,24 +64,52 @@ def parse_args():
 # yapf: enable
 
 
-def calc_bleu(preds, targets):
+def calc_bleu_n(preds, targets, n_size=4):
     assert len(preds) == len(targets), (
         'The length of pred_responses should be equal to the length of '
         'target_responses. But received {} and {}.'.format(
             len(preds), len(targets)))
-    bleu4 = BLEU(n_size=4)
+    bleu = BLEU(n_size=n_size)
     tokenizer = BasicTokenizer()
 
     for pred, target in zip(preds, targets):
         pred_tokens = tokenizer.tokenize(pred)
         target_token = tokenizer.tokenize(target)
 
-        bleu4.add_inst(pred_tokens, [target_token])
+        bleu.add_inst(pred_tokens, [target_token])
 
     print('\n' + '*' * 15)
     print('The auto evaluation result is:')
-    print('BLEU-4:', bleu4.score())
-    return bleu4.score()
+    print('BLEU-' + str(n_size) + ':', bleu.score())
+    return bleu.score()
+
+
+def calc_bleu(preds, targets):
+    calc_bleu_n(preds, targets, 1)
+    calc_bleu_n(preds, targets, 2)
+    calc_bleu_n(preds, targets, 3)
+    bleu4_score = calc_bleu_n(preds, targets, 4)
+    return bleu4_score
+
+
+# def calc_bleu(preds, targets):
+#     assert len(preds) == len(targets), (
+#         'The length of pred_responses should be equal to the length of '
+#         'target_responses. But received {} and {}.'.format(
+#             len(preds), len(targets)))
+#     bleu4 = BLEU(n_size=4)
+#     tokenizer = BasicTokenizer()
+
+#     for pred, target in zip(preds, targets):
+#         pred_tokens = tokenizer.tokenize(pred)
+#         target_token = tokenizer.tokenize(target)
+
+#         bleu4.add_inst(pred_tokens, [target_token])
+
+#     print('\n' + '*' * 15)
+#     print('The auto evaluation result is:')
+#     print('BLEU-4:', bleu4.score())
+#     return bleu4.score()
 
 
 def save_ckpt(model, tokenizer, save_dir, name):

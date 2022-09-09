@@ -1,48 +1,48 @@
-# unset CUDA_VISIBLE_DEVICES
-# python -m paddle.distributed.launch --gpus "2,3,5,6" --log_dir ./unimo/finetune/merge9_epoch30/log run_gen.py \
-#     --dataset_name=dureader_qg \
-#     --train_file=/root/project/data/qa-dataset/qa-clean-qg-merge/merge9.json \
-#     --model_name_or_path='unimo-text-1.0' \
-#     --save_dir=./unimo/finetune/merge9_epoch30/checkpoints \
-#     --output_path=./unimo/finetune/merge9_epoch30/predict.txt \
-#     --logging_steps=100 \
-#     --save_steps=3000 \
-#     --epochs=30 \
-#     --batch_size=16 \
-#     --learning_rate=5e-5 \
-#     --warmup_propotion=0.02 \
-#     --weight_decay=0.01 \
-#     --max_seq_len=512 \
-#     --max_target_len=50 \
-#     --do_train \
-#     --do_predict \
-#     --max_dec_len=40 \
-#     --min_dec_len=3 \
-#     --num_return_sequences=1 \
-#     --adversarial_training=None \
-#     --template=1 \
-#     --device=gpu
-
-
-
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "2,3,5,6" --log_dir ./unimo/finetune/merge9_epoch30_finetune_5e-6/log run_gen.py \
+python -m paddle.distributed.launch --gpus "4,7" --log_dir ./unimo/finetune/merge9_train_epoch30/log run_gen.py \
     --dataset_name=dureader_qg \
-    --model_name_or_path=/root/project/paddle/PaddleNLP/applications/question_generation/unimo/finetune/merge9_epoch30/checkpoints/model_best \
-    --save_dir=./unimo/finetune/merge9_epoch30_finetune_5e-6/checkpoints \
-    --output_path=./unimo/finetune/merge9_epoch30_finetune_5e-6/predict.txt \
+    --train_file=/root/project/data/qa-dataset/qa-clean-qg-merge/merge9.json \
+    --model_name_or_path='unimo-text-1.0' \
+    --save_dir=./unimo/finetune/merge9_train_epoch30/checkpoints \
+    --output_path=./unimo/finetune/merge9_train_epoch30/predict.txt \
     --logging_steps=100 \
-    --save_steps=400 \
+    --save_steps=3000 \
     --epochs=30 \
     --batch_size=16 \
-    --learning_rate=5e-6 \
+    --learning_rate=5e-5 \
     --warmup_propotion=0.02 \
     --weight_decay=0.01 \
     --max_seq_len=512 \
     --max_target_len=50 \
     --do_train \
     --do_predict \
-    --max_dec_len=40 \
+    --max_dec_len=50 \
+    --min_dec_len=3 \
+    --num_return_sequences=1 \
+    --adversarial_training=None \
+    --template=1 \
+    --device=gpu
+
+
+
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "4,7" --log_dir ./unimo/finetune/merge9_train_epoch30_finetune/log run_gen.py \
+    --dataset_name=dureader_qg \
+    --model_name_or_path=/root/project/paddle/PaddleNLP/applications/question_generation/unimo/finetune/merge9_train_epoch30/checkpoints/model_best \
+    --save_dir=./unimo/finetune/merge9_train_epoch30_finetune/checkpoints \
+    --output_path=./unimo/finetune/merge9_train_epoch30_finetune/predict.txt \
+    --logging_steps=100 \
+    --save_steps=400 \
+    --epochs=30 \
+    --batch_size=16 \
+    --learning_rate=5e-5 \
+    --warmup_propotion=0.02 \
+    --weight_decay=0.01 \
+    --max_seq_len=512 \
+    --max_target_len=50 \
+    --do_train \
+    --do_predict \
+    --max_dec_len=50 \
     --min_dec_len=3 \
     --num_return_sequences=1 \
     --adversarial_training=None \
