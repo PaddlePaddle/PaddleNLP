@@ -9,11 +9,13 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='data input/output')
-    group.add_argument('-i', '--input_path',
+    group.add_argument('-i',
+                       '--input_path',
                        type=str,
                        required=True,
                        help='Path to input JSON files.')
-    group.add_argument('-o', '--output_prefix',
+    group.add_argument('-o',
+                       '--output_prefix',
                        type=str,
                        required=True,
                        help='Output prefix to store output file.')
@@ -27,7 +29,8 @@ def get_args():
         '--json_key',
         type=str,
         default='text',
-        help='For JSON format. Space separate listed of keys to extract from json')
+        help=
+        'For JSON format. Space separate listed of keys to extract from json')
     group = parser.add_argument_group(title='common config')
     group.add_argument('--append_eos',
                        action='store_true',
@@ -52,25 +55,23 @@ def get_args():
 
 
 class Sampler(object):
-    lang = {'False', 'await', 'else', 'import', 'pass',
-            'None', 'break', 'except', 'in', 'raise',
-            'True', 'class', 'finally', 'is', 'return',
-            'and', 'continue', 'for', 'lambda', 'try',
-            'as', 'def', 'from', 'nonlocal', 'while',
-            'assert', 'del', 'global', 'not', 'with',
-            'async', 'elif', 'if', 'or', 'yield'}
+    lang = {
+        'False', 'await', 'else', 'import', 'pass', 'None', 'break', 'except',
+        'in', 'raise', 'True', 'class', 'finally', 'is', 'return', 'and',
+        'continue', 'for', 'lambda', 'try', 'as', 'def', 'from', 'nonlocal',
+        'while', 'assert', 'del', 'global', 'not', 'with', 'async', 'elif',
+        'if', 'or', 'yield'
+    }
     builtin = {
-        'set', 'list', 'dict', 'bool', 'str', 'chr',
-        'ord', 'int', 'float', 'format', 'map',
-        'filter', 'sum', 'max', 'min', 'mean', 'open',
-        'enumerate', 'zip', 'range', 'print', 'input',
-        'split', 'self', 'append', 'extend', 'join',
-        'pop', 'object', 'match', 'case'
+        'set', 'list', 'dict', 'bool', 'str', 'chr', 'ord', 'int', 'float',
+        'format', 'map', 'filter', 'sum', 'max', 'min', 'mean', 'open',
+        'enumerate', 'zip', 'range', 'print', 'input', 'split', 'self',
+        'append', 'extend', 'join', 'pop', 'object', 'match', 'case'
     }
 
-    charset = set([chr(ord('a') + i) for i in range(26)] +
-                  [chr(ord('A') + i) for i in range(26)] +
-                  ['_'])
+    charset = set([chr(ord('a') + i)
+                   for i in range(26)] + [chr(ord('A') + i)
+                                          for i in range(26)] + ['_'])
     numset = set('.eE-')
     digiset = set('0123456789')
     quo = {"'": 1, '"': 2, "'''": 3, '"""': 4}
@@ -169,12 +170,13 @@ class Sampler(object):
             if self.stat != self.anno:
                 bcnt += int(x == '{') - int(x == '}')
         if buf and self.stat == self.idt:
-            self.sp.append([buf, len(self.cont) - len(buf),
-                            len(self.cont), self.idt])
-        self.sp.append(
-            ['', len(self.cont) + 10, len(self.cont) + 10, self.idt])
+            self.sp.append(
+                [buf, len(self.cont) - len(buf),
+                 len(self.cont), self.idt])
+        self.sp.append(['', len(self.cont) + 10, len(self.cont) + 10, self.idt])
 
     def _filter(self):
+
         def chk(x) -> bool:
             t = x[0]
             return t not in self.ignore and not self.builtin(t)
@@ -216,8 +218,9 @@ class Sampler(object):
         cbuf = []
         i = len(vlen)
         for i in range(len(vlen) - 1, -1, -1):
-            vids = list(map(lambda y: self.tokenizer(y) + comma,
-                            filter(lambda x: x not in vmap, vtxt[i])))
+            vids = list(
+                map(lambda y: self.tokenizer(y) + comma,
+                    filter(lambda x: x not in vmap, vtxt[i])))
             cids = self.tokenizer('\n' + ctxt[i])
             vl = sum(map(len, vids))
             if length + vl - vlen[i] + len(vids) > siz:
@@ -297,11 +300,13 @@ class Sampler(object):
 
 
 def process(jsonl, key: str, tokenizer, seq_length: int = 1024):
+
     def tk(x):
         return tokenizer(x)['input_ids']
 
-    return Sampler(json.loads(jsonl)[key], tk,
-                   tokenizer.eos_token_id, seq_length + 1).collect()
+    return Sampler(
+        json.loads(jsonl)[key], tk, tokenizer.eos_token_id,
+        seq_length + 1).collect()
 
 
 def prompt_ids(content: str, tokenizer, size: int = 80):

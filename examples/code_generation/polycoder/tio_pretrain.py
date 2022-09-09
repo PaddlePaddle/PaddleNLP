@@ -126,8 +126,7 @@ def get_train_data_file(args):
     ]
     files = [x.replace("_idx_tio.npz", "") for x in files]
     if len(files) == 0:
-        logger.warning(
-            "Not found dataset with name of xxx_tio.pkl !")
+        logger.warning("Not found dataset with name of xxx_tio.pkl !")
         return []
     else:
         return files
