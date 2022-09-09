@@ -106,7 +106,8 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
-                            --doc_dir data/dureader_dev
+                            --doc_dir data/dureader_dev \
+                            --delete_index
 ```
 可以使用下面的命令来查看数据：
 
