@@ -56,7 +56,8 @@ class DataCollator:
 
         bs = batch[0].shape[0]
         if self.task_type == "entity_extraction":
-            max_ent_num = max([len(lb["ent_labels"]) for lb in labels])
+            # Ensure the dimension is greater or equal to 1
+            max_ent_num = max(max([len(lb["ent_labels"]) for lb in labels]), 1)
             num_ents = len(self.label_maps["entity2id"])
             batch_entity_labels = paddle.zeros(
                 shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
@@ -67,8 +68,9 @@ class DataCollator:
 
             batch.append([batch_entity_labels])
         else:
-            max_ent_num = max([len(lb["ent_labels"]) for lb in labels])
-            max_spo_num = max([len(lb["rel_labels"]) for lb in labels])
+            # Ensure the dimension is greater or equal to 1
+            max_ent_num = max(max([len(lb["ent_labels"]) for lb in labels]), 1)
+            max_spo_num = max(max([len(lb["rel_labels"]) for lb in labels]), 1)
             num_ents = len(self.label_maps["entity2id"])
             if "relation2id" in self.label_maps.keys():
                 num_rels = len(self.label_maps["relation2id"])
