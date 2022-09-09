@@ -137,39 +137,77 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
             </td>
         </tr>
         <tr>
-            <td rowspan=2 align=center> 24L1024H </td>
+            <td rowspan=3 align=center> 24L1024H </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>ERNIE 2.0-Large-zh</b></span>
+                <span style="font-size:18px">ERNIE 1.0-Large-CW</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>77.03</b></span>
+                <span style="font-size:18px"><b>79.03</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>76.41</b></span>
+                <span style="font-size:18px">75.97</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>59.67</b></span>
+                <span style="font-size:18px">59.65</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>62.29</b></span>
+                <span style="font-size:18px"><b>62.91</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">83.82</span>
+                <span style="font-size:18px"><b>85.09</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>79.69</b></span>
+                <span style="font-size:18px"><b>81.73</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">89.14</span>
+                <span style="font-size:18px"><b>93.09</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.10</b></span>
+                <span style="font-size:18px"><b>84.53</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.48/90.35</b></span>
+                <span style="font-size:18px"><b>74.22/91.88</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">85.52</span>
+                <span style="font-size:18px"><b>88.57</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>84.54</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 2.0-Large-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.90</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>76.23</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px"><b>59.33</b></span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.91</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.85</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">79.93</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">89.82</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.23</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">70.95/90.31</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">86.78</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>78.12</b></span>
@@ -192,13 +230,13 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">62.02</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>83.88</b></span>
+                <span style="font-size:18px">83.88</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">78.81</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>90.79</b></span>
+                <span style="font-size:18px">90.79</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">83.67</span>
@@ -207,7 +245,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">70.58/89.82</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>85.72</b></span>
+                <span style="font-size:18px">85.72</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">75.26</span>
@@ -219,37 +257,37 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px"><b>ERNIE 3.0-Xbase-zh</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>78.71</b></span>
+                <span style="font-size:18px"><b>78.39</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>76.85</b></span>
+                <span style="font-size:18px"><b>76.16</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>59.89</b></span>
+                <span style="font-size:18px"><b>59.55</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>62.41</b></span>
+                <span style="font-size:18px"><b>61.87</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.76</b></span>
+                <span style="font-size:18px"><b>84.40</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>82.51</b></span>
+                <span style="font-size:18px"><b>81.73</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>89.80</b></span>
+                <span style="font-size:18px"><b>88.82</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.47</b></span>
+                <span style="font-size:18px"><b>83.60</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>75.49/92.67</b></span>
+                <span style="font-size:18px"><b>75.99/93.00</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>86.36</b></span>
+                <span style="font-size:18px"><b>86.78</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.59</b></span>
+                <span style="font-size:18px"><b>84.98</b></span>
             </td>
         </tr>
         <tr>
@@ -335,44 +373,6 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
         </tr>
         <tr>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 2.0-Base-zh</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">74.95</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">76.25</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">58.53</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">61.72</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">83.07</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">78.81</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">84.21</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">82.77</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">68.22/88.71</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">82.78</span>
-            </td>
-            <td style="text-align:center">
-                <span style="font-size:18px">73.19</span>
-            </td>
-        </tr>
-        <tr>
-            <td style="text-align:center">
                 <span style="font-size:18px">Langboat/Mengzi-BERT-Base</span>
             </td>
             <td style="text-align:center">
@@ -407,6 +407,44 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">70.70</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 2.0-Base-zh</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">74.32</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">75.65</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">58.25</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">61.64</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.62</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">78.71</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">81.91</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.33</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">66.08/87.46</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">82.78</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">73.19</span>
             </td>
         </tr>
         <tr>

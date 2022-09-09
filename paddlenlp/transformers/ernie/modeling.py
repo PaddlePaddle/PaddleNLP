@@ -146,6 +146,7 @@ class ErniePretrainedModel(PretrainedModel):
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models. 
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
+
     """
 
     pretrained_init_configuration = {
@@ -775,11 +776,14 @@ class ErniePretrainedModel(PretrainedModel):
 class ErnieModel(ErniePretrainedModel):
     r"""
     The bare ERNIE Model transformer outputting raw hidden-states.
+
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
+
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
+
     Args:
         vocab_size (int):
             Vocabulary size of `inputs_ids` in `ErnieModel`. Also is the vocab size of token embedding matrix.
@@ -819,9 +823,11 @@ class ErnieModel(ErniePretrainedModel):
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`ErniePretrainedModel._init_weights()` for how weights are initialized in `ErnieModel`.
+
         pad_token_id(int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
+
     """
 
     def __init__(self,
@@ -898,8 +904,10 @@ class ErnieModel(ErniePretrainedModel):
                 Selected in the range ``[0, type_vocab_size - 1]``.
                 If `type_vocab_size` is 2, which means the inputs have two portions.
                 Indices can either be 0 or 1:
+
                 - 0 corresponds to a *sentence A* token,
                 - 1 corresponds to a *sentence B* token.
+
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
             position_ids (Tensor, optional):
@@ -941,20 +949,26 @@ class ErnieModel(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
             `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
+
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieModel.from_pretrained('ernie-1.0')
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 sequence_output, pooled_output = model(**inputs)
+
         """
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError(
@@ -1028,6 +1042,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
     r"""
     Ernie Model with a linear layer on top of the output layer,
     designed for sequence classification/regression tasks like GLUE tasks.
+
     Args:
         ernie (ErnieModel): 
             An instance of `paddlenlp.transformers.ErnieModel`.
@@ -1085,19 +1100,26 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
             Otherwise it returns a tuple of tensors corresponding to ordered and
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput`.
+
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForSequenceClassification.from_pretrained('ernie-1.0')
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
+
         """
         outputs = self.ernie(input_ids,
                              token_type_ids=token_type_ids,
@@ -1142,6 +1164,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
     Ernie Model with a linear layer on top of the hidden-states
     output to compute `span_start_logits` and `span_end_logits`,
     designed for question-answering tasks like SQuAD.
+
     Args:
         ernie (`ErnieModel`): 
             An instance of `ErnieModel`.
@@ -1193,16 +1216,21 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` if `return_dict=True`.
             Otherwise it returns a tuple of tensors corresponding to ordered and
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput`.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import ErnieForQuestionAnswering, ErnieTokenizer
+
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForQuestionAnswering.from_pretrained('ernie-1.0')
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
@@ -1257,6 +1285,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
     r"""
     ERNIE Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
+
     Args:
         ernie (`ErnieModel`): 
             An instance of `ErnieModel`.
@@ -1311,16 +1340,21 @@ class ErnieForTokenClassification(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
             Otherwise it returns a tuple of tensors corresponding to ordered and
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
+
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForTokenClassification.from_pretrained('ernie-1.0')
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
@@ -1460,6 +1494,7 @@ class ErnieForPretraining(ErniePretrainedModel):
     r"""
     Ernie Model with a `masked language modeling` head and a `sentence order prediction` head
     on top.
+
     """
 
     def __init__(self, ernie):
@@ -1509,6 +1544,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             next_sentence_label (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the next sequence prediction (classification) loss. Input should be a sequence
                 pair (see `input_ids` docstring) Indices should be in `[0, 1]`:
+
                 - 0 indicates sequence B is a continuation of sequence A,
                 - 1 indicates sequence B is a random sequence.
             output_hidden_states (bool, optional):
@@ -1520,10 +1556,12 @@ class ErnieForPretraining(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.bert.ErnieForPreTrainingOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.bert.ErnieForPreTrainingOutput` if `return_dict=True`.
             Otherwise it returns a tuple of tensors corresponding to ordered and
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.bert.ErnieForPreTrainingOutput`.
+
         """
         with paddle.static.amp.fp16_guard():
             outputs = self.ernie(input_ids,
@@ -1568,6 +1606,7 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
     r"""
     The loss output of Ernie Model during the pretraining:
     a `masked language modeling` head and a `next sentence prediction (classification)` head.
+
     """
 
     def __init__(self, with_nsp_loss=True):
@@ -1597,9 +1636,11 @@ class ErniePretrainingCriterion(paddle.nn.Layer):
                 The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
                 is equal to `seq_relation_labels`. Its data type should be int64 and
                 its shape is [batch_size, 1]
+
         Returns:
             Tensor: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
             Its data type should be float32 and its shape is [1].
+
         """
 
         with paddle.static.amp.fp16_guard():
@@ -1635,9 +1676,11 @@ class ErnieOnlyMLMHead(nn.Layer):
 class ErnieForMaskedLM(ErniePretrainedModel):
     """
     Ernie Model with a `masked language modeling` head on top.
+
     Args:
         ernie (:class:`ErnieModel`):
             An instance of :class:`ErnieModel`.
+
     """
 
     def __init__(self, ernie):
@@ -1663,6 +1706,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 output_attentions=False,
                 return_dict=False):
         r"""
+
         Args:
             input_ids (Tensor):
                 See :class:`ErnieModel`.
@@ -1689,22 +1733,28 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.
             Otherwise it returns a tuple of tensors corresponding to ordered and
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput`.
+
         Example:
             .. code-block::
+
                 import paddle
                 from paddlenlp.transformers import ErnieForMaskedLM, ErnieTokenizer
+
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForMaskedLM.from_pretrained('ernie-1.0')
                 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+
                 logits = model(**inputs)
                 print(logits.shape)
                 # [1, 17, 18000]
+
         """
 
         outputs = self.ernie(input_ids,
@@ -1778,6 +1828,7 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
                 return_dict=False):
         r"""
         The ErnieForMultipleChoice forward method, overrides the __call__() special method.
+
         Args:
             input_ids (Tensor):
                 See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
@@ -1802,10 +1853,12 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
+
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
             Otherwise it returns a tuple of tensors corresponding to ordered and
             not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput`.
+
         """
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape(shape=(

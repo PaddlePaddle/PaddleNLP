@@ -579,28 +579,27 @@ def auto_model_forward(self,
     wtype = self.encoder.layers[0].norm1.fn.weight.dtype if hasattr(
         self.encoder.layers[0].norm1,
         'fn') else self.encoder.layers[0].norm1.weight.dtype
-    if input_ids is not None and "inputs_embeds" in kwargs and kwargs[
-            "inputs_embeds"] is not None:
+    if input_ids is not None and inputs_embeds is not None:
         raise ValueError(
             "You cannot specify both input_ids and inputs_embeds at the same time."
         )
     elif input_ids is not None:
         input_shape = paddle.shape(input_ids)
-    elif "inputs_embeds" in kwargs and kwargs["inputs_embeds"] is not None:
+    elif inputs_embeds is not None:
         input_shape = paddle.shape(inputs_embeds)[:-1]
     else:
         raise ValueError(
             "You have to specify either input_ids or inputs_embeds")
 
     past_key_values_length = None
-    if "past_key_values" in kwargs and kwargs["past_key_values"] is not None:
-        past_key_values_length = kwargs["past_key_values"][0][0].shape[2]
+    if past_key_values is not None:
+        past_key_values_length = past_key_values[0][0].shape[2]
 
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
-        if "past_key_values" in kwargs and kwargs["past_key_values"] is not None:
-            batch_size = kwargs["past_key_values"][0][0].shape[0]
+        if past_key_values is not None:
+            batch_size = past_key_values[0][0].shape[0]
             past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length],
                                      dtype=attention_mask.dtype)
             attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
@@ -615,27 +614,26 @@ def auto_model_forward(self,
     embedding_kwargs_keys = inspect.signature(
         self.embeddings.forward).parameters.keys()
     embedding_kwargs = {}
+    for key in embedding_kwargs_keys:
+        if key in kwargs.keys():
+            embedding_kwargs[key] = kwargs[key]
+    embedding_kwargs["input_ids"] = input_ids
+
+    embedding_output = self.embeddings(**embedding_kwargs)
+
+    self.encoder._use_cache = use_cache  # To be consistent with HF
 
     encoder_kwargs_keys = inspect.signature(
         self.encoder.forward).parameters.keys()
     encoder_kwargs = {}
-
-    for key in embedding_kwargs_keys:
-        if key in kwargs.keys():
-            embedding_kwargs[key] = kwargs[key]
-
     for key in encoder_kwargs_keys:
-        if key in kwargs.keys():
+        if key == "cache":
+            encoder_kwargs[key] = past_key_values
+        elif key == "src_mask":
+            encoder_kwargs[key] = attention_mask
+        elif key in kwargs:
             encoder_kwargs[key] = kwargs[key]
 
-    embedding_kwargs["input_ids"] = input_ids
-    embedding_output = self.embeddings(**embedding_kwargs)
-
-    if "use_cache" in kwargs:
-        self.encoder._use_cache = kwargs[
-            "use_cache"]  # To be consistent with HF
-
-    encoder_kwargs["src_mask"] = attention_mask
     encoder_outputs = self.encoder(embedding_output, **encoder_kwargs)
     if isinstance(encoder_outputs, type(embedding_output)):
         sequence_output = encoder_outputs
