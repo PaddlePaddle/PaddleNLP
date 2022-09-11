@@ -12,21 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import annotations
 import unittest
 import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    RobertaPretrainedModel,
-    RobertaForCausalLM,
-    RobertaForMaskedLM,
-    RobertaForMultipleChoice,
-    RobertaForQuestionAnswering,
-    RobertaForSequenceClassification,
-    RobertaForTokenClassification,
-    RobertaModel,
-)
+    RobertaPretrainedModel, RobertaForCausalLM, RobertaForMaskedLM,
+    RobertaForMultipleChoice, RobertaForQuestionAnswering,
+    RobertaForSequenceClassification, RobertaForTokenClassification,
+    RobertaModel, RobertaConfig)
 
 from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
@@ -36,8 +31,8 @@ ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
 
 class RobertaModelTester:
 
-    def __init__(self, parent):
-        self.parent = parent
+    def __init__(self, parent: RobertaModelTest):
+        self.parent: RobertaModelTest = parent
         self.batch_size = 13
         self.seq_length = 7
         self.is_training = True
@@ -61,6 +56,7 @@ class RobertaModelTester:
         self.cls_token_id = 101
         self.num_labels = 3
         self.num_choices = 4
+        self.dropout = 0.56
         self.scope = None
 
     def prepare_config_and_inputs(self):
@@ -91,22 +87,22 @@ class RobertaModelTester:
         return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "pad_token_id": 0,
-            "layer_norm_eps": 1e-12,
-            "cls_token_id": 101,
-        }
+        return RobertaConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            pad_token_id=0,
+            layer_norm_eps=1e-12,
+            cls_token_id=101,
+        )
 
     def prepare_config_and_inputs_for_decoder(self):
         (
@@ -139,22 +135,29 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaModel(**config)
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict)
-        result = model(input_ids,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict)
-        result = model(input_ids, return_dict=self.parent.return_dict)
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(result[1].shape,
-                                [self.batch_size, self.hidden_size])
+        model_lambdas = [
+            lambda: RobertaModel(config),
+            lambda: RobertaModel(**config.to_dict()),
+        ]
+        for model_lambda in model_lambdas:
+            model = model_lambda()
+            model.eval()
+
+            result = model(input_ids,
+                           attention_mask=input_mask,
+                           token_type_ids=token_type_ids,
+                           return_dict=self.parent.return_dict)
+            result = model(input_ids,
+                           token_type_ids=token_type_ids,
+                           return_dict=self.parent.return_dict)
+            result = model(input_ids, return_dict=self.parent.return_dict)
+
+            self.parent.assertEqual(
+                result[0].shape,
+                [self.batch_size, self.seq_length, self.hidden_size])
+            self.parent.assertEqual(result[1].shape,
+                                    [self.batch_size, self.hidden_size])
 
     def create_and_check_for_causal_lm(
         self,
@@ -166,21 +169,28 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForCausalLM(RobertaModel(**config))
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       labels=token_labels,
-                       return_dict=self.parent.return_dict)
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
+        model_lambdas = [
+            lambda: RobertaForCausalLM(config),
+            lambda: RobertaForCausalLM(config=config),
+            lambda: RobertaForCausalLM(RobertaModel(config)),
+            lambda: RobertaForCausalLM(roberta=RobertaModel(config)),
+        ]
+        for model_lambda in model_lambdas:
+            model: RobertaForCausalLM = model_lambda()
+            model.eval()
+            result = model(input_ids,
+                           attention_mask=input_mask,
+                           token_type_ids=token_type_ids,
+                           labels=token_labels,
+                           return_dict=self.parent.return_dict)
+            if token_labels is not None:
+                result = result[1:]
+            elif paddle.is_tensor(result):
+                result = [result]
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.vocab_size])
+            self.parent.assertEqual(
+                result[0].shape,
+                [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_masked_lm(
         self,
@@ -192,22 +202,29 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForMaskedLM(RobertaModel(**config))
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       labels=token_labels,
-                       return_dict=self.parent.return_dict)
+        model_lambdas = [
+            lambda: RobertaForMaskedLM(config),
+            lambda: RobertaForMaskedLM(config=config),
+            lambda: RobertaForMaskedLM(RobertaModel(config)),
+            lambda: RobertaForMaskedLM(roberta=RobertaModel(config)),
+        ]
+        for model_lambda in model_lambdas:
+            model = model_lambda()
+            model.eval()
+            result = model(input_ids,
+                           attention_mask=input_mask,
+                           token_type_ids=token_type_ids,
+                           labels=token_labels,
+                           return_dict=self.parent.return_dict)
 
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
+            if token_labels is not None:
+                result = result[1:]
+            elif paddle.is_tensor(result):
+                result = [result]
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.vocab_size])
+            self.parent.assertEqual(
+                result[0].shape,
+                [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_token_classification(
         self,
@@ -219,24 +236,54 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForTokenClassification(RobertaModel(**config),
-                                              num_classes=self.num_labels,
-                                              dropout=None)
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       labels=token_labels)
 
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
+        model_lambdas = [
+            lambda: RobertaForTokenClassification(config),
+            lambda: RobertaForTokenClassification(config, self.num_labels),
+            lambda: RobertaForTokenClassification(config, self.num_labels, self.
+                                                  dropout),
+            lambda: RobertaForTokenClassification(config=config),
+            lambda: RobertaForTokenClassification(config=config,
+                                                  num_labels=self.num_labels),
+            lambda: RobertaForTokenClassification(config=config,
+                                                  num_classes=self.num_labels,
+                                                  dropout=self.dropout),
+            lambda: RobertaForTokenClassification(RobertaModel(config)),
+            lambda: RobertaForTokenClassification(RobertaModel(config), self.
+                                                  num_labels),
+            lambda: RobertaForTokenClassification(RobertaModel(config), self.
+                                                  num_labels, self.dropout),
+            lambda: RobertaForTokenClassification(roberta=RobertaModel(config)),
+            lambda: RobertaForTokenClassification(roberta=RobertaModel(config),
+                                                  num_labels=self.num_labels),
+            lambda: RobertaForTokenClassification(roberta=RobertaModel(config),
+                                                  num_classes=self.num_labels,
+                                                  dropout=self.dropout),
+        ]
+        for index, model_lambda in enumerate(model_lambdas):
+            model: RobertaForTokenClassification = model_lambda()
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.num_labels])
+            model.eval()
+            result = model(input_ids,
+                           attention_mask=input_mask,
+                           token_type_ids=token_type_ids,
+                           return_dict=self.parent.return_dict,
+                           labels=token_labels)
+
+            if token_labels is not None:
+                result = result[1:]
+            elif paddle.is_tensor(result):
+                result = [result]
+
+            self.parent.assertEqual(
+                result[0].shape,
+                [self.batch_size, self.seq_length, self.num_labels])
+
+            if index % 3 == 2:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def create_and_check_for_sequence_classification(
         self,
@@ -248,22 +295,54 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForSequenceClassification(RobertaModel(**config),
-                                                 num_classes=self.num_labels)
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       labels=sequence_labels,
-                       return_dict=self.parent.return_dict)
+        model_lambdas = [
+            lambda: RobertaForSequenceClassification(config),
+            lambda: RobertaForSequenceClassification(config, self.num_labels),
+            lambda: RobertaForSequenceClassification(config, self.num_labels,
+                                                     self.dropout),
+            lambda: RobertaForSequenceClassification(config=config),
+            lambda: RobertaForSequenceClassification(
+                config=config, num_labels=self.num_labels),
+            lambda: RobertaForSequenceClassification(config=config,
+                                                     num_classes=self.
+                                                     num_labels,
+                                                     dropout=self.dropout),
+            lambda: RobertaForSequenceClassification(RobertaModel(config)),
+            lambda: RobertaForSequenceClassification(RobertaModel(config), self.
+                                                     num_labels),
+            lambda: RobertaForSequenceClassification(RobertaModel(config), self.
+                                                     num_labels, self.dropout),
+            lambda: RobertaForSequenceClassification(roberta=RobertaModel(config
+                                                                          )),
+            lambda: RobertaForSequenceClassification(
+                roberta=RobertaModel(config), num_labels=self.num_labels),
+            lambda: RobertaForSequenceClassification(
+                roberta=RobertaModel(config),
+                num_classes=self.num_labels,
+                dropout=self.dropout),
+        ]
+        for index, model_lambda in enumerate(model_lambdas):
+            model: RobertaForSequenceClassification = model_lambda()
+            model.eval()
+            result = model(input_ids,
+                           attention_mask=input_mask,
+                           token_type_ids=token_type_ids,
+                           labels=sequence_labels,
+                           return_dict=self.parent.return_dict)
 
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
+            if token_labels is not None:
+                result = result[1:]
+            elif paddle.is_tensor(result):
+                result = [result]
 
-        self.parent.assertEqual(result[0].shape,
-                                [self.batch_size, self.num_labels])
+            self.parent.assertEqual(result[0].shape,
+                                    [self.batch_size, self.num_labels])
+
+            if index % 3 == 2:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def create_and_check_for_multiple_choice(
         self,
@@ -275,27 +354,59 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForMultipleChoice(RobertaModel(**config))
-        model.eval()
-        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        result = model(multiple_choice_inputs_ids,
-                       attention_mask=multiple_choice_input_mask,
-                       token_type_ids=multiple_choice_token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       labels=choice_labels)
 
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
+        model_lambdas = [
+            lambda: RobertaForMultipleChoice(config),
+            lambda: RobertaForMultipleChoice(config, self.num_choices),
+            lambda: RobertaForMultipleChoice(config, self.num_choices, self.
+                                             dropout),
+            lambda: RobertaForMultipleChoice(config=config),
+            lambda: RobertaForMultipleChoice(config=config,
+                                             num_choices=self.num_choices),
+            lambda: RobertaForMultipleChoice(config=config,
+                                             num_choices=self.num_choices,
+                                             dropout=self.dropout),
+            lambda: RobertaForMultipleChoice(RobertaModel(config)),
+            lambda: RobertaForMultipleChoice(RobertaModel(config), self.
+                                             num_choices),
+            lambda: RobertaForMultipleChoice(RobertaModel(config), self.
+                                             num_choices, self.dropout),
+            lambda: RobertaForMultipleChoice(roberta=RobertaModel(config)),
+            lambda: RobertaForMultipleChoice(roberta=RobertaModel(config),
+                                             num_choices=self.num_choices),
+            lambda: RobertaForMultipleChoice(roberta=RobertaModel(config),
+                                             num_choices=self.num_choices,
+                                             dropout=self.dropout),
+        ]
 
-        self.parent.assertEqual(result[0].shape,
-                                [self.batch_size, self.num_choices])
+        for index, model_lambda in enumerate(model_lambdas):
+            model: RobertaForMultipleChoice = model_lambda()
+            model = RobertaForMultipleChoice(RobertaModel(**config))
+            model.eval()
+            multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
+                [-1, self.num_choices, -1])
+            multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
+                [-1, self.num_choices, -1])
+            multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
+                [-1, self.num_choices, -1])
+            result = model(multiple_choice_inputs_ids,
+                           attention_mask=multiple_choice_input_mask,
+                           token_type_ids=multiple_choice_token_type_ids,
+                           return_dict=self.parent.return_dict,
+                           labels=choice_labels)
+
+            if token_labels is not None:
+                result = result[1:]
+            elif paddle.is_tensor(result):
+                result = [result]
+
+            self.parent.assertEqual(result[0].shape,
+                                    [self.batch_size, self.num_choices])
+            if index % 3 == 2:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def create_and_check_for_question_answering(
         self,
@@ -307,24 +418,44 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForQuestionAnswering(RobertaModel(**config))
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       start_positions=sequence_labels,
-                       end_positions=sequence_labels)
 
-        if sequence_labels is not None:
-            start_logits, end_logits = result[1], result[2]
-        else:
-            start_logits, end_logits = result[0], result[1]
+        model_lambdas = [
+            lambda: RobertaForQuestionAnswering(config),
+            lambda: RobertaForQuestionAnswering(config, self.dropout),
+            lambda: RobertaForQuestionAnswering(config=config),
+            lambda: RobertaForQuestionAnswering(config=config,
+                                                dropout=self.dropout),
+            lambda: RobertaForQuestionAnswering(RobertaModel(config)), lambda:
+            RobertaForQuestionAnswering(RobertaModel(config), self.dropout),
+            lambda: RobertaForQuestionAnswering(roberta=RobertaModel(config)),
+            lambda: RobertaForQuestionAnswering(roberta=RobertaModel(config),
+                                                dropout=self.dropout)
+        ]
 
-        self.parent.assertEqual(start_logits.shape,
-                                [self.batch_size, self.seq_length])
-        self.parent.assertEqual(end_logits.shape,
-                                [self.batch_size, self.seq_length])
+        for index, model_lambda in enumerate(model_lambdas):
+            model: RobertaForQuestionAnswering = model_lambda()
+            model.eval()
+            result = model(input_ids,
+                           attention_mask=input_mask,
+                           token_type_ids=token_type_ids,
+                           return_dict=self.parent.return_dict,
+                           start_positions=sequence_labels,
+                           end_positions=sequence_labels)
+
+            if sequence_labels is not None:
+                start_logits, end_logits = result[1], result[2]
+            else:
+                start_logits, end_logits = result[0], result[1]
+
+            self.parent.assertEqual(start_logits.shape,
+                                    [self.batch_size, self.seq_length])
+            self.parent.assertEqual(end_logits.shape,
+                                    [self.batch_size, self.seq_length])
+            if index % 2 == 1:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()

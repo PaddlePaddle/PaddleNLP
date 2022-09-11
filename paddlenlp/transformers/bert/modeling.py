@@ -597,7 +597,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=["num_labels", 'dropout'],
+                                            fields=["num_classes", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForSequenceClassification, self).__init__(config)
 
@@ -730,7 +730,7 @@ class BertForTokenClassification(BertPretrainedModel):
                                             config_class=BertConfig,
                                             args=args,
                                             kwargs=kwargs,
-                                            fields=["num_labels", 'dropout'],
+                                            fields=["num_classes", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForTokenClassification, self).__init__(config)
 

@@ -379,8 +379,10 @@ class PretrainedConfig:
     """
     model_type: str = ""
     is_composition: bool = False
-    attribute_map: Dict[str, str] = {}
     pretrained_init_configuration = {}
+
+    # global attribute mapping
+    attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
     _auto_class: Optional[str] = None
 
     def __setattr__(self, key, value):

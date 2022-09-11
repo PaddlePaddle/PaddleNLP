@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Dict
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
+__all__ = ["PRETRAINED_INIT_CONFIGURATION", "BertConfig"]
+
 PRETRAINED_INIT_CONFIGURATION = {
     "bert-base-uncased": {
         "vocab_size": 30522,

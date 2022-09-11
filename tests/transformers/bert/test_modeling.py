@@ -12,17 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-import os
-import shutil
-import tempfile
 import unittest
 import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
-from paddlenlp.utils.env import MODEL_HOME
 
 from paddlenlp.transformers.bert.configuration import BertConfig
 
@@ -36,7 +33,7 @@ class BertModelTester:
 
     def __init__(
         self,
-        parent,
+        parent: BertModelTest,
         batch_size=13,
         seq_length=7,
         is_training=True,
@@ -61,9 +58,10 @@ class BertModelTester:
         num_labels=3,
         num_choices=4,
         scope=None,
+        dropout=0.56,
         return_dict=False,
     ):
-        self.parent = parent
+        self.parent: unittest.TestCase = parent
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
@@ -88,6 +86,7 @@ class BertModelTester:
         self.num_labels = num_labels
         self.num_choices = num_choices
         self.scope = scope
+        self.dropout = dropout
         self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
@@ -178,7 +177,6 @@ class BertModelTester:
     ):
         model_lambdas = [
             lambda: BertForMaskedLM(config),
-            lambda: BertForMaskedLM(config=config),
             lambda: BertForMaskedLM(config=config),
             lambda: BertForMaskedLM(BertModel(config)),
             lambda: BertForMaskedLM(bert=BertModel(config)),
@@ -298,19 +296,29 @@ class BertModelTester:
     ):
         model_lambdas = [
             lambda: BertForMultipleChoice(config),
+            lambda: BertForMultipleChoice(config, self.num_choices),
+            lambda: BertForMultipleChoice(config, self.num_choices, self.dropout
+                                          ),
             lambda: BertForMultipleChoice(config=config),
             lambda: BertForMultipleChoice(config=config,
+                                          num_choices=self.num_choices),
+            lambda: BertForMultipleChoice(config=config,
                                           num_choices=self.num_choices,
-                                          dropout=self.hidden_dropout_prob),
+                                          dropout=self.dropout),
             lambda: BertForMultipleChoice(BertModel(config)),
+            lambda: BertForMultipleChoice(BertModel(config), self.num_choices),
+            lambda: BertForMultipleChoice(BertModel(config), self.num_choices,
+                                          self.dropout),
             lambda: BertForMultipleChoice(bert=BertModel(config)),
             lambda: BertForMultipleChoice(bert=BertModel(config),
+                                          num_choices=self.num_choices),
+            lambda: BertForMultipleChoice(bert=BertModel(config),
                                           num_choices=self.num_choices,
-                                          dropout=self.hidden_dropout_prob),
+                                          dropout=self.dropout),
         ]
 
-        for model_lambda in model_lambdas:
-            model = model_lambda()
+        for index, model_lambda in enumerate(model_lambdas):
+            model: BertForMultipleChoice = model_lambda()
             model.eval()
             multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
                 [-1, self.num_choices, -1])
@@ -327,6 +335,12 @@ class BertModelTester:
             self.parent.assertEqual(result[1].shape,
                                     [self.batch_size, self.num_choices])
 
+            if index % 3 == 2:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
+
     def create_and_check_for_question_answering(
         self,
         config,
@@ -339,18 +353,19 @@ class BertModelTester:
     ):
         model_lambdas = [
             lambda: BertForQuestionAnswering(config),
+            lambda: BertForQuestionAnswering(config, self.dropout),
             lambda: BertForQuestionAnswering(config=config),
             lambda: BertForQuestionAnswering(config=config,
-                                             dropout=self.hidden_dropout_prob),
+                                             dropout=self.dropout),
             lambda: BertForQuestionAnswering(BertModel(config)),
+            lambda: BertForQuestionAnswering(BertModel(config), self.dropout),
             lambda: BertForQuestionAnswering(bert=BertModel(config)),
             lambda: BertForQuestionAnswering(bert=BertModel(config),
-                                             dropout=self.hidden_dropout_prob),
+                                             dropout=self.dropout)
         ]
 
-        for model_lambda in model_lambdas:
-            model = model_lambda()
-
+        for index, model_lambda in enumerate(model_lambdas):
+            model: BertForQuestionAnswering = model_lambda()
             model.eval()
             result = model(
                 input_ids,
@@ -363,6 +378,11 @@ class BertModelTester:
                                     [self.batch_size, self.seq_length])
             self.parent.assertEqual(result[2].shape,
                                     [self.batch_size, self.seq_length])
+            if index % 2 == 1:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def create_and_check_for_sequence_classification(
         self,
@@ -378,29 +398,28 @@ class BertModelTester:
         model_lambdas = [
             lambda: BertForSequenceClassification(config),
             lambda: BertForSequenceClassification(config, self.num_labels),
-            lambda: BertForSequenceClassification(config),
+            lambda: BertForSequenceClassification(config, self.num_labels, self.
+                                                  dropout),
             lambda: BertForSequenceClassification(config=config),
             lambda: BertForSequenceClassification(config=config,
-                                                  num_labels=self.num_labels,
-                                                  dropout=self.
-                                                  hidden_dropout_prob),
+                                                  num_labels=self.num_labels),
             lambda: BertForSequenceClassification(config=config,
                                                   num_classes=self.num_labels,
-                                                  dropout=self.
-                                                  hidden_dropout_prob),
+                                                  dropout=self.dropout),
             lambda: BertForSequenceClassification(BertModel(config)),
+            lambda: BertForSequenceClassification(BertModel(config), self.
+                                                  num_labels),
+            lambda: BertForSequenceClassification(BertModel(config), self.
+                                                  num_labels, self.dropout),
             lambda: BertForSequenceClassification(bert=BertModel(config)),
             lambda: BertForSequenceClassification(bert=BertModel(config),
-                                                  num_labels=self.num_labels,
-                                                  dropout=self.
-                                                  hidden_dropout_prob),
+                                                  num_labels=self.num_labels),
             lambda: BertForSequenceClassification(bert=BertModel(config),
                                                   num_classes=self.num_labels,
-                                                  dropout=self.
-                                                  hidden_dropout_prob),
+                                                  dropout=self.dropout),
         ]
-        for model_lambda in model_lambdas:
-            model = model_lambda()
+        for index, model_lambda in enumerate(model_lambdas):
+            model: BertForSequenceClassification = model_lambda()
             model.eval()
             result = model(input_ids,
                            attention_mask=input_mask,
@@ -408,6 +427,12 @@ class BertModelTester:
                            labels=sequence_labels)
             self.parent.assertEqual(result[1].shape,
                                     [self.batch_size, self.num_labels])
+
+            if index % 3 == 2:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def create_and_check_for_token_classification(
         self,
@@ -421,28 +446,29 @@ class BertModelTester:
     ):
         model_lambdas = [
             lambda: BertForTokenClassification(config),
+            lambda: BertForTokenClassification(config, self.num_labels),
+            lambda: BertForTokenClassification(config, self.num_labels, self.
+                                               dropout),
             lambda: BertForTokenClassification(config=config),
             lambda: BertForTokenClassification(config=config,
-                                               num_labels=self.num_labels,
-                                               dropout=self.hidden_dropout_prob
-                                               ),
+                                               num_labels=self.num_labels),
             lambda: BertForTokenClassification(config=config,
                                                num_classes=self.num_labels,
-                                               dropout=self.hidden_dropout_prob
-                                               ),
+                                               dropout=self.dropout),
             lambda: BertForTokenClassification(BertModel(config)),
+            lambda: BertForTokenClassification(BertModel(config), self.
+                                               num_labels),
+            lambda: BertForTokenClassification(BertModel(config), self.
+                                               num_labels, self.dropout),
             lambda: BertForTokenClassification(bert=BertModel(config)),
             lambda: BertForTokenClassification(bert=BertModel(config),
-                                               num_labels=self.num_labels,
-                                               dropout=self.hidden_dropout_prob
-                                               ),
+                                               num_labels=self.num_labels),
             lambda: BertForTokenClassification(bert=BertModel(config),
                                                num_classes=self.num_labels,
-                                               dropout=self.hidden_dropout_prob
-                                               ),
+                                               dropout=self.dropout),
         ]
-        for model_lambda in model_lambdas:
-            model = model_lambda()
+        for index, model_lambda in enumerate(model_lambdas):
+            model: BertForTokenClassification = model_lambda()
 
             model.eval()
             result = model(input_ids,
@@ -452,6 +478,12 @@ class BertModelTester:
             self.parent.assertEqual(
                 result[1].shape,
                 [self.batch_size, self.seq_length, self.num_labels])
+
+            if index % 3 == 2:
+                self.parent.assertEqual(model.dropout.p, self.dropout)
+            else:
+                self.parent.assertEqual(model.dropout.p,
+                                        self.hidden_dropout_prob)
 
     def test_addition_params(self, config: BertConfig, *args, **kwargs):
         custom_num_labels, custom_dropout = 7, 0.98
