@@ -6,7 +6,7 @@ input [
   {
     name: "POST_INPUT"
     data_type: TYPE_FP32
-    dims: [ 141 ]
+    dims: [ 74 ]
   }
 ]
 
