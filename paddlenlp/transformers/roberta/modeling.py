@@ -126,7 +126,6 @@ class RobertaPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "hfl/roberta-wwm-ext": {
             "attention_probs_dropout_prob": 0.1,
@@ -213,7 +212,6 @@ class RobertaPretrainedModel(PretrainedModel):
             "pad_token_id": 0
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "hfl/roberta-wwm-ext":
@@ -810,9 +808,13 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
             loss = loss_fct(logits.reshape((-1, self.num_classes)),
                             labels.reshape((-1, )))
         if not return_dict:
+
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            if loss is not None:
+                return (loss, ) + output
+            if len(output) == 1:
+                return output[0]
+            return output
 
         return TokenClassifierOutput(
             loss=loss,

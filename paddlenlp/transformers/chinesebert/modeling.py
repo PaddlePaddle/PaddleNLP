@@ -220,7 +220,6 @@ class ChineseBertPretrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "chinesebert"
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "ChineseBERT-base": {
@@ -258,8 +257,6 @@ class ChineseBertPretrainedModel(PretrainedModel):
             "pinyin_map_len": 32,
         },
     }
-
-    resource_files_names = {"model_state": "model_state.pdparams"}
 
     pretrained_resource_files_map = {
         "model_state": {

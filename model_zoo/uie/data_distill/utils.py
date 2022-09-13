@@ -23,6 +23,7 @@ from tqdm import tqdm
 import numpy as np
 import paddle
 from paddlenlp.utils.log import logger
+from paddlenlp.taskflow.utils import SchemaTree
 
 from data_collator import DataCollator
 

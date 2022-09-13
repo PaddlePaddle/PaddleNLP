@@ -149,7 +149,6 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         # Deprecated, alias for ernie-1.0-base-zh
         "ernie-1.0": {
@@ -177,6 +176,20 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 18000,
             "pad_token_id": 0,
+        },
+        "ernie-1.0-base-zh-cw": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
         },
         "ernie-1.0-large-zh-cw": {
             "attention_probs_dropout_prob": 0.1,
@@ -669,6 +682,8 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
             "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
+            "ernie-1.0-base-zh-cw":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_base_zh_cw.pdparams",
             "ernie-1.0-large-zh-cw":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_large_zh_cw.pdparams",
             "ernie-tiny":

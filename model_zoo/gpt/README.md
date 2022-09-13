@@ -29,13 +29,14 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 - regex
 - sentencepiece >= 0.1.94
 - tqdm
+- tool_helpers
 - visualdl
 - paddlepaddle-gpu >= 2.2rc
 - pybind11
 - lac (可选)
 - zstandard (可选)
 
-安装命令 `pip install regex sentencepiece tqdm visualdl pybind11 lac zstandard`。
+安装命令 `pip install regex sentencepiece tqdm visualdl tool_helpers pybind11 lac zstandard`。
 注：需要PaddlePaddle版本大于等于2.2rc，或者使用最新develop版本，安装方法请参见Paddle[官网](https://www.paddlepaddle.org.cn)。
 
 ### 数据准备
@@ -52,7 +53,7 @@ wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
-然后使用[data_tools](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/../ernie-1.0/data_tools) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[preprocess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/../ernie-1.0/preprocess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name gpt2-en \
