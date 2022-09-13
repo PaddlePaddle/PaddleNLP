@@ -6,6 +6,7 @@ labels:
 
 body: 
   - type: textarea
+    id: environment
     attributes:
       label: 软件环境
       description: |
@@ -22,6 +23,7 @@ body:
     validations:
       required: true
   - type: textarea
+    id: description
     attributes:
       label: 详细描述
       description: 请详细描述您想要反馈的具体问题

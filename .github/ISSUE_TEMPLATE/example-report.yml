@@ -4,10 +4,12 @@ title: "[Example]: "
 labels: example
 body: 
   - type: input
+    id: example-path
     attributes:
       label: 代码路径
       description: 请给出您所运行example的具体路径，如：examples/few_shot/pet
   - type: textarea
+    id: environment
     attributes:
       label: 软件环境
       description: |
@@ -24,6 +26,7 @@ body:
     validations:
       required: true
   - type: textarea
+    id: mvp-code
     attributes:
       label: 稳定复现步骤 & 代码
       description: 请给出稳定复现该问题的步骤 & 代码，以便相关人员能够快速定位到具体问题。
