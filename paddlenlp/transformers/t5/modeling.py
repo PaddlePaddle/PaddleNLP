@@ -945,8 +945,7 @@ class T5Stack(nn.Layer):
                 cache=None,
                 use_cache=False,
                 output_attentions=False,
-                output_hidden_states=False,
-                **kwargs):
+                output_hidden_states=False):
         assert input_ids is not None, "input_ids can not be None"
         input_shape = input_ids.shape
         input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
