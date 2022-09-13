@@ -42,7 +42,6 @@ class TinyBertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "tinybert-4l-312d": {
             "vocab_size": 30522,
@@ -129,7 +128,6 @@ class TinyBertPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "tinybert-4l-312d":

@@ -63,8 +63,8 @@ def compress(self,
         if "ptq" in args.strategy:
             self.args.input_filename_prefix = "pruned_model"
             for width_mult in args.width_mult_list:
-                output_dir_width = os.path.join(args.output_dir,
-                                                "width_mult_" + str(width_mult))
+                output_dir_width = os.path.join(
+                    args.output_dir, "width_mult_" + str(round(width_mult, 2)))
                 self.quant(output_dir_width, "ptq")
     elif args.strategy == "ptq":
         # Input model is an inference model
@@ -414,14 +414,14 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     net_config = utils.dynabert_config(ofa_model, width_mult)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
-                    logger.info("width_mult %s:" % width_mult)
+                    logger.info("width_mult %s:" % round(width_mult, 2))
                     acc = evaluate(ofa_model, eval_dataloader)
                     if acc > best_acc[idx]:
                         best_acc[idx] = acc
                         if paddle.distributed.get_rank() == 0:
                             output_dir_width = os.path.join(
                                 self.args.output_dir,
-                                "width_mult_" + str(width_mult))
+                                "width_mult_" + str(round(width_mult, 2)))
                             if not os.path.exists(output_dir_width):
                                 os.makedirs(output_dir_width)
                             # need better way to get inner model of DataParallel
@@ -433,19 +433,20 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
             if global_step > self.args.num_training_steps:
                 if best_acc[idx] == 0.0:
                     output_dir_width = os.path.join(
-                        self.args.output_dir, "width_mult_" + str(width_mult))
+                        self.args.output_dir,
+                        "width_mult_" + str(round(width_mult, 2)))
                     if not os.path.exists(output_dir_width):
                         os.makedirs(output_dir_width)
                     # need better way to get inner model of DataParallel
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir_width)
-                logger.info("Best acc of width_mult %s: %.4f" %
+                logger.info("Best acc of width_mult %.2f: %.4f" %
                             (width_mult, best_acc[idx]))
                 return ofa_model
 
     for idx, width_mult in enumerate(self.args.width_mult_list):
-        logger.info("Best result of width_mult %s: %.4f" %
+        logger.info("Best result of width_mult %.2f: %.4f" %
                     (width_mult, best_acc[idx]))
     return ofa_model
 
@@ -460,7 +461,7 @@ def _dynabert_export(self, ofa_model):
         0].self_attn.num_heads
     for width_mult in self.args.width_mult_list:
         model_dir = os.path.join(self.args.output_dir,
-                                 "width_mult_" + str(width_mult))
+                                 "width_mult_" + str(round(width_mult, 2)))
         state_dict = paddle.load(os.path.join(model_dir,
                                               "model_state.pdparams"))
         origin_model = self.model.__class__.from_pretrained(model_dir)

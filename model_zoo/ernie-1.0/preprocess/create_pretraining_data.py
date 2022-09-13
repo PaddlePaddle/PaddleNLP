@@ -266,6 +266,18 @@ class Converter(object):
 
         def process(text):
             words = Converter.segment_func(text)
+            # if there are two empty word, the should a split dimer in the pos
+            if self.args.cn_splited:
+                pre_dimer = False
+                for index, w in enumerate(words):
+                    if pre_dimer and len(w) == 0:
+                        words[index] = self.args.cn_split_dimer
+                        pre_dimer = False
+                    elif len(w) == 0:
+                        pre_dimer = True
+                    else:
+                        pre_dimer = False
+
             tokens = Converter.tokenizer.tokenize("".join(words))
             tokens = Converter.whole_word_mask(tokens, words)
             tokens = Converter.tokenizer.convert_tokens_to_ids(tokens)

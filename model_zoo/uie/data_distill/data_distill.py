@@ -23,7 +23,6 @@ from tqdm import tqdm
 import numpy as np
 import paddle
 from paddlenlp import Taskflow
-from paddlenlp.taskflow.utils import SchemaTree
 from paddlenlp.utils.log import logger
 
 from utils import set_seed, build_tree, schema2label_maps, doccano2distill, synthetic2distill
@@ -84,7 +83,7 @@ def do_data_distill():
 
         infer_results = []
         for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
-            infer_results.append(uie(text))
+            infer_results.extend(uie(text))
 
         train_synthetic_lines = synthetic2distill(texts, infer_results,
                                                   args.task_type)

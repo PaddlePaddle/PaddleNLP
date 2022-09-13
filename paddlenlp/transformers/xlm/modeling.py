@@ -198,7 +198,6 @@ class XLMPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         'xlm-mlm-en-2048': {
             'is_encoder': True,
@@ -578,7 +577,6 @@ class XLMPretrainedModel(PretrainedModel):
         }
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             'xlm-mlm-en-2048':
