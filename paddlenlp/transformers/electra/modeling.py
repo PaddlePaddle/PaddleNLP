@@ -167,6 +167,9 @@ class TransformerEncoderPro(TransformerEncoder):
         if self.norm is not None:
             output = self.norm(output)
 
+            if output_hidden_states:
+                all_hidden_states[-1] = output
+
         if not return_dict:
             if output_attentions or output_hidden_states:
                 output = (output, all_attentions, all_hidden_states)

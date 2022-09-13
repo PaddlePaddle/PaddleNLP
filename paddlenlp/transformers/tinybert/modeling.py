@@ -293,6 +293,7 @@ class TinyBertModel(TinyBertPretrainedModel):
     def forward(self,
                 input_ids,
                 token_type_ids=None,
+                position_ids=None,
                 attention_mask=None,
                 output_hidden_states=False,
                 output_attentions=False,
@@ -316,6 +317,10 @@ class TinyBertModel(TinyBertPretrainedModel):
 
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
                 Mask used in multi-head attention to avoid performing attention to some unwanted positions,
                 usually the paddings or the subsequent positions.
@@ -374,7 +379,8 @@ class TinyBertModel(TinyBertPretrainedModel):
                 (input_ids == self.pad_token_id).astype(
                     self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
-        embedding_output = self.embeddings(input_ids, token_type_ids)
+        embedding_output = self.embeddings(input_ids, token_type_ids,
+                                           position_ids)
 
         encoder_outputs = self.encoder(
             embedding_output,
@@ -414,14 +420,20 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
         self.tinybert: TinyBertModel = tinybert
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None):
         r"""
         The TinyBertForPretraining forward method, overrides the __call__() special method.
 
         Args:
             input_ids (Tensor):
                 See :class:`TinyBertModel`.
-            token_tycpe_ids (Tensor, optional):
+            token_type_ids (Tensor, optional):
+                See :class:`TinyBertModel`.
+            position_ids (Tensor, optional):
                 See :class:`TinyBertModel`.
             attention_mask (Tensor, optional):
                 See :class:`TinyBertModel`.
@@ -450,6 +462,7 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
         """
         sequence_output, pooled_output = self.tinybert(input_ids,
                                                        token_type_ids,
+                                                       position_ids,
                                                        attention_mask)
 
         return sequence_output
@@ -485,6 +498,7 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
     def forward(self,
                 input_ids,
                 token_type_ids=None,
+                position_ids=None,
                 attention_mask=None,
                 labels=None,
                 output_hidden_states=False,
@@ -497,6 +511,8 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
             input_ids (Tensor):
                 See :class:`TinyBertModel`.
             token_type_ids (Tensor, optional):
+                See :class:`TinyBertModel`.
+            position_ids (Tensor, optional):
                 See :class:`TinyBertModel`.
             attention_mask_list (list, optional):
                 See :class:`TinyBertModel`.
@@ -539,6 +555,7 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
 
         outputs = self.tinybert(input_ids,
                                 token_type_ids,
+                                position_ids,
                                 attention_mask,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
@@ -595,6 +612,7 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
     def forward(self,
                 input_ids,
                 token_type_ids=None,
+                position_ids=None,
                 attention_mask=None,
                 start_positions=None,
                 end_positions=None,
@@ -606,6 +624,8 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
             input_ids (Tensor):
                 See :class:`TinyBertModel`.
             token_type_ids (Tensor, optional):
+                See :class:`TinyBertModel`.
+            position_ids (Tensor, optional):
                 See :class:`TinyBertModel`.
             attention_mask (Tensor, optional):
                 See :class:`TinyBertModel`.
@@ -656,6 +676,7 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
 
         outputs = self.tinybert(input_ids,
                                 token_type_ids=token_type_ids,
+                                position_ids=position_ids,
                                 attention_mask=attention_mask,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
@@ -723,6 +744,7 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
     def forward(self,
                 input_ids,
                 token_type_ids=None,
+                position_ids=None,
                 attention_mask=None,
                 labels=None,
                 output_hidden_states=False,
@@ -735,6 +757,8 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
             input_ids (Tensor):
                 See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
             token_type_ids(Tensor, optional):
+                See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
                 See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
                 See :class:`TinyBertModel` and shape as [batch_size, num_choice, sequence_length].
@@ -765,12 +789,17 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
             token_type_ids = token_type_ids.reshape(
                 shape=(-1, token_type_ids.shape[-1]))
 
+        if position_ids is not None:
+            position_ids = position_ids.reshape(shape=(-1,
+                                                       position_ids.shape[-1]))
+
         if attention_mask is not None:
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
         outputs = self.tinybert(input_ids,
                                 token_type_ids=token_type_ids,
+                                position_ids=position_ids,
                                 attention_mask=attention_mask,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
