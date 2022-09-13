@@ -792,7 +792,7 @@ class ElectraGenerator(ElectraPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(generator_sequence_output):
+        if isinstance(generator_sequence_output, type(input_ids)):
             generator_sequence_output = (generator_sequence_output, )
 
         prediction_scores = self.generator_predictions(
@@ -1052,7 +1052,7 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(sequence_output):
+        if isinstance(sequence_output, type(input_ids)):
             sequence_output = (sequence_output, )
 
         logits = self.classifier(sequence_output[0])
@@ -1172,7 +1172,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(sequence_output):
+        if isinstance(sequence_output, type(input_ids)):
             sequence_output = (sequence_output, )
 
         logits = self.classifier(self.dropout(sequence_output[0]))
@@ -1733,7 +1733,7 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
             return_dict=return_dict,
         )
 
-        if paddle.is_tensor(sequence_output):
+        if isinstance(sequence_output, type(input_ids)):
             sequence_output = (sequence_output, )
 
         pooled_output = self.sequence_summary(sequence_output[0])
@@ -2091,7 +2091,7 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
             return_dict=return_dict,
         )
 
-        if paddle.is_tensor(sequence_output):
+        if isinstance(sequence_output, type(input_ids)):
             sequence_output = (sequence_output, )
 
         logits = self.classifier(sequence_output[0])

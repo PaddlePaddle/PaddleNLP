@@ -342,7 +342,7 @@ class ErnieGramModel(ErnieGramPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(encoder_outputs):
+        if isinstance(encoder_outputs, type(input_ids)):
             encoder_outputs = (encoder_outputs, )
 
         sequence_output = encoder_outputs[0]

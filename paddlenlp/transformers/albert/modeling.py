@@ -365,9 +365,11 @@ class AlbertLayerGroup(Layer):
                 hidden_states,
                 attention_mask=None,
                 head_mask=None,
-                output_attentions=False):
+                output_attentions=False,
+                output_hidden_states=False):
 
         layer_attentions = () if output_attentions else None
+        all_hidden_states = (hidden_states, ) if output_hidden_states else None
 
         for layer_index, albert_layer in enumerate(self.albert_layers):
 
@@ -382,10 +384,17 @@ class AlbertLayerGroup(Layer):
             if output_attentions:
                 layer_attentions = layer_attentions + (layer_output[1], )
 
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states, )
+
         outputs = (hidden_states, )
+
+        if output_hidden_states:
+            outputs = outputs + (all_hidden_states, )
 
         if output_attentions:
             outputs = outputs + (layer_attentions, )
+
         return outputs
 
 
@@ -434,13 +443,10 @@ class AlbertTransformer(Layer):
                 return_dict=False):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
-        all_hidden_states = () if output_hidden_states else None
+        all_hidden_states = (hidden_states, ) if output_hidden_states else None
         all_attentions = () if output_attentions else None
 
         for i in range(self.num_hidden_layers):
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states, )
-
             # Number of layers in a hidden group
             layers_per_group = int(self.num_hidden_layers /
                                    self.num_hidden_groups)
@@ -454,14 +460,14 @@ class AlbertTransformer(Layer):
                 head_mask[group_idx * layers_per_group:(group_idx + 1) *
                           layers_per_group],
                 output_attentions=output_attentions,
-            )
+                output_hidden_states=output_hidden_states)
             hidden_states = layer_group_output[0]
 
             if output_attentions:
                 all_attentions = all_attentions + layer_group_output[-1]
 
-        if output_hidden_states:
-            all_hidden_states = all_hidden_states + (hidden_states, )
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states, )
 
         if not return_dict:
             return tuple(
@@ -1455,7 +1461,7 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(transformer_outputs):
+        if isinstance(transformer_outputs, type(input_ids)):
             transformer_outputs = [transformer_outputs]
 
         hidden_states = transformer_outputs[0]
