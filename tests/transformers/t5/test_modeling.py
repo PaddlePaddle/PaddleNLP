@@ -288,8 +288,7 @@ class T5ModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
         output_from_no_past = model(next_input_ids)[0]
-        output_from_past = model(next_tokens,
-                                 past_key_values=past_key_values)[0]
+        output_from_past = model(next_tokens, cache=past_key_values)[0]
 
         # select random slice
         random_slice_idx = ids_tensor([
@@ -352,7 +351,7 @@ class T5ModelTester:
         # get two different outputs
         output_from_no_past = model(next_input_ids, attention_mask=attn_mask)[0]
         output_from_past = model(next_tokens,
-                                 past_key_values=past_key_values,
+                                 cache=past_key_values,
                                  attention_mask=paddle.ones(
                                      (attn_mask.shape[0], 1), dtype="int64"))[0]
 
@@ -402,8 +401,8 @@ class T5ModelTester:
         output_from_no_past = model(next_input_ids,
                                     attention_mask=next_attention_mask)[0]
         output_from_past = model(next_tokens,
-                                 attention_mask=next_mask,
-                                 past_key_values=past_key_values)[0]
+                                 attention_mask=next_attention_mask,
+                                 cache=past_key_values)[0]
 
         # select random slice
         random_slice_idx = ids_tensor([
@@ -607,19 +606,6 @@ class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         for model_name in T5_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = T5Model.from_pretrained(model_name)
             self.assertIsNotNone(model)
-
-    # def test_export_to_onnx(self):
-    #     config_and_inputs = self.model_tester.prepare_config_and_inputs()
-    #     model = T5Model(config_and_inputs[0]).to(torch_device)
-    #     with tempfile.TemporaryDirectory() as tmpdirname:
-    #         torch.onnx.export(
-    #             model,
-    #             (config_and_inputs[1], config_and_inputs[3], config_and_inputs[2]),
-    #             f"{tmpdirname}/t5_test.onnx",
-    #             export_params=True,
-    #             opset_version=9,
-    #             input_names=["input_ids", "decoder_input_ids"],
-    #         )
 
 
 class T5ModelIntegrationTests(unittest.TestCase):
