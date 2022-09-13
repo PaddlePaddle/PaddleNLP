@@ -32,7 +32,6 @@ using namespace std;
 
 const int32_t LONG_SENTENCE_LEN = 512;
 
-
 void build_blending_indices(py::array_t<uint8_t>& dataset_index,
                             py::array_t<int64_t>& dataset_sample_index,
                             const py::array_t<double>& weights,
@@ -250,6 +249,8 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
          << std::flush;
     cout << "     maximum sequence length:        " << max_seq_length << endl
          << std::flush;
+    cout << "     minimum sentences num:          " << min_num_sent << endl
+         << std::flush;
     cout << "     short sequence probability:     " << short_seq_prob << endl
          << std::flush;
     cout << "     short sequence ration (1/prob): " << short_seq_ratio << endl
@@ -290,12 +291,17 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
         }
         break;
       }
+      if(epoch > 0 && map_index == 0){
+        cout << endl << "     No available documtment find this dataset." << endl << std::flush;
+        throw std::invalid_argument(
+          "Invalid dataset! the document should be with more than " 
+          + std::to_string(min_num_sent) + " scentences.");
+      }
       // For each document:
       for (int32_t doc = 0; doc < (docs.shape(0) - 1); ++doc) {
         // Document sentences are in [sent_index_first, sent_index_last)
         const auto sent_index_first = docs[doc];
         const auto sent_index_last = docs[doc + 1];
-
         // At the begining of the document previous index is the
         // start index.
         auto prev_start_index = sent_index_first;
@@ -327,7 +333,6 @@ py::array build_mapping_impl(const py::array_t<int64_t>& docs_,
             }
           }
         }
-
         // If we have more than two sentences.
         if ((num_remain_sent >= min_num_sent) && (!contains_long_sentence)) {
           // Set values.
