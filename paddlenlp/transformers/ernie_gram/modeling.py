@@ -556,7 +556,10 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
         outputs = self.ernie_gram(input_ids,
                                   token_type_ids=token_type_ids,
                                   position_ids=position_ids,
-                                  attention_mask=attention_mask)
+                                  attention_mask=attention_mask,
+                                  output_attentions=output_attentions,
+                                  output_hidden_states=output_hidden_states,
+                                  return_dict=return_dict)
 
         logits = self.classifier(outputs[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
