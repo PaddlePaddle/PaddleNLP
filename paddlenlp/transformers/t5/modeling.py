@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 Mesh TensorFlow authors, T5 Authors and HuggingFace Inc. team.
 #
