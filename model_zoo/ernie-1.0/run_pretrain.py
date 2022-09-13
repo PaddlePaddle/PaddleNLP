@@ -541,8 +541,11 @@ def do_train(args):
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                 3, 7) else contextlib.suppress()
 
-            if worker_num > 1 and (args.use_recompute
-                                   or args.accumulate_steps > 1):
+            if worker_num > 1 and (args.use_recompute or
+                                   ((step + 1) % args.accumulate_steps != 0)):
+                # grad acc, no_sync when (step + 1) % args.accumulate_steps != 0:
+                # recompute, no_sync every where
+                # recompute + grad_acc, no_sync every where
                 ctx_manager = model.no_sync()
             else:
                 ctx_manager = contextlib.nullcontext() if sys.version_info >= (
