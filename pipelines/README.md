@@ -3,10 +3,10 @@
 PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **全场景**，帮助用户**低门槛**构建强大**产品级系统**。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
+    <img src="https://user-images.githubusercontent.com/12107462/189293482-1ba0d500-9726-4a67-bdc5-f71339cfe773.gif" width="500">
 </div>
 
-
+更多效果展示Demo请参考 [效果展示](#效果展示)
 
 ## 智能文本产线特色
 * **全场景支持**：依托灵活的插拔式组件产线化设计，支持各类 NLP 场景任务，包括：信息抽取、情感倾向分析、阅读理解、检索系统、问答系统、文本分类、文本生成等。
@@ -31,9 +31,28 @@ PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了�
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
-* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统（用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案）
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统：用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案
 * 快速搭建产品级**多模态信息抽取**系统（即将开放，敬请期待）
 
+### 效果展示
+
++ 语义检索
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/189293482-1ba0d500-9726-4a67-bdc5-f71339cfe773.gif" width="400">
+</div>
+
++ 智能问答
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/189299496-70e5a4d9-862f-45ce-a036-64b91e587035.gif" width="400">
+</div>
+
++ FAQ智能问答
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/189297769-dd2658d3-5a0e-4d79-96a4-12903b6d3acd.gif" width="400">
+</div>
 
 |  |  |
 |-|-|

@@ -1,5 +1,7 @@
 # coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors, and NVIDIA, and PaddlePaddle Authors.
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 The Google AI Language Team Authors, and NVIDIA.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,7 +91,13 @@ class BlendableDataset(paddle.io.Dataset):
 
         while True:
             try:
-                import data_tools.helpers as helpers
+                try:
+                    from tool_helpers import helpers
+                except Exception as ine:
+                    print_rank_0(
+                        ' > missing tool_helpers, pip install tool_helpers please, try to compile locally.'
+                    )
+                    import data_tools.helpers as helpers
                 break
             except Exception as e:
                 if local_rank == 0:
@@ -97,7 +105,6 @@ class BlendableDataset(paddle.io.Dataset):
                 print_rank_0('> wait for hepers to be compiled!')
                 time.sleep(1)
 
-        import data_tools.helpers as helpers
         helpers.build_blending_indices(self.dataset_index,
                                        self.dataset_sample_index, weights,
                                        num_datasets, self.size, local_rank == 0)
@@ -868,9 +875,16 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         print_rank_0(
             ' > building sapmles index mapping for {} ...'.format(name))
         # First compile and then import.
-        if local_rank == 0:
-            compile_helper()
-        import data_tools.helpers as helpers
+        try:
+            from tool_helpers import helpers
+        except ModuleNotFoundError:
+            print_rank_0(
+                ' > missing tool_helpers, pip install tool_helpers please, try to compile locally.'
+            )
+            if local_rank == 0:
+                compile_helper()
+            import data_tools.helpers as helpers
+
         samples_mapping = helpers.build_mapping(indexed_dataset.doc_idx,
                                                 indexed_dataset.sizes,
                                                 num_epochs, max_num_samples,

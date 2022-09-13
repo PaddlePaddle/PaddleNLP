@@ -520,6 +520,12 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
 
         return outputs
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
+
 
 class RoFormerv2ForQuestionAnswering(RoFormerv2PretrainedModel):
     """
