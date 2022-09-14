@@ -1632,10 +1632,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         if not isinstance(encoder_output, (list, tuple)):
             encoder_output = (encoder_output, )
 
-        if use_cache:
-            output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
-        else:
-            output = (lm_logits, ) + (None, ) + encoder_output
+        output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
         return ((loss, ) + output) if loss is not None else output
 
     @staticmethod
