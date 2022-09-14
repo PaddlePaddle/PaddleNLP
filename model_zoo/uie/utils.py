@@ -307,7 +307,6 @@ def get_relation_type_dict(relation_data):
                 res += a[i]
             else:
                 break
-
         if res == "":
             return res
         elif res[::-1][0] == "的":

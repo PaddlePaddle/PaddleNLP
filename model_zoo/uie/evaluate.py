@@ -64,15 +64,13 @@ def do_eval():
     if args.debug:
         for data in test_ds:
             class_name = unify_prompt_name(data['prompt'])
-
             # Only positive examples are evaluated in debug mode
             if len(data['result_list']) != 0:
                 if "的" not in data['prompt']:
                     class_dict.setdefault(class_name, []).append(data)
-                elif len(data['result_list']) != 0:
+                else:
                     relation_data.append((data['prompt'], data))
         relation_type_dict = get_relation_type_dict(relation_data)
-
     else:
         class_dict["all_classes"] = test_ds
 

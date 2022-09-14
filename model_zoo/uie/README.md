@@ -640,7 +640,7 @@ python finetune.py \
     --device gpu
 ```
 
-多卡启动：
+如果在GPU环境中使用，可以指定``gpus``参数进行多卡训练：
 
 ```shell
 python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
