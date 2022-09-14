@@ -118,6 +118,35 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
+def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
+    """
+    Create dataloader.
+    Args:
+        dataset(obj:`paddle.io.Dataset`): Dataset instance.
+        mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
+        batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
+        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
+    Returns:
+        dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
+    """
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
+
+    shuffle = True if mode == 'train' else False
+    if mode == "train":
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
+    else:
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      return_list=True)
+    return dataloader
+
+
 def convert_example(example, tokenizer, max_seq_len):
     """
     example: {

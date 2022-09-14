@@ -23,7 +23,7 @@ from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
 from model import UIE
-from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict
+from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
 
 
 @paddle.no_grad()
@@ -76,20 +76,20 @@ def do_eval():
     else:
         class_dict["all_classes"] = test_ds
 
+    trans_fn = partial(convert_example,
+                       tokenizer=tokenizer,
+                       max_seq_len=args.max_seq_len)
+
     for key in class_dict.keys():
         if args.debug:
             test_ds = MapDataset(class_dict[key])
         else:
             test_ds = class_dict[key]
-        test_ds = test_ds.map(
-            partial(convert_example,
-                    tokenizer=tokenizer,
-                    max_seq_len=args.max_seq_len))
-        test_batch_sampler = paddle.io.BatchSampler(dataset=test_ds,
-                                                    batch_size=args.batch_size,
-                                                    shuffle=False)
-        test_data_loader = paddle.io.DataLoader(
-            dataset=test_ds, batch_sampler=test_batch_sampler, return_list=True)
+
+        test_data_loader = create_data_loader(test_ds,
+                                              mode="test",
+                                              batch_size=args.batch_size,
+                                              trans_fn=trans_fn)
 
         metric = SpanEvaluator()
         precision, recall, f1 = evaluate(model, metric, test_data_loader)
@@ -102,16 +102,10 @@ def do_eval():
         for key in relation_type_dict.keys():
             test_ds = MapDataset(relation_type_dict[key])
 
-            test_ds = test_ds.map(
-                partial(convert_example,
-                        tokenizer=tokenizer,
-                        max_seq_len=args.max_seq_len))
-            test_batch_sampler = paddle.io.BatchSampler(
-                dataset=test_ds, batch_size=args.batch_size, shuffle=False)
-            test_data_loader = paddle.io.DataLoader(
-                dataset=test_ds,
-                batch_sampler=test_batch_sampler,
-                return_list=True)
+            test_data_loader = create_data_loader(test_ds,
+                                                  mode="test",
+                                                  batch_size=args.batch_size,
+                                                  trans_fn=trans_fn)
 
             metric = SpanEvaluator()
             precision, recall, f1 = evaluate(model, metric, test_data_loader)
