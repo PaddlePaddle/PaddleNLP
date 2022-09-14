@@ -575,6 +575,12 @@ class Vocab(object):
         return vocab
 
     def save_vocabulary(self, filepath):
+        """
+        Save the :class:`Vocab` to a specific file. Can be reloaded by calling `load_vocabulary`.
+
+        Args:
+            filepath (str): the path of file to save vocabulary.
+        """
         with open(filepath, 'w') as f:
             for idx in range(len(self._idx_to_token)):
                 f.write(self._idx_to_token[idx] + "\n")

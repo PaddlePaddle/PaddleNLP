@@ -131,6 +131,7 @@ def get_preprocessing_parser():
         type=str,
         help="The code used for bpe. Must be provided when --apply_bpe is set. "
     )
+
     args = parser.parse_args()
     return args
 
@@ -162,25 +163,8 @@ def _dict_path(lang, dest_dir):
     return _dest_path("dict", lang, dest_dir) + ".txt"
 
 
-def dataset_dest_prefix(args, output_prefix, lang):
-    base = os.path.join(args.destdir, output_prefix)
-    if lang is not None:
-        lang_part = f".{args.source_lang}-{args.target_lang}.{lang}"
-    elif args.only_source:
-        lang_part = ""
-    else:
-        lang_part = f".{args.source_lang}-{args.target_lang}"
-
-    return "{}{}".format(base, lang_part)
-
-
-def dataset_dest_file(args, output_prefix, lang, extension):
-    return "{}.{}".format(dataset_dest_prefix(args, output_prefix, lang),
-                          extension)
-
-
 def _build_dictionary(filenames, args, src=False, tgt=False):
-    assert src ^ tgt
+    assert src ^ tgt, "src and tgt cannot be both True or both False. "
 
     if not isinstance(filenames, (list, tuple)):
         filenames = [filenames]
@@ -190,8 +174,7 @@ def _build_dictionary(filenames, args, src=False, tgt=False):
         with open(file, "r") as f:
             lines = f.readlines()
             for line in lines:
-                tks = line.strip().split()
-                tokens.append(tks)
+                tokens.append(line.strip().split())
 
     return Vocab.build_vocab(
         tokens,
@@ -209,16 +192,19 @@ def _make_dataset(vocab, input_prefix, output_prefix, lang, args):
         lang,
         args.dest_dir,
     )
+
     shutil.copyfile(_file_name(input_prefix, lang), output_text_file)
 
 
 def _make_all(lang, vocab, args):
     if args.train_pref:
         _make_dataset(vocab, args.train_pref, "train", lang, args=args)
+
     if args.valid_pref:
         for k, valid_pref in enumerate(args.valid_pref.split(",")):
             out_prefix = "valid{}".format(k) if k > 0 else "valid"
             _make_dataset(vocab, valid_pref, out_prefix, lang, args=args)
+
     if args.test_pref:
         for k, test_pref in enumerate(args.test_pref.split(",")):
             out_prefix = "test{}".format(k) if k > 0 else "test"
@@ -230,6 +216,7 @@ def _align_files(args, src_dict, tgt_dict):
     src_file_name = _train_path(args.source_lang, args.train_pref)
     tgt_file_name = _train_path(args.target_lang, args.train_pref)
     freq_map = {}
+
     with open(args.align_file, "r", encoding="utf-8") as align_file:
         with open(src_file_name, "r", encoding="utf-8") as src_file:
             with open(tgt_file_name, "r", encoding="utf-8") as tgt_file:
@@ -252,9 +239,11 @@ def _align_files(args, src_dict, tgt_dict):
                                 freq_map[src_idx][tgt_idx] = 1
                             else:
                                 freq_map[src_idx][tgt_idx] += 1
+
     align_dict = {}
     for src_idx in freq_map.keys():
         align_dict[src_idx] = max(freq_map[src_idx], key=freq_map[src_idx].get)
+
     with open(
             os.path.join(
                 args.dest_dir,
@@ -270,7 +259,6 @@ def _align_files(args, src_dict, tgt_dict):
 
 def main(args):
     os.makedirs(args.dest_dir, exist_ok=True)
-
     pprint(args)
 
     if args.apply_bpe:
@@ -289,18 +277,21 @@ def main(args):
                 _test_path(lang, args.test_pref)
                 for lang in [args.source_lang, args.target_lang]
             ])
+
         for file in filenames:
             sequences = []
             with open(file, "r") as f:
                 lines = f.readlines()
                 for seq in lines:
                     sequences.append(seq.strip())
+
             bpe_sequences = bpe.apply(sequences)
-            os.makedirs(os.path.join(args.train_pref, "tmp123"), exist_ok=True)
+            os.makedirs(os.path.join(args.train_pref, "tmp_bpe"), exist_ok=True)
             shutil.copyfile(
                 file,
-                os.path.join(args.train_pref, "tmp123",
+                os.path.join(args.train_pref, "tmp_bpe",
                              os.path.split(file)[-1]))
+
             with open(file, "w") as f:
                 for bpe_seq in bpe_sequences:
                     f.write(bpe_seq + "\n")
@@ -337,13 +328,13 @@ def main(args):
             assert (
                 args.train_pref
             ), "--train_pref must be set if --src_dict is not specified. "
-            src_vocab = _build_dictionary(
-                {
-                    _train_path(lang, args.train_pref)
-                    for lang in [args.source_lang, args.target_lang]
-                },
-                args=args,
-                src=True)
+            src_vocab = _build_dictionary([
+                _train_path(lang, args.train_pref)
+                for lang in [args.source_lang, args.target_lang]
+            ],
+                                          args=args,
+                                          src=True)
+
         tgt_vocab = src_vocab
     else:
         if args.src_dict:
@@ -398,10 +389,6 @@ def main(args):
         _align_files(args, src_dict=src_vocab, tgt_dict=tgt_vocab)
 
 
-def cli_main():
+if __name__ == "__main__":
     args = get_preprocessing_parser()
     main(args)
-
-
-if __name__ == "__main__":
-    cli_main()
