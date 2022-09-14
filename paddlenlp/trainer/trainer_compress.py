@@ -39,26 +39,25 @@ from ..metrics.squad import squad_evaluate, compute_prediction
 from .trainer_base import Trainer
 
 
-def compress(self,
-             custom_dynabert_evaluate=None,
-             custom_dynabert_calc_loss=None):
+def compress(self, custom_evaluate=None, custom_dynabert_calc_loss=None):
     """
     Supports pruning DynaBERT and post-training quantization. If both are
     needed, pruning DynaBERT would be performed before quantizaton.
     """
     args = self.args
+    self.custom_evaluate = custom_evaluate
     if "dynabert" in args.strategy:
         try_import('paddleslim')
         if self.args.width_mult_list is not None:
             self.args.width_mult_list = [
                 eval(width_mult) for width_mult in self.args.width_mult_list
             ]
-        self.custom_dynabert_evaluate = custom_dynabert_evaluate
+
         self.custom_dynabert_calc_loss = custom_dynabert_calc_loss
         class_name = self.model.__class__.__name__
         if "SequenceClassification" not in class_name and "TokenClassification" not in class_name and "QuestionAnswering" not in class_name:
-            assert self.custom_dynabert_evaluate is not None and self.custom_dynabert_calc_loss is not None, \
-                "Custom model using DynaBERT strategy needs to pass in parameters `custom_dynabert_evaluate` and `custom_dynabert_calc_loss`."
+            assert self.custom_evaluate is not None and self.custom_dynabert_calc_loss is not None, \
+                "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate` and `custom_dynabert_calc_loss`."
         _dynabert(self, self.model, args.output_dir)
         if "ptq" in args.strategy:
             self.args.input_filename_prefix = "pruned_model"
@@ -88,14 +87,18 @@ def compress(self,
                          input_spec=input_spec,
                          path=input_dir)
             self.quant(input_dir, args.strategy)
+    elif args.strategy == "qat":
+        self.quant(args.output_dir, args.strategy)
 
 
-def quant(self, input_dir, strategy):
+def quant(self, model_dir, strategy):
     """
     Supports Post-Training Quantization now.
     """
     if strategy == "ptq":
-        _post_training_quantization_grid_search(self, input_dir)
+        _post_training_quantization_grid_search(self, model_dir)
+    elif strategy == 'qat':
+        _quant_aware_training_dynamic(self, model_dir)
 
 
 def _dynabert(self, model, output_dir):
@@ -182,6 +185,19 @@ def _recover_transformer_func(self, all_recover=False):
 
 
 def _replace_auto_model_forward(self):
+    self.base_model_class._forward = auto_model_dynabert_forward
+    self.base_model_class._ori_forward = self.base_model_class.forward
+
+    def init_func(layer):
+        if isinstance(layer, self.base_model_class):
+            layer.forward = layer._forward
+
+    for layer in self.children():
+        layer.apply(init_func)
+    return self
+
+
+def _replace_auto_model_qat_forward(self):
     self.base_model_class._forward = auto_model_forward
     self.base_model_class._ori_forward = self.base_model_class.forward
 
@@ -261,40 +277,16 @@ def _dynabert_init(self, model, eval_dataloader):
     return ofa_model, teacher_model
 
 
-def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
-                       eval_dataloader, num_train_epochs):
-
-    def evaluate(model, data_loader):
-        if self.custom_dynabert_evaluate is not None:
-            return self.custom_dynabert_evaluate(model, data_loader)
-        if isinstance(model, OFA):
-            class_name = model.model.__class__.__name__
-        else:
-            class_name = model.__class__.__name__
-        if "SequenceClassification" in class_name:
-            return evaluate_seq_cls(model, data_loader)
-        elif "QuestionAnswering" in class_name:
-            return evaluate_qa(model, data_loader)
-        elif "TokenClassification" in class_name:
-            return evaluate_token_cls(model, data_loader)
-        else:
-            raise NotImplementedError(
-                "Model to be compressed is an instance of a custom class, " \
-                "so function `evaluate(model, data_loader)` should be " \
-                "implemented, and `model` should support both `paddle.nn.layer` " \
-                "and `paddleslim.nas.ofa.OFA` instances, and it should return " \
-                "a single float for precision value, such as acc.")
+def evaluate(self, model, data_loader, is_ofa_model=False):
 
     @paddle.no_grad()
-    def evaluate_qa(model, data_loader):
+    def evaluate_qa(model, data_loader, is_ofa_model=False):
         model.eval()
         all_start_logits = []
         all_end_logits = []
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
-                           attention_mask=[None, None])
-            if isinstance(model, OFA):
+            logits = model(batch['input_ids'], batch['token_type_ids'])
+            if is_ofa_model:
                 start_logits_tensor, end_logits_tensor = logits[0]
             else:
                 start_logits_tensor, end_logits_tensor = logits
@@ -318,15 +310,13 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         return res
 
     @paddle.no_grad()
-    def evaluate_seq_cls(model, data_loader):
+    def evaluate_seq_cls(model, data_loader, is_ofa_model=False):
         metric = Accuracy()
         model.eval()
         metric.reset()
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
-                           attention_mask=[None, None])
-            if isinstance(model, OFA):
+            logits = model(batch['input_ids'], batch['token_type_ids'])
+            if is_ofa_model:
                 logits = logits[0]
             correct = metric.compute(logits, batch['labels'])
             metric.update(correct)
@@ -336,15 +326,13 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         return res
 
     @paddle.no_grad()
-    def evaluate_token_cls(model, data_loader):
+    def evaluate_token_cls(model, data_loader, is_ofa_model=False):
         metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
         model.eval()
         metric.reset()
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
-                           attention_mask=[None, None])
-            if isinstance(model, OFA):
+            logits = model(batch['input_ids'], batch['token_type_ids'])
+            if is_ofa_model:
                 logits = logits[0]
             preds = logits.argmax(axis=2)
             num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
@@ -357,6 +345,30 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         res = res[2]
         model.train()
         return res
+
+    if self.custom_evaluate is not None:
+        return self.custom_evaluate(model, data_loader)
+    if is_ofa_model:
+        class_name = model.model.__class__.__name__
+    else:
+        class_name = model.__class__.__name__
+    if "SequenceClassification" in class_name:
+        return evaluate_seq_cls(model, data_loader, is_ofa_model)
+    elif "QuestionAnswering" in class_name:
+        return evaluate_qa(model, data_loader, is_ofa_model)
+    elif "TokenClassification" in class_name:
+        return evaluate_token_cls(model, data_loader, is_ofa_model)
+    else:
+        raise NotImplementedError(
+            "Model to be compressed is an instance of a custom class, " \
+            "so function `evaluate(model, data_loader)` should be " \
+            "implemented, and `model` should support both `paddle.nn.layer` " \
+            "and `paddleslim.nas.ofa.OFA` instances, and it should return " \
+            "a single float for precision value, such as acc.")
+
+
+def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
+                       eval_dataloader, num_train_epochs):
 
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
     global_step = 0
@@ -415,7 +427,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
                     logger.info("width_mult %s:" % width_mult)
-                    acc = evaluate(ofa_model, eval_dataloader)
+                    acc = evaluate(ofa_model, eval_dataloader, True)
                     if acc > best_acc[idx]:
                         best_acc[idx] = acc
                         if paddle.distributed.get_rank() == 0:
@@ -532,7 +544,9 @@ def _post_training_quantization_grid_search(self, model_dir):
             is_full_quantize=False,
             weight_bits=8,
             activation_bits=8,
-            activation_quantize_type='range_abs_max',
+            activation_quantize_type='range_abs_max'
+            if args.activation_quantize_type is None else
+            args.activation_quantize_type,
             weight_quantize_type=args.weight_quantize_type,
             onnx_format=False,
             optimize_model=False)
@@ -549,21 +563,137 @@ def _post_training_quantization_grid_search(self, model_dir):
                 _post_training_quantization(algo, batch_size, batch_nums)
 
     paddle.disable_static()
-    logger.info("Post training quantization ends.")
+    logger.info(
+        "Post training quantization ends and quantized models are saved.")
 
 
-def auto_model_forward(self,
-                       input_ids,
-                       token_type_ids=None,
-                       position_ids=None,
-                       attention_mask=[None, None],
-                       task_type_ids=None,
-                       past_key_values=None,
-                       inputs_embeds=None,
-                       use_cache=None,
-                       output_hidden_states=False,
-                       output_attentions=False,
-                       return_dict=False):
+def _quant_aware_training_dynamic(self, input_dir):
+    args = self.args
+    args.output_filename_prefix = "int8"
+    quant_config = {
+        'activation_preprocess_type':
+        args.activation_preprocess_type,  # PACT or None
+        'weight_preprocess_type':
+        args.weight_preprocess_type,  # PACT or None
+        'weight_quantize_type':
+        args.weight_quantize_type,
+        'activation_quantize_type':
+        'moving_average_abs_max' if args.activation_quantize_type is None else
+        args.activation_quantize_type,
+        'weight_bits':
+        8,
+        'activation_bits':
+        8,
+        'dtype':
+        'int8',
+        # window size for 'range_abs_max' quantization. defaulf is 10000
+        'window_size':
+        10000,
+        'quantizable_layer_type': ['Linear', 'Conv2D'],
+        'moving_rate':
+        args.moving_rate,
+        'onnx_format':
+        False
+    }
+
+    from paddleslim import QAT
+    self.model = _replace_auto_model_qat_forward(self.model)
+
+    quanter = QAT(config=quant_config)
+
+    quanter.quantize(self.model)
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    output_param_path = os.path.join(args.output_dir, "best_quant.pdparams")
+
+    train_dataloader = self.get_train_dataloader()
+    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
+
+    # TODO: args.gradient_accumulation_steps
+    if args.max_steps > 0:
+        args.num_training_steps = args.max_steps
+        args.num_train_epochs = math.ceil(num_training_steps /
+                                          len(train_dataloader))
+    else:
+        args.num_training_steps = len(train_dataloader) * args.num_train_epochs
+        args.num_train_epochs = math.ceil(args.num_train_epochs)
+
+    self.create_optimizer_and_scheduler(
+        num_training_steps=args.num_training_steps)
+
+    global_step = 0
+    tic_train = time.time()
+    best_acc, acc = 0.0, 0.0
+
+    logger.info("FP32 model's evaluation starts.")
+
+    tic_eval = time.time()
+    acc = evaluate(self, self.model, eval_dataloader, False)
+    logger.info("eval done total: %s s" % (time.time() - tic_eval))
+
+    logger.info("Quant aware training starts.")
+    for epoch in range(args.num_train_epochs):
+        for step, batch in enumerate(train_dataloader):
+            global_step += 1
+            if "token_type_ids" in batch:
+                logits = self.model(batch['input_ids'], batch['token_type_ids'])
+            else:
+                logits = self.model(batch['input_ids'])
+
+            loss = self.criterion(logits, batch['labels'])
+            loss.backward()
+            self.optimizer.step()
+            self.lr_scheduler.step()
+            self.optimizer.clear_grad()
+            if global_step % self.args.logging_steps == 0:
+                if paddle.distributed.get_rank() == 0:
+                    logger.info(
+                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
+                        % (global_step, epoch, step, loss, args.logging_steps /
+                           (time.time() - tic_train)))
+                tic_train = time.time()
+
+            if global_step % args.save_steps == 0:
+                tic_eval = time.time()
+                acc = evaluate(self, self.model, eval_dataloader, False)
+                if acc > best_acc:
+                    best_acc = acc
+                    if paddle.distributed.get_rank() == 0:
+                        # need better way to get inner model of DataParallel
+                        model_to_save = self.model._layers if isinstance(
+                            self.model, paddle.DataParallel) else self.model
+                        paddle.save(model_to_save.state_dict(),
+                                    output_param_path)
+                logger.info("eval done total: %s s" % (time.time() - tic_eval))
+    logger.info("Best result: %.4f" % best_acc)
+    self.model.set_state_dict(paddle.load(output_param_path))
+    # Train self.model
+    quanter.save_quantized_model(
+        self.model,
+        os.path.join(input_dir, args.output_filename_prefix),
+        input_spec=[
+            paddle.static.InputSpec(shape=[None, None], dtype='int64'),
+            paddle.static.InputSpec(shape=[None, None], dtype='int64')
+            if "token_type_ids" in self.eval_dataset[0] else None
+        ])
+    logger.info("Quant aware training ends and quantized models are saved.")
+    self.model = _recover_auto_model_forward(self.model)
+
+
+def auto_model_dynabert_forward(self,
+                                input_ids,
+                                token_type_ids=None,
+                                position_ids=None,
+                                attention_mask=[None, None],
+                                task_type_ids=None,
+                                past_key_values=None,
+                                inputs_embeds=None,
+                                use_cache=None,
+                                output_hidden_states=False,
+                                output_attentions=False,
+                                return_dict=False):
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(
         self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
 
@@ -638,6 +768,41 @@ def auto_model_forward(self,
             past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions)
+
+
+def auto_model_forward(self,
+                       input_ids,
+                       token_type_ids=None,
+                       position_ids=None,
+                       attention_mask=None,
+                       task_type_ids=None,
+                       past_key_values=None,
+                       inputs_embeds=None,
+                       use_cache=None,
+                       output_hidden_states=False,
+                       output_attentions=False,
+                       return_dict=False):
+    past_key_values_length = None
+    if past_key_values is not None:
+        past_key_values_length = past_key_values[0][0].shape[2]
+
+    if attention_mask is None:
+        attention_mask = paddle.unsqueeze(
+            (input_ids == self.pad_token_id).astype(paddle.float32),
+            axis=[1, 2])
+        if past_key_values is not None:
+            batch_size = past_key_values[0][0].shape[0]
+            past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length],
+                                     dtype=attention_mask.dtype)
+            attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
+    # For 2D attention_mask from tokenizer
+    elif attention_mask.ndim == 2:
+        attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(
+            paddle.get_default_dtype())
+        attention_mask = (1.0 - attention_mask) * -1e4
+    return self._ori_forward(input_ids,
+                             token_type_ids,
+                             attention_mask=attention_mask)
 
 
 def soft_cross_entropy(inp, target):

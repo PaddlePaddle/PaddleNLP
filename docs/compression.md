@@ -161,28 +161,26 @@ trainer.compress()
     - 输入每个 batch 的数据，返回模型的 loss。
     - 将该函数传入 `compress()` 中的 `custom_dynabert_calc_loss` 参数；
 
-- 如果评估器也不满足上述所支持情况，需实现自定义 `custom_dynabert_evaluate` 评估函数，需要同时支持 `paddleslim.nas.ofa.OFA` 模型和 `paddle.nn.layer` 模型。可参考下方示例代码。
+- 如果评估器也不满足上述所支持情况，需实现自定义 `custom_evaluate` 评估函数，需要同时支持 `paddleslim.nas.ofa.OFA` 模型和 `paddle.nn.layer` 模型。可参考下方示例代码。
     - 输入`model` 和 `dataloader`，返回模型的评价指标（单个 float 值）。
-    - 将该函数传入 `compress()` 中的 `custom_dynabert_evaluate` 参数；
+    - 将该函数传入 `compress()` 中的 `custom_evaluate` 参数；
 
-`custom_dynabert_evaluate()` 函数定义示例：
+`custom_evaluate()` 函数定义示例：
 
 ```python
     import paddle
     from paddle.metric import Accuracy
-    from paddleslim.nas.ofa import OFA
 
     @paddle.no_grad()
-    def evaluate_seq_cls(model, data_loader):
+    def evaluate_seq_cls(model, data_loader, is_ofa_model=False):
         metric = Accuracy()
         model.eval()
         metric.reset()
         for batch in data_loader:
             logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
-                           attention_mask=[None, None])
+                           batch['token_type_ids'])
             # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
-            if isinstance(model, OFA):
+            if is_ofa_model:
                 logits = logits[0]
             correct = metric.compute(logits, batch['labels'])
             metric.update(correct)
@@ -205,7 +203,7 @@ def calc_loss(loss_fct, model, batch, head_mask):
 在调用 `compress()` 时传入这 2 个自定义函数：
 
 ```python
-trainer.compress(custom_dynabert_evaluate=evaluate_seq_cls,
+trainer.compress(custom_evaluate=evaluate_seq_cls,
                  custom_dynabert_calc_loss=calc_loss)
 ```
 
@@ -245,8 +243,8 @@ python compress.py \
 
 公共参数中的参数和具体的压缩策略无关。
 
-- **--strategy** 模型压缩策略，目前支持 `'dynabert+ptq'`、 `'dynabert'` 和 `'ptq'`。
-其中 `'dynabert'` 代表基于 DynaBERT 的宽度裁剪策略，`'ptq'` 表示静态离线量化， `'dynabert+ptq'` 代表先裁剪后量化。默认是 `'dynabert+ptq'`；
+- **--strategy** 模型压缩策略，目前支持 `'dynabert+ptq'`、 `'dynabert'` 、 `'ptq'` 和 `'qat'`。
+其中 `'dynabert'` 代表基于 DynaBERT 的宽度裁剪策略，`'ptq'` 表示静态离线量化， `'dynabert+ptq'` 代表先裁剪后量化。`qat` 表示量化训练。默认是 `'dynabert+ptq'`；
 
 - **--output_dir** 模型压缩后模型保存目录；
 
