@@ -83,19 +83,19 @@ class GenerationTesterMixin:
         forced_bos_token_id=None,
         forced_eos_token_id=None,
         max_length=None,
-        diversity_penalty=None,
+        diversity_rate=None,
     ):
         process_kwargs = {
             "min_length": 1 if max_length is None else max_length - 1,
             "repetition_penalty": 1.2,
         }
 
-        if diversity_penalty is not None:
-            process_kwargs["diversity_rate"] = diversity_penalty
+        if diversity_rate is not None:
+            process_kwargs["diversity_rate"] = diversity_rate
         logits_processor = LogitsProcessorList(([
             HammingDiversityLogitsProcessor(
-                diversity_penalty, num_beams=2, num_beam_groups=2),
-        ] if diversity_penalty is not None else []) + ([
+                diversity_rate, num_beams=2, num_beam_groups=2),
+        ] if diversity_rate is not None else []) + ([
             MinLengthLogitsProcessor(process_kwargs["min_length"], eos_token_id
                                      ),
         ] if eos_token_id is not None else []) + ([
@@ -143,7 +143,7 @@ class GenerationTesterMixin:
             "num_beams": 2,
             "num_return_sequences": num_return_sequences,
             "num_beam_groups": 2,  # one beam per group
-            "diversity_penalty": 2.0,
+            "diversity_rate": 2.0,
         }
         beam_scorer = BeamSearchScorer(
             batch_size=batch_size,
@@ -171,6 +171,9 @@ class GenerationTesterMixin:
             input_ids,
             attention_mask=attention_mask,
         )
+        if isinstance(encoder_outputs, (list, tuple)):
+            encoder_outputs = encoder_outputs[0]
+
         encoder_outputs = encoder_outputs.repeat_interleave(num_interleave,
                                                             axis=0)
 
@@ -368,6 +371,7 @@ class GenerationTesterMixin:
         logits_processor,
         logits_process_kwargs,
     ):
+        beam_kwargs.pop("diversity_rate")
         model.eval()
         with paddle.no_grad():
             output_generate = model.generate(
@@ -593,7 +597,7 @@ class GenerationTesterMixin:
                 getattr(config, "forced_bos_token_id", None),
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
-                diversity_penalty=2.0,
+                diversity_rate=2.0,
             )
 
             # check `generate()` and `group_beam_search()` are equal
@@ -790,7 +794,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             num_beams=4,
             num_return_sequences=3,
             num_beam_groups=4,
-            diversity_penalty=2.0,
+            diversity_rate=2.0,
         )
 
         generated_text = bart_tokenizer.batch_decode(outputs,
