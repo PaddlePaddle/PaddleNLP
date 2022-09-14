@@ -178,8 +178,8 @@ class TrainingArguments:
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
-        scale_loss (`float`,  *optional*, defaults to 1024):
-            The value of initial scale_loss for fp16. (default: 1024)
+        scale_loss (`float`,  *optional*, defaults to 32768):
+            The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
             Rank of the process during distributed training.
         dataloader_drop_last (`bool`, *optional*, defaults to `False`):
@@ -414,7 +414,7 @@ class TrainingArguments:
     )
 
     scale_loss: float = field(
-        default=2**10,
+        default=2**15,
         metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
