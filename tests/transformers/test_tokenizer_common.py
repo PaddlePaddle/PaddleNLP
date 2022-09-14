@@ -947,7 +947,8 @@ class TokenizerTesterMixin:
 
                 sequence1 = tokenizer(seq_1,
                                       return_token_type_ids=None,
-                                      add_special_tokens=False)
+                                      add_special_tokens=False,
+                                      truncation=False)
                 total_length1 = len(sequence1["input_ids"])
                 self.assertGreater(
                     total_length1, model_max_length,
@@ -1080,12 +1081,14 @@ class TokenizerTesterMixin:
 
                 sequence1 = tokenizer(seq_1,
                                       return_token_type_ids=None,
-                                      add_special_tokens=False)
+                                      add_special_tokens=False,
+                                      truncation=False)
                 total_length1 = len(sequence1["input_ids"])
                 sequence2 = tokenizer(seq_2,
                                       seq_1,
                                       return_token_type_ids=None,
-                                      add_special_tokens=False)
+                                      add_special_tokens=False,
+                                      truncation=False)
                 total_length2 = len(sequence2["input_ids"])
                 self.assertLess(
                     total_length1, model_max_length - 10,
@@ -1900,25 +1903,46 @@ class TokenizerTesterMixin:
                 ]
 
                 # Test not batched
-                encoded_sequences_1 = tokenizer.encode(sequences[0])
-                encoded_sequences_2 = tokenizer(sequences[0])
+                encoded_sequences_1 = tokenizer.encode(
+                    sequences[0],
+                    return_token_type_ids=False,
+                    return_attention_mask=True)
+                encoded_sequences_2 = tokenizer(sequences[0],
+                                                return_token_type_ids=False,
+                                                return_attention_mask=True)
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
                 # Test not batched pairs
-                encoded_sequences_1 = tokenizer.encode(sequences[0],
-                                                       sequences[1])
-                encoded_sequences_2 = tokenizer(sequences[0], sequences[1])
+                encoded_sequences_1 = tokenizer.encode(
+                    sequences[0],
+                    sequences[1],
+                    return_token_type_ids=False,
+                    return_attention_mask=True)
+                encoded_sequences_2 = tokenizer(sequences[0],
+                                                sequences[1],
+                                                return_token_type_ids=False,
+                                                return_attention_mask=True)
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
                 # Test batched
-                encoded_sequences_1 = tokenizer.batch_encode(sequences)
-                encoded_sequences_2 = tokenizer(sequences)
+                encoded_sequences_1 = tokenizer.batch_encode(
+                    sequences,
+                    return_token_type_ids=False,
+                    return_attention_mask=True)
+                encoded_sequences_2 = tokenizer(sequences,
+                                                return_token_type_ids=False,
+                                                return_attention_mask=True)
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
                 # Test batched pairs
                 encoded_sequences_1 = tokenizer.batch_encode(
-                    list(zip(sequences, sequences)))
-                encoded_sequences_2 = tokenizer(sequences, sequences)
+                    list(zip(sequences, sequences)),
+                    return_token_type_ids=False,
+                    return_attention_mask=True)
+                encoded_sequences_2 = tokenizer(sequences,
+                                                sequences,
+                                                return_token_type_ids=False,
+                                                return_attention_mask=True)
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
     def test_batch_encode_plus_batch_sequence_length(self):
