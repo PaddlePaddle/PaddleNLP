@@ -19,7 +19,7 @@ import os
 import six
 import logging
 import inspect
-from typing import Optional
+from typing import Any, Optional
 
 import paddle
 import numpy as np
@@ -547,23 +547,29 @@ class PretrainedModel(Layer, GenerationMixin):
         self.vocab_size = new_num_tokens
 
         # update init_config
-        def update_init_config_vocab_size_field(sub_dict: dict):
-            if 'vocab_size' in sub_dict:
-                sub_dict['vocab_size'] = new_num_tokens
-                return
-            models = [
-                arg for arg in sub_dict.get('init_args', [])
-                if isinstance(arg, PretrainedModel)
-            ]
-            if models:
-                update_init_config_vocab_size_field(models[0].init_config)
-
-        update_init_config_vocab_size_field(self.init_config)
+        self._update_init_config(self.init_config, 'vocab_size', new_num_tokens)
 
         # TODO(westfish@126.com): add tie_weight.
         # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
 
         return new_embeddings
+
+    def _update_init_config(self, init_config: dict, key: str, value: Any):
+        """update init_config by <key, value> pair
+
+        Args:
+            init_config (dict): the init_config instance
+            key (str): the key field
+            value (Any): the new value of instance
+        """
+        if key in init_config:
+            init_config[key] = value
+            return
+
+        for arg in init_config.get('init_args', []):
+            if not isinstance(arg, PretrainedModel):
+                continue
+            self._update_init_config(arg.init_config, key, value)
 
     def _get_resized_embeddings(
             self,
