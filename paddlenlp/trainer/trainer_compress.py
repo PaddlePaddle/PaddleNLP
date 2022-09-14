@@ -291,8 +291,8 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         all_start_logits = []
         all_end_logits = []
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
+            logits = model(input_ids=batch['input_ids'],
+                           token_type_ids=batch['token_type_ids'],
                            attention_mask=[None, None])
             if isinstance(model, OFA):
                 start_logits_tensor, end_logits_tensor = logits[0]
@@ -341,8 +341,8 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         model.eval()
         metric.reset()
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
+            logits = model(input_ids=batch['input_ids'],
+                           token_type_ids=batch['token_type_ids'],
                            attention_mask=[None, None])
             if isinstance(model, OFA):
                 logits = logits[0]
