@@ -175,8 +175,11 @@ class TrainingArguments:
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
             For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at 
             https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
-        scale_loss (`float`,  *optional*, defaults to 32768):
-            The value of initial scale_loss for fp16. (default: 32768)
+        recompute (`bool`, *optional*, defaults to `False`):
+            Recompute the forward pass to calculate gradients. Used for saving memory.
+            Only support for networks with transformer blocks.
+        scale_loss (`float`,  *optional*, defaults to 1024):
+            The value of initial scale_loss for fp16. (default: 1024)
         local_rank (`int`, *optional*, defaults to -1):
             Rank of the process during distributed training.
         dataloader_drop_last (`bool`, *optional*, defaults to `False`):
@@ -401,8 +404,17 @@ class TrainingArguments:
         },
     )
 
+    recompute: bool = field(
+        default=False,
+        metadata={
+            "help":
+            "Recompute the forward pass to calculate gradients. Used for saving memory. "
+            "Only support for networks with transformer blocks."
+        },
+    )
+
     scale_loss: float = field(
-        default=2**15,
+        default=2**10,
         metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
