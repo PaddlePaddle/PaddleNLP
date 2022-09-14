@@ -1782,7 +1782,6 @@ class FunnelPreTrainedModel(PreTrainedModel):
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "funnel-transformer/small": {},  # B4-4-4H768
         "funnel-transformer/small-base": {},  # B4-4-4H768, no decoder

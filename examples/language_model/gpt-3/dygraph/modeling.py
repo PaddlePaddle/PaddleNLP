@@ -1179,5 +1179,9 @@ class GPTForPretrainingPipe(PipelineLayer):
                          topology=topology,
                          seg_method="layer:TransformerDecoderLayer",
                          recompute_interval=1 if use_recompute else 0,
-                         recompute_partition=False,
-                         recompute_offload=False)
+                         recompute_ctx={
+                             "mp_group":
+                             fleet.fleet._hcg.get_model_parallel_group(),
+                             "offload": False,
+                             "partition": False
+                         })

@@ -17,6 +17,7 @@ import random
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     XLNetForMultipleChoice,
@@ -29,6 +30,7 @@ from paddlenlp.transformers import (
 )
 from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
+from ..test_generation_utils import GenerationTesterMixin
 
 
 class XLNetModelTester:
@@ -62,14 +64,15 @@ class XLNetModelTester:
         self.eos_token_id = 2
         self.pad_token_id = 5
         self.num_choices = 4
+        self.num_classes = 3
 
     def prepare_config_and_inputs(self):
         input_ids_1 = ids_tensor([self.batch_size, self.seq_length],
                                  self.vocab_size)
         input_ids_2 = ids_tensor([self.batch_size, self.seq_length],
                                  self.vocab_size)
-        segment_ids = ids_tensor([self.batch_size, self.seq_length],
-                                 self.type_vocab_size)
+        token_type_ids = ids_tensor([self.batch_size, self.seq_length],
+                                    self.type_vocab_size)
         input_mask = random_attention_mask([self.batch_size, self.seq_length])
 
         input_ids_q = ids_tensor([self.batch_size, self.seq_length + 1],
@@ -84,18 +87,22 @@ class XLNetModelTester:
         ])
         target_mapping[:, 0, -1] = 1.0  # predict last token
 
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
+
+        if self.parent.use_labels:
+            sequence_labels = ids_tensor([self.batch_size],
+                                         self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length],
+                                      self.num_classes)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
+
         config = self.get_config()
 
-        return (
-            config,
-            input_ids_1,
-            input_ids_2,
-            input_ids_q,
-            perm_mask,
-            input_mask,
-            target_mapping,
-            segment_ids,
-        )
+        return (config, input_ids_1, input_ids_2, input_ids_q, perm_mask,
+                input_mask, target_mapping, token_type_ids, sequence_labels,
+                token_labels, choice_labels)
 
     def get_config(self):
         return {
@@ -119,46 +126,34 @@ class XLNetModelTester:
         random.seed(self.seed)
         paddle.seed(self.seed)
 
-    def create_and_check_xlnet_base_model(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
+    def create_and_check_xlnet_base_model(self, config, input_ids_1,
+                                          input_ids_2, input_ids_q, perm_mask,
+                                          input_mask, target_mapping,
+                                          token_type_ids, sequence_labels,
+                                          token_labels, choice_labels):
         model = XLNetModel(**config)
         model.eval()
 
         result = model(input_ids_1, input_mask=input_mask)
         result = model(input_ids_1, attention_mask=input_mask)
-        result = model(input_ids_1, token_type_ids=segment_ids)
-        result = model(input_ids_1, return_dict=True)
+        result = model(input_ids_1, token_type_ids=token_type_ids)
+        result = model(input_ids_1, return_dict=self.parent.return_dict)
 
         config["mem_len"] = 0
         model = XLNetModel(**config)
         model.eval()
-        base_model_output = model(input_ids_1, return_dict=True)
-        self.parent.assertEqual(len(base_model_output), 4)
+        base_model_output = model(input_ids_1,
+                                  return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(
-            result["last_hidden_state"].shape,
+            result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
 
-    def create_and_check_use_mems_train(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
+    def create_and_check_use_mems_train(self, config, input_ids_1, input_ids_2,
+                                        input_ids_q, perm_mask, input_mask,
+                                        target_mapping, token_type_ids,
+                                        sequence_labels, token_labels,
+                                        choice_labels):
         model = XLNetForSequenceClassification(XLNetModel(**config))
         model.train()
 
@@ -168,147 +163,155 @@ class XLNetModelTester:
         for i in range(train_size // batch_size + 1):
             input_ids = input_ids_1[i:(i + 1) * batch_size]
             outputs = model(input_ids=input_ids, return_dict=True)
-            self.parent.assertIsNone(outputs["mems"])
+            self.parent.assertIsNone(outputs.get("mems", None))
 
     def create_and_check_xlnet_base_model_with_att_output(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
+            self, config, input_ids_1, input_ids_2, input_ids_q, perm_mask,
+            input_mask, target_mapping, token_type_ids, sequence_labels,
+            token_labels, choice_labels):
         model = XLNetModel(**config)
         model.eval()
 
-        attentions = model(input_ids_1,
-                           target_mapping=target_mapping,
-                           return_dict=True)["attentions"]
+        outputs = model(input_ids_1,
+                        target_mapping=target_mapping,
+                        output_attentions=True,
+                        return_dict=self.parent.return_dict)
+
+        if isinstance(outputs, tuple):
+            attentions = outputs[1]
+        else:
+            attentions = outputs.attentions
 
         self.parent.assertEqual(len(attentions), config["n_layer"])
         self.parent.assertIsInstance(attentions[0], tuple)
         self.parent.assertEqual(len(attentions[0]), 2)
         self.parent.assertTrue(attentions[0][0].shape, attentions[0][0].shape)
 
-    def create_and_check_xlnet_lm_head(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
+    def create_and_check_xlnet_lm_head(self, config, input_ids_1, input_ids_2,
+                                       input_ids_q, perm_mask, input_mask,
+                                       target_mapping, token_type_ids,
+                                       sequence_labels, token_labels,
+                                       choice_labels):
         model = XLNetLMHeadModel(XLNetModel(**config))
         model.eval()
 
-        result1 = model(input_ids_1,
-                        token_type_ids=segment_ids,
-                        return_dict=True)
-        result2 = model(input_ids_2,
-                        token_type_ids=segment_ids,
-                        mems=result1["mems"],
-                        return_dict=True)
+        results = []
 
-        _ = model(input_ids_q,
-                  perm_mask=perm_mask,
-                  target_mapping=target_mapping)
-
+        result = model(input_ids_1,
+                       token_type_ids=token_type_ids,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
         self.parent.assertEqual(
-            result1["logits"].shape,
-            [self.batch_size, self.seq_length, self.vocab_size])
-        self.parent.assertEqual(
-            result2["logits"].shape,
+            result[0].shape,
             [self.batch_size, self.seq_length, self.vocab_size])
 
-    def create_and_check_xlnet_qa(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
+        result = model(input_ids_q,
+                       perm_mask=perm_mask,
+                       target_mapping=target_mapping,
+                       return_dict=self.parent.return_dict)
+
+        if paddle.is_tensor(result):
+            result = [result]
+
+        self.parent.assertEqual(result[0].shape,
+                                [self.batch_size, 1, self.vocab_size])
+
+    def create_and_check_xlnet_qa(self, config, input_ids_1, input_ids_2,
+                                  input_ids_q, perm_mask, input_mask,
+                                  target_mapping, token_type_ids,
+                                  sequence_labels, token_labels, choice_labels):
         model = XLNetForQuestionAnswering(XLNetModel(**config))
         model.eval()
 
-        result = model(input_ids_1)
+        results = []
+        result = model(input_ids_1,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.parent.return_dict)
+        results.append(result)
 
-        result_with_mask = model(
-            input_ids_1,
-            input_mask=input_mask,
-        )
+        result_with_mask = model(input_ids_1,
+                                 start_positions=sequence_labels,
+                                 end_positions=sequence_labels,
+                                 input_mask=input_mask,
+                                 return_dict=self.parent.return_dict)
+        results.append(result_with_mask)
 
-        self.parent.assertEqual(result[0].shape,
-                                [self.batch_size, self.seq_length])
-        self.parent.assertEqual(result[1].shape,
-                                [self.batch_size, self.seq_length])
+        for result in results:
+            if token_labels is not None:
+                result = result[1:]
 
-    def create_and_check_xlnet_token_classif(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
-        model = XLNetForTokenClassification(XLNetModel(**config))
+            self.parent.assertEqual(result[0].shape,
+                                    [self.batch_size, self.seq_length])
+            self.parent.assertEqual(result[1].shape,
+                                    [self.batch_size, self.seq_length])
+
+    def create_and_check_xlnet_token_classif(self, config, input_ids_1,
+                                             input_ids_2, input_ids_q,
+                                             perm_mask, input_mask,
+                                             target_mapping, token_type_ids,
+                                             sequence_labels, token_labels,
+                                             choice_labels):
+        model = XLNetForTokenClassification(XLNetModel(**config),
+                                            num_classes=self.num_classes)
         model.eval()
 
-        result = model(input_ids_1, return_dict=True)
-        self.parent.assertEqual(
-            result["logits"].shape,
-            [self.batch_size, self.seq_length, self.type_sequence_label_size])
+        result = model(input_ids_1,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
 
-    def create_and_check_xlnet_sequence_classif(
-        self,
-        config,
-        input_ids_1,
-        input_ids_2,
-        input_ids_q,
-        perm_mask,
-        input_mask,
-        target_mapping,
-        segment_ids,
-    ):
+        self.parent.assertEqual(
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.num_classes])
+
+    def create_and_check_xlnet_sequence_classif(self, config, input_ids_1,
+                                                input_ids_2, input_ids_q,
+                                                perm_mask, input_mask,
+                                                target_mapping, token_type_ids,
+                                                sequence_labels, token_labels,
+                                                choice_labels):
         model = XLNetForSequenceClassification(XLNetModel(**config))
         model.eval()
 
-        result = model(input_ids_1, return_dict=True)
+        result = model(input_ids_1,
+                       labels=sequence_labels,
+                       return_dict=self.parent.return_dict)
+
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
 
         self.parent.assertEqual(
-            result["logits"].shape,
-            [self.batch_size, self.type_sequence_label_size])
+            result[0].shape, [self.batch_size, self.type_sequence_label_size])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
-        (
-            config,
-            input_ids_1,
-            input_ids_2,
-            input_ids_q,
-            perm_mask,
-            input_mask,
-            target_mapping,
-            segment_ids,
-        ) = config_and_inputs
+        (config, input_ids_1, input_ids_2, input_ids_q, perm_mask, input_mask,
+         target_mapping, token_type_ids, sequence_labels, token_labels,
+         choice_labels) = config_and_inputs
         inputs_dict = {"input_ids": input_ids_1}
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = XLNetModel
+    use_labels = False
+    return_dict = False
     all_model_classes = (
         XLNetModel,
         XLNetLMHeadModel,
@@ -458,9 +461,10 @@ class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
             self.assertIsNotNone(model)
 
 
-class XLNetModelLanguageGenerationTest(unittest.TestCase):
+class XLNetModelLanguageGenerationTest(unittest.TestCase,
+                                       GenerationTesterMixin):
 
-    @slow
+    # @slow
     def test_lm_generate_xlnet_base_cased(self):
         model = XLNetLMHeadModel.from_pretrained("xlnet-base-cased")
         # fmt: off
@@ -854,5 +858,7 @@ class XLNetModelLanguageGenerationTest(unittest.TestCase):
         #  <sep><cls>, Rasputin is asked to perform magic. He is asked to perform a ritual of the Virgin Mary.
         #  He is asked to perform a ritual of the Virgin Mary. He is asked to perform
 
-        output_ids = model.generate(input_ids, max_length=200, do_sample=False)
+        output_ids, _ = model.generate(input_ids,
+                                       max_length=39,
+                                       decode_strategy="greedy_search")
         self.assertListEqual(output_ids[0].tolist(), expected_output_ids)

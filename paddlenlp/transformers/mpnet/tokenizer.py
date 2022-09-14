@@ -19,6 +19,8 @@ from .. import AddedToken
 
 __all__ = ['MPNetTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"mpnet-base": 514}
+
 
 class MPNetTokenizer(BertTokenizer):
     """
@@ -33,6 +35,7 @@ class MPNetTokenizer(BertTokenizer):
         }
     }
     pretrained_init_configuration = {"mpnet-base": {"do_lower_case": True}}
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
