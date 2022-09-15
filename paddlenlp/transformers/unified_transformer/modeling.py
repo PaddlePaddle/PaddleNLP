@@ -593,9 +593,9 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
-        logits[:, self.unified_transformer.unk_token_id] = -1e9
-        logits[:, self.unified_transformer.bos_token_id] = -1e9
-        logits[:, self.unified_transformer.mask_token_id] = -1e9
+        logits[:, self.unified_transformer.unk_token_id] = -1e4
+        logits[:, self.unified_transformer.bos_token_id] = -1e4
+        logits[:, self.unified_transformer.mask_token_id] = -1e4
         return logits
 
     def prepare_inputs_for_generation(self,
