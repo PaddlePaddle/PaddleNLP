@@ -3,7 +3,7 @@
 PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **全场景**，帮助用户**低门槛**构建强大**产品级系统**。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/189293482-1ba0d500-9726-4a67-bdc5-f71339cfe773.gif" width="500">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
 </div>
 
 更多效果展示Demo请参考 [效果展示](#效果展示)
@@ -39,19 +39,19 @@ PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了�
 + 语义检索
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/189293482-1ba0d500-9726-4a67-bdc5-f71339cfe773.gif" width="400">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
 </div>
 
 + 智能问答
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/189299496-70e5a4d9-862f-45ce-a036-64b91e587035.gif" width="400">
+    <img src="https://user-images.githubusercontent.com/12107462/190298926-a1fc92f3-5ec7-4265-8357-ab860cc1fed2.gif" width="500px">
 </div>
 
 + FAQ智能问答
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/189297769-dd2658d3-5a0e-4d79-96a4-12903b6d3acd.gif" width="400">
+    <img src="https://user-images.githubusercontent.com/12107462/190307449-38135678-f259-4483-ac0f-2fa3ae4be97f.gif" width="500px">
 </div>
 
 |  |  |
