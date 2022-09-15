@@ -424,7 +424,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = ((input_ids == self.pad_token_id).astype(
-                paddle.get_default_dtype()) * -1e9).unsqueeze([1, 2])
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
             attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(input_ids,
@@ -635,7 +635,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
         if attention_mask is None:
             attention_mask = ((input_ids == self.pad_token_id).astype(
-                paddle.get_default_dtype()) * -1e9).unsqueeze([1, 2])
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
             attention_mask.stop_gradient = True
 
         # only last token for inputs_ids if cache is defined in kwargs
