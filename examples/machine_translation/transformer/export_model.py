@@ -135,12 +135,13 @@ if __name__ == "__main__":
     if ARGS.vocab_file is not None:
         args.src_vocab = ARGS.vocab_file
         args.trg_vocab = ARG.vocab_file
+        args.joined_dictionary = True
     else:
         args.src_vocab = ARGS.src_vocab
         args.trg_vocab = ARGS.trg_vocab
-    args.joined_dictionary = not (args.src_vocab is not None
-                                  and args.trg_vocab is not None
-                                  and args.src_vocab != args.trg_vocab)
+        args.joined_dictionary = not (args.src_vocab is not None
+                                      and args.trg_vocab is not None
+                                      and args.src_vocab != args.trg_vocab)
 
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token

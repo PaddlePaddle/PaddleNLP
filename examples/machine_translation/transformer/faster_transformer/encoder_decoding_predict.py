@@ -79,22 +79,6 @@ def parse_args():
         action="store_true",
         help="Whether to profile the performance using newstest2014 dataset. ")
     parser.add_argument(
-        "--train_file",
-        nargs='+',
-        default=None,
-        type=str,
-        help=
-        "The files for training, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. "
-    )
-    parser.add_argument(
-        "--dev_file",
-        nargs='+',
-        default=None,
-        type=str,
-        help=
-        "The files for validation, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. "
-    )
-    parser.add_argument(
         "--test_file",
         nargs='+',
         default=None,
@@ -287,12 +271,13 @@ if __name__ == "__main__":
     if ARGS.vocab_file is not None:
         args.src_vocab = ARGS.vocab_file
         args.trg_vocab = ARG.vocab_file
+        args.joined_dictionary = True
     else:
         args.src_vocab = ARGS.src_vocab
         args.trg_vocab = ARGS.trg_vocab
-    args.joined_dictionary = not (args.src_vocab is not None
-                                  and args.trg_vocab is not None
-                                  and args.src_vocab != args.trg_vocab)
+        args.joined_dictionary = not (args.src_vocab is not None
+                                      and args.trg_vocab is not None
+                                      and args.src_vocab != args.trg_vocab)
 
     if ARGS.src_lang is not None:
         args.src_lang = ARGS.src_lang
