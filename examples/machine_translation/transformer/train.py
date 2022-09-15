@@ -86,6 +86,11 @@ def parse_args():
                         type=str,
                         choices=['true', 'false', 'True', 'False'],
                         help="Whether to use amp to train Transformer. ")
+    parser.add_argument("--to_static",
+                        default=None,
+                        type=str,
+                        choices=['true', 'false', 'True', 'False'],
+                        help="Whether use to_static to train Transformer. ")
     parser.add_argument(
         "--amp_level",
         default=None,
@@ -383,6 +388,12 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    if ARGS.to_static:
+        ARGS.to_static = ARGS.to_static.lower()
+        if ARGS.to_static == "true":
+            args.to_static = True
+        else:
+            args.to_static = False
     pprint(args)
 
     args.profiler_options = ARGS.profiler_options

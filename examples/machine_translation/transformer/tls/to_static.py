@@ -36,4 +36,5 @@ def apply_to_static(config, model):
     if support_to_static:
         specs = create_input_specs()
         model = to_static(model, input_spec=specs)
+        print("Successfully to apply @to_static with specs: {}".format(specs))
     return model
