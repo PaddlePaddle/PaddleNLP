@@ -47,7 +47,7 @@ def get_preprocessing_parser():
         type=str,
         help="The prefix for train file and also used to save dict. ")
     parser.add_argument(
-        "--valid_pref",
+        "--dev_pref",
         default=None,
         type=str,
         help="The prefixes for dev file and use comma to separate. "
@@ -82,11 +82,11 @@ def get_preprocessing_parser():
                         type=str,
                         help="Reuse given target dictionary. ")
     parser.add_argument("--nwords_tgt",
-                        default=-1,
+                        default=None,
                         type=int,
                         help="The number of target words to retain. ")
     parser.add_argument("--nwords_src",
-                        default=-1,
+                        default=None,
                         type=int,
                         help="The number of source words to retain. ")
     parser.add_argument("--align_file",
@@ -139,8 +139,8 @@ def _train_path(lang, train_pref):
     return "{}{}".format(train_pref, ("." + lang) if lang else "")
 
 
-def _valid_path(lang, valid_pref):
-    return "{}{}".format(valid_pref, ("." + lang) if lang else "")
+def _dev_path(lang, dev_pref):
+    return "{}{}".format(dev_pref, ("." + lang) if lang else "")
 
 
 def _test_path(lang, test_pref):
@@ -177,6 +177,7 @@ def _build_dictionary(filenames, args, src=False, tgt=False):
 
     return Vocab.build_vocab(
         tokens,
+        max_size=args.nwords_src if src else args.nwords_tgt,
         min_freq=args.threshold_src if src else args.threshold_tgt,
         unk_token=args.unk_token,
         pad_token=args.pad_token,
@@ -199,10 +200,10 @@ def _make_all(lang, vocab, args):
     if args.train_pref:
         _make_dataset(vocab, args.train_pref, "train", lang, args=args)
 
-    if args.valid_pref:
-        for k, valid_pref in enumerate(args.valid_pref.split(",")):
+    if args.dev_pref:
+        for k, dev_pref in enumerate(args.dev_pref.split(",")):
             out_prefix = "dev{}".format(k) if k > 0 else "dev"
-            _make_dataset(vocab, valid_pref, out_prefix, lang, args=args)
+            _make_dataset(vocab, dev_pref, out_prefix, lang, args=args)
 
     if args.test_pref:
         for k, test_pref in enumerate(args.test_pref.split(",")):
@@ -266,9 +267,9 @@ def main(args):
             _train_path(lang, args.train_pref)
             for lang in [args.source_lang, args.target_lang]
         ]
-        for k, valid_pref in enumerate(args.valid_pref.split(",")):
+        for k, dev_pref in enumerate(args.dev_pref.split(",")):
             filenames.extend([
-                _valid_path(lang, args.valid_pref)
+                _dev_path(lang, args.dev_pref)
                 for lang in [args.source_lang, args.target_lang]
             ])
         for k, test_pref in enumerate(args.test_pref.split(",")):
@@ -350,8 +351,6 @@ def main(args):
                 [_train_path(args.source_lang, args.train_pref)],
                 args=args,
                 src=True)
-            import pdb
-            pdb.set_trace()
 
         if target:
             if args.tgt_vocab:
