@@ -422,7 +422,8 @@ class GenerationMixin(object):
         # method.
 
         # update cache
-        if isinstance(outputs, tuple):
+        if isinstance(outputs,
+                      tuple) and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
         # update token_type_ids with last value
