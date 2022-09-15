@@ -88,12 +88,12 @@ def parse_args():
         "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
     )
     parser.add_argument("-s",
-                        "--source_lang",
+                        "--src_lang",
                         default=None,
                         type=str,
                         help="Source language. ")
     parser.add_argument("-t",
-                        "--target_lang",
+                        "--trg_lang",
                         default=None,
                         type=str,
                         help="Target language. ")
@@ -413,7 +413,6 @@ if __name__ == "__main__":
         args.use_pure_fp16 = ARGS.amp_level == 'O2'
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
-    args.test_file = ARGS.test_file
 
     if ARGS.vocab_file is not None:
         args.src_vocab = ARGS.vocab_file

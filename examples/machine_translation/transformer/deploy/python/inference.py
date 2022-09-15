@@ -86,12 +86,12 @@ def parse_args():
         "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
     )
     parser.add_argument("-s",
-                        "--source_lang",
+                        "--src_lang",
                         default=None,
                         type=str,
                         help="Source language. ")
     parser.add_argument("-t",
-                        "--target_lang",
+                        "--trg_lang",
                         default=None,
                         type=str,
                         help="Target language. ")
