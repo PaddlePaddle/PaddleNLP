@@ -1,4 +1,19 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
+import os
 
 import paddle
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
@@ -9,7 +24,9 @@ from pipelines.utils import launch_es
 data_dict = {
     'data/dureader_dev':
     "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
-    "data/baike": "https://paddlenlp.bj.bcebos.com/applications/baike.zip"
+    "data/baike": "https://paddlenlp.bj.bcebos.com/applications/baike.zip",
+    "data/insurance":
+    "https://paddlenlp.bj.bcebos.com/applications/insurance.zip"
 }
 
 parser = argparse.ArgumentParser()
@@ -51,6 +68,11 @@ parser.add_argument("--passage_embedding_model",
                     type=str,
                     help="The passage_embedding_model path")
 
+parser.add_argument("--params_path",
+                    default="checkpoints/model_40/model_state.pdparams",
+                    type=str,
+                    help="The checkpoint path")
+
 parser.add_argument(
     '--delete_index',
     action='store_true',
@@ -82,16 +104,30 @@ def offline_ann(index_name, doc_dir):
     document_store.write_documents(dicts)
 
     ### 语义索引模型
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model=args.query_embedding_model,
-        passage_embedding_model=args.passage_embedding_model,
-        max_seq_len_query=64,
-        max_seq_len_passage=256,
-        batch_size=16,
-        use_gpu=True,
-        embed_title=False,
-    )
+    if (os.path.exists(args.params_path)):
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim,
+            max_seq_len_query=64,
+            max_seq_len_passage=256,
+            batch_size=16,
+            use_gpu=True,
+            embed_title=False,
+        )
+
+    else:
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            max_seq_len_query=64,
+            max_seq_len_passage=256,
+            batch_size=16,
+            use_gpu=True,
+            embed_title=False,
+        )
 
     # 建立索引库
     document_store.update_embeddings(retriever)

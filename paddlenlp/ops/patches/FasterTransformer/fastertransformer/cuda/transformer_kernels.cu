@@ -404,9 +404,15 @@ __global__ void add_bias_input_layernorm_2(const T* __restrict input,
   for (int i = tid; i < n; i += blockDim.x) {
     float local_out = (float)(__ldg(&input[blockIdx.x * n + i]));
     local_out += (float)(output[blockIdx.x * n + i]);
-    local_out += (float)(__ldg(&bias[i]));
+    if(bias != nullptr){
+        local_out += (float)(__ldg(&bias[i]));
+    }
     output[blockIdx.x * n + i] = (T)local_out;
     local_sum += local_out;
+  }
+
+  if (gamma == nullptr || beta == nullptr){
+    return;
   }
 
   mean = blockReduceSum<float>(local_sum);

@@ -144,7 +144,6 @@ class LayoutLMEmbeddings(Layer):
 
 
 class LayoutLMPretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "layoutlm-base-uncased": {
             "vocab_size": 30522,
@@ -179,7 +178,6 @@ class LayoutLMPretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "layoutlm-base-uncased":

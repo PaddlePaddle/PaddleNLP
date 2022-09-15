@@ -249,7 +249,6 @@ class RoFormerPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "roformer-chinese-small": {
             "vocab_size": 50000,
@@ -421,7 +420,6 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "roformer-chinese-small":
@@ -702,6 +700,12 @@ class RoFormerModel(RoFormerPretrainedModel):
                 past_key_values=encoder_outputs.past_key_values,
                 hidden_states=encoder_outputs.hidden_states,
                 attentions=encoder_outputs.attentions)
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
 
     def get_input_embeddings(self) -> nn.Embedding:
         return self.embeddings.word_embeddings

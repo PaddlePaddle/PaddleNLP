@@ -196,7 +196,6 @@ class LayoutLMv2Embeddings(Layer):
 
 
 class LayoutLMv2PretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "layoutlmv2-base-uncased": {
             "attention_probs_dropout_prob": 0.1,
@@ -290,7 +289,6 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
             "use_visual_backbone": False,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "layoutlmv2-base-uncased":

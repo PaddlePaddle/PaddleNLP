@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #

@@ -150,6 +150,31 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       cudaStream_t stream,
                                       const T* logits_mask = nullptr,
                                       const bool min_penalty = false,
-                                      const int end_id = -1);
+                                      const int end_id = -1,
+                                      const T* bias = nullptr);
+
+template <typename T>
+void gptj_start_id_embedding_lookups_kernel_launcher(T* from_tensor,
+                                                         int* output_ids,
+                                                         const T* embedding_table, 
+                                                         const int* word_ids,
+                                                         const int length,
+                                                         const int max_length,
+                                                         const int batch_size,
+                                                         const int hidden_units, 
+                                                         cudaStream_t stream);
+
+template <typename T>
+void gpj_embedding_lookups_kernel_launcher(T* from_tensor,
+                                            const T* embedding_table, 
+                                            const int* word_ids,
+                                            const int local_batch_size,
+                                            const int batch_size,
+                                            const int hidden_units, 
+                                            int step, 
+                                            int ite,
+                                            int max_input_len,
+                                            const int* start_lengths,
+                                            cudaStream_t stream);
 
 }  // namespace fastertransformer

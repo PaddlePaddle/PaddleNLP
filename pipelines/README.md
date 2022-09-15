@@ -3,10 +3,10 @@
 PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **全场景**，帮助用户**低门槛**构建强大**产品级系统**。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="500">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
 </div>
 
-
+更多效果展示Demo请参考 [效果展示](#效果展示)
 
 ## 智能文本产线特色
 * **全场景支持**：依托灵活的插拔式组件产线化设计，支持各类 NLP 场景任务，包括：信息抽取、情感倾向分析、阅读理解、检索系统、问答系统、文本分类、文本生成等。
@@ -31,9 +31,28 @@ PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了�
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
-* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统（用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案）
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统：用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案
 * 快速搭建产品级**多模态信息抽取**系统（即将开放，敬请期待）
 
+### 效果展示
+
++ 语义检索
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+</div>
+
++ 智能问答
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190298926-a1fc92f3-5ec7-4265-8357-ab860cc1fed2.gif" width="500px">
+</div>
+
++ FAQ智能问答
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190307449-38135678-f259-4483-ac0f-2fa3ae4be97f.gif" width="500px">
+</div>
 
 |  |  |
 |-|-|
@@ -57,7 +76,7 @@ Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装
 - Docker 18.03 以上
 ### pip 安装
 ```
-pip install --upgrade pipelines
+pip install --upgrade paddle-pipelines
 ```
 
 ### 源码安装
@@ -77,21 +96,29 @@ python setup.py install
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import DensePassageRetriever, ErnieRanker
 
-# Step1: Initialize a FaissDocumentStore to store texts of documents
+# Step1: Preparing the data
+documents = [
+  {'content': '金钱龟不分品种,只有生长地之分,在我国主要分布于广东、广西、福建、海南、香港、澳门等地,在国外主要分布于越南等亚热带国家和地区。',
+  'meta': {'name': 'test1.txt'}},
+  {'content': '衡量酒水的价格的因素很多的，酒水的血统(也就是那里产的，采用什么工艺等）；存储的时间等等，酒水是一件很难标准化得商品，只要你敢要价，有买的那就值那个钱。',
+  'meta': {'name': 'test2.txt'}}
+]
+
+# Step2: Initialize a FaissDocumentStore to store texts of documents
 document_store = FAISSDocumentStore(embedding_dim=768)
 document_store.write_documents(documents)
 
-# Step2: Initialize a DenseRetriever and build ANN index
-retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-dureader-query-encoder")
+# Step3: Initialize a DenseRetriever and build ANN index
+retriever = DensePassageRetriever(document_store=document_store, query_embedding_model="rocketqa-zh-base-query-encoder",embed_title=False)
 document_store.update_embeddings(retriever)
 
-# Step3: Initialize a Ranker
-ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder")
+# Step4: Initialize a Ranker
+ranker = ErnieRanker(model_name_or_path="rocketqa-base-cross-encoder")
 
-# Step4: Initialize a SemanticSearchPipeline and ask questions
+# Step5: Initialize a SemanticSearchPipeline and ask questions
 from pipelines import SemanticSearchPipeline
 pipeline = SemanticSearchPipeline(retriever, ranker)
-prediction = pipeline.run(query="亚马逊河流的相关介绍")
+prediction = pipeline.run(query="衡量酒水的价格的因素有哪些?")
 ```
 ### 快速部署
 
@@ -170,7 +197,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 
 #### 查询精度大幅提升
 
-市面已有的工程规范查询系统解决方案一直延续着传统关键字词匹配的方式，依赖用户对对查询结果进行自行排序、筛选，甚至要再次人工查阅工程规范文件后，才能最终确认是否为想要查询的规范条款。传统规范查询系统至少需要进行 3~5 次查询才能找到用户想要的规范条款，而寻规系统是基于强大预训练模型构建起来的语义检索系统，针对 80% 的规范查询需求仅 **1 次查询** 就能精确命中查询意图，并返回查询条款的结果！
+市面现已有的工程规范查询系统解决方案一直延续着传统关键字词匹配的查询方式，依赖用户对查询结果进行自行排序、筛选、鉴别，有时甚至还要再次由工程设计人员耗费一定时间精力人工查阅工程规范文件后，才能最终确认是否为想要查询的规范条款。传统规范查询系统至少需要进行 3~5 次查询才能找到用户想要的规范条款，而寻规系统是基于强大预训练模型构建起来的语义检索系统，针对 80% 的规范查询需求仅 **1 次查询** 就能精确命中查询意图，并返回真正符合工程设计人员查询意图的结果！
 
 ## :mortar_board: Tutorials
 - Tutorial 1 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
