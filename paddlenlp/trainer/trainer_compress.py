@@ -78,12 +78,19 @@ def compress(self,
         else:
             # Prefix of `export_model` is 'model'
             self.args.input_filename_prefix = "model"
-            input_spec = [
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64"),  # input_ids
-                paddle.static.InputSpec(shape=[None, None], dtype="int64")
-                if "token_type_ids" in self.train_dataset[0] else None
-            ]
+            if 'token_type_ids' in self.train_dataset[0]:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None],
+                                            dtype="int64"),  # input_ids
+                    paddle.static.InputSpec(shape=[None, None],
+                                            dtype="int64")  # token_type_ids
+                ]
+            else:
+                input_spec = [
+                    paddle.static.InputSpec(shape=[None, None],
+                                            dtype="int64")  # input_ids
+                ]
+
             input_dir = args.output_dir
             export_model(model=self.model,
                          input_spec=input_spec,
@@ -479,11 +486,15 @@ def _dynabert_export(self, ofa_model):
         for name, sublayer in origin_model_new.named_sublayers():
             if isinstance(sublayer, paddle.nn.MultiHeadAttention):
                 sublayer.num_heads = int(width_mult * sublayer.num_heads)
-        input_shape = [
-            paddle.static.InputSpec(shape=[None, None], dtype='int64'),
-            paddle.static.InputSpec(shape=[None, None], dtype='int64')
-            if 'token_type_ids' in self.train_dataset[0] else None
-        ]
+        if 'token_type_ids':
+            input_shape = [
+                paddle.static.InputSpec(shape=[None, None], dtype='int64'),
+                paddle.static.InputSpec(shape=[None, None], dtype='int64')
+            ]
+        else:
+            input_shape = [
+                paddle.static.InputSpec(shape=[None, None], dtype='int64')
+            ]
         pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
 
         net = paddle.jit.to_static(origin_model_new, input_spec=input_shape)
