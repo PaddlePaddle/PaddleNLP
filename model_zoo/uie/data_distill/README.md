@@ -146,13 +146,6 @@ python train.py \
           'text': '登革热'}]}]
 ```
 
-## 效果验证
-
-| 模型 |  Entity-F1  | SPO-F1 |
-| :---: | :--------: | :--------: |
-| UIE-Finetune | 78.57 | 56.25 |
-| GPLinker-ernie-3.0-mini-zh | 68.18 | 47.06 |
-| GPLinker-ernie-3.0-mini-zh + UIE数据蒸馏 | 76.38 | 50.42 |
 
 # References
 
