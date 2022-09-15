@@ -20,7 +20,7 @@ import json
 import os
 import six
 import inspect
-from typing import Optional, Type, Dict, List, Tuple, Union
+from typing import Optional, Type, Dict, List, Tuple, Union, Any
 import shutil
 
 import paddle
@@ -631,10 +631,30 @@ class PretrainedModel(Layer, GenerationMixin):
         self.base_model.config['vocab_size'] = new_num_tokens
         self.vocab_size = new_num_tokens
 
+        # update init_config
+        self._update_init_config(self.init_config, 'vocab_size', new_num_tokens)
+
         # TODO(westfish@126.com): add tie_weight.
         # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
 
         return new_embeddings
+
+    def _update_init_config(self, init_config: dict, key: str, value: Any):
+        """update init_config by <key, value> pair
+
+        Args:
+            init_config (dict): the init_config instance
+            key (str): the key field
+            value (Any): the new value of instance
+        """
+        if key in init_config:
+            init_config[key] = value
+            return
+
+        for arg in init_config.get('init_args', []):
+            if not isinstance(arg, PretrainedModel):
+                continue
+            self._update_init_config(arg.init_config, key, value)
 
     def _get_resized_embeddings(
             self,
