@@ -139,7 +139,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
         <tr>
             <td rowspan=3 align=center> 24L1024H </td>
             <td style="text-align:center">
-                <span style="font-size:18px">ERNIE 1.0-Large-CW</span>
+                <span style="font-size:18px">ERNIE 1.0-Large-cw</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>79.03</b></span>
@@ -291,7 +291,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
             </td>
         </tr>
         <tr>
-            <td rowspan=8 align=center> 12L768H </td>
+            <td rowspan=9 align=center> 12L768H </td>
             <td style="text-align:center">
                 <span style="font-size:18px">
                     <a href="https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams">
@@ -331,6 +331,44 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>77.88</b></span>
+            </td>
+        </tr>
+        <tr>
+            <td style="text-align:center">
+                <span style="font-size:18px">ERNIE 1.0-Base-zh-cw</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.47</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.07</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">57.86</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">59.91</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.41</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">79.58</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">89.91</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">83.42</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">72.88/90.78</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">84.68</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px">76.98</span>
             </td>
         </tr>
         <tr>
