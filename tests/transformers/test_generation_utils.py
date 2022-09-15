@@ -498,6 +498,7 @@ class GenerationTesterMixin:
                                  output_generate[0].tolist())
 
     def test_beam_search_generate(self):
+        paddle.seed(100)
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
             )

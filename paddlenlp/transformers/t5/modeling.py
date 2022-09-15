@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import math
 from typing import Optional, Tuple
@@ -1733,8 +1734,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                     raise e
 
 
-@register_base_model
 class T5EncoderModel(T5PretrainedModel):
+    base_model_class = None
 
     def __init__(self,
                  vocab_size=32128,
@@ -1750,6 +1751,20 @@ class T5EncoderModel(T5PretrainedModel):
                  is_decoder: bool = False,
                  **kwargs):
         super().__init__()
+        self.config = {
+            "vocab_size": vocab_size,
+            "d_model": d_model,
+            "d_kv": d_kv,
+            "d_ff": d_ff,
+            "num_layers": num_layers,
+            "num_heads": num_heads,
+            "relative_attention_num_buckets": relative_attention_num_buckets,
+            "dropout_rate": dropout_rate,
+            "layer_norm_epsilon": layer_norm_epsilon,
+            "feed_forward_proj": feed_forward_proj,
+            "is_decoder": is_decoder,
+        }
+        self.config.update(kwargs)
         self.shared = nn.Embedding(vocab_size, d_model)
 
         self.use_cache = False
@@ -1768,6 +1783,19 @@ class T5EncoderModel(T5PretrainedModel):
 
         # Initialize weights and apply final processing
         self.init_weights()
+
+    def _post_init(self, *args, **kwargs):
+        """
+        **prevent the `config` property to be assigned**
+
+        It would be hooked after `__init__` to add a dict including arguments of
+        `__init__` as a attribute named `config` of the pretrained model instance.
+        """
+        pass
+
+    @property
+    def t5(self):
+        return self
 
     def get_input_embeddings(self):
         return self.shared
@@ -1802,3 +1830,6 @@ class T5EncoderModel(T5PretrainedModel):
         )
 
         return encoder_outputs
+
+
+T5EncoderModel.base_model_class = T5EncoderModel
