@@ -50,7 +50,7 @@ def get_preprocessing_parser():
         "--valid_pref",
         default=None,
         type=str,
-        help="The prefixes for valid file and use comma to separate. "
+        help="The prefixes for dev file and use comma to separate. "
         "(words missing from train set are replaced with <unk>)")
     parser.add_argument(
         "--test_pref",
@@ -62,8 +62,7 @@ def get_preprocessing_parser():
         "--dest_dir",
         default="./data/",
         type=str,
-        help="The destination dir to save processed train, valid and test file. "
-    )
+        help="The destination dir to save processed train, dev and test file. ")
     parser.add_argument(
         "--threshold_tgt",
         default=0,
@@ -74,11 +73,11 @@ def get_preprocessing_parser():
         default=0,
         type=int,
         help="Map words appearing less than threshold times to unknown. ")
-    parser.add_argument("--src_dict",
+    parser.add_argument("--src_vocab",
                         default=None,
                         type=str,
                         help="Reuse given source dictionary. ")
-    parser.add_argument("--tgt_dict",
+    parser.add_argument("--tgt_vocab",
                         default=None,
                         type=str,
                         help="Reuse given target dictionary. ")
@@ -202,7 +201,7 @@ def _make_all(lang, vocab, args):
 
     if args.valid_pref:
         for k, valid_pref in enumerate(args.valid_pref.split(",")):
-            out_prefix = "valid{}".format(k) if k > 0 else "valid"
+            out_prefix = "dev{}".format(k) if k > 0 else "dev"
             _make_dataset(vocab, valid_pref, out_prefix, lang, args=args)
 
     if args.test_pref:
@@ -211,7 +210,7 @@ def _make_all(lang, vocab, args):
             _make_dataset(vocab, test_pref, out_prefix, lang, args=args)
 
 
-def _align_files(args, src_dict, tgt_dict):
+def _align_files(args, src_vocab, tgt_vocab):
     assert args.train_pref, "--train_pref must be set if --align_file is specified"
     src_file_name = _train_path(args.source_lang, args.train_pref)
     tgt_file_name = _train_path(args.target_lang, args.train_pref)
@@ -221,18 +220,18 @@ def _align_files(args, src_dict, tgt_dict):
         with open(src_file_name, "r", encoding="utf-8") as src_file:
             with open(tgt_file_name, "r", encoding="utf-8") as tgt_file:
                 for a, s, t in zip_longest(align_file, src_file, tgt_file):
-                    si = src_dict.to_indices(s)
-                    ti = tgt_dict.to_indices(t)
+                    si = src_vocab.to_indices(s)
+                    ti = tgt_vocab.to_indices(t)
                     ai = list(map(lambda x: tuple(x.split("\t")), a.split()))
                     for sai, tai in ai:
                         src_idx = si[int(sai)]
                         tgt_idx = ti[int(tai)]
-                        if src_idx != src_dict.get_unk_token_id(
-                        ) and tgt_idx != tgt_dict.get_unk_token_id():
-                            assert src_idx != src_dict.get_pad_token_id()
-                            assert src_idx != src_dict.get_eos_token_id()
-                            assert tgt_idx != tgt_dict.get_pad_token_id()
-                            assert tgt_idx != tgt_dict.get_eos_token_id()
+                        if src_idx != src_vocab.get_unk_token_id(
+                        ) and tgt_idx != tgt_vocab.get_unk_token_id():
+                            assert src_idx != src_vocab.get_pad_token_id()
+                            assert src_idx != src_vocab.get_eos_token_id()
+                            assert tgt_idx != tgt_vocab.get_pad_token_id()
+                            assert tgt_idx != tgt_vocab.get_eos_token_id()
                             if src_idx not in freq_map:
                                 freq_map[src_idx] = {}
                             if tgt_idx not in freq_map[src_idx]:
@@ -254,7 +253,7 @@ def _align_files(args, src_dict, tgt_dict):
             encoding="utf-8",
     ) as f:
         for k, v in align_dict.items():
-            print("{} {}".format(src_dict[k], tgt_dict[v]), file=f)
+            print("{} {}".format(src_vocab[k], tgt_vocab[v]), file=f)
 
 
 def main(args):
@@ -299,27 +298,27 @@ def main(args):
     # build dictionaries
     target = not args.only_source
 
-    if not args.src_dict and os.path.exists(
+    if not args.src_vocab and os.path.exists(
             _dict_path(args.source_lang, args.dest_dir)):
         raise FileExistsError(_dict_path(args.source_lang, args.dest_dir))
 
-    if (target and not args.tgt_dict
+    if (target and not args.tgt_vocab
             and os.path.exists(_dict_path(args.target_lang, args.dest_dir))):
         raise FileExistsError(_dict_path(args.target_lang, args.dest_dir))
 
     if args.joined_dictionary:
         assert (
-            not args.src_dict or not args.tgt_dict
-        ), "Cannot use both --src_dict and --tgt_dict with --joined_dictionary"
+            not args.src_vocab or not args.tgt_vocab
+        ), "Cannot use both --src_vocab and --tgt_vocab with --joined_dictionary"
 
-        if args.src_dict:
-            src_vocab = Vocab.load_vocabulary(filepath=args.src_dict,
+        if args.src_vocab:
+            src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
                                               eos_token=args.eos_token,
                                               pad_token=args.pad_token)
-        elif args.tgt_dict:
-            src_vocab = Vocab.load_vocabulary(filepath=args.tgt_dict,
+        elif args.tgt_vocab:
+            src_vocab = Vocab.load_vocabulary(filepath=args.tgt_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
                                               eos_token=args.eos_token,
@@ -327,7 +326,7 @@ def main(args):
         else:
             assert (
                 args.train_pref
-            ), "--train_pref must be set if --src_dict is not specified. "
+            ), "--train_pref must be set if --src_vocab is not specified. "
             src_vocab = _build_dictionary([
                 _train_path(lang, args.train_pref)
                 for lang in [args.source_lang, args.target_lang]
@@ -337,15 +336,16 @@ def main(args):
 
         tgt_vocab = src_vocab
     else:
-        if args.src_dict:
-            src_vocab = Vocab.load_vocabulary(filepath=args.src_dict,
+        if args.src_vocab:
+            src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
                                               eos_token=args.eos_token,
                                               pad_token=args.pad_token)
         else:
-            assert (args.train_pref
-                    ), "--train_pref must be set if --src_dict is not specified"
+            assert (
+                args.train_pref
+            ), "--train_pref must be set if --src_vocab is not specified"
             src_vocab = _build_dictionary(
                 [_train_path(args.source_lang, args.train_pref)],
                 args=args,
@@ -354,8 +354,8 @@ def main(args):
             pdb.set_trace()
 
         if target:
-            if args.tgt_dict:
-                tgt_vocab = Vocab.load_vocabulary(filepath=args.tgt_dict,
+            if args.tgt_vocab:
+                tgt_vocab = Vocab.load_vocabulary(filepath=args.tgt_vocab,
                                                   unk_token=args.unk_token,
                                                   bos_token=args.bos_token,
                                                   eos_token=args.eos_token,
@@ -363,7 +363,7 @@ def main(args):
             else:
                 assert (
                     args.train_pref
-                ), "--train_pref must be set if --tgt_dict is not specified"
+                ), "--train_pref must be set if --tgt_vocab is not specified"
                 tgt_vocab = _build_dictionary(
                     [_train_path(args.target_lang, args.train_pref)],
                     args=args,
@@ -386,7 +386,7 @@ def main(args):
     logger.info("Wrote preprocessed data to {}".format(args.dest_dir))
 
     if args.align_file:
-        _align_files(args, src_dict=src_vocab, tgt_dict=tgt_vocab)
+        _align_files(args, src_vocab=src_vocab, tgt_vocab=tgt_vocab)
 
 
 if __name__ == "__main__":

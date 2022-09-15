@@ -22,7 +22,6 @@ import numpy as np
 from paddle.io import BatchSampler, DataLoader, Dataset
 import paddle.distributed as dist
 from paddlenlp.data import Pad, Vocab
-from paddlenlp.datasets import load_dataset
 from paddlenlp.data.sampler import SamplerHelper
 
 
@@ -34,26 +33,107 @@ def min_max_filer(data, max_len, min_len=0):
 
 
 def create_data_loader(args, places=None):
-    if args.train_file is not None and args.dev_file is not None:
-        datasets = load_dataset('wmt14ende',
-                                data_files=[args.train_file, args.dev_file],
-                                splits=('train', 'dev'))
-    elif args.train_file is None and args.dev_file is None:
-        datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
-    else:
-        raise ValueError(
-            "--train_file and --dev_file must be both or neither set. ")
+    use_custom_dataset = (args.train_file is not None
+                          or args.dev_file is not None
+                          or args.test_file is not None
+                          or args.data_dir is not None)
+    if use_custom_dataset:
+        data_files = {}
+        if args.data_dir is not None:
+            if os.path.exist(
+                    os.path.join(
+                        args.data_dir,
+                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                                args.src_lang))):
+                data_files["train"] = [
+                    os.path.join(
+                        args.data_dir,
+                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                                args.src_lang)),
+                    os.path.join(
+                        args.data_dir,
+                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                                args.trg_lang)),
+                ]
+            if os.path.exist(
+                    os.path.join(
+                        args.data_dir,
+                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                              args.src_lang))):
+                data_files["dev"] = [
+                    os.path.join(
+                        args.data_dir,
+                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                              args.src_lang)),
+                    os.path.join(
+                        args.data_dir,
+                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                              args.trg_lang)),
+                ]
+            if os.path.exist(
+                    os.path.join(
+                        args.data_dir,
+                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                               args.src_lang))):
+                data_files["test"] = [
+                    os.path.join(
+                        args.data_dir,
+                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                               args.src_lang)),
+                    os.path.join(
+                        args.data_dir,
+                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                               args.trg_lang)),
+                ]
+        else:
+            if args.train_file is not None:
+                data_files["train"] = args.train_file
+            if args.dev_file is not None:
+                data_files["dev"] = args.dev_file
+            if args.test_file is not None:
+                data_files["test"] = args.test_file
 
-    if args.vocab_file is not None:
-        src_vocab = Vocab.load_vocabulary(filepath=args.vocab_file,
-                                          unk_token=args.unk_token,
-                                          bos_token=args.bos_token,
-                                          eos_token=args.eos_token)
-    elif not args.benchmark:
-        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+        from datasets import load_dataset
+        datasets = load_dataset('language_pair',
+                                data_files=data_files,
+                                split=('train', 'dev'))
+
+        if args.src_vocab is not None:
+            src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
+        else:
+            raise ValueError(
+                "The --src_vocab must be specified when using custom dataset. ")
+
     else:
-        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
-    trg_vocab = src_vocab
+        from paddlenlp.datasets import load_dataset
+        datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
+
+        if args.src_vocab is not None:
+            src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
+        elif not args.benchmark:
+            src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+        else:
+            src_vocab = Vocab.load_vocabulary(
+                **datasets[0].vocab_info["benchmark"])
+
+    if use_custom_dataset and not args.joined_dictionary:
+        if args.trg_vocab is not None:
+            trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
+        else:
+            raise ValueError(
+                "The --trg_vocab must be specified when the dict is not joined. "
+            )
+    else:
+        trg_vocab = src_vocab
 
     padding_vocab = (
         lambda x:
@@ -62,8 +142,8 @@ def create_data_loader(args, places=None):
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
     def convert_samples(sample):
-        source = sample[args.src_lang].split()
-        target = sample[args.trg_lang].split()
+        source = sample["source"].split()
+        target = sample["target"].split()
 
         source = src_vocab.to_indices(source)
         target = trg_vocab.to_indices(target)
@@ -104,23 +184,107 @@ def create_data_loader(args, places=None):
 
 
 def create_infer_loader(args):
-    if args.test_file is not None:
-        dataset = load_dataset('wmt14ende',
-                               data_files=[args.test_file],
-                               splits=['test'])
-    else:
-        dataset = load_dataset('wmt14ende', splits=('test'))
+    use_custom_dataset = (args.train_file is not None
+                          or args.dev_file is not None
+                          or args.test_file is not None
+                          or args.data_dir is not None)
+    if use_custom_dataset:
+        data_files = {}
+        if args.data_dir is not None:
+            if os.path.exist(
+                    os.path.join(
+                        args.data_dir,
+                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                                args.src_lang))):
+                data_files["train"] = [
+                    os.path.join(
+                        args.data_dir,
+                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                                args.src_lang)),
+                    os.path.join(
+                        args.data_dir,
+                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                                args.trg_lang)),
+                ]
+            if os.path.exist(
+                    os.path.join(
+                        args.data_dir,
+                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                              args.src_lang))):
+                data_files["dev"] = [
+                    os.path.join(
+                        args.data_dir,
+                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                              args.src_lang)),
+                    os.path.join(
+                        args.data_dir,
+                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                              args.trg_lang)),
+                ]
+            if os.path.exist(
+                    os.path.join(
+                        args.data_dir,
+                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                               args.src_lang))):
+                data_files["test"] = [
+                    os.path.join(
+                        args.data_dir,
+                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                               args.src_lang)),
+                    os.path.join(
+                        args.data_dir,
+                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
+                                               args.trg_lang)),
+                ]
+        else:
+            if args.train_file is not None:
+                data_files["train"] = args.train_file
+            if args.dev_file is not None:
+                data_files["dev"] = args.dev_file
+            if args.test_file is not None:
+                data_files["test"] = args.test_file
 
-    if args.vocab_file is not None:
-        src_vocab = Vocab.load_vocabulary(filepath=args.vocab_file,
-                                          unk_token=args.unk_token,
-                                          bos_token=args.bos_token,
-                                          eos_token=args.eos_token)
-    elif not args.benchmark:
-        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+        from datasets import load_dataset
+        datasets = load_dataset('language_pair',
+                                data_files=data_files,
+                                split=('test'))
+
+        if args.src_vocab is not None:
+            src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
+        else:
+            raise ValueError(
+                "The --src_vocab must be specified when using custom dataset. ")
+
     else:
-        src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
-    trg_vocab = src_vocab
+        from paddlenlp.datasets import load_dataset
+        datasets = load_dataset('wmt14ende', splits=('test'))
+
+        if args.src_vocab is not None:
+            src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
+        elif not args.benchmark:
+            src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+        else:
+            src_vocab = Vocab.load_vocabulary(
+                **datasets[0].vocab_info["benchmark"])
+
+    if use_custom_dataset and not args.joined_dictionary:
+        if args.trg_vocab is not None:
+            trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
+        else:
+            raise ValueError(
+                "The --trg_vocab must be specified when the dict is not joined. "
+            )
+    else:
+        trg_vocab = src_vocab
 
     padding_vocab = (
         lambda x:
@@ -129,8 +293,8 @@ def create_infer_loader(args):
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
     def convert_samples(sample):
-        source = sample[args.src_lang].split()
-        target = sample[args.trg_lang].split()
+        source = sample["source"].split()
+        target = sample["target"].split()
 
         source = src_vocab.to_indices(source)
         target = trg_vocab.to_indices(target)
@@ -156,18 +320,32 @@ def create_infer_loader(args):
 
 
 def adapt_vocab_size(args):
-    if args.vocab_file is not None:
-        src_vocab = Vocab.load_vocabulary(filepath=args.vocab_file,
+    if args.src_vocab:
+        src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                           unk_token=args.unk_token,
                                           bos_token=args.bos_token,
                                           eos_token=args.eos_token)
+    elif not args.benchmark:
+        from paddlenlp.datasets import load_dataset
+        datasets = load_dataset('wmt14ende', splits=('test'))
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
     else:
-        dataset = load_dataset('wmt14ende', splits=('test'))
-        if not args.benchmark:
-            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
+        from paddlenlp.datasets import load_dataset
+        datasets = load_dataset('wmt14ende', splits=('test'))
+        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
+
+    if not args.joined_dictionary:
+        if args.trg_vocab is not None:
+            trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
+                                              unk_token=args.unk_token,
+                                              bos_token=args.bos_token,
+                                              eos_token=args.eos_token)
         else:
-            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
-    trg_vocab = src_vocab
+            raise ValueError(
+                "The --trg_vocab must be specified when the dict is not joined. "
+            )
+    else:
+        trg_vocab = src_vocab
 
     padding_vocab = (
         lambda x:

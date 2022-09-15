@@ -81,7 +81,7 @@ for l in $src $tgt; do
     perl $LC < $tmp/train.tags.$lang.clean.$l > $tmp/train.tags.$lang.$l
 done
 
-echo "pre-processing valid/test data..."
+echo "pre-processing dev/test data..."
 for l in $src $tgt; do
     for o in `ls $origin/$lang/IWSLT14.TED*.$l.xml`; do
     fname=${o##*/}
@@ -98,9 +98,9 @@ for l in $src $tgt; do
 done
 
 
-echo "creating train, valid, test..."
+echo "creating train, dev, test..."
 for l in $src $tgt; do
-    awk '{if (NR%23 == 0)  print $0; }' $tmp/train.tags.de-en.$l > $tmp/valid.$l
+    awk '{if (NR%23 == 0)  print $0; }' $tmp/train.tags.de-en.$l > $tmp/dev.$l
     awk '{if (NR%23 != 0)  print $0; }' $tmp/train.tags.de-en.$l > $tmp/train.$l
 
     cat $tmp/IWSLT14.TED.dev2010.de-en.$l \
@@ -122,7 +122,7 @@ echo "learn_bpe.py on ${TRAIN}..."
 python $BPEROOT/learn_bpe.py -s $BPE_TOKENS < $TRAIN > $BPE_CODE
 
 for L in $src $tgt; do
-    for f in train.$L valid.$L test.$L; do
+    for f in train.$L dev.$L test.$L; do
         echo "apply_bpe.py to ${f}..."
         python $BPEROOT/apply_bpe.py -c $BPE_CODE < $tmp/$f > $prep/$f
     done

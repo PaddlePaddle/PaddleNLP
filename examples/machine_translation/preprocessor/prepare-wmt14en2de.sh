@@ -126,9 +126,9 @@ for l in $src $tgt; do
     echo ""
 done
 
-echo "splitting train and valid..."
+echo "splitting train and dev..."
 for l in $src $tgt; do
-    awk '{if (NR%100 == 0)  print $0; }' $tmp/train.tags.$lang.tok.$l > $tmp/valid.$l
+    awk '{if (NR%100 == 0)  print $0; }' $tmp/train.tags.$lang.tok.$l > $tmp/dev.$l
     awk '{if (NR%100 != 0)  print $0; }' $tmp/train.tags.$lang.tok.$l > $tmp/train.$l
 done
 
@@ -143,14 +143,14 @@ echo "learn_bpe.py on ${TRAIN}..."
 python $BPEROOT/learn_bpe.py -s $BPE_TOKENS < $TRAIN > $BPE_CODE
 
 for L in $src $tgt; do
-    for f in train.$L valid.$L test.$L; do
+    for f in train.$L dev.$L test.$L; do
         echo "apply_bpe.py to ${f}..."
         python $BPEROOT/apply_bpe.py -c $BPE_CODE < $tmp/$f > $tmp/bpe.$f
     done
 done
 
 perl $CLEAN -ratio 1.5 $tmp/bpe.train $src $tgt $prep/train 1 250
-perl $CLEAN -ratio 1.5 $tmp/bpe.valid $src $tgt $prep/valid 1 250
+perl $CLEAN -ratio 1.5 $tmp/bpe.dev $src $tgt $prep/dev 1 250
 
 for L in $src $tgt; do
     cp $tmp/bpe.test.$L $prep/test.$L

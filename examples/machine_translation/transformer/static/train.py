@@ -51,7 +51,7 @@ def parse_args():
         default=None,
         type=str,
         help=
-        "The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. "
+        "The files for training, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. "
     )
     parser.add_argument(
         "--dev_file",
@@ -59,7 +59,15 @@ def parse_args():
         default=None,
         type=str,
         help=
-        "The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. "
+        "The files for validation, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. "
+    )
+    parser.add_argument(
+        "--test_file",
+        nargs='+',
+        default=None,
+        type=str,
+        help=
+        "The files for test, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. "
     )
     parser.add_argument(
         "--vocab_file",
@@ -68,6 +76,30 @@ def parse_args():
         help=
         "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
+    parser.add_argument(
+        "--src_vocab",
+        default=None,
+        type=str,
+        help=
+        "The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. "
+    )
+    parser.add_argument(
+        "--trg_vocab",
+        default=None,
+        type=str,
+        help=
+        "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
+    )
+    parser.add_argument("-s",
+                        "--source_lang",
+                        default=None,
+                        type=str,
+                        help="Source language. ")
+    parser.add_argument("-t",
+                        "--target_lang",
+                        default=None,
+                        type=str,
+                        help="Target language. ")
     parser.add_argument(
         "--unk_token",
         default=None,
@@ -346,7 +378,23 @@ if __name__ == "__main__":
         args.max_iter = ARGS.max_iter
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
-    args.vocab_file = ARGS.vocab_file
+    args.test_file = ARGS.test_file
+
+    if ARGS.vocab_file is not None:
+        args.src_vocab = ARGS.vocab_file
+        args.trg_vocab = ARG.vocab_file
+    else:
+        args.src_vocab = ARGS.src_vocab
+        args.trg_vocab = ARGS.trg_vocab
+    args.joined_dictionary = not (args.src_vocab is not None
+                                  and args.trg_vocab is not None
+                                  and args.src_vocab != args.trg_vocab)
+
+    if ARGS.src_lang is not None:
+        args.src_lang = ARGS.src_lang
+    if ARGS.trg_lang is not None:
+        args.trg_lang = ARGS.trg_lang
+
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token

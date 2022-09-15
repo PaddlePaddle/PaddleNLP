@@ -80,6 +80,20 @@ def parse_args():
         "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
     parser.add_argument(
+        "--src_vocab",
+        default=None,
+        type=str,
+        help=
+        "The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. "
+    )
+    parser.add_argument(
+        "--trg_vocab",
+        default=None,
+        type=str,
+        help=
+        "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
+    )
+    parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
@@ -171,7 +185,17 @@ if __name__ == "__main__":
     args.topk = ARGS.topk
     args.topp = ARGS.topp
     args.benchmark = ARGS.benchmark
-    args.vocab_file = ARGS.vocab_file
+
+    if ARGS.vocab_file is not None:
+        args.src_vocab = ARGS.vocab_file
+        args.trg_vocab = ARG.vocab_file
+    else:
+        args.src_vocab = ARGS.src_vocab
+        args.trg_vocab = ARGS.trg_vocab
+    args.joined_dictionary = not (args.src_vocab is not None
+                                  and args.trg_vocab is not None
+                                  and args.src_vocab != args.trg_vocab)
+
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
