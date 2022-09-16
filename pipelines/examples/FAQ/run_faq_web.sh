@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python feature_extract.py \
-        --model_dir=./output \
-        --model_name_or_path rocketqa-zh-base-query-encoder \
-        --corpus_file "data/corpus.csv" 
+unset http_proxy && unset https_proxy
+# 配置模型服务地址
+export API_ENDPOINT=http://127.0.0.1:8891
+# 在指定端口 8502 启动 WebUI
+python -m streamlit run ui/webapp_faq.py --server.port 8502
