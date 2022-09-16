@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 The IDEA-CCNL Authors and The HuggingFace Inc. team.
+# Copyright 2022 The IDEA-CCNL Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -275,10 +275,6 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (string) in a single string."""
-        # for token in
-        # tokens = tokens or self.ids_to_tokens(ids)
-        # tokens = [token for token in tokens if not self._is_special(token)]
-
         text = ''
         for i, token in enumerate(tokens):
             if token[:2] == '##':
@@ -317,9 +313,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         return token_ids_0 + token_ids_1 + [self.eos_token_id]
 
     def _special_token_mask(self, seq):
-        all_special_ids = set(
-            self.all_special_ids)  # call it once instead of inside list comp
-        # all_special_ids.remove(self.unk_token_id)  # <unk> is only sometimes special
+        all_special_ids = set(self.all_special_ids)
 
         return [1 if x in all_special_ids else 0 for x in seq]
 
