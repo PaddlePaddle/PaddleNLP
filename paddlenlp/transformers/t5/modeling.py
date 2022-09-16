@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -1734,6 +1734,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                     raise e
 
 
+from paddle.nn.layer.transformer import MultiHeadAttention
+
+
 class T5EncoderModel(T5PretrainedModel):
     base_model_class = None
 
@@ -1813,7 +1816,7 @@ class T5EncoderModel(T5PretrainedModel):
         attention_mask: Optional[Tensor] = None,
         encoder_hidden_states: Optional[Tuple[Tensor]] = None,
         encoder_attention_mask: Optional[Tensor] = None,
-        cache=None,
+        cache: Optional[MultiHeadAttention.Cache] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,

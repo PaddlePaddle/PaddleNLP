@@ -21,11 +21,8 @@ import unittest
 
 from tests.testing_utils import slow
 
-# from ..test_generation_utils import GenerationTesterMixin
-# from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
-
-from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
 
 import paddle
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Model, T5Tokenizer, T5EncoderModel
