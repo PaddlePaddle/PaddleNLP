@@ -832,6 +832,7 @@ class Pipeline(BasePipeline):
                 component_type=component_type, **component_params)
             components[name] = instance
         except Exception as e:
+            # breakpoint()
             raise Exception(f"Failed loading pipeline component '{name}': {e}")
         return instance
 
