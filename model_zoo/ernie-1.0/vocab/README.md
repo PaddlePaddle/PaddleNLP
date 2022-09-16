@@ -77,7 +77,7 @@ python gen_char.py path_to_corpus.txt
 ```
 可以在本地文件夹得到`char_dict.pickle`字符频率文件。同时我们也提供了自己统计的词频文件，方便用户复现：
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/char_dict.pickle
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/char_dict.pickle
 ```
 
 ### 2.3 英文字符词表
@@ -91,7 +91,7 @@ python gen_vocab.py ./wikitext-103-raw/wiki.train.raw
 ```
 即可产生英文部分的词表。这里我们也提供了处理好的 vocab 方便用户验证。
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/eng.vocab
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/eng.vocab
 ```
 
 
