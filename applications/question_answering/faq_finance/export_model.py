@@ -30,22 +30,25 @@ parser.add_argument("--params_path", type=str, required=True,
                     default='./checkpoint/model_50/model_state.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output',
                     help="The path of model parameter in static graph to be saved.")
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
+parser.add_argument("--output_emb_size", default=256, type=int, help="Output_embedding_size, 0 means use hidden_size as output embedding size.")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    output_emb_size = 256
 
-    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
-    model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    model = SimCSE(pretrained_model, output_emb_size=args.output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-
+    else:
+        raise ValueError(
+            "Please set --params_path with correct pretrained model file")
     model.eval()
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(

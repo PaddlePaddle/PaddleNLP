@@ -35,7 +35,7 @@ parser.add_argument("--model_dir", type=str, required=True,
 
 parser.add_argument("--corpus_file", type=str, required=True,
     help="The corpus_file path.")
-
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--max_seq_length", default=64, type=int,
     help="The maximum total input sequence length after tokenization. Sequences "
     "longer than this will be truncated, sequences shorter will be padded.")
@@ -214,7 +214,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
