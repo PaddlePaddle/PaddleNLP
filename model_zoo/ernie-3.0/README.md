@@ -210,7 +210,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">86.78</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>78.12</b></span>
+                <span style="font-size:18px">78.12</span>
             </td>
         </tr>
         <tr>
@@ -300,10 +300,10 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>76.05</b></span>
+                <span style="font-size:18px">76.05</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>75.93</b></span>
+                <span style="font-size:18px">75.93</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">58.26</span>
@@ -312,7 +312,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">61.56</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>83.02</b></span>
+                <span style="font-size:18px">83.02</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>80.10</b></span>
@@ -327,7 +327,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">70.71/90.41</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>84.26</b></span>
+                <span style="font-size:18px">84.26</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px"><b>77.88</b></span>
@@ -338,10 +338,10 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">ERNIE 1.0-Base-zh-cw</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">76.47</span>
+                <span style="font-size:18px"><b>76.47</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">76.07</span>
+                <span style="font-size:18px"><b>76.07</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">57.86</span>
@@ -350,22 +350,22 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">59.91</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">83.41</span>
+                <span style="font-size:18px"><b>83.41</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">79.58</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">89.91</span>
+                <span style="font-size:18px"><b>89.91</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">83.42</span>
+                <span style="font-size:18px"><b>83.42</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">72.88/90.78</span>
+                <span style="font-size:18px"><b>72.88/90.78</b></span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px">84.68</span>
+                <span style="font-size:18px"><b>84.68</b></span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">76.98</span>
@@ -394,13 +394,13 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
                 <span style="font-size:18px">79.08</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>88.82</b></span>
+                <span style="font-size:18px">88.82</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>82.83</b></span>
+                <span style="font-size:18px">82.83</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px"><b>71.82/90.38</b></span>
+                <span style="font-size:18px">71.82/90.38</span>
             </td>
             <td style="text-align:center">
                 <span style="font-size:18px">84.04</span>
