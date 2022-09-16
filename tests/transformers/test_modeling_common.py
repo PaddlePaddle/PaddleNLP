@@ -24,7 +24,7 @@ import numpy as np
 
 import paddle
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.model_utils import PretrainedModelNew
+from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.env import MODEL_HOME
 from ..testing_utils import slow
 
@@ -46,8 +46,8 @@ def floats_tensor(shape, scale=1.0):
     return scale * paddle.randn(shape, dtype="float32")
 
 
-def check_two_model_parameter(first_model: PretrainedModelNew,
-                              second_model: PretrainedModelNew):
+def check_two_model_parameter(first_model: PretrainedModel,
+                              second_model: PretrainedModel):
     assert len(
         set(first_model.state_dict().keys()) -
         set(second_model.state_dict().keys())) == 0
@@ -517,7 +517,7 @@ class ModelTesterMixin:
 
 
 class ModelTesterPretrainedMixin:
-    base_model_class: PretrainedModelNew = None
+    base_model_class: PretrainedModel = None
 
     @slow
     def test_model_from_pretrained_with_cache_dir(self):

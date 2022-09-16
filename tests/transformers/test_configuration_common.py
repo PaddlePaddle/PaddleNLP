@@ -17,15 +17,12 @@
 import copy
 import json
 import os
-import shutil
-import sys
 import tempfile
 import unittest
 import unittest.mock as mock
-from pathlib import Path
 
 from requests.exceptions import HTTPError
-# from transformers import AutoConfig, BertConfig, GPT2Config
+from transformers import AutoConfig, BertConfig, GPT2Config
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 
@@ -259,7 +256,7 @@ class ConfigTestUtils(unittest.TestCase):
         # If this part of the test fails, you have arguments to addin config_common_kwargs above.
         self.assertListEqual(
             missing_keys,
-            ["is_encoder_decoder", "_name_or_path", "transformers_version"])
+            ["is_encoder_decoder", "_name_or_path", "paddlenlp_version"])
         keys_with_defaults = [
             key for key, value in config_common_kwargs.items()
             if value == getattr(base_config, key)

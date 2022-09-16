@@ -1,12 +1,28 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """ BERT model configuration"""
 from __future__ import annotations
 
 from typing import Dict
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
-__all__ = ["PRETRAINED_INIT_CONFIGURATION", "BertConfig"]
+__all__ = [
+    "BERT_PRETRAINED_INIT_CONFIGURATION", "BertConfig",
+    "BERT_PRETRAINED_RESOURCE_FILES_MAP"
+]
 
-PRETRAINED_INIT_CONFIGURATION = {
+BERT_PRETRAINED_INIT_CONFIGURATION = {
     "bert-base-uncased": {
         "vocab_size": 30522,
         "hidden_size": 768,
@@ -261,7 +277,7 @@ PRETRAINED_INIT_CONFIGURATION = {
     },
 }
 
-PRETRAINED_RESOURCE_FILES_MAP = {
+BERT_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "bert-base-uncased":
         "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams",
@@ -369,8 +385,11 @@ class BertConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "bert"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
-    pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
+    attribute_map: Dict[str, str] = {
+        "num_classes": "num_labels",
+        "dropout": "classifier_dropout"
+    }
+    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(self,
                  vocab_size: int = 30522,
@@ -387,6 +406,9 @@ class BertConfig(PretrainedConfig):
                  pad_token_id: int = 0,
                  pool_act: str = "tanh",
                  fuse: bool = False,
+                 layer_norm_eps=1e-12,
+                 use_cache=True,
+                 classifier_dropout=None,
                  **kwargs):
         attribute_map(self, kwargs)
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -404,3 +426,7 @@ class BertConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pool_act = pool_act
         self.fuse = fuse
+
+        self.layer_norm_eps = layer_norm_eps
+        self.use_cache = use_cache
+        self.classifier_dropout = classifier_dropout

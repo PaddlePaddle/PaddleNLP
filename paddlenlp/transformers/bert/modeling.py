@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 import warnings
 
 import paddle
@@ -18,16 +19,15 @@ from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+
 try:
     from paddle.incubate.nn import FusedTransformerEncoderLayer
 except ImportError:
     FusedTransformerEncoderLayer = None
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import List, Optional, Tuple, Union
-from .. import PretrainedModel, register_base_model
-from paddlenlp.transformers.model_utils import PretrainedModelNew
+from paddlenlp.transformers.model_utils import PretrainedModel
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
     SequenceClassifierOutput,
     TokenClassifierOutput,
@@ -36,7 +36,7 @@ from ..model_outputs import (
     MaskedLMOutput,
     ModelOutput,
 )
-from .configuration import PRETRAINED_INIT_CONFIGURATION, PRETRAINED_RESOURCE_FILES_MAP, BertConfig
+from .configuration import BERT_PRETRAINED_RESOURCE_FILES_MAP, BertConfig, BERT_PRETRAINED_INIT_CONFIGURATION
 from ..configuration_utils import parse_config
 
 __all__ = [
@@ -124,7 +124,7 @@ class BertPooler(Layer):
         return pooled_output
 
 
-class BertPretrainedModel(PretrainedModelNew):
+class BertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained BERT models. It provides BERT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -132,15 +132,14 @@ class BertPretrainedModel(PretrainedModelNew):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-
     model_config_file = "model_config.json"
     config_class = BertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
     _keys_to_ignore_on_load_missing = [r'position_ids']
 
-    pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = PRETRAINED_RESOURCE_FILES_MAP
+    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -154,8 +153,9 @@ class BertPretrainedModel(PretrainedModelNew):
                                              self, "initializer_range") else
                                          self.config.initializer_range,
                                          shape=layer.weight.shape))
+
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-12
+            layer._epsilon = self.config.layer_norm_eps
 
 
 class BertModel(BertPretrainedModel):
@@ -288,7 +288,7 @@ class BertModel(BertPretrainedModel):
                 use_cache=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
 
@@ -360,7 +360,7 @@ class BertModel(BertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         past_key_values_length = None
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
@@ -459,10 +459,9 @@ class BertForQuestionAnswering(BertPretrainedModel):
                                             return_unused_kwargs=True)
         super(BertForQuestionAnswering, self).__init__(config)
         self.bert = bert if bert is not None else BertModel(config)
-
-        dropout = kwargs.pop("dropout", None)
         self.dropout = nn.Dropout(
-            dropout if dropout is not None else config.hidden_dropout_prob)
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
@@ -475,7 +474,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 end_positions=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -529,6 +528,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 end_logits = outputs[1]
         """
 
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.bert(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
@@ -600,14 +600,11 @@ class BertForSequenceClassification(BertPretrainedModel):
                                             fields=["num_classes", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForSequenceClassification, self).__init__(config)
-
         self.bert = bert if bert is not None else BertModel(config)
-
         self.num_labels = config.num_labels
-
-        dropout = kwargs.pop("dropout", None)
         self.dropout = nn.Dropout(
-            dropout if dropout is not None else config.hidden_dropout_prob)
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
@@ -619,7 +616,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -670,6 +667,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 # [1, 2]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.bert(input_ids,
                             token_type_ids=token_type_ids,
@@ -735,11 +733,10 @@ class BertForTokenClassification(BertPretrainedModel):
         super(BertForTokenClassification, self).__init__(config)
 
         self.bert = bert if bert is not None else BertModel(config)
-        dropout = kwargs.pop('dropout', None)
-
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
-            dropout if dropout is not None else config.hidden_dropout_prob)
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
@@ -751,7 +748,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r"""
         The BertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -799,6 +796,7 @@ class BertForTokenClassification(BertPretrainedModel):
                 # [1, 13, 2]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.bert(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
@@ -976,9 +974,7 @@ class BertForPretraining(BertPretrainedModel):
                                     args=args,
                                     kwargs=kwargs)
         super(BertForPretraining, self).__init__(config)
-
         self.bert = bert if bert is not None else BertModel(config)
-
         self.cls = BertPretrainingHeads(
             config,
             embedding_weights=self.bert.embeddings.word_embeddings.weight)
@@ -995,7 +991,7 @@ class BertForPretraining(BertPretrainedModel):
                 next_sentence_label=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r"""
 
         Args:
@@ -1162,15 +1158,11 @@ class BertForMultipleChoice(BertPretrainedModel):
                                             fields=["num_choices", 'dropout'],
                                             return_unused_kwargs=True)
         super(BertForMultipleChoice, self).__init__(config)
-
         self.bert = bert if bert is not None else BertModel(config)
-
-        # dropout is from `__init__` and is not in `BertConfig`. the suggested parameter name is: `hidden_dropout_prob` which is align with BertConfig attr
-        dropout = kwargs.get('dropout', None)
-
         self.num_choices = config.num_choices
         self.dropout = nn.Dropout(
-            dropout if dropout is not None else config.hidden_dropout_prob)
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
@@ -1182,7 +1174,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1266,6 +1258,7 @@ class BertForMultipleChoice(BertPretrainedModel):
                 # [2, 2]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape(shape=(
             -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
@@ -1343,9 +1336,7 @@ class BertForMaskedLM(BertPretrainedModel):
                                     args=args,
                                     kwargs=kwargs)
         super(BertForMaskedLM, self).__init__(config)
-        if bert is None:
-            bert = BertModel(config=config)
-        self.bert = bert
+        self.bert = bert if bert is not None else BertModel(config=config)
 
         self.cls = BertOnlyMLMHead(
             config=config,
@@ -1361,7 +1352,7 @@ class BertForMaskedLM(BertPretrainedModel):
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
-                return_dict=False):
+                return_dict=None):
         r"""
 
         Args:
@@ -1409,6 +1400,7 @@ class BertForMaskedLM(BertPretrainedModel):
                 # [1, 13, 30522]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.bert(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,

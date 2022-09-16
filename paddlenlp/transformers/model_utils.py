@@ -14,20 +14,21 @@
 from __future__ import annotations
 
 import copy
+from distutils.command.config import config
 import re
 import io
 import json
 import os
 import six
 import inspect
-from typing import Optional, Type, Dict, List, Tuple, Union
+from typing import Optional, Type, Dict, List, Tuple, Union, Generic, TypeVar
 import shutil
 
 import paddle
 from paddle import Tensor
 import numpy as np
 import paddle.nn as nn
-from paddle.nn import Layer
+from paddle.nn import Layer, Embedding
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import get_path_from_url, is_url
 from paddlenlp.utils.downloader import download_check, COMMUNITY_MODEL_PREFIX
@@ -71,13 +72,13 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def _find_weight_file_path(cache_dir: str,
-                           model_class: Type[PretrainedModelNew],
+                           model_class: Type[PretrainedModel],
                            resource_uri: Optional[str] = None) -> str:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
     Args:
         cache_dir (str): the cache dir of pretrained weighted files
-        model_class (Type[PretrainedModelNew]): the class of pretrained model
+        model_class (Type[PretrainedModel]): the class of pretrained model
         resource_uri (Optional[str], optional): the weight file resource file uri to help find the target file name. Defaults to None.
     """
     # 1. if the weight file is the name of resource_uri, eg: 'bert-base-uncased.pdparams'
@@ -87,7 +88,7 @@ def _find_weight_file_path(cache_dir: str,
         if os.path.isfile(weight_file_path):
             return weight_file_path
 
-    # 2. find the target weight file name under the `resource_files_names` attribute of `PretrainedModelNew`
+    # 2. find the target weight file name under the `resource_files_names` attribute of `PretrainedModel`
     resource_weight_file_name = model_class.resource_files_names.get(
         'model_state', None)
     weight_file_path = os.path.join(cache_dir, resource_weight_file_name)
@@ -204,14 +205,36 @@ class PretrainedModel(Layer, GenerationMixin):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
+    config_class = None
+
+    # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
+    # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
+    _keys_to_ignore_on_load_missing = None
+    # a list of `re` patterns of `state_dict` keys that should be removed from the list of
+    # unexpected keys we find (keys inside the checkpoint but not the model) and avoid unnecessary
+    # warnings.
+    _keys_to_ignore_on_load_unexpected = None
+    # a list of `state_dict` keys to ignore when saving the model (useful for keys that aren't
+    # trained, but which are either deterministic or tied variables)
+    _keys_to_ignore_on_save = None
+
+    def __init__(self,
+                 config: PretrainedConfig,
+                 name_scope=None,
+                 dtype="float32"):
+        super(PretrainedModel, self).__init__(name_scope, dtype)
+        if self._constructed_from_pretrained_config():
+            self.config = config
 
     def _post_init(self, original_init, *args, **kwargs):
         """
         It would be hooked after `__init__` to add a dict including arguments of
         `__init__` as a attribute named `config` of the pretrained model instance.
         """
-        init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
-        self.config = init_dict
+        if not self._constructed_from_pretrained_config():
+            init_dict = fn_args_to_dict(original_init, *((self, ) + args),
+                                        **kwargs)
+            self.config = init_dict
 
     @property
     def base_model(self):
@@ -231,32 +254,70 @@ class PretrainedModel(Layer, GenerationMixin):
         # Todo: return all model name
         return list(self.pretrained_init_configuration.keys())
 
-    def get_input_embeddings(self):
+    def get_input_embeddings(self) -> nn.Embedding:
+        """get input embedding of model
+
+        Returns:
+            nn.Embedding: embedding of model
+        """
         base_model = getattr(self, self.base_model_prefix, self)
         if base_model is not self:
             return base_model.get_input_embeddings()
-        else:
-            raise NotImplementedError(
-                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
-                ' or `set_input_embeddings` method')
 
-    def set_input_embeddings(self, value):
+        raise NotImplementedError(
+            f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
+            ' or `set_input_embeddings` method')
+
+    def set_input_embeddings(self, value: Embedding):
+        """set new input embedding for model
+
+        Args:
+            value (Embedding): the new embedding of model
+
+        Raises:
+            NotImplementedError: Model has not implement `set_input_embeddings` method
+
+        Returns:
+            : 
+        """
         base_model = getattr(self, self.base_model_prefix, self)
         if base_model is not self:
             return base_model.set_input_embeddings(value)
-        else:
-            raise NotImplementedError(
-                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
-                ' or `set_input_embeddings` method')
+        raise NotImplementedError(
+            f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
+            ' or `set_input_embeddings` method')
 
-    def get_output_embeddings(self):
-        return None  # Overwrite for models with output embeddings
+    def get_output_embeddings(self) -> Optional[Embedding]:
+        """To be overwrited for models with output embeddings
 
-    def resize_position_embeddings(self, new_num_position_embeddings):
+        Returns:
+            Optional[Embedding]: the otuput embedding of model
+        """
+        return None
+
+    def resize_position_embeddings(self, new_num_position_embeddings: int):
+        """resize position embedding, this method should be overrited overwrited by downstream models
+
+        Args:
+            new_num_position_embeddings (int): the new position size
+
+        Raises:
+            NotImplementedError: when called and not be implemented
+        """
         raise NotImplementedError(
             f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
             f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
         )
+
+    @classmethod
+    def _constructed_from_pretrained_config(cls) -> bool:
+        """check if the model is constructed from `PretrainedConfig`
+
+        Returns:
+            bool: if the model is constructed from `PretrainedConfig`
+        """
+        return cls.config_class is not None and issubclass(
+            cls.config_class, PretrainedConfig)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -306,6 +367,10 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
+        if cls._constructed_from_pretrained_config():
+            return cls.from_pretrained_v2(pretrained_model_name_or_path, *args,
+                                          **kwargs)
+
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
@@ -586,6 +651,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 # reload from save_directory
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
+        if self._constructed_from_pretrained_config():
+            return self.save_pretrained_v2(save_dir)
+
         assert not os.path.isfile(
             save_dir
         ), "Saving directory ({}) should be a directory, not a file".format(
@@ -681,131 +749,6 @@ class PretrainedModel(Layer, GenerationMixin):
     def __setattr__(self, name, value):
         value = adapt_stale_fwd_patch(self, name, value)
         return super(PretrainedModel, self).__setattr__(name, value)
-
-
-class PretrainedModelNew(Layer, GenerationMixin):
-    """
-    The base class for all pretrained models. It mainly provides common methods
-    for loading (construction and loading) and saving pretrained models. Loading
-    and saving also rely on the following class attributes which should be overridden
-    by derived classes accordingly:
-
-    - **model_config_file** (str): Represents the file name of model configuration
-      for configuration saving and loading in local file system. The value is
-      `model_config.json`.
-    - **resource_files_names** (dict): Name of local file where the model configuration
-      can be saved and loaded locally. Currently, resources only include the model state,
-      thus the dict only includes `'model_state'` as key with corresponding
-      value `'model_state.pdparams'` for model weights saving and loading.
-    - **pretrained_init_configuration** (dict): Provides the model configurations
-      of built-in pretrained models (contrasts to models in local file system).
-      It has pretrained model names as keys (such as `bert-base-uncased`), and
-      the values are dict preserving corresponding configuration for model initialization.
-    - **pretrained_resource_files_map** (dict): Provides resource URLs of built-in
-      pretrained models (contrasts to models in local file system).
-      It has the same key as resource_files_names (that is "model_state"),
-      and the corresponding value is a dict with specific model name to model weights URL mapping
-      (such as "bert-base-uncased" ->
-      "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams").
-    - **base_model_prefix** (str): Represents the attribute associated to the
-      base model in derived classes of the same architecture adding layers on
-      top of the base model. Note: A base model class is pretrained model class
-      decorated by `register_base_model`, such as `BertModel`; A derived model
-      class is a pretrained model class adding layers on top of the base model,
-      and it has a base model as attribute, such as `BertForSequenceClassification`.
-
-    Methods common to models for text generation are defined in `GenerationMixin`
-    and also inherited here.
-
-    Besides, metaclass `InitTrackerMeta` is used to create `PretrainedModel`,
-    by which subclasses can track arguments for initialization automatically.
-    """
-    model_config_file = "model_config.json"
-    pretrained_init_configuration = {}
-    # TODO: more flexible resource handle, namedtuple with fields as:
-    # resource_name, saved_file, handle_name_for_load(None for used as __init__
-    # arguments), handle_name_for_save
-    resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {}
-    base_model_prefix = ""
-
-    # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
-    # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
-    _keys_to_ignore_on_load_missing = None
-    # a list of `re` patterns of `state_dict` keys that should be removed from the list of
-    # unexpected keys we find (keys inside the checkpoint but not the model) and avoid unnecessary
-    # warnings.
-    _keys_to_ignore_on_load_unexpected = None
-    # a list of `state_dict` keys to ignore when saving the model (useful for keys that aren't
-    # trained, but which are either deterministic or tied variables)
-    _keys_to_ignore_on_save = None
-
-    def __init__(self, config: PretrainedConfig, *inputs, **kwargs):
-        super().__init__()
-        if not isinstance(config, PretrainedConfig):
-            raise ValueError(
-                f"Parameter config in `{self.__class__.__name__}(config)` should be an instance of class "
-                "`PretrainedConfig`. To create a model from a pretrained model use "
-                f"`model = {self.__class__.__name__}.from_pretrained(PRETRAINED_MODEL_NAME)`"
-            )
-        # Save config and origin of the pretrained weights if given in model
-        self.config = config
-        self.name_or_path = config.name_or_path
-        self.warnings_issued = {}
-
-    @property
-    def base_model(self):
-        """
-        PretrainedModel: The body of the same model architecture. It is the base
-            model itself for base model or the base model attribute for derived
-            model.
-        """
-        return getattr(self, self.base_model_prefix, self)
-
-    @property
-    def model_name_list(self):
-        """
-        list: Contains all supported built-in pretrained model names of the
-            current PretrainedModel class.
-        """
-        # Todo: return all model name
-        return list(self.pretrained_init_configuration.keys())
-
-    def get_input_embeddings(self):
-        """get the input embedding of the model.
-            if there is base model, so call the basic model
-
-        Raises:
-            NotImplementedError: 
-
-        Returns:
-            _type_: _description_
-        """
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_input_embeddings()
-        else:
-            raise NotImplementedError(
-                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
-                ' or `set_input_embeddings` method')
-
-    def set_input_embeddings(self, value):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.set_input_embeddings(value)
-        else:
-            raise NotImplementedError(
-                f'model of {type(base_model)} has not implemented the `get_input_embeddings`'
-                ' or `set_input_embeddings` method')
-
-    def get_output_embeddings(self):
-        return None  # Overwrite for models with output embeddings
-
-    def resize_position_embeddings(self, new_num_position_embeddings):
-        raise NotImplementedError(
-            f"`resize_position_embeddings` is not implemented for {self.__class__}`. To implement it, you should "
-            f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
-        )
 
     @classmethod
     def _resolve_model_file_path(cls: Type[PretrainedModel],
@@ -906,7 +849,7 @@ class PretrainedModelNew(Layer, GenerationMixin):
     @classmethod
     def _load_pretrained_model(
         cls,
-        model: PretrainedModelNew,
+        model: PretrainedModel,
         state_dict: Dict[str, Tensor],
         loaded_keys: List[str],
         ignore_mismatched_sizes=False,
@@ -917,7 +860,7 @@ class PretrainedModelNew(Layer, GenerationMixin):
             * check the 
 
         Args:
-            model (PretrainedModelNew): the pretrained model instance
+            model (PretrainedModel): the pretrained model instance
             state_dict (Dict[str, Tensor]): the model state dict data
             loaded_keys (List[str]): 
             ignore_mismatched_sizes (bool, optional): whether ignore error when tensor size mismatched. Defaults to False.
@@ -1051,7 +994,7 @@ class PretrainedModelNew(Layer, GenerationMixin):
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained_v2(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -1201,7 +1144,7 @@ class PretrainedModelNew(Layer, GenerationMixin):
                 " to use it for predictions and inference.")
         return model
 
-    def save_pretrained(self, save_dir: str):
+    def save_pretrained_v2(self, save_dir: str):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -1251,82 +1194,3 @@ class PretrainedModelNew(Layer, GenerationMixin):
         else:
             logger.warning(
                 "Save pretrained model only supported dygraph mode for now!")
-
-    def resize_token_embeddings(self,
-                                new_num_tokens: Optional[int] = None
-                                ) -> nn.Embedding:
-        """
-        Resizes input token embeddings matrix of the model according to new_num_tokens.
-
-        Args:
-            new_num_tokens (Optional[int]):
-                The number of new tokens in the embedding matrix. Increasing the size will add newly initialized
-                vectors at the end. Reducing the size will remove vectors from the end. If not provided or None, just
-                returns a pointer to the input tokens embedding module of the model without doing anything.
-
-        Returns:
-            paddle.nn.Embedding: The input tokens Embeddings Module of the model.
-        """
-        old_embeddings: nn.Embedding = self.get_input_embeddings()
-        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[
-                0]:
-            return old_embeddings
-
-        new_embeddings = self._get_resized_embeddings(old_embeddings,
-                                                      new_num_tokens)
-        self.set_input_embeddings(new_embeddings)
-
-        # 2. Update vocab_size
-        self.base_model.config['vocab_size'] = new_num_tokens
-        self.vocab_size = new_num_tokens
-
-        # TODO(westfish@126.com): add tie_weight.
-        # TODO(westfish) Add tie_weight to tie the weights between the input embeddings and the output embeddings if needed.
-
-        return new_embeddings
-
-    def _get_resized_embeddings(
-            self,
-            old_embeddings: nn.Embedding,
-            new_num_tokens: Optional[int] = None) -> nn.Embedding:
-        """
-        Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
-        initialized vectors at the end. Reducing the size will remove vectors from the end
-        
-        Args:
-            old_embeddings (nn.Embedding):
-                Old embeddings to be resized.
-            new_num_tokens (Optional[int]):
-                New number of tokens in the embedding matrix.
-                Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
-                vectors from the end. 
-
-        Returns:
-            paddle.nn.Embedding: The resized Embedding Module or the old Embedding Module if new_num_tokens is None.
-        """
-        if new_num_tokens is None:
-            return old_embeddings
-
-        old_num_tokens, old_embedding_dim = old_embeddings.weight.shape
-        if old_num_tokens == new_num_tokens:
-            return old_embeddings
-
-        if not isinstance(old_embeddings, nn.Embedding):
-            raise TypeError(
-                f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
-                " should either use a different resize function or make sure that old_embeddings are an instance of"
-                f" {nn.Embedding}.")
-
-        # Build new embeddings
-        new_embeddings = nn.Embedding(new_num_tokens, old_embedding_dim)
-
-        # numbers of tokens to copy
-        n = min(old_num_tokens, new_num_tokens)
-        with paddle.no_grad():
-            new_embeddings.weight[:n, :] = old_embeddings.weight[:n, :]
-
-        return new_embeddings
-
-    def __setattr__(self, name, value):
-        value = adapt_stale_fwd_patch(self, name, value)
-        return super(PretrainedModelNew, self).__setattr__(name, value)

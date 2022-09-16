@@ -1,7 +1,7 @@
 # coding=utf-8
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,10 +33,11 @@ from ..utils import CONFIG_NAME
 from ..utils.downloader import is_url, get_path_from_url
 
 from paddlenlp.utils.log import logger
+from paddlenlp import __version__
 
 if TYPE_CHECKING:
     from paddlenlp.transformers.model_utils import PretrainedModel
-    from paddlenlp.transformers.model_utils import PretrainedModelNew
+    from paddlenlp.transformers.model_utils import PretrainedModel
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -172,6 +173,29 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]):
             kwargs[new_key] = kwargs.pop(old_key)
 
 
+def flatten_model_config(config: dict) -> dict:
+    """flatten the model config which can be old-style model config
+
+    Args:
+        config (dict): the source of config which can be flatten config or nest config
+
+    Returns:
+        dict: the flatten config
+    """
+    # 1. extract the init_args into the top level
+    init_args = config.pop('init_args', [])
+    for init_arg in init_args:
+        for key, value in init_arg.items():
+            if key not in config:
+                config[key] = value
+
+    # 2. convert `init_class` into `architectures`
+    if 'init_class' in config:
+        config['architectures'] = [config.pop('init_class')]
+
+    return config
+
+
 def is_community_model_name(model_name: str) -> Optional[bool]:
     """check if the model_name is community-contributed pretrained model
 
@@ -202,10 +226,10 @@ class PretrainedConfig:
     Class attributes (overridden by derived classes):
 
     - **model_type** (`str`) -- An identifier for the model type, serialized into the JSON file, and used to recreate
-      the correct object in [`~transformers.AutoConfig`].
+      the correct object in [`~paddlenlp.AutoConfig`].
     - **is_composition** (`bool`) -- Whether the config class is composed of multiple sub-configs. In this case the
-      config has to be initialized from two or more configs of type [`~transformers.PretrainedConfig`] like:
-      [`~transformers.EncoderDecoderConfig`] or [`~RagConfig`].
+      config has to be initialized from two or more configs of type [`~paddlenlp.PretrainedConfig`] like:
+      [`~paddlenlp.EncoderDecoderConfig`] or [`~RagConfig`].
     - **keys_to_ignore_at_inference** (`List[str]`) -- A list of keys to ignore by default when looking at dictionary
       outputs of the model during inference.
     - **attribute_map** (`Dict[str, str]`) -- A dict that maps model specific attribute names to the standardized
@@ -223,14 +247,14 @@ class PretrainedConfig:
     Arg:
         name_or_path (`str`, *optional*, defaults to `""`):
             Store the string that was passed to [`PreTrainedModel.from_pretrained`] or
-            [`TFPreTrainedModel.from_pretrained`] as `pretrained_model_name_or_path` if the configuration was created
+            [`PreTrainedModel.from_pretrained`] as `pretrained_model_name_or_path` if the configuration was created
             with such a method.
         output_hidden_states (`bool`, *optional*, defaults to `False`):
             Whether or not the model should return all hidden-states.
         output_attentions (`bool`, *optional*, defaults to `False`):
             Whether or not the model should returns all attentions.
         return_dict (`bool`, *optional*, defaults to `True`):
-            Whether or not the model should return a [`~transformers.utils.ModelOutput`] instead of a plain tuple.
+            Whether or not the model should return a [`~paddlenlp.transformers.model_outputs.ModelOutput`] instead of a plain tuple.
         is_encoder_decoder (`bool`, *optional*, defaults to `False`):
             Whether the model is used as an encoder/decoder or not.
         is_decoder (`bool`, *optional*, defaults to `False`):
@@ -307,7 +331,7 @@ class PretrainedConfig:
         output_scores (`bool`, *optional*, defaults to `False`):
             Whether the model should return the logits when used for generation.
         return_dict_in_generate (`bool`, *optional*, defaults to `False`):
-            Whether the model should return a [`~transformers.utils.ModelOutput`] instead of a `torch.LongTensor`.
+            Whether the model should return a [`~paddlenlp.transformers.model_outputs.ModelOutput`] instead of a `paddlenlp.Tensor`.
         forced_bos_token_id (`int`, *optional*):
             The id of the token to force as the first generated token after the `decoder_start_token_id`. Useful for
             multilingual models like [mBART](../model_doc/mbart) where the first generated token needs to be the target
@@ -323,8 +347,7 @@ class PretrainedConfig:
         architectures (`List[str]`, *optional*):
             Model architectures that can be used with the model pretrained weights.
         finetuning_task (`str`, *optional*):
-            Name of the task used to fine-tune the model. This can be used when converting from an original (TensorFlow
-            or PyTorch) checkpoint.
+            Name of the task used to fine-tune the model. This can be used when converting from an original checkpoint.
         id2label (`Dict[int, str]`, *optional*):
             A map from index (for instance prediction index, or target index) to label.
         label2id (`Dict[str, int]`, *optional*): A map from label to index for the model.
@@ -350,10 +373,6 @@ class PretrainedConfig:
             If an encoder-decoder model starts decoding with a different token than _bos_, the id of that token.
         sep_token_id (`int`, *optional*): The id of the _separation_ token.
 
-        > PyTorch specific parameters
-
-        torchscript (`bool`, *optional*, defaults to `False`):
-            Whether or not the model should be used with Torchscript.
         tie_word_embeddings (`bool`, *optional*, defaults to `True`):
             Whether the model's input and output word embeddings should be tied. Note that this is only relevant if the
             model has a output word embedding layer.
@@ -362,23 +381,30 @@ class PretrainedConfig:
             (which is normally `float32`) and thus allow for optimal storage allocation. For example, if the saved
             model is `float16`, ideally we want to load it back using the minimal amount of memory needed to load
             `float16` weights. Since the config object is stored in plain text, this attribute contains just the
-            floating type string without the `torch.` prefix. For example, for `torch.float16` ``torch_dtype` is the
+            floating type string without the `paddle.` prefix. For example, for `paddle.float16` ``dtype` is the
             `"float16"` string.
 
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
-
-        > TensorFlow specific parameters
-
-        use_bfloat16 (`bool`, *optional*, defaults to `False`):
-            Whether or not the model should use BFloat16 scalars (only used by some TensorFlow models).
-        tf_legacy_loss (`bool`, *optional*, defaults to `False`):
-            Whether the model should use legacy TensorFlow losses. Legacy losses have variable output shapes and may
-            not be XLA-compatible. This option is here for backward compatibility and will be removed in Transformers
-            v5.
     """
     model_type: str = ""
     is_composition: bool = False
+
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    # TODO: this comment should be removed after this feature is accepted by PaddleNLP teams
+    # `pretrained_init_configuration` can be `dict` or `url`: eg:
+    #     {
+    #         "bert-base-uncased": {
+    #             "vocab_size": 30522,
+    #             "hidden_size": 768,
+    #         },
+    #         "bert-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/model_config.json"
+    #     }
+    #
+    # advantages:
+    #     1. reuse the concept: `pretrained_init_configuration` and extend it
+    #     2. make code more concise when support resource file
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     pretrained_init_configuration = {}
 
     # global attribute mapping
@@ -412,7 +438,6 @@ class PretrainedConfig:
         self.return_dict = kwargs.pop("return_dict", True)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
-        self.use_bfloat16 = kwargs.pop("use_bfloat16", False)
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
             "tie_word_embeddings", True
@@ -498,17 +523,11 @@ class PretrainedConfig:
                 "but only 'regression', 'single_label_classification' and 'multi_label_classification' are valid."
             )
 
-        # TPU arguments
-        if kwargs.pop("xla_device", None) is not None:
-            logger.warning(
-                "The `xla_device` argument has been deprecated in v4.4.0 of Transformers. It is ignored and you can "
-                "safely remove it from your `config.json` file.")
-
         # Name or path to the pretrained checkpoint
         self._name_or_path = str(kwargs.pop("name_or_path", ""))
 
         # Drop the transformers version info
-        self.transformers_version = kwargs.pop("transformers_version", None)
+        self.paddlenlp_version = kwargs.pop("paddlenlp_version", None)
 
         # Deal with gradient checkpointing
         if kwargs.get("gradient_checkpointing", False):
@@ -539,9 +558,8 @@ class PretrainedConfig:
     @property
     def use_return_dict(self) -> bool:
         """
-        `bool`: Whether or not return [`~utils.ModelOutput`] instead of tuples.
+        `bool`: Whether or not return [`~paddlenlp.transformers.model_outputs.ModelOutput`] instead of tuples.
         """
-        # If torchscript is set, force `return_dict=False` to avoid jit errors
         return self.return_dict
 
     @property
@@ -601,7 +619,7 @@ class PretrainedConfig:
                 This can be either:
 
                 - a string, the *model id* of a pretrained model configuration hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
+                  paddlenlp bos server. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
                   namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
                 - a path to a *directory* containing a configuration file saved using the
                   [`~PretrainedConfig.save_pretrained`] method, e.g., `./my_model_directory/`.
@@ -612,16 +630,6 @@ class PretrainedConfig:
             force_download (`bool`, *optional*, defaults to `False`):
                 Whether or not to force to (re-)download the configuration files and override the cached versions if
                 they exist.
-            resume_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to delete incompletely received file. Attempts to resume the download if such a file
-                exists.
-            proxies (`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}.` The proxies are used on each request.
-            revision (`str`, *optional*, defaults to `"main"`):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
-                identifier allowed by git.
             return_unused_kwargs (`bool`, *optional*, defaults to `False`):
                 If `False`, then this function returns just the final configuration object.
 
@@ -664,6 +672,7 @@ class PretrainedConfig:
         ```"""
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path,
                                                   **kwargs)
+        config_dict = flatten_model_config(config_dict)
         if "model_type" in config_dict and hasattr(
                 cls,
                 "model_type") and config_dict["model_type"] != cls.model_type:
@@ -711,15 +720,19 @@ class PretrainedConfig:
                                                                    os.PathLike],
                          **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
-        force_download = kwargs.pop("force_download", False)
-
-        from_auto_class = kwargs.pop("_from_auto", False)
-
-        user_agent = {"file_type": "config", "from_auto_class": from_auto_class}
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
         resolved_config_file = None
+
+        # init from pretrained_init_configuration
+        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+            # which can be: dict or url
+            pretrained_model_name_or_path = cls.pretrained_init_configuration[
+                pretrained_model_name_or_path]
+
+            if isinstance(pretrained_model_name_or_path, dict):
+                return pretrained_model_name_or_path, kwargs
 
         # 1. get the configuration file from local file, eg: /cache/path/model_config.json
         if os.path.isfile(pretrained_model_name_or_path):
@@ -738,17 +751,26 @@ class PretrainedConfig:
                                                   configuration_file)
                 if os.path.isfile(configuration_file):
                     resolved_config_file = configuration_file
+                else:
+                    raise FileNotFoundError(
+                        'please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` '
+                        'param into `from_pretarined` method to specific the configuration file name'
+                    )
+            else:
+                raise NotFoundErr(
+                    "pretrained_model_name_or_path<%s> is not a valid model-name/file/url/dir."
+                    "if it's a model-name, please make sure it's one of <%s>;",
+                    pretrained_model_name_or_path,
+                    ','.join(list(cls.pretrained_init_configuration.keys())))
 
-        if resolved_config_file is not None:
-            try:
-                logger.info(
-                    f"loading configuration file {resolved_config_file}")
-                # Load config dict
-                config_dict = cls._dict_from_json_file(resolved_config_file)
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                raise EnvironmentError(
-                    f"It looks like the config file at '{resolved_config_file}' is not a valid JSON file."
-                )
+        try:
+            logger.info(f"loading configuration file {resolved_config_file}")
+            # Load config dict
+            config_dict = cls._dict_from_json_file(resolved_config_file)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise EnvironmentError(
+                f"It looks like the config file<'{resolved_config_file}'> is not a valid JSON file."
+            )
 
         return config_dict, kwargs
 
@@ -771,8 +793,6 @@ class PretrainedConfig:
         return_unused_kwargs = kwargs.pop("return_unused_kwargs", False)
         # Those arguments may be passed along for our internal telemetry.
         # We remove them so they don't appear in `return_unused_kwargs`.
-        kwargs.pop("_from_auto", None)
-        kwargs.pop("_from_pipeline", None)
 
         config = cls(**config_dict)
 
@@ -855,7 +875,7 @@ class PretrainedConfig:
 
         # only serialize values that differ from the default config
         for key, value in config_dict.items():
-            if (key not in default_config_dict or key == "transformers_version"
+            if (key not in default_config_dict or key == "paddlenlp_version"
                     or value != default_config_dict[key] or
                 (key in class_config_dict and value != class_config_dict[key])):
                 serializable_config_dict[key] = value
@@ -989,7 +1009,7 @@ class PretrainedConfig:
 
 def get_configuration_file(configuration_files: List[str]) -> str:
     """
-    Get the configuration file to use for this version of transformers.
+    Get the configuration file to use for this version of paddlenlp.
 
     Args:
         configuration_files (`List[str]`): The list of available configuration files.
@@ -1007,9 +1027,9 @@ def get_configuration_file(configuration_files: List[str]) -> str:
 
     # Defaults to FULL_CONFIGURATION_FILE and then try to look at some newer versions.
     configuration_file = CONFIG_NAME
-    transformers_version = version.parse(__version__)
+    paddlenlp_version = version.parse(__version__)
     for v in available_versions:
-        if version.parse(v) <= transformers_version:
+        if version.parse(v) <= paddlenlp_version:
             configuration_file = configuration_files_map[v]
         else:
             # No point going further since the versions are sorted.
@@ -1074,7 +1094,7 @@ def parse_config(
     fields: Optional[List[str]] = None,
     return_model: bool = True,
     return_unused_kwargs: bool = False
-) -> Tuple[PretrainedConfigClass, PretrainedModelNew]:
+) -> Tuple[PretrainedConfigClass, PretrainedModel]:
     """parse config from config & kwargs
 
     Args:
@@ -1088,16 +1108,16 @@ def parse_config(
         [config, [PretrainedModel], [unsed_kwargs]]
     """
     # import locally to avoid circular reference
-    from paddlenlp.transformers.model_utils import PretrainedModelNew
+    from paddlenlp.transformers.model_utils import PretrainedModel
     # 0. pop config and pretrained model
     for index in range(len(args)):
-        if isinstance(args[index], (PretrainedConfig, PretrainedModelNew)):
+        if isinstance(args[index], (PretrainedConfig, PretrainedModel)):
             config_or_model = args[index]
             args = args[0:index] + args[index + 1:]
             break
 
     for key in list(kwargs.keys()):
-        if isinstance(kwargs[key], (PretrainedConfig, PretrainedModelNew)):
+        if isinstance(kwargs[key], (PretrainedConfig, PretrainedModel)):
             config_or_model = kwargs.pop(key)
             break
 
@@ -1105,7 +1125,7 @@ def parse_config(
     model = None
     unused_kwargs = {}
 
-    if isinstance(config_or_model, PretrainedModelNew):
+    if isinstance(config_or_model, PretrainedModel):
         unused_kwargs = _construct_kwargs(args, kwargs, fields)
         config = config_or_model.config
         model = config_or_model
