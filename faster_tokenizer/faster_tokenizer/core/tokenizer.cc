@@ -26,8 +26,16 @@ limitations under the License. */
 #include "faster_tokenizer/postprocessors/postprocessors.h"
 #include "faster_tokenizer/pretokenizers/pretokenizers.h"
 
+
+
 #ifdef WITH_OMP
 #include <omp.h>
+#else
+// add by YSL
+// Replace OMP with std::thread
+#include <stdlib.h>
+#include <thread>
+using namespace std;
 #endif
 
 namespace paddlenlp {
@@ -248,23 +256,72 @@ void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
   }
 }
 
+void Tokenizer::MultiThreadEncodeBatchStrings(
+    const std::vector<EncodeInput>& batch_encode_input,
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+
+    auto batch_size = batch_encode_input.size();
+    size_t end_index = start_index+step_index;
+    if(end_index>batch_size) end_index = batch_size;
+    for (size_t i = start_index; i < end_index; ++i) {
+        EncodePairStrings(
+            batch_encode_input[i], &(*encodings)[i], add_special_tokens);
+    }
+}
+
 void Tokenizer::EncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
     bool add_special_tokens) const {
   auto batch_size = batch_encode_input.size();
   encodings->resize(batch_size);
+
 #ifdef WITH_OMP
 // (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
 // tokenization.
 // Use workload to determine whether create omp threads. Need to optimize the
 // workload estimation.
 #pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-#endif
   for (int i = 0; i < batch_size; ++i) {
     EncodePairStrings(
         batch_encode_input[i], &(*encodings)[i], add_special_tokens);
   }
+#else
+  char* env_var = std::getenv("OMP_NUM_THREADS");
+  int thread_num = std::atoi(env_var);
+  if(thread_num ==0 || batch_size<4){
+    thread_num = 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS ==0 or batch_size<4, this time we change OMP_NUM_THREADS = 1";
+  }else if(thread_num > (batch_size/4 +1) ){
+    thread_num = batch_size/4 + 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS > batch_size/4, this time we change OMP_NUM_THREADS = batch_size/4";
+  }
+  std::vector<std::thread*> vectorOfThread;
+  size_t start_index = 0;
+  size_t step_index = batch_size/thread_num;
+
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread.push_back(new std::thread(&Tokenizer::MultiThreadEncodeBatchStrings,
+                                              this,
+                                              std::ref(batch_encode_input),
+                                              encodings,
+                                              add_special_tokens,
+                                              start_index,
+                                              step_index));
+    start_index = start_index + step_index;
+  }
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread[i]->join();
+    delete vectorOfThread[i];
+  }
+  vectorOfThread.clear();
+#endif
+  
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
   }
@@ -289,6 +346,24 @@ void Tokenizer::EncodePairStringsCharOffsets(const EncodeInput& encode_input,
   PostProcess(&encoding, &pair_encoding, add_special_tokens, encodings);
 }
 
+void Tokenizer::MultiThreadEncodeBatchStringsCharOffsets(
+    const std::vector<EncodeInput>& batch_encode_input,
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+
+    auto batch_size = batch_encode_input.size();
+    size_t end_index = start_index+step_index;
+    if( end_index>batch_size ) end_index = batch_size;
+    for (size_t i = start_index; i < end_index; ++i) {
+        Encoding encoding;
+        EncodePairStringsCharOffsets(
+            batch_encode_input[i], &encoding, add_special_tokens);
+        (*encodings)[i] = std::move(encoding);
+    }
+}
+
 void Tokenizer::EncodeBatchStringsCharOffsets(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
@@ -301,13 +376,46 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
 // Use workload to determine whether create omp threads. Need to optimize the
 // workload estimation.
 #pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-#endif
   for (int i = 0; i < batch_size; ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(
         batch_encode_input[i], &encoding, add_special_tokens);
     (*encodings)[i] = std::move(encoding);
   }
+#else
+  char* env_var = std::getenv("OMP_NUM_THREADS");
+  int thread_num = std::atoi(env_var);
+  if(thread_num ==0 || batch_size<4){
+    thread_num = 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS ==0 or batch_size<4, this time we change OMP_NUM_THREADS = 1";
+  }else if(thread_num > (batch_size/4 +1) ){
+    thread_num = batch_size/4 + 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS > batch_size/4, this time we change OMP_NUM_THREADS = batch_size/4";
+  }
+  
+  std::vector<std::thread*> vectorOfThread;
+  size_t start_index = 0;
+  size_t step_index = batch_size/thread_num;
+
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread.push_back(new std::thread(&Tokenizer::MultiThreadEncodeBatchStringsCharOffsets,
+                                              this,
+                                              std::ref(batch_encode_input),
+                                              encodings,
+                                              add_special_tokens,
+                                              start_index,
+                                              step_index));
+    start_index = start_index + step_index;
+  }
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++) {
+    vectorOfThread[i]->join();
+    delete vectorOfThread[i];
+  }
+  vectorOfThread.clear();
+#endif
+
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
   }
@@ -404,11 +512,28 @@ void Tokenizer::Decode(const std::vector<uint32_t>& token_ids,
   }
 }
 
+
+void Tokenizer::MultiThreadDecodeBatch(
+    const std::vector<std::vector<uint32_t>>& batch_token_ids,
+    std::vector<std::string>* results,
+    bool skip_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+
+    auto batch_size = batch_token_ids.size();
+    size_t end_index = start_index+step_index;
+    if( end_index>batch_size ) end_index = batch_size;
+    for (size_t i = start_index; i < end_index; ++i) {
+      Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
+    }
+}
+
 void Tokenizer::DecodeBatch(
     const std::vector<std::vector<uint32_t>>& batch_token_ids,
     std::vector<std::string>* results,
     bool skip_special_tokens) const {
-  results->resize(batch_token_ids.size());
+  auto batch_size = batch_token_ids.size();
+  results->resize(batch_size);
 #ifdef WITH_OMP
 // (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
 // tokenization.
@@ -416,10 +541,42 @@ void Tokenizer::DecodeBatch(
 // workload estimation.
 #pragma omp parallel for if (batch_token_ids.size() >= 4 && \
                                                   omp_get_num_threads() > 1)
-#endif
   for (int i = 0; i < batch_token_ids.size(); ++i) {
     Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
   }
+#else
+  char* env_var = std::getenv("OMP_NUM_THREADS");
+  int thread_num = std::atoi(env_var);
+  if(thread_num ==0 || batch_size<4){
+    thread_num = 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS ==0 or batch_size<4, this time we change OMP_NUM_THREADS = 1";
+  }else if(thread_num > (batch_size/4 +1) ){
+    thread_num = batch_size/4 + 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS > batch_size/4, this time we change OMP_NUM_THREADS = batch_size/4";
+  }
+  
+  std::vector<std::thread*> vectorOfThread;
+  size_t start_index = 0;
+  size_t step_index = batch_size/thread_num;
+
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread.push_back(new std::thread(&Tokenizer::MultiThreadDecodeBatch,
+                                              this,
+                                              std::ref(batch_token_ids),
+                                              results,
+                                              skip_special_tokens,
+                                              start_index,
+                                              step_index));
+    start_index = start_index + step_index;
+  }
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++) {
+    vectorOfThread[i]->join();
+    delete vectorOfThread[i];
+  }
+  vectorOfThread.clear();
+#endif
 }
 
 bool Tokenizer::GetUseTruncation() const { return use_truncation_; }

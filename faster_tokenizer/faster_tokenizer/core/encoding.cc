@@ -21,6 +21,12 @@ limitations under the License. */
 
 #ifdef WITH_OMP
 #include <omp.h>
+#else
+// add by YSL
+// Replace OMP with std::thread
+#include <stdlib.h>
+#include <thread>
+using namespace std;
 #endif
 namespace paddlenlp {
 namespace faster_tokenizer {
@@ -600,6 +606,23 @@ bool TruncateEncodings(Encoding* encoding,
   return true;
 }
 
+void MultiThreadPadEncodings(std::vector<Encoding>* encodings,
+                  const PadMethod& method,
+                  size_t pad_length,
+                  size_t start_index,
+                  size_t step_index) {
+  auto batch_size = encodings->size();
+  size_t end_index = start_index+step_index;
+  if(end_index>batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+      auto& encoding = (*encodings)[i];
+      encoding.Pad(pad_length,
+                  method.pad_id_,
+                  method.pad_token_type_id_,
+                  method.pad_token_,
+                  method.direction_);
+  }
+}
 void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   if (encodings == nullptr || encodings->empty()) {
     return;
@@ -619,7 +642,6 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   auto batch_size = encodings->size();
 #ifdef WITH_OMP
 #pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-#endif
   for (int i = 0; i < batch_size; ++i) {
     auto& encoding = (*encodings)[i];
     encoding.Pad(pad_length,
@@ -628,6 +650,38 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
                  method.pad_token_,
                  method.direction_);
   }
+#else
+  char* env_var = std::getenv("OMP_NUM_THREADS");
+  int thread_num = std::atoi(env_var);
+  if(thread_num ==0 || batch_size<4){
+    thread_num = 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS ==0 or batch_size<4, this time we change OMP_NUM_THREADS = 1";
+  }else if(thread_num > (batch_size/4 +1) ){
+    thread_num = batch_size/4 + 1;
+    std::ostringstream oss;
+    oss << "OMP_NUM_THREADS > batch_size/4, this time we change OMP_NUM_THREADS = batch_size/4";
+  }
+  std::vector<std::thread*> vectorOfThread;
+  size_t start_index = 0;
+  size_t step_index = batch_size/thread_num;
+
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread.push_back(new std::thread(&MultiThreadPadEncodings,
+                                              encodings，
+                                              std::ref(method),
+                                              pad_length,
+                                              start_index,
+                                              step_index));
+    start_index = start_index + step_index;
+  }
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread[i]->join();
+    delete vectorOfThread[i];
+  }
+  vectorOfThread.clear();
+#endif
+
 }
 
 }  // namespace core
