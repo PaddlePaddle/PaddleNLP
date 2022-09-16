@@ -484,24 +484,24 @@ python3 -u  -m paddle.distributed.launch \
 
     我们release了base、large两个模型。均取得了较好的预训练效果。
 
-    - **ERNIE 1.0-Base-zh-CW** 模型：
+    - **ERNIE 1.0-Base-zh-cw** 模型：
         - 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-1.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
  Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1| Acc| Acc | Acc
-ERNIE 1.0-Base-zh-CW | 12L768H | <b>76.44</b> | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
+ERNIE 1.0-Base-zh-cw | 12L768H | <b>76.47</b> | 76.07 |    57.86 |    59.91 |    83.41 | 79.91 |    89.91 |   <b>83.42</b> |  72.88/90.78 |    <b>84.68</b> |    76.98 |
 ERNIE 2.0-Base-zh | 12L768H | 74.95  | 76.25 |    58.53 |    61.72 |    83.07 |    78.81 |    84.21 |    82.77 | 68.22/88.71    | 82.78    | 73.19
 ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
 -
-    - **ERNIE 1.0-Large-zh-CW** 模型：
+    - **ERNIE 1.0-Large-zh-cw** 模型：
 
         - 除了base模型外，我们还训练了放出了large模型。此模型参数采用的是词表与ernie-1.0相同，因此命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失：
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
 Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1 | Acc| Acc
-ERNIE 1.0-Large-zh-CW| 24L1024H | <b>79.03</b> | 75.97 |    59.65 |    62.91 |    85.09 |    81.73| 93.09 |    84.53 | 74.22/91.88 | 88.57 | 84.54
+ERNIE 1.0-Large-zh-cw | 24L1024H | <b>79.03</b> | 75.97 |    59.65 |    62.91 |    85.09 |    81.73| 93.09 |    84.53 | 74.22/91.88 | 88.57 | 84.54
 ERNIE 3.0-Xbase-zh| 20L1024H | 78.71 | 76.85 |    59.89 |    62.41 |    84.76 |    82.51 |    89.80 |    84.47 |    75.49/92.67 | 86.36 | 84.59
 RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    83.88 |    78.81 |    90.79 |    83.67 |    70.58/89.82 |    85.72 |    75.26
 

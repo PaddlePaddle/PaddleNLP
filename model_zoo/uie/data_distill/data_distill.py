@@ -85,7 +85,7 @@ def do_data_distill():
         for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
             infer_results.extend(uie(text))
 
-        train_synthetic_lines = synthetic2distill(texts, infer_results,
+        train_synthetic_lines = synthetic2distill(infer_texts, infer_results,
                                                   args.task_type)
 
         # Concat origin and synthetic data
