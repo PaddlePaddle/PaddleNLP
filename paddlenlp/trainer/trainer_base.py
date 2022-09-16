@@ -38,6 +38,7 @@ import paddle
 import paddle.nn as nn
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
+from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 from paddle.io import (
     Dataset,
     DataLoader,
@@ -246,6 +247,15 @@ class Trainer:
             self.scaler = paddle.amp.GradScaler(
                 init_loss_scaling=self.args.scale_loss)
             logger.info("Using half precision")
+
+        if args.recompute:
+
+            def fn(layer):
+                if type(layer) == paddle.nn.TransformerEncoder or type(
+                        layer) == paddle.nn.TransformerDecoder:
+                    layer.enable_recompute = True
+
+            model.apply(fn)
 
         default_label_names = ([
             "start_positions", "end_positions"
@@ -549,9 +559,13 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control)
 
-                if (((step + 1) % args.gradient_accumulation_steps != 0)
-                        and args.local_rank != -1
-                        and args._no_sync_in_gradient_accumulation):
+                is_no_sync = (((
+                    (step + 1) % args.gradient_accumulation_steps != 0)
+                               and args.local_rank != -1
+                               and args._no_sync_in_gradient_accumulation)
+                              or (args.recompute and args.local_rank != -1))
+
+                if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
                         tr_loss_step = self.training_step(model, inputs)
@@ -564,6 +578,11 @@ class Trainer:
                         # last step in epoch but step is always smaller than gradient_accumulation_steps
                         steps_in_epoch <= args.gradient_accumulation_steps and
                     (step + 1) == steps_in_epoch):
+
+                    if (args.recompute and args.local_rank != -1):
+                        fused_allreduce_gradients(list(model.parameters()),
+                                                  None)
+
                     if self.do_grad_scaling:
                         self.scaler.minimize(self.optimizer, tr_loss)
                     else:
