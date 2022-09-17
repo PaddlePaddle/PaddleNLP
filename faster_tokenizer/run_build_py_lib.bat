@@ -1,7 +1,7 @@
 for %%x in (6 7 8 9) do (
   if not exist build_py3%%x mkdir build_py3%%x
   cd build_py3%%x
-  for /d %%G in ("*") do rmdir /s /q "%G"
+  for /d %%G in ("*") do rmdir /s /q "%%G"
   del /q *
   cmake .. -G "Ninja" -DWITH_PYTHON=ON ^
                       -DWITH_TESTING=OFF ^
