@@ -23,11 +23,8 @@ from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForS
 
 from paddlenlp.transformers.bert.configuration import BertConfig
 
-# from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
-# from ...testing_utils import slow
-
-from tests.transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
-from tests.testing_utils import slow
+from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
+from ...testing_utils import slow
 
 from ..test_configuration_common import ConfigTester
 
@@ -64,7 +61,7 @@ class BertModelTester:
         dropout=0.56,
         return_dict=False,
     ):
-        self.parent: unittest.TestCase = parent
+        self.parent: BertModelTest = parent
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
@@ -298,21 +295,17 @@ class BertModelTester:
         choice_labels,
     ):
         model_lambdas = [
-            lambda: BertForMultipleChoice(config),
             lambda: BertForMultipleChoice(config, self.num_choices),
             lambda: BertForMultipleChoice(config, self.num_choices, self.dropout
                                           ),
-            lambda: BertForMultipleChoice(config=config),
             lambda: BertForMultipleChoice(config=config,
                                           num_choices=self.num_choices),
             lambda: BertForMultipleChoice(config=config,
                                           num_choices=self.num_choices,
                                           dropout=self.dropout),
-            lambda: BertForMultipleChoice(BertModel(config)),
             lambda: BertForMultipleChoice(BertModel(config), self.num_choices),
             lambda: BertForMultipleChoice(BertModel(config), self.num_choices,
                                           self.dropout),
-            lambda: BertForMultipleChoice(bert=BertModel(config)),
             lambda: BertForMultipleChoice(bert=BertModel(config),
                                           num_choices=self.num_choices),
             lambda: BertForMultipleChoice(bert=BertModel(config),
@@ -320,8 +313,7 @@ class BertModelTester:
                                           dropout=self.dropout),
         ]
 
-        for index, model_lambda in enumerate(model_lambdas):
-            print(index)
+        for model_lambda in model_lambdas:
             model: BertForMultipleChoice = model_lambda()
             model.eval()
             multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
@@ -362,7 +354,7 @@ class BertModelTester:
                                              dropout=self.dropout)
         ]
 
-        for index, model_lambda in enumerate(model_lambdas):
+        for model_lambda in model_lambdas:
             model: BertForQuestionAnswering = model_lambda()
             model.eval()
             result = model(
@@ -389,29 +381,25 @@ class BertModelTester:
     ):
 
         model_lambdas = [
-            lambda: BertForSequenceClassification(config),
             lambda: BertForSequenceClassification(config, self.num_labels),
             lambda: BertForSequenceClassification(config, self.num_labels, self.
                                                   dropout),
-            lambda: BertForSequenceClassification(config=config),
             lambda: BertForSequenceClassification(config=config,
                                                   num_labels=self.num_labels),
             lambda: BertForSequenceClassification(config=config,
                                                   num_classes=self.num_labels,
                                                   dropout=self.dropout),
-            lambda: BertForSequenceClassification(BertModel(config)),
             lambda: BertForSequenceClassification(BertModel(config), self.
                                                   num_labels),
             lambda: BertForSequenceClassification(BertModel(config), self.
                                                   num_labels, self.dropout),
-            lambda: BertForSequenceClassification(bert=BertModel(config)),
             lambda: BertForSequenceClassification(bert=BertModel(config),
                                                   num_labels=self.num_labels),
             lambda: BertForSequenceClassification(bert=BertModel(config),
                                                   num_classes=self.num_labels,
                                                   dropout=self.dropout),
         ]
-        for index, model_lambda in enumerate(model_lambdas):
+        for model_lambda in model_lambdas:
             model: BertForSequenceClassification = model_lambda()
             model.eval()
             result = model(input_ids,
@@ -454,7 +442,7 @@ class BertModelTester:
                                                num_classes=self.num_labels,
                                                dropout=self.dropout),
         ]
-        for index, model_lambda in enumerate(model_lambdas):
+        for model_lambda in model_lambdas:
             model: BertForTokenClassification = model_lambda()
 
             model.eval()

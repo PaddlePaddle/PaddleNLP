@@ -347,8 +347,6 @@ class PretrainedModel(Layer, GenerationMixin):
             else:
                 index += 1
 
-        index, keys = 0, list(kwargs.keys())
-        # while index < len(keys):
         for key in list(kwargs.keys()):
             value = kwargs[key]
             if isinstance(value, PretrainedModel):
@@ -387,7 +385,7 @@ class PretrainedModel(Layer, GenerationMixin):
             "config": config,
         }
 
-        # if `base_model_prefix` is in __init__ params list, so it should add it into kwargs whether it has value or not.
+        # if `cls.base_model_prefix` is in __init__ params list, so it should add it into kwargs whether it has value or not.
         if param_in_init(init_func, cls.base_model_prefix):
             kwargs[cls.base_model_prefix] = model
 
@@ -1130,13 +1128,11 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
 
                 # Name of community-contributed pretrained model
-                model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+                model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned', num_labels=3)
 
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
-        resource_files = {}
-        init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         cache_dir = kwargs.pop('cache_dir', None)
         config = kwargs.pop("config", None)

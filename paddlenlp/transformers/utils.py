@@ -125,10 +125,6 @@ class InitTrackerMeta(type(Layer)):
     """
 
     def __init__(cls, name, bases, attrs):
-
-        # save the source of __init__ method to do more magic things, eg: get full argument specifications
-        cls.__sourceinit__ = deepcopy(cls.__init__)
-
         init_func = cls.__init__
         # If attrs has `__init__`, wrap it using accessable `_pre_init, _post_init`.
         # Otherwise, no need to wrap again since the super cls has been wraped.
@@ -138,19 +134,17 @@ class InitTrackerMeta(type(Layer)):
         post_init_func = getattr(cls, '_post_init',
                                  None) if '__init__' in attrs else None
         cls.__init__ = InitTrackerMeta.init_and_track_conf(
-            init_func, cls, pre_init_func, post_init_func)
+            init_func, pre_init_func, post_init_func)
         super(InitTrackerMeta, cls).__init__(name, bases, attrs)
 
     @staticmethod
-    def init_and_track_conf(init_func,
-                            class_type,
-                            pre_init_func=None,
-                            post_init_func=None):
+    def init_and_track_conf(init_func, pre_init_func=None, post_init_func=None):
         """
         wraps `init_func` which is `__init__` method of a class to add `init_config`
         attribute for instances of that class.
         Args:
             init_func (callable): It should be the `__init__` method of a class.
+                warning: `self` always is the class type of down-stream model, eg: BertForTokenClassification
             pre_init_func (callable, optional): If provided, it would be hooked after
                 `init_func` and called as `pre_init_func(self, init_func, *init_args, **init_args)`.
                 Default None.
@@ -164,13 +158,8 @@ class InitTrackerMeta(type(Layer)):
 
         @functools.wraps(init_func)
         def __impl__(self, *args, **kwargs):
-            """
-            Notice:
-                1. `self` is always the instance of top layer, eg: BertForTokenClassification
-                2. `class_type` is the class of `init_func`, eg: BertForTokenClassification, BertModel, BertPretrainedModel, PretrainedModel, Layer
-            """
-            if getattr(class_type, "parse_args_and_kwargs", None) is not None:
-                args, kwargs = class_type.parse_args_and_kwargs(
+            if getattr(self, "parse_args_and_kwargs", None) is not None:
+                args, kwargs = self.parse_args_and_kwargs(
                     init_func, args, kwargs)
 
             # registed helper by `pre_init_func`

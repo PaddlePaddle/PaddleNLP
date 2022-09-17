@@ -583,13 +583,8 @@ class BertForSequenceClassification(BertPretrainedModel):
     init_fields = ['num_classes', "dropout"]
 
     def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
-        config, bert, kwargs = parse_config(config_or_model=config,
-                                            config_class=BertConfig,
-                                            args=args,
-                                            kwargs=kwargs,
-                                            fields=["num_classes", 'dropout'],
-                                            return_unused_kwargs=True)
         super(BertForSequenceClassification, self).__init__(config)
+
         self.bert = bert if bert is not None else BertModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
@@ -724,23 +719,6 @@ class BertForTokenClassification(BertPretrainedModel):
             classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
-
-    # def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-    #     config, bert, kwargs = parse_config(config_or_model=config,
-    #                                         config_class=BertConfig,
-    #                                         args=args,
-    #                                         kwargs=kwargs,
-    #                                         fields=["num_classes", 'dropout'],
-    #                                         return_unused_kwargs=True)
-    #     super(BertForTokenClassification, self).__init__(config)
-
-    #     self.bert = bert if bert is not None else BertModel(config)
-    #     self.num_labels = config.num_labels
-    #     self.dropout = nn.Dropout(
-    #         config.classifier_dropout if config.
-    #         classifier_dropout is not None else config.hidden_dropout_prob)
-    #     self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-    #     self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
@@ -1149,9 +1127,9 @@ class BertForMultipleChoice(BertPretrainedModel):
         >>> config.hidden_dropout_prob = 0.1
         >>> model = BertForMultipleChoice(config)
     """
-    init_fields = ['num_choices', 'dropout']
+    init_fields = [('num_choices', 2), 'dropout']
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModell] = None):
+    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
         super(BertForMultipleChoice, self).__init__(config)
 
         self.bert = bert if bert is not None else BertModel(config)
@@ -1323,14 +1301,7 @@ class BertForMaskedLM(BertPretrainedModel):
 
     """
 
-    def __init__(self,
-                 config: Optional[Union[BertModel, BertConfig]] = None,
-                 *args,
-                 **kwargs):
-        config, bert = parse_config(config_or_model=config,
-                                    config_class=BertConfig,
-                                    args=args,
-                                    kwargs=kwargs)
+    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
         super(BertForMaskedLM, self).__init__(config)
         self.bert = bert if bert is not None else BertModel(config=config)
 

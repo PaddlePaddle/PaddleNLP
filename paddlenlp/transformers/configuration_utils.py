@@ -1013,6 +1013,9 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     """
     Get the configuration file to use for this version of paddlenlp.
 
+    # TODO: there is not supported actual application models, but useful.
+        this method has not been tested, so be caution to use this feature.
+
     Args:
         configuration_files (`List[str]`): The list of available configuration files.
 
@@ -1154,8 +1157,7 @@ def parse_config(
 
         # map the valid attr into the config, eg: num_labels
         for key in list(unused_kwargs.keys()):
-            if hasattr(config, key):
-                setattr(config, key, unused_kwargs.pop(key))
+            setattr(config, key, unused_kwargs.pop(key))
 
     outputs = (config, )
     if return_model:
