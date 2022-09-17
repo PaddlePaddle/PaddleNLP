@@ -157,7 +157,8 @@ def cached_path(
     return output_path
 
 
-def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]):
+def attribute_map(config: PretrainedConfig,
+                  kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """map the <old-attr> to <new-attr> with configuration
 
     Args:
@@ -171,6 +172,7 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]):
                     'receive param<%s> and param<%s>, but the first one will be adopt'
                 )
             kwargs[new_key] = kwargs.pop(old_key)
+    return kwargs
 
 
 def flatten_model_config(config: dict) -> dict:
@@ -1133,11 +1135,6 @@ def parse_config(
     # 2. if `config_or_model` is Config, so construct args and kwargs to init model
     elif isinstance(config_or_model, config_class):
         unused_kwargs = _construct_kwargs(args, kwargs, fields)
-        # map the valid attr into the config, eg: num_labels
-        for key in list(unused_kwargs.keys()):
-            if hasattr(config_or_model, key):
-                setattr(config_or_model, key, unused_kwargs[key])
-
         config = config_or_model
     else:
         # 3. create config and use it to init model
@@ -1148,6 +1145,17 @@ def parse_config(
         # TODO(wj-Mcat): return unused_kwargs
         kwargs = _construct_kwargs(args, kwargs, fields)
         config = config_class(**kwargs)
+
+    # map the attribute to config
+    if len(unused_kwargs) > 0:
+        for old_key, new_key in config.attribute_map.items():
+            if old_key in unused_kwargs:
+                config[new_key] = unused_kwargs.pop(old_key)
+
+        # map the valid attr into the config, eg: num_labels
+        for key in list(unused_kwargs.keys()):
+            if hasattr(config, key):
+                setattr(config, key, unused_kwargs.pop(key))
 
     outputs = (config, )
     if return_model:

@@ -410,7 +410,7 @@ class BertConfig(PretrainedConfig):
                  use_cache=True,
                  classifier_dropout=None,
                  **kwargs):
-        attribute_map(self, kwargs)
+        kwargs = attribute_map(self, kwargs)
         super().__init__(pad_token_id=pad_token_id, **kwargs)
 
         self.vocab_size = vocab_size

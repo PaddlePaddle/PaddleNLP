@@ -22,7 +22,6 @@ import unittest
 import unittest.mock as mock
 
 from requests.exceptions import HTTPError
-from transformers import AutoConfig, BertConfig, GPT2Config
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 

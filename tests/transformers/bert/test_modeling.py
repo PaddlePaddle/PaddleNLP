@@ -23,8 +23,11 @@ from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForS
 
 from paddlenlp.transformers.bert.configuration import BertConfig
 
-from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
-from ...testing_utils import slow
+# from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
+# from ...testing_utils import slow
+
+from tests.transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
+from tests.testing_utils import slow
 
 from ..test_configuration_common import ConfigTester
 
@@ -318,6 +321,7 @@ class BertModelTester:
         ]
 
         for index, model_lambda in enumerate(model_lambdas):
+            print(index)
             model: BertForMultipleChoice = model_lambda()
             model.eval()
             multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
@@ -334,12 +338,6 @@ class BertModelTester:
             )
             self.parent.assertEqual(result[1].shape,
                                     [self.batch_size, self.num_choices])
-
-            if index % 3 == 2:
-                self.parent.assertEqual(model.dropout.p, self.dropout)
-            else:
-                self.parent.assertEqual(model.dropout.p,
-                                        self.hidden_dropout_prob)
 
     def create_and_check_for_question_answering(
         self,
@@ -378,11 +376,6 @@ class BertModelTester:
                                     [self.batch_size, self.seq_length])
             self.parent.assertEqual(result[2].shape,
                                     [self.batch_size, self.seq_length])
-            if index % 2 == 1:
-                self.parent.assertEqual(model.dropout.p, self.dropout)
-            else:
-                self.parent.assertEqual(model.dropout.p,
-                                        self.hidden_dropout_prob)
 
     def create_and_check_for_sequence_classification(
         self,
@@ -428,12 +421,6 @@ class BertModelTester:
             self.parent.assertEqual(result[1].shape,
                                     [self.batch_size, self.num_labels])
 
-            if index % 3 == 2:
-                self.parent.assertEqual(model.dropout.p, self.dropout)
-            else:
-                self.parent.assertEqual(model.dropout.p,
-                                        self.hidden_dropout_prob)
-
     def create_and_check_for_token_classification(
         self,
         config,
@@ -478,12 +465,6 @@ class BertModelTester:
             self.parent.assertEqual(
                 result[1].shape,
                 [self.batch_size, self.seq_length, self.num_labels])
-
-            if index % 3 == 2:
-                self.parent.assertEqual(model.dropout.p, self.dropout)
-            else:
-                self.parent.assertEqual(model.dropout.p,
-                                        self.hidden_dropout_prob)
 
     def test_addition_params(self, config: BertConfig, *args, **kwargs):
         custom_num_labels, custom_dropout = 7, 0.98
@@ -606,6 +587,43 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
         config = self.model_tester.get_config()
         model = self.base_model_class(config)
         self.assertTrue(len(model.model_name_list) != 0)
+
+    @slow
+    def test_params_compatibility_of_init_method(self):
+        """test initing model with different params
+        """
+
+        # 1. simple bert-model
+        bert_model = BertModel.from_pretrained('bert-base-uncased')
+
+        model = BertForTokenClassification(bert_model)
+        assert model.num_labels == 2
+        assert model.dropout.p == 0.1
+
+        model = BertForTokenClassification(bert_model, 4)
+        assert model.num_labels == 4
+        assert model.dropout.p == 0.1
+
+        model = BertForTokenClassification(bert_model, 4, dropout=0.3)
+        assert model.num_labels == 4
+        assert model.dropout.p == 0.3
+
+        model = BertForTokenClassification(bert_model,
+                                           num_classes=4,
+                                           dropout=0.3)
+        assert model.num_labels == 4
+        assert model.dropout.p == 0.3
+
+        model = BertForTokenClassification(bert_model,
+                                           num_labels=4,
+                                           dropout=0.3)
+        assert model.num_labels == 4
+        assert model.dropout.p == 0.3
+
+        model: BertForTokenClassification = BertForTokenClassification.from_pretrained(
+            "bert-base-uncased", num_classes=4, dropout=0.3)
+        assert model.num_labels == 4
+        assert model.dropout.p == 0.3
 
 
 class BertModelPretrainedTest(unittest.TestCase):
