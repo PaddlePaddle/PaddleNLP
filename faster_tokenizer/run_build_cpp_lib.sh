@@ -16,6 +16,14 @@
 mkdir -p build_cpp
 cd build_cpp
 rm -rf *
-cmake .. -DWITH_PYTHON=ON -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
-make -j48
+platform="$(uname -s)"
+if [[ $platform == Linux* ]];
+then
+  core_num=`nproc`
+else
+  core_num=`sysctl -n hw.logicalcpu`
+fi
+echo "Compile with $core_num cores"
+cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
+make -j${core_num}
 cd ..
