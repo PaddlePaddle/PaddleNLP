@@ -65,8 +65,17 @@ def read_local_dataset(path, label_list):
     """
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
-            sentence, label = line.strip().split('\t')
-            labels = [label_list[l] for l in label.split(',')]
+            items = line.strip().split('\t')
+            if len(items) == 0:
+                continue
+            elif len(items) == 1:
+                sentence = items[0]
+                labels = []
+                label = ''
+            else:
+                sentence = ''.join(items[:-1])
+                label = items[-1]
+                labels = [label_list[l] for l in label.split(',')]
             yield {"text": sentence, 'label': labels, 'label_n': label}
 
 
@@ -135,9 +144,8 @@ def evaluate():
     probs = []
     labels = []
     for batch in train_data_loader:
-        input_ids, token_type_ids, label = batch['input_ids'], batch[
-            'token_type_ids'], batch['labels']
-        logits = model(input_ids, token_type_ids)
+        label = batch.pop("labels")
+        logits = model(**batch)
         labels.extend(label.numpy())
         probs.extend(F.sigmoid(logits).numpy())
     probs = np.array(probs)
@@ -151,9 +159,8 @@ def evaluate():
     probs = []
     labels = []
     for batch in dev_data_loader:
-        input_ids, token_type_ids, label = batch['input_ids'], batch[
-            'token_type_ids'], batch['labels']
-        logits = model(input_ids, token_type_ids)
+        label = batch.pop("labels")
+        logits = model(**batch)
         labels.extend(label.numpy())
         probs.extend(F.sigmoid(logits).numpy())
     probs = np.array(probs)

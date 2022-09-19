@@ -14,21 +14,28 @@
 import os
 import setuptools
 import sys
+import io
 import pipelines
-import platform
 
-long_description = "PIPELINES: An End to End Natural Language Proceessing Development Kit Based on ERNIE"
+description = "Paddle-Pipelines: An End to End Natural Language Proceessing Development Kit Based on PaddleNLP"
 
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
 
-setuptools.setup(name="pipelines",
+
+def read(*names, **kwargs):
+    with io.open(os.path.join(os.path.dirname(__file__), *names),
+                 encoding=kwargs.get("encoding", "utf8")) as fp:
+        return fp.read()
+
+
+setuptools.setup(name="paddle-pipelines",
                  version=pipelines.__version__,
                  author="PaddlePaddle Speech and Language Team",
                  author_email="paddlenlp@baidu.com",
-                 description=long_description,
-                 long_description=long_description,
-                 long_description_content_type="text/plain",
+                 description=description,
+                 long_description=read("README.md"),
+                 long_description_content_type="text/markdown",
                  url="https://github.com/PaddlePaddle/PaddleNLP",
                  packages=setuptools.find_packages(
                      where='.',

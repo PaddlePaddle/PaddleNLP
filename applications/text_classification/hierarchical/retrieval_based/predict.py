@@ -84,10 +84,14 @@ if __name__ == "__main__":
                          max_seq_length=args.max_seq_length,
                          pad_to_max_seq_len=args.pad_to_max_seq_len)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # tilte_segment
     ): [data for data in fn(samples)]
     valid_ds = load_dataset(read_text_pair,
                             data_path=args.text_pair_file,

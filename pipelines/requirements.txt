@@ -15,9 +15,11 @@ faiss-cpu>=1.7.2
 opencv-python>=4.4
 opencv-contrib-python-headless
 python-multipart
+htbuilder@git+https://github.com/tvst/htbuilder.git
 st-annotated-text
 streamlit==1.9.0
 fastapi
 uvicorn
 markdown
 numba
+pymilvus

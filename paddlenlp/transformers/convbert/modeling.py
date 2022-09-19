@@ -365,7 +365,6 @@ class ConvBertPretrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "convbert"
-    model_config_file = "model_config.json"
 
     # pretrained general configuration
     gen_weight = 1.0
@@ -431,7 +430,6 @@ class ConvBertPretrainedModel(PretrainedModel):
             "num_groups": 1,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "convbert-base":

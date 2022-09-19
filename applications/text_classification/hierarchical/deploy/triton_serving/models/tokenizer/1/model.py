@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import time
 
@@ -33,7 +47,7 @@ class TritonPythonModel(object):
           * model_version: Model version
           * model_name: Model name
         """
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-2.0-base-en",
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
                                                        use_faster=True)
         # You must parse model_config. JSON string is not parsed here
         self.model_config = json.loads(args['model_config'])
@@ -72,7 +86,6 @@ class TritonPythonModel(object):
           be the same as `requests`
         """
         responses = []
-        # print("num:", len(requests), flush=True)
         for request in requests:
             data = pb_utils.get_input_tensor_by_name(request,
                                                      self.input_names[0])
@@ -85,9 +98,6 @@ class TritonPythonModel(object):
             input_ids = np.array(data["input_ids"], dtype=self.output_dtype[0])
             token_type_ids = np.array(data["token_type_ids"],
                                       dtype=self.output_dtype[1])
-
-            # print("input_ids:", input_ids)
-            # print("token_type_ids:", token_type_ids)
 
             out_tensor1 = pb_utils.Tensor(self.output_names[0], input_ids)
             out_tensor2 = pb_utils.Tensor(self.output_names[1], token_type_ids)
