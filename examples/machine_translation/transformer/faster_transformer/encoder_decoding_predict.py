@@ -79,6 +79,13 @@ def parse_args():
         action="store_true",
         help="Whether to profile the performance using newstest2014 dataset. ")
     parser.add_argument(
+        "--data_dir",
+        default=None,
+        type=str,
+        help=
+        "The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. "
+    )
+    parser.add_argument(
         "--test_file",
         nargs='+',
         default=None,
@@ -263,12 +270,18 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     if ARGS.batch_size:
         args.infer_batch_size = ARGS.batch_size
-
+    args.data_dir = ARGS.data_dir
     args.test_file = ARGS.test_file
 
     if ARGS.vocab_file is not None:
         args.src_vocab = ARGS.vocab_file
         args.trg_vocab = ARG.vocab_file
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
         args.joined_dictionary = True
     else:
         args.src_vocab = ARGS.src_vocab
@@ -276,6 +289,15 @@ if __name__ == "__main__":
         args.joined_dictionary = not (args.src_vocab is not None
                                       and args.trg_vocab is not None
                                       and args.src_vocab != args.trg_vocab)
+    if args.weight_sharing != args.joined_dictionary:
+        if args.weight_sharing:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be consistency when weight_sharing is True. "
+            )
+        else:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
+            )
 
     if ARGS.src_lang is not None:
         args.src_lang = ARGS.src_lang

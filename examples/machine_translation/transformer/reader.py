@@ -22,21 +22,20 @@ import numpy as np
 from paddle.io import BatchSampler, DataLoader, Dataset
 import paddle.distributed as dist
 from paddlenlp.data import Pad, Vocab
-from paddlenlp.data.sampler import SamplerHelper
 
 
 def min_max_filer(data, max_len, min_len=0):
     # 1 for special tokens.
-    data_min_len = min(len(data[0]), len(data[1])) + 1
-    data_max_len = max(len(data[0]), len(data[1])) + 1
+    data_min_len = min(len(data["source"]), len(data["target"])) + 1
+    data_max_len = max(len(data["source"]), len(data["target"])) + 1
     return (data_min_len >= min_len) and (data_max_len <= max_len)
 
 
 def create_data_loader(args, places=None):
     use_custom_dataset = (args.train_file is not None
                           or args.dev_file is not None
-                          or args.test_file is not None
                           or args.data_dir is not None)
+    map_kwargs = {}
     if use_custom_dataset:
         data_files = {}
         if args.data_dir is not None:
@@ -70,28 +69,12 @@ def create_data_loader(args, places=None):
                         "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
                                               args.trg_lang)),
                 ]
-            if os.path.exist(
-                    os.path.join(
-                        args.data_dir,
-                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                               args.src_lang))):
-                data_files["test"] = [
-                    os.path.join(
-                        args.data_dir,
-                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                               args.src_lang)),
-                    os.path.join(
-                        args.data_dir,
-                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                               args.trg_lang)),
-                ]
         else:
+            # datasets.load_dataset doesn't support tuple
             if args.train_file is not None:
-                data_files["train"] = args.train_file
+                data_files["train"] = list(args.train_file)
             if args.dev_file is not None:
-                data_files["dev"] = args.dev_file
-            if args.test_file is not None:
-                data_files["test"] = args.test_file
+                data_files["dev"] = list(args.dev_file)
 
         from datasets import load_dataset
         datasets = load_dataset('language_pair',
@@ -110,6 +93,8 @@ def create_data_loader(args, places=None):
     else:
         from paddlenlp.datasets import load_dataset
         datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
+
+        map_kwargs["lazy"] = False
 
         if args.src_vocab is not None:
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
@@ -143,16 +128,16 @@ def create_data_loader(args, places=None):
 
     def convert_samples(sample):
         source = sample["source"].split()
+        sample["source"] = src_vocab.to_indices(source)
+
         target = sample["target"].split()
+        sample["target"] = trg_vocab.to_indices(target)
 
-        source = src_vocab.to_indices(source)
-        target = trg_vocab.to_indices(target)
-
-        return source, target
+        return sample
 
     data_loaders = [(None)] * 2
     for i, dataset in enumerate(datasets):
-        dataset = dataset.map(convert_samples, lazy=False).filter(
+        dataset = dataset.map(convert_samples, **map_kwargs).filter(
             partial(min_max_filer, max_len=args.max_length))
         batch_sampler = TransformerBatchSampler(
             dataset=dataset,
@@ -184,43 +169,12 @@ def create_data_loader(args, places=None):
 
 
 def create_infer_loader(args):
-    use_custom_dataset = (args.train_file is not None
-                          or args.dev_file is not None
-                          or args.test_file is not None
+    use_custom_dataset = (args.test_file is not None
                           or args.data_dir is not None)
+    map_kwargs = {}
     if use_custom_dataset:
         data_files = {}
         if args.data_dir is not None:
-            if os.path.exist(
-                    os.path.join(
-                        args.data_dir,
-                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                                args.src_lang))):
-                data_files["train"] = [
-                    os.path.join(
-                        args.data_dir,
-                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                                args.src_lang)),
-                    os.path.join(
-                        args.data_dir,
-                        "train.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                                args.trg_lang)),
-                ]
-            if os.path.exist(
-                    os.path.join(
-                        args.data_dir,
-                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                              args.src_lang))):
-                data_files["dev"] = [
-                    os.path.join(
-                        args.data_dir,
-                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                              args.src_lang)),
-                    os.path.join(
-                        args.data_dir,
-                        "dev.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                              args.trg_lang)),
-                ]
             if os.path.exist(
                     os.path.join(
                         args.data_dir,
@@ -232,22 +186,24 @@ def create_infer_loader(args):
                         "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
                                                args.src_lang)),
                     os.path.join(
-                        args.data_dir,
-                        "test.{}-{}.{}".format(args.src_lang, args.trg_lang,
-                                               args.trg_lang)),
+                        args.data_dir, "test.{}-{}.{}".format(
+                            args.src_lang, args.trg_lang, args.trg_lang))
+                    if os.path.exist(
+                        os.path.join(
+                            args.data_dir, "test.{}-{}.{}".format(
+                                args.src_lang, args.trg_lang, args.trg_lang)))
+                    else None,
                 ]
         else:
-            if args.train_file is not None:
-                data_files["train"] = args.train_file
-            if args.dev_file is not None:
-                data_files["dev"] = args.dev_file
             if args.test_file is not None:
-                data_files["test"] = args.test_file
+                # datasets.load_dataset doesn't support tuple
+                data_files["test"] = list(args.test_file) if isinstance(
+                    args.test_file, tuple) else args.test_file
 
         from datasets import load_dataset
-        datasets = load_dataset('language_pair',
-                                data_files=data_files,
-                                split=('test'))
+        dataset = load_dataset('language_pair',
+                               data_files=data_files,
+                               split=('test'))
 
         if args.src_vocab is not None:
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
@@ -260,7 +216,9 @@ def create_infer_loader(args):
 
     else:
         from paddlenlp.datasets import load_dataset
-        datasets = load_dataset('wmt14ende', splits=('test'))
+        dataset = load_dataset('wmt14ende', splits=('test'))
+
+        map_kwargs["lazy"] = False
 
         if args.src_vocab is not None:
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
@@ -268,10 +226,9 @@ def create_infer_loader(args):
                                               bos_token=args.bos_token,
                                               eos_token=args.eos_token)
         elif not args.benchmark:
-            src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
         else:
-            src_vocab = Vocab.load_vocabulary(
-                **datasets[0].vocab_info["benchmark"])
+            src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
 
     if use_custom_dataset and not args.joined_dictionary:
         if args.trg_vocab is not None:
@@ -294,20 +251,20 @@ def create_infer_loader(args):
 
     def convert_samples(sample):
         source = sample["source"].split()
-        target = sample["target"].split()
+        sample["source"] = src_vocab.to_indices(source)
 
-        source = src_vocab.to_indices(source)
-        target = trg_vocab.to_indices(target)
+        if "target" in sample.keys() and sample["target"] != "":
+            target = sample["target"].split()
+            sample["target"] = trg_vocab.to_indices(target)
 
-        return source, target
+        return sample
 
-    dataset = dataset.map(convert_samples, lazy=False)
-
-    batch_sampler = SamplerHelper(dataset).batch(
-        batch_size=args.infer_batch_size, drop_last=False)
+    dataset = dataset.map(convert_samples, **map_kwargs)
 
     data_loader = DataLoader(dataset=dataset,
-                             batch_sampler=batch_sampler,
+                             batch_size=args.infer_batch_size,
+                             shuffle=False,
+                             drop_last=False,
                              collate_fn=partial(prepare_infer_input,
                                                 bos_idx=args.bos_idx,
                                                 eos_idx=args.eos_idx,
@@ -364,19 +321,20 @@ def prepare_train_input(insts,
     Put all padded data needed by training into a list.
     """
     word_pad = Pad(pad_idx, dtype=dtype)
-    src_max_len = (max([len(inst[0])
+    src_max_len = (max([len(inst["source"])
                         for inst in insts]) + pad_seq) // pad_seq * pad_seq
-    trg_max_len = (max([len(inst[1])
+    trg_max_len = (max([len(inst["target"])
                         for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([
-        inst[0] + [eos_idx] + [pad_idx] * (src_max_len - 1 - len(inst[0]))
-        for inst in insts
+        inst["source"] + [eos_idx] + [pad_idx] *
+        (src_max_len - 1 - len(inst["source"])) for inst in insts
     ])
-    trg_word = word_pad([[bos_idx] + inst[1] + [pad_idx] *
-                         (trg_max_len - 1 - len(inst[1])) for inst in insts])
+    trg_word = word_pad([[bos_idx] + inst["target"] + [pad_idx] *
+                         (trg_max_len - 1 - len(inst["target"]))
+                         for inst in insts])
     lbl_word = np.expand_dims(word_pad([
-        inst[1] + [eos_idx] + [pad_idx] * (trg_max_len - 1 - len(inst[1]))
-        for inst in insts
+        inst["target"] + [eos_idx] + [pad_idx] *
+        (trg_max_len - 1 - len(inst["target"])) for inst in insts
     ]),
                               axis=2)
 
@@ -395,11 +353,11 @@ def prepare_infer_input(insts,
     Put all padded data needed by beam search decoder into a list.
     """
     word_pad = Pad(pad_idx, dtype=dtype)
-    src_max_len = (max([len(inst[0])
+    src_max_len = (max([len(inst["source"])
                         for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([
-        inst[0] + [eos_idx] + [pad_idx] * (src_max_len - 1 - len(inst[0]))
-        for inst in insts
+        inst["source"] + [eos_idx] + [pad_idx] *
+        (src_max_len - 1 - len(inst["source"])) for inst in insts
     ])
 
     return [
@@ -499,7 +457,7 @@ class TransformerBatchSampler(BatchSampler):
         self._local_rank = rank
         self._sample_infos = []
         for i, data in enumerate(self._dataset):
-            lens = [len(data[0]), len(data[1])]
+            lens = [len(data["source"]), len(data["target"])]
             self._sample_infos.append(SampleInfo(i, lens, self._pad_seq))
 
     def __iter__(self):

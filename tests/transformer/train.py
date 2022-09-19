@@ -41,6 +41,13 @@ def parse_args():
                         type=int,
                         help="The maximum iteration for training. ")
     parser.add_argument(
+        "--data_dir",
+        default=None,
+        type=str,
+        help=
+        "The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. "
+    )
+    parser.add_argument(
         "--train_file",
         nargs='+',
         default=None,
@@ -335,6 +342,7 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.data_dir = ARGS.data_dir
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
 
@@ -342,12 +350,27 @@ if __name__ == "__main__":
         args.src_vocab = ARGS.vocab_file
         args.trg_vocab = ARG.vocab_file
         args.joined_dictionary = True
+    elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
+        args.joined_dictionary = True
     else:
         args.src_vocab = ARGS.src_vocab
         args.trg_vocab = ARGS.trg_vocab
         args.joined_dictionary = not (args.src_vocab is not None
                                       and args.trg_vocab is not None
                                       and args.src_vocab != args.trg_vocab)
+    if args.weight_sharing != args.joined_dictionary:
+        if args.weight_sharing:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be consistency when weight_sharing is True. "
+            )
+        else:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
+            )
 
     if ARGS.src_lang is not None:
         args.src_lang = ARGS.src_lang

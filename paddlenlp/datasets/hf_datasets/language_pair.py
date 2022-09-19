@@ -114,6 +114,15 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
         # Test files.
         if hasattr(self.config,
                    "data_files") and "test" in self.config.data_files:
+            # test may not contain target languages.
+            if isinstance(self.config.data_files["test"], str):
+                self.config.data_files["test"] = [
+                    self.config.data_files["test"], None
+                ]
+            elif (isinstance(self.config.data_files["test"], (list, tuple))
+                  and len(self.config.data_files["test"]) == 1):
+                self.config.data_files["test"].append(None)
+
             test_split = datasets.SplitGenerator(
                 name="test",
                 gen_kwargs={
@@ -145,17 +154,30 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
         key = 0
 
         with open(source_filepath, 'r', encoding="utf-8") as src_fin:
-            with open(target_filepath, 'r', encoding="utf-8") as tgt_fin:
-                src_seq = src_fin.readlines()
-                tgt_seq = tgt_fin.readlines()
+            if target_filepath is not None:
+                with open(target_filepath, 'r', encoding="utf-8") as tgt_fin:
+                    src_seq = src_fin.readlines()
+                    tgt_seq = tgt_fin.readlines()
 
+                    for i, src in enumerate(src_seq):
+                        source = src.strip()
+                        target = tgt_seq[i].strip()
+
+                        yield key, {
+                            "id": str(key),
+                            "source": source,
+                            "target": target,
+                        }
+                        key += 1
+            else:
+                src_seq = src_fin.readlines()
                 for i, src in enumerate(src_seq):
                     source = src.strip()
-                    target = tgt_seq[i].strip()
 
                     yield key, {
                         "id": str(key),
                         "source": source,
-                        "target": target
+                        # None is not allowed.
+                        "target": "",
                     }
                     key += 1
