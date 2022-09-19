@@ -18,6 +18,8 @@
 from __future__ import annotations
 
 import copy
+from curses.ascii import isdigit
+from genericpath import isdir
 import json
 import os
 import os.path as osp
@@ -30,7 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_
 from packaging import version
 
 from ..utils import CONFIG_NAME
-from ..utils.downloader import is_url, get_path_from_url
+from ..utils.downloader import COMMUNITY_MODEL_PREFIX, is_url, get_path_from_url
 
 from paddlenlp.utils.log import logger
 from paddlenlp import __version__
@@ -393,7 +395,7 @@ class PretrainedConfig:
     is_composition: bool = False
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-    # TODO: this comment should be removed after this feature is accepted by PaddleNLP teams
+    # TODO(wj-Mcat): this comment should be removed after this feature is accepted by PaddleNLP teams
     # `pretrained_init_configuration` can be `dict` or `url`: eg:
     #     {
     #         "bert-base-uncased": {
@@ -744,27 +746,25 @@ class PretrainedConfig:
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url(
                 pretrained_model_name_or_path, cache_dir)
-        else:
-            # 3. get the configuration file from local dir with default name, eg: /local/path
-            if os.path.isdir(pretrained_model_name_or_path):
-                configuration_file = kwargs.pop("_configuration_file",
-                                                CONFIG_NAME)
-                configuration_file = os.path.join(pretrained_model_name_or_path,
-                                                  configuration_file)
-                if os.path.isfile(configuration_file):
-                    resolved_config_file = configuration_file
-                else:
-                    raise FileNotFoundError(
-                        'please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` '
-                        'param into `from_pretarined` method to specific the configuration file name'
-                    )
+        # 3. get the configuration file from local dir with default name, eg: /local/path
+        elif os.path.isdir(pretrained_model_name_or_path):
+            configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
+            configuration_file = os.path.join(pretrained_model_name_or_path,
+                                              configuration_file)
+            if os.path.isfile(configuration_file):
+                resolved_config_file = configuration_file
             else:
-                raise NotFoundErr(
-                    "pretrained_model_name_or_path<%s> is not a valid model-name/file/url/dir."
-                    "if it's a model-name, please make sure it's one of <%s>;",
-                    pretrained_model_name_or_path,
-                    ','.join(list(cls.pretrained_init_configuration.keys())))
-
+                raise FileNotFoundError(
+                    'please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` '
+                    'param into `from_pretarined` method to specific the configuration file name'
+                )
+        # 4. load it as the community resource file
+        else:
+            community_url = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                         pretrained_model_name_or_path,
+                                         CONFIG_NAME)
+            assert is_url(community_url)
+            return cls._get_config_dict(community_url)
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
             # Load config dict

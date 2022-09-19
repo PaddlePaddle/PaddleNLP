@@ -932,11 +932,10 @@ class PretrainedModel(Layer, GenerationMixin):
                 return weight_file_path
         else:
             # assume that the community-based models, name format: community/model-name
-            if len(pretrained_model_name_or_path.split('/')) == 2:
-                pretrained_model_name_or_path = os.path.join(
-                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path)
-                return cls.pretrained_resource_files_map(
-                    pretrained_model_name_or_path)
+            pretrained_model_name_or_path = os.path.join(
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                cls.resource_files_names['model_state'])
+            return pretrained_model_name_or_path
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>",
@@ -1135,7 +1134,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned', num_labels=3)
 
                 # Load from local directory path
-                model = BertForSequenceClassification.from_pretrained('./my_bert/')
+                model = BertForSequenceClassification.from_pretrained('./my_bert/'
         """
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         cache_dir = kwargs.pop('cache_dir', None)
@@ -1149,36 +1148,16 @@ class PretrainedModel(Layer, GenerationMixin):
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
-
             config_path = config if config is not None else pretrained_model_name_or_path
-            # 1.1 get configuration from `pretrained_init_configuration` field
-            if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-                config = cls.config_class(
-                    **cls.
-                    pretrained_init_configuration[pretrained_model_name_or_path]
-                )
-                config.save_pretrained(cache_dir)
-            elif os.path.isdir(pretrained_model_name_or_path):
-                # 1.2 get configuration from local_dir
-                config, model_kwargs = cls.config_class.from_pretrained(
-                    config_path,
-                    cache_dir=cache_dir,
-                    return_unused_kwargs=True,
-                    force_download=force_download,
-                    **kwargs,
-                )
-            else:
-                # community-contributed model
-                config_path = cls.config_class.from_pretrained(
-                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                    cls.model_config_file)
-                config = cls.config_class.from_pretrained(
-                    config_path,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    **kwargs,
-                )
+            config, model_kwargs = cls.config_class.from_pretrained(
+                config_path,
+                cache_dir=cache_dir,
+                return_unused_kwargs=True,
+                force_download=force_download,
+                **kwargs,
+            )
 
+        config.save_pretrained(cache_dir)
         # 2. init the model
         model = cls(config=config, **model_kwargs)
 
@@ -1236,7 +1215,10 @@ class PretrainedModel(Layer, GenerationMixin):
                 f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
                 f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
                 " to use it for predictions and inference.")
-        return model
+        if paddle.in_dynamic_mode():
+            return model
+
+        return model, model_state_dict
 
     def save_pretrained_v2(self, save_dir: str):
         """
