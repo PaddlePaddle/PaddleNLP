@@ -1748,7 +1748,7 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(reshaped_logits, labels)
-            output = (loss,) + output
+            output = (loss, ) + output
 
         if not return_dict:
             output = (reshaped_logits, ) + sequence_output[1:]

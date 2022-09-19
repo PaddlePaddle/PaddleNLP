@@ -481,6 +481,7 @@ class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
 
 
 class XLNetModelLanguageGenerationTest(unittest.TestCase):
+
     @slow
     def test_lm_generate_xlnet_base_cased(self):
         return

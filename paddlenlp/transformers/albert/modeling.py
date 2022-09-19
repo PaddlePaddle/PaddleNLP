@@ -22,17 +22,12 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutput,
-    ModelOutput,
-    BaseModelOutputWithPooling,
-    MaskedLMOutput,
-    MultipleChoiceModelOutput,
-    QuestionAnsweringModelOutput,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    tuple_output
-)
+from ..model_outputs import (BaseModelOutput, ModelOutput,
+                             BaseModelOutputWithPooling, MaskedLMOutput,
+                             MultipleChoiceModelOutput,
+                             QuestionAnsweringModelOutput,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             tuple_output)
 
 __all__ = [
     "AlbertPretrainedModel",

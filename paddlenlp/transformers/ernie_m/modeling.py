@@ -16,14 +16,10 @@ import paddle
 import paddle.nn as nn
 
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPooling,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    tuple_output
-)
+from ..model_outputs import (BaseModelOutputWithPooling,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, tuple_output)
 
 __all__ = [
     'ErnieMModel', 'ErnieMPretrainedModel', 'ErnieMForSequenceClassification',

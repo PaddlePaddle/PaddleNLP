@@ -17,13 +17,9 @@ import paddle.nn as nn
 
 from ..ernie.modeling import ErniePooler
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPooling,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    tuple_output
-)
+from ..model_outputs import (BaseModelOutputWithPooling,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput, tuple_output)
 
 __all__ = [
     'ErnieGramModel',

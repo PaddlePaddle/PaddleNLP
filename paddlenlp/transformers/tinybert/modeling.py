@@ -19,13 +19,10 @@ import paddle.nn as nn
 from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 
-from ..model_outputs import (
-    BaseModelOutputWithPooling,
-    SequenceClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    tuple_output
-)
+from ..model_outputs import (BaseModelOutputWithPooling,
+                             SequenceClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, tuple_output)
 
 __all__ = [
     'TinyBertModel', 'TinyBertPretrainedModel', 'TinyBertForPretraining',

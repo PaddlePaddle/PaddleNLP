@@ -27,7 +27,6 @@ from paddle.distributed.fleet.utils import recompute
 from .utils import adapt_stale_fwd_patch
 
 
-
 def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
     """re-construct the outputs with one method which contains the simple logic
 
@@ -36,7 +35,7 @@ def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
         loss (Optional[Tensor], optional): the loss of the model. Defaults to None.
     """
     if loss is not None:
-        outputs = (loss,) + outputs
+        outputs = (loss, ) + outputs
     if len(outputs) == 1:
         return outputs[0]
     return outputs

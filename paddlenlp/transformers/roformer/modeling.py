@@ -18,16 +18,11 @@ import paddle.nn as nn
 
 from .. import PretrainedModel, register_base_model
 from ..albert.modeling import get_activation
-from ..model_outputs import (
-    BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
-    tuple_output
-)
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             CausalLMOutputWithCrossAttentions, tuple_output)
 from paddle.common_ops_import import convert_dtype
 
 __all__ = [
