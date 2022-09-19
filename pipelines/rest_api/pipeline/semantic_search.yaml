@@ -2,7 +2,7 @@ version: '1.1.0'
 
 components:    # define all the building-blocks for Pipeline
   - name: DocumentStore
-    type: ElasticsearchDocumentStore  # consider using MilvusDocumentStore or WeaviateDocumentStore for scaling to large number of documents
+    type: ElasticsearchDocumentStore  # consider using Milvus2DocumentStore or WeaviateDocumentStore for scaling to large number of documents
     params:
       host: localhost
       port: 9200

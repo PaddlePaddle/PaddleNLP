@@ -108,11 +108,14 @@ def convert_clue(example,
                             max_seq_len=max_seq_length)
 
     if not is_test:
-        return {
-            "input_ids": example['input_ids'],
-            "token_type_ids": example['token_type_ids'],
-            "labels": label
-        }
+        if "token_type_ids" in example:
+            return {
+                "input_ids": example['input_ids'],
+                "token_type_ids": example['token_type_ids'],
+                "labels": label
+            }
+        else:
+            return {"input_ids": example['input_ids'], "labels": label}
     else:
         return {
             "input_ids": example['input_ids'],

@@ -53,9 +53,11 @@ parser.add_argument('--eval_steps', type=int, default=10000, help="Step interval
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file.")
 parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween pos_sample and neg_samples.")
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
+parser.add_argument("--is_unsupervised", action='store_true', help="Whether to use unsupervised training")
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout for pretrained model encoder.")
 parser.add_argument("--dup_rate", default=0.32, type=float, help="duplicate rate for word reptition.")
 parser.add_argument("--infer_with_fc_pooler", action='store_true', help="Whether use fc layer after cls embedding or not for when infer.")
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--rdrop_coef", default=0.0, type=float, help="The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works")
 args = parser.parse_args()
 
@@ -101,15 +103,19 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
-    train_ds = load_dataset(
+    if(args.is_unsupervised):
+        train_ds = load_dataset(
+        read_simcse_text, data_path=args.train_set_file,is_test=False, lazy=False)
+    else:
+        train_ds = load_dataset(
         read_text_pair, data_path=args.train_set_file,is_test=False, lazy=False)
-    model_name_or_path='rocketqa-zh-dureader-query-encoder'
+
     pretrained_model = AutoModel.from_pretrained(
-       model_name_or_path,
+       args.model_name_or_path,
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(
         convert_example,
