@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from re import S
 import unittest
 from typing import Optional, Union, Dict
 from paddlenlp.transformers.configuration_utils import attribute_map, parse_config, PretrainedConfig
