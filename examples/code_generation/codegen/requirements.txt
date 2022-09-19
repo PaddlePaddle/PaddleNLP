@@ -4,3 +4,4 @@ python-dotenv==0.20.0
 sse_starlette==0.10.3
 uvicorn==0.17.6
 openai==0.8.0
+regex==2022.6.2
