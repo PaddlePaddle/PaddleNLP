@@ -23,7 +23,6 @@ import json
 import time
 import yaml
 import shutil
-from functools import partial
 
 import numpy as np
 import paddle
@@ -200,7 +199,6 @@ def run_evaluate(data_loader,
                  args,
                  task_name="valid"):
     model.eval()
-
     all_loss, all_lm_loss, all_sop_loss = [], [], []
 
     if args.binary_head:
