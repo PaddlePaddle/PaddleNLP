@@ -174,6 +174,7 @@ print(result)
   [Hint: Expected kernels_iter != all_op_kernels.end(), but received kernels_iter == all_op_kernels.end().] (at /home/Paddle/paddle/fluid/imperative/prepared_operator.cc:341)
   [operator < unsqueeze2 > error]
 ```
+- 本代码也支持插件[fauxpilot](https://marketplace.visualstudio.com/items?itemName=Venthe.fauxpilot)，感谢[@linonetwo](https://github.com/linonetwo)测试。`settings.json`中配置"fauxpilot.server": "http://服务器ip:8978/v1/engines"
 
 ## 训练定制
 
@@ -315,3 +316,4 @@ hello_world()
 ## References
 - Nijkamp, Erik, et al. "A conversational paradigm for program synthesis." arXiv preprint arXiv:2203.13474 (2022).
 - [https://github.com/features/copilot/](https://github.com/features/copilot/)
+- [https://github.com/AndPuQing/Papilot](https://github.com/AndPuQing/Papilot)
