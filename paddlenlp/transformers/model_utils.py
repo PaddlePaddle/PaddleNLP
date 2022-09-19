@@ -330,7 +330,9 @@ class PretrainedModel(Layer, GenerationMixin):
             args & kwargs
         """
         # if the Model don't support PretrainedConfig, so return the source of args and kwargs
-        if not cls.constructed_from_pretrained_config():
+
+        if not cls.constructed_from_pretrained_config() or not issubclass(
+                cls, PretrainedModel):
             return args, kwargs
 
         # pop the model & config from data
@@ -355,7 +357,6 @@ class PretrainedModel(Layer, GenerationMixin):
             elif isinstance(value, PretrainedConfig):
                 config = value
                 kwargs.pop(key)
-
         if model is None and config is None:
             raise ValueError(
                 "Failed to init PretrainedModel which need PretrainedConfig or base-model, but all of them is None"
@@ -381,9 +382,12 @@ class PretrainedModel(Layer, GenerationMixin):
                 f"there are {len(unused_kwargs)} fields<{','.join(list(unused_kwargs.keys()))}> not used, please make sure all of params should be the attribute of {str(cls.config_class)}, "
                 "if there are some fields to be mapped into another field, you can add it into `init_fields` class attribute"
             )
-        kwargs = {
-            "config": config,
-        }
+
+        kwargs = {}
+        if config is not None:
+            kwargs['config'] = config
+        if model is not None:
+            kwargs[cls.base_model_prefix] = model
 
         # if `cls.base_model_prefix` is in __init__ params list, so it should add it into kwargs whether it has value or not.
         if param_in_init(init_func, cls.base_model_prefix):
