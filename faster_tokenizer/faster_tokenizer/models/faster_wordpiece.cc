@@ -133,6 +133,8 @@ void FasterWordPiece::AppendTokensToOutput(
   if (id == unk_token_id_) {
     value = unk_token_;
   } else {
+    auto c_offset = *curr_offset_in_sequence;
+    c_offset = (std::min)(c_offset, static_cast<int>(sequence.length() - 1));
     value = sequence.substr(*curr_offset_in_sequence, token_substr_length);
   }
 
@@ -286,7 +288,7 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithoutPreTokenize(
                                        &all_tokens);
   }
   if (all_tokens.size() == 0) {
-      ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
+    ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
   }
   VLOG(6) << "All tokens num from TokenizeWithoutPreTokenize: "
           << all_tokens.size();
@@ -374,7 +376,7 @@ std::vector<core::Token> FasterWordPiece::TokenizeWithPreTokenize(
                          &all_tokens);
   }
   if (all_tokens.size() == 0) {
-      ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
+    ResetOutputAppendUNK(0, sequence.size(), &original_num_tokens, &all_tokens);
   }
   VLOG(6) << "All tokens num from TokenizeWithPreTokenize: "
           << all_tokens.size();

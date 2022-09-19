@@ -12,7 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python feature_extract.py \
-        --model_dir=./output \
-        --model_name_or_path rocketqa-zh-base-query-encoder \
-        --corpus_file "data/corpus.csv" 
+# Can be used in linux and mac
+mkdir -p build_cpp
+cd build_cpp
+rm -rf *
+platform="$(uname -s)"
+if [[ $platform == Linux* ]];
+then
+  core_num=`nproc`
+else
+  core_num=`sysctl -n hw.logicalcpu`
+fi
+echo "Compile with $core_num cores"
+cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
+make -j${core_num}
+cd ..

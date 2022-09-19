@@ -17,7 +17,7 @@ norm_train:../examples/machine_translation/transformer/train.py --config ../exam
 pact_train:null
 fpgm_train:null
 distill_train:null
-null:null
+to_static_train:--to_static
 null:null
 ##
 ===========================eval_params=========================== 
