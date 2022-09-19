@@ -687,6 +687,16 @@ python evaluate.py \
     --max_seq_len 512
 ```
 
+通过运行以下命令对UIE-M进行模型评估：
+
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --batch_size 16 \
+    --max_seq_len 512 \
+    --multilingual
+```
+
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
 
 可开启`debug`模式对每个正例类别分别进行评估，该模式仅用于模型调试：

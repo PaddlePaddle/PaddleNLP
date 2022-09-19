@@ -344,7 +344,6 @@ class UIETask(Task):
 
     def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-
         if model in ['uie-m-base', 'uie-m-large']:
             self._multilingual = True
             self.resource_files_names[

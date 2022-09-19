@@ -22,7 +22,7 @@ from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
-from model import UIE
+from model import UIE, UIEM
 from utils import convert_example, reader, unify_prompt_name
 
 

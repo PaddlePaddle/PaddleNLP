@@ -48,10 +48,10 @@ def do_train():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if args.model in ["uie-m-large", "uie-m-base"]:
         multilingual = True
-        model = UIE.from_pretrained(args.model)
+        model = UIEM.from_pretrained(args.model)
     else:
         multilingual = False
-        model = UIEM.from_pretrained(args.model)
+        model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(reader,
                             data_path=args.train_path,
