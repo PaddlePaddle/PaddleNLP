@@ -4,9 +4,9 @@ python:python
 gpu_list:0|0,1
 null:null
 null:null
---epoch:lite_train_lite_infer=1
+--epoch:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=3
 --save_dir:null
---batch_size:lite_train_lite_infer=32
+--batch_size:lite_train_lite_infer=32|lite_train_whole_infer=32|whole_train_whole_infer=32
 null:null
 null:model
 null:null
