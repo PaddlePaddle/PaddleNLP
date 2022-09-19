@@ -185,6 +185,7 @@ core::Vocab WordPiece::GetVocabFromFile(const std::string& file) {
     std::string word_str = word;
     auto leading_spaces = word_str.find_first_not_of(WHITESPACE);
     if (leading_spaces != std::string::npos) {
+      leading_spaces = (std::min)(leading_spaces, word_str.length() - 1);
       word_str = word_str.substr(leading_spaces);
     }
     auto trailing_spaces = word_str.find_last_not_of(WHITESPACE);
@@ -275,6 +276,7 @@ void WordPieceFactory::GetVocabFromFiles(const std::string& files) {
     std::string word_str = word;
     auto leading_spaces = word_str.find_first_not_of(WHITESPACE);
     if (leading_spaces != std::string::npos) {
+      leading_spaces = (std::min)(leading_spaces, word_str.length() - 1);
       word_str = word_str.substr(leading_spaces);
     }
     auto trailing_spaces = word_str.find_last_not_of(WHITESPACE);

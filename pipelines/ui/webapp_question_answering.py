@@ -85,14 +85,7 @@ def main():
         on_change=reset_results,
     )
 
-    top_k_ranker = st.sidebar.slider(
-        "最大排序数量",
-        min_value=1,
-        max_value=50,
-        value=DEFAULT_DOCS_FROM_RANKER,
-        step=1,
-        on_change=reset_results,
-    )
+    top_k_ranker = 1
 
     top_k_reader = st.sidebar.slider(
         "最大的答案的数量",

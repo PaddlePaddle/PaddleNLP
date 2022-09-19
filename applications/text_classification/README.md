@@ -8,6 +8,7 @@
   - [2.3 高效模型调优方案](#高效模型调优方案)
   - [2.4 产业级全流程方案](#产业级全流程方案)
 - [3. 快速开始](#快速开始)
+- [4. 常用中文分类数据集](#常用中文分类数据集)
 
 <a name="文本分类应用简介"></a>
 
@@ -233,3 +234,59 @@
 - 快速开启多标签分类 👉 [多标签指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#readme)
 
 - 快速开启层次分类 👉 [层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme)
+
+<a name="常用中文分类数据集"></a>
+
+## 4. 常用中文分类数据集
+
+**多分类数据集：**
+
+- [THUCNews新闻分类数据集](http://thuctc.thunlp.org/)
+
+- [百科问答分类数据集](https://github.com/brightmart/nlp_chinese_corpus#3%E7%99%BE%E7%A7%91%E7%B1%BB%E9%97%AE%E7%AD%94json%E7%89%88baike2018qa)
+
+- [头条新闻标题数据集TNEWS](https://github.com/aceimnorstuvwxz/toutiao-text-classfication-dataset)
+
+- [复旦新闻文本数据集](https://www.heywhale.com/mw/dataset/5d3a9c86cf76a600360edd04)
+
+- [IFLYTEK app应用描述分类数据集](https://storage.googleapis.com/cluebenchmark/tasks/iflytek_public.zip)
+
+- [CAIL 2022事件检测](https://cloud.tsinghua.edu.cn/d/6e911ff1286d47db8016/)
+
+**情感分类数据集(多分类):**
+
+- [亚马逊商品评论情感数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/yf_amazon/intro.ipynb)
+
+- [财经新闻情感分类数据集](https://github.com/wwwxmu/Dataset-of-financial-news-sentiment-classification)
+
+- [ChnSentiCorp 酒店评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/tree/master/datasets/ChnSentiCorp_htl_all)
+
+- [外卖评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/waimai_10k/intro.ipynb)
+
+- [weibo情感二分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/weibo_senti_100k/intro.ipynb)
+
+- [weibo情感四分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/simplifyweibo_4_moods/intro.ipynb)
+
+- [商品评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/online_shopping_10_cats/intro.ipynb)
+
+- [电影评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/dmsc_v2/intro.ipynb)
+
+- [大众点评分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/yf_dianping/intro.ipynb)
+
+**多标签数据集:**
+
+- [学生评语分类数据集](https://github.com/FBI1314/textClassification/tree/master/multilabel_text_classfication/data)
+
+- [CAIL2019婚姻要素识别](https://aistudio.baidu.com/aistudio/projectdetail/3996601)
+
+- [CAIL2018 刑期预测、法条预测、罪名预测](https://cail.oss-cn-qingdao.aliyuncs.com/CAIL2018_ALL_DATA.zip)
+
+**层次分类数据集:**
+
+- [头条新闻标题分类-TNEWS的升级版](https://github.com/aceimnorstuvwxz/toutiao-multilevel-text-classfication-dataset)
+
+- [网页层次分类数据集](https://csri.scu.edu.cn/info/1012/2827.htm)
+
+- [医学意图数据集(CMID)](https://github.com/liutongyang/CMID)
+
+- [2020语言与智能技术竞赛事件分类](https://github.com/percent4/keras_bert_multi_label_cls/tree/master/data)
