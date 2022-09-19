@@ -1340,14 +1340,32 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 
 ```shell
 # 分类任务
-python run_seq_cls.py  --task_name tnews --model_name_or_path ernie-3.0-medium-zh --do_train
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+python run_seq_cls.py  \
+    --task_name tnews \
+    --model_name_or_path ernie-3.0-medium-zh \
+    --do_train
 
 # 序列标注任务
-python run_token_cls.py --task_name msra_ner  --model_name_or_path ernie-3.0-medium-zh --do_train
+python run_token_cls.py \
+    --task_name msra_ner  \
+    --model_name_or_path ernie-3.0-medium-zh \
+    --do_train \
+    --num_train_epochs 3 \
+    --learning_rate 0.00005 \
+    --save_steps 100 \
+    --batch_size 32 \
+    --max_seq_length 128 \
+    --remove_unused_columns False
 
 # 阅读理解任务
-python run_qa.py --model_name_or_path ernie-3.0-medium-zh --do_train
-
+python run_qa.py \
+    --model_name_or_path ernie-3.0-medium-zh \
+    --do_train \
+    --learning_rate 0.00003 \
+    --num_train_epochs 8 \
+    --batch_size 24 \
+    --max_seq_length 512
 ```
 
 <a name="模型压缩"></a>
@@ -1617,7 +1635,7 @@ ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署�
 - [【快速上手ERNIE 3.0】机器阅读理解实战](https://aistudio.baidu.com/aistudio/projectdetail/2017189)
 
 - [【快速上手ERNIE 3.0】对话意图识别](https://aistudio.baidu.com/aistudio/projectdetail/2017202?contributionType=1)
-tangtang
+
 
 ## 参考文献
 
