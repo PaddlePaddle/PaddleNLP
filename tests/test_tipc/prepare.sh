@@ -111,6 +111,10 @@ elif [ ${MODE} = "whole_train_whole_infer" ];then
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd ..
     fi
 
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
+    fi
+
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
         sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
@@ -169,6 +173,10 @@ elif [ ${MODE} = "lite_train_whole_infer" ];then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
         wget -nc -P ./data/ https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd ..
+    fi
+
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
     fi
 
     if [[ ${model_name} =~ transformer* ]]; then
@@ -247,6 +255,10 @@ elif [ ${MODE} = "whole_infer" ];then
         cd ./test_tipc/bigru_crf && tar xfz bigru_crf_infer_model.tgz && cd ../..
     fi
 
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
+    fi
+    
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
         sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
