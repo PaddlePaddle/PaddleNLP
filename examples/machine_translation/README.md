@@ -1,6 +1,6 @@
 # 机器翻译
 
-机器翻译（Machine Translation）是利用计算机将一种自然语言(源语言)转换为另一种自然语言(目标语言)的过程，输入为源语言句子，输出为相应的目标语言的句子。
+机器翻译（Machine Translation）是利用计算机将一种自然语言（源语言）转换为另一种自然语言（目标语言）的过程，输入为源语言句子，输出为相应的目标语言的句子。
 
 ## 快速开始
 
@@ -15,7 +15,9 @@
 
 ### 数据准备
 
-#### 使用内置已经处理完成数据
+数据准备部分分成两种模式，一种是使用 PaddleNLP 内置的已经处理好的 WMT14 EN-DE 翻译的数据集，另一种，提供了当前 Transformer demo 使用自定义数据集的方式。以下分别展开介绍。
+
+#### 使用内置已经处理完成数据集
 
 内置的处理好的数据集是基于公开的数据集：WMT 数据集。
 
@@ -27,9 +29,11 @@ WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中�
 datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
 ```
 
+如果使用内置的处理好的数据，那到这里即可完成数据准备一步，可以直接移步 [Transformer 翻译模型](transformer/README.md) 将详细介绍如何使用内置的数据集训一个英德翻译的 Transformer 模型。
+
 #### 使用自定义翻译数据集
 
-若以上数据集不能满足需求，本示例同时提供了自定义数据集的方法。可参考以下执行数据处理方式：
+本示例同时提供了自定义数据集的方法。可参考以下执行数据处理方式：
 
 ``` bash
 # 数据下载、处理，包括 bpe 的训练
@@ -60,7 +64,7 @@ python preprocessor/preprocessor.py \
 * `--trg_vocab`: 目标语言词表，默认为 None，表示需要预处理步骤根据训练集语料重新生成一份词表。如果源语言与目标语言共用同一份词表，那么将使用 `--src_vocab` 指定的词表。
 * `--nwords_src`: 源语言词表最大的大小，不包括 special token。默认为 None，表示不限制。若源语言和目标语言共用同一份词表，那么将使用 `--nwords_src` 指定的大小。
 * `--nwords_trg`: 目标语言词表最大的大小，不包括 special token。默认为 None，表示不限制。若源语言和目标语言共用同一份词表，那么将使用 `--nwords_src` 指定的大小。
-* `--align_file`:
+* `--align_file`: 是否将平行语料文件整合成一个文件。
 * `--joined_dictionary`: 源语言和目标语言是否使用同一份词表。若不共用同一份词表，无需指定。
 * `--only_source`: 是否仅处理源语言。
 * `--dict_only`: 是否仅处理词表。若指定，则仅完成词表处理。
@@ -83,7 +87,10 @@ bash prepare-wmt14en2fr.sh
 完成数据处理之后，同样也可以采用上文提到的预处理方式获取词表，完成预处理。以下再以 WMT14 EN-DE 翻译数据集预处理为例：
 
 ``` bash
+# 数据下载、处理，包括 bpe 的训练
 DATA_DIR=examples/translation/wmt14_en_de
+
+# 数据预处理
 python preprocessor/preprocessor.py \
     --source_lang en \
     --target_lang de \
@@ -96,23 +103,25 @@ python preprocessor/preprocessor.py \
     --joined_dictionary
 ```
 
-如果有或者需要使用其他的平行语料，可以自行完成下载和简单的处理。简单的处理需要用到 [mosesdecoder](https://github.com/moses-smt/mosesdecoder) 和 [subword-nmt](https://github.com/rsennrich/subword-nmt) 这两个工具。包括:
+如果有或者需要使用其他的平行语料，可以自行完成下载和简单的处理。
 
-* 使用 `mosesdecoder/scripts/tokenizer/tokenizer.perl` 完成对词做一个初级的切分，目的是用于后面 bpe 分词学习；
+在下载部分，即在 shell 脚本中，处理需要用到 [mosesdecoder](https://github.com/moses-smt/mosesdecoder) 和 [subword-nmt](https://github.com/rsennrich/subword-nmt) 这两个工具。包括:
+
+* 使用 `mosesdecoder/scripts/tokenizer/tokenizer.perl` 完成对词做一个初步的切分；
 * 基于 `mosesdecoder/scripts/training/clean-corpus-n.perl` 完成数据的清洗；
 * 使用 `subword-nmt/subword_nmt/learn_bpe.py` 完成 bpe 的学习；
 
-此外，基于学到的 bpe code 进行分词的操作目前提供了两种选项，可以在以上的 shell 脚本中处理完成，使用以下的工具：
+此外，基于学到的 bpe code 进行分词的操作目前提供了两种选项，其一是，可以在以上的 shell 脚本中处理完成，使用以下的工具：
 
 * 使用 `subword-nmt/subword_nmt/apply_bpe.py` 完成分词工作。
 
-也可以直接在后面的 `preprocessor/preprocessor.py` 脚本中，指明 `--apply_bpe` 完成分词操作。
+其二，也可以直接在后面的 `preprocessor/preprocessor.py` 脚本中，指明 `--apply_bpe` 完成分词操作。
 
-而在预处理 `preprocessor/preprocessor.py` 脚本中，将提供词表构建，甚至于 bpe 分词的功能（bpe 分词过程可选）。最后获取的处理完成的 train，dev，test 数据可以直接用于后面 Transformer 模型的训练、评估、推理中。
+而在预处理 `preprocessor/preprocessor.py` 脚本中，则提供词表构建，数据集文件整理，甚至于 bpe 分词的功能（bpe 分词过程可选）。最后获取的处理完成的 train，dev，test 数据可以直接用于后面 Transformer 模型的训练、评估和推理中。
 
 ### 如何训一个翻译模型
 
-前面完成了数据处理，接下来模型训练部分可以直接参考对应的模型文档：
+前文介绍了如何快速开始完成翻译训练所需平行语料的准备，关于进一步的，模型训练、评估和推理部分，可以根据需要，参考对应的模型的文档：
 
 * [Transformer 翻译模型](transformer/README.md)
 

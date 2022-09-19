@@ -25,8 +25,6 @@ from pprint import pprint
 from paddlenlp.data import Vocab
 from paddlenlp.utils.log import logger
 
-import fastBPE
-
 
 def get_preprocessing_parser():
     parser = argparse.ArgumentParser()
@@ -261,6 +259,8 @@ def main(args):
     pprint(args)
 
     if args.apply_bpe:
+        import fastBPE
+
         bpe = fastBPE.fastBPE(args.bpe_code)
         filenames = [
             _train_path(lang, args.train_pref)
