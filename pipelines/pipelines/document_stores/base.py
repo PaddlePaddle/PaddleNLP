@@ -31,7 +31,7 @@ from pipelines.schema import Document, Label
 from pipelines.nodes.base import BaseComponent
 from pipelines.errors import DuplicateDocumentError
 from pipelines.nodes.preprocessor import PreProcessor
-from pipelines.document_stores.utils import eval_data_from_json, eval_data_from_jsonl
+from pipelines.document_stores.utils import eval_data_from_json, eval_data_from_jsonl, squad_json_to_jsonl
 
 logger = logging.getLogger(__name__)
 
