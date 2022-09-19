@@ -17,25 +17,15 @@ import argparse
 import os
 import random
 import numpy as np
+import time
 
 import paddle
+
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification
+from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
 
 from data import load_dict, load_dataset, parse_decodes
-
-parser = argparse.ArgumentParser()
-
-# yapf: disable
-parser.add_argument("--save_dir", default='./ernie_ckpt', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
-parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
-
-args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed):
@@ -112,13 +102,13 @@ def create_dataloader(dataset,
                                 return_list=True)
 
 
-if __name__ == '__main__':
+def do_train(args):
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     trainer_num = paddle.distributed.get_world_size()
     if trainer_num > 1:
         paddle.distributed.init_parallel_env()
-    set_seed(102)
+    set_seed(args.seed)
     # Create dataset, tokenizer and dataloader.
     train_ds, dev_ds, test_ds = load_dataset(
         datafiles=(os.path.join(args.data_dir, 'train.txt'),
@@ -126,7 +116,7 @@ if __name__ == '__main__':
                    os.path.join(args.data_dir, 'test.txt')))
 
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
-    tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
 
     trans_func = partial(convert_to_features,
                          tokenizer=tokenizer,
@@ -161,7 +151,7 @@ if __name__ == '__main__':
                                     batchify_fn=batchify_fn)
 
     # Define the model netword and its loss
-    model = ErnieForTokenClassification.from_pretrained(
+    model = AutoModelForTokenClassification.from_pretrained(
         "ernie-1.0", num_classes=len(label_vocab))
     if trainer_num > 1:
         model = paddle.DataParallel(model)
@@ -170,22 +160,36 @@ if __name__ == '__main__':
     optimizer = paddle.optimizer.AdamW(learning_rate=2e-5,
                                        parameters=model.parameters())
 
-    step = 0
+    global_step = 0
+    tic_train = time.time()
     for epoch in range(args.epochs):
-        for input_ids, token_type_ids, length, labels in train_loader:
+        for step, batch in enumerate(train_loader):
+            input_ids, token_type_ids, length, labels = batch
             logits = model(input_ids, token_type_ids)
             loss = paddle.mean(loss_fn(logits, labels))
+
+            global_step += 1
+            if global_step % 10 == 0 and rank == 0:
+                print(
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
+                tic_train = time.time()
+
             loss.backward()
             optimizer.step()
             optimizer.clear_grad()
-            step += 1
-            print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
-        evaluate(model, metric, dev_loader)
-        model_to_save = model._layers if isinstance(
-            model, paddle.DataParallel) else model
-        model_to_save.save_pretrained(
-            os.path.join(args.save_dir, 'model_%d' % step))
 
+            if global_step % 100 == 0 and rank == 0:
+                evaluate(model, metric, dev_loader)
+                save_dir = os.path.join(args.save_dir, "model")
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                model_to_save.save_pretrained(save_dir)
+                tokenizer.save_pretrained(save_dir)
+
+            if global_step > args.max_steps:
+                return
     if rank == 0:
         preds = predict(model, test_loader, test_ds, label_vocab)
         file_path = "ernie_results.txt"
@@ -196,3 +200,19 @@ if __name__ == '__main__':
             "The results have been saved in the file: %s, some examples are shown below: "
             % file_path)
         print("\n".join(preds[:10]))
+
+
+if __name__ == '__main__':
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+    parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+    parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+    parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
+    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")
+    parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
+    args = parser.parse_args()
+    # yapf: enable
+
+    do_train(args)
