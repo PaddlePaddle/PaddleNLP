@@ -20,6 +20,17 @@ limitations under the License. */
 #include <vector>
 #include "faster_tokenizer/core/base.h"
 #include "faster_tokenizer/utils/utils.h"
+#include "glog/logging.h"
+
+#ifdef WITH_OMP
+#include <omp.h>
+#else
+// Replace OMP with std::thread
+#include <stdlib.h>
+#include <thread>
+#include <math.h>
+using namespace std;
+#endif
 
 namespace paddlenlp {
 namespace faster_tokenizer {
@@ -122,6 +133,7 @@ bool FASTERTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
 void FASTERTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
                                        const PadMethod& method);
 
+int GetThreadNum(size_t batch_size);
 }  // namespace core
 }  // namespace faster_tokenizer
 }  // namespace paddlenlp

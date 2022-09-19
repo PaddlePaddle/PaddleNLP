@@ -17,11 +17,7 @@ limitations under the License. */
 #include <cassert>
 #include <climits>
 #include <sstream>
-#include "glog/logging.h"
 
-#ifdef WITH_OMP
-#include <omp.h>
-#endif
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
@@ -600,6 +596,23 @@ bool TruncateEncodings(Encoding* encoding,
   return true;
 }
 
+void MultiThreadPadEncodings(std::vector<Encoding>* encodings,
+                  const PadMethod& method,
+                  size_t pad_length,
+                  size_t start_index,
+                  size_t step_index) {
+  auto batch_size = encodings->size();
+  size_t end_index = start_index+step_index;
+  if(end_index>batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+      auto& encoding = (*encodings)[i];
+      encoding.Pad(pad_length,
+                  method.pad_id_,
+                  method.pad_token_type_id_,
+                  method.pad_token_,
+                  method.direction_);
+  }
+}
 void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   if (encodings == nullptr || encodings->empty()) {
     return;
@@ -619,7 +632,6 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
   auto batch_size = encodings->size();
 #ifdef WITH_OMP
 #pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-#endif
   for (int i = 0; i < batch_size; ++i) {
     auto& encoding = (*encodings)[i];
     encoding.Pad(pad_length,
@@ -628,6 +640,46 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
                  method.pad_token_,
                  method.direction_);
   }
+#else
+  int thread_num = GetThreadNum(batch_size);
+  std::vector<std::thread> vectorOfThread;
+  size_t start_index = 0;
+  size_t step_index = ceil(batch_size/thread_num);
+
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread.emplace_back(std::thread(&MultiThreadPadEncodings,
+                                              encodings,
+                                              std::ref(method),
+                                              pad_length,
+                                              start_index,
+                                              step_index));
+    start_index = start_index + step_index;
+  }
+  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
+    vectorOfThread[thread_index].join();
+  }
+  vectorOfThread.clear();
+#endif
+
+}
+
+int GetThreadNum(size_t batch_size){
+  char* env_var = std::getenv("OMP_NUM_THREADS");
+  int thread_num = std::atoi(env_var);
+  if(batch_size <=0){
+    thread_num = 1;
+    VLOG(0) << "batch_size <=0, we set OMP_NUM_THREADS = 1";
+  }else{
+    int best_num = ceil(batch_size/4);
+    if(thread_num > best_num){
+      thread_num = best_num;
+      VLOG(0) << "OMP_NUM_THREADS > batch_size/4, we set OMP_NUM_THREADS = batch_size/4";
+    }else if(thread_num == 0){
+        thread_num = best_num;
+        VLOG(0) << "OMP_NUM_THREADS == 0, we set OMP_NUM_THREADS = batch_size/4";
+    }
+  }
+  return thread_num;
 }
 
 }  // namespace core
