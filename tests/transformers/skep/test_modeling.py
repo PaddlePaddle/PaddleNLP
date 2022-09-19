@@ -155,6 +155,8 @@ class SkepModelTester:
                        token_type_ids=token_type_ids,
                        return_dict=self.parent.return_dict,
                        labels=sequence_labels)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if token_labels is not None:
             result = result[1:]
@@ -176,7 +178,8 @@ class SkepModelTester:
                        token_type_ids=token_type_ids,
                        return_dict=self.parent.return_dict,
                        labels=token_labels)
-
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
         if token_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):

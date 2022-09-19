@@ -186,6 +186,8 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=choice_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -232,6 +234,8 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
         if paddle.is_tensor(result):
             result = [result]
         elif choice_labels is not None:
@@ -255,11 +259,13 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
         if paddle.is_tensor(result):
             result = [result]
         elif choice_labels is not None:
             result = result[1:]
-
         self.parent.assertEqual(result[0].shape, [
             self.config.batch_size, self.config.seq_length,
             self.config.vocab_size
@@ -277,6 +283,8 @@ class RoFormerModelTester:
                        token_type_ids=token_type_ids,
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
         if paddle.is_tensor(result):
             result = [result]
         elif choice_labels is not None:

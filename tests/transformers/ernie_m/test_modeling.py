@@ -174,6 +174,9 @@ class ErnieMModelTester:
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
 
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
         if token_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
@@ -219,6 +222,8 @@ class ErnieMModelTester:
                        position_ids=position_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if token_labels is not None:
             result = result[1:]
@@ -252,7 +257,8 @@ class ErnieMModelTester:
                        attention_mask=multiple_choice_attention_mask,
                        labels=choice_labels,
                        return_dict=self.parent.return_dict)
-
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
         if token_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):

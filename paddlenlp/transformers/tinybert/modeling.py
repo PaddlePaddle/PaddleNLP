@@ -24,6 +24,7 @@ from ..model_outputs import (
     SequenceClassifierOutput,
     QuestionAnsweringModelOutput,
     MultipleChoiceModelOutput,
+    tuple_output
 )
 
 __all__ = [
@@ -576,11 +577,7 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            if loss is not None:
-                return (loss, ) + output
-            if len(output) == 1:
-                return output[0]
-            return output
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -702,8 +699,7 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
 
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,
@@ -815,8 +811,7 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
 
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(
             loss=loss,
