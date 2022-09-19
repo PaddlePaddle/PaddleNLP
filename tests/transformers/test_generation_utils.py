@@ -72,7 +72,9 @@ class GenerationTesterMixin:
 
         # generate max 3 tokens
         max_length = 3
-        if config["eos_token_id"] is not None and config["pad_token_id"] is None:
+        if config.get(
+                "eos_token_id",
+                None) is not None and config.get("pad_token_id", None) is None:
             # hack to allow generate for models such as GPT2 as is done in `generate()`
             config["pad_token_id"] = config["eos_token_id"]
         return config, input_ids, attention_mask, max_length
@@ -193,8 +195,8 @@ class GenerationTesterMixin:
         if self.is_encoder_decoder:
             max_length = 4
         logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-            eos_token_id=getattr(
-                model, model.base_model_prefix).config["eos_token_id"],
+            eos_token_id=getattr(model, model.base_model_prefix).config.get(
+                "eos_token_id", None),
             forced_bos_token_id=getattr(
                 getattr(model, model.base_model_prefix).config,
                 "forced_bos_token_id", None),
@@ -231,10 +233,10 @@ class GenerationTesterMixin:
                 input_ids.shape[-1],
                 attention_mask=attention_mask,
                 logits_processors=logits_processor,
-                pad_token_id=getattr(
-                    model, model.base_model_prefix).config["pad_token_id"],
-                eos_token_id=getattr(
-                    model, model.base_model_prefix).config["eos_token_id"],
+                pad_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "pad_token_id", None),
+                eos_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "eos_token_id", None),
                 **kwargs,
             )
         return output_greedy, output_generate
@@ -288,10 +290,10 @@ class GenerationTesterMixin:
                 1 if self.is_encoder_decoder else max_length +
                 input_ids.shape[-1],
                 logits_processors=logits_processors,
-                pad_token_id=getattr(
-                    model, model.base_model_prefix).config["pad_token_id"],
-                eos_token_id=getattr(
-                    model, model.base_model_prefix).config["eos_token_id"],
+                pad_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "pad_token_id", None),
+                eos_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "eos_token_id", None),
                 top_k=1,
                 **process_kwargs,
                 **kwargs,
@@ -352,10 +354,10 @@ class GenerationTesterMixin:
                 logits_processors=logits_processor,
                 diversity_rate=getattr(logits_process_kwargs, "diversity_rate",
                                        0.0),
-                pad_token_id=getattr(
-                    model, model.base_model_prefix).config["pad_token_id"],
-                eos_token_id=getattr(
-                    model, model.base_model_prefix).config["eos_token_id"],
+                pad_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "pad_token_id", None),
+                eos_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "eos_token_id", None),
                 **kwargs,
             )
         return output_generate, output_beam_search
@@ -414,10 +416,10 @@ class GenerationTesterMixin:
                 input_ids.shape[-1],
                 attention_mask=attention_mask_clone,
                 logits_processors=logits_processor,
-                pad_token_id=getattr(
-                    model, model.base_model_prefix).config["pad_token_id"],
-                eos_token_id=getattr(
-                    model, model.base_model_prefix).config["eos_token_id"],
+                pad_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "pad_token_id", None),
+                eos_token_id=getattr(model, model.base_model_prefix).config.get(
+                    "eos_token_id", None),
                 **kwargs,
             )
         return output_generate, output_group_beam_search
@@ -458,7 +460,8 @@ class GenerationTesterMixin:
                 max_length = 4
 
             process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-                getattr(model, model.base_model_prefix).config["eos_token_id"],
+                getattr(model, model.base_model_prefix).config.get(
+                    "eos_token_id", None),
                 forced_bos_token_id=getattr(
                     getattr(model, model.base_model_prefix).config,
                     "forced_bos_token_id", None),
@@ -511,7 +514,7 @@ class GenerationTesterMixin:
                 max_length = 4
 
             logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-                config["eos_token_id"],
+                config.get("eos_token_id", None),
                 getattr(config, "forced_bos_token_id", None),
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
@@ -563,7 +566,7 @@ class GenerationTesterMixin:
         config, _, _, max_length = self._get_input_ids_and_config()
 
         # if no bos token id => cannot generate from None
-        if config["bos_token_id"] is None:
+        if config.get("bos_token_id", None) is None:
             return
 
         for model_class in self.all_generative_model_classes.keys():
@@ -593,7 +596,7 @@ class GenerationTesterMixin:
                 max_length = 4
 
             logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
-                config["eos_token_id"],
+                config.get("eos_token_id", None),
                 getattr(config, "forced_bos_token_id", None),
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
