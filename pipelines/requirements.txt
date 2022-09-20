@@ -17,6 +17,7 @@ opencv-contrib-python-headless
 python-multipart
 htbuilder@git+https://github.com/tvst/htbuilder.git
 st-annotated-text
+click==8.0
 streamlit==1.9.0
 fastapi
 uvicorn

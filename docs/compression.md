@@ -40,13 +40,19 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 
 ## 如何启动模型压缩
 
-模型压缩 API 中的压缩功能依赖 `paddleslim` 包。可运行以下命令安装：
+### 环境依赖
+
+- paddlepaddle-gpu >=2.3
+- paddlenlp >= 2.4.0
+- paddleslim >= 2.3.0
+
+模型压缩 API 中的压缩功能依赖最新的 `paddleslim` 包。可运行以下命令安装：
 
 ```shell
-pip install paddleslim
+pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-大致分为四步：
+模型压缩 API 的使用大致分为四步：
 
 - Step 1: 使用 `PdArgumentParser` 解析从命令行传入的超参数，以获取压缩参数 `compression_args`；
 - Step 2: 实例化 Trainer 并调用 `compress()` 压缩 API
@@ -81,7 +87,7 @@ python compress.py \
     --output_dir ./compress_models  \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
-    --num_train_epochs 4
+    --num_train_epochs 4 \
     --width_mult_list 0.75 \
     --batch_size_list 4 8 16 \
     --batch_num_list 1 \
@@ -111,7 +117,7 @@ compression_args = parser.parse_args_into_dataclasses()
 
 #### Trainer 实例化参数介绍
 
-- **--model** 待压缩的模型，目前支持 ERNIE 等模型，是在下游任务中微调后的模型。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
+- **--model** 待压缩的模型，目前支持 ERNIE、BERT、RoBERTa、ERNIE-M、ERNIE-Gram、PP-MiniLM、TinyBERT 等结构相似的模型，是在下游任务中微调后的模型，当预训练模型选择 ERNIE 时，需要继承 `ErniePretrainedModel`。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
 - **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
 - **--train_dataset** 裁剪训练需要使用的训练集，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。不启动裁剪时，可以为 None；
 - **--eval_dataset** 裁剪训练使用的评估集，也是量化使用的校准数据，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。是 Trainer 的必选参数；
@@ -155,7 +161,7 @@ trainer.compress()
 
 需要注意以下三个条件：
 
-- 如果模型是自定义模型，模型需要支持调用 `from_pretrained()` 导入模型，且只含 `pretrained_model_name_or_path` 一个必选参数，`forward` 函数返回 `logits` 或者 `tuple of logits`；
+- 如果模型是自定义模型，需要继承 `XXXPretrainedModel`，例如当预训练模型选择 ERNIE 时，继承 `ErniePretrainedModel`，模型需要支持调用 `from_pretrained()` 导入模型，且只含 `pretrained_model_name_or_path` 一个必选参数，`forward` 函数返回 `logits` 或者 `tuple of logits`；
 
 - 如果模型是自定义模型，或者数据集比较特殊，压缩 API 中 loss 的计算不符合使用要求，需要自定义 `custom_dynabert_calc_loss` 函数。计算 loss 后计算梯度，从而得出计算神经元的重要性以便裁剪使用。可参考下方示例代码。
     - 输入每个 batch 的数据，返回模型的 loss。
@@ -178,8 +184,9 @@ trainer.compress()
         model.eval()
         metric.reset()
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
+            logits = model(input_ids=batch['input_ids'],
+                           token_type_ids=batch['token_type_ids'],
+                           #必须写这一行
                            attention_mask=[None, None])
             # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
             if isinstance(model, OFA):
@@ -196,8 +203,9 @@ trainer.compress()
 
 ```python
 def calc_loss(loss_fct, model, batch, head_mask):
-    logits = model(batch["input_ids"],
-                batch["token_type_ids"],
+    logits = model(input_ids=batch["input_ids"],
+                token_type_ids=batch["token_type_ids"],
+                # 必须写下面这行
                 attention_mask=[None, head_mask])
     loss = loss_fct(logits, batch["labels"])
     return loss
@@ -226,7 +234,7 @@ python compress.py \
     --output_dir ./compress_models  \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
-    --num_train_epochs 4
+    --num_train_epochs 4 \
     --width_mult_list 0.75 \
     --batch_size_list 4 8 16 \
     --batch_num_list 1 \
@@ -268,7 +276,7 @@ python compress.py \
 
 - **--logging_steps** 两个日志之间的更新步骤数。默认为 500；
 
-- **--save_steps** 评估模型的步数。默认为 500；
+- **--save_steps** 评估模型的步数。默认为 100；
 
 - **--optim** 裁剪训练使用的优化器名称，默认为adamw，默认为 'adamw'；
 

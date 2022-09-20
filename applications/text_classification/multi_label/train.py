@@ -181,9 +181,6 @@ def train():
             logits = model(**batch)
             loss = criterion(logits, labels)
 
-            probs = F.sigmoid(logits)
-            metric.update(probs, labels)
-
             loss.backward()
             optimizer.step()
             if args.warmup:
@@ -192,11 +189,9 @@ def train():
 
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
-                micro_f1_score, macro_f1_score = metric.accumulate()
                 logger.info(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, micro_f1_score,
-                       macro_f1_score, args.logging_steps /
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, args.logging_steps /
                        (time.time() - tic_train)))
                 tic_train = time.time()
 
