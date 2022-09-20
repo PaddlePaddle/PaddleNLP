@@ -24,8 +24,8 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
     - [3.4 训练数据流配置](#data_pipe)
     - [3.5 观察评估](#观察评估)
 - [4. 训练效果](#release_models)
-    - [4.1 ERNIE 1.0-Base-zh-CW 模型](#ernie-1.0-base-zh-cw)
-    - [4.2 ERNIE 1.0-Large-zh-CW 模型](#ernie-1.0-large-zh-cw)
+    - [4.1 ERNIE 1.0-Base-zh-cw 模型](#ernie-1.0-base-zh-cw)
+    - [4.2 ERNIE 1.0-Large-zh-cw 模型](#ernie-1.0-large-zh-cw)
 * [5. 参考](#references)
 
 全部流程介绍图如下：
@@ -72,7 +72,7 @@ WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目�
 
 为了方便用户测试，我们提供了少量part的WuDao数据供大家使用，（如有侵权，请联系我们删除）
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/WuDaoCorpus2.0_base_200G_sample.tar.gz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/WuDaoCorpus2.0_base_200G_sample.tar.gz
 tar -xvf WuDaoCorpus2.0_base_200G_sample.tar.gz
 ```
 用户可以用这份数据跑完后续全程。数据量约为2GB。
@@ -121,7 +121,7 @@ python ./preprocess/trans_to_json.py  \
 ```
 使用 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据可以得到jsonl文本为:
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_corpus_200g_sample.jsonl
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample.jsonl
 ```
 用户可以下载处理好的数据，进行tokenizer转换。
 
@@ -167,8 +167,8 @@ python -u  ./preprocess/create_pretraining_data.py \
 同样，对于 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据，使用`ernie-3.0-bash-zh`的tokenizer，可以得到数据。
 ```
 mkdir data && cd data
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-bash-zh_ids.npy
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-bash-zh_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
 cd -
 ```
 
@@ -222,7 +222,7 @@ python ./vocab/gen_char.py path_to_corpus.txt
 ```
 可以在本地文件夹得到`char_dict.pickle`字符频率文件。同时我们也提供了自己统计的词频文件，方便用户复现：
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/char_dict.pickle
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/char_dict.pickle
 ```
 
 ### 2.3 英文字符词表
@@ -236,7 +236,7 @@ python ./vocab/gen_vocab.py ./wikitext-103-raw/wiki.train.raw
 ```
 即可产生英文部分的词表。这里我们也提供了处理好的 vocab 方便用户验证。
 ```
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/eng.vocab
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/eng.vocab
 ```
 
 
@@ -577,28 +577,28 @@ python3 -u  -m paddle.distributed.launch \
 
 <a name="ernie-1.0-base-zh-cw"></a>
 
-### 4.1 ERNIE 1.0-Base-zh-CW 模型
+### 4.1 ERNIE 1.0-Base-zh-cw 模型
 
 使用CLUE，WuDao共计400GB的语料，batch_size 1024, 训练 400w step，即可训练得到`ernie-3.0-base-zh`类似的模型效果。相关模型参数，开源为`ernie-1.0-base-zh-cw`，用户加载即可使用。使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
  Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1| Acc| Acc
-ERNIE 1.0-Base-zh-CW | 12L768H | <b>76.44</b> | 76.04 |    58.02 |    60.87 |    83.56 | 78.61 |    89.14 |    84.00 |  72.26/90.40 |    84.73 |    77.15 |
+ERNIE 1.0-Base-zh-cw | 12L768H | <b>76.47</b> | 76.04 |    57.86 |    59.91 |   <b>83.41</b> | 79.58 |    89.91 |    83.42 |  72.88/90.78 |    <b>84.68</b> |    76.98 |
 ERNIE 2.0-Base-zh | 12L768H | 74.32  | 75.65 |  58.25 | 61.64 |  82.62 |  78.71 |    81.91 |  82.33 | 66.08/87.46    | 82.78    | 73.19
 ERNIE 1.0-Base-zh | 12L768H | 74.17 | 74.84 |    58.91 |    62.25 |    81.68 |    76.58 |    85.20 |    82.77 | 67.32/87.83 | 82.47 | 69.68
 
 
 <a name="ernie-1.0-large-zh-cw"> </a>
 
-### 4.2 ERNIE 1.0-Large-zh-CW 模型
+### 4.2 ERNIE 1.0-Large-zh-cw 模型
 
 除了base模型外，我们还训练了large模型。命名为`ernie-1.0-large-zh-cw`。使用开源语料，batch_size 512, 训练 400w step，训练去除SOP任务，只保留MLM损失，使用CLUE benchmark 对最优超参数进行GradSearch搜索：
 
 Model&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  | Arch | CLUE AVG |  AFQMC | TNEWS | IFLYTEK | CMNLI | OCNLI | CLUE WSC2020 | CSL | CMRC | CHID | C3
 -- | -- | -- | -- | -- | -- | -- |  -- | -- | -- | -- | -- |  -- |
 Metrics |   |   | Acc | Acc | Acc | Acc | Acc | Acc | Acc | Exact/F1 | Acc| Acc
-ERNIE 1.0-Large-zh-CW| 24L1024H | <b>79.03</b> | 75.97 |    59.65 |    62.91 |    85.09 |    81.73| 93.09 |    84.53 | 74.22/91.88 | 88.57 | 84.54
+ERNIE 1.0-Large-zh-cw| 24L1024H | <b>79.03</b> | 75.97 |    59.65 |    62.91 |    85.09 |    81.73| 93.09 |    84.53 | 74.22/91.88 | 88.57 | 84.54
 ERNIE 3.0-Xbase-zh| 20L1024H | 78.39 | 76.16 | 59.55 | 61.87 | 84.40 |  81.73 | 88.82 | 83.60 |    75.99/93.00 | 86.78 | 84.98
 RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    83.88 |    78.81 |    90.79 |    83.67 |    70.58/89.82 |    85.72 |    75.26
 
