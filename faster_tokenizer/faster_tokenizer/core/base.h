@@ -21,9 +21,9 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 
+#include "faster_tokenizer/utils/utils.h"
 #include "glog/logging.h"
 #include "nlohmann/json.hpp"
-#include "faster_tokenizer/utils/utils.h"
 
 namespace std {
 template <>

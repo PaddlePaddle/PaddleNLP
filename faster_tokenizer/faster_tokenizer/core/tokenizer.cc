@@ -27,14 +27,13 @@ limitations under the License. */
 #include "faster_tokenizer/pretokenizers/pretokenizers.h"
 
 
-
 #ifdef WITH_OMP
 #include <omp.h>
 #else
 // Replace OMP with std::thread
+#include <math.h>
 #include <stdlib.h>
 #include <thread>
-#include <math.h>
 using namespace std;
 #endif
 
@@ -262,14 +261,13 @@ void Tokenizer::MultiThreadEncodeBatchStrings(
     bool add_special_tokens,
     size_t start_index,
     size_t step_index) const {
-
-    auto batch_size = batch_encode_input.size();
-    size_t end_index = start_index+step_index;
-    if(end_index>batch_size) end_index = batch_size;
-    for (size_t i = start_index; i < end_index; ++i) {
-        EncodePairStrings(
-            batch_encode_input[i], &(*encodings)[i], add_special_tokens);
-    }
+  auto batch_size = batch_encode_input.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    EncodePairStrings(
+        batch_encode_input[i], &(*encodings)[i], add_special_tokens);
+  }
 }
 
 void Tokenizer::EncodeBatchStrings(
@@ -290,16 +288,16 @@ void Tokenizer::EncodeBatchStrings(
         batch_encode_input[i], &(*encodings)[i], add_special_tokens);
   }
 #else
-    auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStrings,
-                          this,
-                          std::ref(batch_encode_input),
-                          encodings,
-                          add_special_tokens,
-                          std::placeholders::_1,
-                          std::placeholders::_2);
-    RunMultiThread(func,batch_size);
+  auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStrings,
+                        this,
+                        std::ref(batch_encode_input),
+                        encodings,
+                        add_special_tokens,
+                        std::placeholders::_1,
+                        std::placeholders::_2);
+  RunMultiThread(func, batch_size);
 #endif
-  
+
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
   }
@@ -330,16 +328,15 @@ void Tokenizer::MultiThreadEncodeBatchStringsCharOffsets(
     bool add_special_tokens,
     size_t start_index,
     size_t step_index) const {
-
-    auto batch_size = batch_encode_input.size();
-    size_t end_index = start_index+step_index;
-    if( end_index>batch_size ) end_index = batch_size;
-    for (size_t i = start_index; i < end_index; ++i) {
-        Encoding encoding;
-        EncodePairStringsCharOffsets(
-            batch_encode_input[i], &encoding, add_special_tokens);
-        (*encodings)[i] = std::move(encoding);
-    }
+  auto batch_size = batch_encode_input.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    Encoding encoding;
+    EncodePairStringsCharOffsets(
+        batch_encode_input[i], &encoding, add_special_tokens);
+    (*encodings)[i] = std::move(encoding);
+  }
 }
 
 void Tokenizer::EncodeBatchStringsCharOffsets(
@@ -368,7 +365,7 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
                         add_special_tokens,
                         std::placeholders::_1,
                         std::placeholders::_2);
-  RunMultiThread(func,batch_size);
+  RunMultiThread(func, batch_size);
 #endif
 
   if (use_padding_) {
@@ -474,13 +471,12 @@ void Tokenizer::MultiThreadDecodeBatch(
     bool skip_special_tokens,
     size_t start_index,
     size_t step_index) const {
-
-    auto batch_size = batch_token_ids.size();
-    size_t end_index = start_index+step_index;
-    if( end_index>batch_size ) end_index = batch_size;
-    for (size_t i = start_index; i < end_index; ++i) {
-      Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
-    }
+  auto batch_size = batch_token_ids.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
+  }
 }
 
 void Tokenizer::DecodeBatch(
@@ -500,14 +496,14 @@ void Tokenizer::DecodeBatch(
     Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
   }
 #else
-    auto func = std::bind(&Tokenizer::MultiThreadDecodeBatch,
-                          this,
-                          std::ref(batch_token_ids),
-                          results,
-                          skip_special_tokens,
-                          std::placeholders::_1,
-                          std::placeholders::_2);
-    RunMultiThread(func,batch_size);
+  auto func = std::bind(&Tokenizer::MultiThreadDecodeBatch,
+                        this,
+                        std::ref(batch_token_ids),
+                        results,
+                        skip_special_tokens,
+                        std::placeholders::_1,
+                        std::placeholders::_2);
+  RunMultiThread(func, batch_size);
 #endif
 }
 

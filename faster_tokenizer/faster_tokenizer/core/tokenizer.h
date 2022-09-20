@@ -161,23 +161,23 @@ public:
                    Encoding* result_encoding) const;
 
   void MultiThreadEncodeBatchStrings(
-    const std::vector<EncodeInput>& batch_encode_input,
-    std::vector<Encoding>* encodings,
-    bool add_special_tokens,
-    size_t start_index,
-    size_t step_index) const;
+      const std::vector<EncodeInput>& batch_encode_input,
+      std::vector<Encoding>* encodings,
+      bool add_special_tokens,
+      size_t start_index,
+      size_t step_index) const;
 
   void EncodeBatchStrings(const std::vector<EncodeInput>& batch_encode_input,
                           std::vector<Encoding>* encodings,
                           bool add_special_tokens = true) const;
 
   void MultiThreadEncodeBatchStringsCharOffsets(
-    const std::vector<EncodeInput>& batch_encode_input,
-    std::vector<Encoding>* encodings,
-    bool add_special_tokens,
-    size_t start_index,
-    size_t step_index) const;
-    
+      const std::vector<EncodeInput>& batch_encode_input,
+      std::vector<Encoding>* encodings,
+      bool add_special_tokens,
+      size_t start_index,
+      size_t step_index) const;
+
   void EncodeBatchStringsCharOffsets(
       const std::vector<EncodeInput>& batch_encode_input,
       std::vector<Encoding>* encodings,
@@ -209,11 +209,11 @@ public:
               std::string* result,
               bool skip_special_tokens = true) const;
   void MultiThreadDecodeBatch(
-    const std::vector<std::vector<uint32_t>>& batch_token_ids,
-    std::vector<std::string>* results,
-    bool skip_special_tokens,
-    size_t start_index,
-    size_t step_index) const;
+      const std::vector<std::vector<uint32_t>>& batch_token_ids,
+      std::vector<std::string>* results,
+      bool skip_special_tokens,
+      size_t start_index,
+      size_t step_index) const;
   void DecodeBatch(const std::vector<std::vector<uint32_t>>& batch_token_ids,
                    std::vector<std::string>* results,
                    bool skip_special_tokens = true) const;

@@ -26,10 +26,10 @@ limitations under the License. */
 #include <omp.h>
 #else
 // Replace OMP with std::thread
-#include <stdlib.h>
-#include <thread>
 #include <math.h>
+#include <stdlib.h>
 #include <functional>
+#include <thread>
 using namespace std;
 #endif
 
@@ -136,7 +136,8 @@ void FASTERTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
 
 int FASTERTOKENIZER_DECL GetThreadNum(size_t batch_size);
 
-void FASTERTOKENIZER_DECL RunMultiThread(std::function<void(size_t,size_t)> func, size_t batch_size);
+void FASTERTOKENIZER_DECL
+RunMultiThread(std::function<void(size_t, size_t)> func, size_t batch_size);
 }  // namespace core
 }  // namespace faster_tokenizer
 }  // namespace paddlenlp
