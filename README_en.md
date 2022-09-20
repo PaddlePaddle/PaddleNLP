@@ -35,9 +35,6 @@
   * 🍭 AIGC: Release code generation SOTA model [**CodeGen**](./examples/code_generation/codegen), support for multiple programming languages code generation. Integrate [**Text to Image Model**](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) DALL·E Mini, Disco Diffusion, Stable Diffusion, let's play and have some fun! Release [**Chinese Text Summarization Application**](./applications/text_summarization), first release of chinese text summarization model pretrained on a large scale of corpus, it can be use via Taskflow API and support for finetuning on your own data.
   * 💪 Framework upgrade: Release [**Auto Model Compression API**], support for auto pruning and quantization, ; Release [**Few-shot Prompt**](./applications/text_classification/multi_class/few-shot), integrate the algorithms such as PET, P-Tuning and RGL.
 
-* 👀 **2022.9.6 PaddlePaddle intelligent financial industry series live course**
-
-  * 围绕深度学习技术在金融行业的产业实践与发展趋势，邀请行业内专家分享产业实践。探讨科技金融的未来发展；
 
 * 👀 **2022.9.6 飞桨智慧金融行业系列直播课**
 
