@@ -228,6 +228,13 @@ class BaseDocumentStore(BaseComponent):
         self.ids_iterator = self.ids_iterator[1:]
         return ret
 
+    def scale_to_unit_interval(self, score: float,
+                               similarity: Optional[str]) -> float:
+        if similarity == "cosine":
+            return (score + 1) / 2
+        else:
+            return float(expit(score / 100))
+
     @abstractmethod
     def get_all_labels(
         self,

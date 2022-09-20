@@ -17,13 +17,15 @@ import argparse
 
 import paddle
 from pipelines.document_stores import FAISSDocumentStore
+from pipelines.document_stores import MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever, ErnieRanker
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
-parser.add_argument("--index_name", default='faiss_index', type=str, help="The ann index name of FAISS.")
+parser.add_argument("--index_name", default='dureader_index', type=str, help="The ann index name of ANN.")
+parser.add_argument("--search_engine", choices=['faiss', 'milvus'], default="faiss", help="The type of ANN search engine.")
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
@@ -44,41 +46,38 @@ parser.add_argument("--embedding_dim",
                     default=312,
                     type=int,
                     help="The embedding_dim of index")
+
+parser.add_argument('--host',
+                    type=str,
+                    default="localhost",
+                    help='host ip of ANN search engine')
+
+parser.add_argument('--port',
+                    type=str,
+                    default="8530",
+                    help='port of ANN search engine')
+
 args = parser.parse_args()
 # yapf: enable
 
 
-def semantic_search_tutorial():
-
-    use_gpu = True if args.device == 'gpu' else False
-
+def get_faiss_retriever(use_gpu):
     faiss_document_store = "faiss_document_store.db"
     if os.path.exists(args.index_name) and os.path.exists(faiss_document_store):
         # connect to existed FAISS Index
         document_store = FAISSDocumentStore.load(args.index_name)
-        if (os.path.exists(args.params_path)):
-            retriever = DensePassageRetriever(
-                document_store=document_store,
-                query_embedding_model=args.query_embedding_model,
-                params_path=args.params_path,
-                output_emb_size=args.embedding_dim,
-                max_seq_len_query=args.max_seq_len_query,
-                max_seq_len_passage=args.max_seq_len_passage,
-                batch_size=args.retriever_batch_size,
-                use_gpu=use_gpu,
-                embed_title=False,
-            )
-        else:
-            retriever = DensePassageRetriever(
-                document_store=document_store,
-                query_embedding_model=args.query_embedding_model,
-                passage_embedding_model=args.passage_embedding_model,
-                max_seq_len_query=args.max_seq_len_query,
-                max_seq_len_passage=args.max_seq_len_passage,
-                batch_size=args.retriever_batch_size,
-                use_gpu=use_gpu,
-                embed_title=False,
-            )
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=False,
+        )
     else:
         doc_dir = "data/dureader_dev"
         dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
@@ -97,35 +96,98 @@ def semantic_search_tutorial():
                                             faiss_index_factory_str="Flat")
         document_store.write_documents(dicts)
 
-        if (os.path.exists(args.params_path)):
-            retriever = DensePassageRetriever(
-                document_store=document_store,
-                query_embedding_model=args.query_embedding_model,
-                params_path=args.params_path,
-                output_emb_size=args.embedding_dim,
-                max_seq_len_query=args.max_seq_len_query,
-                max_seq_len_passage=args.max_seq_len_passage,
-                batch_size=args.retriever_batch_size,
-                use_gpu=use_gpu,
-                embed_title=False,
-            )
-        else:
-            retriever = DensePassageRetriever(
-                document_store=document_store,
-                query_embedding_model=args.query_embedding_model,
-                passage_embedding_model=args.passage_embedding_model,
-                max_seq_len_query=args.max_seq_len_query,
-                max_seq_len_passage=args.max_seq_len_passage,
-                batch_size=args.retriever_batch_size,
-                use_gpu=use_gpu,
-                embed_title=False,
-            )
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=False,
+        )
 
         # update Embedding
         document_store.update_embeddings(retriever)
 
         # save index
         document_store.save(args.index_name)
+    return document_store
+
+
+def get_milvus_retriever(use_gpu):
+
+    milvus_document_store = "milvus_document_store.db"
+    if os.path.exists(milvus_document_store):
+        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
+                                             host=args.host,
+                                             index=args.index_name,
+                                             port=args.port,
+                                             index_param={
+                                                 "M": 16,
+                                                 "efConstruction": 50
+                                             },
+                                             index_type="HNSW")
+        # connect to existed Milvus Index
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=False,
+        )
+    else:
+        doc_dir = "data/dureader_dev"
+        dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
+
+        fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
+        dicts = convert_files_to_dicts(dir_path=doc_dir,
+                                       split_paragraphs=True,
+                                       encoding='utf-8')
+        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
+                                             host=args.host,
+                                             index=args.index_name,
+                                             port=args.port,
+                                             index_param={
+                                                 "M": 16,
+                                                 "efConstruction": 50
+                                             },
+                                             index_type="HNSW")
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=False,
+        )
+
+        document_store.write_documents(dicts)
+        # update Embedding
+        document_store.update_embeddings(retriever)
+
+    return retriever
+
+
+def semantic_search_tutorial():
+
+    use_gpu = True if args.device == 'gpu' else False
+
+    if (args.search_engine == 'milvus'):
+        retriever = get_milvus_retriever(use_gpu)
+    else:
+        retriever = get_faiss_retriever(use_gpu)
 
     ### Ranker
     ranker = ErnieRanker(

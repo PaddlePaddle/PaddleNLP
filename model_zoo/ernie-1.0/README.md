@@ -331,8 +331,8 @@ vocab_dir="${base_nfs}/"
 对于`ernie-3.0-base-zh`我们提供了悟道的一个小规模样本的数据：
 ```
 mkdir data && cd data
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-bash-zh_ids.npy
-wget https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-bash-zh_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
 cd -
 ```
 可以指定`tokenizer_name_or_path=ernie-3.0-bash-zh`,`input_dir=./data` 用下面的脚本训练。
