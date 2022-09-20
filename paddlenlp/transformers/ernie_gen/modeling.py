@@ -25,6 +25,7 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.log import logger
 from paddlenlp.transformers import BertPretrainedModel, ElectraPretrainedModel, RobertaPretrainedModel, ErniePretrainedModel
+from .. import PretrainedModel
 
 from ..utils import InitTrackerMeta, fn_args_to_dict
 
@@ -216,7 +217,7 @@ class ErnieEncoderStack(nn.Layer):
 
 
 @six.add_metaclass(InitTrackerMeta)
-class ErnieGenPretrainedModel(object):
+class ErnieGenPretrainedModel(PretrainedModel):
     r"""
     An abstract class for pretrained ErnieGen models. It provides ErnieGen related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
