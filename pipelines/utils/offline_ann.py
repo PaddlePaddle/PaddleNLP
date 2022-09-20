@@ -17,7 +17,7 @@ import os
 
 import paddle
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
-from pipelines.document_stores import ElasticsearchDocumentStore
+from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever
 from pipelines.utils import launch_es
 
@@ -33,21 +33,24 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--index_name",
                     default='baike_cities',
                     type=str,
-                    help="The index name of the elasticsearch engine")
+                    help="The index name of the ANN search engine")
 parser.add_argument("--doc_dir",
                     default='data/baike/',
                     type=str,
                     help="The doc path of the corpus")
-
+parser.add_argument("--search_engine",
+                    choices=['elastic', 'milvus'],
+                    default="elastic",
+                    help="The type of ANN search engine.")
 parser.add_argument('--host',
                     type=str,
                     default="127.0.0.1",
-                    help='host ip of elastic search')
+                    help='host ip of ANN search engine')
 
 parser.add_argument('--port',
                     type=str,
                     default="9200",
-                    help='port of elastic search')
+                    help='port of ANN search engine')
 
 parser.add_argument("--embedding_dim",
                     default=312,
@@ -83,15 +86,25 @@ args = parser.parse_args()
 
 def offline_ann(index_name, doc_dir):
 
-    launch_es()
-
-    document_store = ElasticsearchDocumentStore(
-        host=args.host,
-        port=args.port,
-        username="",
-        password="",
-        embedding_dim=args.embedding_dim,
-        index=index_name)
+    if (args.search_engine == "milvus"):
+        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
+                                             host=args.host,
+                                             index=args.index_name,
+                                             port=args.port,
+                                             index_param={
+                                                 "M": 16,
+                                                 "efConstruction": 50
+                                             },
+                                             index_type="HNSW")
+    else:
+        launch_es()
+        document_store = ElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username="",
+            password="",
+            embedding_dim=args.embedding_dim,
+            index=index_name)
     # 将每篇文档按照段落进行切分
     dicts = convert_files_to_dicts(dir_path=doc_dir,
                                    split_paragraphs=True,
@@ -104,44 +117,42 @@ def offline_ann(index_name, doc_dir):
     document_store.write_documents(dicts)
 
     ### 语义索引模型
-    if (os.path.exists(args.params_path)):
-        retriever = DensePassageRetriever(
-            document_store=document_store,
-            query_embedding_model=args.query_embedding_model,
-            params_path=args.params_path,
-            output_emb_size=args.embedding_dim,
-            max_seq_len_query=64,
-            max_seq_len_passage=256,
-            batch_size=16,
-            use_gpu=True,
-            embed_title=False,
-        )
-
-    else:
-        retriever = DensePassageRetriever(
-            document_store=document_store,
-            query_embedding_model=args.query_embedding_model,
-            passage_embedding_model=args.passage_embedding_model,
-            max_seq_len_query=64,
-            max_seq_len_passage=256,
-            batch_size=16,
-            use_gpu=True,
-            embed_title=False,
-        )
+    retriever = DensePassageRetriever(
+        document_store=document_store,
+        query_embedding_model=args.query_embedding_model,
+        passage_embedding_model=args.passage_embedding_model,
+        params_path=args.params_path,
+        output_emb_size=args.embedding_dim,
+        max_seq_len_query=64,
+        max_seq_len_passage=256,
+        batch_size=16,
+        use_gpu=True,
+        embed_title=False,
+    )
 
     # 建立索引库
     document_store.update_embeddings(retriever)
 
 
 def delete_data(index_name):
-    document_store = ElasticsearchDocumentStore(
-        host=args.host,
-        port=args.port,
-        username="",
-        password="",
-        embedding_dim=args.embedding_dim,
-        index=index_name)
-
+    if (args.search_engine == 'milvus'):
+        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
+                                             host=args.host,
+                                             index=args.index_name,
+                                             port=args.port,
+                                             index_param={
+                                                 "M": 16,
+                                                 "efConstruction": 50
+                                             },
+                                             index_type="HNSW")
+    else:
+        document_store = ElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username="",
+            password="",
+            embedding_dim=args.embedding_dim,
+            index=index_name)
     document_store.delete_index(index_name)
     print('Delete an existing elasticsearch index {} Done.'.format(index_name))
 
