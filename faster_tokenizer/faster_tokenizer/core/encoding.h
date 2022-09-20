@@ -20,18 +20,12 @@ limitations under the License. */
 #include <vector>
 #include "faster_tokenizer/core/base.h"
 #include "faster_tokenizer/utils/utils.h"
-#include "glog/logging.h"
 
-#ifdef WITH_OMP
-#include <omp.h>
-#else
-// Replace OMP with std::thread
 #include <math.h>
 #include <stdlib.h>
 #include <functional>
 #include <thread>
 using namespace std;
-#endif
 
 namespace paddlenlp {
 namespace faster_tokenizer {

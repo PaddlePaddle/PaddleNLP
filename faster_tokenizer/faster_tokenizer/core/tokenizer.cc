@@ -30,12 +30,6 @@ limitations under the License. */
 #ifdef WITH_OMP
 #include <omp.h>
 #else
-// Replace OMP with std::thread
-#include <math.h>
-#include <stdlib.h>
-#include <thread>
-using namespace std;
-#endif
 
 namespace paddlenlp {
 namespace faster_tokenizer {

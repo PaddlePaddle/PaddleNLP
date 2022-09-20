@@ -17,6 +17,11 @@ limitations under the License. */
 #include <cassert>
 #include <climits>
 #include <sstream>
+#include "glog/logging.h"
+
+#ifdef WITH_OMP
+#include <omp.h>
+#endif
 
 namespace paddlenlp {
 namespace faster_tokenizer {
