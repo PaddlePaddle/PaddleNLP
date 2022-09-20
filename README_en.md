@@ -30,13 +30,13 @@
 
 ## News 📢
 * 🔥 **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
-  * 💎 NLP Tool：**[Pipelines](./pipelines)** released. Support for fast construction of search engine and question answering systems, and is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
-  * 💢 Industrial application：Release **[The whole process solution of text classification](./applications/text_classification)** covering various scenarios of text classification: multi-class, multi-label and hierarchical, it also supports for **few-shot learning** and the training and optimization of **TrustAI**. Upgrade for **universal information extraction(./model_zoo/uie)**, release **UIE-M**, support both Chinese and English extraction in one model; release the data distillation solution for UIE to break the bottleneck of time-consuming of inference.
+  * 💎 NLP Tool：**[Pipelines](./pipelines)** released. Support for fast construction of search engine and question answering systems, and it is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
+  * 💢 Industrial application：Release **[Complete solution of text classification](./applications/text_classification)** covering various scenarios of text classification: multi-class, multi-label and hierarchical, it also supports for **few-shot learning** and the training and optimization of **TrustAI**. Upgrade for [**universal information extraction](./model_zoo/uie)** and release **UIE-M**, support both Chinese and English information extraction in a single model; release the data distillation solution for UIE to break the bottleneck of time-consuming of inference.
   * 🍭 AIGC: Release code generation SOTA model [**CodeGen**](./examples/code_generation/codegen), support for multiple programming languages code generation. Integrate [**Text to Image Model**](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) DALL·E Mini, Disco Diffusion, Stable Diffusion, let's play and have some fun! Release [**Chinese Text Summarization Application**](./applications/text_summarization), first release of chinese text summarization model pretrained on a large scale of corpus, it can be use via Taskflow API and support for finetuning on your own data.
-  * 💪 Framework upgrade: Release [**Auto Model Compression API**], support for auto pruning and quantization, ; Release [**Few-shot Prompt**](./applications/text_classification/multi_class/few-shot), integrate the algorithms such as PET, P-Tuning and RGL.
+  * 💪 Framework upgrade: Release [**Auto Model Compression API**], support for auto pruning and quantization, lower the barriers of model compression; Release [**Few-shot Prompt**](./applications/text_classification/multi_class/few-shot), integrate the algorithms such as PET, P-Tuning and RGL.
 
 
-* 👀 **2022.9.6 飞桨智慧金融行业系列直播课**
+* 👀 **2022.9.6 PaddlePaddle intelligent financial industry series live course**
 
   * Centering on the industrial practice and development trend of deep learning technology in the financial industry, experts in the industry are invited to share the industrial practice. Discussion on the Future Development of Science and Technology Finance.
 
