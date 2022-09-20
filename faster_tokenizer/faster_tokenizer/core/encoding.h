@@ -29,6 +29,7 @@ limitations under the License. */
 #include <stdlib.h>
 #include <thread>
 #include <math.h>
+#include <functional>
 using namespace std;
 #endif
 
@@ -133,7 +134,9 @@ bool FASTERTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
 void FASTERTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
                                        const PadMethod& method);
 
-int GetThreadNum(size_t batch_size);
+int FASTERTOKENIZER_DECL GetThreadNum(size_t batch_size);
+
+void FASTERTOKENIZER_DECL RunMultiThread(std::function<void(size_t,size_t)> func, size_t batch_size);
 }  // namespace core
 }  // namespace faster_tokenizer
 }  // namespace paddlenlp

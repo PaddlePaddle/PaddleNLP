@@ -290,25 +290,14 @@ void Tokenizer::EncodeBatchStrings(
         batch_encode_input[i], &(*encodings)[i], add_special_tokens);
   }
 #else
-  int thread_num = GetThreadNum(batch_size);
-  std::vector<std::thread> vectorOfThread;
-  size_t start_index = 0;
-  size_t step_index = ceil(batch_size/thread_num);
-
-  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
-    vectorOfThread.emplace_back(std::thread(&Tokenizer::MultiThreadEncodeBatchStrings,
-                                              this,
-                                              std::ref(batch_encode_input),
-                                              encodings,
-                                              add_special_tokens,
-                                              start_index,
-                                              step_index));
-    start_index = start_index + step_index;
-  }
-  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
-    vectorOfThread[thread_index].join();
-  }
-  vectorOfThread.clear();
+    auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStrings,
+                          this,
+                          std::ref(batch_encode_input),
+                          encodings,
+                          add_special_tokens,
+                          std::placeholders::_1,
+                          std::placeholders::_2);
+    RunMultiThread(func,batch_size);
 #endif
   
   if (use_padding_) {
@@ -372,25 +361,14 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
     (*encodings)[i] = std::move(encoding);
   }
 #else
-  int thread_num = GetThreadNum(batch_size);
-  std::vector<std::thread> vectorOfThread;
-  size_t start_index = 0;
-  size_t step_index = ceil(batch_size/thread_num);
-
-  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
-    vectorOfThread.emplace_back(std::thread(&Tokenizer::MultiThreadEncodeBatchStringsCharOffsets,
-                                              this,
-                                              std::ref(batch_encode_input),
-                                              encodings,
-                                              add_special_tokens,
-                                              start_index,
-                                              step_index));
-    start_index = start_index + step_index;
-  }
-  for(size_t thread_index = 0; thread_index < thread_num; thread_index++) {
-    vectorOfThread[thread_index].join();
-  }
-  vectorOfThread.clear();
+  auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStringsCharOffsets,
+                        this,
+                        std::ref(batch_encode_input),
+                        encodings,
+                        add_special_tokens,
+                        std::placeholders::_1,
+                        std::placeholders::_2);
+  RunMultiThread(func,batch_size);
 #endif
 
   if (use_padding_) {
@@ -522,25 +500,14 @@ void Tokenizer::DecodeBatch(
     Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
   }
 #else
-  int thread_num = GetThreadNum(batch_size);
-  std::vector<std::thread> vectorOfThread;
-  size_t start_index = 0;
-  size_t step_index = ceil(batch_size/thread_num);
-
-  for(size_t thread_index = 0; thread_index < thread_num; thread_index++){
-    vectorOfThread.emplace_back(std::thread(&Tokenizer::MultiThreadDecodeBatch,
-                                              this,
-                                              std::ref(batch_token_ids),
-                                              results,
-                                              skip_special_tokens,
-                                              start_index,
-                                              step_index));
-    start_index = start_index + step_index;
-  }
-  for(size_t thread_index = 0; thread_index < thread_num; thread_index++) {
-    vectorOfThread[thread_index].join();
-  }
-  vectorOfThread.clear();
+    auto func = std::bind(&Tokenizer::MultiThreadDecodeBatch,
+                          this,
+                          std::ref(batch_token_ids),
+                          results,
+                          skip_special_tokens,
+                          std::placeholders::_1,
+                          std::placeholders::_2);
+    RunMultiThread(func,batch_size);
 #endif
 }
 
