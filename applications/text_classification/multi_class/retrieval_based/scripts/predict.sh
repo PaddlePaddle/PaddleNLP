@@ -12,24 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# GPU training
-root_path=inbatch
-data_path=data
-python -u -m paddle.distributed.launch --gpus "0,1" \
-    train.py \
+# gpu version
+root_dir="checkpoints/inbatch/model_best" 
+python -u -m paddle.distributed.launch --gpus "0" \
+    predict.py \
     --device gpu \
-    --save_dir ./checkpoints/${root_path} \
-    --batch_size 24 \
-    --learning_rate 5E-5 \
-    --epochs 100 \
+    --params_path "${root_dir}/model_state.pdparams" \
+    --model_name_or_path rocketqa-zh-dureader-query-encoder \
     --output_emb_size 0 \
-    --save_steps 50 \
+    --batch_size 128 \
     --max_seq_length 384 \
-    --warmup_proportion 0.0 \
-    --margin 0.2 \
-    --recall_result_dir "recall_result_dir" \
-    --recall_result_file "recall_result.txt" \
-    --train_set_file ${data_path}/train.txt \
-    --corpus_file ${data_path}/label.txt   \
-    --similar_text_pair ${data_path}/dev.txt \
-    --evaluate True
+    --text_pair_file "data/dev.txt"
+
+
+# cpu
+# root_dir="checkpoints/inbatch/model_best" 
+# python -u -m paddle.distributed.launch \
+#     predict.py \
+#     --device cpu \
+#     --params_path "${root_dir}/model_state.pdparams" \
+#     --output_emb_size 0 \
+#     --batch_size 128 \
+#     --max_seq_length 384 \
+#     --text_pair_file "data/train.txt"
