@@ -29,7 +29,7 @@ limitations under the License. */
 
 #ifdef WITH_OMP
 #include <omp.h>
-#else
+#endif
 
 namespace paddlenlp {
 namespace faster_tokenizer {
