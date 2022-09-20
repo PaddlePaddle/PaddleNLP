@@ -21,8 +21,8 @@ limitations under the License. */
 #include "faster_tokenizer/normalizers/normalizer.h"
 #include "faster_tokenizer/utils/utf8.h"
 
-#include "glog/logging.h"
 #include "faster_tokenizer/normalizers/unicode.h"
+#include "glog/logging.h"
 #include "re2/re2.h"
 #include "unicode/edits.h"
 #include "unicode/errorcode.h"
@@ -100,6 +100,8 @@ void NormalizedString::UpdateNormalizedRange(
   // Retrieve the original characters that are being replaced. This let us
   // compute the change in byte sizes along the way.
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+  n_range.first = (std::min)(n_range.first,
+                             static_cast<uint32_t>(normalized_.length() - 1));
   std::u32string u32replaced_normalized = conv.from_bytes(
       normalized_.substr(n_range.first, n_range.second - n_range.first));
   uint32_t initial_removed = 0;
@@ -332,12 +334,14 @@ NormalizedString& NormalizedString::RStrip() { return LRStrip(false, true); }
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 NormalizedString& NormalizedString::LRStrip(bool left, bool right) {
-  int leading_spaces = 0;
-  int trailing_spaces = 0;
+  uint32_t leading_spaces = 0;
+  uint32_t trailing_spaces = 0;
   std::string new_normalized = normalized_;
   if (left) {
     leading_spaces = new_normalized.find_first_not_of(WHITESPACE);
     if (leading_spaces != std::string::npos) {
+      leading_spaces = (std::min)(
+          leading_spaces, static_cast<uint32_t>(new_normalized.length() - 1));
       new_normalized = new_normalized.substr(leading_spaces);
     }
   }
@@ -534,8 +538,16 @@ bool NormalizedString::Slice(core::Range range,
       ConvertOffsets(&original_range, false);
     }
     uint32_t n_shift = original_range.first;
+
+    original_range.first =
+        (std::min)(original_range.first,
+                   static_cast<uint32_t>(this->original_.length() - 1));
     normalized->original_ = this->original_.substr(
         original_range.first, original_range.second - original_range.first);
+
+    normalized_range.first =
+        (std::min)(normalized_range.first,
+                   static_cast<uint32_t>(this->normalized_.length() - 1));
     normalized->normalized_ = this->normalized_.substr(
         normalized_range.first,
         normalized_range.second - normalized_range.first);

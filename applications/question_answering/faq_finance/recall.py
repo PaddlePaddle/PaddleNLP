@@ -45,7 +45,7 @@ parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum 
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument("--recall_num", default=10, type=int, help="Recall number for each query from Ann index.")
-
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--hnsw_m", default=100, type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_ef", default=100, type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--hnsw_max_elements", default=1000000, type=int, help="Recall number for each query from Ann index.")
@@ -59,8 +59,7 @@ if __name__ == "__main__":
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-    model_name_or_path = 'rocketqa-zh-dureader-query-encoder'
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(convert_example_test,
                          tokenizer=tokenizer,
@@ -73,7 +72,7 @@ if __name__ == "__main__":
             ),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = AutoModel.from_pretrained(model_name_or_path)
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
     model = SimCSE(pretrained_model, output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
@@ -105,7 +104,6 @@ if __name__ == "__main__":
     final_index = build_index(args, corpus_data_loader, inner_model)
 
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
-    # print(text_list[:5])
 
     query_ds = MapDataset(text_list)
 

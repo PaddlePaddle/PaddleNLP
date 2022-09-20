@@ -15,6 +15,7 @@ limitations under the License. */
 #include "faster_tokenizer/pretokenizers/metaspace.h"
 #include "re2/re2.h"
 #include "faster_tokenizer/utils/utf8.h"
+#include "glog/logging.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {

@@ -293,7 +293,7 @@ bool AddedVocabulary::FindMatch(const std::string& sequence,
     if (added_tokens.GetIsSingleWord()) {
       bool start_space =
           (curr_start == 0) || !EndWithWord(sequence.substr(0, curr_start));
-      bool stop_space = (curr_end == sequence.length()) ||
+      bool stop_space = (curr_end >= sequence.length()) ||
                         !StartWithWord(sequence.substr(curr_end));
       if (!start_space || !stop_space) {
         // Discard not single word

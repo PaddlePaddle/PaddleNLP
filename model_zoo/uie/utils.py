@@ -733,6 +733,7 @@ def convert_ext_examples(raw_examples,
                     positive_examples.extend(relation_examples[i])
                     negative_examples.extend(negative_example)
                     pbar.update(1)
+            all_relation_examples = positive_examples + negative_examples
         else:
             relation_examples = add_full_negative_example(
                 relation_examples, texts, relation_prompts, predicate_set,
