@@ -16,6 +16,7 @@ import io
 import os
 import json
 import itertools
+from shutil import copyfile
 from contextlib import contextmanager
 import sentencepiece as spm
 
@@ -23,7 +24,7 @@ from .. import PretrainedTokenizer, AddedToken
 from ...utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from ...utils.env import MODEL_HOME
 
-__all__ = ['MBartTokenizer']
+__all__ = ['MBartTokenizer', 'MBart50Tokenizer']
 
 MBART_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "mbart-large-cc25": 1024,
@@ -37,7 +38,7 @@ MBART50_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
 }
 
 
-class _MBartTokenizer(PretrainedTokenizer):
+class MBartTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }
@@ -54,6 +55,7 @@ class _MBartTokenizer(PretrainedTokenizer):
         "mbart-large-en-ro": {}
     }
     max_model_input_sizes = MBART_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+    model_input_names = ["input_ids"]
 
     FAIRSEQ_LANGUAGE_CODES = [
         "ar_AR",
@@ -95,6 +97,7 @@ class _MBartTokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  sp_model_kwargs=None,
+                 additional_special_tokens=None,
                  **kwargs):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
@@ -102,7 +105,8 @@ class _MBartTokenizer(PretrainedTokenizer):
                                 lstrip=True, rstrip=False) if isinstance(
                                     mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
-        self.sp_model = spm.SentencePieceProcessor()
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        self.vocab_file = vocab_file
         self.sp_model.Load(str(vocab_file))
         self.fairseq_offset = 1
         self.fairseq_tokens_to_ids = {
@@ -130,6 +134,13 @@ class _MBartTokenizer(PretrainedTokenizer):
         self.unk_token_id = self.fairseq_tokens_to_ids[unk_token]
         self.set_src_lang_special_tokens(self.src_lang)
         self._additional_special_tokens = list(self.lang_code_to_id.keys())
+
+        if additional_special_tokens is not None:
+            # Only add those special tokens if they are not already there.
+            self._additional_special_tokens.extend([
+                t for t in additional_special_tokens
+                if t not in self._additional_special_tokens
+            ])
 
     def __call__(self,
                  text,
@@ -159,7 +170,7 @@ class _MBartTokenizer(PretrainedTokenizer):
                 "truncation_strategy"] != "longest_first":
             truncation = kwargs["truncation_strategy"]
 
-        return super(_MBartTokenizer, self).__call__(
+        return super(MBartTokenizer, self).__call__(
             text=text,
             text_pair=text_pair,
             max_length=max_length,
@@ -174,6 +185,34 @@ class _MBartTokenizer(PretrainedTokenizer):
             return_overflowing_tokens=return_overflowing_tokens,
             return_special_tokens_mask=return_special_tokens_mask,
             **kwargs)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["sp_model"] = None
+        state["sp_model_proto"] = self.sp_model.serialized_model_proto()
+        return state
+
+    def __setstate__(self, d):
+        self.__dict__ = d
+
+        # for backward compatibility
+        if not hasattr(self, "sp_model_kwargs"):
+            self.sp_model_kwargs = {}
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        self.sp_model.LoadFromSerializedProto(self.sp_model_proto)
+
+    def save_resources(self, save_directory):
+        for name, file_name in self.resource_files_names.items():
+            save_path = os.path.join(save_directory, file_name)
+            if os.path.abspath(self.vocab_file) != os.path.abspath(
+                    save_path) and os.path.isfile(self.vocab_file):
+                copyfile(self.vocab_file, save_path)
+            elif not os.path.isfile(self.vocab_file):
+                with open(save_path, "wb") as fi:
+                    content_spiece_model = self.sp_model.serialized_model_proto(
+                    )
+                    fi.write(content_spiece_model)
 
     @property
     def vocab_size(self):
@@ -282,7 +321,7 @@ class _MBartTokenizer(PretrainedTokenizer):
         self.suffix_tokens = [self.eos_token_id, self.cur_lang_code_id]
 
 
-class _MBart50Tokenizer(PretrainedTokenizer):
+class MBart50Tokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }
@@ -302,6 +341,7 @@ class _MBart50Tokenizer(PretrainedTokenizer):
         "mbart-large-50-many-to-many-mmt": {}
     }
     max_model_input_sizes = MBART50_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+    model_input_names = ["input_ids"]
 
     FAIRSEQ_LANGUAGE_CODES = [
         "ar_AR", "cs_CZ", "de_DE", "en_XX", "es_XX", "et_EE", "fi_FI", "fr_XX",
@@ -325,6 +365,7 @@ class _MBart50Tokenizer(PretrainedTokenizer):
                  pad_token="<pad>",
                  mask_token="<mask>",
                  sp_model_kwargs=None,
+                 additional_special_tokens=None,
                  **kwargs):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
@@ -332,7 +373,8 @@ class _MBart50Tokenizer(PretrainedTokenizer):
                                 lstrip=True, rstrip=False) if isinstance(
                                     mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
-        self.sp_model = spm.SentencePieceProcessor()
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        self.vocab_file = vocab_file
         self.sp_model.Load(str(vocab_file))
         self.fairseq_offset = 1
         self.fairseq_tokens_to_ids = {
@@ -360,6 +402,13 @@ class _MBart50Tokenizer(PretrainedTokenizer):
         self.unk_token_id = self.fairseq_tokens_to_ids[unk_token]
         self.set_src_lang_special_tokens(self.src_lang)
         self._additional_special_tokens = list(self.lang_code_to_id.keys())
+
+        if additional_special_tokens is not None:
+            # Only add those special tokens if they are not already there.
+            self._additional_special_tokens.extend([
+                t for t in additional_special_tokens
+                if t not in self._additional_special_tokens
+            ])
 
     def __call__(self,
                  text,
@@ -389,7 +438,7 @@ class _MBart50Tokenizer(PretrainedTokenizer):
                 "truncation_strategy"] != "longest_first":
             truncation = kwargs["truncation_strategy"]
 
-        return super(_MBart50Tokenizer, self).__call__(
+        return super(MBart50Tokenizer, self).__call__(
             text=text,
             text_pair=text_pair,
             max_length=max_length,
@@ -404,6 +453,34 @@ class _MBart50Tokenizer(PretrainedTokenizer):
             return_overflowing_tokens=return_overflowing_tokens,
             return_special_tokens_mask=return_special_tokens_mask,
             **kwargs)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["sp_model"] = None
+        state["sp_model_proto"] = self.sp_model.serialized_model_proto()
+        return state
+
+    def __setstate__(self, d):
+        self.__dict__ = d
+
+        # for backward compatibility
+        if not hasattr(self, "sp_model_kwargs"):
+            self.sp_model_kwargs = {}
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        self.sp_model.LoadFromSerializedProto(self.sp_model_proto)
+
+    def save_resources(self, save_directory):
+        for name, file_name in self.resource_files_names.items():
+            save_path = os.path.join(save_directory, file_name)
+            if os.path.abspath(self.vocab_file) != os.path.abspath(
+                    save_path) and os.path.isfile(self.vocab_file):
+                copyfile(self.vocab_file, save_path)
+            elif not os.path.isfile(self.vocab_file):
+                with open(save_path, "wb") as fi:
+                    content_spiece_model = self.sp_model.serialized_model_proto(
+                    )
+                    fi.write(content_spiece_model)
 
     def get_vocab(self):
         vocab = {
@@ -511,73 +588,18 @@ class _MBart50Tokenizer(PretrainedTokenizer):
         self.prefix_tokens = [self.cur_lang_code_id]
         self.suffix_tokens = [self.eos_token_id]
 
-
-class MBartTokenizer:
-    mbart_model_names = _MBartTokenizer.pretrained_init_configuration.keys()
-    mbart50_model_names = _MBart50Tokenizer.pretrained_init_configuration.keys()
-    tokenizer_config_file = "tokenizer_config.json"
-
-    def __init__(self, mbart_type="mbart", *args, **kwargs):
-        if mbart_type == "mbart":
-            self.tokenizer = _MBartTokenizer(*args, **kwargs)
-        else:
-            self.tokenizer = _MBart50Tokenizer(*args, **kwargs)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
-                        **kwargs):
-        # From built-in pretrained models
-        if pretrained_model_name_or_path in cls.mbart_model_names:
-            return _MBartTokenizer.from_pretrained(
-                pretrained_model_name_or_path, *model_args, **kwargs)
-        elif pretrained_model_name_or_path in cls.mbart50_model_names:
-            return _MBart50Tokenizer.from_pretrained(
-                pretrained_model_name_or_path, *model_args, **kwargs)
-
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path,
-                                       cls.tokenizer_config_file)
-            if os.path.exists(config_file):
-                with io.open(config_file, encoding="utf-8") as f:
-                    init_kwargs = json.load(f)
-                # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class", None)
-                if init_class == "_MBart50Tokenizer":
-                    return _MBart50Tokenizer.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
-                if init_class == "_MBartTokenizer":
-                    return _MBartTokenizer.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
-            return _MBartTokenizer.from_pretrained(
-                pretrained_model_name_or_path, *model_args, **kwargs)
-        else:
-            # Assuming from community-contributed pretrained models
-            config_file = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                       pretrained_model_name_or_path,
-                                       cls.tokenizer_config_file)
-            default_root = os.path.join(MODEL_HOME,
-                                        pretrained_model_name_or_path)
-            try:
-                resolved_config_file = get_path_from_url(
-                    config_file, default_root)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't find load tokenizer_config_file for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "a correct model-identifier of community-contributed pretrained models.\n"
-                )
-            with io.open(resolved_config_file, encoding="utf-8") as f:
-                init_kwargs = json.load(f)
-
-            init_class = init_kwargs.pop("init_class", None)
-            if init_class == "_MBart50Tokenizer":
-                return _MBart50Tokenizer.from_pretrained(
-                    pretrained_model_name_or_path, *model_args, **kwargs)
-            elif init_class == "_MBartTokenizer":
-                return _MBartTokenizer.from_pretrained(
-                    pretrained_model_name_or_path, *model_args, **kwargs)
-            else:
-                return _MBartTokenizer.from_pretrained(
-                    pretrained_model_name_or_path, *model_args, **kwargs)
+    def _build_translation_inputs(self, raw_inputs, return_tensors, src_lang,
+                                  tgt_lang, **extra_kwargs):
+        """Used by translation pipeline, to prepare inputs for the generate function"""
+        if src_lang is None or tgt_lang is None:
+            raise ValueError(
+                "Translation requires a `src_lang` and a `tgt_lang` for this model"
+            )
+        self.src_lang = src_lang
+        inputs = self(raw_inputs,
+                      add_special_tokens=True,
+                      return_tensors=return_tensors,
+                      **extra_kwargs)
+        tgt_lang_id = self.convert_tokens_to_ids(tgt_lang)
+        inputs["forced_bos_token_id"] = tgt_lang_id
+        return inputs

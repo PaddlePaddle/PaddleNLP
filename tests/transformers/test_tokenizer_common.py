@@ -722,8 +722,6 @@ class TokenizerTesterMixin:
                 # smaller than the original vocabs - let's not assert this
                 # self.assertEqual(vocab_size, all_size)
 
-                # import pdb; pdb.set_trace()
-
                 new_toks = ["aaaaa bbbbbb", "cccccccccdddddddd"]
                 added_toks = tokenizer.add_tokens(new_toks)
                 vocab_size_2 = tokenizer.vocab_size
@@ -738,7 +736,6 @@ class TokenizerTesterMixin:
                     "aaaaa bbbbbb low cccccccccdddddddd l",
                     return_token_type_ids=None,
                     add_special_tokens=False)["input_ids"]
-                # import pdb; pdb.set_trace()
                 self.assertGreaterEqual(len(tokens), 4)
                 self.assertGreater(tokens[0], tokenizer.vocab_size - 1)
                 self.assertGreater(tokens[-2], tokenizer.vocab_size - 1)
@@ -871,7 +868,9 @@ class TokenizerTesterMixin:
         ):
             weights_lists_2.append(list(map_list.keys()))
 
+        weights_list.sort()
         for weights_list_2 in weights_lists_2:
+            weights_list_2.sort()
             self.assertListEqual(weights_list, weights_list_2)
 
     def test_mask_output(self):

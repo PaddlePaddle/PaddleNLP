@@ -546,7 +546,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         `__init__` whose name ends with `_token`) as attributes of the tokenizer
         instance.
         """
-        # import pdb; pdb.set_trace()
         init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
         init_dict.pop('self', None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
@@ -675,7 +674,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         return len(tokens_to_add)
 
     def _create_trie(self, unique_no_split_tokens):
-        # import pdb; pdb.set_trace()
         trie = Trie()
         for token in unique_no_split_tokens:
             if hasattr(
@@ -750,7 +748,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         no_split_token = set(self.unique_no_split_tokens)
         tokens = self.tokens_trie.split(text)
 
-        # import pdb; pdb.set_trace()
         # ["This is something", "<special_token_1>", "  else"]
         for i, token in enumerate(tokens):
             if token in no_split_token:
@@ -985,7 +982,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
         def get_input_ids(text):
             if isinstance(text, str):
-                # import pdb; pdb.set_trace()
                 tokens = self.tokenize(text, **kwargs)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text,
@@ -1015,7 +1011,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
         first_ids = get_input_ids(text)
         second_ids = get_input_ids(text_pair) if text_pair is not None else None
-        # import pdb; pdb.set_trace()
 
         if return_offsets_mapping:
             kwargs['text'] = text
