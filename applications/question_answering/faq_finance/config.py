@@ -12,20 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from milvus import MetricType, IndexType
+search_param = {'nprobe': 20}
+collection_name = 'faq_finance'
+partition_tag = 'partition_1'
 
-MILVUS_HOST = '10.21.226.173'
+MILVUS_HOST = '10.21.226.175'
 MILVUS_PORT = 8530
+data_dim = 256
+top_k = 10
+embedding_name = 'embeddings'
 
-collection_param = {
-    'dimension': 256,
-    'index_file_size': 256,
-    'metric_type': MetricType.L2
+index_config = {
+    "index_type": "IVF_FLAT",
+    "metric_type": "L2",
+    "params": {
+        "nlist": 1000
+    },
 }
 
-index_type = IndexType.IVF_FLAT
-index_param = {'nlist': 1000}
-
-top_k = 10
-search_param = {'nprobe': 20}
+search_params = {
+    "metric_type": "L2",
+    "params": {
+        "nprobe": top_k
+    },
+}

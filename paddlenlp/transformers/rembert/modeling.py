@@ -69,7 +69,6 @@ ACT2FN = {
 
 
 class RembertPretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "rembert": {
             "attention_probs_dropout_prob": 0,
@@ -88,7 +87,6 @@ class RembertPretrainedModel(PretrainedModel):
             "layer_norm_eps": 1e-12
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "rembert":

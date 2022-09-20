@@ -8,6 +8,7 @@
   - [2.3 高效模型调优方案](#高效模型调优方案)
   - [2.4 产业级全流程方案](#产业级全流程方案)
 - [3. 快速开始](#快速开始)
+- [4. 常用中文分类数据集](#常用中文分类数据集)
 
 <a name="文本分类应用简介"></a>
 
@@ -17,7 +18,7 @@
 文本分类简单来说就是对给定的一个句子或一段文本使用分类模型分类。虽然文本分类在金融、医疗、法律、工业等领域都有广泛的成功实践应用，但如何选择合适的方案和预训练模型、数据标注质量差、效果调优困难、AI入门成本高、如何高效训练部署等问题使部分开发者望而却步。针对文本分类领域的痛点和难点，PaddleNLP文本分类应用提出了多种前沿解决方案，助力开发者简单高效实现文本分类数据标注、训练、调优、上线，降低文本分类落地技术门槛。
 
 <div align="center">
-    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187667617-81567ba3-7f1f-4d72-9e89-cf6e8d68b906.png">
+    <img width="700" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189114119-4a1b0bd5-a604-4a34-a63b-7b27519eaf09.png">
 </div>
 
 **文本分类应用技术特色：**
@@ -36,7 +37,7 @@
 ### 2.1 文本分类方案全覆盖
 
 <div align="center">
-    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187871917-9cabcd20-8059-4df0-8a1d-0bf875d80549.png">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/189114232-bb706af4-45a9-4e63-8857-76945a63d081.png">
 </div>
 
 #### 2.1.1 分类场景齐全
@@ -66,7 +67,7 @@
 
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/63761690/187669557-20893b74-8ff6-43bf-9768-9b431be23895.png width=800 height=300 />
+    <img src=https://user-images.githubusercontent.com/63761690/189115968-c1d14ed3-dbdd-4a84-ac11-e9eaa447d40f.png width=800 height=300 />
 </div>
 
 
@@ -79,18 +80,18 @@
 
 【方案选择】提示学习（Prompt Learning）适用于**标注成本高、标注样本较少的文本分类场景**。在小样本场景中，相比于预训练模型微调学习，提示学习能取得更好的效果。对于标注样本充足、标注成本较低的场景，我们仍旧推荐使用充足的标注样本进行文本分类[预训练模型微调](#预训练模型微调)。
 
-【方案介绍】**提示学习的主要思想是将文本分类任务转换为构造提示中掩码 `[MASK]` 的分类预测任务**，也即在掩码 `[MASK]`向量后接入线性层分类器预测掩码位置可能的字或词。提示学习使用待预测字的预训练向量来初始化分类器参数（如果待预测的是词，则为词中所有字的预训练向量平均值），充分利用预训练语言模型学习到的特征和标签文本，从而降低样本需求。提示学习同时提供[ R-Drop](https://arxiv.org/abs/2106.14448) 和 [RGL](https://aclanthology.org/2022.findings-naacl.81/) 策略，帮助提示模型效果。
+【方案介绍】**提示学习的主要思想是将文本分类任务转换为构造提示中掩码 `[MASK]` 的分类预测任务**，也即在掩码 `[MASK]`向量后接入线性层分类器预测掩码位置可能的字或词。提示学习使用待预测字的预训练向量来初始化分类器参数（如果待预测的是词，则为词中所有字的预训练向量平均值），充分利用预训练语言模型学习到的特征和标签文本，从而降低样本需求。提示学习同时提供[ R-Drop](https://arxiv.org/abs/2106.14448) 和 [RGL](https://aclanthology.org/2022.findings-naacl.81/) 策略，帮助提升模型效果。
 
 我们以下图情感二分类任务为例来具体介绍提示学习流程，分类任务标签分为 `0:负向` 和 `1:正向` 。在文本加入构造提示 `我[MASK]喜欢。` ，将情感分类任务转化为预测掩码 `[MASK]` 的待预测字是 `不` 还是 `很`。具体实现方法是在掩码`[MASK]`的输出向量后接入线性分类器（二分类），然后用`不`和`很`的预训练向量来初始化分类器进行训练，分类器预测分类为 `0：不` 或 `1：很` 对应原始标签 `0:负向` 或 `1:正向`。而预训练模型微调则是在预训练模型`[CLS]`向量接入随机初始化线性分类器进行训练，分类器直接预测分类为 `0:负向` 或 `1:正向`。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/25607475/183909263-6ead8871-699c-4c2d-951f-e33eddcfdd9c.png width=800 height=300 />
+    <img src=https://user-images.githubusercontent.com/63761690/189114324-376025b6-8f4e-4d94-a135-953f53f20636.png width=800 height=300 />
 </div>
 
 【方案效果】我们比较预训练模型微调与提示学习在多分类、多标签、层次分类小样本场景的模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值），可以看到在样本较少的情况下，提示学习比预训练模型微调有明显优势。
 
 <div align="center">
-    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650189-18dc5d4c-66c6-459e-827e-8a8d67a24d42.jpeg">
+    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189114445-ee0dd6af-f102-4708-9f46-c630c572dfd3.png">
 </div>
 
 
@@ -107,6 +108,10 @@
 【方案选择】基于语义索引的文本分类方案**适用于标签类别不固定的场景**，对于新增标签类别或新的相关分类任务无需重新训练，模型仍然能获得较好预测效果，方案具有良好的拓展性。
 
 【方案介绍】语义索引目标是从海量候选召回集中快速、准确地召回一批与输入文本语义相关的文本。基于语义索引的文本分类方法具体来说是将标签集作为召回目标集，召回与输入文本语义相似的标签作为文本的标签类别。
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/63761690/189114541-2278b7f7-1af6-470d-a300-28e7e902b6a8.png width=800 height=300 />
+</div>
 
 【快速开始】
 - 快速开启多分类任务参见 👉 [语义索引-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/retrieval_based#readme)
@@ -136,24 +141,35 @@
 有这么一句话在业界广泛流传，"数据决定了机器学习的上限，而模型和算法只是逼近这个上限"，可见数据质量的重要性。文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)开源了模型分析模块，针对标注数据质量不高、训练数据覆盖不足、样本数量少等文本分类常见数据痛点，提供稀疏数据筛选、脏数据清洗、数据增强三种数据优化方案，解决训练数据缺陷问题，用低成本方式获得大幅度的效果提升。
 
 
-- **稀疏数据筛选**基于特征相似度的实例级证据分析方法挖掘待预测数据中缺乏证据支持的数据（也即稀疏数据），并进行有选择的训练集数据增强或针对性筛选未标注数据进行标注来解决稀疏数据问题，有效提升模型表现。我们采用在多分类、多标签、层次分类场景中评测稀疏数据-数据增强策略和稀疏数据-数据标注策略，下图表明稀疏数据筛选方案在各场景能够有效提高模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值）。
+- **稀疏数据筛选**基于特征相似度的实例级证据分析方法挖掘待预测数据中缺乏证据支持的数据（也即稀疏数据），并进行有选择的训练集数据增强或针对性筛选未标注数据进行标注来解决稀疏数据问题，有效提升模型表现。
+<div align="center">
+    <img width="1000" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189114644-c0d21801-dd6c-4530-b3a3-5f5a568a7a22.png">
+</div>
+
+我们采用在多分类、多标签、层次分类场景中评测稀疏数据-数据增强策略和稀疏数据-数据标注策略，下图表明稀疏数据筛选方案在各场景能够有效提高模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值）。
 
 <div align="center">
-    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187650173-c83afc31-a1f8-478b-a391-b977d5170825.jpeg">
+    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189114660-820d1471-4907-4c73-a118-c494200afff0.png">
 </div>
 
 
-- **脏数据清洗**基于表示点方法的实例级证据分析方法，计算训练数据对模型的影响分数，分数高的训练数据表明对模型影响大，这些数据有较大概率为脏数据（标注错误样本）。脏数据清洗方案通过高效识别训练集中脏数据（也即标注质量差的数据），有效降低人力检查成本。我们采用在多分类、多标签、层次分类场景中评测脏数据清洗方案，实验表明方案能够高效筛选出训练集中脏数据，提高模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值）。
+- **脏数据清洗**基于表示点方法的实例级证据分析方法，计算训练数据对模型的影响分数，分数高的训练数据表明对模型影响大，这些数据有较大概率为脏数据（标注错误样本）。脏数据清洗方案通过高效识别训练集中脏数据（也即标注质量差的数据），有效降低人力检查成本。
 
 <div align="center">
-    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187652793-aec6dc9f-a709-431e-9d18-58e39719a1e5.jpeg">
+    <img width="1000" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189114677-9a2f5232-9551-4e10-a215-54ddb7ca1f33.png">
+</div>
+
+我们采用在多分类、多标签、层次分类场景中评测脏数据清洗方案，实验表明方案能够高效筛选出训练集中脏数据，提高模型表现（多分类精度为准确率，多标签和层次分类精度为Macro F1值）。
+
+<div align="center">
+    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189114695-90cef2fd-955d-4243-9fc4-78f2dcf7fb6c.png">
 </div>
 
 
 - **数据增强**在数据量较少的情况下能够通过增加数据集多样性，提升模型效果。PaddleNLP内置[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM预测）、TF-IDF等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
 
 <div align="center">
-    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/187666776-53abc345-da7f-4f7e-ada4-8040577c8720.png">
+    <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189115071-40152f7c-7c90-41b3-a70b-4d4aabc5b715.png">
 </div>
 
 
@@ -172,7 +188,7 @@
 文本分类应用提供了简单易用的数据标注-模型训练-模型调优-模型压缩-预测部署全流程方案，我们将以预训练模型微调方案为例介绍文本分类应用的全流程：
 
 <div align="center">
-    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187828356-e2f4f627-f5fe-4c83-8879-ed6951f7511e.png">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/189115101-20cbaa00-e549-425b-b047-61bac2a5e39f.png">
 </div>
 <div align="center">
     <font size ="2">
@@ -198,7 +214,11 @@
 
 **3.模型部署**
 
-- 现实部署场景需要同时考虑模型的精度和性能表现。基于压缩API的模型裁剪能够进一步压缩模型体积，此外模型裁剪去掉了部分冗余参数的扰动，增加了模型的泛化能力，在部分任务预测精度得到提高。
+- 现实部署场景需要同时考虑模型的精度和性能表现，文本分类应用接入PaddleNLP 模型压缩 API 。采用了DynaBERT 中宽度自适应裁剪策略，对预训练模型多头注意力机制中的头（Head ）进行重要性排序，保证更重要的头（Head ）不容易被裁掉，然后用原模型作为蒸馏过程中的教师模型，宽度更小的模型作为学生模型，蒸馏得到的学生模型就是我们裁剪得到的模型。实验表明模型裁剪能够有效缩小模型体积、减少内存占用、提升推理速度。模型裁剪去掉了部分冗余参数的扰动，增加了模型的泛化能力，在部分任务中预测精度得到提高。
+
+<div align="center">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/189115124-2f429043-3145-4bf8-9969-47580a706037.png">
+</div>
 
 - 模型部署需要将保存的最佳模型参数（动态图参数）导出成静态图参数，用于后续的推理部署。p.s.模型裁剪之后会默认导出静态图模型
 
@@ -214,3 +234,59 @@
 - 快速开启多标签分类 👉 [多标签指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#readme)
 
 - 快速开启层次分类 👉 [层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical#readme)
+
+<a name="常用中文分类数据集"></a>
+
+## 4. 常用中文分类数据集
+
+**多分类数据集：**
+
+- [THUCNews新闻分类数据集](http://thuctc.thunlp.org/)
+
+- [百科问答分类数据集](https://github.com/brightmart/nlp_chinese_corpus#3%E7%99%BE%E7%A7%91%E7%B1%BB%E9%97%AE%E7%AD%94json%E7%89%88baike2018qa)
+
+- [头条新闻标题数据集TNEWS](https://github.com/aceimnorstuvwxz/toutiao-text-classfication-dataset)
+
+- [复旦新闻文本数据集](https://www.heywhale.com/mw/dataset/5d3a9c86cf76a600360edd04)
+
+- [IFLYTEK app应用描述分类数据集](https://storage.googleapis.com/cluebenchmark/tasks/iflytek_public.zip)
+
+- [CAIL 2022事件检测](https://cloud.tsinghua.edu.cn/d/6e911ff1286d47db8016/)
+
+**情感分类数据集(多分类):**
+
+- [亚马逊商品评论情感数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/yf_amazon/intro.ipynb)
+
+- [财经新闻情感分类数据集](https://github.com/wwwxmu/Dataset-of-financial-news-sentiment-classification)
+
+- [ChnSentiCorp 酒店评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/tree/master/datasets/ChnSentiCorp_htl_all)
+
+- [外卖评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/waimai_10k/intro.ipynb)
+
+- [weibo情感二分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/weibo_senti_100k/intro.ipynb)
+
+- [weibo情感四分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/simplifyweibo_4_moods/intro.ipynb)
+
+- [商品评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/online_shopping_10_cats/intro.ipynb)
+
+- [电影评论情感分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/dmsc_v2/intro.ipynb)
+
+- [大众点评分类数据集](https://github.com/SophonPlus/ChineseNlpCorpus/blob/master/datasets/yf_dianping/intro.ipynb)
+
+**多标签数据集:**
+
+- [学生评语分类数据集](https://github.com/FBI1314/textClassification/tree/master/multilabel_text_classfication/data)
+
+- [CAIL2019婚姻要素识别](https://aistudio.baidu.com/aistudio/projectdetail/3996601)
+
+- [CAIL2018 刑期预测、法条预测、罪名预测](https://cail.oss-cn-qingdao.aliyuncs.com/CAIL2018_ALL_DATA.zip)
+
+**层次分类数据集:**
+
+- [头条新闻标题分类-TNEWS的升级版](https://github.com/aceimnorstuvwxz/toutiao-multilevel-text-classfication-dataset)
+
+- [网页层次分类数据集](https://csri.scu.edu.cn/info/1012/2827.htm)
+
+- [医学意图数据集(CMID)](https://github.com/liutongyang/CMID)
+
+- [2020语言与智能技术竞赛事件分类](https://github.com/percent4/keras_bert_multi_label_cls/tree/master/data)

@@ -122,7 +122,6 @@ class SkepPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "skep_ernie_1.0_large_ch": {
             "attention_probs_dropout_prob": 0.1,
@@ -167,7 +166,6 @@ class SkepPretrainedModel(PretrainedModel):
             "pad_token_id": 1,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "skep_ernie_1.0_large_ch":
@@ -389,7 +387,7 @@ class SkepModel(SkepPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(encoder_outputs):
+        if isinstance(encoder_outputs, type(input_ids)):
             encoder_outputs = (encoder_outputs, )
 
         sequence_output = encoder_outputs[0]

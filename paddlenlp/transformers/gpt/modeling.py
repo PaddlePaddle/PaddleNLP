@@ -450,7 +450,6 @@ class GPTPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "gpt-cpm-large-cn": { # 2.6B
             "vocab_size": 30000,
@@ -592,7 +591,6 @@ class GPTPretrainedModel(PretrainedModel):
             "eol_token_id": 198,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "gpt-cpm-large-cn":

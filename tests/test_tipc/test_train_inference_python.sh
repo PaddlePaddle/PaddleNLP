@@ -1,4 +1,19 @@
 #!/bin/bash
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 source test_tipc/common_func.sh
 
 FILENAME=$1
@@ -40,8 +55,8 @@ fpgm_key=$(func_parser_key "${lines[17]}")
 fpgm_trainer=$(func_parser_value "${lines[17]}")
 distill_key=$(func_parser_key "${lines[18]}")
 distill_trainer=$(func_parser_value "${lines[18]}")
-trainer_key1=$(func_parser_key "${lines[19]}")
-trainer_value1=$(func_parser_value "${lines[19]}")
+to_static_key=$(func_parser_key "${lines[19]}")
+to_static_trainer=$(func_parser_value "${lines[19]}")
 trainer_key2=$(func_parser_key "${lines[20]}")
 trainer_value2=$(func_parser_value "${lines[20]}")
 
@@ -295,9 +310,12 @@ else
                 elif [ ${trainer} = "${distill_key}" ]; then
                     run_train=${distill_trainer}
                     run_export=${distill_export}
-                elif [ ${trainer} = ${trainer_key1} ]; then
-                    run_train=${trainer_value1}
-                    run_export=${export_value1}
+                # In case of @to_static, we re-used norm_traier,
+                # but append "--to_static" for config
+                # to trigger "apply_to_static" logic in 'train.py'
+                elif [ ${trainer} = "${to_static_key}" ]; then
+                    run_train="${norm_trainer}  ${to_static_trainer}"
+                    run_export=${norm_export}
                 elif [[ ${trainer} = ${trainer_key2} ]]; then
                     run_train=${trainer_value2}
                     run_export=${export_value2}

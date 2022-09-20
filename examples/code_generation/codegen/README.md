@@ -38,7 +38,13 @@
 
 
 ## 效果展示
-- 解算法题。求解无重复字符的最长子串的长度
+
+- Github Copilot代码提示效果展示
+<p align="center">
+<img src="https://user-images.githubusercontent.com/24390500/189046785-6c04a3c3-ce89-4684-9aff-a7dc2e7a7041.gif"/> <br />
+</p>
+
+- 解算法题效果展示。求解无重复字符的最长子串的长度
 ```python
 from paddlenlp import Taskflow
 
