@@ -180,10 +180,6 @@ def train():
             logits = model(**batch)
             loss = criterion(logits, labels)
 
-            probs = F.softmax(logits, axis=1)
-            correct = metric.compute(probs, labels)
-            metric.update(correct)
-
             loss.backward()
             optimizer.step()
             if args.warmup:
@@ -192,10 +188,9 @@ def train():
 
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
-                acc = metric.accumulate()
                 logger.info(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, acc: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc, args.logging_steps /
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, args.logging_steps /
                        (time.time() - tic_train)))
                 tic_train = time.time()
 
