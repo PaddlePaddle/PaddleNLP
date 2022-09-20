@@ -213,3 +213,11 @@ rm -rf faiss_document_store.db
 ```
 export CUDA_VISIBLE_DEVICES=""
 ```
+
+#### 运行streamlit前端程序出现错误：`AttributeError: module 'click' has no attribute 'get_os_args'`
+
+click版本过高导致：
+
+```
+pip install click==8.0
+```
