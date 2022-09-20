@@ -189,7 +189,10 @@ class _MBartTokenizer(PretrainedTokenizer):
             self.lang_code_to_id) + self.fairseq_offset + 1
 
     def get_vocab(self):
-        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -403,7 +406,10 @@ class _MBart50Tokenizer(PretrainedTokenizer):
             **kwargs)
 
     def get_vocab(self):
-        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -507,10 +513,8 @@ class _MBart50Tokenizer(PretrainedTokenizer):
 
 
 class MBartTokenizer:
-    mbart_model_names = _MBartTokenizer.pretrained_init_configuration.keys(
-    )
-    mbart50_model_names = _MBart50Tokenizer.pretrained_init_configuration.keys(
-    )
+    mbart_model_names = _MBartTokenizer.pretrained_init_configuration.keys()
+    mbart50_model_names = _MBart50Tokenizer.pretrained_init_configuration.keys()
     tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, mbart_type="mbart", *args, **kwargs):
