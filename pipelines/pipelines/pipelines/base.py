@@ -35,6 +35,7 @@ from pipelines.pipelines.config import (
     get_pipeline_definition,
     read_pipeline_config_from_yaml,
 )
+from pipelines.schema import Document, Label, MultiLabel
 from pipelines.pipelines.utils import generate_code
 
 try:
@@ -203,16 +204,10 @@ class BasePipeline:
                 pipeline_name=pipeline_name,
                 overwrite_with_env_variables=overwrite_with_env_variables,
             )
-        elif pipeline_definition["type"] == "RayPipeline":
-            return RayPipeline.load_from_config(
-                pipeline_config=pipeline_config,
-                pipeline_name=pipeline_name,
-                overwrite_with_env_variables=overwrite_with_env_variables,
-            )
         else:
             raise KeyError(
                 f"Pipeline Type '{pipeline_definition['type']}' is not a valid. The available types are"
-                f"'Pipeline' and 'RayPipeline'.")
+                f"'Pipeline'.")
 
     @classmethod
     def load_from_yaml(cls,
@@ -527,133 +522,6 @@ class Pipeline(BasePipeline):
         reordered_columns = filtered_order + missing_columns
         assert len(reordered_columns) == len(df.columns)
         return df.reindex(columns=reordered_columns)
-
-    def _build_eval_dataframe(self, query: str, query_labels: MultiLabel,
-                              node_name: str, node_output: dict) -> DataFrame:
-        """
-        Builds a Dataframe for each query from which evaluation metrics can be calculated.
-        Currently only answer or document returning nodes are supported, returns None otherwise.
-
-        Each row contains either an answer or a document that has been retrieved during evaluation.
-        Rows are being enriched with basic infos like rank, query, type or node.
-        Additional answer or document specific evaluation infos like gold labels
-        and metrics depicting whether the row matches the gold labels are included, too.
-        """
-
-        if query_labels is None or query_labels.labels is None:
-            logger.warning(
-                f"There is no label for query '{query}'. Query will be omitted."
-            )
-            return pd.DataFrame()
-
-        # remarks for no_answers:
-        # Single 'no_answer'-labels are not contained in MultiLabel aggregates.
-        # If all labels are no_answers, MultiLabel.answers will be [""] and the other aggregates []
-        gold_answers = query_labels.answers
-        gold_offsets_in_documents = query_labels.gold_offsets_in_documents
-        gold_document_ids = query_labels.document_ids
-        gold_document_contents = query_labels.document_contents
-
-        # if node returned answers, include answer specific info:
-        # - the answer returned itself
-        # - the document_id the answer was found in
-        # - the position or offsets within the document the answer was found
-        # - the surrounding context of the answer within the document
-        # - the gold answers
-        # - the position or offsets of the gold answer within the document
-        # - the gold document ids containing the answer
-        # - the exact_match metric depicting if the answer exactly matches the gold label
-        # - the f1 metric depicting how well the answer overlaps with the gold label on token basis
-        # - the sas metric depicting how well the answer matches the gold label on a semantic basis.
-        #   this will be calculated on all queries in eval() for performance reasons if a sas model has been provided
-
-        partial_dfs = []
-        for field_name in ["answers", "answers_isolated"]:
-            df = pd.DataFrame()
-            answers = node_output.get(field_name, None)
-            if answers is not None:
-                answer_cols_to_keep = [
-                    "answer", "document_id", "offsets_in_document", "context"
-                ]
-                df_answers = pd.DataFrame(answers, columns=answer_cols_to_keep)
-                if len(df_answers) > 0:
-                    df_answers["type"] = "answer"
-                    df_answers["gold_answers"] = [gold_answers
-                                                  ] * len(df_answers)
-                    df_answers["gold_offsets_in_documents"] = [
-                        gold_offsets_in_documents
-                    ] * len(df_answers)
-                    df_answers["gold_document_ids"] = [gold_document_ids
-                                                       ] * len(df_answers)
-                    df_answers["exact_match"] = df_answers.apply(
-                        lambda row: calculate_em_str_multi(
-                            gold_answers, row["answer"]),
-                        axis=1)
-                    df_answers["f1"] = df_answers.apply(
-                        lambda row: calculate_f1_str_multi(
-                            gold_answers, row["answer"]),
-                        axis=1)
-                    df_answers["rank"] = np.arange(1, len(df_answers) + 1)
-                    df = pd.concat([df, df_answers])
-
-            # add general info
-            df["node"] = node_name
-            df["multilabel_id"] = query_labels.id
-            df["query"] = query
-            df["filters"] = json.dumps(query_labels.filters,
-                                       sort_keys=True).encode()
-            df["eval_mode"] = "isolated" if "isolated" in field_name else "integrated"
-            partial_dfs.append(df)
-
-        # if node returned documents, include document specific info:
-        # - the document_id
-        # - the content of the document
-        # - the gold document ids
-        # - the gold document contents
-        # - the gold_id_match metric depicting whether one of the gold document ids matches the document
-        # - the answer_match metric depicting whether the document contains the answer
-        # - the gold_id_or_answer_match metric depicting whether one of the former two conditions are met
-        for field_name in ["documents", "documents_isolated"]:
-            df = pd.DataFrame()
-            documents = node_output.get(field_name, None)
-            if documents is not None:
-                document_cols_to_keep = ["content", "id"]
-                df_docs = pd.DataFrame(documents, columns=document_cols_to_keep)
-                if len(df_docs) > 0:
-                    df_docs = df_docs.rename(columns={"id": "document_id"})
-                    df_docs["type"] = "document"
-                    df_docs["gold_document_ids"] = [gold_document_ids
-                                                    ] * len(df_docs)
-                    df_docs["gold_document_contents"] = [
-                        gold_document_contents
-                    ] * len(df_docs)
-                    df_docs["gold_id_match"] = df_docs.apply(
-                        lambda row: 1.0
-                        if row["document_id"] in gold_document_ids else 0.0,
-                        axis=1)
-                    df_docs["answer_match"] = df_docs.apply(
-                        lambda row: 1.0 if not query_labels.no_answer and any(
-                            gold_answer in row["content"]
-                            for gold_answer in gold_answers) else 0.0,
-                        axis=1,
-                    )
-                    df_docs["gold_id_or_answer_match"] = df_docs.apply(
-                        lambda row: max(row["gold_id_match"], row["answer_match"
-                                                                  ]),
-                        axis=1)
-                    df_docs["rank"] = np.arange(1, len(df_docs) + 1)
-                    df = pd.concat([df, df_docs])
-
-            # add general info
-            df["node"] = node_name
-            df["multilabel_id"] = query_labels.id
-            df["query"] = query
-            df["filters"] = json.dumps(query_labels.filters,
-                                       sort_keys=True).encode()
-            df["eval_mode"] = "isolated" if "isolated" in field_name else "integrated"
-            partial_dfs.append(df)
-
-        return pd.concat(partial_dfs, ignore_index=True)
 
     def get_next_nodes(self, node_id: str, stream_id: str):
         current_node_edges = self.graph.edges(node_id, data=True)
