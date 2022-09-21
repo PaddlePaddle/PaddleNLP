@@ -143,12 +143,12 @@ def initialize_mp_dp_parameters(model, hcg):
             paddle.distributed.broadcast(param.detach(),
                                          src=mp_src_rank,
                                          group=mp_group,
-                                         use_calc_stream=True)
+                                         sync_op=True)
 
         paddle.distributed.broadcast(param.detach(),
                                      src=dp_src_rank,
                                      group=dp_group,
-                                     use_calc_stream=True)
+                                     sync_op=True)
 
 
 def unscale_method(self, optimizer):
