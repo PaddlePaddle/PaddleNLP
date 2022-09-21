@@ -359,10 +359,11 @@ else
                 fi
                 # run train
                 eval $cmd
+                last_status=${PIPESTATUS[0]}
                 if [ ${#gpu} -ge 2 ];then
                     cat ${WORK_PATH}/log/workerlog.0 > ${_train_log} 
                 fi
-                status_check $? "${cmd}" "${status_log}" "${model_name}" "${_train_log}"
+                status_check ${last_status} "${cmd}" "${status_log}" "${model_name}" "${_train_log}"
 
                 set_eval_pretrain=$(func_set_params "${pretrain_model_key}" "${save_log}/${train_model_name}")
 
