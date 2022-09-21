@@ -1312,10 +1312,11 @@ class REDecoder(nn.Layer):
         self.loss_fct = CrossEntropyLoss()
 
     def build_relation(self, relations, entities):
-        batch_size = len(relations)
-        new_relations = paddle.full(shape=[batch_size, 100000, 3],
-                                    fill_value=-1,
-                                    dtype=relations.dtype)
+        batch_size, max_seq_len = paddle.shape(entities)[:2]
+        new_relations = paddle.full(
+            shape=[batch_size, max_seq_len * max_seq_len, 3],
+            fill_value=-1,
+            dtype=relations.dtype)
         for b in range(batch_size):
             if entities[b, 0, 0] <= 2:
                 entitie_new = paddle.full(shape=[512, 3],
@@ -1407,7 +1408,7 @@ class REDecoder(nn.Layer):
         relations, entities = self.build_relation(relations, entities)
         loss = 0
         all_pred_relations = paddle.full(
-            shape=[batch_size, max_length + 1, 7, 2],
+            shape=[batch_size, max_length * max_length, 7, 2],
             fill_value=-1,
             dtype=entities.dtype)
         for b in range(batch_size):
@@ -1446,11 +1447,12 @@ class REDecoder(nn.Layer):
             loss += self.loss_fct(logits, relation_labels)
             pred_relations = self.get_predicted_relations(
                 logits, relation, entities[b])
-            pred_relations = paddle.stack(pred_relations)
-            all_pred_relations[b, 0, :, :] = paddle.shape(
-                pred_relations)[0].astype(all_pred_relations.dtype)
-            all_pred_relations[b,
-                               1:len(pred_relations) + 1, :, :] = pred_relations
+            if len(pred_relations) > 0:
+                pred_relations = paddle.stack(pred_relations)
+                all_pred_relations[b, 0, :, :] = paddle.shape(
+                    pred_relations)[0].astype(all_pred_relations.dtype)
+                all_pred_relations[b, 1:len(pred_relations) +
+                                   1, :, :] = pred_relations
         return loss, all_pred_relations
 
 
@@ -1538,9 +1540,13 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         loss, pred_relations = self.extractor(sequence_output, entities,
                                               relations)
+        hidden_states = [
+            outputs[2][f"{idx}_data"]
+            for idx in range(self.layoutxlm.config["num_hidden_layers"])
+        ]
+        hidden_states = paddle.stack(hidden_states, axis=1)
 
-        res = dict(
-            loss=loss,
-            pred_relations=pred_relations,
-        )
+        res = dict(loss=loss,
+                   pred_relations=pred_relations,
+                   hidden_states=hidden_states)
         return res
