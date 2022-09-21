@@ -206,7 +206,7 @@ def all_reduce_parameters(params, group):
     with paddle.framework.no_grad():
         for p in params:
             grad = p.grad.scale_(div_factor)
-            paddle.distributed.all_reduce(grad, use_calc_stream=True)
+            paddle.distributed.all_reduce(grad, sync_op=True)
 
 
 def parameters_classify(model, use_sharding=False):
@@ -492,9 +492,9 @@ def do_train(args):
                 dist.broadcast(p,
                                src=sharding_group.ranks[0],
                                group=sharding_group,
-                               use_calc_stream=True)
+                               sync_op=True)
             # Multi stream operation will be supported later
-            dist.wait(tensor=p, group=sharding_group, use_calc_stream=True)
+            dist.wait(tensor=p, group=sharding_group, sync_op=True)
         else:
             initialize_mp_dp_parameters(model, hcg)
 
