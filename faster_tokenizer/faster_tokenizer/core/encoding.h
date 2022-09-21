@@ -21,6 +21,12 @@ limitations under the License. */
 #include "faster_tokenizer/core/base.h"
 #include "faster_tokenizer/utils/utils.h"
 
+#include <math.h>
+#include <stdlib.h>
+#include <functional>
+#include <thread>
+using namespace std;
+
 namespace paddlenlp {
 namespace faster_tokenizer {
 namespace core {
@@ -122,6 +128,10 @@ bool FASTERTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
 void FASTERTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
                                        const PadMethod& method);
 
+int FASTERTOKENIZER_DECL GetThreadNum(size_t batch_size);
+
+void FASTERTOKENIZER_DECL
+RunMultiThread(std::function<void(size_t, size_t)> func, size_t batch_size);
 }  // namespace core
 }  // namespace faster_tokenizer
 }  // namespace paddlenlp

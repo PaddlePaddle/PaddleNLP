@@ -14,31 +14,23 @@
 
 import argparse
 import os
-from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
 from paddlenlp.transformers import AutoModelForSequenceClassification
-from paddlenlp.data import Stack, Tuple, Pad
-
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
-parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
-args = parser.parse_args()
-# yapf: enable
 
 if __name__ == "__main__":
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900', help="The path to model parameters to be loaded.")
+    parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
+    args = parser.parse_args()
+    # yapf: enable
+
     # The number of labels should be in accordance with the training dataset.
     label_map = {0: 'negative', 1: 'positive'}
     model = AutoModelForSequenceClassification.from_pretrained(
-        "ernie-3.0-medium-zh", num_classes=len(label_map))
+        args.params_path, num_classes=len(label_map))
 
-    if args.params_path and os.path.isfile(args.params_path):
-        state_dict = paddle.load(args.params_path)
-        model.set_dict(state_dict)
-        print("Loaded parameters from %s" % args.params_path)
     model.eval()
 
     # Convert to static graph with specific input description
