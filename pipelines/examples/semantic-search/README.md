@@ -17,7 +17,7 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。
+本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想接入自己训练的模型，可以参考[Neural Search的流程](./Neural_Search.md)。
 
 ### 2.1 系统特色
 
@@ -52,9 +52,11 @@ b. 硬件环境：
 c. 依赖安装：
 首先需要安装PaddlePaddle，PaddlePaddle的安装请参考文档[官方安装文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，然后安装下面的依赖：
 ```bash
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-# 1) 安装 pipelines package
+# pip 一键安装
+pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 或者源码进行安装最新版本
 cd ${HOME}/PaddleNLP/pipelines/
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
@@ -71,11 +73,15 @@ python setup.py install
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/semantic-search/semantic_search_example.py --device gpu
+python examples/semantic-search/semantic_search_example.py --device gpu \
+                                                          --search_engine faiss
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/semantic-search/semantic_search_example.py --device cpu
+python examples/semantic-search/semantic_search_example.py --device cpu \
+                                                          --search_engine faiss
 ```
+`semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
+
 
 ### 3.4 构建 Web 可视化语义检索系统
 
@@ -102,7 +108,9 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
-                            --doc_dir data/dureader_dev
+                            --doc_dir data/dureader_dev \
+                            --search_engine elastic \
+                            --delete_index
 ```
 可以使用下面的命令来查看数据：
 
@@ -114,8 +122,9 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
-* `host`: Elasticsearch的IP地址
-* `port`: Elasticsearch的端口号
+* `host`: ANN索引引擎的IP地址
+* `port`: ANN索引引擎的端口号
+* `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 #### 3.4.3 启动 RestAPI 模型服务
@@ -134,7 +143,6 @@ sh examples/semantic-search/run_search_server.sh
 
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
-
 ```
 #### 3.4.4 启动 WebUI
 ```bash

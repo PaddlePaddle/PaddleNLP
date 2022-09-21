@@ -87,8 +87,7 @@ def main():
 
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
-                                   max_seq_length=data_args.max_seq_length,
-                                   label_nums=len(label_list))
+                                   max_seq_length=data_args.max_seq_length)
     train_dataset = train_ds.map(trans_func)
     dev_dataset = dev_ds.map(trans_func)
 

@@ -19,6 +19,12 @@ __all__ = [
     'ConvBertTokenizer',
 ]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "convbert-base": 512,
+    "convbert-medium-small": 512,
+    "convbert-small": 512
+}
+
 
 class ConvBertTokenizer(ElectraTokenizer):
     """
@@ -47,3 +53,4 @@ class ConvBertTokenizer(ElectraTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES

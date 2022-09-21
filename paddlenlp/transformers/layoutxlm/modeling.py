@@ -223,7 +223,6 @@ class LayoutXLMEmbeddings(Layer):
 
 
 class LayoutXLMPretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "layoutxlm-base-uncased": {
             "attention_probs_dropout_prob": 0.1,
@@ -291,7 +290,6 @@ class LayoutXLMPretrainedModel(PretrainedModel):
             "vocab_size": 250002,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "layoutxlm-base-uncased":

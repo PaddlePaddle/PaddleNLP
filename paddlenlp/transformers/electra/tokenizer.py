@@ -21,6 +21,15 @@ __all__ = [
     'ElectraTokenizer',
 ]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "electra-small": 512,
+    "electra-base": 512,
+    "electra-large": 512,
+    "chinese-electra-base": 512,
+    "chinese-electra-small": 512,
+    "ernie-health-chinese": 512
+}
+
 
 class ElectraTokenizer(PretrainedTokenizer):
     """
@@ -106,14 +115,7 @@ class ElectraTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         }
     }
-    max_model_input_sizes = {
-        "electra-small": 512,
-        "electra-base": 512,
-        "electra-large": 512,
-        "chinese-electra-base": 512,
-        "chinese-electra-small": 512,
-        "ernie-health-chinese": 512,
-    }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

@@ -11,7 +11,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功�
 
 ## Featrues
 
-- 全面支持生成式预训练模型。包括GPT、OPT、BART、mBART、UnifiedTransformer和UNIMO-text。
+- 全面支持生成式预训练模型。包括GPT、OPT、CodeGen、GPTJ、BART、mBART、UnifiedTransformer和UNIMO-text。
 - 支持大多数主流解码策略。包括Beam Search、Sampling、Greedy Search。以及Diverse Sibling Search、Length Penalty等子策略。
 - 解码速度快。最高可达非加速版generate函数的**18倍**。**并支持FP16混合精度计算**。
 - 易用性强。功能的入口为`model.generate`，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。
@@ -20,17 +20,17 @@ FasterGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功�
 ### Inference Model Support
 下表为PaddleNLP FasterGeneration对预训练模型和解码策略的支持情况（GPU）。
 
-| Model   Name           | GPT2    | OPT     | BART            | mBART           | UnifiedTransformer |
-|------------------------|---------|---------|-----------------|-----------------|--------------------|
-| Model   Structure      | Decoder | Decoder | Encoder-Decoder | Encoder-Decoder | Prefix-LM          |
-| Beam Search            | ❌       | ❌       | ✅               | ✅               | ✅                  |
-| Top-K Sampling         | ✅       | ✅       | ✅               | ✅               | ✅                  |
-| Top-P Sampling         | ✅       | ✅       | ✅               | ✅               | ✅                  |
-| Diverse Sibling Search | ❌       | ❌       | ✅               | ✅               | ✅                  |
-| Forced Decoding        | ❌       | ❌       | ❌               | ✅               | ❌                  |
-| Length Penalty         | ❌       | ❌       | ✅               | ✅               | ✅                  |
-| Temperature            | ✅       | ✅       | ✅               | ✅               | ✅                  |
-| Repetition Penalty     | ✅       | ✅       | ❌               | ❌               | ❌                  |
+| Model   Name           | GPT2    | OPT     | CodeGen| GPTJ| BART            | mBART           | UnifiedTransformer |
+|------------------------|---------|---------| ---------| ---------|-----------------|-----------------|--------------------|
+| Model   Structure      | Decoder | Decoder |Decoder|Decoder| Encoder-Decoder | Encoder-Decoder | Prefix-LM          |
+| Beam Search            | ❌       | ❌       |❌|❌| ✅               | ✅               | ✅                  |
+| Top-K Sampling         | ✅       | ✅       |✅|✅| ✅               | ✅               | ✅                  |
+| Top-P Sampling         | ✅       | ✅       |✅|✅| ✅               | ✅               | ✅                  |
+| Diverse Sibling Search | ❌       | ❌       |❌|❌| ✅               | ✅               | ✅                  |
+| Forced Decoding        | ❌       | ❌       |❌|❌| ❌               | ✅               | ❌                  |
+| Length Penalty         | ❌       | ❌       |❌|❌| ✅               | ✅               | ✅                  |
+| Temperature            | ✅       | ✅       |✅|✅| ✅               | ✅               | ✅                  |
+| Repetition Penalty     | ✅       | ✅       |✅|✅| ❌               | ❌               | ❌                  |
 
 ## Performence
 
@@ -59,6 +59,26 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183376428-7e7a0998-803c-4bc3-acf6-971a9471b300.png" width="800" height ="400" />
+</p>
+
+**CodeGen:**
+* 环境和超参
+- Platform: Tesla V100-SXM2-32GB
+- CUDA 10.1
+- CUDNN 7.6.5
+- PaddlePaddle-gpu 2.3.1.post101
+- transformers==4.21.1
+- torch==1.11.0
+- Batch Size: 1
+- Input Length: 60
+- Output Length: 20
+<p align="left">
+  <img src="https://user-images.githubusercontent.com/24390500/185611444-df2bec75-6cec-4c86-afd6-3049faae6288.png" width="800" height ="350" />
+</p>
+
+- Platform: A100-40G
+<p align="left">
+  <img src="https://user-images.githubusercontent.com/24390500/185743415-317e75f5-029b-4037-aaaa-75d38db6b288.png" width="800" height ="350" />
 </p>
 
 更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf)

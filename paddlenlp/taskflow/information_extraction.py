@@ -14,13 +14,16 @@
 # limitations under the License.
 
 import re
+import os
+import json
 import numpy as np
 import paddle
 from ..datasets import load_dataset
-from ..transformers import AutoTokenizer
-from .models import UIE
+from ..transformers import AutoTokenizer, AutoModel
+from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
+from .models import UIE, UIEM
 from .task import Task
-from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc
+from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc, gp_decode, DataCollatorGP
 
 usage = r"""
             from paddlenlp import Taskflow
@@ -80,11 +83,12 @@ usage = r"""
             [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
             '''
 
-            schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
-            ie_en.set_schema(schema)
-            ie_en("overall i 'm happy with my toy.")
+            # Multilingual Model
+            schema = [{'Person': ['Company', 'Position']}]
+            ie_m = Taskflow('information_extraction', schema=schema, model='uie-m-base', schema_lang="en")
+            ie_m('In 1997, Steve was excited to become the CEO of Apple.')
             '''
-            
+            [{'Person': [{'text': 'Steve', 'start': 9, 'end': 14, 'probability': 0.9998436034905893, 'relations': {'Company': [{'text': 'Apple', 'start': 48, 'end': 53, 'probability': 0.9842775467359672}], 'Position': [{'text': 'CEO', 'start': 41, 'end': 44, 'probability': 0.9628799853543271}]}}]}]
             '''
          """
 
@@ -264,8 +268,8 @@ class UIETask(Task):
         },
         "uie-base-en": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.0/model_state.pdparams",
-                "d12e03c2bfe2824c876883b4b836d79d"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
+                "2baf0647774d6309e4b2be726ad4283a"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
@@ -284,20 +288,79 @@ class UIETask(Task):
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
+        "uie-m-base": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
+                "ed96cb17b4b3283a65ad0846ada7799e"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
+                "05c4b9d050e1402a891b207e36d2e501"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/tokenizer_config.json",
+                "f144bd065ea90cc26eaa91197124bdcc"
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046"
+            ],
+        },
+        "uie-m-large": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
+                "75f3989c515f05f6842e314d3f75ee27"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
+                "22ad69618dc3f4c3fe756e3044c3056e"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/tokenizer_config.json",
+                "f144bd065ea90cc26eaa91197124bdcc"
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046"
+            ],
+        },
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
+
+        if model in ['uie-m-base', 'uie-m-large']:
+            self._multilingual = True
+            self.resource_files_names[
+                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
+        else:
+            self._multilingual = False
+            if 'sentencepiece_model_file' in self.resource_files_names.keys():
+                del self.resource_files_names['sentencepiece_model_file']
         self._schema_tree = None
         self.set_schema(schema)
         self._check_task_files()
-        self._construct_tokenizer()
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
-        self._is_en = False if model not in [
-            "uie-base-en",
-        ] else True
+        self._is_en = True if model in ['uie-base-en'
+                                        ] or schema_lang == 'en' else False
         self._max_seq_len = self.kwargs[
             'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
         self._batch_size = self.kwargs[
@@ -310,6 +373,9 @@ class UIETask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         self._num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
+        self.use_faster = self.kwargs[
+            'use_faster'] if 'use_faster' in self.kwargs else False
+        self._construct_tokenizer()
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -320,26 +386,39 @@ class UIETask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='token_type_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='pos_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='att_mask'),
-        ]
+        if self._multilingual:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+            ]
+        else:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='token_type_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='att_mask'),
+            ]
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UIE.from_pretrained(self._task_path)
+        if self._multilingual:
+            model_instance = UIEM.from_pretrained(self._task_path)
+        else:
+            model_instance = UIE.from_pretrained(self._task_path)
         self._model = model_instance
         self._model.eval()
 
@@ -347,7 +426,8 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._task_path, use_faster=self.use_faster)
 
     def _preprocess(self, inputs):
         """
@@ -389,16 +469,21 @@ class UIETask(Task):
                                                  pad_to_max_seq_len=True,
                                                  return_attention_mask=True,
                                                  return_position_ids=True,
-                                                 return_dict=False,
                                                  return_offsets_mapping=True)
-                encoded_inputs = encoded_inputs[0]
-                tokenized_output = [
-                    encoded_inputs["input_ids"],
-                    encoded_inputs["token_type_ids"],
-                    encoded_inputs["position_ids"],
-                    encoded_inputs["attention_mask"],
-                    encoded_inputs["offset_mapping"]
-                ]
+                if self._multilingual:
+                    tokenized_output = [
+                        encoded_inputs["input_ids"][0],
+                        encoded_inputs["position_ids"][0],
+                        encoded_inputs["offset_mapping"][0]
+                    ]
+                else:
+                    tokenized_output = [
+                        encoded_inputs["input_ids"][0],
+                        encoded_inputs["token_type_ids"][0],
+                        encoded_inputs["position_ids"][0],
+                        encoded_inputs["attention_mask"][0],
+                        encoded_inputs["offset_mapping"][0]
+                    ]
                 tokenized_output = [
                     np.array(x, dtype="int64") for x in tokenized_output
                 ]
@@ -417,22 +502,35 @@ class UIETask(Task):
         sentence_ids = []
         probs = []
         for batch in infer_data_loader:
-            input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
+            if self._multilingual:
+                input_ids, pos_ids, offset_maps = batch
+            else:
+                input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
             if self._predictor_type == "paddle-inference":
-                self.input_handles[0].copy_from_cpu(input_ids.numpy())
-                self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
-                self.input_handles[2].copy_from_cpu(pos_ids.numpy())
-                self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                if self._multilingual:
+                    self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                    self.input_handles[1].copy_from_cpu(pos_ids.numpy())
+                else:
+                    self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                    self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                    self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                    self.input_handles[3].copy_from_cpu(att_mask.numpy())
                 self.predictor.run()
                 start_prob = self.output_handle[0].copy_to_cpu().tolist()
                 end_prob = self.output_handle[1].copy_to_cpu().tolist()
             else:
-                input_dict = {
-                    "input_ids": input_ids.numpy(),
-                    "token_type_ids": token_type_ids.numpy(),
-                    "pos_ids": pos_ids.numpy(),
-                    "att_mask": att_mask.numpy()
-                }
+                if self._multilingual:
+                    input_dict = {
+                        "input_ids": input_ids.numpy(),
+                        "pos_ids": pos_ids.numpy(),
+                    }
+                else:
+                    input_dict = {
+                        "input_ids": input_ids.numpy(),
+                        "token_type_ids": token_type_ids.numpy(),
+                        "pos_ids": pos_ids.numpy(),
+                        "att_mask": att_mask.numpy()
+                    }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
                 start_prob = start_prob.tolist()
                 end_prob = end_prob.tolist()
@@ -702,3 +800,307 @@ class UIETask(Task):
         This function will convert the model output to raw text.
         """
         return inputs['result']
+
+
+class GPTask(Task):
+    """
+    Global Pointer for closed-domain information extraction Task. 
+    Args:
+        task(string): The name of task.
+        model(string): The model name in the task.
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    """
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json"
+    }
+
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._schema_tree = None
+        self._load_config()
+        self._construct_tokenizer()
+        self._get_inference_model()
+        self._max_seq_len = self.kwargs[
+            'max_seq_len'] if 'max_seq_len' in self.kwargs else 256
+        self._batch_size = self.kwargs[
+            'batch_size'] if 'batch_size' in self.kwargs else 64
+        self._lazy_load = self.kwargs[
+            'lazy_load'] if 'lazy_load' in self.kwargs else False
+        self._num_workers = self.kwargs[
+            'num_workers'] if 'num_workers' in self.kwargs else 0
+
+    def _load_config(self):
+        model_config_file = os.path.join(
+            self._task_path, self.resource_files_names["model_config"])
+        with open(model_config_file, encoding="utf-8") as f:
+            model_config = json.load(f)
+        self._label_maps = model_config["label_maps"]
+        self._task_type = model_config["task_type"]
+        self._encoder = model_config["encoder"]
+        schema = model_config["label_maps"]["schema"]
+        self._set_schema(schema)
+
+    def _set_schema(self, schema):
+        if isinstance(schema, dict) or isinstance(schema, str):
+            schema = [schema]
+        self._schema_tree = self._build_tree(schema)
+
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        self._input_spec = [
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='att_mask'),
+        ]
+
+    def _construct_model(self, model):
+        """
+        Construct the inference model for the predictor.
+        """
+        encoder = AutoModel.from_pretrained(self._encoder)
+        if self._task_type == "entity_extraction":
+            model_instance = GlobalPointerForEntityExtraction(
+                encoder, self._label_maps)
+        else:
+            model_instance = GPLinkerForRelationExtraction(
+                encoder, self._label_maps)
+        model_path = os.path.join(self._task_path, "model_state.pdparams")
+        state_dict = paddle.load(model_path)
+        model_instance.set_dict(state_dict)
+        self._model = model_instance
+        self._model.eval()
+
+    def _construct_tokenizer(self):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        # TODO(zhoushunjie): Will set use_faster=True in future.
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
+
+    def _preprocess(self, inputs):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
+        inputs = self._check_input_text(inputs)
+
+        def read(inputs):
+            for x in inputs:
+                tokenized_inputs = self._tokenizer(
+                    x,
+                    max_length=self._max_seq_len,
+                    padding=False,
+                    truncation=True,
+                    return_attention_mask=True,
+                    return_offsets_mapping=True,
+                    return_token_type_ids=False,
+                )
+                tokenized_inputs['text'] = x
+                yield tokenized_inputs
+
+        infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
+
+        data_collator = DataCollatorGP(self._tokenizer,
+                                       label_maps=self._label_maps,
+                                       task_type=self._task_type)
+
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
+                                               batch_size=self._batch_size,
+                                               shuffle=False)
+
+        infer_data_loader = paddle.io.DataLoader(dataset=infer_ds,
+                                                 batch_sampler=batch_sampler,
+                                                 collate_fn=data_collator,
+                                                 num_workers=self._num_workers,
+                                                 return_list=True)
+        outputs = {}
+        outputs['data_loader'] = infer_data_loader
+        outputs['input_texts'] = inputs
+        return outputs
+
+    def _run_model(self, inputs):
+        all_preds = ([], []) if self._task_type in [
+            "opinion_extraction", "relation_extraction"
+        ] else []
+        for batch in inputs['data_loader']:
+            input_ids, attention_masks, offset_mappings, texts = batch
+            self.input_handles[0].copy_from_cpu(
+                input_ids.numpy().astype('int64'))
+            self.input_handles[1].copy_from_cpu(
+                attention_masks.numpy().astype('int64'))
+            self.predictor.run()
+            logits = [
+                paddle.to_tensor(self.output_handle[i].copy_to_cpu())
+                for i in range(len(self.output_handle))
+            ]
+            batch_outputs = gp_decode(logits, offset_mappings, texts,
+                                      self._label_maps, self._task_type)
+            if isinstance(batch_outputs, tuple):
+                all_preds[0].extend(batch_outputs[0])  # Entity output
+                all_preds[1].extend(batch_outputs[1])  # Relation output
+            else:
+                all_preds.extend(batch_outputs)
+        inputs['result'] = all_preds
+        return inputs
+
+    @classmethod
+    def _build_tree(cls, schema, name='root'):
+        """
+        Build the schema tree.
+        """
+        schema_tree = SchemaTree(name)
+        for s in schema:
+            if isinstance(s, str):
+                schema_tree.add_child(SchemaTree(s))
+            elif isinstance(s, dict):
+                for k, v in s.items():
+                    if isinstance(v, str):
+                        child = [v]
+                    elif isinstance(v, list):
+                        child = v
+                    else:
+                        raise TypeError(
+                            "Invalid schema, value for each key:value pairs should be list or string"
+                            "but {} received".format(type(v)))
+                    schema_tree.add_child(cls._build_tree(child, name=k))
+            else:
+                raise TypeError(
+                    "Invalid schema, element should be string or dict, "
+                    "but {} received".format(type(s)))
+        return schema_tree
+
+    def _postprocess(self, inputs):
+        if self._task_type == "entity_extraction":
+            results = self._postprocess_entity_extraction(inputs)
+        elif self._task_type == "opinion_extraction":
+            results = self._postprocess_opinion_extraction(inputs)
+        else:
+            results = self._postprocess_relation_extraction(inputs)
+        return results
+
+    def _postprocess_opinion_extraction(self, inputs):
+        all_ent_preds, all_rel_preds = inputs['result']
+        results = []
+        for i in range(len(inputs['input_texts'])):
+            result = {}
+            aspect_maps = {}
+            for ent in all_ent_preds[i]:
+                ent_res = {
+                    'text': ent['text'],
+                    'start': ent['start_index'],
+                    'end': ent['start_index'] + len(ent['text']),
+                    'probability': ent['probability']
+                }
+                result.setdefault(ent['type'], []).append(ent_res)
+                if ent['type'] == "评价维度":
+                    for r in result["评价维度"]:
+                        if ent['text'] == r['text'] and ent['start_index'] == r[
+                                'start']:
+                            aspect_maps[(ent['text'], ent['start_index'])] = r
+                            break
+
+            for rel in all_rel_preds[i]:
+                r = aspect_maps[(rel['aspect'], rel['aspect_start_index'])]
+                r['relations'] = {}
+                sentiment = {
+                    'probability': rel['probability'],
+                    'text': rel['sentiment']
+                }
+                opinion = {
+                    'text': rel['opinion'],
+                    'start': rel['opinion_start_index'],
+                    'end': rel['opinion_start_index'] + len(rel['opinion']),
+                    'probability': rel['probability']
+                }
+                r['relations'].setdefault('情感倾向[正向，负向]', []).append(sentiment)
+                r['relations'].setdefault('观点词', []).append(opinion)
+            results.append(result)
+        return results
+
+    def _postprocess_relation_extraction(self, inputs):
+        all_ent_preds, all_rel_preds = inputs['result']
+        results = []
+        for input_text_idx in range(len(inputs['input_texts'])):
+            result = {}
+            schema_list = self._schema_tree.children[:]
+            while len(schema_list) > 0:
+                node = schema_list.pop(0)
+                if node.parent_relations is None:
+                    prefix = []
+                    relations = [[]]
+                    cnt = -1
+                    for ent in all_ent_preds[input_text_idx]:
+                        if node.name == ent['type']:
+                            ent_res = {
+                                'text': ent['text'],
+                                'start': ent['start_index'],
+                                'end': ent['start_index'] + len(ent['text']),
+                                'probability': ent['probability']
+                            }
+                            result.setdefault(node.name, []).append(ent_res)
+                            cnt += 1
+                            result[node.name][cnt]['relations'] = {}
+                            relations[0].append(result[node.name][cnt])
+                else:
+                    relations = [[] for _ in range(len(node.parent_relations))]
+                    for i, rs in enumerate(node.parent_relations):
+                        for r in rs:
+                            cnt = -1
+                            for rel in all_rel_preds[input_text_idx]:
+                                if r['text'] == rel['subject'] and r['start'] == rel[
+                                        'subject_start_index'] and node.name == rel[
+                                            'predicate']:
+                                    rel_res = {
+                                        'text':
+                                        rel['object'],
+                                        'start':
+                                        rel['object_start_index'],
+                                        'end':
+                                        rel['object_start_index'] +
+                                        len(rel['object']),
+                                        'probability':
+                                        rel['probability']
+                                    }
+                                    r['relations'].setdefault(
+                                        node.name, []).append(rel_res)
+                                    cnt += 1
+                                    r['relations'][
+                                        node.name][cnt]['relations'] = {}
+                                    relations[i].append(
+                                        r['relations'][node.name][cnt])
+                for child in node.children:
+                    child.prefix = prefix
+                    child.parent_relations = relations
+                    schema_list.append(child)
+            results.append(result)
+        return results
+
+    def _postprocess_entity_extraction(self, inputs):
+        all_preds = inputs['result']
+        results = []
+        for input_text_idx in range(len(inputs['input_texts'])):
+            result = {}
+            schema_list = self._schema_tree.children[:]
+            while len(schema_list) > 0:
+                node = schema_list.pop(0)
+                for ent in all_preds[input_text_idx]:
+                    if node.name == ent['type']:
+                        ent_res = {
+                            'text': ent['text'],
+                            'start': ent['start_index'],
+                            'end': ent['start_index'] + len(ent['text']),
+                            'probability': ent['probability']
+                        }
+                        result.setdefault(node.name, []).append(ent_res)
+            results.append(result)
+        return results

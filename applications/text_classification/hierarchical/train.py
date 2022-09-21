@@ -40,10 +40,10 @@ parser.add_argument("--dataset_dir", required=True, default=None, type=str, help
 parser.add_argument("--save_dir", default="./checkpoint", type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument('--model_name', default="ernie-3.0-medium-zh", help="Select model to train, defaults to ernie-3.0-medium-zh.",
-                    choices=["ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en"])
+                    choices=["ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"])
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--epochs", default=100, type=int, help="Total number of training epochs to perform.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
 parser.add_argument('--early_stop', action='store_true', help='Epoch before early stop.')
 parser.add_argument('--early_stop_nums', type=int, default=3, help='Number of epoch before early stop.')
 parser.add_argument("--logging_steps", default=5, type=int, help="The interval steps to logging.")
@@ -178,14 +178,9 @@ def train():
 
         for step, batch in enumerate(train_data_loader, start=1):
 
-            input_ids, token_type_ids, labels = batch['input_ids'], batch[
-                'token_type_ids'], batch['labels']
-
-            logits = model(input_ids, token_type_ids)
+            labels = batch.pop("labels")
+            logits = model(**batch)
             loss = criterion(logits, labels)
-
-            probs = F.sigmoid(logits)
-            metric.update(probs, labels)
 
             loss.backward()
             optimizer.step()
@@ -195,11 +190,10 @@ def train():
 
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
-                micro_f1_score, macro_f1_score = metric.accumulate()
                 logger.info(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, micro_f1_score,
-                       macro_f1_score, 10 / (time.time() - tic_train)))
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
         early_stop_count += 1

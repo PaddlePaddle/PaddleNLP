@@ -1,4 +1,4 @@
-# FasterTokenizer Demo
+# FasterTokenizer C++ Demo
 
 ## 1. 快速安装
 

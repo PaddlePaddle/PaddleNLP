@@ -84,4 +84,3 @@ if __name__ == "__main__":
         print('recall@{}={}'.format(key, val))
         res.append(str(val))
     result.write('\t'.join(res) + '\n')
-    # print("\t".join(recall_N))

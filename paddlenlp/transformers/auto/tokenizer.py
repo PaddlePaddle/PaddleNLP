@@ -79,7 +79,9 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("BartTokenizer", "bart"),
     ("GAUAlphaTokenizer", "gau_alpha"),
     ("CodeGenTokenizer", "codegen"),
+    ("CLIPTokenizer", "clip"),
     ("ArtistTokenizer", "artist"),
+    ("ErnieViLTokenizer", "ernie_vil"),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
@@ -121,6 +123,7 @@ class AutoTokenizer():
     MAPPING_NAMES = get_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
+    _faster_name_mapping = FASTER_TOKENIZER_MAPPING_NAMES
     tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
@@ -181,7 +184,6 @@ class AutoTokenizer():
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:
                 all_tokenizer_names.append(name)
-
         # From built-in pretrained models
         if pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():
@@ -232,11 +234,22 @@ class AutoTokenizer():
                 init_class = init_kwargs.pop("init_class", None)
                 if init_class is None:
                     init_class = init_kwargs.pop("tokenizer_class", None)
+
                 if init_class:
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
+                    if use_faster:
+                        for faster_tokenizer_class, name in cls._faster_name_mapping.items(
+                        ):
+                            if name == class_name:
+                                import_class = importlib.import_module(
+                                    f"paddlenlp.transformers.{class_name}.faster_tokenizer"
+                                )
+                                tokenizer_class = getattr(
+                                    import_class, faster_tokenizer_class)
+                                break
                     logger.info(
                         "We are using %s to load '%s'." %
                         (tokenizer_class, pretrained_model_name_or_path))

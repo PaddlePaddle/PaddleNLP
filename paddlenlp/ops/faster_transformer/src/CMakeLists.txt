@@ -221,6 +221,16 @@ else(ON_INFER)
     set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
   endif()
 
+  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.__version__)"
+                RESULT_VARIABLE _INC_PYTHON_SUCCESS
+                OUTPUT_VARIABLE _INC_PYTHON_VALUES)
+  message(STATUS "PADDLE_VERSION: ${_INC_PYTHON_VALUES}")
+
+  # TODO(gongenlei): support PADDLE_NEW_ALLOCATOR for ON_INFER
+  if(_INC_PYTHON_VALUES VERSION_GREATER_EQUAL "2.3.0")
+      add_definitions(-DPADDLE_NEW_ALLOCATOR)
+  endif()
+
   execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
                   RESULT_VARIABLE _INC_PYTHON_SUCCESS
                   OUTPUT_VARIABLE _INC_PYTHON_VALUES)

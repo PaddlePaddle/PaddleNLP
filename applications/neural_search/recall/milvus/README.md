@@ -104,6 +104,7 @@ Milvus 搭建完系统以后就可以插入和检索向量了，首先生成 emb
 ```
 CUDA_VISIBLE_DEVICES=0 python feature_extract.py \
         --model_dir=./output \
+        --model_name_or_path rocketqa-zh-base-query-encoder \
         --corpus_file "data/milvus_data.csv"
 ```
 其中 output 目录下存放的是召回的 Paddle Inference 静态图模型。

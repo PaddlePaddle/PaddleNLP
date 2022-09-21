@@ -62,7 +62,7 @@ class ErnieRanker(BaseRanker):
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
                                                      multi_gpu=True)
-
+        print("Loading Parameters from:{}".format(model_name_or_path))
         self.transformer_model = ErnieCrossEncoder(model_name_or_path)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.transformer_model.eval()

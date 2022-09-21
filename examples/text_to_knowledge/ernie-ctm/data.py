@@ -37,7 +37,7 @@ def convert_example(example,
     tokens = example["tokens"]
     tokenized_input = tokenizer(tokens,
                                 return_length=True,
-                                is_split_into_words=True,
+                                is_split_into_words='token',
                                 max_seq_len=max_seq_len)
 
     if is_test:

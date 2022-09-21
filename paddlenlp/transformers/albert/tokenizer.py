@@ -26,6 +26,23 @@ __all__ = ['AlbertTokenizer']
 
 SPIECE_UNDERLINE = "▁"
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "albert-base-v1": 512,
+    "albert-large-v1": 512,
+    "albert-xlarge-v1": 512,
+    "albert-xxlarge-v1": 512,
+    "albert-base-v2": 512,
+    "albert-large-v2": 512,
+    "albert-xlarge-v2": 512,
+    "albert-xxlarge-v2": 512,
+    "albert-chinese-tiny": 512,
+    "albert-chinese-small": 512,
+    "albert-chinese-base": 512,
+    "albert-chinese-large": 512,
+    "albert-chinese-xlarge": 512,
+    "albert-chinese-xxlarge": 512
+}
+
 
 class AlbertTokenizer(PretrainedTokenizer):
     """
@@ -228,6 +245,8 @@ class AlbertTokenizer(PretrainedTokenizer):
             "pad_token": "[PAD]",
         },
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

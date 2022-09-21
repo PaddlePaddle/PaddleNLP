@@ -225,7 +225,6 @@ class ErnieGenPretrainedModel(object):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
-    model_config_file = "model_config.json"
     ernie_gen_pretrained_init_configuration = {
         "ernie-gen-base-en": {
             "attention_probs_dropout_prob": 0.1,
@@ -270,7 +269,6 @@ class ErnieGenPretrainedModel(object):
             "pad_token_id": 0,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     ernie_gen_pretrained_resource_files_map = {
         "model_state": {
             "ernie-gen-base-en":

@@ -58,7 +58,7 @@ def on_change_text():
 def main():
 
     st.set_page_config(
-        page_title="pipelines 语义检索",
+        page_title="PaddleNLP Pipelines 语义检索",
         page_icon=
         "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
@@ -75,7 +75,7 @@ def main():
         st.session_state.raw_json = None
 
     # Title
-    st.write("# PaddleNLP语义检索")
+    st.write("# PaddleNLP Pipelines 语义检索")
     # Sidebar
     st.sidebar.header("选项")
     top_k_reader = st.sidebar.slider(
@@ -197,6 +197,9 @@ def main():
                 markdown(context),
                 unsafe_allow_html=True,
             )
+            # Sqlalchemy Support storing list type data by adding value semicolon, so split str data into separate files
+            if (type(result['images']) == str):
+                result['images'] = result['images'].split(';')
             for image_path in result['images']:
                 image_url = pipelines_files(image_path)
                 st.image(

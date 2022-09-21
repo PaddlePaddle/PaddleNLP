@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from typing import List, Dict, Union, Optional
+import os
 
 import logging
 import numpy as np
@@ -22,11 +23,12 @@ from tqdm.auto import tqdm
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieDualEncoder, AutoTokenizer
+from paddlenlp.transformers import ErnieDualEncoder, AutoTokenizer, AutoModel
 
 from pipelines.schema import Document
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.retriever.base import BaseRetriever
+from pipelines.nodes.models import SemanticIndexBatchNeg
 from pipelines.data_handler.processor import TextSimilarityProcessor
 from pipelines.utils.common_utils import initialize_device_settings
 
@@ -45,7 +47,9 @@ class DensePassageRetriever(BaseRetriever):
             Path, str] = "rocketqa-zh-dureader-query-encoder",
         passage_embedding_model: Union[
             Path, str] = "rocketqa-zh-dureader-para-encoder",
+        params_path: Optional[str] = "",
         model_version: Optional[str] = None,
+        output_emb_size=256,
         max_seq_len_query: int = 64,
         max_seq_len_passage: int = 256,
         top_k: int = 10,
@@ -133,12 +137,25 @@ class DensePassageRetriever(BaseRetriever):
                 "This can be set when initializing the DocumentStore")
 
         # Init & Load Encoders
-        self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
-                                                   passage_embedding_model)
-        self.query_tokenizer = AutoTokenizer.from_pretrained(
-            query_embedding_model)
-        self.passage_tokenizer = AutoTokenizer.from_pretrained(
-            passage_embedding_model)
+        if (os.path.exists(params_path)):
+            pretrained_model = AutoModel.from_pretrained(query_embedding_model)
+            self.ernie_dual_encoder = SemanticIndexBatchNeg(
+                pretrained_model, output_emb_size=output_emb_size)
+            # Load Custom models
+            print("Loading Parameters from:{}".format(params_path))
+            state_dict = paddle.load(params_path)
+            self.ernie_dual_encoder.set_dict(state_dict)
+            self.query_tokenizer = AutoTokenizer.from_pretrained(
+                query_embedding_model)
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(
+                query_embedding_model)
+        else:
+            self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
+                                                       passage_embedding_model)
+            self.query_tokenizer = AutoTokenizer.from_pretrained(
+                query_embedding_model)
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(
+                passage_embedding_model)
 
         self.processor = TextSimilarityProcessor(
             query_tokenizer=self.query_tokenizer,

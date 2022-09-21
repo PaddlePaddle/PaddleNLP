@@ -128,7 +128,7 @@ class Template(nn.Layer):
         idx = []
         for p in self.template:
             if 'shortenable' in p:
-                idx.append(1 if d['shortenable'] else 0)
+                idx.append(1 if p['shortenable'] else 0)
             else:
                 idx.append(1 if 'text' in p else 0)
         return idx

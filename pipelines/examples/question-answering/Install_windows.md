@@ -12,7 +12,9 @@ a. 依赖安装：
 git clone https://github.com/tvst/htbuilder.git
 cd htbuilder/
 python setup install
-# 1) 安装 pipelines package
+# pip 一键安装
+pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 或者源码进行安装最新版本
 cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
@@ -34,6 +36,7 @@ python examples/question-answering/dense_qa_example.py --device gpu
 unset CUDA_VISIBLE_DEVICES
 python examples/question-answering/dense_qa_example.py --device cpu
 ```
+`dense_qa_example.py`中`DensePassageRetriever`，`ErnieRanker`和`ErnieReader`的模型介绍请参考[API介绍](../../API.md)
 
 ### 1.4 构建 Web 可视化问答系统
 

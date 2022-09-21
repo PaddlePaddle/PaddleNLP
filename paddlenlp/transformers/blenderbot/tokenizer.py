@@ -19,6 +19,12 @@ from paddle.utils import try_import
 
 __all__ = ['BlenderbotTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "blenderbot-3B": 128,
+    "blenderbot-400M-distill": 128,
+    "blenderbot-1B-distill": 128
+}
+
 
 class BlenderbotTokenizer(GPTTokenizer):
     r"""
@@ -87,6 +93,7 @@ class BlenderbotTokenizer(GPTTokenizer):
             "add_prefix": True
         }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

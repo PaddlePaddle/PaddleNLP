@@ -622,6 +622,68 @@ def infer_mbart_decoding(
                       attrs_names, attrs_val, outputs_names, outputs_dtype)
 
 
+def infer_gptj_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
+                        slf_ln_bias, slf_q_weight, slf_out_weight,
+                        ffn_inter_weight, ffn_inter_bias, ffn_out_weight,
+                        ffn_out_bias, decoder_ln_weight, decoder_ln_bias,
+                        linear_weight, linear_bias, topk, topp, max_out_len,
+                        head_num, size_per_head, num_layer, bos_id, eos_id,
+                        temperature, rotary_embedding_dim, repetition_penalty,
+                        min_length, use_fp16_decoding):
+    tensor_para_size = get_ft_para_conf().tensor_para_size
+    layer_para_size = get_ft_para_conf().layer_para_size
+    layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
+
+    inputs = {
+        "Input": input,
+        "AttentionMask": attn_mask,
+        "StartLength": mem_seq_len,
+        "WordEmbedding": word_emb,
+        "SelfLayernormWeight@VECTOR": slf_ln_weight,
+        "SelfLayernormBias@VECTOR": slf_ln_bias,
+        "SelfQueryWeight@VECTOR": slf_q_weight,
+        "SelfOutWeight@VECTOR": slf_out_weight,
+        "FFNInterWeight@VECTOR": ffn_inter_weight,
+        "FFNInterBias@VECTOR": ffn_inter_bias,
+        "FFNOutWeight@VECTOR": ffn_out_weight,
+        "FFNOutBias@VECTOR": ffn_out_bias,
+        "DecoderLayernormWeight": decoder_ln_weight,
+        "DecoderLayernormBias": decoder_ln_bias,
+        "EmbWeight": linear_weight,
+        "EmbBias": linear_bias
+    }
+
+    attrs = {
+        "topk": topk,
+        "topp": topp,
+        "max_len": max_out_len,
+        "n_head": head_num,
+        "size_per_head": size_per_head,
+        "num_layer": num_layer,
+        "bos_id": bos_id,
+        "eos_id": eos_id,
+        "temperature": temperature,
+        "rotary_embedding_dim": rotary_embedding_dim,
+        "repetition_penalty": repetition_penalty,
+        "min_length": min_length,
+        "use_fp16": use_fp16_decoding,
+        "tensor_para_size": tensor_para_size,
+        "layer_para_size": layer_para_size,
+        "layer_para_batch_size": layer_para_batch_size
+    }
+
+    outputs_names = ["OutputIds"]
+    outputs_dtype = ["int32"]
+
+    return run_custom(op_name="fusion_gptj",
+                      inputs_names=inputs.keys(),
+                      inputs_var=inputs.values(),
+                      attrs_names=attrs.keys(),
+                      attrs_val=attrs.values(),
+                      outputs_names=outputs_names,
+                      outputs_dtype=outputs_dtype)
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -2516,3 +2578,265 @@ class InferMBartDecoding(nn.Layer):
                        sequence_length,
                        decoding_strategy=decoding_strategy)
         return ids
+
+
+def convert_gptj_params(faster_model,
+                        model,
+                        fuse_qkv=1,
+                        use_fp16=False,
+                        restore_data=False,
+                        permutation=None):
+    r"""
+    Convert parameters included in Transformer layer  from original models 
+    to the format of faster models.
+
+    Args:
+        faster_model (Layer): The faster model object.
+        model (Layer): The Transformer layer. 
+        fuse_qkv (int): 0 for nofuse, 1 for fuse, 2 for fuse and delete the
+            unfused parameters. If environment variable `PPFG_QKV_MEM_OPT` is
+            set and the weights of q/k/v is fused, it will try to delete the
+            original unfused weights. Note the rollback to original model would
+            not be guarantee anymore when the faster model failed if the original
+            weights are deleted. Default to 1.
+        use_fp16 (bool): Whether to use float16. Maybe we should use the default
+            dtype as the highest priority later. Default to `False`.
+        restore_data (bool): If `False`, need to reload the weight values. It
+            should be `True` for weight loaded models. Default to `False`.
+
+    Returns:
+        defaultdict: Each value is a list including converted parameters in all
+            layers. For other parameters not included in Transformer module to
+            be converted, such as embeddings, you can achieve it by using the
+            returned dict `params` though `params['word_emb'].append()` directly
+            which would do CPU/GPU and fp32/fp16 transfer automatically.
+    """
+    if fuse_qkv == 1:
+        fuse_qkv = 2 if os.getenv("PPFG_QKV_MEM_OPT", "0") == "1" else 1
+    ft_para_conf = get_ft_para_conf()
+
+    class _list(list):
+
+        def append(self, item):
+            if isinstance(item[0], nn.Layer):
+                # Axis is used for tensor slice in tensor parallel.
+                # Use None to make no slice on the tensor.
+                if len(item) == 2:
+                    layer, attr = item
+                    axis = None
+                else:
+                    layer, attr, axis = item
+                param = getattr(layer, attr)
+                if axis is not None and isinstance(layer, nn.Linear):
+                    param = ft_para_conf.slice_weight(param, axis)
+                param = transfer_param(
+                    param,
+                    is_bias=attr.endswith("bias"),
+                    dtype="float16" if use_fp16 else "float32",
+                    restore_data=restore_data)
+                # NOTE: Assignment to parameter 'weight' should be of type
+                # Parameter or None, thus delete first in case of param is
+                # a tensor.
+                # TODO(guosheng): Make slice_weight use `output_param=True`
+                # and remove delattr. Currently, if `param` is Tensor rather
+                # than Parameter, it would not be in state_dict.
+                delattr(layer, attr)
+                setattr(layer, attr, param)
+            else:
+                # NOTE: Compared with if branch, there is no layer attribute
+                # refered to the transfered param, thus we should set it as
+                # the layer attribute to be able to convert to static graph.
+                # Additionally, we suppose no need to process tensor parallel
+                # here since the param passed in might have been processed.
+                if len(item) == 2:
+                    param, is_bias = item
+                    attr_handle = lambda x: x
+                else:
+                    param, is_bias, attr_handle = item
+                param = transfer_param(
+                    param,
+                    is_bias=is_bias,
+                    dtype="float16" if use_fp16 else "float32",
+                    restore_data=restore_data)
+                attr_handle(param)
+            return super().append(param)
+
+    params = defaultdict(_list)
+
+    def _convert(module):
+        num_layer = len(module)
+        for i, layer in enumerate(module):
+            if not ft_para_conf.is_load(i, num_layer):
+                continue
+            # TODO(guosheng): Tensor with size 0 might be failed in
+            # paddle develop, thus use tensor with size 1 instead
+            # temporarily. Besides, we use 2D tensor since jit log
+            # requires that on linear weight. While size 0 seems all
+            # right in jit.to_static/jit.save.
+            dummy_tensor = paddle.zeros([1, 1])
+            if permutation is not None:
+                qkv = layer.attn.qkv_proj.weight.numpy()
+                qkv = qkv[:, permutation]
+                if fuse_qkv == 2:
+                    del layer.attn.qkv_proj.weight
+                    setattr(layer.attn.qkv_proj, "weight", dummy_tensor)
+                w = paddle.to_tensor(qkv)
+            else:
+                w = _convert_qkv(layer.attn.q_proj,
+                                 layer.attn.k_proj,
+                                 layer.attn.v_proj,
+                                 attr="weight",
+                                 use_numpy=fuse_qkv == 2,
+                                 del_param=fuse_qkv == 2,
+                                 dummy_tensor=dummy_tensor)
+            params["slf_q_weight"].append((w, False))
+            # NOTE: Use `params["slf_q_weight"][-1]` rather than `w`,
+            # since the appended tensor might be a new transfered tensor.
+            # Besides, to allow convert_params be called more than once,
+            # we find a attr name not existing to avoid overwriting the
+            # existing attr.
+            attr = "slf_q_weight_" + str(i)
+            while hasattr(faster_model, attr):
+                attr += "_"
+            setattr(faster_model, attr, params["slf_q_weight"][-1])
+
+            params["slf_out_weight"].append((layer.attn.out_proj, "weight", 0))
+            params["slf_ln_weight"].append((layer.ln_1, "weight"))
+            params["slf_ln_bias"].append((layer.ln_1, "bias"))
+            # Slice tensor when append according to axis(1 or 0) if parallel
+            # is enable.
+            params["ffn_inter_weight"].append((layer.mlp.fc_in, "weight", 1))
+            params["ffn_inter_bias"].append((layer.mlp.fc_in, "bias", 1))
+            params["ffn_out_weight"].append((layer.mlp.fc_out, "weight", 0))
+            params["ffn_out_bias"].append((layer.mlp.fc_out, "bias"))
+
+    _convert(model)
+    return params
+
+
+class InferGptJDecoding(nn.Layer):
+
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 transpose_qkv=False):
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
+        else:
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
+            load("FasterTransformer"
+                 if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                 verbose=True,
+                 need_parallel=not get_ft_para_conf().no_para)
+
+        super(InferGptJDecoding, self).__init__()
+
+        self.use_fp16_decoding = use_fp16_decoding
+        self.model = model
+        self.head_num = self.model.transformer.config['n_head']
+        self.size_per_head = int(self.model.transformer.config['n_embd'] /
+                                 self.head_num)
+        self.num_layer = self.model.transformer.config['n_layer']
+        self.rotary_embedding_dim = self.model.transformer.config['rotary_dim']
+        logger.info("Converting model weights, it will cost a few seconds.....")
+        permutation = None
+        if transpose_qkv:
+            # GPTJ is different with CodeGen in attention project layer.
+            local_dim = self.model.transformer.config['n_embd'] // 4
+            base_permutation = [0, 3, 6, 9, 2, 5, 8, 11, 1, 4, 7, 10]
+            permutation = np.concatenate([
+                np.arange(i * local_dim, (i + 1) * local_dim)
+                for i in base_permutation
+            ])
+        params = convert_gptj_params(self,
+                                     model.transformer.h,
+                                     fuse_qkv=2,
+                                     use_fp16=use_fp16_decoding,
+                                     restore_data=True,
+                                     permutation=permutation)
+
+        params["word_emb"].append((self.model.transformer.wte, "weight"))
+        params["decoder_ln_weight"].append(
+            (self.model.transformer.ln_f, "weight"))
+        params["decoder_ln_bias"].append((self.model.transformer.ln_f, "bias"))
+        params["linear_weight"].append((self.model.lm_head.weight.t(),
+                                        partial(setattr, self,
+                                                "linear_weight_out")))
+        params["linear_bias"].append((self.model.lm_head, "bias"))
+
+        for k, v in params.items():
+            setattr(self, k, v)
+        logger.info("Already converted model weights.")
+
+    def forward(self,
+                input_ids,
+                mem_seq_len,
+                attention_mask=None,
+                topk=4,
+                topp=0.0,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                max_out_len=256,
+                temperature=1,
+                repetition_penalty=1.0,
+                min_length=0):
+        if attention_mask is None:
+            batch_size, input_length = paddle.shape(input_ids)
+            attention_mask = paddle.unsqueeze(
+                (input_ids != pad_token_id).astype("float32"), axis=[1])
+            causal_mask = paddle.tril(
+                paddle.ones([batch_size, input_length, input_length],
+                            dtype="float32"))
+            attention_mask = paddle.logical_and(attention_mask, causal_mask)
+            if not self.use_fp16_decoding:
+                attention_mask = paddle.cast(attention_mask, dtype="float32")
+            else:
+                attention_mask = paddle.cast(attention_mask, dtype="float16")
+
+        if self.use_fp16_decoding and attention_mask.dtype == paddle.float32:
+            attention_mask = paddle.cast(attention_mask, dtype="float16")
+
+        output_ids, = infer_gptj_decoding(
+            input=[input_ids],
+            attn_mask=[attention_mask],
+            mem_seq_len=[mem_seq_len],
+            word_emb=self.word_emb,
+            slf_ln_weight=self.slf_ln_weight,
+            slf_ln_bias=self.slf_ln_bias,
+            slf_q_weight=self.slf_q_weight,
+            slf_out_weight=self.slf_out_weight,
+            ffn_inter_weight=self.ffn_inter_weight,
+            ffn_inter_bias=self.ffn_inter_bias,
+            ffn_out_weight=self.ffn_out_weight,
+            ffn_out_bias=self.ffn_out_bias,
+            decoder_ln_weight=self.decoder_ln_weight,
+            decoder_ln_bias=self.decoder_ln_bias,
+            linear_weight=self.linear_weight,
+            linear_bias=self.linear_bias,
+            topk=topk,
+            topp=topp,
+            max_out_len=max_out_len,
+            head_num=self.head_num,
+            size_per_head=self.size_per_head,
+            num_layer=self.num_layer,
+            bos_id=bos_token_id,
+            eos_id=eos_token_id,
+            temperature=temperature,
+            rotary_embedding_dim=self.rotary_embedding_dim,
+            repetition_penalty=repetition_penalty,
+            min_length=min_length,
+            use_fp16_decoding=self.use_fp16_decoding)
+
+        output_ids = output_ids[paddle.shape(input_ids)[-1]:, :]
+        if forced_eos_token_id is not None:
+            output_ids[:, -1] = forced_eos_token_id
+        return output_ids

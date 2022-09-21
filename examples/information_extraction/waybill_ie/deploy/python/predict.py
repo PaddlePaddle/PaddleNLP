@@ -116,7 +116,7 @@ def convert_to_features(example, tokenizer):
     tokens = example[0]
     tokenized_input = tokenizer(tokens,
                                 return_length=True,
-                                is_split_into_words=True)
+                                is_split_into_words='token')
     # Token '[CLS]' and '[SEP]' will get label 'O'
     return tokenized_input['input_ids'], tokenized_input[
         'token_type_ids'], tokenized_input['seq_len']

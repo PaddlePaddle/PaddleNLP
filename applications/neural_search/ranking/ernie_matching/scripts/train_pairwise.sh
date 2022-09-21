@@ -1,5 +1,5 @@
 # gpu
-python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_pairwise.py \
+python -u -m paddle.distributed.launch --gpus="0,1,2,3" train_pairwise.py \
         --device gpu \
         --save_dir ./checkpoints \
         --batch_size 32 \

@@ -40,7 +40,8 @@ class ErnieOp(Op):
 
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "rocketqa-zh-base-query-encoder")
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
@@ -56,7 +57,7 @@ class ErnieOp(Op):
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
                 ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
                 ),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)

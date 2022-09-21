@@ -15,11 +15,23 @@
 """Modeling classes for ALBERT model."""
 
 import math
+from typing import Optional, Tuple, List
+from dataclasses import dataclass
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutput,
+    ModelOutput,
+    BaseModelOutputWithPooling,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+)
 
 __all__ = [
     "AlbertPretrainedModel",
@@ -74,6 +86,39 @@ ACT2FN = {
     "linear": linear_act,
     "swish": swish,
 }
+
+
+class AlbertForPreTrainingOutput(ModelOutput):
+    """
+    Output type of [`AlbertForPreTraining`].
+
+    Args:
+        loss (*optional*, returned when `labels` is provided, `paddle.Tensor` of shape `(1,)`):
+            Total loss as the sum of the masked language modeling loss and the next sequence prediction
+            (classification) loss.
+        prediction_logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        sop_logits (`paddle.Tensor` of shape `(batch_size, 2)`):
+            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
+            before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    prediction_logits: paddle.Tensor = None
+    sop_logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
 
 
 class AlbertEmbeddings(Layer):
@@ -316,32 +361,41 @@ class AlbertLayerGroup(Layer):
             ) for _ in range(inner_group_num)
         ])
 
-    def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        head_mask=None,
-        return_dict=False,
-    ):
-        layer_hidden_states = ()
-        layer_attentions = ()
+    def forward(self,
+                hidden_states,
+                attention_mask=None,
+                head_mask=None,
+                output_attentions=False,
+                output_hidden_states=False):
+
+        layer_attentions = () if output_attentions else None
+        all_hidden_states = (hidden_states, ) if output_hidden_states else None
 
         for layer_index, albert_layer in enumerate(self.albert_layers):
-            layer_output = albert_layer(hidden_states, attention_mask,
-                                        head_mask[layer_index], return_dict)
+
+            layer_output = albert_layer(
+                hidden_states,
+                attention_mask,
+                head_mask[layer_index],
+                output_attentions=output_attentions,
+            )
             hidden_states = layer_output[0]
 
-            if return_dict:
+            if output_attentions:
                 layer_attentions = layer_attentions + (layer_output[1], )
-                layer_hidden_states = layer_hidden_states + (hidden_states, )
 
-        if return_dict:
-            return {
-                "last_hidden_state": hidden_states,
-                "all_hidden_states": layer_hidden_states,
-                "all_attentions": layer_attentions,
-            }
-        return hidden_states
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states, )
+
+        outputs = (hidden_states, )
+
+        if output_hidden_states:
+            outputs = outputs + (all_hidden_states, )
+
+        if output_attentions:
+            outputs = outputs + (layer_attentions, )
+
+        return outputs
 
 
 class AlbertTransformer(Layer):
@@ -380,17 +434,17 @@ class AlbertTransformer(Layer):
             ) for _ in range(num_hidden_groups)
         ])
 
-    def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        head_mask=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                hidden_states,
+                attention_mask=None,
+                head_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
-        all_hidden_states = (hidden_states, ) if return_dict else None
-        all_attentions = () if return_dict else None
+        all_hidden_states = (hidden_states, ) if output_hidden_states else None
+        all_attentions = () if output_attentions else None
 
         for i in range(self.num_hidden_layers):
             # Number of layers in a hidden group
@@ -405,23 +459,23 @@ class AlbertTransformer(Layer):
                 attention_mask,
                 head_mask[group_idx * layers_per_group:(group_idx + 1) *
                           layers_per_group],
-                return_dict,
-            )
-            hidden_states = layer_group_output if not return_dict \
-                else layer_group_output["last_hidden_state"]
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states)
+            hidden_states = layer_group_output[0]
 
-            if return_dict:
-                all_attentions = all_attentions + layer_group_output[
-                    "all_attentions"]
+            if output_attentions:
+                all_attentions = all_attentions + layer_group_output[-1]
+
+            if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states, )
 
-        if return_dict:
-            return {
-                "last_hidden_state": hidden_states,
-                "all_hidden_states": all_hidden_states,
-                "all_attentions": all_attentions,
-            }
-        return hidden_states
+        if not return_dict:
+            return tuple(
+                v for v in [hidden_states, all_hidden_states, all_attentions]
+                if v is not None)
+        return BaseModelOutput(last_hidden_state=hidden_states,
+                               hidden_states=all_hidden_states,
+                               attentions=all_attentions)
 
 
 class AlbertPretrainedModel(PretrainedModel):
@@ -432,7 +486,6 @@ class AlbertPretrainedModel(PretrainedModel):
     loading pretrained models. See `PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "albert-base-v1": {
             "attention_probs_dropout_prob": 0.1,
@@ -716,7 +769,6 @@ class AlbertPretrainedModel(PretrainedModel):
         },
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "albert-base-v1":
@@ -945,16 +997,16 @@ class AlbertModel(AlbertPretrainedModel):
 
         return head_mask
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r'''
          The AlbertModel forward method, overrides the `__call__()` special method.
 
@@ -995,9 +1047,15 @@ class AlbertModel(AlbertPretrainedModel):
              inputs_embeds (Tensor, optional):
                 If you want to control how to convert `inputs_ids` indices into associated vectors, you can
                 pass an embedded representation directly instead of passing `inputs_ids`.
-             return_dict (bool, optional):
-                 Whether or not to return a dict instead of a plain tuple. Default to `False`.
-
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
          Returns:
              tuple or Dict: Returns tuple (`sequence_output`, `pooled_output`) or a dict with
@@ -1076,23 +1134,24 @@ class AlbertModel(AlbertPretrainedModel):
             embedding_output,
             extended_attention_mask,
             head_mask=head_mask,
-            return_dict=return_dict,
-        )
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
-        sequence_output = encoder_outputs if not return_dict \
-            else encoder_outputs["last_hidden_state"]
+        sequence_output = encoder_outputs[0]
 
         pooled_output = self.pooler_activation(self.pooler(sequence_output[:, 0])) \
             if self.pooler is not None else None
 
-        if return_dict:
-            return {
-                "last_hidden_state": sequence_output,
-                "pooler_output": pooled_output,
-                "all_hidden_states": encoder_outputs["all_hidden_states"],
-                "all_attentions": encoder_outputs["all_attentions"],
-            }
-        return sequence_output, pooled_output
+        if not return_dict:
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
+
+        return BaseModelOutputWithPooling(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions,
+        )
 
 
 class AlbertForPretraining(AlbertPretrainedModel):
@@ -1130,17 +1189,18 @@ class AlbertForPretraining(AlbertPretrainedModel):
     def get_input_embeddings(self):
         return self.transformer.embeddings.word_embeddings
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        sentence_order_label=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                sentence_order_label=None,
+                labels=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The AlbertForPretraining forward method, overrides the __call__() special method.
 
@@ -1161,8 +1221,15 @@ class AlbertForPretraining(AlbertPretrainedModel):
                 Labels of the next sequence prediction. Input should be a sequence pair
                 Indices should be 0 or 1. ``0`` indicates original order (sequence A, then sequence B),
                 and ``1`` indicates switched order (sequence B, then sequence A). Defaults to `None`.
-            return_dict(bool, optional):
-                See :class:`AlbertModel`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple or Dict: Returns tuple (`prediction_scores`, `sop_scores`) or a dict with
@@ -1204,24 +1271,37 @@ class AlbertForPretraining(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        sequence_output = outputs[0] if not return_dict \
-            else outputs["last_hidden_state"]
-        pooled_output = outputs[1] if not return_dict \
-            else outputs["pooler_output"]
+        sequence_output, pooled_output = outputs[:2]
 
         prediction_scores = self.predictions(sequence_output)
         sop_scores = self.sop_classifier(pooled_output)
 
-        if return_dict:
-            return {
-                "prediction_logits": prediction_scores,
-                "sop_logits": sop_scores,
-                "hidden_states": outputs["all_hidden_states"],
-                "attentions": outputs["all_attentions"],
-            }
-        return prediction_scores, sop_scores
+        total_loss = None
+        if labels is not None and sentence_order_label is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape([-1, self.config.vocab_size]),
+                labels.reshape([-1]))
+            sentence_order_loss = loss_fct(sop_scores.reshape([-1, 2]),
+                                           sentence_order_label.reshape([-1]))
+            total_loss = masked_lm_loss + sentence_order_loss
+
+        if not return_dict:
+            output = (prediction_scores, sop_scores) + outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return AlbertForPreTrainingOutput(
+            loss=total_loss,
+            prediction_logits=prediction_scores,
+            sop_logits=sop_scores,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class AlbertMLMHead(Layer):
@@ -1306,17 +1386,17 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
     def get_input_embeddings(self):
         return self.transformer.embeddings.word_embeddings
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The AlbertForPretraining forward method, overrides the __call__() special method.
 
@@ -1333,8 +1413,15 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
                 See :class:`AlbertModel`.
             inputs_embeds(Tensor, optional):
                 See :class:`AlbertModel`.
-            return_dict(bool, optional):
-                See :class:`AlbertModel`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor or Dict: Returns tensor `prediction_scores` or a dict with `logits`,
@@ -1368,20 +1455,35 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        if isinstance(transformer_outputs, type(input_ids)):
+            transformer_outputs = [transformer_outputs]
+
+        hidden_states = transformer_outputs[0]
+        logits = self.predictions(hidden_states)
+
+        masked_lm_loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss(
+            )  # -100 index = padding token
+            masked_lm_loss = loss_fct(logits.reshape((-1, logits.shape[-1])),
+                                      labels.reshape((-1, )))
+
+        if not return_dict:
+            output = (logits, ) + transformer_outputs[2:]
+            return ((masked_lm_loss, ) +
+                    output) if masked_lm_loss is not None else (
+                        output[0] if len(output) == 1 else output)
+
+        return MaskedLMOutput(
+            loss=masked_lm_loss,
+            logits=logits,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
         )
-
-        sequence_outputs = transformer_outputs[0] if not return_dict \
-            else transformer_outputs["last_hidden_state"]
-        prediction_scores = self.predictions(sequence_outputs)
-
-        if return_dict:
-            return {
-                "logits": prediction_scores,
-                "hidden_states": transformer_outputs["all_hidden_states"],
-                "attentions": transformer_outputs["all_attentions"]
-            }
-        return prediction_scores
 
 
 class AlbertForSequenceClassification(AlbertPretrainedModel):
@@ -1411,16 +1513,17 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
 
         self.init_weights()
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The AlbertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -1437,8 +1540,20 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
                 See :class:`AlbertModel`.
             inputs_embeds(Tensor, optional):
                 See :class:`AlbertModel`.
-            return_dict(bool, optional):
-                See :class:`AlbertModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor or Dict: Returns tensor `logits`, or a dict with `logits`, `hidden_states`, `attentions` fields.
@@ -1480,21 +1595,38 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict,
-        )
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
-        pooled_output = transformer_outputs[1] if not return_dict \
-            else transformer_outputs["pooler_output"]
+        pooled_output = transformer_outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
-        if return_dict:
-            return {
-                "logits": logits,
-                "hidden_states": transformer_outputs["all_hidden_states"],
-                "attentions": transformer_outputs["all_attentions"]
-            }
-        return logits
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits, ) + transformer_outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+        )
 
 
 class AlbertForTokenClassification(AlbertPretrainedModel):
@@ -1522,16 +1654,17 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
 
         self.init_weights()
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The AlbertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1548,8 +1681,17 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
                 See :class:`AlbertModel`.
             inputs_embeds(Tensor, optional):
                 See :class:`AlbertModel`.
-            return_dict(bool, optional):
-                See :class:`AlbertModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor or Dict: Returns tensor `logits`, or a dict with `logits`, `hidden_states`, `attentions` fields.
@@ -1591,20 +1733,30 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict,
-        )
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
-        sequence_output = transformer_outputs[0] if not return_dict \
-            else transformer_outputs["sequence_output"]
+        sequence_output = transformer_outputs[0]
+
         logits = self.classifier(sequence_output)
 
-        if return_dict:
-            return {
-                "logits": logits,
-                "hidden_states": transformer_outputs["all_hidden_states"],
-                "attentions": transformer_outputs["all_attentions"]
-            }
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
+        if not return_dict:
+            output = (logits, ) + transformer_outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+        )
 
 
 class AlbertForQuestionAnswering(AlbertPretrainedModel):
@@ -1629,18 +1781,18 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
                                     num_labels)
         self.init_weights()
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        start_positions=None,
-        end_positions=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                start_positions=None,
+                end_positions=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The AlbertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1657,12 +1809,23 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
                 See :class:`AlbertModel`.
             inputs_embeds(Tensor, optional):
                 See :class:`AlbertModel`.
-            start_positions(Tensor, optional):
-                Start positions of the text. Defaults to `None`.
-            end_positions(Tensor, optional):
-                End positions of the text. Defaults to `None`.
-            return_dict(bool, optional):
-                See :class:`AlbertModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             tuple or Dict: Returns tuple (`start_logits, end_logits`)or a dict
@@ -1710,10 +1873,11 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict,
-        )
-        sequence_output = transformer_outputs[0] if not return_dict \
-            else transformer_outputs["sequence_output"]
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        sequence_output = transformer_outputs[0]
         logits = self.qa_outputs(sequence_output)
 
         start_logits, end_logits = paddle.split(logits,
@@ -1722,14 +1886,34 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         start_logits = start_logits.squeeze(axis=-1)
         end_logits = start_logits.squeeze(axis=-1)
 
-        if return_dict:
-            return {
-                "start_logits": start_logits,
-                "end_logits": end_logits,
-                "hidden_states": transformer_outputs["all_hidden_states"],
-                "attentions": transformer_outputs["all_attentions"]
-            }
-        return start_logits, end_logits
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+        if not return_dict:
+            output = (start_logits, end_logits) + transformer_outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+        )
 
 
 class AlbertForMultipleChoice(AlbertPretrainedModel):
@@ -1751,17 +1935,17 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
         self.classifier = nn.Linear(self.transformer.config["hidden_size"], 1)
         self.init_weights()
 
-    def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        return_dict=False,
-    ):
+    def forward(self,
+                input_ids,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                inputs_embeds=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The AlbertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1778,12 +1962,19 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
                 See :class:`AlbertModel`.
             inputs_embeds(Tensor, optional):
                 See :class:`AlbertModel`.
-            start_positions(Tensor, optional):
-                Start positions of the text. Defaults to `None`.
-            end_positions(Tensor, optional):
-                End positions of the text. Defaults to `None`.
-            return_dict(bool, optional):
-                See :class:`AlbertModel`.
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor or Dict: Returns tensor `reshaped_logits` or a dict
@@ -1826,18 +2017,27 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            return_dict=return_dict,
-        )
-        pooled_output = transformer_outputs[1] if not return_dict \
-            else transformer_outputs["pooler_output"]
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        pooled_output = transformer_outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         reshaped_logits = logits.reshape([-1, num_choices])
 
-        if return_dict:
-            return {
-                "logits": reshaped_logits,
-                "hidden_states": transformer_outputs["all_hidden_states"],
-                "attentions": transformer_outputs["all_attentions"]
-            }
-        return reshaped_logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+        if not return_dict:
+            output = (reshaped_logits, ) + transformer_outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=reshaped_logits,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+        )

@@ -54,7 +54,6 @@ class MBartPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "mbart-large-cc25": {
             "vocab_size": 250027,
@@ -157,7 +156,6 @@ class MBartPretrainedModel(PretrainedModel):
             "init_std": 0.02,
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "mbart-large-cc25":

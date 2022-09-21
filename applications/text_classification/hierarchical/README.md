@@ -9,6 +9,10 @@
     - [2.4 模型训练](#模型训练)
     - [2.5 模型部署](#模型部署)
     - [2.6 模型效果](#模型效果)
+
+
+<a name="层次分类简介"></a>
+
 ## 1. 层次分类简介
 
 本项目提供通用场景下**基于预训练模型微调的层次分类端到端应用方案**，打通数据标注-模型训练-模型调优-模型压缩-预测部署全流程，有效缩短开发周期，降低AI开发落地门槛。
@@ -22,19 +26,19 @@
 
 **方案亮点：**
 
-- **分析高效✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
-
-- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0轻量级模型作为训练基座，ERNIE 3.0轻量级模型学习海量的中文数据与知识，具有广泛成熟的实践应用。
-
-- **低门槛操作👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，高效完成从数据标注到部署全流程
+- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
 
 **更多选择：**
 
-对于大多数层次分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，层次分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术方案](../README.md#文本分类技术方案)。
+对于大多数层次分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，层次分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
 
 - 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习层次分类方案](./few-shot#readme)
 
 - 【标签类别不固定场景】 👉 [语义索引层次分类方案](./retrieval_based#readme)
+
+<a name="快速开始"></a>
 
 ## 2. 快速开始
 
@@ -43,10 +47,11 @@
 wget https://paddlenlp.bj.bcebos.com/datasets/baidu_extract_2020.tar.gz
 tar -zxvf baidu_extract_2020.tar.gz
 mv baidu_extract_2020 data
+rm baidu_extract_2020.tar.gz
 ```
 
 <div align="center">
-    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/186386181-7cdf3015-3e6c-4ffe-9512-95ba707fd00c.png">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187828356-e2f4f627-f5fe-4c83-8879-ed6951f7511e.png">
 </div>
 <div align="center">
     <font size ="2">
@@ -54,11 +59,13 @@ mv baidu_extract_2020 data
      </font>
 </div>
 
+<a name="运行环境"></a>
+
 ### 2.1 运行环境
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.3.4
+- paddlenlp >= 2.4
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -70,7 +77,7 @@ mv baidu_extract_2020 data
 
 安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 ```shell
-python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
+python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
 ```
 
 
@@ -79,10 +86,12 @@ python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
 python3 -m  pip install scikit-learn==1.0.2
 ```
 
+<a name="代码结构"></a>
+
 ### 2.2 代码结构
 
 ```text
-multi_label/
+hierarchical/
 ├── deploy # 部署
 │   └── predictor # 离线部署
 │   │   ├── infer.py # 测试脚本
@@ -105,6 +114,8 @@ multi_label/
 ├── prune.py # 裁剪脚本
 └── README.md # 使用说明
 ```
+
+<a name="数据准备"></a>
 
 ### 2.3 数据准备
 
@@ -173,6 +184,8 @@ data/
 ...
 ```
 
+<a name="模型训练"></a>
+
 ### 2.4 模型训练
 
 #### 2.4.1 预训练模型微调
@@ -180,22 +193,25 @@ data/
 使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
 python train.py \
+    --dataset_dir "data" \
     --device "gpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
-
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
 ```shell
 python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
-    --device "gpu" \
+    --dataset_dir "data" \
+    --device "cpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
 
 如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
@@ -203,13 +219,14 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" train.py \
+    --dataset_dir "data" \
     --device "gpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
-
 
 
 可支持配置的参数：
@@ -218,7 +235,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-1.0-large-zh-cw"；默认为"ernie-3.0-medium-zh"。
+* `model_name`：选择预训练模型,可选"ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"；默认为"ernie-3.0-medium-zh",根据任务复杂度和硬件条件进行选择。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
@@ -246,14 +263,14 @@ checkpoint/
 
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `--init_from_ckpt checkpoint/model_state.pdparams` 。
-* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
-
+* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
+* 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 #### 2.4.2 训练评估与模型优化
 
 训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt"
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
 ```
 
 输出打印示例：
@@ -294,7 +311,7 @@ Prediction    Label    Text
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
 
 ```shell
-python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
+python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_dir "data"
 ```
 
 可支持配置的参数：
@@ -308,6 +325,8 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
 
+<a name="模型部署"></a>
+
 ### 2.5 模型部署
 
 #### 2.5.1 静态图导出
@@ -318,8 +337,13 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32
 python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 
-可支持配置的参数：
+如果使用ERNIE M作为预训练模型，运行方式：
+```shell
+python export_model.py --params_path ./checkpoint/ --output_path ./export --multilingual
+```
 
+可支持配置的参数：
+* `multilingual`：是否为多语言任务（是否使用ERNIE M作为预训练模型）；默认为False。
 * `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
 
@@ -334,7 +358,7 @@ export/
  导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 #### 2.5.2 模型裁剪
 
-如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 压缩(Compression API）, 一行命令即可启动模型裁剪。
+如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 [压缩API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md), 一行命令即可启动模型裁剪。
 
 使用裁剪功能需要安装 paddleslim：
 
@@ -342,17 +366,20 @@ export/
 pip install paddleslim==2.2.2
 ```
 
-开始模型裁剪训练：
+开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
 python prune.py \
     --device "gpu" \
+    --dataset_dir "data" \
+    --output_dir "prune" \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --num_train_epochs 10 \
     --max_seq_length 128 \
+    --logging_steps 5 \
+    --save_steps 100 \
     --width_mult_list '3/4' '2/3' '1/2'
 ```
-默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
 
 
 可支持配置的参数：
@@ -362,7 +389,7 @@ python prune.py \
 * `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
-* `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
+* `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
 * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
 * `seed`：随机种子，默认为3。
 * `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
@@ -375,9 +402,9 @@ python prune.py \
 ```text
 prune/
 ├── width_mult_0.75
-│   ├── float32.pdiparams
-│   ├── float32.pdiparams.info
-│   ├── float32.pdmodel
+│   ├── pruned_model.pdiparams
+│   ├── pruned_model.pdiparams.info
+│   ├── pruned_model.pdmodel
 │   ├── model_state.pdparams
 │   └── model_config.json
 └── ...
@@ -391,12 +418,15 @@ prune/
 
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
+4. **压缩API暂不支持多语言预训练模型ERNIE-M**，相关功能正在加紧开发中。
 
 #### 2.5.3 部署方案
 
 - 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
 
 - 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
+
+<a name="模型效果"></a>
 
 ### 2.6 模型效果
 
@@ -430,12 +460,13 @@ prune/
 
 |   | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |------------ |
-|ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|95.68|93.39| 4.63 |
-|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|95.26|93.22| 2.42|
-|ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|94.72|93.03| 0.93|
-|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.70|
-|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|93.98|91.25|0.54|
-| ERNIE 3.0 Medium + FP16  | 6-layer, 768-hidden, 12-heads|95.26|93.22| 0.79|
+|ERNIE 1.0 Large Cw  |24-layer, 1024-hidden, 20-heads|96.24|94.24 |5.59 |
+|ERNIE 3.0 Xbase |20-layer, 1024-hidden, 16-heads|96.21|94.13| 5.51 |
+|ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|95.68|93.39| 2.01 |
+|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|95.26|93.22| 1.01|
+|ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|94.72|93.03| 0.36|
+|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.24|
+|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|93.98|91.25|0.19|
 | ERNIE 3.0 Medium + 裁剪(保留比例3/4)|6-layer, 768-hidden, 9-heads| 95.45|93.40| 0.81   |
 | ERNIE 3.0 Medium + 裁剪(保留比例2/3)|6-layer, 768-hidden, 8-heads| 95.23|93.27 | 0.74  |
 | ERNIE 3.0 Medium + 裁剪(保留比例1/2)|6-layer, 768-hidden, 6-heads| 94.92 | 92.70| 0.61 |

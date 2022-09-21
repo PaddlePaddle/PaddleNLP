@@ -21,13 +21,16 @@ import json
 import pickle
 import warnings
 import contextlib
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+import paddle.nn.functional as F
 from paddle.dataset.common import md5file
 from ..utils.log import logger
 from ..utils.downloader import get_path_from_url, DownloaderCheck
+from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
 
 DOC_FORMAT = r"""
     Examples:
@@ -770,6 +773,7 @@ class SchemaTree(object):
         self.children = []
         self.prefix = None
         self.parent_relations = None
+        self.parent = None
         if children is not None:
             for child in children:
                 self.add_child(child)
@@ -1398,3 +1402,137 @@ class WordTagRelationExtractor(object):
                                 res_cand.append(tmp.copy())
                             continue
         return res_cand
+
+
+@dataclass
+class DataCollatorGP:
+    tokenizer: PretrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    label_maps: Optional[dict] = None
+    task_type: Optional[str] = None
+
+    def __call__(
+        self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]
+    ) -> Dict[str, paddle.Tensor]:
+        new_features = [{
+            k: v
+            for k, v in f.items() if k not in ["offset_mapping", "text"]
+        } for f in features]
+
+        batch = self.tokenizer.pad(
+            new_features,
+            padding=self.padding,
+        )
+
+        batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
+        batch.append([feature["offset_mapping"] for feature in features])
+        batch.append([feature["text"] for feature in features])
+        return batch
+
+
+def gp_decode(batch_outputs,
+              offset_mappings,
+              texts,
+              label_maps,
+              task_type="relation_extraction"):
+    if task_type == "entity_extraction":
+        batch_ent_results = []
+        for entity_output, offset_mapping, text in zip(batch_outputs[0].numpy(),
+                                                       offset_mappings, texts):
+            entity_output[:, [0, -1]] -= np.inf
+            entity_output[:, :, [0, -1]] -= np.inf
+            entity_probs = F.softmax(paddle.to_tensor(entity_output),
+                                     axis=1).numpy()
+            ent_list = []
+            for l, start, end in zip(*np.where(entity_output > 0.)):
+                ent_prob = entity_probs[l, start, end]
+                start, end = (offset_mapping[start][0], offset_mapping[end][-1])
+                ent = {
+                    "text": text[start:end],
+                    "type": label_maps['id2entity'][str(l)],
+                    "start_index": start,
+                    "probability": ent_prob
+                }
+                ent_list.append(ent)
+            batch_ent_results.append(ent_list)
+        return batch_ent_results
+    else:
+        batch_ent_results = []
+        batch_rel_results = []
+        for entity_output, head_output, tail_output, offset_mapping, text in zip(
+                batch_outputs[0].numpy(),
+                batch_outputs[1].numpy(),
+                batch_outputs[2].numpy(),
+                offset_mappings,
+                texts,
+        ):
+            entity_output[:, [0, -1]] -= np.inf
+            entity_output[:, :, [0, -1]] -= np.inf
+            entity_probs = F.softmax(paddle.to_tensor(entity_output),
+                                     axis=1).numpy()
+            head_probs = F.softmax(paddle.to_tensor(head_output),
+                                   axis=1).numpy()
+            tail_probs = F.softmax(paddle.to_tensor(tail_output),
+                                   axis=1).numpy()
+
+            ents = set()
+            ent_list = []
+            for l, start, end in zip(*np.where(entity_output > 0.)):
+                ent_prob = entity_probs[l, start, end]
+                ents.add((start, end))
+                start, end = (offset_mapping[start][0], offset_mapping[end][-1])
+                ent = {
+                    "text": text[start:end],
+                    "type": label_maps['id2entity'][str(l)],
+                    "start_index": start,
+                    "probability": ent_prob
+                }
+                ent_list.append(ent)
+            batch_ent_results.append(ent_list)
+
+            rel_list = []
+            for sh, st in ents:
+                for oh, ot in ents:
+                    p1s = np.where(head_output[:, sh, oh] > 0.)[0]
+                    p2s = np.where(tail_output[:, st, ot] > 0.)[0]
+                    ps = set(p1s) & set(p2s)
+                    for p in ps:
+                        rel_prob = head_probs[p, sh, oh] * tail_probs[p, st, ot]
+                        if task_type == "relation_extraction":
+                            rel = {
+                                "subject":
+                                text[offset_mapping[sh][0]:offset_mapping[st]
+                                     [1]],
+                                "predicate":
+                                label_maps['id2relation'][str(p)],
+                                "object":
+                                text[offset_mapping[oh][0]:offset_mapping[ot]
+                                     [1]],
+                                "subject_start_index":
+                                offset_mapping[sh][0],
+                                "object_start_index":
+                                offset_mapping[oh][0],
+                                "probability":
+                                rel_prob,
+                            }
+                        else:
+                            rel = {
+                                "aspect":
+                                text[offset_mapping[sh][0]:offset_mapping[st]
+                                     [1]],
+                                "sentiment":
+                                label_maps['id2relation'][str(p)],
+                                "opinion":
+                                text[offset_mapping[oh][0]:offset_mapping[ot]
+                                     [1]],
+                                "aspect_start_index":
+                                offset_mapping[sh][0],
+                                "opinion_start_index":
+                                offset_mapping[oh][0],
+                                "probability":
+                                rel_prob,
+                            }
+                        rel_list.append(rel)
+            batch_rel_results.append(rel_list)
+        return (batch_ent_results, batch_rel_results)

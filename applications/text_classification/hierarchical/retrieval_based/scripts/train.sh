@@ -1,7 +1,7 @@
 # GPU training
 root_path=inbatch
 data_path=data
-python -u -m paddle.distributed.launch --gpus "1,2,3,4" \
+python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     train.py \
     --device gpu \
     --save_dir ./checkpoints/${root_path} \

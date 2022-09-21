@@ -35,9 +35,10 @@ from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
-from .information_extraction import UIETask
+from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
-from .text_to_image import TextToImageGenerationTask
+from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
+from .text_summarization import TextSummarizationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -222,6 +223,18 @@ TASKS = {
             "model": "rocketqa-zh-dureader-cross-encoder"
         }
     },
+    'text_summarization': {
+        "models": {
+            "unimo-text-1.0-summary": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-unimo-text-1.0-summary",
+                "task_priority_path": "unimo-text-1.0-summary",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-summary"
+        }
+    },
     "word_segmentation": {
         "modes": {
             "fast": {
@@ -287,6 +300,20 @@ TASKS = {
                 "task_class": UIETask,
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-base-en"
+            },
+            "uie-m-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-m-base"
+            },
+            "uie-m-large": {
+                "task_class": UIETask,
+                "hidden_size": 1024,
+                "task_flag": "information_extraction-uie-m-large"
+            },
+            "uie-data-distill-gp": {
+                "task_class": GPTask,
+                "task_flag": "information_extraction-uie-data-distill-gp"
             },
         },
         "default": {
@@ -377,6 +404,35 @@ TASKS = {
                 "task_flag": "text_to_image-pai-painter-commercial-base-zh",
                 "task_priority_path": "pai-painter-commercial-base-zh",
             },
+            "openai/disco-diffusion-clip-vit-base-patch32": {
+                "task_class":
+                TextToImageDiscoDiffusionTask,
+                "task_flag":
+                "text_to_image-openai/disco-diffusion-clip-vit-base-patch32",
+                "task_priority_path":
+                "openai/disco-diffusion-clip-vit-base-patch32",
+            },
+            "openai/disco-diffusion-clip-rn50": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn50",
+                "task_priority_path": "openai/disco-diffusion-clip-rn50",
+            },
+            "openai/disco-diffusion-clip-rn101": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
+                "task_priority_path": "openai/disco-diffusion-clip-rn101",
+            },
+            "disco_diffusion_ernie_vil-2.0-base-zh": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag":
+                "text_to_image-disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_priority_path": "disco_diffusion_ernie_vil-2.0-base-zh",
+            },
+            "CompVis/stable-diffusion-v1-4": {
+                "task_class": TextToImageStableDiffusionTask,
+                "task_flag": "text_to_image-CompVis/stable-diffusion-v1-4",
+                "task_priority_path": "CompVis/stable-diffusion-v1-4",
+            },
         },
         "default": {
             "model": "pai-painter-painting-base-zh",
@@ -386,7 +442,16 @@ TASKS = {
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "uie-base-en", "wordtag"
+    "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base"
+]
+
+support_argument_list = [
+    "dalle-mini", "dalle-mega", "dalle-mega-v16",
+    "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh",
+    "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4",
+    "openai/disco-diffusion-clip-vit-base-patch32",
+    "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101",
+    "disco_diffusion_ernie_vil-2.0-base-zh"
 ]
 
 
@@ -495,3 +560,7 @@ class Taskflow(object):
     def set_schema(self, schema):
         assert self.task_instance.model in support_schema_list, 'This method can only be used by the task with the model of uie or wordtag.'
         self.task_instance.set_schema(schema)
+
+    def set_argument(self, argument):
+        assert self.task_instance.model in support_argument_list, 'This method can only be used by the task with the model of text_to_image generation.'
+        self.task_instance.set_argument(argument)

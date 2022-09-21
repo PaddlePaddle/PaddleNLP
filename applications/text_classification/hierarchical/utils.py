@@ -34,9 +34,8 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
     losses = []
     for batch in data_loader:
-        input_ids, token_type_ids, labels = batch['input_ids'], batch[
-            'token_type_ids'], batch['labels']
-        logits = model(input_ids, token_type_ids)
+        labels = batch.pop("labels")
+        logits = model(**batch)
         loss = criterion(logits, labels)
         probs = F.sigmoid(logits)
         losses.append(loss.numpy())
@@ -51,7 +50,11 @@ def evaluate(model, criterion, metric, data_loader):
     return micro_f1_score, macro_f1_score
 
 
-def preprocess_function(examples, tokenizer, max_seq_length, label_nums):
+def preprocess_function(examples,
+                        tokenizer,
+                        max_seq_length,
+                        label_nums,
+                        is_test=False):
     """
     Builds model inputs from a sequence for sequence classification tasks
     by concatenating and adding special tokens.
@@ -68,21 +71,33 @@ def preprocess_function(examples, tokenizer, max_seq_length, label_nums):
     """
     result = tokenizer(text=examples["sentence"], max_seq_len=max_seq_length)
     # One-Hot label
-    result["labels"] = [
-        float(1) if i in examples["label"] else float(0)
-        for i in range(label_nums)
-    ]
+    if not is_test:
+        result["labels"] = [
+            float(1) if i in examples["label"] else float(0)
+            for i in range(label_nums)
+        ]
     return result
 
 
-def read_local_dataset(path, label_list):
+def read_local_dataset(path, label_list=None, is_test=False):
     """
     Read dataset
     """
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
-            items = line.strip().split('\t')
-            sentence = ''.join(items[:-1])
-            label = items[-1]
-            labels = [label_list[l] for l in label.split(',')]
-            yield {'sentence': sentence, 'label': labels}
+            if is_test:
+                items = line.strip().split('\t')
+                sentence = ''.join(items)
+                yield {'sentence': sentence}
+            else:
+                items = line.strip().split('\t')
+                if len(items) == 0:
+                    continue
+                elif len(items) == 1:
+                    sentence = items[0]
+                    labels = []
+                else:
+                    sentence = ''.join(items[:-1])
+                    label = items[-1]
+                    labels = [label_list[l] for l in label.split(',')]
+                yield {'sentence': sentence, 'label': labels}

@@ -42,7 +42,7 @@ In-batch Negatives 策略的训练数据为语义相似的 Pair 对，策略核�
 
 ### 技术方案
 
-双塔模型，采用ERNIE1.0热启，在召回训练阶段引入In-batch Negatives  策略，使用hnswlib建立索引库，进行召回测试。
+双塔模型，在召回训练阶段引入In-batch Negatives  策略，使用hnswlib建立索引库，进行召回测试。
 
 
 ### 评估指标
@@ -53,10 +53,10 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 **效果评估**
 
-|  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
+|  策略 | 模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
-|  In-batch Negatives |  51.301 | 65.309| 69.878| 73.996|78.881| Inbatch-negative有监督训练|
-
+|  In-batch Negatives | ernie 1.0 | 51.301 | 65.309| 69.878| 73.996|78.881|
+|  In-batch Negatives | rocketqa-zh-base-query-encoder | **59.622** | **75.089**| **79.668**| **83.404**|**87.773**|
 
 
 <a name="环境依赖"></a>
@@ -166,10 +166,10 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[batch_neg](https://bj.bcebos.com/v1/paddlenlp/models/inbatch_model.zip)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|f3e5c7d7b0b718c2530c5e1b136b2d74|
+|[batch_neg](https://bj.bcebos.com/v1/paddlenlp/models/inbatch_model.zip)|<div style="width: 150pt">ernie 1.0 margin:0.2 scale:30 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|f3e5c7d7b0b718c2530c5e1b136b2d74|
+
 
 ### 训练环境说明
-
 
 - NVIDIA Driver Version: 440.64.00
 - Ubuntu 16.04.6 LTS (Docker)
@@ -185,7 +185,7 @@ Recall@K召回率是指预测的前topK（top-k是指从最后的按得分排序
 然后运行下面的命令使用GPU训练，得到语义索引模型：
 
 ```
-root_path=recall
+root_path=inbatch
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     train_batch_neg.py \
     --device gpu \
@@ -194,11 +194,11 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --learning_rate 5E-5 \
     --epochs 3 \
     --output_emb_size 256 \
+    --model_name_or_path rocketqa-zh-base-query-encoder \
     --save_steps 10 \
     --max_seq_length 64 \
     --margin 0.2 \
     --train_set_file recall/train.csv \
-    --evaluate \
     --recall_result_dir "recall_result_dir" \
     --recall_result_file "recall_result.txt" \
     --hnsw_m 100 \
@@ -217,6 +217,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 * `learning_rate`: 训练的学习率的大小
 * `epochs`: 训练的epoch数
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
+* `model_name_or_path`: 预训练模型，用于模型和`Tokenizer`的参数初始化
 * `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
 * `max_seq_length`: 输入序列的最大长度
 * `margin`: 正样本相似度与负样本之间的目标 Gap
@@ -234,7 +235,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 也可以使用bash脚本：
 
 ```
-sh scripts/train_batch_neg.sh
+sh scripts/train.sh
 ```
 
 
@@ -270,6 +271,7 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
         --params_path "${root_dir}/model_40/model_state.pdparams" \
+        --model_name_or_path rocketqa-zh-base-query-encoder \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
@@ -280,16 +282,17 @@ python -u -m paddle.distributed.launch --gpus "3" --log_dir "recall_log/" \
         --corpus_file "recall/corpus.csv"
 ```
 参数含义说明
-* `device`: 使用 cpu/gpu 进行训练
-* `recall_result_dir`: 召回结果存储目录
-* `recall_result_file`: 召回结果的文件名
+* `device`： 使用 cpu/gpu 进行训练
+* `recall_result_dir`： 召回结果存储目录
+* `recall_result_file`： 召回结果的文件名
 * `params_path`： 待评估模型的参数文件名
-* `hnsw_m`: hnsw 算法相关参数，保持默认即可
-* `hnsw_ef`: hnsw 算法相关参数，保持默认即可
-* `output_emb_size`: Transformer 顶层输出的文本向量维度
-* `recall_num`: 对 1 个文本召回的相似文本数量
-* `similar_text_pair`: 由相似文本对构成的评估集
-* `corpus_file`: 召回库数据 corpus_file
+* `model_name_or_path`: 预训练模型，用于模型和`Tokenizer`的参数初始化
+* `hnsw_m`： hnsw 算法相关参数，保持默认即可
+* `hnsw_ef`： hnsw 算法相关参数，保持默认即可
+* `output_emb_size`： Transformer 顶层输出的文本向量维度
+* `recall_num`： 对 1 个文本召回的相似文本数量
+* `similar_text_pair`： 由相似文本对构成的评估集
+* `corpus_file`： 召回库数据 corpus_file
 
 也可以使用下面的bash脚本：
 
@@ -383,10 +386,11 @@ python inference.py
 ```
 root_dir="checkpoints/inbatch"
 
-python -u -m paddle.distributed.launch --gpus "3" \
+python -u -m paddle.distributed.launch --gpus "0" \
     predict.py \
     --device gpu \
     --params_path "${root_dir}/model_40/model_state.pdparams" \
+    --model_name_or_path rocketqa-zh-base-query-encoder \
     --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
@@ -396,6 +400,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
 参数含义说明
 * `device`: 使用 cpu/gpu 进行训练
 * `params_path`： 预训练模型的参数文件名
+* `model_name_or_path`: 预训练模型，用于模型和`Tokenizer`的参数初始化
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `text_pair_file`: 由文本 Pair 构成的待预测数据集
 
@@ -423,7 +428,9 @@ predict.sh文件包含了cpu和gpu运行的脚本，默认是gpu运行的脚本
 首先把动态图模型转换为静态图：
 
 ```
-python export_model.py --params_path checkpoints/inbatch/model_40/model_state.pdparams --output_path=./output
+python export_model.py --params_path checkpoints/inbatch/model_40/model_state.pdparams \
+                       --model_name_or_path rocketqa-zh-base-query-encoder \
+                       --output_path=./output
 ```
 也可以运行下面的bash脚本：
 
@@ -449,7 +456,9 @@ corpus_list=[['中西方语言与文化的差异','中西方文化差异以及�
 然后使用PaddleInference
 
 ```
-python deploy/python/predict.py --model_dir=./output
+python deploy/python/predict.py \
+                             --model_dir=./output \
+                             --model_name_or_path rocketqa-zh-base-query-encoder
 ```
 也可以运行下面的bash脚本：
 
@@ -501,9 +510,16 @@ Paddle Serving的部署有两种方式，第一种方式是Pipeline的方式，�
 
 #### Pipeline方式
 
-启动 Pipeline Server:
+修改模型需要用到的`Tokenizer`
 
 ```
+self.tokenizer = AutoTokenizer.from_pretrained("rocketqa-zh-base-query-encoder")
+```
+
+然后启动 Pipeline Server:
+
+```
+cd deploy/python
 python web_service.py
 ```
 
@@ -520,7 +536,7 @@ list_data = [
 然后运行：
 
 ```
-python rpc_client.py
+python deploy/python/rpc_client.py
 ```
 模型的输出为：
 
@@ -547,12 +563,12 @@ python -m paddle_serving_server.serve --model serving_server --port 9393 --gpu_i
 也可以使用脚本：
 
 ```
-sh deploy/C++/start_server.sh
+sh deploy/cpp/start_server.sh
 ```
 Client 可以使用 http 或者 rpc 两种方式，rpc 的方式为：
 
 ```
-python deploy/C++/rpc_client.py
+python deploy/cpp/rpc_client.py
 ```
 运行的输出为：
 ```
@@ -571,7 +587,7 @@ time to cost :0.3960278034210205 seconds
 或者使用 http 的客户端访问模式：
 
 ```
-python deploy/C++/http_client.py
+python deploy/cpp/http_client.py
 ```
 运行的输出为：
 
@@ -599,6 +615,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     train_batch_neg.py \
     --device gpu \
     --save_dir ./checkpoints/simcse_inbatch_negative \
+    --model_name_or_path rocketqa-zh-base-query-encoder \
     --batch_size 64 \
     --learning_rate 5E-5 \
     --epochs 3 \
