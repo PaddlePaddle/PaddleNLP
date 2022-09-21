@@ -83,8 +83,9 @@ def _transformer_decoder_layer_fwd(self,
     tgt = residual + self.dropout3(tgt)
     if not self.normalize_before:
         tgt = self.norm3(tgt)
-    return tgt if cache is None else (tgt, (incremental_cache,
-                                            static_cache if memory is not None else None))
+    return tgt if cache is None else (tgt, (
+        incremental_cache, static_cache if memory is not None else None))
+
 
 def _transformer_encoder_layer_fwd(self,
                                    src,
