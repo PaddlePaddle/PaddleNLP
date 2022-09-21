@@ -35,8 +35,6 @@ from paddle.incubate.distributed.models import moe
 MoeLayer = moe.MoELayer
 from utils import get_timers
 
-from paddle.distributed.fleet.meta_parallel.pp_utils.utils import _initialize_recompute_setting, _initialize_recompute_hcg
-
 __all__ = [
     'GPTModel',
     "GPTPretrainedModel",
@@ -768,11 +766,6 @@ class GPTModel(GPTPretrainedModel):
         self.initializer_range = initializer_range
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
-
-        if recompute_interval > 0:
-            _initialize_recompute_hcg(hcg)
-            _initialize_recompute_setting(recompute_offload,
-                                          recompute_partition)
 
         self.embeddings = GPTEmbeddings(vocab_size, hidden_size,
                                         hidden_dropout_prob,
