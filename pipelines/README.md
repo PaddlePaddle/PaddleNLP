@@ -174,6 +174,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 |  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
 |  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
 |  CUDA10.2 + cuDNN 7           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+|  CUDA11.2 + cuDNN 8           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8 |  Linux   |
 
 如果您的机器不在中国大陆地区，我们推荐您使用DockerHub的镜像：
 
@@ -181,7 +182,8 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 | :--------------------------: | :-------------------------------: | :-------------: |
 |  CPU                         | paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
 |  CPU                         | paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
-|  CUDA10.2 + cuDNN 7           | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
+|  CUDA10.2 + cuDNN 7          | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7  |  Linux   |
+|  CUDA11.2 + cuDNN 8          | paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8  |  Linux   |
 
 对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 

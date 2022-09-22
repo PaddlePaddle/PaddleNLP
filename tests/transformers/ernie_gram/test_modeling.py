@@ -162,6 +162,8 @@ class ErnieGramModelTester:
                        attention_mask=attention_mask,
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -207,7 +209,8 @@ class ErnieGramModelTester:
                        labels=token_labels,
                        return_dict=self.parent.return_dict,
                        attention_mask=attention_mask)
-
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
         if paddle.is_tensor(result):
             result = [result]
         elif token_labels is not None:
