@@ -45,6 +45,8 @@ parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
                     help="Select which device to train model, defaults to gpu.")
 parser.add_argument("--pad_to_max_seq_len", action="store_true",
                     help="Whether to pad to max seq length.")
+parser.add_argument("--model_name_or_path", default='rocketqa-zh-dureader-query-encoder',
+                    type=str, help='The pretrained model used for training')
 args = parser.parse_args()
 # yapf: enable
 
@@ -77,8 +79,7 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        "rocketqa-zh-dureader-query-encoder")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=args.max_seq_length,
@@ -101,8 +102,7 @@ if __name__ == "__main__":
                                           batch_size=args.batch_size,
                                           batchify_fn=batchify_fn,
                                           trans_fn=trans_func)
-    pretrained_model = AutoModel.from_pretrained(
-        "rocketqa-zh-dureader-query-encoder")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     model = SemanticIndexBase(pretrained_model,
                               output_emb_size=args.output_emb_size)
     if args.params_path and os.path.isfile(args.params_path):
