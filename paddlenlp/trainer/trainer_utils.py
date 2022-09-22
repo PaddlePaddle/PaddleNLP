@@ -134,6 +134,21 @@ class OptimizerNames(ExplicitEnum):
     ADAFACTOR = "adafactor"
 
 
+class ShardingOption(ExplicitEnum):
+    """
+    Sharding Option
+    OP for sharding optimizer state
+    GRAD for sharding gradients
+    FULL_SHARD for sharding optimizer gradient and parameter
+    OFFLOAD means offload to cpu.
+    """
+    SHARD_OP = "stage1"
+    SHARD_GRAD_OP = "stage2"
+    FULL_SHARD = "stage3"
+    # NO_SHARD = "no"
+    OFFLOAD = "offload"
+
+
 def is_main_process(local_rank):
     """
     Whether or not the current process is the local process, based on `xm.get_ordinal()` (for TPUs) first, then on

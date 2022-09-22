@@ -38,7 +38,11 @@ import paddle
 import paddle.nn as nn
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
+from paddle.distributed.sharding import group_sharded_parallel
+from paddle.fluid.dygraph.parallel import sync_params_buffers
+
 from paddle.io import (
     Dataset,
     DataLoader,
@@ -65,6 +69,7 @@ from .trainer_utils import (
     EvalLoopOutput,
     speed_metrics,
     OptimizerNames,
+    ShardingOption,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
     get_scheduler,
@@ -179,10 +184,6 @@ class Trainer:
         optimizers: Tuple[paddle.optimizer.Optimizer,
                           paddle.optimizer.lr.LRScheduler] = (None, None),
     ):
-        if paddle.distributed.get_world_size() > 1:
-            if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
-            ):
-                paddle.distributed.init_parallel_env()
 
         if args is None:
             output_dir = "tmp_trainer"
@@ -193,7 +194,7 @@ class Trainer:
 
         self.args = args
         self.is_in_train = False
-        self.do_grad_scaling = args.fp16
+        # self.do_grad_scaling = args.fp16
 
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
@@ -203,6 +204,31 @@ class Trainer:
 
         if self.args.should_save:
             os.makedirs(self.args.output_dir, exist_ok=True)
+
+        self.sharding = None
+        if len(args.sharding) > 0:
+            if args.local_rank == -1:
+                raise ValueError(
+                    "Using sharding only works in distributed training.")
+            self.sharding = True
+
+        # init parallel env
+        if paddle.distributed.get_world_size() > 1:
+            if self.sharding:
+                self.args.dp_degree = self.args.world_size // self.args.sharding_degree
+                strategy = fleet.DistributedStrategy()
+                strategy.hybrid_configs = {
+                    "dp_degree": self.args.dp_degree,
+                    "mp_degree": 1,
+                    "pp_degree": 1,
+                    "sharding_degree": self.args.sharding_degree
+                }
+                self.strategy = strategy
+                fleet.init(is_collective=True, strategy=strategy)
+
+            elif not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
+            ):
+                paddle.distributed.init_parallel_env()
 
         default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(
             tokenizer)
@@ -222,6 +248,13 @@ class Trainer:
         self.state = TrainerState()
         self.control = TrainerControl()
         self._signature_columns = None
+
+        if (self.sharding is not None) and (self.optimizer is not None
+                                            or self.lr_scheduler is not None):
+            raise RuntimeError(
+                "Passing `optimizers` is not allowed if sharding is enabled."
+                "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
+            )
 
         default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(
             self.args.report_to)
@@ -243,16 +276,34 @@ class Trainer:
                 "train_dataset does not implement __len__, max_steps has to be specified"
             )
 
+        self.do_grad_scaling = False
         if args.fp16:
+            # self.scaler = paddle.amp.GradScaler(
+            #     init_loss_scaling=self.args.scale_loss)
+            logger.info("Using half precision")
+            self.do_grad_scaling = True
+
             self.scaler = paddle.amp.GradScaler(
                 init_loss_scaling=self.args.scale_loss)
-            logger.info("Using half precision")
+
+            if self.sharding is not None:
+                if ShardingOption.SHARD_OP in self.args.sharding:
+                    self.scaler = fleet.distributed_scaler(scaler)
+                else:
+                    # scaler for stage2 and stage3
+                    if paddle.in_dygraph_mode():
+                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
+                        self.scaler = GroupShardedScaler(self.scaler)
+                    else:
+                        from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
+                        self.scaler = ShardingScaler(self.scaler)
 
         if args.recompute:
 
             def fn(layer):
-                if type(layer) == paddle.nn.TransformerEncoder or type(
-                        layer) == paddle.nn.TransformerDecoder:
+                if hasattr(
+                        layer,
+                        "enable_recompute") and layer.enable_recompute is False:
                     layer.enable_recompute = True
 
             model.apply(fn)
@@ -409,9 +460,6 @@ class Trainer:
             del state_dict
 
         train_dataloader = self.get_train_dataloader()
-        model = self._wrap_model(self.model_wrapped)
-
-        self.state = TrainerState()
 
         args = self.init_num_steps(args, len(self.train_dataset))
 
@@ -423,8 +471,27 @@ class Trainer:
                             exp_step)
                 args.eval_steps = exp_step
 
-        self.create_optimizer_and_scheduler(
-            num_training_steps=args.num_training_steps)
+        # delay_optimizer_creation = (
+        #     self.sharding is not None
+        #     and ShardingOption.SHARD_OP not in self.args.sharding
+        # )
+        delay_optimizer_creation = self.sharding is None
+
+        if not delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(
+                num_training_steps=args.num_training_steps)
+
+        self.state = TrainerState()
+
+        model = self._wrap_model(self.model_wrapped)
+
+        # for the rest of this function `model` is the outside model, whether it was wrapped or not
+        if model is not self.model:
+            self.model_wrapped = model
+
+        if delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(
+                num_training_steps=args.num_training_steps)
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
@@ -559,11 +626,14 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control)
 
-                is_no_sync = (((
-                    (step + 1) % args.gradient_accumulation_steps != 0)
-                               and args.local_rank != -1
-                               and args._no_sync_in_gradient_accumulation)
-                              or (args.recompute and args.local_rank != -1))
+                dp_enabled = self.args.dp_degree > 1 if self.sharding else args.local_rank != -1
+                is_no_sync = (
+                    (((step + 1) % args.gradient_accumulation_steps != 0)
+                     and dp_enabled and args._no_sync_in_gradient_accumulation)
+                    or (args.recompute and dp_enabled))
+                # sharding
+                # stage1. the same as ddp
+                # stage2. manualy collect gradient on dp group
 
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
@@ -579,7 +649,26 @@ class Trainer:
                         steps_in_epoch <= args.gradient_accumulation_steps and
                     (step + 1) == steps_in_epoch):
 
-                    if (args.recompute and args.local_rank != -1):
+                    # Maunally collect gradients
+                    # Case 1: Use sharding stage 2/3 with dp
+                    # Case 2: Use recompute and dp
+                    # local_rank != -1 don't means no dp in networks.
+                    if self.sharding and self.args.dp_degree > 1 and ShardingOption.SHARD_OP not in self.args.sharding:
+                        fused_allreduce_gradients(
+                            model.parameters(),
+                            fleet.get_hybrid_communicate_group())
+                        if ShardingOption.FULL_SHARD in self.args.sharding:
+                            # Why need sync on parm again ?
+                            hcg = fleet.get_hybrid_communicate_group()
+                            dp_group = hcg.get_data_parallel_group()
+                            for p in model.parameters():
+                                if hasattr(p, "bw_storage"):
+                                    assert p.grad is None, "This case shouldn't happen."
+                                    p.bw_storage.scale_(1.0 / dp_group.nranks)
+                                    paddle.distributed.all_reduce(
+                                        p.bw_storage, group=dp_group)
+
+                    elif (args.recompute and args.local_rank != -1):
                         fused_allreduce_gradients(list(model.parameters()),
                                                   None)
 
@@ -866,14 +955,28 @@ class Trainer:
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
                 self.args)
 
-            self.optimizer = optimizer_cls(
-                learning_rate=self.lr_scheduler
-                if lr_scheduler is None else lr_scheduler,
-                apply_decay_param_fun=apply_decay_param_fun,
-                parameters=self.model.parameters(),
-                weight_decay=self.args.weight_decay,
-                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
-                **optimizer_kwargs)
+            if ShardingOption.SHARD_OP in self.args.sharding:
+                from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
+                self.optimizer = DygraphShardingOptimizer(
+                    hcg=fleet.get_hybrid_communicate_group(),
+                    user_defined_strategy=self.strategy,
+                    params=self.model.parameters(),
+                    inner_optimizer_class=optimizer_cls,
+                    learning_rate=self.lr_scheduler
+                    if lr_scheduler is None else lr_scheduler,
+                    apply_decay_param_fun=apply_decay_param_fun,
+                    weight_decay=self.args.weight_decay,
+                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
+                    **optimizer_kwargs)
+            else:
+                self.optimizer = optimizer_cls(
+                    learning_rate=self.lr_scheduler
+                    if lr_scheduler is None else lr_scheduler,
+                    apply_decay_param_fun=apply_decay_param_fun,
+                    parameters=self.model.parameters(),
+                    weight_decay=self.args.weight_decay,
+                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
+                    **optimizer_kwargs)
 
         return self.optimizer
 
@@ -962,8 +1065,6 @@ class Trainer:
         return self.lr_scheduler
 
     def _wrap_model(self, model, training=True):
-        if self.args.world_size > 1:
-            model = paddle.DataParallel(model)
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
@@ -973,6 +1074,44 @@ class Trainer:
         # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
         if not training:
             return model
+
+        # Multi-gpu training
+        if self.args.world_size > 1 and self.sharding is None:
+            model = paddle.DataParallel(model)
+            # Distributed training (should be after apex fp16 initialization)
+        if self.sharding is not None:
+            # Sharded DDP!
+            if ShardingOption.SHARD_OP in self.args.sharding:
+                model = fleet.distributed_model(model)
+                self.optimizer = fleet.distributed_optimizer(self.optimizer)
+            else:
+                ###### 3.dp通信组内广播参数，然后用sharding api封装
+                if self.args.dp_degree > 1:
+                    hcg = fleet.get_hybrid_communicate_group()
+                    dp_group = hcg.get_data_parallel_group()
+                    sync_params_buffers(model,
+                                        comm_group=dp_group,
+                                        src_rank=dp_group.ranks[0])
+
+                cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
+                assert self.optimizer is not None, "optimizer is empty!"
+                level = None
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                    level = "os_g"
+                if ShardingOption.FULL_SHARD in self.args.sharding:
+                    level = "p_g_os"
+
+                hcg = fleet.get_hybrid_communicate_group()
+                sharding_group = hcg.get_sharding_parallel_group()
+
+                model, optimizer, _ = group_sharded_parallel(
+                    model,
+                    self.optimizer,
+                    level=level,
+                    scaler=None,
+                    group=sharding_group,
+                    offload=cpu_offload)
+                self.optimizer = optimizer
 
         return model
 
