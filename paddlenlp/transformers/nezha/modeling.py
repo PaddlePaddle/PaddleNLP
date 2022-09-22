@@ -364,7 +364,6 @@ class NeZhaPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "nezha-base-chinese": {
             "vocab_size": 21128,
@@ -427,7 +426,6 @@ class NeZhaPretrainedModel(PretrainedModel):
             "use_relative_position": True
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "nezha-base-chinese":

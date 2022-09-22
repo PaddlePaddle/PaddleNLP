@@ -23,7 +23,7 @@ from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
 from model import UIE
-from utils import convert_example, reader, unify_prompt_name
+from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
 
 
 @paddle.no_grad()
@@ -60,28 +60,34 @@ def do_eval():
                            max_seq_len=args.max_seq_len,
                            lazy=False)
     class_dict = {}
+    relation_data = []
     if args.debug:
         for data in test_ds:
             class_name = unify_prompt_name(data['prompt'])
             # Only positive examples are evaluated in debug mode
             if len(data['result_list']) != 0:
-                class_dict.setdefault(class_name, []).append(data)
+                if "的" not in data['prompt']:
+                    class_dict.setdefault(class_name, []).append(data)
+                else:
+                    relation_data.append((data['prompt'], data))
+        relation_type_dict = get_relation_type_dict(relation_data)
     else:
         class_dict["all_classes"] = test_ds
+
+    trans_fn = partial(convert_example,
+                       tokenizer=tokenizer,
+                       max_seq_len=args.max_seq_len)
+
     for key in class_dict.keys():
         if args.debug:
             test_ds = MapDataset(class_dict[key])
         else:
             test_ds = class_dict[key]
-        test_ds = test_ds.map(
-            partial(convert_example,
-                    tokenizer=tokenizer,
-                    max_seq_len=args.max_seq_len))
-        test_batch_sampler = paddle.io.BatchSampler(dataset=test_ds,
-                                                    batch_size=args.batch_size,
-                                                    shuffle=False)
-        test_data_loader = paddle.io.DataLoader(
-            dataset=test_ds, batch_sampler=test_batch_sampler, return_list=True)
+
+        test_data_loader = create_data_loader(test_ds,
+                                              mode="test",
+                                              batch_size=args.batch_size,
+                                              trans_fn=trans_fn)
 
         metric = SpanEvaluator()
         precision, recall, f1 = evaluate(model, metric, test_data_loader)
@@ -89,6 +95,22 @@ def do_eval():
         logger.info("Class Name: %s" % key)
         logger.info("Evaluation Precision: %.5f | Recall: %.5f | F1: %.5f" %
                     (precision, recall, f1))
+
+    if args.debug and len(relation_type_dict.keys()) != 0:
+        for key in relation_type_dict.keys():
+            test_ds = MapDataset(relation_type_dict[key])
+
+            test_data_loader = create_data_loader(test_ds,
+                                                  mode="test",
+                                                  batch_size=args.batch_size,
+                                                  trans_fn=trans_fn)
+
+            metric = SpanEvaluator()
+            precision, recall, f1 = evaluate(model, metric, test_data_loader)
+            logger.info("-----------------------------")
+            logger.info("Class Name: X的%s" % key)
+            logger.info("Evaluation Precision: %.5f | Recall: %.5f | F1: %.5f" %
+                        (precision, recall, f1))
 
 
 if __name__ == "__main__":

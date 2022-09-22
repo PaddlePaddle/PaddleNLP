@@ -91,7 +91,13 @@ def read_local_dataset(path, label_list=None, is_test=False):
                 yield {'sentence': sentence}
             else:
                 items = line.strip().split('\t')
-                sentence = ''.join(items[:-1])
-                label = items[-1]
-                labels = [label_list[l] for l in label.split(',')]
+                if len(items) == 0:
+                    continue
+                elif len(items) == 1:
+                    sentence = items[0]
+                    labels = []
+                else:
+                    sentence = ''.join(items[:-1])
+                    label = items[-1]
+                    labels = [label_list[l] for l in label.split(',')]
                 yield {'sentence': sentence, 'label': labels}

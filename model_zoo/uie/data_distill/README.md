@@ -12,21 +12,41 @@
 
 ## 数据准备
 
-本项目中从CMeIE数据集中采样少量数据展示了UIE数据蒸馏流程，[示例数据下载](https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json)，解压后放在``../data``目录下。
+本项目中从CMeIE数据集中采样少量数据展示了UIE数据蒸馏流程，[示例数据下载](https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip)，解压后放在``../data``目录下。
+
+```shell
+wget https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip && unzip data.zip -d ../
+```
 
 示例数据包含以下两部分：
 
 | 名称 |  数量  |
 | :---: | :-----: |
-| 标注数据（doccano格式） | 200 |
-| 无标注数据 | 1277 |
+| doccano格式标注数据（doccano_ext.json）| 200 |
+| 无标注数据（unlabeled_data.txt）| 1277 |
 
 ## UIE Finetune
 
 参考[UIE主文档](../README.md)完成UIE模型微调。
 
+训练集/验证集切分：
+
 ```shell
-python finetune.py --train_path ./data/train.txt --dev_path ./data/dev.txt --learning_rate 5e-6 --batch_size 2
+python doccano.py \
+    --doccano_file ./data/doccano_ext.json \
+    --task_type ext \
+    --save_dir ./data \
+    --splits 0.8 0.2 0
+```
+
+模型微调：
+
+```shell
+python finetune.py \
+    --train_path ./data/train.txt \
+    --dev_path ./data/dev.txt \
+    --learning_rate 5e-6 \
+    --batch_size 2
 ```
 
 ## 离线蒸馏
@@ -34,7 +54,12 @@ python finetune.py --train_path ./data/train.txt --dev_path ./data/dev.txt --lea
 #### 通过训练好的UIE定制模型预测无监督数据的标签
 
 ```shell
-python data_distill.py --data_path ../data --save_dir student_data --task_type relation_extraction --synthetic_ratio 10 --model_path ../checkpoint/model_best
+python data_distill.py \
+    --data_path ../data \
+    --save_dir student_data \
+    --task_type relation_extraction \
+    --synthetic_ratio 10 \
+    --model_path ../checkpoint/model_best
 ```
 
 可配置参数说明：
@@ -121,13 +146,6 @@ python train.py \
           'text': '登革热'}]}]
 ```
 
-## 效果验证
-
-| 模型 |  Entity-F1  | SPO-F1 |
-| :---: | :--------: | :--------: |
-| UIE-Finetune | 78.57 | 56.25 |
-| GPLinker-ernie-3.0-mini-zh | 68.18 | 47.06 |
-| GPLinker-ernie-3.0-mini-zh + UIE数据蒸馏 | 76.38 | 50.42 |
 
 # References
 

@@ -40,7 +40,7 @@ def convert_to_features(example, tokenizer, label_vocab):
     tokens, labels = example
     tokenized_input = tokenizer(tokens,
                                 return_length=True,
-                                is_split_into_words=True)
+                                is_split_into_words='token')
     # Token '[CLS]' and '[SEP]' will get label 'O'
     labels = ['O'] + labels + ['O']
     tokenized_input['labels'] = [label_vocab[x] for x in labels]

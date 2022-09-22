@@ -19,6 +19,7 @@ limitations under the License. */
 #include "faster_tokenizer/postprocessors/postprocessors.h"
 #include "faster_tokenizer/pretokenizers/pretokenizers.h"
 #include "faster_tokenizer/utils/utils.h"
+#include "glog/logging.h"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
