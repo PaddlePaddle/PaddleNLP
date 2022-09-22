@@ -21,6 +21,21 @@ from paddle.nn import Layer, Embedding
 from ..nezha.modeling import ACT2FN
 from .. import PretrainedModel, register_base_model
 
+CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "Salesforce/codegen-350M-nl",
+    "Salesforce/codegen-350M-multi",
+    "Salesforce/codegen-350M-mono",
+    "Salesforce/codegen-2B-nl",
+    "Salesforce/codegen-2B-multi",
+    "Salesforce/codegen-2B-mono",
+    "Salesforce/codegen-6B-nl",
+    "Salesforce/codegen-6B-multi",
+    "Salesforce/codegen-6B-mono",
+    "Salesforce/codegen-16B-nl",
+    "Salesforce/codegen-16B-multi",
+    "Salesforce/codegen-16B-mono",
+]
+
 
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
     dim = x.shape[-1]
@@ -510,7 +525,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
     r"""
     CodeGen Model with a `language modeling` head on top.
     Args:
-        bart (:class:`CodeGenModel`):
+        transformer (:class:`CodeGenModel`):
             An instance of CodeGenModel.
     """
     _keys_to_ignore_on_load_missing = [
