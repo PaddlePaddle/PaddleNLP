@@ -288,10 +288,10 @@ class Trainer:
 
             if self.sharding is not None:
                 if ShardingOption.SHARD_OP in self.args.sharding:
-                    self.scaler = fleet.distributed_scaler(scaler)
+                    self.scaler = fleet.distributed_scaler(self.scaler)
                 else:
                     # scaler for stage2 and stage3
-                    if paddle.in_dygraph_mode():
+                    if paddle.fluid.framework.in_dygraph_mode():
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
                         self.scaler = GroupShardedScaler(self.scaler)
                     else:
