@@ -138,6 +138,10 @@ def parse_args():
         help=
         "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
     )
+    parser.add_argument("--weight_decay",
+                        default=None,
+                        type=float,
+                        help="Weight Decay for optimizer. ")
 
     # For benchmark.
     parser.add_argument(
@@ -223,7 +227,8 @@ def do_train(args):
                                           beta1=args.beta1,
                                           beta2=args.beta2,
                                           epsilon=float(args.eps),
-                                          parameters=transformer.parameters())
+                                          parameters=transformer.parameters(),
+                                          weight_decay=args.weight_decay)
 
         if args.is_distributed:
             build_strategy = paddle.static.BuildStrategy()
@@ -397,6 +402,8 @@ if __name__ == "__main__":
     args.is_distributed = ARGS.distributed
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.weight_decay = ARGS.weight_decay
+
     args.data_dir = ARGS.data_dir
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file

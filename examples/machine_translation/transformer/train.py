@@ -144,6 +144,10 @@ def parse_args():
         type=str,
         choices=['O1', 'O2'],
         help="The amp level if --use_amp is on. Can be one of [O1, O2]. ")
+    parser.add_argument("--weight_decay",
+                        default=None,
+                        type=float,
+                        help="Weight Decay for optimizer. ")
 
     # For benchmark.
     parser.add_argument(
@@ -213,7 +217,7 @@ def do_train(args):
                                           beta2=args.beta2,
                                           epsilon=float(args.eps),
                                           parameters=transformer.parameters(),
-                                          weight_decay=0.0001)
+                                          weight_decay=args.weight_decay)
     else:
         optimizer = paddle.optimizer.Adam(learning_rate=scheduler,
                                           beta1=args.beta1,
@@ -221,7 +225,7 @@ def do_train(args):
                                           epsilon=float(args.eps),
                                           parameters=transformer.parameters(),
                                           use_multi_tensor=True,
-                                          weight_decay=0.0001)
+                                          weight_decay=args.weight_decay)
 
     # Init from some checkpoint, to resume the previous training
     if args.init_from_checkpoint:
@@ -435,6 +439,8 @@ if __name__ == "__main__":
             args.use_amp = False
     if ARGS.amp_level:
         args.use_pure_fp16 = ARGS.amp_level == 'O2'
+    args.weight_decay = ARGS.weight_decay
+
     args.data_dir = ARGS.data_dir
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
