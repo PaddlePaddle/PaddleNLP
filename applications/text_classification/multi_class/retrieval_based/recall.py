@@ -22,7 +22,6 @@ import random
 import time
 
 import numpy as np
-import hnswlib
 import paddle
 import paddle.nn.functional as F
 from paddlenlp.data import Stack, Tuple, Pad
@@ -33,7 +32,7 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 from base_model import SemanticIndexBase
 from data import convert_corpus_example, create_dataloader
 from data import gen_id2corpus, gen_text_file
-from ann_util import build_index
+from data import build_index
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -63,7 +62,7 @@ parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
                     help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--model_name_or_path",default='rocketqa-zh-dureader-query-encoder',type=str,help='The pretrained model used for training')
+parser.add_argument("--model_name_or_path", default='rocketqa-zh-dureader-query-encoder', type=str, help='The pretrained model used for training')
 args = parser.parse_args()
 # yapf: enable
 
@@ -105,7 +104,12 @@ if __name__ == "__main__":
                                            trans_fn=trans_func)
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
-    final_index = build_index(args, corpus_data_loader, inner_model)
+    final_index = build_index(corpus_data_loader,
+                              inner_model,
+                              output_emb_size=args.output_emb_size,
+                              hnsw_max_elements=args.hnsw_max_elements,
+                              hnsw_ef=args.hnsw_ef,
+                              hnsw_m=args.hnsw_m)
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
     query_ds = MapDataset(text_list)
     query_data_loader = create_dataloader(query_ds,
