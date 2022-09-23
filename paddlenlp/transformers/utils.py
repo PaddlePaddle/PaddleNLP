@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, TYPE_CHECKING
-from copy import deepcopy
+import os
 import functools
 import inspect
+from copy import deepcopy
 import warnings
 
-import paddle
 from paddle.nn import Layer
-
-if TYPE_CHECKING:
-    from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
 
 
 def fn_args_to_dict(func, *args, **kwargs):
@@ -206,3 +204,28 @@ def param_in_init(func, param_field: str) -> bool:
         result = inspect.getargspec(func)
 
     return param_field in result[0]
+
+
+def resolve_cache_dir(pretrained_model_name_or_path: str, kwargs: dict,
+                      pretrained_init_configuration: dict) -> str:
+    """resolve cache dir for PretrainedModel and PretrainedConfig
+
+    Args:
+        pretrained_model_name_or_path (str): the name or path of pretrained model
+        kwargs (dict): the kwargs of method
+        pretrained_init_configuration (dict): the pretrained init configuration
+    """
+    cache_dir = kwargs.pop("cache_dir", None)
+    if cache_dir is not None:
+        return cache_dir
+
+    if os.path.isdir(pretrained_model_name_or_path):
+        return pretrained_model_name_or_path
+
+    if pretrained_model_name_or_path in pretrained_init_configuration:
+        cache_dir = os.path.join(MODEL_HOME, pretrained_init_configuration)
+    else:
+        cache_dir = os.path.join(COMMUNITY_MODEL_PREFIX,
+                                 pretrained_init_configuration)
+
+    return cache_dir

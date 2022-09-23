@@ -1157,9 +1157,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 **kwargs,
             )
 
-        config.save_pretrained(cache_dir)
         # 2. init the model
-        model = cls(config=config, **model_kwargs)
+        init_args = config['init_args'] or ()
+        model = cls(config, *init_args, **model_kwargs)
 
         # 3. resolve model_weight file
         model_weight_file = cls._resolve_model_file_path(

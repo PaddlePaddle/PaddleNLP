@@ -30,6 +30,9 @@ import copy
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
 
 from packaging import version
+from paddlenlp.transformers.utils import resolve_cache_dir
+
+from paddlenlp.utils.env import MODEL_HOME
 
 from ..utils import CONFIG_NAME
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, is_url, get_path_from_url
@@ -38,7 +41,6 @@ from paddlenlp.utils.log import logger
 from paddlenlp import __version__
 
 if TYPE_CHECKING:
-    from paddlenlp.transformers.model_utils import PretrainedModel
     from paddlenlp.transformers.model_utils import PretrainedModel
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
@@ -146,7 +148,7 @@ def cached_path(
         # URL, so get it from the cache (downloading if necessary)
         output_path = get_path_from_url(
             url_or_filename,
-            cache_dir=cache_dir,
+            root_dir=cache_dir,
         )
     elif os.path.exists(url_or_filename):
         # File, and it exists.
@@ -188,31 +190,25 @@ def flatten_model_config(config: dict) -> dict:
     """
     # 1. extract the init_args into the top level
     init_args = config.pop('init_args', [])
-    for init_arg in init_args:
-        for key, value in init_arg.items():
-            if key not in config:
-                config[key] = value
+
+    index = 0
+    while index < len(init_args):
+        if isinstance(init_args[index], dict):
+            for key, value in init_args[index].items():
+                if key not in config:
+                    config[key] = value
+            init_args.pop(index)
+        else:
+            index += 1
+
+    if init_args:
+        config['init_args'] = init_args
 
     # 2. convert `init_class` into `architectures`
     if 'init_class' in config:
         config['architectures'] = [config.pop('init_class')]
 
     return config
-
-
-def is_community_model_name(model_name: str) -> Optional[bool]:
-    """check if the model_name is community-contributed pretrained model
-
-    Args:
-        model_name (str): model name, which can be: bert-base-uncased, facebook/opt-125m
-
-    Returns:
-        Optional[bool]: if the model name is community-contributed based. if it's None, it means can not detect the type
-    """
-    if os.path.isdir(model_name) or is_url(model_name):
-        return None
-
-    return len(model_name.split('/')) == 2
 
 
 class PretrainedConfig:
@@ -436,10 +432,10 @@ class PretrainedConfig:
 
     def __init__(self, **kwargs):
         # Attributes with defaults
-
         # map the old attr to new atr, eg: num_classes -> num_labels
+        kwargs = attribute_map(self, kwargs=kwargs)
 
-        self.return_dict = kwargs.pop("return_dict", True)
+        self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.pruned_heads = kwargs.pop("pruned_heads", {})
@@ -501,6 +497,8 @@ class PretrainedConfig:
             # Keys are always strings in JSON so convert ids to int here.
         else:
             self.num_labels = kwargs.pop("num_labels", 2)
+
+        self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 
         # Tokenizer arguments TODO: eventually tokenizer and models should share the same config
         self.tokenizer_class = kwargs.pop("tokenizer_class", None)
@@ -724,6 +722,8 @@ class PretrainedConfig:
                                                                    os.PathLike],
                          **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, kwargs,
+                                      cls.pretrained_init_configuration)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -764,7 +764,7 @@ class PretrainedConfig:
                                          pretrained_model_name_or_path,
                                          CONFIG_NAME)
             assert is_url(community_url)
-            return cls._get_config_dict(community_url)
+            return cls._get_config_dict(community_url, cache_dir=cache_dir)
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
             # Load config dict

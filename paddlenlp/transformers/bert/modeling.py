@@ -124,7 +124,6 @@ class BertPooler(Layer):
         return pooled_output
 
 
-@register_base_model
 class BertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained BERT models. It provides BERT related
@@ -163,6 +162,7 @@ class BertPretrainedModel(PretrainedModel):
             layer._epsilon = self.config.layer_norm_eps
 
 
+@register_base_model
 class BertModel(BertPretrainedModel):
     """
     The bare BERT Model transformer outputting raw hidden-states.
@@ -948,11 +948,7 @@ class BertForPretraining(BertPretrainedModel):
 
     """
 
-    def __init__(self, config: Optional[BertConfig] = None, *args, **kwargs):
-        config, bert = parse_config(config_or_model=config,
-                                    config_class=BertConfig,
-                                    args=args,
-                                    kwargs=kwargs)
+    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
         super(BertForPretraining, self).__init__(config)
         self.bert = bert if bert is not None else BertModel(config)
         self.cls = BertPretrainingHeads(
