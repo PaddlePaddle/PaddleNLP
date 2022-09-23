@@ -204,10 +204,14 @@ def _replace_auto_model_forward(self):
 def _recover_auto_model_forward(self):
 
     def init_func(layer):
-        if isinstance(layer, self.base_model_class):
+        if isinstance(
+                layer, self.base_model_class
+                if not isinstance(self, paddle.DataParallel) else
+                self._layers.base_model_class):
             layer.forward = layer._ori_forward
 
-    for layer in self.children():
+    for layer in self._layers.children() if isinstance(
+            self, paddle.DataParallel) else self.children():
         layer.apply(init_func)
     return self
 
@@ -293,7 +297,10 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         if self.custom_dynabert_evaluate is not None:
             return self.custom_dynabert_evaluate(model, data_loader)
         if isinstance(model, OFA):
-            class_name = model.model.__class__.__name__
+            if isinstance(model.model, paddle.DataParallel):
+                class_name = model.model._layers.__class__.__name__
+            else:
+                class_name = model.model.__class__.__name__
         else:
             class_name = model.__class__.__name__
         if "SequenceClassification" in class_name:
@@ -488,9 +495,12 @@ def _dynabert_export(self, ofa_model):
     ofa_model._add_teacher = False
     ofa_model, ofa_model.model = _recover_transformer_func(
         ofa_model), _recover_transformer_func(ofa_model.model)
-
-    ori_num_heads = ofa_model.model.base_model.encoder.layers[
-        0].self_attn.num_heads
+    if isinstance(ofa_model.model, paddle.DataParallel):
+        ori_num_heads = ofa_model.model._layers.base_model.encoder.layers[
+            0].self_attn.num_heads
+    else:
+        ori_num_heads = ofa_model.model.base_model.encoder.layers[
+            0].self_attn.num_heads
     for width_mult in self.args.width_mult_list:
         model_dir = os.path.join(self.args.output_dir,
                                  "width_mult_" + str(round(width_mult, 2)))
@@ -521,8 +531,12 @@ def _dynabert_export(self, ofa_model):
         net = paddle.jit.to_static(origin_model_new, input_spec=input_shape)
         paddle.jit.save(net, pruned_infer_model_dir)
         # Recover num_heads of ofa_model.model
-        for layer in ofa_model.model.base_model.encoder.layers:
-            layer.self_attn.num_heads = ori_num_heads
+        if isinstance(ofa_model.model, paddle.DataParallel):
+            for layer in ofa_model.model._layers.base_model.encoder.layers:
+                layer.self_attn.num_heads = ori_num_heads
+        else:
+            for layer in ofa_model.model.base_model.encoder.layers:
+                layer.self_attn.num_heads = ori_num_heads
     logger.info("Pruned models have been exported.")
 
 
