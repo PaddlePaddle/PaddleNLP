@@ -18,7 +18,6 @@ limitations under the License. */
 #include <string>
 #include <vector>
 #include "faster_tokenizer/core/base.h"
-#include "glog/logging.h"
 #include "faster_tokenizer/utils/utils.h"
 
 namespace re2 {

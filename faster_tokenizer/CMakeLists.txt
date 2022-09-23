@@ -102,7 +102,7 @@ endforeach()
 
 ELSE(WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
-    IF (LINUX)
+    IF (NOT APPLE)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ldl -lpthread")
     ENDIF()
     set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
@@ -110,7 +110,7 @@ ENDIF(WIN32)
 
 # For OpenMP
 # openmp not support well for now on windows
-if (LINUX)
+if (NOT APPLE AND NOT WIN32) # Linux
     find_package(OpenMP)
     if (OPENMP_FOUND)
         add_definitions(-DWITH_OMP)
@@ -143,7 +143,7 @@ if(WITH_PYTHON)
 
 add_subdirectory(python)
 
-if(LINUX)
+if (NOT APPLE AND NOT WIN32) # Linux
 add_custom_target(build_tokenizers_bdist_wheel ALL
     COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel --plat-name=manylinux1_x86_64
     COMMENT "Packing whl packages------>>>"
@@ -168,6 +168,8 @@ file(COPY ${PROJECT_SOURCE_DIR}/FasterTokenizer.cmake DESTINATION ${CPP_PACKAGE_
 # copy headers
 file(COPY ${PROJECT_SOURCE_DIR}/faster_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/include/faster_tokenizer/
     FILES_MATCHING PATTERN "*.h"
+    PATTERN "test" EXCLUDE
+    PATTERN "demo" EXCLUDE
     PATTERN "pybind" EXCLUDE)
 
 add_custom_target(copy_third_party_headers ALL
@@ -175,11 +177,6 @@ add_custom_target(copy_third_party_headers ALL
     ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR}
     ${GLOG_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${RE2_INCLUDE_DIR}
     ${CPP_PACKAGE_DIR}/third_party/include
-    DEPENDS build_cpp_package_dir)
-
-add_custom_target(copy_boost_headers ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory 
-    ${BOOST_INCLUDE_DIR}/boost ${CPP_PACKAGE_DIR}/third_party/include/boost
     DEPENDS build_cpp_package_dir)
 
 # copy library

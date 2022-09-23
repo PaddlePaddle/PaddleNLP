@@ -1,4 +1,3 @@
-# coding=utf-8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 Mesh TensorFlow authors, T5 Authors and HuggingFace Inc. team.
 #
@@ -13,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import math
+from typing import Optional, Tuple, Union, List
 
 import numpy as np
 import paddle
+from paddle import Tensor
 
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -26,9 +28,14 @@ from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
 
 __all__ = [
-    'T5Model',
-    "T5PretrainedModel",
-    'T5ForConditionalGeneration',
+    'T5Model', "T5PretrainedModel", 'T5ForConditionalGeneration',
+    'T5EncoderModel'
+]
+
+T5_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "t5-small",
+    "t5-base",
+    "t5-large",
 ]
 
 
@@ -107,6 +114,27 @@ class T5DenseGatedGeluDense(nn.Layer):
         return hidden_states
 
 
+class T5DenseGatedSiluDense(nn.Layer):
+    """
+    Construct a dense-gated_gelu-dense module.
+    """
+
+    def __init__(self, d_model, d_ff, dropout_rate):
+        super().__init__()
+        self.wi_0 = nn.Linear(d_model, d_ff, bias_attr=False)
+        self.wi_1 = nn.Linear(d_model, d_ff, bias_attr=False)
+        self.wo = nn.Linear(d_ff, d_model, bias_attr=False)
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, hidden_states):
+        hidden_silu = F.silu(self.wi_0(hidden_states))
+        hidden_linear = self.wi_1(hidden_states)
+        hidden_states = hidden_silu * hidden_linear
+        hidden_states = self.dropout(hidden_states)
+        hidden_states = self.wo(hidden_states)
+        return hidden_states
+
+
 class T5LayerFF(nn.Layer):
 
     def __init__(self, feed_forward_proj, d_model, d_ff, layer_norm_epsilon,
@@ -116,6 +144,9 @@ class T5LayerFF(nn.Layer):
             self.DenseReluDense = T5DenseReluDense(d_model, d_ff, dropout_rate)
         elif feed_forward_proj == "gated-gelu":
             self.DenseReluDense = T5DenseGatedGeluDense(d_model, d_ff,
+                                                        dropout_rate)
+        elif feed_forward_proj == "gated-silu":
+            self.DenseReluDense = T5DenseGatedSiluDense(d_model, d_ff,
                                                         dropout_rate)
         else:
             raise ValueError(
@@ -522,6 +553,7 @@ class T5Block(nn.Layer):
             output_attentions=output_attentions,
         )
         hidden_states, present_key_value_state = self_attention_outputs[:2]
+
         attention_outputs = self_attention_outputs[
             2:]  # Keep self-attention outputs and relative position weights
 
@@ -601,7 +633,6 @@ class T5PretrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "t5"
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "t5-small": {
@@ -695,7 +726,6 @@ class T5PretrainedModel(PretrainedModel):
             "feed_forward_proj": "gated-gelu",
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "t5-small":
@@ -991,7 +1021,7 @@ class T5Stack(nn.Layer):
 
             # layer_outputs is a tuple with:
             # hidden-states, key-value-states, (self-attention position bias), (self-attention weights), (cross-attention position bias), (cross-attention weights)
-            if use_cache is False:
+            if not use_cache:
                 layer_outputs = layer_outputs[:1] + (None, ) + layer_outputs[1:]
 
             hidden_states, present_key_value_state = layer_outputs[:2]
@@ -1042,8 +1072,6 @@ class T5Stack(nn.Layer):
                 causal_mask = paddle.tile(seq_ids.unsqueeze(axis=[0, 1]),
                                           [batch_size, seq_length, 1
                                            ]) <= seq_ids.unsqueeze(axis=[0, 2])
-                # in case cache are used we need to add a prefix ones mask to the causal mask
-                # causal and attention masks must have same type with pytorch version < 1.3
                 causal_mask = causal_mask.astype(attention_mask.dtype)
 
                 if causal_mask.shape[1] < attention_mask.shape[1]:
@@ -1064,6 +1092,35 @@ class T5Stack(nn.Layer):
                     1) * attention_mask.unsqueeze([1, 2])
             else:
                 extended_attention_mask = attention_mask.unsqueeze([1, 2])
+        elif attention_mask.ndim == 4:
+            if self.is_decoder:
+                batch_size, seq_length = input_shape
+                seq_ids = paddle.arange(seq_length)
+                causal_mask = paddle.tile(seq_ids.unsqueeze(axis=[0, 1]),
+                                          [batch_size, seq_length, 1
+                                           ]) <= seq_ids.unsqueeze(axis=[0, 2])
+                # in case cache are used we need to add a prefix ones mask to the causal mask
+                # causal and attention masks must have same type with pytorch version < 1.3
+                causal_mask = causal_mask.astype(attention_mask.dtype)
+
+                if causal_mask.shape[1] < attention_mask.shape[-1]:
+                    prefix_seq_len = attention_mask.shape[
+                        1] - causal_mask.shape[1]
+                    causal_mask = paddle.concat(
+                        [
+                            paddle.ones(
+                                [batch_size, seq_length, prefix_seq_len],
+                                dtype=causal_mask.dtype,
+                            ),
+                            causal_mask,
+                        ],
+                        axis=-1,
+                    )
+
+                extended_attention_mask = causal_mask.unsqueeze(
+                    1) * attention_mask
+            else:
+                extended_attention_mask = attention_mask
         else:
             raise ValueError(
                 f"Wrong shape for input_ids (shape {input_shape}) or attention_mask (shape {attention_mask.shape})"
@@ -1074,10 +1131,12 @@ class T5Stack(nn.Layer):
         return extended_attention_mask
 
     def invert_attention_mask(self, encoder_attention_mask):
-        if encoder_attention_mask.ndim == 3:
+        if encoder_attention_mask.ndim == 4:
+            encoder_extended_attention_mask = encoder_attention_mask
+        elif encoder_attention_mask.ndim == 3:
             encoder_extended_attention_mask = encoder_attention_mask.unsqueeze(
                 1)
-        if encoder_attention_mask.ndim == 2:
+        elif encoder_attention_mask.ndim == 2:
             encoder_extended_attention_mask = encoder_attention_mask.unsqueeze(
                 [1, 2])
         encoder_extended_attention_mask = encoder_extended_attention_mask.astype(
@@ -1177,6 +1236,13 @@ class T5Model(T5PretrainedModel):
         self.d_kv = d_kv
         self.d_model = d_model
         self.initializer_factor = initializer_factor
+
+        if num_decoder_layers is None and num_layers is None:
+            raise ValueError(
+                "You have to specify either num_decoder_layers or num_layers or both."
+            )
+        elif num_decoder_layers is None:
+            num_decoder_layers = num_layers
 
         self.shared = nn.Embedding(vocab_size, d_model)
         self.encoder = T5Stack(d_model,
@@ -1403,9 +1469,10 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         self.lm_head = new_embeddings
 
     def get_output_embeddings(self):
-        if not self.t5.config["tie_word_embeddings"]:
+        if self.t5.config["tie_word_embeddings"]:
             return self.t5.shared
-        return self.lm_head
+        else:
+            return self.lm_head
 
     def get_encoder(self):
         return self.t5.encoder
@@ -1516,7 +1583,10 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states)
 
-        hidden_states = encoder_output[0]
+        if isinstance(encoder_output, (tuple, list)):
+            hidden_states = encoder_output[0]
+        else:
+            hidden_states = encoder_output
 
         if labels is not None and decoder_input_ids is None:
             # get decoder inputs from shifting lm labels to the right
@@ -1560,6 +1630,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             loss = loss_fct(lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
                             labels.flatten())
+
+        if not isinstance(encoder_output, (list, tuple)):
+            encoder_output = (encoder_output, )
 
         output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
         return ((loss, ) + output) if loss is not None else output
@@ -1659,3 +1732,104 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class T5EncoderModel(T5PretrainedModel):
+    base_model_class = None
+
+    def __init__(self,
+                 vocab_size=32128,
+                 d_model=768,
+                 d_kv=64,
+                 d_ff=3072,
+                 num_layers=12,
+                 num_heads=12,
+                 relative_attention_num_buckets=32,
+                 dropout_rate=0.1,
+                 layer_norm_epsilon=1e-06,
+                 feed_forward_proj="relu",
+                 is_decoder: bool = False,
+                 **kwargs):
+        super().__init__()
+        self.config = {
+            "vocab_size": vocab_size,
+            "d_model": d_model,
+            "d_kv": d_kv,
+            "d_ff": d_ff,
+            "num_layers": num_layers,
+            "num_heads": num_heads,
+            "relative_attention_num_buckets": relative_attention_num_buckets,
+            "dropout_rate": dropout_rate,
+            "layer_norm_epsilon": layer_norm_epsilon,
+            "feed_forward_proj": feed_forward_proj,
+            "is_decoder": is_decoder,
+        }
+        self.config.update(kwargs)
+        self.shared = nn.Embedding(vocab_size, d_model)
+
+        self.use_cache = False
+        self.is_encoder_decoder = False
+        self.encoder = T5Stack(d_model,
+                               num_layers,
+                               layer_norm_epsilon,
+                               dropout_rate,
+                               relative_attention_num_buckets,
+                               d_kv,
+                               num_heads,
+                               feed_forward_proj,
+                               d_ff,
+                               embed_tokens=self.shared,
+                               is_decoder=is_decoder)
+
+        # Initialize weights and apply final processing
+        self.init_weights()
+
+    def _post_init(self, *args, **kwargs):
+        """
+        **prevent the `config` property to be assigned**
+
+        It would be hooked after `__init__` to add a dict including arguments of
+        `__init__` as a attribute named `config` of the pretrained model instance.
+        """
+        pass
+
+    @property
+    def t5(self):
+        return self
+
+    def get_input_embeddings(self):
+        return self.shared
+
+    def set_input_embeddings(self, new_embeddings):
+        self.shared = new_embeddings
+        self.encoder.set_input_embeddings(new_embeddings)
+
+    def get_encoder(self):
+        return self.encoder
+
+    def forward(
+        self,
+        input_ids: Tensor = None,
+        attention_mask: Optional[Tensor] = None,
+        encoder_hidden_states: Optional[Tuple[Tensor]] = None,
+        encoder_attention_mask: Optional[Tensor] = None,
+        cache=None,
+        use_cache: Optional[bool] = False,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
+    ):
+        encoder_outputs = self.encoder(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            cache=cache,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+
+        return encoder_outputs
+
+
+T5EncoderModel.base_model_class = T5EncoderModel

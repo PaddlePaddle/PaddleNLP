@@ -88,6 +88,8 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-1.0-base-zh-cw":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_base_zh_cw_vocab.txt",
             "ernie-1.0-large-zh-cw":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
             "ernie-tiny":
@@ -169,6 +171,9 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-1.0-base-zh": {
+            "do_lower_case": True
+        },
+        "ernie-1.0-base-zh-cw": {
             "do_lower_case": True
         },
         "ernie-1.0-large-zh-cw": {
@@ -286,6 +291,7 @@ class ErnieTokenizer(PretrainedTokenizer):
     max_model_input_sizes = {
         "ernie-1.0": 513,
         "ernie-1.0-base-zh": 513,
+        "ernie-1.0-base-zh-cw": 512,
         "ernie-1.0-large-zh-cw": 512,
         "ernie-tiny": 600,
         "ernie-2.0-base-zh": 513,

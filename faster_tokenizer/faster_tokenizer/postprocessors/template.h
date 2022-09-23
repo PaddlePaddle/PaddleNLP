@@ -18,11 +18,10 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 
-#include "boost/variant.hpp"
-#include "glog/logging.h"
-#include "nlohmann/json.hpp"
 #include "faster_tokenizer/postprocessors/postprocessor.h"
 #include "faster_tokenizer/utils/utils.h"
+#include "faster_tokenizer/utils/variant.h"
+#include "nlohmann/json.hpp"
 
 namespace paddlenlp {
 namespace faster_tokenizer {
@@ -37,7 +36,8 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SequenceType,
 using TemplateSequence = std::pair<SequenceType, uint32_t>;
 using TemplateSpecialToken = std::pair<std::string, uint32_t>;
 
-using TemplatePiece = boost::variant<TemplateSequence, TemplateSpecialToken>;
+using TemplatePiece =
+    paddlenlp::variant<TemplateSequence, TemplateSpecialToken>;
 void to_json(nlohmann::json& j, const TemplatePiece& template_piece);
 void from_json(const nlohmann::json& j, TemplatePiece& template_piece);
 
@@ -119,10 +119,10 @@ private:
     for (auto&& piece : pieces) {
       TemplatePiece template_piece;
       GetTemplatePieceFromString(piece, &template_piece);
-      if (boost::get<TemplateSequence>(&template_piece)) {
-        pieces_.push_back(boost::get<TemplateSequence>(template_piece));
+      if (paddlenlp::get_if<TemplateSequence>(&template_piece)) {
+        pieces_.push_back(paddlenlp::get<TemplateSequence>(template_piece));
       } else {
-        pieces_.push_back(boost::get<TemplateSpecialToken>(template_piece));
+        pieces_.push_back(paddlenlp::get<TemplateSpecialToken>(template_piece));
       }
     }
   }

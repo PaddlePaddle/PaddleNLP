@@ -55,7 +55,7 @@ def on_change_text():
 def main():
 
     st.set_page_config(
-        page_title="PaddleNLP 智能问答",
+        page_title="PaddleNLP Pipelines 智能问答",
         page_icon=
         "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
@@ -73,7 +73,7 @@ def main():
         st.session_state.raw_json = None
 
     # Title
-    st.write("# PaddleNLP 智能问答")
+    st.write("# PaddleNLP Pipelines 智能问答")
     # Sidebar
     st.sidebar.header("选项")
     top_k_retriever = st.sidebar.slider(
@@ -85,14 +85,7 @@ def main():
         on_change=reset_results,
     )
 
-    top_k_ranker = st.sidebar.slider(
-        "最大排序数量",
-        min_value=1,
-        max_value=50,
-        value=DEFAULT_DOCS_FROM_RANKER,
-        step=1,
-        on_change=reset_results,
-    )
+    top_k_ranker = 1
 
     top_k_reader = st.sidebar.slider(
         "最大的答案的数量",
