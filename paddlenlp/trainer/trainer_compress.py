@@ -473,7 +473,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir_width)
-                logger.info("Best acc of width_mult %.2f: %.4f" %
+                logger.info("Best result of width_mult %.2f: %.4f" %
                             (width_mult, best_acc[idx]))
                 return ofa_model
 
