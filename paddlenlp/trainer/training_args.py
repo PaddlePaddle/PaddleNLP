@@ -648,6 +648,8 @@ class TrainingArguments:
                 "The world size for workers should be divided by sharding_degree, "
                 "sharding_degree:{sharding_degree}, world_size:{self.world_size}"
             )
+            if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
+                warnings.warn("`offload` and `stage3` is not supported NOW!")
 
         if self.report_to is None:
             logger.info(

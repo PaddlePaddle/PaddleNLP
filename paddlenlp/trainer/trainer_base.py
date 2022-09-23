@@ -225,6 +225,9 @@ class Trainer:
                 }
                 self.strategy = strategy
                 fleet.init(is_collective=True, strategy=strategy)
+                self.hcg = fleet.get_hybrid_communicate_group()
+                self.dp_group = self.hcg.get_data_parallel_group()
+                self.sharding_group = self.hcg.get_sharding_parallel_group()
 
             elif not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
             ):
@@ -627,6 +630,11 @@ class Trainer:
                         args, self.state, self.control)
 
                 dp_enabled = self.args.dp_degree > 1 if self.sharding else args.local_rank != -1
+                if self.sharding and (ShardingOption.SHARD_OP
+                                      not in self.args.sharding):
+                    # stage2 and stage3 with no_sync
+                    dp_enabled = False
+
                 is_no_sync = (
                     (((step + 1) % args.gradient_accumulation_steps != 0)
                      and dp_enabled and args._no_sync_in_gradient_accumulation)
@@ -659,21 +667,26 @@ class Trainer:
                             fleet.get_hybrid_communicate_group())
                         if ShardingOption.FULL_SHARD in self.args.sharding:
                             # Why need sync on parm again ?
-                            hcg = fleet.get_hybrid_communicate_group()
-                            dp_group = hcg.get_data_parallel_group()
+                            # TODO: fix this.
                             for p in model.parameters():
                                 if hasattr(p, "bw_storage"):
                                     assert p.grad is None, "This case shouldn't happen."
-                                    p.bw_storage.scale_(1.0 / dp_group.nranks)
+                                    p.bw_storage.scale_(1.0 /
+                                                        self.dp_group.nranks)
                                     paddle.distributed.all_reduce(
-                                        p.bw_storage, group=dp_group)
+                                        p.bw_storage, group=self.dp_group)
 
                     elif (args.recompute and args.local_rank != -1):
                         fused_allreduce_gradients(list(model.parameters()),
                                                   None)
 
                     if self.do_grad_scaling:
-                        self.scaler.minimize(self.optimizer, tr_loss)
+                        # TODO: fix sharding stage2 stage3 with original scaler useage.
+                        if self.sharding is not None and ShardingOption.SHARD_OP not in self.args.sharding:
+                            self.scaler.step(self.optimizer)
+                            self.scaler.update()
+                        else:
+                            self.scaler.minimize(self.optimizer, tr_loss)
                     else:
                         self.optimizer.step()
 
@@ -1101,15 +1114,12 @@ class Trainer:
                 if ShardingOption.FULL_SHARD in self.args.sharding:
                     level = "p_g_os"
 
-                hcg = fleet.get_hybrid_communicate_group()
-                sharding_group = hcg.get_sharding_parallel_group()
-
                 model, optimizer, _ = group_sharded_parallel(
                     model,
                     self.optimizer,
                     level=level,
                     scaler=None,
-                    group=sharding_group,
+                    group=self.sharding_group,
                     offload=cpu_offload)
                 self.optimizer = optimizer
 
@@ -1256,11 +1266,25 @@ class Trainer:
 
         self.save_model(output_dir)
 
+        if self.sharding is not None:
+            if self.dp_group.rank == 0:
+                paddle.save(
+                    self.optimizer.state_dict(),
+                    os.path.join(
+                        output_dir,
+                        OPTIMIZER_NAME + f"_shard{self.sharding_group.rank}"))
+
         if self.args.should_save:
-            paddle.save(self.optimizer.state_dict(),
-                        os.path.join(output_dir, OPTIMIZER_NAME))
+            if self.sharding is not None:
+                # alias for opitimizer state, should be merge on different shard!
+                paddle.save({}, os.path.join(output_dir, OPTIMIZER_NAME))
+            else:
+                paddle.save(self.optimizer.state_dict(),
+                            os.path.join(output_dir, OPTIMIZER_NAME))
+
             paddle.save(self.lr_scheduler.state_dict(),
                         os.path.join(output_dir, SCHEDULER_NAME))
+
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(),
                             os.path.join(output_dir, SCALER_NAME))
@@ -1411,8 +1435,21 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME)) and os.path.isfile(
                     os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(
-                paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME)))
+            if self.sharding is not None:
+                self.optimizer.set_state_dict(
+                    paddle.load(
+                        os.path.join(
+                            checkpoint, OPTIMIZER_NAME +
+                            f"_shard{self.sharding_group.rank}")))
+                empty_dict = paddle.load(os.path.join(checkpoint,
+                                                      OPTIMIZER_NAME),
+                                         return_numpy=True)
+                assert len(
+                    empty_dict
+                ) == 0, "Optimizer file of sharding, should be empty!"
+            else:
+                self.optimizer.set_state_dict(
+                    paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME)))
             self.lr_scheduler.set_state_dict(
                 paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(
