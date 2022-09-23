@@ -681,42 +681,47 @@ def convert_ext_examples(raw_examples,
                     redundants1 = inverse_relation_list[i]
 
                     # 2. entity_name_set ^ subject_goldens[i]
-                    nonentity_list = list(
-                        set(entity_name_set) ^ set(subject_goldens[i]))
-                    nonentity_list.sort()
+                    redundants2 = []
+                    if len(predicate_list[i]) != 0:
+                        nonentity_list = list(
+                            set(entity_name_set) ^ set(subject_goldens[i]))
+                        nonentity_list.sort()
 
-                    if schema_lang == "zh":
-                        redundants2 = [
-                            nonentity + "的" +
-                            predicate_list[i][random.randrange(
-                                len(predicate_list[i]))]
-                            for nonentity in nonentity_list
-                        ]
-                    else:
-                        redundants2 = [
-                            predicate_list[i][random.randrange(
-                                len(predicate_list[i]))] + " of " + nonentity
-                            for nonentity in nonentity_list
-                        ]
+                        if schema_lang == "zh":
+                            redundants2 = [
+                                nonentity + "的" +
+                                predicate_list[i][random.randrange(
+                                    len(predicate_list[i]))]
+                                for nonentity in nonentity_list
+                            ]
+                        else:
+                            redundants2 = [
+                                predicate_list[i][random.randrange(
+                                    len(predicate_list[i]))] + " of " +
+                                nonentity for nonentity in nonentity_list
+                            ]
 
                     # 3. entity_label_set ^ entity_prompts[i]
-                    non_ent_label_list = list(
-                        set(entity_label_set) ^ set(entity_prompts[i]))
-                    non_ent_label_list.sort()
+                    redundants3 = []
+                    if len(subject_goldens[i]) != 0:
+                        non_ent_label_list = list(
+                            set(entity_label_set) ^ set(entity_prompts[i]))
+                        non_ent_label_list.sort()
 
-                    if schema_lang == "zh":
-                        redundants3 = [
-                            subject_goldens[i][random.randrange(
-                                len(subject_goldens[i]))] + "的" + non_ent_label
-                            for non_ent_label in non_ent_label_list
-                        ]
-                    else:
-                        redundants3 = [
-                            non_ent_label + " of " +
-                            subject_goldens[i][random.randrange(
-                                len(subject_goldens[i]))]
-                            for non_ent_label in non_ent_label_list
-                        ]
+                        if schema_lang == "zh":
+                            redundants3 = [
+                                subject_goldens[i][random.randrange(
+                                    len(subject_goldens[i]))] + "的" +
+                                non_ent_label
+                                for non_ent_label in non_ent_label_list
+                            ]
+                        else:
+                            redundants3 = [
+                                non_ent_label + " of " +
+                                subject_goldens[i][random.randrange(
+                                    len(subject_goldens[i]))]
+                                for non_ent_label in non_ent_label_list
+                            ]
 
                     redundants_list = [redundants1, redundants2, redundants3]
 
