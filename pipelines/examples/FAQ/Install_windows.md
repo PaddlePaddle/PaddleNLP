@@ -27,7 +27,7 @@ python setup.py install
 ```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 python examples/frequently-asked-question/dense_faq_example.py --device gpu
-# 如果只有 CPU 机器，安装CPU版本的paddle后，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
+# 如果只有 CPU 机器，安装CPU版本的Paddle后，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 python examples/frequently-asked-question/dense_faq_example.py --device cpu
 ```
 
