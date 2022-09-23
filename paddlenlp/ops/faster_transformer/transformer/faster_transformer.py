@@ -77,6 +77,8 @@ class FasterTransformer(TransformerModel):
             The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         decoding_strategy (str, optional):
             Indicating the strategy of decoding. It can be 'beam_search', 'beam_search_v2',
             'topk_sampling' and 'topp_sampling'. For beam search strategies,
@@ -137,6 +139,7 @@ class FasterTransformer(TransformerModel):
                  act_dropout=None,
                  bos_id=0,
                  eos_id=1,
+                 pad_id=None,
                  decoding_strategy="beam_search",
                  beam_size=4,
                  topk=1,

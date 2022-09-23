@@ -60,12 +60,6 @@ def parse_args():
         "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
     )
     parser.add_argument(
-        "--unk_token",
-        default=None,
-        type=str,
-        help=
-        "The unknown token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
         "--bos_token",
         default=None,
         type=str,
@@ -76,6 +70,13 @@ def parse_args():
         default=None,
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help=
+        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
     )
     args = parser.parse_args()
     return args
@@ -98,6 +99,7 @@ def do_export(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
+        pad_id=args.pad_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         beam_search_version=args.beam_search_version,
@@ -175,6 +177,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     pprint(args)
 
     do_export(args)

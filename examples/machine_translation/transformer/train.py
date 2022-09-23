@@ -122,6 +122,13 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help=
+        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
+    )
     parser.add_argument("--batch_size",
                         default=None,
                         type=int,
@@ -185,7 +192,8 @@ def do_train(args):
                                    dropout=args.dropout,
                                    weight_sharing=args.weight_sharing,
                                    bos_id=args.bos_idx,
-                                   eos_id=args.eos_idx)
+                                   eos_id=args.eos_idx,
+                                   pad_id=args.pad_idx)
 
     transformer = apply_to_static(args, transformer)
 
@@ -204,14 +212,16 @@ def do_train(args):
                                           beta1=args.beta1,
                                           beta2=args.beta2,
                                           epsilon=float(args.eps),
-                                          parameters=transformer.parameters())
+                                          parameters=transformer.parameters(),
+                                          weight_decay=0.0001)
     else:
         optimizer = paddle.optimizer.Adam(learning_rate=scheduler,
                                           beta1=args.beta1,
                                           beta2=args.beta2,
                                           epsilon=float(args.eps),
                                           parameters=transformer.parameters(),
-                                          use_multi_tensor=True)
+                                          use_multi_tensor=True,
+                                          weight_decay=0.0001)
 
     # Init from some checkpoint, to resume the previous training
     if args.init_from_checkpoint:
@@ -466,6 +476,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     args.to_static = ARGS.to_static
     pprint(args)
 

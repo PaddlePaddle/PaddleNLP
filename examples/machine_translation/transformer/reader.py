@@ -85,7 +85,8 @@ def create_data_loader(args, places=None):
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         else:
             raise ValueError(
                 "The --src_vocab must be specified when using custom dataset. ")
@@ -100,7 +101,8 @@ def create_data_loader(args, places=None):
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         elif not args.benchmark:
             src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
         else:
@@ -112,7 +114,8 @@ def create_data_loader(args, places=None):
             trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         else:
             raise ValueError(
                 "The --trg_vocab must be specified when the dict is not joined. "
@@ -125,6 +128,15 @@ def create_data_loader(args, places=None):
         (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor)
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
+
+    if args.bos_token is not None:
+        args.bos_idx = src_vocab.get_bos_token_id()
+    if args.eos_token is not None:
+        args.eos_idx = src_vocab.get_eos_token_id()
+    if args.pad_token is not None:
+        args.pad_idx = src_vocab.get_pad_token_id()
+    else:
+        args.pad_idx = args.bos_idx
 
     def convert_samples(sample):
         source = sample["source"].split()
@@ -160,7 +172,7 @@ def create_data_loader(args, places=None):
                                  collate_fn=partial(prepare_train_input,
                                                     bos_idx=args.bos_idx,
                                                     eos_idx=args.eos_idx,
-                                                    pad_idx=args.bos_idx,
+                                                    pad_idx=args.pad_idx,
                                                     pad_seq=args.pad_seq,
                                                     dtype=args.input_dtype),
                                  num_workers=args.num_workers)
@@ -209,7 +221,8 @@ def create_infer_loader(args):
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         else:
             raise ValueError(
                 "The --src_vocab must be specified when using custom dataset. ")
@@ -224,7 +237,8 @@ def create_infer_loader(args):
             src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         elif not args.benchmark:
             src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
         else:
@@ -235,7 +249,8 @@ def create_infer_loader(args):
             trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         else:
             raise ValueError(
                 "The --trg_vocab must be specified when the dict is not joined. "
@@ -248,6 +263,15 @@ def create_infer_loader(args):
         (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor)
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
+
+    if args.bos_token is not None:
+        args.bos_idx = src_vocab.get_bos_token_id()
+    if args.eos_token is not None:
+        args.eos_idx = src_vocab.get_eos_token_id()
+    if args.pad_token is not None:
+        args.pad_idx = src_vocab.get_pad_token_id()
+    else:
+        args.pad_idx = args.bos_idx
 
     def convert_samples(sample):
         source = sample["source"].split()
@@ -268,7 +292,7 @@ def create_infer_loader(args):
                              collate_fn=partial(prepare_infer_input,
                                                 bos_idx=args.bos_idx,
                                                 eos_idx=args.eos_idx,
-                                                pad_idx=args.bos_idx,
+                                                pad_idx=args.pad_idx,
                                                 pad_seq=args.pad_seq,
                                                 dtype=args.input_dtype),
                              num_workers=args.num_workers,
@@ -281,7 +305,8 @@ def adapt_vocab_size(args):
         src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
                                           unk_token=args.unk_token,
                                           bos_token=args.bos_token,
-                                          eos_token=args.eos_token)
+                                          eos_token=args.eos_token,
+                                          pad_token=args.pad_token)
     elif not args.benchmark:
         from paddlenlp.datasets import load_dataset
         datasets = load_dataset('wmt14ende', splits=('test'))
@@ -296,7 +321,8 @@ def adapt_vocab_size(args):
             trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
                                               unk_token=args.unk_token,
                                               bos_token=args.bos_token,
-                                              eos_token=args.eos_token)
+                                              eos_token=args.eos_token,
+                                              pad_token=args.pad_token)
         else:
             raise ValueError(
                 "The --trg_vocab must be specified when the dict is not joined. "
@@ -309,6 +335,15 @@ def adapt_vocab_size(args):
         (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor)
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
+
+    if args.bos_token is not None:
+        args.bos_idx = src_vocab.get_bos_token_id()
+    if args.eos_token is not None:
+        args.eos_idx = src_vocab.get_eos_token_id()
+    if args.pad_token is not None:
+        args.pad_idx = src_vocab.get_pad_token_id()
+    else:
+        args.pad_idx = args.bos_idx
 
 
 def prepare_train_input(insts,

@@ -671,6 +671,8 @@ class TransformerModel(nn.Layer):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         activation (str, optional):
             The activation used in FFN. Defaults to "relu".
     """
@@ -690,17 +692,19 @@ class TransformerModel(nn.Layer):
                  act_dropout=None,
                  bos_id=0,
                  eos_id=1,
+                 pad_id=None,
                  activation="relu"):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
+        self.pad_id = pad_id if pad_id is not None else self.bos_id
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
                                                 emb_dim=d_model,
-                                                bos_id=self.bos_id)
+                                                bos_id=self.pad_id)
         self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
                                                      max_length=max_length)
         if weight_sharing:
@@ -712,7 +716,7 @@ class TransformerModel(nn.Layer):
         else:
             self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
                                                     emb_dim=d_model,
-                                                    bos_id=self.bos_id)
+                                                    bos_id=self.pad_id)
             self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
                                                          max_length=max_length)
 
@@ -788,7 +792,7 @@ class TransformerModel(nn.Layer):
         src_max_len = paddle.shape(src_word)[-1]
         trg_max_len = paddle.shape(trg_word)[-1]
         src_slf_attn_bias = paddle.cast(
-            src_word == self.bos_id,
+            src_word == self.pad_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         src_slf_attn_bias.stop_gradient = True
         trg_slf_attn_bias = self.transformer.generate_square_subsequent_mask(
@@ -796,10 +800,10 @@ class TransformerModel(nn.Layer):
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = src_slf_attn_bias
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+            src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len, dtype=src_word.dtype)
         trg_pos = paddle.cast(
-            trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+            trg_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=trg_max_len, dtype=trg_word.dtype)
 
         with paddle.static.amp.fp16_guard():
@@ -865,6 +869,8 @@ class InferTransformerModel(TransformerModel):
             The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         beam_size (int, optional):
             The beam width for beam search. Defaults to 4. 
         max_out_len (int, optional):
@@ -909,6 +915,7 @@ class InferTransformerModel(TransformerModel):
                  act_dropout=None,
                  bos_id=0,
                  eos_id=1,
+                 pad_id=None,
                  beam_size=4,
                  max_out_len=256,
                  output_time_major=False,
@@ -988,7 +995,7 @@ class InferTransformerModel(TransformerModel):
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
         if trg_word is not None:
-            trg_length = paddle.sum(paddle.cast(trg_word != self.bos_id,
+            trg_length = paddle.sum(paddle.cast(trg_word != self.pad_id,
                                                 dtype="int32"),
                                     axis=-1)
         else:
@@ -997,11 +1004,11 @@ class InferTransformerModel(TransformerModel):
         if self.beam_search_version == 'v1':
             src_max_len = paddle.shape(src_word)[-1]
             src_slf_attn_bias = paddle.cast(
-                src_word == self.bos_id,
+                src_word == self.pad_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             trg_src_attn_bias = src_slf_attn_bias
             src_pos = paddle.cast(
-                src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+                src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
                     start=0, end=src_max_len, dtype=src_word.dtype)
 
             # Run encoder
@@ -1078,11 +1085,11 @@ class InferTransformerModel(TransformerModel):
         # run encoder
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = paddle.cast(
-            src_word == self.bos_id,
+            src_word == self.pad_id,
             dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         src_slf_attn_bias.stop_gradient = True
         src_pos = paddle.cast(
-            src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+            src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len, dtype=src_word.dtype)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)

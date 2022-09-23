@@ -51,7 +51,7 @@ def parse_args():
         default=None,
         type=str,
         help=
-        "The files for test, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. "
+        "The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. "
     )
     parser.add_argument("--without_ft",
                         action="store_true",
@@ -105,6 +105,13 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help=
+        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
+    )
     args = parser.parse_args()
     return args
 
@@ -152,6 +159,7 @@ def do_predict(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
+        pad_id=args.pad_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         use_ft=not args.without_ft,
@@ -234,6 +242,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     pprint(args)
 
     do_predict(args)

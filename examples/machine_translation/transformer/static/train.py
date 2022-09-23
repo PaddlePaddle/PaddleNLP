@@ -131,6 +131,13 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help=
+        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
+    )
 
     # For benchmark.
     parser.add_argument(
@@ -197,7 +204,8 @@ def do_train(args):
                                        dropout=args.dropout,
                                        weight_sharing=args.weight_sharing,
                                        bos_id=args.bos_idx,
-                                       eos_id=args.eos_idx)
+                                       eos_id=args.eos_idx,
+                                       pad_id=args.pad_idx)
         # Define loss
         criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
 
@@ -427,6 +435,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     pprint(args)
     args.profiler_options = ARGS.profiler_options
 

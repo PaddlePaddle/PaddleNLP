@@ -94,7 +94,8 @@ python train.py \
     --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
     --eos_token "</s>" \
-    --unk_token "<unk>"
+    --unk_token "<unk>" \
+    --pad_token "<s>"
 ```
 
 `train.py` 脚本中，各个参数的含义如下：
@@ -111,6 +112,7 @@ python train.py \
 * `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
 * `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
 * `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
 * `--batch_size`: 指明训练时，一个 batch 里面，最多的 token 的数目。默认为 config 中设置的 4096。
 * `--max_iter`: 指明训练时，需要训练的最大的 step 的数目，默认为 None。表示使用 config 中指定的 `epoch: 30` 来作为最大的迭代的 epoch 的数量，而不是 step。
 * `--use_amp`: 是否使用混合精度训练。设置的类型是一个 `str`，可以是 `['true', 'false', 'True', 'False']` 中任意一个。默认不使用混合精度训练。
@@ -177,13 +179,14 @@ python predict.py \
 * `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
   * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
   * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
-* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，可以是一组平行语料的源语言和目标语言，依次两个文件的路径和名称，`--test_file ${SOURCE_LANG_FILE} ${TARGET_LANG_FILE}`，也可以只转入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de ${DATA_DEST_DIR}/test.de-en.en` 或者 `--test_file ${DATA_DEST_DIR}/test.de-en.de`。
+* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，传入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de`。
 * `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
 * `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
 * `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
 * `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
 * `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
 * `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
 * `--without_ft`: 本示例在预测时，支持了 GPU 的翻译预测的加速，如果不使用加速特性，可以设置 `--without_ft` 即会执行普通的 PaddlePaddle 动态图预测。
 
 翻译结果会输出到 config 文件中 `output_file` 条目指定的文件中。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。
@@ -210,8 +213,7 @@ python export_model.py \
     --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
     --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
-    --eos_token "</s>" \
-    --unk_token "<unk>"
+    --eos_token "</s>"
 ```
 
 其中：
@@ -219,9 +221,9 @@ python export_model.py \
 * `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
 * `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
 * `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
-* `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
 * `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
 * `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
 
 #### 使用 Paddle Inference API 进行推理
 
@@ -311,6 +313,7 @@ python train.py \
 * `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
 * `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
 * `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
 * `--batch_size`: 指明训练时，一个 batch 里面，最多的 token 的数目。默认为 config 中设置的 4096。
 * `--max_iter`: 指明训练时，需要训练的最大的 step 的数目，默认为 None。表示使用 config 中指定的 `epoch: 30` 来作为最大的迭代的 epoch 的数量，而不是 step。
 
@@ -391,13 +394,14 @@ python predict.py \
 * `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
   * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
   * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
-* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，可以是一组平行语料的源语言和目标语言，依次两个文件的路径和名称，`--test_file ${SOURCE_LANG_FILE} ${TARGET_LANG_FILE}`，也可以只转入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de ${DATA_DEST_DIR}/test.de-en.en` 或者 `--test_file ${DATA_DEST_DIR}/test.de-en.de`。
+* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，传入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de`。
 * `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
 * `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
 * `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
 * `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
 * `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
 * `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
 * `--without_ft`: 本示例在预测时，支持了 GPU 的翻译预测的加速，如果不使用加速特性，可以设置 `--without_ft` 即会执行普通的 PaddlePaddle 动态图预测。
 
 翻译结果会输出到 config 文件中 `output_file` 条目指定的文件中。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。

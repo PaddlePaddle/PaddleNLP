@@ -126,6 +126,13 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help=
+        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
+    )
     args = parser.parse_args()
     return args
 
@@ -394,6 +401,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     pprint(args)
 
     do_train(args)

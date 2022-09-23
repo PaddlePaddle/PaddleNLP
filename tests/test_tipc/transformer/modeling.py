@@ -649,6 +649,10 @@ class TransformerModel(nn.Layer):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
     """
 
     def __init__(self,
@@ -665,12 +669,15 @@ class TransformerModel(nn.Layer):
                  attn_dropout=None,
                  act_dropout=None,
                  bos_id=0,
-                 eos_id=1):
+                 eos_id=1,
+                 pad_id=None,
+                 activation="relu"):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
+        self.pad_id = pad_id if pad_id is not None else self.bos_id
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
@@ -700,7 +707,7 @@ class TransformerModel(nn.Layer):
             dropout=dropout,
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
-            activation="relu",
+            activation=activation,
             normalize_before=True)
 
         if weight_sharing:
