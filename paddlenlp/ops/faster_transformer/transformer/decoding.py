@@ -2328,6 +2328,7 @@ class InferMBartDecoding(nn.Layer):
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  hidden_act="gelu"):
+        decoding_lib = "/paddle/fast_transformer/mbart/PaddleNLP/paddlenlp/ops/build/lib/libdecoding_op.so"
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             if "FasterTransformer" not in LOADED_EXT.keys():
@@ -2515,7 +2516,8 @@ class InferMBartDecoding(nn.Layer):
         self.pos_emb = [model.decoder.decoder_embed_positions.weight]
         self.word_emb = [model.decoder.embed_tokens.weight]
 
-        self.linear_weight = [model.lm_head_weight.t()]
+        setattr(self, "lm_head_weight_", model.lm_head_weight.t())
+        self.linear_weight = [getattr(self, "lm_head_weight_")]
         self.linear_bias = [model.final_logits_bias]
 
     def forward(self,

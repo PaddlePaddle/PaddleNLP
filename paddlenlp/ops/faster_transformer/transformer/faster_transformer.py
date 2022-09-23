@@ -1379,8 +1379,13 @@ class FasterBART(BartPretrainedModel):
 
 
 class FasterMBART(MBartPretrainedModel):
+    enable_faster_encoder_func = enable_faster_encoder
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 enable_faster_encoder=False):
         super(FasterMBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1393,12 +1398,17 @@ class FasterMBART(MBartPretrainedModel):
         self.encoder = model.mbart.get_encoder()
         self.decoder = model.mbart.get_decoder()
         self.pad_token_id = model.mbart.config['pad_token_id']
+        self.enable_faster_encoder = enable_faster_encoder
 
         self.decoding = InferMBartDecoding(
             model=self._model,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             hidden_act=model.mbart.config['activation_function'])
+
+        if self.enable_faster_encoder:
+            # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
+            self.encoder = FasterMBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):
         return self.encoder
@@ -1439,11 +1449,9 @@ class FasterMBART(MBartPretrainedModel):
 
         #(gongenlei) Not enable_faster_encoder temporarily
         if encoder_output is None:
-            self.encoder = enable_faster_encoder(self.encoder)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
-            self.encoder = disable_faster_encoder(self.encoder)
         batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
