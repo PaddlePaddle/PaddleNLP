@@ -70,6 +70,7 @@ Docker编译一个定制化CUDA版本的Pipelines的镜像流程分2步，第一
 
 ```
 nvidia-docker run --name pipelines --net host --shm-size 4g -it registry.baidubce.com/paddlepaddle/paddle:2.3.2-gpu-cuda11.2-cudnn8 /bin/bash
+cd /root
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
