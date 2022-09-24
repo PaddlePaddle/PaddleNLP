@@ -494,7 +494,7 @@ def do_train(args):
                                group=sharding_group,
                                sync_op=True)
             # Multi stream operation will be supported later
-            dist.wait(tensor=p, group=sharding_group, sync_op=True)
+            dist.wait(tensor=p, group=sharding_group, use_calc_stream=True)
         else:
             initialize_mp_dp_parameters(model, hcg)
 
