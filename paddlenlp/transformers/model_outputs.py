@@ -357,7 +357,10 @@ class ModelOutput(OrderedDict):
         """
         Convert self to a tuple containing all the attributes/keys that are not `None`.
         """
-        return tuple(self[k] for k in self.keys())
+        # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3355
+        # when trying to get the keys of `OrderedDict`, `keys` method return empty values.
+        # TODO(wj-Mcat): this bug should be fixed Paddle framework
+        return tuple(v for v in self.__dict__.values() if v is not None)
 
 
 @dataclass
