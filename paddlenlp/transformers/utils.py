@@ -223,9 +223,9 @@ def resolve_cache_dir(pretrained_model_name_or_path: str, kwargs: dict,
         return pretrained_model_name_or_path
 
     if pretrained_model_name_or_path in pretrained_init_configuration:
-        cache_dir = os.path.join(MODEL_HOME, pretrained_init_configuration)
+        cache_dir = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
     else:
         cache_dir = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                 pretrained_init_configuration)
+                                 pretrained_model_name_or_path)
 
     return cache_dir

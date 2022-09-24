@@ -36,7 +36,7 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from .generation_utils import GenerationMixin
-from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, param_in_init
+from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, param_in_init, resolve_cache_dir
 from .configuration_utils import PretrainedConfig, parse_config
 
 __all__ = [
@@ -105,29 +105,6 @@ def _find_weight_file_path(cache_dir: str,
     raise ValueError(
         'can"t find the target weight files<%s> or <%s> under the cache_dir<%s>',
         resouce_uri_file_name, resource_weight_file_name, cache_dir)
-
-
-def _resolve_cache_dir(pretrained_model_name_or_path: str,
-                       cache_dir: Optional[str] = None):
-    """resolve cache dir which can be: official model and community model
-
-    Args:
-        pretrained_model_name_or_path (_type_): the source of pretarined model_name or path
-        cache_dir (Optional[str], optional): cache dir. Defaults to None.
-
-    Returns:
-        cache_dir (Optional[str]): the final cache dir
-    """
-    if cache_dir is not None:
-        return cache_dir
-
-    if os.path.isdir(pretrained_model_name_or_path):
-        return pretrained_model_name_or_path
-
-    if is_url(pretrained_model_name_or_path):
-        return None
-
-    return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
 
 
 def register_base_model(cls):
@@ -1137,13 +1114,16 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('./my_bert/'
         """
         load_state_as_np = kwargs.pop("load_state_as_np", False)
-        cache_dir = kwargs.pop('cache_dir', None)
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", None)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
 
-        cache_dir = _resolve_cache_dir(pretrained_model_name_or_path, cache_dir)
+        cache_dir = resolve_cache_dir(
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            kwargs=kwargs,
+            pretrained_init_configuration=cls.pretrained_init_configuration,
+        )
 
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model
