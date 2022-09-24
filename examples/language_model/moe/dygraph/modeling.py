@@ -408,7 +408,9 @@ class TransformerDecoderLayer(nn.Layer):
                  top_k=2,
                  hcg=None,
                  gate=None,
-                 recompute_interval=0):
+                 recompute_interval=0,
+                 recompute_partition=False,
+                 recompute_offload=False):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
@@ -452,12 +454,19 @@ class TransformerDecoderLayer(nn.Layer):
                 "type": "gshard",
                 "top_k": top_k,
             }
+
+            recompute_ctx = {
+                "mp_group": mp_group,
+                "offload": recompute_offload,
+                "partition": recompute_partition
+            }
             self.moe_mlp = MoeLayer(d_model=d_model,
                                     experts=experts_list,
                                     gate=gate_config,
                                     moe_group=moe_group,
                                     mp_group=mp_group,
-                                    recompute_interval=self.recompute_interval)
+                                    recompute_interval=self.recompute_interval,
+                                    recompute_ctx=recompute_ctx)
         else:
             self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
                 d_model,
@@ -793,7 +802,9 @@ class GPTModel(GPTPretrainedModel):
                     top_k=top_k,
                     hcg=hcg,
                     gate=gate,
-                    recompute_interval=recompute_interval))
+                    recompute_interval=recompute_interval,
+                    recompute_partition=recompute_partition,
+                    recompute_offload=recompute_offload))
 
         self.decoder = TransformerDecoder(decoder_layers,
                                           num_hidden_layers,

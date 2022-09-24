@@ -146,7 +146,7 @@ def main():
         ]
         export_path = os.path.join(training_args.output_dir, 'export')
         trainer.export_model(export_path,
-                             input_spec=input_sepc,
+                             input_spec=input_spec,
                              export_type=model_args.export_type)
 
 

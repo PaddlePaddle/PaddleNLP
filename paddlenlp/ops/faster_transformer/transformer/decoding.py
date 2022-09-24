@@ -2515,7 +2515,8 @@ class InferMBartDecoding(nn.Layer):
         self.pos_emb = [model.decoder.decoder_embed_positions.weight]
         self.word_emb = [model.decoder.embed_tokens.weight]
 
-        self.linear_weight = [model.lm_head_weight.t()]
+        setattr(self, "lm_head_weight_", model.lm_head_weight.t())
+        self.linear_weight = [getattr(self, "lm_head_weight_")]
         self.linear_bias = [model.final_logits_bias]
 
     def forward(self,
