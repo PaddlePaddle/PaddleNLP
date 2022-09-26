@@ -38,7 +38,11 @@ def setup_args():
     parser.add_argument("--num_return_sequences",
                         default=1,
                         type=int,
-                        help="The number of returned sequences. ")
+                        help="The number of returned sequences. When " \
+                             "applying sampling to decode, this must be " \
+                             "given according to the --num_return_sequences " \
+                             "when you process mbart export scripts. When applying " \
+                             "beam search to decode, this flag should NOT be set. ")
 
     args = parser.parse_args()
 
