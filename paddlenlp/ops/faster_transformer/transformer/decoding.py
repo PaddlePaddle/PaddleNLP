@@ -2328,6 +2328,7 @@ class InferMBartDecoding(nn.Layer):
                  decoding_lib=None,
                  use_fp16_decoding=False,
                  hidden_act="gelu"):
+        decoding_lib = "/paddle/fast_transformer/mbart/PaddleNLP/paddlenlp/ops/build/lib/libdecoding_op.so"
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
             if "FasterTransformer" not in LOADED_EXT.keys():

@@ -112,14 +112,13 @@ def do_predict(args):
         input_spec=[
             # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int32"),
-            # forced_bos_token_ids
-            paddle.static.InputSpec(shape=[None, 1], dtype="int32"),
             # encoder_output
             None,
             # seq_len
             None,
-            # bos_id,  # forced_bos_token_id
-            None,  # forced_bos_token_id can be None when forced_bos_token_ids is provided. 
+            paddle.static.InputSpec(
+                shape=[None, 1],
+                dtype="int32"),  # forced_bos_token_id can be a Tensor or int
             args.num_beams,  # num_beams.
             args.topk,  # top_k
             args.topp,  # top_p
