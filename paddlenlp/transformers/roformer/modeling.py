@@ -18,15 +18,11 @@ import paddle.nn as nn
 
 from .. import PretrainedModel, register_base_model
 from ..albert.modeling import get_activation
-from ..model_outputs import (
-    BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
-)
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             CausalLMOutputWithCrossAttentions, tuple_output)
 from paddle.common_ops_import import convert_dtype
 
 __all__ = [
@@ -249,7 +245,6 @@ class RoFormerPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "roformer-chinese-small": {
             "vocab_size": 50000,
@@ -421,7 +416,6 @@ class RoFormerPretrainedModel(PretrainedModel):
         },
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "roformer-chinese-small":
@@ -709,6 +703,12 @@ class RoFormerModel(RoFormerPretrainedModel):
     def set_input_embeddings(self, embedding: nn.Embedding):
         self.embeddings.word_embeddings = embedding
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding):
+        self.embeddings.word_embeddings = embedding
+
 
 class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
     r"""
@@ -818,8 +818,7 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
 
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,
@@ -933,8 +932,7 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -1037,8 +1035,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -1178,8 +1175,7 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
 
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(
             loss=loss,
@@ -1283,9 +1279,7 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
 
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
-            return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else (
-                        output[0] if len(output) == 1 else output)
+            return tuple_output(output, masked_lm_loss)
 
         return MaskedLMOutput(
             loss=masked_lm_loss,
@@ -1399,8 +1393,7 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
                     (-1, prediction_scores.shape[-1])), labels.reshape((-1, )))
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
-            return ((lm_loss, ) + output) if lm_loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, lm_loss)
 
         return CausalLMOutputWithCrossAttentions(
             loss=lm_loss,

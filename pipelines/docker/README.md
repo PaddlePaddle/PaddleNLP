@@ -59,3 +59,67 @@ docker-compose -f docker-compose-gpu.yml stop
 docker logs pip02
 ```
 构建过程一般会持续3分钟左右，然后cpu版本启动等待1分钟左右，然后您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
+
+## 3. Docker编译一个定制化CUDA版本的Pipelines的镜像
+
+Docker编译一个定制化CUDA版本的Pipelines的镜像流程分2步，第一步是利用Paddle镜像构建Pipelines基础镜像，第二步是构建一键启动镜像。第一步构建的镜像是一个可用的状态，但是启动后，需要进入容器，手工启动服务，第二步是需要把运行命令打包到镜像中，使得Docker启动的时候能够自动启动Pipelines的服务。
+
+### 3.1 基础镜像
+
+以CUDA 11.2环境为例，编译一个Pipelines基础镜像流程如下：
+
+```
+nvidia-docker run --name pipelines --net host --shm-size 4g -it registry.baidubce.com/paddlepaddle/paddle:2.3.2-gpu-cuda11.2-cudnn8 /bin/bash
+cd /root
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines/
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python setup.py install
+apt-get install lsof
+```
+镜像构建完成可以使用`Ctrl+P+Q`组合键跳出容器。
+
+在第一步构建镜像的过程中，如果是CUDA的其他版本，则需要在[Paddle官网](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/docker/linux-docker.html)上查找是否有对应的CUDA版本的Paddle镜像，如果没有，则需要自己手工构建一个该CUDA版本的Docker，然后安装对应CUDA版本的PaddlePaddle，然后继续执行上面的流程。
+
+### 3.2 一键启动镜像
+
+到了上一步就构建了一个可用的Pipelines镜像了，但是这个镜像还没有一键启动功能，即需要进入容器手动启动后台和前端。这里进一步打包镜像，把启动运行的命令也打包到镜像中，执行过程如下：
+
+```
+docker commit pipelines pipelines:1.0-gpu-cuda11.2-cudnn8
+docker tag pipelines:1.0-gpu-cuda11.2-cudnn8  paddlepaddle/paddlenlp:pipelines-1.0-gpu-cuda11.2-cudnn8
+# 在容器外下载一份PaddleNLP代码
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines/docker
+```
+修改`Dockerfile-GPU`文件，更换基础镜像，并添加一键运行命令：
+
+```
+FROM paddlepaddle/paddlenlp:pipelines-1.0-gpu-cuda11.2-cudnn8
+# 使得Docker容器启动start.sh，并且保持运行
+ENTRYPOINT /root/start.sh && tail -f /dev/null
+```
+然后执行：
+
+```
+# Dockerfile-GPU 包含一键启动的命令
+docker build --tag=paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8 . -f Dockerfile-GPU
+```
+
+这样就构建了一键启动的Docker镜像。
+
+### 3.3 启动镜像
+
+一键启动的Docker构建完成以后就可以使用下面的命令启动：
+
+```
+nvidia-docker run -d --name paddlenlp_pipelines_gpu --net host -ti paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8
+# 查看运行日志
+sudo docker logs paddlenlp_pipelines_gpu
+# 进入容器命令
+sudo docker exec -it paddlenlp_pipelines_gpu bash
+# 查看后台端口状态
+lsof -i:8891
+# 查看前端端口状态
+lsof -i:8502
+```

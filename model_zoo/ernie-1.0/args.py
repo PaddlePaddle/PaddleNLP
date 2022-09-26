@@ -96,7 +96,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
-    # Argument for bert
+    # Argument for bert/ernie
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1, help="Short sequence prob.")
     parser.add_argument("--favor_longer_ngram", type=str2bool, default=False, help="Short sequence prob.")
@@ -121,5 +121,8 @@ def parse_args(MODEL_CLASSES):
             logger.warning(
                 "The attention_probs_dropout_prob should set to 0 for accuracy checking."
             )
+    if args.dp_degree * args.mp_degree * args.pp_degree * args.sharding_degree == 1:
+        if paddle.distributed.get_world_size() > 1:
+            args.dp_degree = paddle.distributed.get_world_size()
 
     return args

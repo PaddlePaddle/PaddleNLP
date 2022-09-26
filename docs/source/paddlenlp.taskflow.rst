@@ -29,7 +29,7 @@ paddlenlp.taskflow
    paddlenlp.taskflow.sentiment_analysis
    paddlenlp.taskflow.task
    paddlenlp.taskflow.taskflow
-   paddlenlp.taskflow.text2image_generation
+   paddlenlp.taskflow.text_to_image
    paddlenlp.taskflow.text_correction
    paddlenlp.taskflow.text_generation
    paddlenlp.taskflow.text_similarity

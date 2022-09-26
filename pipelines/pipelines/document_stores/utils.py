@@ -125,6 +125,21 @@ def eval_data_from_jsonl(
     yield docs, labels
 
 
+def squad_json_to_jsonl(squad_file: str, output_file: str):
+    """
+    Converts a SQuAD-json-file into jsonl format with one document per line.
+    :param squad_file: SQuAD-file in json format.
+    :param output_file: Name of output file (SQuAD in jsonl format)
+    """
+    with open(squad_file, encoding="utf-8") as json_file, open(
+            output_file, "w", encoding="utf-8") as jsonl_file:
+        squad_json = json.load(json_file)
+
+        for doc in squad_json["data"]:
+            json.dump(doc, jsonl_file)
+            jsonl_file.write("\n")
+
+
 def _extract_docs_and_labels_from_dict(document_dict: Dict,
                                        preprocessor: PreProcessor = None,
                                        open_domain: bool = False):
