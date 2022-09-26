@@ -132,19 +132,15 @@ class InitTrackerMeta(type(Layer)):
         post_init_func = getattr(cls, '_post_init',
                                  None) if '__init__' in attrs else None
         cls.__init__ = InitTrackerMeta.init_and_track_conf(
-            cls, init_func, pre_init_func, post_init_func)
+            init_func, pre_init_func, post_init_func)
         super(InitTrackerMeta, cls).__init__(name, bases, attrs)
 
     @staticmethod
-    def init_and_track_conf(init_func_class,
-                            init_func,
-                            pre_init_func=None,
-                            post_init_func=None):
+    def init_and_track_conf(init_func, pre_init_func=None, post_init_func=None):
         """
         wraps `init_func` which is `__init__` method of a class to add `init_config`
         attribute for instances of that class.
         Args:
-            init_func_class: the class of the `init_func`
             init_func (callable): It should be the `__init__` method of a class.
                 warning: `self` always is the class type of down-stream model, eg: BertForTokenClassification
             pre_init_func (callable, optional): If provided, it would be hooked after
@@ -160,13 +156,6 @@ class InitTrackerMeta(type(Layer)):
 
         @functools.wraps(init_func)
         def __impl__(self, *args, **kwargs):
-            if getattr(init_func_class,
-                       "parse_args_and_kwargs", None) is not None and getattr(
-                           init_func_class, "base_model_class",
-                           None) is not None:
-                args, kwargs = init_func_class.parse_args_and_kwargs(
-                    init_func, args, kwargs)
-
             # registed helper by `pre_init_func`
             if pre_init_func:
                 pre_init_func(self, init_func, *args, **kwargs)

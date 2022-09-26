@@ -224,13 +224,6 @@ class BertModel(BertPretrainedModel):
             Defaults to `"tanh"`.
 
     """
-    init_fields = [
-        "vocab_size", "hidden_size", "num_hidden_layers", "num_attention_heads",
-        "intermediate_size", "hidden_act", "hidden_dropout_prob",
-        "attention_probs_dropout_prob", "max_position_embeddings",
-        "type_vocab_size", "initializer_range", "pad_token_id", "pool_act",
-        "fuse"
-    ]
 
     def __init__(self, config: BertConfig):
         super(BertModel, self).__init__(config)
@@ -446,11 +439,10 @@ class BertForQuestionAnswering(BertPretrainedModel):
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
             instance `bert`. Defaults to `None`.
         """
-    init_fields = ["dropout"]
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
+    def __init__(self, config: BertConfig):
         super(BertForQuestionAnswering, self).__init__(config)
-        self.bert = bert if bert is not None else BertModel(config)
+        self.bert = BertModel(config)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
             classifier_dropout is not None else config.hidden_dropout_prob)
@@ -580,12 +572,11 @@ class BertForSequenceClassification(BertPretrainedModel):
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
             instance `bert`. Defaults to None.
     """
-    init_fields = ['num_classes', "dropout"]
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
+    def __init__(self, config: BertConfig):
         super(BertForSequenceClassification, self).__init__(config)
 
-        self.bert = bert if bert is not None else BertModel(config)
+        self.bert = BertModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
@@ -707,12 +698,11 @@ class BertForTokenClassification(BertPretrainedModel):
             If None, use the same value as `hidden_dropout_prob` of `BertModel`
             instance `bert`. Defaults to None.
     """
-    init_fields = ['num_classes', 'dropout']
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
+    def __init__(self, config: BertConfig):
         super().__init__(config)
 
-        self.bert = bert if bert is not None else BertModel(config)
+        self.bert = BertModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
@@ -948,9 +938,9 @@ class BertForPretraining(BertPretrainedModel):
 
     """
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
+    def __init__(self, config: BertConfig):
         super(BertForPretraining, self).__init__(config)
-        self.bert = bert if bert is not None else BertModel(config)
+        self.bert = BertModel(config)
         self.cls = BertPretrainingHeads(
             config,
             embedding_weights=self.bert.embeddings.word_embeddings.weight)
@@ -1123,12 +1113,11 @@ class BertForMultipleChoice(BertPretrainedModel):
         >>> config.hidden_dropout_prob = 0.1
         >>> model = BertForMultipleChoice(config)
     """
-    init_fields = [('num_choices', 2), 'dropout']
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
+    def __init__(self, config: BertConfig):
         super(BertForMultipleChoice, self).__init__(config)
 
-        self.bert = bert if bert is not None else BertModel(config)
+        self.bert = BertModel(config)
         self.num_choices = config.num_choices
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
@@ -1297,9 +1286,9 @@ class BertForMaskedLM(BertPretrainedModel):
 
     """
 
-    def __init__(self, config: BertConfig, bert: Optional[BertModel] = None):
+    def __init__(self, config: BertConfig):
         super(BertForMaskedLM, self).__init__(config)
-        self.bert = bert if bert is not None else BertModel(config=config)
+        self.bert = BertModel(config=config)
 
         self.cls = BertOnlyMLMHead(
             config=config,

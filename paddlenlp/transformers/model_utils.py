@@ -184,9 +184,6 @@ class PretrainedModel(Layer, GenerationMixin):
     base_model_prefix = ""
     config_class = None
 
-    # TODO: compatibility code for old-style of init params, which should be removed
-    init_fields: List[Union[str, Tuple[str, Any]]] = []
-
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
     # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
     _keys_to_ignore_on_load_missing = None
@@ -290,87 +287,6 @@ class PretrainedModel(Layer, GenerationMixin):
         """
         return cls.config_class is not None and issubclass(
             cls.config_class, PretrainedConfig)
-
-    @classmethod
-    def parse_args_and_kwargs(cls: PretrainedModel, init_func, args: tuple,
-                              kwargs: dict) -> Union[tuple, Dict[str, Any]]:
-        """parse the config from args & kwargs to intergrate PretrainedConfig into PretrainedModel
-
-            `cls` can be: BertModel, BertForTokenClassification, ... which config[required] and bert[optional]
-
-        Args:
-            cls (PretrainedModel): the sub-class of PretrainedModel
-            args (tuple): the args
-            kwargs (dict): the kwargs
-
-        Returns:
-            args & kwargs
-        """
-        # if the Model don't support PretrainedConfig, so return the source of args and kwargs
-
-        if not cls.constructed_from_pretrained_config() or not issubclass(
-                cls, PretrainedModel):
-            return args, kwargs
-
-        # pop the model & config from data
-        model, config = None, None
-
-        index = 0
-        while index < len(args):
-            if isinstance(args[index], PretrainedModel):
-                model = args[index]
-                args = args[0:index] + args[index + 1:]
-            elif isinstance(args[index], PretrainedConfig):
-                config = args[index]
-                args = args[0:index] + args[index + 1:]
-            else:
-                index += 1
-
-        for key in list(kwargs.keys()):
-            value = kwargs[key]
-            if isinstance(value, PretrainedModel):
-                model = value
-                kwargs.pop(key)
-            elif isinstance(value, PretrainedConfig):
-                config = value
-                kwargs.pop(key)
-        if model is None and config is None:
-            raise ValueError(
-                "Failed to init PretrainedModel which need PretrainedConfig or base-model, but all of them is None"
-            )
-
-        if model is not None and config is not None:
-            raise ValueError(
-                "Failed to init PretrainedModel which need one of PretrainedConfig and base-model, but all of them is not None "
-            )
-
-        # get the old-style params fields, eg: `num_classes`, `dropout` which should be mapped into PretrainedConfig instance.
-        fields = getattr(cls, "init_fields", [])
-        config, model, unused_kwargs = parse_config(
-            config_or_model=model if model is not None else config,
-            config_class=cls.config_class,
-            args=args,
-            kwargs=kwargs,
-            fields=fields,
-            return_model=True,
-            return_unused_kwargs=True)
-        if len(unused_kwargs) > 0:
-            logger.warning(
-                f"there are {len(unused_kwargs)} fields<{','.join(list(unused_kwargs.keys()))}> not used, please make sure all of params should be the attribute of {str(cls.config_class)}, "
-                "if there are some fields to be mapped into another field, you can add it into `init_fields` class attribute"
-            )
-
-        kwargs = {}
-        if config is not None:
-            kwargs['config'] = config
-        if model is not None:
-            kwargs[cls.base_model_prefix] = model
-
-        # if `cls.base_model_prefix` is in __init__ params list, so it should add it into kwargs whether it has value or not.
-        if param_in_init(init_func, cls.base_model_prefix):
-            kwargs[cls.base_model_prefix] = model
-
-        return (), kwargs
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -1129,7 +1045,7 @@ class PretrainedModel(Layer, GenerationMixin):
         """
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         config = kwargs.pop("config", None)
-        force_download = kwargs.pop("force_download", None)
+        force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
 

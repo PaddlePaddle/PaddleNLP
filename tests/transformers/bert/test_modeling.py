@@ -183,22 +183,15 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model_lambdas = [
-            lambda: BertForMaskedLM(config),
-            lambda: BertForMaskedLM(config=config),
-            lambda: BertForMaskedLM(BertModel(config)),
-            lambda: BertForMaskedLM(bert=BertModel(config)),
-        ]
-        for model_lambda in model_lambdas:
-            model = model_lambda()
-            model.eval()
-            result = model(input_ids,
-                           attention_mask=input_mask,
-                           token_type_ids=token_type_ids,
-                           labels=token_labels)
-            self.parent.assertEqual(
-                result[1].shape,
-                [self.batch_size, self.seq_length, self.vocab_size])
+        model = BertForMaskedLM(config)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=token_labels)
+        self.parent.assertEqual(
+            result[1].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_model_past_large_inputs(
         self,
@@ -271,26 +264,19 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model_lambdas = [
-            lambda: BertForPretraining(config),
-            lambda: BertForPretraining(config=config),
-            lambda: BertForPretraining(BertModel(config)),
-            lambda: BertForPretraining(bert=BertModel(config)),
-        ]
-        for model_lambda in model_lambdas:
-            model = model_lambda()
-            model.eval()
-            result = model(
-                input_ids,
-                attention_mask=input_mask,
-                token_type_ids=token_type_ids,
-                labels=token_labels,
-                next_sentence_label=sequence_labels,
-            )
-            self.parent.assertEqual(
-                result[1].shape,
-                [self.batch_size, self.seq_length, self.vocab_size])
-            self.parent.assertEqual(result[2].shape, [self.batch_size, 2])
+        model = BertForPretraining(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            labels=token_labels,
+            next_sentence_label=sequence_labels,
+        )
+        self.parent.assertEqual(
+            result[1].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result[2].shape, [self.batch_size, 2])
 
     def create_and_check_for_multiple_choice(
         self,
@@ -302,42 +288,22 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model_lambdas = [
-            lambda: BertForMultipleChoice(config, self.num_choices),
-            lambda: BertForMultipleChoice(config, self.num_choices, self.dropout
-                                          ),
-            lambda: BertForMultipleChoice(config=config,
-                                          num_choices=self.num_choices),
-            lambda: BertForMultipleChoice(config=config,
-                                          num_choices=self.num_choices,
-                                          dropout=self.dropout),
-            lambda: BertForMultipleChoice(BertModel(config), self.num_choices),
-            lambda: BertForMultipleChoice(BertModel(config), self.num_choices,
-                                          self.dropout),
-            lambda: BertForMultipleChoice(bert=BertModel(config),
-                                          num_choices=self.num_choices),
-            lambda: BertForMultipleChoice(bert=BertModel(config),
-                                          num_choices=self.num_choices,
-                                          dropout=self.dropout),
-        ]
-
-        for model_lambda in model_lambdas:
-            model: BertForMultipleChoice = model_lambda()
-            model.eval()
-            multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
-                [-1, self.num_choices, -1])
-            multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
-                [-1, self.num_choices, -1])
-            multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
-                [-1, self.num_choices, -1])
-            result = model(
-                multiple_choice_inputs_ids,
-                attention_mask=multiple_choice_input_mask,
-                token_type_ids=multiple_choice_token_type_ids,
-                labels=choice_labels,
-            )
-            self.parent.assertEqual(result[1].shape,
-                                    [self.batch_size, self.num_choices])
+        model = BertForMultipleChoice(config)
+        model.eval()
+        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
+            [-1, self.num_choices, -1])
+        result = model(
+            multiple_choice_inputs_ids,
+            attention_mask=multiple_choice_input_mask,
+            token_type_ids=multiple_choice_token_type_ids,
+            labels=choice_labels,
+        )
+        self.parent.assertEqual(result[1].shape,
+                                [self.batch_size, self.num_choices])
 
     def create_and_check_for_question_answering(
         self,
@@ -349,33 +315,20 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model_lambdas = [
-            lambda: BertForQuestionAnswering(config),
-            lambda: BertForQuestionAnswering(config, self.dropout),
-            lambda: BertForQuestionAnswering(config=config),
-            lambda: BertForQuestionAnswering(config=config,
-                                             dropout=self.dropout),
-            lambda: BertForQuestionAnswering(BertModel(config)),
-            lambda: BertForQuestionAnswering(BertModel(config), self.dropout),
-            lambda: BertForQuestionAnswering(bert=BertModel(config)),
-            lambda: BertForQuestionAnswering(bert=BertModel(config),
-                                             dropout=self.dropout)
-        ]
+        model = BertForQuestionAnswering(config)
 
-        for model_lambda in model_lambdas:
-            model: BertForQuestionAnswering = model_lambda()
-            model.eval()
-            result = model(
-                input_ids,
-                attention_mask=input_mask,
-                token_type_ids=token_type_ids,
-                start_positions=sequence_labels,
-                end_positions=sequence_labels,
-            )
-            self.parent.assertEqual(result[1].shape,
-                                    [self.batch_size, self.seq_length])
-            self.parent.assertEqual(result[2].shape,
-                                    [self.batch_size, self.seq_length])
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+        )
+        self.parent.assertEqual(result[1].shape,
+                                [self.batch_size, self.seq_length])
+        self.parent.assertEqual(result[2].shape,
+                                [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -388,34 +341,14 @@ class BertModelTester:
         choice_labels,
     ):
 
-        model_lambdas = [
-            lambda: BertForSequenceClassification(config, self.num_labels),
-            lambda: BertForSequenceClassification(config, self.num_labels, self.
-                                                  dropout),
-            lambda: BertForSequenceClassification(config=config,
-                                                  num_labels=self.num_labels),
-            lambda: BertForSequenceClassification(config=config,
-                                                  num_classes=self.num_labels,
-                                                  dropout=self.dropout),
-            lambda: BertForSequenceClassification(BertModel(config), self.
-                                                  num_labels),
-            lambda: BertForSequenceClassification(BertModel(config), self.
-                                                  num_labels, self.dropout),
-            lambda: BertForSequenceClassification(bert=BertModel(config),
-                                                  num_labels=self.num_labels),
-            lambda: BertForSequenceClassification(bert=BertModel(config),
-                                                  num_classes=self.num_labels,
-                                                  dropout=self.dropout),
-        ]
-        for model_lambda in model_lambdas:
-            model: BertForSequenceClassification = model_lambda()
-            model.eval()
-            result = model(input_ids,
-                           attention_mask=input_mask,
-                           token_type_ids=token_type_ids,
-                           labels=sequence_labels)
-            self.parent.assertEqual(result[1].shape,
-                                    [self.batch_size, self.num_labels])
+        model = BertForSequenceClassification(config)
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=sequence_labels)
+        self.parent.assertEqual(result[1].shape,
+                                [self.batch_size, self.num_labels])
 
     def create_and_check_for_token_classification(
         self,
@@ -427,63 +360,27 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model_lambdas = [
-            lambda: BertForTokenClassification(config),
-            lambda: BertForTokenClassification(config, self.num_labels),
-            lambda: BertForTokenClassification(config, self.num_labels, self.
-                                               dropout),
-            lambda: BertForTokenClassification(config=config),
-            lambda: BertForTokenClassification(config=config,
-                                               num_labels=self.num_labels),
-            lambda: BertForTokenClassification(config=config,
-                                               num_classes=self.num_labels,
-                                               dropout=self.dropout),
-            lambda: BertForTokenClassification(BertModel(config)),
-            lambda: BertForTokenClassification(BertModel(config), self.
-                                               num_labels),
-            lambda: BertForTokenClassification(BertModel(config), self.
-                                               num_labels, self.dropout),
-            lambda: BertForTokenClassification(bert=BertModel(config)),
-            lambda: BertForTokenClassification(bert=BertModel(config),
-                                               num_labels=self.num_labels),
-            lambda: BertForTokenClassification(bert=BertModel(config),
-                                               num_classes=self.num_labels,
-                                               dropout=self.dropout),
-        ]
-        for model_lambda in model_lambdas:
-            model: BertForTokenClassification = model_lambda()
+        model = BertForTokenClassification(config),
 
-            model.eval()
-            result = model(input_ids,
-                           attention_mask=input_mask,
-                           token_type_ids=token_type_ids,
-                           labels=token_labels)
-            self.parent.assertEqual(
-                result[1].shape,
-                [self.batch_size, self.seq_length, self.num_labels])
+        model.eval()
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       labels=token_labels)
+        self.parent.assertEqual(
+            result[1].shape,
+            [self.batch_size, self.seq_length, self.num_labels])
 
     def test_addition_params(self, config: BertConfig, *args, **kwargs):
-        custom_num_labels, custom_dropout = 7, 0.98
+        config.num_labels = 7
+        config.classifier_dropout = 0.98
 
-        model_lambdas = [
-            lambda: BertForTokenClassification(config, custom_num_labels,
-                                               custom_dropout),
-            lambda: BertForTokenClassification(config=config,
-                                               num_labels=custom_num_labels,
-                                               dropout=custom_dropout),
-            lambda: BertForTokenClassification(BertModel(
-                config), custom_num_labels, custom_dropout),
-            lambda: BertForTokenClassification(bert=BertModel(config),
-                                               num_labels=custom_num_labels,
-                                               dropout=custom_dropout),
-        ]
-        for model_lambda in model_lambdas:
-            model: BertForTokenClassification = model_lambda()
-            model.eval()
+        model = BertForTokenClassification(config)
+        model.eval()
 
-            self.parent.assertEqual(model.classifier.weight.shape,
-                                    [config.hidden_size, custom_num_labels])
-            self.parent.assertEqual(model.dropout.p, custom_dropout)
+        self.parent.assertEqual(model.classifier.weight.shape,
+                                [config.hidden_size, 7])
+        self.parent.assertEqual(model.dropout.p, 0.98)
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -588,34 +485,6 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
     def test_params_compatibility_of_init_method(self):
         """test initing model with different params
         """
-
-        # 1. simple bert-model
-        bert_model = BertModel.from_pretrained('bert-base-uncased')
-
-        model = BertForTokenClassification(bert_model)
-        assert model.num_labels == 2
-        assert model.dropout.p == 0.1
-
-        model = BertForTokenClassification(bert_model, 4)
-        assert model.num_labels == 4
-        assert model.dropout.p == 0.1
-
-        model = BertForTokenClassification(bert_model, 4, dropout=0.3)
-        assert model.num_labels == 4
-        assert model.dropout.p == 0.3
-
-        model = BertForTokenClassification(bert_model,
-                                           num_classes=4,
-                                           dropout=0.3)
-        assert model.num_labels == 4
-        assert model.dropout.p == 0.3
-
-        model = BertForTokenClassification(bert_model,
-                                           num_labels=4,
-                                           dropout=0.3)
-        assert model.num_labels == 4
-        assert model.dropout.p == 0.3
-
         model: BertForTokenClassification = BertForTokenClassification.from_pretrained(
             "bert-base-uncased", num_classes=4, dropout=0.3)
         assert model.num_labels == 4
@@ -716,34 +585,27 @@ class BertCompatibilityTest(unittest.TestCase):
     @slow
     def test_bert_save_token_load(self):
         """bert -> token"""
-        print("test_bert_save_token_load")
         from paddlenlp.transformers import BertModel, BertForTokenClassification
         saved_dir = os.path.join(self.get_tempdir(), 'bert-saved')
         bert: BertModel = BertModel.from_pretrained("bert-base-uncased")
         bert.save_pretrained(saved_dir)
 
         bert_for_token = BertForTokenClassification.from_pretrained(saved_dir)
-        self.compare_two_weight(
-            bert.state_dict()['encoder.layers.8.linear2.weight'],
-            bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
+        self.compare_two_model(bert, bert_for_token)
 
     @slow
     def test_bert_save_bert_load(self):
         """bert -> bert"""
-        print("test_bert_save_bert_load")
         saved_dir = os.path.join(self.get_tempdir(), 'bert-saved')
         bert: BertModel = BertModel.from_pretrained("bert-base-uncased")
         bert.save_pretrained(saved_dir)
 
         bert_loaded = BertModel.from_pretrained(saved_dir)
-        self.compare_two_weight(
-            bert.state_dict()['encoder.layers.8.linear2.weight'],
-            bert_loaded.state_dict()['encoder.layers.8.linear2.weight'])
+        self.compare_two_model(bert, bert_loaded)
 
     @slow
     def test_token_saved_bert_load(self):
         """token -> bert"""
-        print("test_token_saved_bert_load")
         from paddlenlp.transformers import BertModel, BertForTokenClassification
         saved_dir = os.path.join(self.get_tempdir(), 'bert-token-saved')
         bert_for_token = BertForTokenClassification.from_pretrained(
@@ -751,14 +613,11 @@ class BertCompatibilityTest(unittest.TestCase):
         bert_for_token.save_pretrained(saved_dir)
 
         bert = BertModel.from_pretrained(saved_dir)
-        self.compare_two_weight(
-            bert.state_dict()['encoder.layers.8.linear2.weight'],
-            bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
+        self.compare_two_model(bert, bert_for_token)
 
     @slow
     def test_token_saved_token_load(self):
         """token -> token"""
-        print("test_token_saved_token_load")
         saved_dir = os.path.join(self.get_tempdir(), 'bert-token-saved')
         bert_for_token = BertForTokenClassification.from_pretrained(
             "bert-base-uncased")
@@ -766,12 +625,9 @@ class BertCompatibilityTest(unittest.TestCase):
 
         bert_for_token_loaded = BertForTokenClassification.from_pretrained(
             saved_dir)
-        self.compare_two_weight(
-            bert_for_token_loaded.state_dict()
-            ['bert.encoder.layers.8.linear2.weight'],
-            bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
+        self.compare_two_model(bert_for_token, bert_for_token_loaded)
 
-    @slow
+    # @slow
     def test_auto_model(self):
         AutoModel.from_pretrained("bert-base-uncased")
         model = AutoModelForTokenClassification.from_pretrained(

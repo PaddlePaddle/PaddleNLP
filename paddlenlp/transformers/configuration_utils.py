@@ -722,6 +722,8 @@ class PretrainedConfig:
                                                                    os.PathLike],
                          **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
+        force_download = kwargs.pop("force_download", False)
+
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, kwargs,
                                       cls.pretrained_init_configuration)
 
@@ -745,7 +747,9 @@ class PretrainedConfig:
         # 2. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url(
-                pretrained_model_name_or_path, cache_dir)
+                pretrained_model_name_or_path,
+                cache_dir,
+                check_exist=not force_download)
         # 3. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
@@ -1043,126 +1047,4 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     return configuration_file
 
 
-def _construct_kwargs(args, kwargs: Dict[str, Any],
-                      fields: List[Union[str, Tuple[str, Any]]]):
-    """construct kwargs with `args`, `kwargs` and `fields`
-
-    Examples:
-        fields = ["hidden_size", ("dropout", 0)]
-
-    Args:
-        args (tuple): args of method
-        kwargs (Dict[str, Any]): key-word args
-        fields (List[Union[str, Tuple[str, Any]]]): name of old method parameters, and can be with default value
-
-    Returns:
-        Dict[str, Any]: the final kwargs
-    """
-    args = args or ()
-    # 1. convert args into kwargs
-    for index, arg in enumerate(args):
-        # if parameters is: (a,b,c), but args is (1, 2), kwargs is {b=3, c=4} -> (1, 2, b=3, c=4)
-        assert fields[
-            index] not in kwargs, f"{index}th field<{fields[index]}> is already in kwargs, but you have set it twice"
-
-        field = fields[index]
-        # field can be str or list/tuple, eg: [("num_labels", 2), ("dropout", 0.3)]
-        if isinstance(field, (list, tuple)):
-            field = field[0]
-
-        kwargs[field] = arg
-
-    # 2. check that fields is with default values
-    fields = fields or []
-    for field in fields:
-        if isinstance(field, str):
-            continue
-        assert len(
-            field
-        ) == 2, 'fields should be: `field` or (`field`, `field_default_value`)'
-
-        key, value = field
-        if key not in kwargs:
-            kwargs[key] = value
-
-    return kwargs
-
-
 PretrainedConfigClass = TypeVar("PretrainedConfigClass")
-
-
-def parse_config(
-    config_or_model: Optional[Union[PretrainedConfig, PretrainedModel]] = None,
-    config_class: Type[PretrainedConfigClass] = None,
-    args: Tuple[Any] = None,
-    kwargs: Dict[str, Any] = None,
-    fields: Optional[List[str]] = None,
-    return_model: bool = True,
-    return_unused_kwargs: bool = False
-) -> Tuple[PretrainedConfigClass, PretrainedModel]:
-    """parse config from config & kwargs
-
-    Args:
-        config (Optional[PretrainedConfig], optional): the new config instance. Defaults to None.
-        config_class (PretrainedConfig): the class of the target config class
-        args (Tuple[Any]): the source arg list
-        kwargs (Dict[str, Any]): the source of the parameters of initialization method
-        fields (Optional[List[str]], optional): the old fields of kwargs
-    
-    Returns:
-        [config, [PretrainedModel], [unsed_kwargs]]
-    """
-    # import locally to avoid circular reference
-    from paddlenlp.transformers.model_utils import PretrainedModel
-    # 0. pop config and pretrained model
-    for index in range(len(args)):
-        if isinstance(args[index], (PretrainedConfig, PretrainedModel)):
-            config_or_model = args[index]
-            args = args[0:index] + args[index + 1:]
-            break
-
-    for key in list(kwargs.keys()):
-        if isinstance(kwargs[key], (PretrainedConfig, PretrainedModel)):
-            config_or_model = kwargs.pop(key)
-            break
-
-    # 1. if `config_or_model` is Model, so construct args and kwargs to init config
-    model = None
-    unused_kwargs = {}
-
-    if isinstance(config_or_model, PretrainedModel):
-        unused_kwargs = _construct_kwargs(args, kwargs, fields)
-        config = config_or_model.config
-        model = config_or_model
-
-    # 2. if `config_or_model` is Config, so construct args and kwargs to init model
-    elif isinstance(config_or_model, config_class):
-        unused_kwargs = _construct_kwargs(args, kwargs, fields)
-        config = config_or_model
-    else:
-        # 3. create config and use it to init model
-        args = args or ()
-        if config_or_model is not None:
-            args = (config_or_model, ) + args
-
-        # TODO(wj-Mcat): return unused_kwargs
-        kwargs = _construct_kwargs(args, kwargs, fields)
-        config = config_class(**kwargs)
-
-    # map the attribute to config
-    if len(unused_kwargs) > 0:
-        for old_key, new_key in config.attribute_map.items():
-            if old_key in unused_kwargs:
-                config[new_key] = unused_kwargs.pop(old_key)
-
-        # map the valid attr into the config, eg: num_labels
-        for key in list(unused_kwargs.keys()):
-            setattr(config, key, unused_kwargs.pop(key))
-
-    outputs = (config, )
-    if return_model:
-        outputs = outputs + (model, )
-    if return_unused_kwargs:
-        outputs = outputs + (unused_kwargs, )
-
-    return outputs[0] if len(outputs) == 1 else outputs
