@@ -448,7 +448,7 @@ class GPTDataset(paddle.io.Dataset):
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
-        attention_mask = loss_mask
+        attention_mask = np.ones(seq_length, dtype="int64")
         labels = np.array(labels, dtype="int64")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
 
