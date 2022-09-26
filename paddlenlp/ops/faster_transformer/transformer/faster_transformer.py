@@ -1418,6 +1418,7 @@ class FasterMBART(MBartPretrainedModel):
 
     def forward(self,
                 input_ids=None,
+                forced_bos_token_ids=None,
                 encoder_output=None,
                 seq_len=None,
                 forced_bos_token_id=None,
@@ -1474,22 +1475,24 @@ class FasterMBART(MBartPretrainedModel):
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
 
-        if forced_bos_token_id is not None:
-            if decode_strategy == "sampling":
-                trg_word = paddle.full([batch_size * num_return_sequences, 1],
-                                       forced_bos_token_id,
-                                       dtype="int32")
+        if forced_bos_token_ids is None:
+            if forced_bos_token_id is not None:
+                if decode_strategy == "sampling":
+                    forced_bos_token_ids = paddle.full(
+                        [batch_size * num_return_sequences, 1],
+                        forced_bos_token_id,
+                        dtype="int32")
+                else:
+                    forced_bos_token_ids = paddle.full([batch_size, 1],
+                                                       forced_bos_token_id,
+                                                       dtype="int32")
             else:
-                trg_word = paddle.full([batch_size, 1],
-                                       forced_bos_token_id,
-                                       dtype="int32")
-        else:
-            trg_word = paddle.zeros([0])
+                forced_bos_token_ids = paddle.zeros([0])
 
         return self.decoding(enc_output=encoder_output,
                              memory_seq_lens=seq_len,
                              beam_size=num_beams,
-                             trg_word=trg_word,
+                             trg_word=forced_bos_token_ids,
                              top_k=top_k,
                              top_p=top_p,
                              decoding_strategy=decode_strategy,
