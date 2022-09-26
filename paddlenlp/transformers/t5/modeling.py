@@ -1903,7 +1903,7 @@ T5EncoderModel.base_model_class = T5EncoderModel
 
 def convert_encoder_output(encoder_output):
     """
-    Convert encoder_output which type is tuple to an instance of BaseModelOutput.
+    Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`.
     
     Args: 
         encoder_output (tuple or ModleOutput):
