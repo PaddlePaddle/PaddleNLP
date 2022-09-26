@@ -21,7 +21,6 @@ limitations under the License. */
 #include "faster_tokenizer/postprocessors/postprocessor.h"
 #include "faster_tokenizer/utils/utils.h"
 #include "faster_tokenizer/utils/variant.h"
-#include "glog/logging.h"
 #include "nlohmann/json.hpp"
 
 namespace paddlenlp {

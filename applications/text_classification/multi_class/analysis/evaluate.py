@@ -52,14 +52,14 @@ def preprocess_function(examples, tokenizer, max_seq_length, is_test=False):
     return result
 
 
-def read_local_dataset(path, label_list):
+def read_local_dataset(path, label_map):
     """
     Read dataset file
     """
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
             sentence, label = line.strip().split('\t')
-            yield {'text': sentence, 'label': label_list[label]}
+            yield {'text': sentence, 'label': label_map[label]}
 
 
 @paddle.no_grad()
@@ -85,20 +85,20 @@ def evaluate():
     train_path = os.path.join(args.dataset_dir, args.train_file)
     dev_path = os.path.join(args.dataset_dir, args.dev_file)
 
-    label_list = {}
     label_map = {}
+    label_list = []
     with open(label_path, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):
             l = line.strip()
-            label_list[l] = i
-            label_map[i] = l
+            label_map[l] = i
+            label_list.append(l)
     train_ds = load_dataset(read_local_dataset,
                             path=train_path,
-                            label_list=label_list,
+                            label_map=label_map,
                             lazy=False)
     dev_ds = load_dataset(read_local_dataset,
                           path=dev_path,
-                          label_list=label_list,
+                          label_map=label_map,
                           lazy=False)
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
@@ -157,33 +157,48 @@ def evaluate():
     logger.info("Accuracy in dev dataset: {:.2f}%".format(report['accuracy'] *
                                                           100))
     logger.info("Top-2 accuracy in dev dataset: {:.2f}%".format(
-        top_k_accuracy_score(labels, probs, k=2) * 100))
+        top_k_accuracy_score(y_true=labels,
+                             y_score=probs,
+                             k=2,
+                             labels=list(range(len(label_list)))) * 100))
     logger.info("Top-3 accuracy in dev dataset: {:.2f}%".format(
-        top_k_accuracy_score(labels, probs, k=3) * 100))
-    for i in label_map:
-        logger.info("Class name: {}".format(label_map[i]))
-        logger.info(
-            "Evaluation examples in train dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
-            .format(report_train[str(i)]['support'],
-                    100 * report_train[str(i)]['support'] / len(train_ds),
-                    report_train[str(i)]['precision'] * 100,
-                    report_train[str(i)]['recall'] * 100,
-                    report_train[str(i)]['f1-score'] * 100))
-        logger.info(
-            "Evaluation examples in dev dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
-            .format(report[str(i)]['support'],
-                    100 * report[str(i)]['support'] / len(dev_ds),
-                    report[str(i)]['precision'] * 100,
-                    report[str(i)]['recall'] * 100,
-                    report[str(i)]['f1-score'] * 100))
+        top_k_accuracy_score(y_true=labels,
+                             y_score=probs,
+                             k=3,
+                             labels=list(range(len(label_list)))) * 100))
+
+    for i, l in enumerate(label_list):
+        logger.info("Class name: {}".format(l))
+        i = str(i)
+        if i in report_train:
+            logger.info(
+                "Evaluation examples in train dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
+                .format(report_train[i]['support'],
+                        100 * report_train[i]['support'] / len(train_ds),
+                        report_train[i]['precision'] * 100,
+                        report_train[i]['recall'] * 100,
+                        report_train[i]['f1-score'] * 100))
+        else:
+            logger.info("Evaluation examples in train dataset: 0 (0%)")
+
+        if i in report:
+            logger.info(
+                "Evaluation examples in dev dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
+                .format(report[i]['support'],
+                        100 * report[i]['support'] / len(dev_ds),
+                        report[i]['precision'] * 100, report[i]['recall'] * 100,
+                        report[i]['f1-score'] * 100))
+        else:
+            logger.info("Evaluation examples in dev dataset: 0 (0%)")
+
         logger.info("----------------------------")
     with open(args.bad_case_path, 'w', encoding="utf-8") as f:
         f.write("Confidence\tPrediction\tLabel\tText\n")
         for i, (p, l) in enumerate(zip(preds, labels)):
             p, l = int(p), int(l)
             if p != l:
-                f.write("{:.2f}".format(probs[i][p]) + "\t" + label_map[p] +
-                        "\t" + label_map[l] + "\t" + dev_ds.data[i]["text"] +
+                f.write("{:.2f}".format(probs[i][p]) + "\t" + label_list[p] +
+                        "\t" + label_list[l] + "\t" + dev_ds.data[i]["text"] +
                         "\n")
     f.close()
     logger.info("Bad case in dev dataset saved in {}".format(

@@ -32,7 +32,8 @@ parser.add_argument("--output_path", type=str, default='./output',
                     help="The path of model parameter in static graph to be saved.")
 parser.add_argument("--output_emb_size", default=0,
                     type=int, help="output_embedding_size")
-parser.add_argument("--model_name_or_path",default='rocketqa-zh-dureader-query-encoder',type=str,help='The pretrained model used for training')
+parser.add_argument("--model_name_or_path", default='rocketqa-zh-dureader-query-encoder',
+                    type=str, help='The pretrained model used for training')
 args = parser.parse_args()
 # yapf: enable
 
@@ -46,7 +47,9 @@ if __name__ == "__main__":
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-
+    else:
+        raise ValueError(
+            "Please set --params_path with correct pretrained model file")
     model.eval()
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(
