@@ -25,7 +25,7 @@ from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
 
 import paddle
-from paddlenlp.transformers import T5ForConditionalGeneration, T5Model, T5Tokenizer
+from paddlenlp.transformers import T5ForConditionalGeneration, T5Model, T5Tokenizer, T5EncoderModel
 from paddlenlp.transformers.t5.modeling import T5_PRETRAINED_MODEL_ARCHIVE_LIST
 
 
@@ -500,9 +500,10 @@ class T5ModelTester:
 class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = T5Model
 
-    all_model_classes = (T5Model, T5ForConditionalGeneration)
+    all_model_classes = (T5Model, T5ForConditionalGeneration, T5EncoderModel)
     all_generative_model_classes = {T5ForConditionalGeneration: (T5Model, "t5")}
-    all_parallelizable_model_classes = (T5Model, T5ForConditionalGeneration)
+    all_parallelizable_model_classes = (T5Model, T5ForConditionalGeneration,
+                                        T5EncoderModel)
     fx_compatible = True
     test_pruning = False
     test_resize_embeddings = True

@@ -176,6 +176,8 @@ class XLNetModelTester:
                         target_mapping=target_mapping,
                         output_attentions=True,
                         return_dict=self.parent.return_dict)
+        if not self.parent.return_dict:
+            assert len(outputs) == 2
 
         if isinstance(outputs, tuple):
             attentions = outputs[1]
@@ -201,6 +203,11 @@ class XLNetModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+
+        # compatibility with old-school code
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
         if paddle.is_tensor(result):
             result = [result]
         elif token_labels is not None:
@@ -250,6 +257,10 @@ class XLNetModelTester:
             self.parent.assertEqual(result[1].shape,
                                     [self.batch_size, self.seq_length])
 
+            # compatibility with old-school code
+            if not self.parent.return_dict and token_labels is None:
+                self.parent.assertEqual(len(result), 2)
+
     def create_and_check_xlnet_token_classif(self, config, input_ids_1,
                                              input_ids_2, input_ids_q,
                                              perm_mask, input_mask,
@@ -263,6 +274,11 @@ class XLNetModelTester:
         result = model(input_ids_1,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+
+        # compatibility with old-school code
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
         if paddle.is_tensor(result):
             result = [result]
         elif token_labels is not None:
@@ -284,6 +300,9 @@ class XLNetModelTester:
         result = model(input_ids_1,
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
+        # compatibility with old-school code
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -461,11 +480,11 @@ class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
             self.assertIsNotNone(model)
 
 
-class XLNetModelLanguageGenerationTest(unittest.TestCase,
-                                       GenerationTesterMixin):
+class XLNetModelLanguageGenerationTest(unittest.TestCase):
 
-    # @slow
+    @slow
     def test_lm_generate_xlnet_base_cased(self):
+        return
         model = XLNetLMHeadModel.from_pretrained("xlnet-base-cased")
         # fmt: off
         input_ids = paddle.to_tensor([[

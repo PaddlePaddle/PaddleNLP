@@ -106,7 +106,7 @@ python codegen_server.py
 
 ##### 配置参数说明
 在codegen_server.py中配置如下参数：
-- `model_name_or_path`：模型名，默认为 "Salesforce/codegen-2B-mono"
+- `model_name_or_path`：模型名，默认为 "Salesforce/codegen-350M-mono"
 - `device`：运行设备，默认为"gpu"
 - `temperature`：解码参数temperature，默认为0.5
 - `top_k`：解码参数top_k，默认为10
@@ -114,7 +114,7 @@ python codegen_server.py
 - `repetition_penalty`：解码重复惩罚项，默认为1.0
 - `min_length`：生成的最小长度，默认为0
 - `max_length`：生成的最大长度，默认为16
-- `decode_strategy`：解码策略，默认为"sampling"
+- `decode_strategy`：解码策略，默认为"greedy_search"
 - `load_state_as_np`：以numpy格式加载模型参数，可节省显存，默认为True
 - `use_faster`：是否使用Fastergeneration，可加速推理，默认为True
 - `use_fp16_decoding`：是否使用fp16推理，可节省显存和加速推理，默认为True
@@ -165,7 +165,16 @@ print(result)
 - 如果使用FasterGeneration，需要设置[codegen_server.py](#配置参数说明)中`use_faster=True`，第一次推理会涉及到编译，会耗费一些时间。FasterGeneration的环境依赖参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E)。
 - 如果要使用自己训练好的模型，可以设置[codegen_server.py](#配置参数说明)中`model_name_or_path`为本地模型路径。
 - 如果要从本地访问服务器，上述的`127.0.0.1`需要换成服务器的对外IP。
-
+- 如果出现下方的提示和报错，则说明FasterGeneration没有启动成功，需要定位下失败的原因。或者也可设置`use_faster=False`，不启动FasterGeneration加速，但推理速度会较慢。
+```shell
+  FasterGeneration is not available, and the original version would be used instead.
+```
+```shell
+  RuntimeError: (NotFound) There are no kernels which are registered in the unsqueeze2 operator.
+  [Hint: Expected kernels_iter != all_op_kernels.end(), but received kernels_iter == all_op_kernels.end().] (at /home/Paddle/paddle/fluid/imperative/prepared_operator.cc:341)
+  [operator < unsqueeze2 > error]
+```
+- 本代码也支持插件[fauxpilot](https://marketplace.visualstudio.com/items?itemName=Venthe.fauxpilot)，感谢[@linonetwo](https://github.com/linonetwo)测试。`settings.json`中配置"fauxpilot.server": "http://服务器ip:8978/v1/engines"
 
 ## 训练定制
 
@@ -307,3 +316,4 @@ hello_world()
 ## References
 - Nijkamp, Erik, et al. "A conversational paradigm for program synthesis." arXiv preprint arXiv:2203.13474 (2022).
 - [https://github.com/features/copilot/](https://github.com/features/copilot/)
+- [https://github.com/AndPuQing/Papilot](https://github.com/AndPuQing/Papilot)
