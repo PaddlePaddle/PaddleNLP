@@ -934,7 +934,7 @@ class PretrainedModel(Layer, GenerationMixin):
         Args:
             model (PretrainedModel): the pretrained model instance
             state_dict (Dict[str, Tensor]): the model state dict data
-            loaded_keys (List[str]): 
+            loaded_keys (List[str]):
             ignore_mismatched_sizes (bool, optional): whether ignore error when tensor size mismatched. Defaults to False.
             dtype (_type_, optional): the dtype of model state dict. Defaults to None.
 
@@ -993,18 +993,6 @@ class PretrainedModel(Layer, GenerationMixin):
         if len(cls.base_model_prefix) > 0 and not hasattr(
                 model, cls.base_model_prefix) and has_prefix_module:
             start_prefix = cls.base_model_prefix + "."
-        if len(cls.base_model_prefix) > 0 and hasattr(
-                model, cls.base_model_prefix) and not has_prefix_module:
-            model_to_load = getattr(model, cls.base_model_prefix)
-            if any(key in expected_keys_not_prefixed for key in loaded_keys):
-                raise ValueError(
-                    "The state dictionary of the model you are trying to load is corrupted. Are you sure it was "
-                    "properly saved?")
-            if device_map is not None:
-                device_map = {
-                    k.replace(f"{cls.base_model_prefix}.", ""): v
-                    for k, v in device_map.items()
-                }
 
         def _find_mismatched_keys(
             state_dict,
@@ -1044,11 +1032,42 @@ class PretrainedModel(Layer, GenerationMixin):
             ignore_mismatched_sizes,
         )
 
-        # remove the prefix
-        if start_prefix:
+        start_prefix = prefix + '.'
+
+        # `add_prefix_to_model` and `remove_prefix_from_model` are for different situation,
+        # you can check the following matrix, which means:
+        # the value of cell: (add_prefix_to_model, remove_prefix_from_model)
+        # the load/Init-Base is the state-dict which don't contain `prefix`.
+        # the load/Init-DownStream is the state-dict which contain the `prefix`
+        #
+        # |                 | load-Base | load-DownStream |
+        # |-----------------|-----------|-----------------|
+        # | Init-Base       | F,F       | T,F             |
+        # | Init-DonwStream | F,T       | F,F             |
+        #
+        # the above value matrix will help you understand the following code.
+        if add_prefix_to_model:
             for key in list(state_dict.keys()):
                 if key.startswith(start_prefix):
-                    state_dict[key.replace(start_prefix, '')] = state_dict[key]
+                    state_dict[key.replace(start_prefix,
+                                           '')] = state_dict.pop(key)
+
+        if remove_prefix_from_model:
+            for key in list(state_dict.keys()):
+                state_dict[start_prefix + key] = state_dict.pop(key)
+
+        # convert the dtype of state dict
+        if dtype is not None:
+            if isinstance(dtype, paddle.dtype):
+                dtype = str(dtype)[7:]
+
+            if dtype not in ['float32', 'float16']:
+                raise ValueError(
+                    f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}"
+                )
+            for key in state_to_load.keys():
+                state_to_load[key] = paddle.cast(state_to_load[key],
+                                                 dtype=dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
@@ -1057,11 +1076,6 @@ class PretrainedModel(Layer, GenerationMixin):
             model_to_load, state_dict)
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
-
-        #     if track_download:
-        #         download_check(pretrained_model_name_or_path, "from_pretrained")
-        # if track_download:
-        #     download_check(pretrained_model_name_or_path, "from_pretrained")
 
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 

@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+import os
+import tempfile
+from typing import List
 
 import unittest
 import paddle
@@ -20,8 +23,10 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
+from paddlenlp import __version__ as current_version
 
 from paddlenlp.transformers.bert.configuration import BertConfig
+from paddlenlp.utils import install_package, uninstall_package
 
 from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
 from ...testing_utils import slow
@@ -614,12 +619,123 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
         assert model.dropout.p == 0.3
 
 
-class BertModelPretrainedTest(unittest.TestCase):
+class BertCompatibilityTest(unittest.TestCase):
 
     def test_model_config_mapping(self):
         config = BertConfig(num_labels=22, hidden_dropout_prob=0.99)
         self.assertEqual(config.hidden_dropout_prob, 0.99)
         self.assertEqual(config.num_labels, 22)
+
+    def setUp(self) -> None:
+        self.tempdirs: List[tempfile.TemporaryDirectory] = []
+
+    def tearDown(self) -> None:
+        for tempdir in self.tempdirs:
+            tempdir.cleanup()
+
+    def get_tempdir(self) -> str:
+        tempdir = tempfile.TemporaryDirectory()
+        self.tempdirs.append(tempdir)
+        return tempdir.name
+
+    def run_token_for_classification(self, version: str):
+        install_package('paddlenlp', version=version)
+
+        from paddlenlp import __version__
+        self.assertEqual(__version__, version)
+        from paddlenlp.transformers import BertForTokenClassification, BertModel
+        tempdir = self.get_tempdir()
+
+        # prepare the old version of model
+        base_model: BertModel = BertModel.from_pretrained("bert-base-uncased")
+
+        model: BertForTokenClassification = BertForTokenClassification.from_pretrained(
+            "bert-base-uncased", num_classes=4, dropout=0.3)
+        model.save_pretrained(tempdir)
+
+        uninstall_package('paddlenlp')
+        from paddlenlp import __version__
+        self.assertEqual(__version__, current_version)
+
+        from paddlenlp.transformers import BertForTokenClassification, BertModel
+
+        model: BertForTokenClassification = BertForTokenClassification.from_pretrained(
+            tempdir)
+        self.compare_two_weight(
+            base_model.state_dict()['encoder.layers.8.linear2.weight'],
+            model.state_dict()['bert.encoder.layers.8.linear2.weight'])
+        self.assertEqual(model.num_labels, 4)
+        self.assertEqual(model.dropout.p, 0.3)
+
+    def compare_two_weight(self, first_tensor, second_tensor):
+        diff = paddle.sum(first_tensor - second_tensor).numpy().item()
+        self.assertEqual(diff, 0.0)
+
+    @slow
+    def test_paddlenlp_token_classification(self):
+        versions = ['2.2.2', '2.3.0', '2.3.4', '2.3.7', '2.4.0']
+        for version in versions:
+            install_package("paddlenlp", version=version)
+            self.run_token_for_classification(version)
+            uninstall_package('paddlenlp')
+
+    @slow
+    def test_bert_save_token_load(self):
+        """bert -> token"""
+        print("test_bert_save_token_load")
+        from paddlenlp.transformers import BertModel, BertForTokenClassification
+        saved_dir = os.path.join(self.get_tempdir(), 'bert-saved')
+        bert: BertModel = BertModel.from_pretrained("bert-base-uncased")
+        bert.save_pretrained(saved_dir)
+
+        bert_for_token = BertForTokenClassification.from_pretrained(saved_dir)
+        self.compare_two_weight(
+            bert.state_dict()['encoder.layers.8.linear2.weight'],
+            bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
+
+    @slow
+    def test_bert_save_bert_load(self):
+        """bert -> bert"""
+        print("test_bert_save_bert_load")
+        saved_dir = os.path.join(self.get_tempdir(), 'bert-saved')
+        bert: BertModel = BertModel.from_pretrained("bert-base-uncased")
+        bert.save_pretrained(saved_dir)
+
+        bert_loaded = BertModel.from_pretrained(saved_dir)
+        self.compare_two_weight(
+            bert.state_dict()['encoder.layers.8.linear2.weight'],
+            bert_loaded.state_dict()['encoder.layers.8.linear2.weight'])
+
+    @slow
+    def test_token_saved_bert_load(self):
+        """token -> bert"""
+        print("test_token_saved_bert_load")
+        from paddlenlp.transformers import BertModel, BertForTokenClassification
+        saved_dir = os.path.join(self.get_tempdir(), 'bert-token-saved')
+        bert_for_token = BertForTokenClassification.from_pretrained(
+            "bert-base-uncased")
+        bert_for_token.save_pretrained(saved_dir)
+
+        bert = BertModel.from_pretrained(saved_dir)
+        self.compare_two_weight(
+            bert.state_dict()['encoder.layers.8.linear2.weight'],
+            bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
+
+    @slow
+    def test_token_saved_token_load(self):
+        """token -> token"""
+        print("test_token_saved_token_load")
+        saved_dir = os.path.join(self.get_tempdir(), 'bert-token-saved')
+        bert_for_token = BertForTokenClassification.from_pretrained(
+            "bert-base-uncased")
+        bert_for_token.save_pretrained(saved_dir)
+
+        bert_for_token_loaded = BertForTokenClassification.from_pretrained(
+            saved_dir)
+        self.compare_two_weight(
+            bert_for_token_loaded.state_dict()
+            ['bert.encoder.layers.8.linear2.weight'],
+            bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
 
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
