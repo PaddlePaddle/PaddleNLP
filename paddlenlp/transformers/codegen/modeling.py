@@ -412,6 +412,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         self,
         input_ids=None,
         attention_mask=None,
+        token_type_ids=None,
         use_cache=False,
         cache=None,
     ):
@@ -476,6 +477,10 @@ class CodeGenModel(CodeGenPreTrainedModel):
             attention_mask.stop_gradient = True
 
         inputs_embeds = self.wte(input_ids)
+        if token_type_ids is not None:
+            token_type_embeds = self.wte(token_type_ids)
+            inputs_embeds = inputs_embeds + token_type_embeds
+
         hidden_states = self.drop(inputs_embeds)
         output_shape = input_shape[:] + [hidden_states.shape[-1]]
 
@@ -572,6 +577,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
     def forward(self,
                 input_ids=None,
                 attention_mask=None,
+                token_type_ids=None,
                 use_cache=False,
                 cache=None):
         r"""
@@ -606,6 +612,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
 
         transformer_outputs = self.transformer(input_ids,
                                                attention_mask=attention_mask,
+                                               token_type_ids=token_type_ids,
                                                use_cache=use_cache,
                                                cache=cache)
 
