@@ -469,14 +469,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
             past_length = cache[0][0].shape[-2]
 
         # Attention mask.
-        if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating attention_mask"
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
-        # For 2D attention_mask from tokenizer
-        elif attention_mask.ndim == 2:
+        if attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
