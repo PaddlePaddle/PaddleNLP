@@ -57,7 +57,7 @@ python data/download_data.py --resource data.retriever.qas.nq
 ## 模型训练
 ### 基于 [Dense Passage Retriever](https://arxiv.org/abs/2004.04906) 策略训练
 ```
-python train_dense_encoder.py \
+python train_gradient_cache_DPR.py \
    --batch_size 128 \
    --learning_rate 2e-05 \
    --save_dir save_biencoder
