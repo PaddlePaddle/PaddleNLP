@@ -23,9 +23,12 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
     BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
+from paddlenlp.transformers import (AutoModel, AutoModelForTokenClassification,
+                                    AutoModelForQuestionAnswering)
 from paddlenlp import __version__ as current_version
 
 from paddlenlp.transformers.bert.configuration import BertConfig
+from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils import install_package, uninstall_package
 
 from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
@@ -647,11 +650,14 @@ class BertCompatibilityTest(unittest.TestCase):
         tempdir = self.get_tempdir()
 
         # prepare the old version of model
-        base_model: BertModel = BertModel.from_pretrained("bert-base-uncased")
+        old_model = BertModel.from_pretrained("bert-base-uncased")
+        old_model_path = os.path.join(tempdir, 'old-model')
+        old_model.save_pretrained(old_model_path)
 
-        model: BertForTokenClassification = BertForTokenClassification.from_pretrained(
+        old_model_for_token = BertForTokenClassification.from_pretrained(
             "bert-base-uncased", num_classes=4, dropout=0.3)
-        model.save_pretrained(tempdir)
+        old_model_for_token_path = os.path.join(tempdir, 'old-model-for-token')
+        old_model_for_token.save_pretrained(old_model_for_token_path)
 
         uninstall_package('paddlenlp')
         from paddlenlp import __version__
@@ -659,13 +665,41 @@ class BertCompatibilityTest(unittest.TestCase):
 
         from paddlenlp.transformers import BertForTokenClassification, BertModel
 
-        model: BertForTokenClassification = BertForTokenClassification.from_pretrained(
-            tempdir)
-        self.compare_two_weight(
-            base_model.state_dict()['encoder.layers.8.linear2.weight'],
-            model.state_dict()['bert.encoder.layers.8.linear2.weight'])
+        # bert: from old bert
+        model = BertModel.from_pretrained(old_model_path)
+        self.compare_two_model(old_model, model)
+
+        # bert: from old bert-for-token
+        model = BertModel.from_pretrained(old_model_for_token_path)
+        self.compare_two_model(old_model, model)
+
+        # bert-for-token: from old bert
+        model = BertForTokenClassification.from_pretrained(old_model_path)
+        self.compare_two_model(old_model_for_token, model)
+        self.assertNotEqual(model.num_labels, 4)
+        self.assertNotEqual(model.dropout.p, 0.3)
+
+        # bert-for-token: from old bert-for-token
+        model = BertForTokenClassification.from_pretrained(
+            old_model_for_token_path)
+        self.compare_two_model(old_model_for_token, model)
         self.assertEqual(model.num_labels, 4)
         self.assertEqual(model.dropout.p, 0.3)
+
+    def compare_two_model(self, first_model: PretrainedModel,
+                          second_model: PretrainedModel):
+
+        first_weight_name = 'encoder.layers.8.linear2.weight'
+        if first_model.__class__.__name__ != 'BertModel':
+            first_weight_name = 'bert.' + first_weight_name
+
+        second_weight_name = 'encoder.layers.8.linear2.weight'
+        if second_model.__class__.__name__ != 'BertModel':
+            second_weight_name = 'bert.' + second_weight_name
+
+        first_tensor = first_model.state_dict()[first_weight_name]
+        second_tensor = second_model.state_dict()[second_weight_name]
+        self.compare_two_weight(first_tensor, second_tensor)
 
     def compare_two_weight(self, first_tensor, second_tensor):
         diff = paddle.sum(first_tensor - second_tensor).numpy().item()
@@ -736,6 +770,18 @@ class BertCompatibilityTest(unittest.TestCase):
             bert_for_token_loaded.state_dict()
             ['bert.encoder.layers.8.linear2.weight'],
             bert_for_token.state_dict()['bert.encoder.layers.8.linear2.weight'])
+
+    @slow
+    def test_auto_model(self):
+        AutoModel.from_pretrained("bert-base-uncased")
+        model = AutoModelForTokenClassification.from_pretrained(
+            "bert-base-uncased", num_classes=4, dropout=0.3)
+        self.assertEqual(model.num_labels, 4)
+        self.assertEqual(model.dropout.p, 0.3)
+
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            "bert-base-uncased", dropout=0.3)
+        self.assertEqual(model.dropout.p, 0.3)
 
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
