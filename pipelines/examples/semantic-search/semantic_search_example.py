@@ -114,7 +114,7 @@ def get_faiss_retriever(use_gpu):
 
         # save index
         document_store.save(args.index_name)
-    return document_store
+    return retriever
 
 
 def get_milvus_retriever(use_gpu):

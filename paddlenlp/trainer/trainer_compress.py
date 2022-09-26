@@ -36,11 +36,16 @@ from ..transformers.ofa_utils import *
 from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 from ..metrics import ChunkEvaluator
 from ..metrics.squad import squad_evaluate, compute_prediction
-
 from .trainer_base import Trainer
 
 
-def compress(self, custom_evaluate=None, custom_dynabert_calc_loss=None):
+def global_try_import_slim():
+    global paddleslim
+    try_import('paddleslim')
+    import paddleslim
+
+
+def compress(self, custom_evaluate=None):
     """
     Supports pruning DynaBERT and post-training quantization. If both are
     needed, pruning DynaBERT would be performed before quantizaton.
@@ -48,17 +53,15 @@ def compress(self, custom_evaluate=None, custom_dynabert_calc_loss=None):
     args = self.args
     self.custom_evaluate = custom_evaluate
     if "dynabert" in args.strategy:
-        try_import('paddleslim')
+        global_try_import_slim()
         if self.args.width_mult_list is not None:
             self.args.width_mult_list = [
                 eval(width_mult) for width_mult in self.args.width_mult_list
             ]
-
-        self.custom_dynabert_calc_loss = custom_dynabert_calc_loss
         class_name = self.model.__class__.__name__
         if "SequenceClassification" not in class_name and "TokenClassification" not in class_name and "QuestionAnswering" not in class_name:
-            assert self.custom_evaluate is not None and self.custom_dynabert_calc_loss is not None, \
-                "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate` and `custom_dynabert_calc_loss`."
+            assert self.custom_evaluate is not None, \
+                "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
         _dynabert(self, self.model, args.output_dir)
         if "ptq" in args.strategy:
             self.args.input_filename_prefix = "pruned_model"
@@ -77,25 +80,14 @@ def compress(self, custom_evaluate=None, custom_dynabert_calc_loss=None):
         else:
             # Prefix of `export_model` is 'model'
             self.args.input_filename_prefix = "model"
-            if 'token_type_ids' in self.train_dataset[0]:
-                input_spec = [
-                    paddle.static.InputSpec(shape=[None, None],
-                                            dtype="int64"),  # input_ids
-                    paddle.static.InputSpec(shape=[None, None],
-                                            dtype="int64")  # token_type_ids
-                ]
-            else:
-                input_spec = [
-                    paddle.static.InputSpec(shape=[None, None],
-                                            dtype="int64")  # input_ids
-                ]
-
+            input_spec = generate_input_spec(self.model, self.train_dataset)
             input_dir = args.output_dir
             export_model(model=self.model,
                          input_spec=input_spec,
                          path=input_dir)
             self.quant(input_dir, args.strategy)
     elif args.strategy == "qat":
+        global_try_import_slim()
         self.quant(args.output_dir, args.strategy)
 
 
@@ -107,6 +99,20 @@ def quant(self, model_dir, strategy):
         _post_training_quantization_grid_search(self, model_dir)
     elif strategy == 'qat':
         _quant_aware_training_dynamic(self, model_dir)
+
+
+def generate_input_spec(model, dataset):
+    model_para_keys = inspect.signature(model.forward).parameters.keys()
+    input_num = 0
+    for key in dataset[0].keys():
+        if key in model_para_keys and key not in ('labels', 'start_positions',
+                                                  'end_positions'):
+            input_num += 1
+    input_spec = [
+        paddle.static.InputSpec(shape=[None, None], dtype='int64')
+        for i in range(input_num)
+    ]
+    return input_spec
 
 
 def _dynabert(self, model, output_dir):
@@ -220,10 +226,14 @@ def _replace_auto_model_qat_forward(self):
 def _recover_auto_model_forward(self):
 
     def init_func(layer):
-        if isinstance(layer, self.base_model_class):
+        if isinstance(
+                layer, self.base_model_class
+                if not isinstance(self, paddle.DataParallel) else
+                self._layers.base_model_class):
             layer.forward = layer._ori_forward
 
-    for layer in self.children():
+    for layer in self._layers.children() if isinstance(
+            self, paddle.DataParallel) else self.children():
         layer.apply(init_func)
     return self
 
@@ -273,8 +283,7 @@ def _dynabert_init(self, model, eval_dataloader):
         data_loader=eval_dataloader,
         loss_fct=self.criterion,
         num_layers=model.base_model.config['num_hidden_layers'],
-        num_heads=model.base_model.config['num_attention_heads'],
-        custom_dynabert_calc_loss=self.custom_dynabert_calc_loss)
+        num_heads=model.base_model.config['num_attention_heads'])
 
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
 
@@ -284,102 +293,119 @@ def _dynabert_init(self, model, eval_dataloader):
     return ofa_model, teacher_model
 
 
-def evaluate(self, model, data_loader, is_ofa_model=False):
+def check_dynabert_config(net_config, width_mult):
+    '''
+    Corrects net_config for OFA model if necessary.
+    '''
+    if 'electra.embeddings_project' in net_config:
+        net_config["electra.embeddings_project"]['expand_ratio'] = 1.0
+    for key in net_config:
+        # Makes sure to expands the size of the last dim to `width_mult` for
+        # these Linear weights.
+        if 'q_proj' in key or 'k_proj' in key or 'v_proj' in key or 'linear1' in key:
+            net_config[key]['expand_ratio'] = width_mult
+        # Keeps the size of the last dim of these Linear weights same as
+        # before.
+        elif 'out_proj' in key or 'linear2' in key:
+            net_config[key]['expand_ratio'] = 1.0
+    return net_config
 
-    @paddle.no_grad()
-    def evaluate_qa(model, data_loader, is_ofa_model=False):
-        model.eval()
-        all_start_logits = []
-        all_end_logits = []
-        for batch in data_loader:
-            logits = model(input_ids=batch['input_ids'],
-                           token_type_ids=batch['token_type_ids'])
-            if is_ofa_model:
-                start_logits_tensor, end_logits_tensor = logits[0]
-            else:
-                start_logits_tensor, end_logits_tensor = logits
 
-            for idx in range(start_logits_tensor.shape[0]):
-                all_start_logits.append(start_logits_tensor.numpy()[idx])
-                all_end_logits.append(end_logits_tensor.numpy()[idx])
-        n_best_size = 20
-        max_answer_length = 50
-        all_predictions, _, _ = compute_prediction(
-            self.eval_examples, self.eval_dataset,
-            (all_start_logits, all_end_logits), False, n_best_size,
-            max_answer_length)
-        res = squad_evaluate(
-            examples=[raw_data for raw_data in self.eval_examples],
-            preds=all_predictions,
-            is_whitespace_splited=False)
-        logger.info("EM: %f, F1: %f, " % (res['exact'], res['f1']))
-        res = res['exact']
-        model.train()
-        return res
-
-    @paddle.no_grad()
-    def evaluate_seq_cls(model, data_loader, is_ofa_model=False):
-        metric = Accuracy()
-        model.eval()
-        metric.reset()
-        for batch in data_loader:
-            labels = batch.pop("labels")
-            logits = model(**batch)
-            if is_ofa_model:
-                logits = logits[0]
-            correct = metric.compute(logits, labels)
-            metric.update(correct)
-        res = metric.accumulate()
-        logger.info("acc: %s, " % res)
-        model.train()
-        return res
-
-    @paddle.no_grad()
-    def evaluate_token_cls(model, data_loader, is_ofa_model=False):
-        metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
-        model.eval()
-        metric.reset()
-        for batch in data_loader:
-            logits = model(input_ids=batch['input_ids'],
-                           token_type_ids=batch['token_type_ids'])
-            if is_ofa_model:
-                logits = logits[0]
-            preds = logits.argmax(axis=2)
-            num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-                batch['seq_len'], preds, batch['labels'])
-            metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
-                          num_correct_chunks.numpy())
-        res = metric.accumulate()
-        logger.info("precision: %f, recall: %f, f1_score: %f" %
-                    (res[0], res[1], res[2]))
-        res = res[2]
-        model.train()
-        return res
-
+def evaluate(self, model, data_loader):
     if self.custom_evaluate is not None:
-        return self.custom_evaluate(model, data_loader)
-    if is_ofa_model:
+        return self.custom_evaluate(self, model, data_loader)
+    if isinstance(model, paddleslim.nas.ofa.OFA):
         class_name = model.model.__class__.__name__
     else:
         class_name = model.__class__.__name__
     if "SequenceClassification" in class_name:
-        return evaluate_seq_cls(model, data_loader, is_ofa_model)
+        return evaluate_seq_cls(self, model, data_loader)
     elif "QuestionAnswering" in class_name:
-        return evaluate_qa(model, data_loader, is_ofa_model)
+        return evaluate_qa(self, model, data_loader)
     elif "TokenClassification" in class_name:
-        return evaluate_token_cls(model, data_loader, is_ofa_model)
+        return evaluate_token_cls(self, model, data_loader)
     else:
         raise NotImplementedError(
             "Model to be compressed is an instance of a custom class, " \
-            "so function `evaluate(model, data_loader)` should be " \
+            "so function `evaluate(self, model, data_loader)` should be " \
             "implemented, and `model` should support both `paddle.nn.layer` " \
             "and `paddleslim.nas.ofa.OFA` instances, and it should return " \
             "a single float for precision value, such as acc.")
 
 
+@paddle.no_grad()
+def evaluate_qa(self, model, data_loader):
+    model.eval()
+    all_start_logits = []
+    all_end_logits = []
+    for batch in data_loader:
+        logits = model(input_ids=batch['input_ids'],
+                       token_type_ids=batch['token_type_ids'])
+        if isinstance(model, paddleslim.nas.ofa.OFA):
+            start_logits_tensor, end_logits_tensor = logits[0]
+        else:
+            start_logits_tensor, end_logits_tensor = logits
+        for idx in range(start_logits_tensor.shape[0]):
+            all_start_logits.append(start_logits_tensor.numpy()[idx])
+            all_end_logits.append(end_logits_tensor.numpy()[idx])
+    n_best_size = 20
+    max_answer_length = 50
+    all_predictions, _, _ = compute_prediction(
+        self.eval_examples, self.eval_dataset,
+        (all_start_logits, all_end_logits), False, n_best_size,
+        max_answer_length)
+    res = squad_evaluate(examples=[raw_data for raw_data in self.eval_examples],
+                         preds=all_predictions,
+                         is_whitespace_splited=False)
+    logger.info("EM: %f, F1: %f, " % (res['exact'], res['f1']))
+    res = res['exact']
+    model.train()
+    return res
+
+
+@paddle.no_grad()
+def evaluate_seq_cls(self, model, data_loader):
+    metric = Accuracy()
+    model.eval()
+    metric.reset()
+    for batch in data_loader:
+        labels = batch.pop("labels")
+        logits = model(**batch)
+        if isinstance(model, paddleslim.nas.ofa.OFA):
+            logits = logits[0]
+        correct = metric.compute(logits, labels)
+        metric.update(correct)
+    res = metric.accumulate()
+    logger.info("acc: %s, " % res)
+    model.train()
+    return res
+
+
+@paddle.no_grad()
+def evaluate_token_cls(self, model, data_loader):
+    metric = ChunkEvaluator(label_list=self.train_dataset.label_list)
+    model.eval()
+    metric.reset()
+    for batch in data_loader:
+        logits = model(input_ids=batch['input_ids'],
+                       token_type_ids=batch['token_type_ids'])
+        if isinstance(model, paddleslim.nas.ofa.OFA):
+            logits = logits[0]
+        preds = logits.argmax(axis=2)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
+            batch['seq_len'], preds, batch['labels'])
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
+    res = metric.accumulate()
+    logger.info("precision: %f, recall: %f, f1_score: %f" %
+                (res[0], res[1], res[2]))
+    res = res[2]
+    model.train()
+    return res
+
+
 def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                        eval_dataloader, num_train_epochs):
-
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
     global_step = 0
     lambda_logit = 1.0
@@ -389,7 +415,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
 
     logger.info("Teacher's evaluation starts.")
     tic_eval = time.time()
-    evaluate(teacher_model, eval_dataloader)
+    evaluate(self, teacher_model, eval_dataloader)
     logger.info("eval done total: %s s" % (time.time() - tic_eval))
 
     logger.info("DynaBERT training starts. This period will cost some time.")
@@ -403,6 +429,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 # Step8: Broadcast supernet config from width_mult,
                 # and use this config in supernet training.
                 net_config = utils.dynabert_config(ofa_model, width_mult)
+                net_config = check_dynabert_config(net_config, width_mult)
                 ofa_model.set_net_config(net_config)
                 if "token_type_ids" in batch:
                     logits, teacher_logits = ofa_model(
@@ -439,10 +466,11 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
             if global_step % self.args.save_steps == 0:
                 for idx, width_mult in enumerate(self.args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
+                    net_config = check_dynabert_config(net_config, width_mult)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
                     logger.info("width_mult %s:" % round(width_mult, 2))
-                    acc = evaluate(ofa_model, eval_dataloader)
+                    acc = evaluate(self, ofa_model, eval_dataloader)
                     if acc > best_acc[idx]:
                         best_acc[idx] = acc
                         if paddle.distributed.get_rank() == 0:
@@ -468,7 +496,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir_width)
-                logger.info("Best acc of width_mult %.2f: %.4f" %
+                logger.info("Best result of width_mult %.2f: %.4f" %
                             (width_mult, best_acc[idx]))
                 return ofa_model
 
@@ -483,9 +511,12 @@ def _dynabert_export(self, ofa_model):
     ofa_model._add_teacher = False
     ofa_model, ofa_model.model = _recover_transformer_func(
         ofa_model), _recover_transformer_func(ofa_model.model)
-
-    ori_num_heads = ofa_model.model.base_model.encoder.layers[
-        0].self_attn.num_heads
+    if isinstance(ofa_model.model, paddle.DataParallel):
+        ori_num_heads = ofa_model.model._layers.base_model.encoder.layers[
+            0].self_attn.num_heads
+    else:
+        ori_num_heads = ofa_model.model.base_model.encoder.layers[
+            0].self_attn.num_heads
     for width_mult in self.args.width_mult_list:
         model_dir = os.path.join(self.args.output_dir,
                                  "width_mult_" + str(round(width_mult, 2)))
@@ -494,6 +525,7 @@ def _dynabert_export(self, ofa_model):
         origin_model = self.model.__class__.from_pretrained(model_dir)
         ofa_model.model.set_state_dict(state_dict)
         best_config = utils.dynabert_config(ofa_model, width_mult)
+        best_config = check_dynabert_config(best_config, width_mult)
         origin_model_new = ofa_model.export(best_config,
                                             input_shapes=[[1, 1], [1, 1]],
                                             input_dtypes=['int64', 'int64'],
@@ -501,22 +533,17 @@ def _dynabert_export(self, ofa_model):
         for name, sublayer in origin_model_new.named_sublayers():
             if isinstance(sublayer, paddle.nn.MultiHeadAttention):
                 sublayer.num_heads = int(width_mult * sublayer.num_heads)
-        if 'token_type_ids':
-            input_shape = [
-                paddle.static.InputSpec(shape=[None, None], dtype='int64'),
-                paddle.static.InputSpec(shape=[None, None], dtype='int64')
-            ]
-        else:
-            input_shape = [
-                paddle.static.InputSpec(shape=[None, None], dtype='int64')
-            ]
+        input_spec = generate_input_spec(self.model, self.train_dataset)
         pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
-
-        net = paddle.jit.to_static(origin_model_new, input_spec=input_shape)
+        net = paddle.jit.to_static(origin_model_new, input_spec=input_spec)
         paddle.jit.save(net, pruned_infer_model_dir)
         # Recover num_heads of ofa_model.model
-        for layer in ofa_model.model.base_model.encoder.layers:
-            layer.self_attn.num_heads = ori_num_heads
+        if isinstance(ofa_model.model, paddle.DataParallel):
+            for layer in ofa_model.model._layers.base_model.encoder.layers:
+                layer.self_attn.num_heads = ori_num_heads
+        else:
+            for layer in ofa_model.model.base_model.encoder.layers:
+                layer.self_attn.num_heads = ori_num_heads
     logger.info("Pruned models have been exported.")
 
 
@@ -529,6 +556,7 @@ def _post_training_quantization_grid_search(self, model_dir):
         args.batch_size_list = [4, 8, 16]
     if args.algo_list is None:
         args.algo_list = ['mse', 'KL']
+
     paddle.enable_static()
     place = paddle.set_device(args.device)
     exe = paddle.static.Executor(place)
@@ -538,20 +566,19 @@ def _post_training_quantization_grid_search(self, model_dir):
     def _post_training_quantization(algo, batch_size, batch_nums):
 
         def _batch_generator_func():
-            has_token_type_ids = "token_type_ids" in self.eval_dataset[0]
-            batch_data = [[], []] if has_token_type_ids else [[]]
+            param_name_list = []
+            for key in self.eval_dataset[0]:
+                if key in ('input_ids', 'token_type_ids'):
+                    param_name_list.append(key)
+            batch_data = [[] for i in range(len(param_name_list))]
             for data in self.eval_dataset:
-                batch_data[0].append(data['input_ids'])
-                if has_token_type_ids:
-                    batch_data[1].append(data['token_type_ids'])
+                for i in range(len(param_name_list)):
+                    batch_data[i].append(data[param_name_list[i]])
                 if len(batch_data[0]) == batch_size:
-                    input_ids = Pad(axis=0, pad_val=0)(batch_data[0])
-                    if has_token_type_ids:
-                        token_type_ids = Pad(axis=0, pad_val=0)(batch_data[1])
-                        yield [input_ids, token_type_ids]
-                    else:
-                        yield [input_ids]
-                    batch_data = [[], []] if has_token_type_ids else [[]]
+                    for i in range(len(param_name_list)):
+                        batch_data[i] = Pad(axis=0, pad_val=0)(batch_data[i])
+                    yield batch_data
+                    batch_data = [[] for i in range(len(param_name_list))]
 
         post_training_quantization = PostTrainingQuantization(
             executor=exe,
@@ -578,7 +605,9 @@ def _post_training_quantization_grid_search(self, model_dir):
             optimize_model=False)
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
-            save_model_path=os.path.join(model_dir, algo + str(batch_size)),
+            save_model_path=os.path.join(
+                model_dir, algo +
+                "_".join([str(batch_size), str(batch_nums)])),
             model_filename=args.output_filename_prefix + ".pdmodel",
             params_filename=args.output_filename_prefix + ".pdiparams")
 
@@ -618,8 +647,6 @@ def _quant_aware_training_dynamic(self, input_dir):
         'quantizable_layer_type': ['Linear', 'Conv2D'],
         'moving_rate':
         args.moving_rate,
-        'onnx_format':
-        False
     }
 
     from paddleslim import QAT
@@ -656,19 +683,28 @@ def _quant_aware_training_dynamic(self, input_dir):
     logger.info("FP32 model's evaluation starts.")
 
     tic_eval = time.time()
-    acc = evaluate(self, self.model, eval_dataloader, False)
+    acc = evaluate(self, self.model, eval_dataloader)
     logger.info("eval done total: %s s" % (time.time() - tic_eval))
-
     logger.info("Quant aware training starts.")
+    # Train self.model
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
             global_step += 1
-            if "token_type_ids" in batch:
-                logits = self.model(batch['input_ids'], batch['token_type_ids'])
-            else:
-                logits = self.model(batch['input_ids'])
+            labels = None
+            if "labels" in batch:
+                labels = batch.pop("labels")
+            elif "start_positions" in batch and "end_positions" in batch:
+                labels = (batch.pop("start_positions"),
+                          batch.pop("end_positions"))
+            model_para_keys = inspect.signature(
+                self.model.forward).parameters.keys()
+            inputs = {}
+            for key in batch:
+                if key in model_para_keys:
+                    inputs[key] = batch[key]
+            logits = self.model(**inputs)
+            loss = self.criterion(logits, labels)
 
-            loss = self.criterion(logits, batch['labels'])
             loss.backward()
             self.optimizer.step()
             self.lr_scheduler.step()
@@ -683,7 +719,7 @@ def _quant_aware_training_dynamic(self, input_dir):
 
             if global_step % args.save_steps == 0:
                 tic_eval = time.time()
-                acc = evaluate(self, self.model, eval_dataloader, False)
+                acc = evaluate(self, self.model, eval_dataloader)
                 if acc > best_acc:
                     best_acc = acc
                     if paddle.distributed.get_rank() == 0:
@@ -695,17 +731,17 @@ def _quant_aware_training_dynamic(self, input_dir):
                 logger.info("eval done total: %s s" % (time.time() - tic_eval))
     logger.info("Best result: %.4f" % best_acc)
     self.model.set_state_dict(paddle.load(output_param_path))
-    # Train self.model
-    quanter.save_quantized_model(
-        self.model,
-        os.path.join(input_dir, args.output_filename_prefix),
-        input_spec=[
-            paddle.static.InputSpec(shape=[None, None], dtype='int64'),
-            paddle.static.InputSpec(shape=[None, None], dtype='int64')
-            if "token_type_ids" in self.eval_dataset[0] else None
-        ])
-    logger.info("Quant aware training ends and quantized models are saved.")
+
+    input_spec = generate_input_spec(self.model, self.train_dataset)
+
     self.model = _recover_auto_model_forward(self.model)
+
+    quanter.save_quantized_model(self.model,
+                                 os.path.join(input_dir,
+                                              args.output_filename_prefix),
+                                 input_spec=input_spec,
+                                 onnx_format=True)
+    logger.info("Quant aware training ends and quantized models are saved.")
 
 
 def auto_model_dynabert_forward(self,
@@ -720,22 +756,6 @@ def auto_model_dynabert_forward(self,
                                 output_hidden_states=False,
                                 output_attentions=False,
                                 return_dict=False):
-    wtype = self.pooler.dense.fn.weight.dtype if hasattr(
-        self.pooler.dense, 'fn') else self.pooler.dense.weight.dtype
-
-
-def auto_model_forward(self,
-                       input_ids,
-                       token_type_ids=None,
-                       position_ids=None,
-                       attention_mask=[None, None],
-                       task_type_ids=None,
-                       past_key_values=None,
-                       inputs_embeds=None,
-                       use_cache=None,
-                       output_hidden_states=False,
-                       output_attentions=False,
-                       return_dict=False):
     kwargs = locals()
     wtype = self.encoder.layers[0].norm1.fn.weight.dtype if hasattr(
         self.encoder.layers[0].norm1,
@@ -757,13 +777,20 @@ def auto_model_forward(self,
         past_key_values_length = past_key_values[0][0].shape[2]
 
     if attention_mask is None:
-        attention_mask = paddle.unsqueeze(
-            (input_ids == self.pad_token_id).astype(wtype) * -1e4, axis=[1, 2])
-        if past_key_values is not None:
-            batch_size = past_key_values[0][0].shape[0]
-            past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length],
-                                     dtype=attention_mask.dtype)
-            attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
+        # input_ids[0][0] is equals to 0 while exporting.
+        if input_ids[0][0] != 0:
+            attention_mask = [None, None]
+            attention_mask[0] = paddle.unsqueeze(
+                (input_ids == self.pad_token_id).astype(wtype) * -1e4,
+                axis=[1, 2])
+        else:
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
     elif isinstance(attention_mask, paddle.Tensor) and attention_mask.ndim == 2:
         attention_mask = paddle.unsqueeze(attention_mask,
                                           axis=[1, 2]).astype(wtype)
@@ -781,6 +808,8 @@ def auto_model_forward(self,
     embedding_kwargs["input_ids"] = input_ids
 
     embedding_output = self.embeddings(**embedding_kwargs)
+    if hasattr(self, "embeddings_project"):
+        embedding_output = self.embeddings_project(embedding_output)
 
     self.encoder._use_cache = use_cache  # To be consistent with HF
 

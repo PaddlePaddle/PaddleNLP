@@ -19,7 +19,7 @@ import sys
 import random
 import time
 
-sys.path.append('../recall/milvus')
+sys.path.append('./recall/milvus')
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
