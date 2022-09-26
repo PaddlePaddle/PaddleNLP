@@ -34,7 +34,6 @@ from ..model_outputs import (
     ModelOutput,
 )
 
-
 __all__ = [
     'T5Model', "T5PretrainedModel", 'T5ForConditionalGeneration',
     'T5EncoderModel'
@@ -1075,7 +1074,7 @@ class T5Stack(nn.Layer):
             hidden_states=all_hidden_states,
             attentions=all_attentions,
             cross_attentions=all_cross_attentions,
-        )         
+        )
 
     def get_extended_attention_mask(self, attention_mask, input_shape):
         if attention_mask.ndim == 3:
@@ -1363,12 +1362,15 @@ class T5Model(T5PretrainedModel):
                 Whether or not to return the output of all hidden layers.
                 Defaults to `False`.
             return_dict (bool, optional):
-                Whether or not to return a class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput` if `return_dict=True`.
-                Otherwise it returns a tuple of tensors corresponding to ordered and
-                not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`.
+                Whether or not to return a class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
 
         Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput` if `return_dict=True`. 
+            Otherwise it returns a tuple of tensors corresponding to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`.
+
             tuple: Returns tuple (`last_hidden_state`, `cache`, `decoder_hidden_states`, `decoder_attentions`,
             `cross_attentions`, `encoder_last_hidden_state`, `encoder_hidden_states`, `encoder_attentions`)
 
@@ -1474,7 +1476,7 @@ class T5Model(T5PretrainedModel):
             encoder_hidden_states=encoder_output.hidden_states,
             encoder_attentions=encoder_output.attentions,
         )
-            
+
 
 class T5ForConditionalGeneration(T5PretrainedModel):
     """
@@ -1562,6 +1564,10 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 See :class:`T5Model`.
 
         Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput` if `return_dict=True`. 
+            Otherwise it returns a tuple of tensors corresponding to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput`. 
+
             tuple: Returns tuple (`loss`, `logits`, `cache`, `decoder_hidden_states`, `decoder_attentions`,
             `cross_attentions`, `encoder_last_hidden_state`, `encoder_hidden_states`, `encoder_attentions`)
 
@@ -1674,7 +1680,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             loss = loss_fct(lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
                             labels.flatten())
-        
+
         if not return_dict:
             # 元组相加
             output = (lm_logits, ) + decoder_outputs[1:] + encoder_output[0:]
@@ -1695,7 +1701,6 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_hidden_states=encoder_output.hidden_states,
             encoder_attentions=encoder_output.attentions,
         )
-
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -1888,8 +1893,7 @@ class T5EncoderModel(T5PretrainedModel):
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict
-        )
+            return_dict=return_dict)
 
         return encoder_outputs
 
@@ -1903,7 +1907,7 @@ def convert_encoder_output(encoder_output):
     args: encoder_output = (last_hidden_state, hidden_states, attentions)
     """
     return BaseModelOutput(
-            last_hidden_state=encoder_output[0],
-            hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,
-            attentions=encoder_output[2] if len(encoder_output) > 2 else None,
-        )
+        last_hidden_state=encoder_output[0],
+        hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,
+        attentions=encoder_output[2] if len(encoder_output) > 2 else None,
+    )
