@@ -1763,6 +1763,7 @@ class T5EncoderModel(T5PretrainedModel):
             "layer_norm_epsilon": layer_norm_epsilon,
             "feed_forward_proj": feed_forward_proj,
             "is_decoder": is_decoder,
+            "initializer_factor": kwargs.pop("initializer_factor", 1.0)
         }
         self.config.update(kwargs)
         self.shared = nn.Embedding(vocab_size, d_model)
@@ -1784,27 +1785,18 @@ class T5EncoderModel(T5PretrainedModel):
         # Initialize weights and apply final processing
         self.init_weights()
 
-    def _post_init(self, *args, **kwargs):
-        """
-        **prevent the `config` property to be assigned**
-
-        It would be hooked after `__init__` to add a dict including arguments of
-        `__init__` as a attribute named `config` of the pretrained model instance.
-        """
-        pass
-
     @property
     def t5(self):
         return self
 
-    def get_input_embeddings(self):
+    def get_input_embeddings(self) -> nn.Embedding:
         return self.shared
 
-    def set_input_embeddings(self, new_embeddings):
+    def set_input_embeddings(self, new_embeddings: nn.Embedding) -> None:
         self.shared = new_embeddings
         self.encoder.set_input_embeddings(new_embeddings)
 
-    def get_encoder(self):
+    def get_encoder(self) -> T5Stack:
         return self.encoder
 
     def forward(
