@@ -1447,7 +1447,7 @@ class T5Model(T5PretrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict)
-        elif return_dict and not isinstance(encoder_output, ModelOutput):
+        elif return_dict and not isinstance(encoder_output, BaseModelOutput):
             encoder_output = convert_encoder_output(encoder_output)
         hidden_states = encoder_output[0]
 
@@ -1631,10 +1631,12 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict)
+        else:
+            if isinstance(encoder_output, paddle.Tensor):
+                encoder_output = (encoder_output, )
+            if return_dict and not isinstance(encoder_output, BaseModelOutput):
+                encoder_output = convert_encoder_output(encoder_output)
 
-        # encoder_output could be a Tensor, tuple or ModelOutput
-        if isinstance(encoder_output, paddle.Tensor):
-            encoder_output = (encoder_output, )
         hidden_states = encoder_output[0]
 
         if labels is not None and decoder_input_ids is None:
@@ -1682,13 +1684,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                             labels.flatten())
 
         if not return_dict:
-            # 元组相加
-            output = (lm_logits, ) + decoder_outputs[1:] + encoder_output[0:]
-
+            output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
             return ((loss, ) + output) if loss is not None else output
-
-        if not isinstance(encoder_output, ModelOutput):
-            encoder_output = convert_encoder_output(encoder_output)
 
         return Seq2SeqLMOutput(
             loss=loss,
@@ -1910,6 +1907,7 @@ def convert_encoder_output(encoder_output):
             The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
             The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
     """
+    # if isinstance(encoder_output, tuple)
     return BaseModelOutput(
         last_hidden_state=encoder_output[0],
         hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,

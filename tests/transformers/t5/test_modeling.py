@@ -18,6 +18,7 @@ import random
 import copy
 import tempfile
 import unittest
+from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
@@ -497,10 +498,16 @@ class T5ModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = T5Model
 
-    all_model_classes = (T5Model, T5ForConditionalGeneration, T5EncoderModel)
+    all_model_classes = (T5Model, T5ForConditionalGeneration)
     all_generative_model_classes = {T5ForConditionalGeneration: (T5Model, "t5")}
     all_parallelizable_model_classes = (T5Model, T5ForConditionalGeneration,
                                         T5EncoderModel)
