@@ -1487,6 +1487,10 @@ class FasterMBART(MBartPretrainedModel):
                                                       dtype="int32")
             else:
                 forced_bos_token_id = paddle.zeros([0])
+        elif decode_strategy == "sampling":
+            num_samples = paddle.shape(encoder_output)[0]
+            forced_bos_token_id = paddle.expand(forced_bos_token_id,
+                                                shape=[num_samples, 1])
 
         return self.decoding(enc_output=encoder_output,
                              memory_seq_lens=seq_len,

@@ -35,14 +35,6 @@ def setup_args():
                         default=1,
                         type=int,
                         help="Batch size. ")
-    parser.add_argument("--num_return_sequences",
-                        default=1,
-                        type=int,
-                        help="The number of returned sequences. When " \
-                             "applying sampling to decode, this must be " \
-                             "given according to the --num_return_sequences " \
-                             "when you process mbart export scripts. When applying " \
-                             "beam search to decode, this flag should NOT be set. ")
 
     args = parser.parse_args()
 
@@ -79,8 +71,7 @@ def infer(args):
                                                                 axis=0)
 
     # Forced bos token ids
-    forced_bos_token = np.ones([args.batch_size * args.num_return_sequences, 1],
-                               dtype="int32") * bos_id
+    forced_bos_token = np.ones([args.batch_size, 1], dtype="int32") * bos_id
 
     # Load FasterTransformer lib.
     load("FasterTransformer", verbose=True)
