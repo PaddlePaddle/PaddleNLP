@@ -60,6 +60,13 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument(
+        "--device", 
+        default="gpu", 
+        choices=["gpu", "cpu", "xpu", "npu"], 
+        help="Device selected for inference."
+    )
+
     args = parser.parse_args()
     return args
 
@@ -83,6 +90,10 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 def do_predict(args):
     if args.device == "gpu":
         place = "gpu"
+    elif args.device == "xpu":
+        place = "xpu"
+    elif args.device == "npu":
+        place = "npu"
     else:
         place = "cpu"
 
@@ -157,6 +168,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.device = ARGS.device
     pprint(args)
 
     do_predict(args)
