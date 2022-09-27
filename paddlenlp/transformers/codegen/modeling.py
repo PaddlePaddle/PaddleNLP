@@ -469,19 +469,19 @@ class CodeGenModel(CodeGenPreTrainedModel):
         else:
             past_length = cache[0][0].shape[-2]
 
-        batch_size, seq_len = input_shape
         # Attention mask.
-        if batch_size == 1 and past_length != 0:
-            attention_mask = paddle.ones(
-                [batch_size, 1, 1, seq_len + past_length],
-                dtype=paddle.get_default_dtype())
-
         if attention_mask is None:
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating attention_mask"
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            if batch_size == 1 and past_length != 0:
+                batch_size, seq_len = input_shape
+                attention_mask = paddle.ones(
+                    [batch_size, 1, 1, seq_len + past_length],
+                    dtype=paddle.get_default_dtype())
+            else:
+                attention_mask = paddle.cast(
+                    input_ids == self.pad_token_id,
+                    dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
