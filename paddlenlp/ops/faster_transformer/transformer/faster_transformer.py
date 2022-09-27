@@ -1474,7 +1474,7 @@ class FasterMBART(MBartPretrainedModel):
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
 
-        if not isinstance(forced_bos_token_id, paddle.Tensor):
+        if not isinstance(forced_bos_token_id, type(input_ids)):
             if forced_bos_token_id is not None:
                 if decode_strategy == "sampling":
                     forced_bos_token_id = paddle.full(
