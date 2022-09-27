@@ -500,10 +500,9 @@ class T5ModelTester:
 class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = T5Model
 
-    all_model_classes = (T5Model, T5ForConditionalGeneration, T5EncoderModel)
+    all_model_classes = (T5Model, T5ForConditionalGeneration)
     all_generative_model_classes = {T5ForConditionalGeneration: (T5Model, "t5")}
-    all_parallelizable_model_classes = (T5Model, T5ForConditionalGeneration,
-                                        T5EncoderModel)
+    all_parallelizable_model_classes = (T5Model, T5ForConditionalGeneration)
     fx_compatible = True
     test_pruning = False
     test_resize_embeddings = True
@@ -606,6 +605,139 @@ class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         for model_name in T5_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = T5Model.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class T5EncoderOnlyModelTester:
+
+    def __init__(
+        self,
+        parent,
+        vocab_size=99,
+        batch_size=13,
+        encoder_seq_length=7,
+        # For common tests
+        use_attention_mask=True,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        d_ff=37,
+        relative_attention_num_buckets=8,
+        is_training=False,
+        dropout_rate=0.1,
+        initializer_factor=0.002,
+        is_encoder_decoder=False,
+        eos_token_id=1,
+        pad_token_id=0,
+        scope=None,
+    ):
+
+        self.parent = parent
+        self.batch_size = batch_size
+        self.encoder_seq_length = encoder_seq_length
+        # For common tests
+        self.seq_length = self.encoder_seq_length
+        self.use_attention_mask = use_attention_mask
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.d_ff = d_ff
+        self.relative_attention_num_buckets = relative_attention_num_buckets
+        self.dropout_rate = dropout_rate
+        self.initializer_factor = initializer_factor
+        self.eos_token_id = eos_token_id
+        self.pad_token_id = pad_token_id
+        self.is_encoder_decoder = is_encoder_decoder
+        self.scope = None
+        self.is_training = is_training
+
+    def get_config(self):
+        config = dict(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            d_ff=self.d_ff,
+            d_kv=self.hidden_size // self.num_attention_heads,
+            num_layers=self.num_hidden_layers,
+            num_heads=self.num_attention_heads,
+            relative_attention_num_buckets=self.relative_attention_num_buckets,
+            dropout_rate=self.dropout_rate,
+            initializer_factor=self.initializer_factor,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.pad_token_id,
+            pad_token_id=self.pad_token_id,
+            is_encoder_decoder=self.is_encoder_decoder,
+        )
+        return config
+
+    def prepare_config_and_inputs(self):
+        input_ids = ids_tensor([self.batch_size, self.encoder_seq_length],
+                               self.vocab_size)
+
+        attention_mask = None
+        if self.use_attention_mask:
+            attention_mask = ids_tensor(
+                [self.batch_size, self.encoder_seq_length], vocab_size=2)
+
+        config = self.get_config()
+        return (
+            config,
+            input_ids,
+            attention_mask,
+        )
+
+    def create_and_check_model(
+        self,
+        config,
+        input_ids,
+        attention_mask,
+    ):
+        model = T5EncoderModel(**config)
+        model.eval()
+        result = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
+        result = model(input_ids=input_ids)
+        encoder_output = result[0]
+
+        self.parent.assertEqual(
+            encoder_output.shape,
+            [self.batch_size, self.encoder_seq_length, self.hidden_size])
+
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        (
+            config,
+            input_ids,
+            attention_mask,
+        ) = config_and_inputs
+
+        inputs_dict = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+        }
+        return config, inputs_dict
+
+
+class T5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
+    all_model_classes = (T5EncoderModel, )
+    test_pruning = False
+    test_resize_embeddings = False
+    test_model_parallel = True
+    all_parallelizable_model_classes = (T5EncoderModel, )
+
+    def _make_model_instance(self, config, model_class):
+        return model_class(**config)
+
+    def setUp(self):
+        self.model_tester = T5EncoderOnlyModelTester(self)
+
+    def test_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model(*config_and_inputs)
+
+    def test_model_name_list(self):
+        pass
 
 
 class T5ModelIntegrationTests(unittest.TestCase):
