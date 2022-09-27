@@ -153,10 +153,27 @@ I0727 06:50:34.993671 43126 naive_executor.cc:102] ---  skip [linear_75.tmp_1], 
 [OP Object] init success
 ```
 
-#### 启动client测试
+#### 启动rpc client测试
 注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
 ```shell
 python rpc_client.py
+```
+输出打印如下:
+```
+text:  请问木竭胶囊能同高血压药、氨糖同时服吗？
+label:  3,37
+--------------------
+text:  低压100*高压140*头涨，想吃点降压药。谢谢！
+label:  0
+--------------------
+text:  脑穿通畸形易发人群有哪些
+label:  0,9
+--------------------
+```
+#### 启动http client测试
+注意执行客户端请求时关闭代理，并根据实际情况修改server_url地址(启动服务所在的机器)
+```shell
+python http_client.py
 ```
 输出打印如下:
 ```
