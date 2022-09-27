@@ -784,7 +784,8 @@ class Seq2SeqModelOutput(ModelOutput):
     cross_attentions: Optional[Tuple[paddle.Tensor]] = None
     encoder_last_hidden_state: Optional[paddle.Tensor] = None
     encoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
-    encoder_attentions: Optional[Tuple[paddle.Tensor]] = None   
+    encoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+
 
 @dataclass
 class Seq2SeqLMOutput(ModelOutput):
