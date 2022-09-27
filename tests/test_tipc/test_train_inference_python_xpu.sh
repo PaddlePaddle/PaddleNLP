@@ -19,12 +19,12 @@ REPO_ROOT_PATH=$(readlinkf ${BASEDIR}/../)
 FILENAME=$1
 
 # change gpu to npu in tipc txt configs
-sed -i "s/--device:gpu/--device:npu/g" $FILENAME
-sed -i "s/state=GPU/state=NPU/g" $FILENAME
+sed -i "s/--device:gpu/--device:xpu/g" $FILENAME
+sed -i "s/state=GPU/state=XPU/g" $FILENAME
 sed -i "s/trainer:pact_train/trainer:norm_train/g" $FILENAME
 sed -i "s/trainer:fpgm_train/trainer:norm_train/g" $FILENAME
-sed -i "s/--device:cpu|gpu/--device:cpu|npu/g" $FILENAME
-sed -i "s/--device:gpu|cpu/--device:cpu|npu/g" $FILENAME
+sed -i "s/--device:cpu|gpu/--device:cpu|xpu/g" $FILENAME
+sed -i "s/--device:gpu|cpu/--device:cpu|xpu/g" $FILENAME
 sed -i "s/--benchmark:True/--benchmark:False/g" $FILENAME
 sed -i "s/--use_tensorrt:False|True/--use_tensorrt:False/g" $FILENAME
 sed -i 's/\"gpu\"/\"npu\"/g' test_tipc/test_train_inference_python.sh

@@ -130,15 +130,18 @@ def do_train(args):
     if args.device == "gpu":
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
+    elif args.device == "npu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("npu")
+    elif args.device == "xpu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("xpu")
     else:
         rank = 0
         trainer_count = 1
-        if args.device == "npu":
-            paddle.set_device("npu")
-        elif args.device == "xpu":
-            paddle.set_device("xpu")
-        else:
-            paddle.set_device("cpu")
+        paddle.set_device("cpu")
 
     if trainer_count > 1:
         dist.init_parallel_env()
