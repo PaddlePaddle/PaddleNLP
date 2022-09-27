@@ -29,11 +29,8 @@ python setup.py install
 
 ```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
-# 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
-export CUDA_VISIBLE_DEVICES=0
 python examples/question-answering/dense_qa_example.py --device gpu
-# 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
-unset CUDA_VISIBLE_DEVICES
+# 如果只有 CPU 机器，安装CPU版本的Paddle后，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 python examples/question-answering/dense_qa_example.py --device cpu
 ```
 `dense_qa_example.py`中`DensePassageRetriever`，`ErnieRanker`和`ErnieReader`的模型介绍请参考[API介绍](../../API.md)

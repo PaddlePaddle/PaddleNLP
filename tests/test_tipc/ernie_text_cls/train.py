@@ -27,22 +27,6 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
-parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
-parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-args = parser.parse_args()
-# yapf: enable
-
 
 def set_seed(seed):
     """sets random seed"""
@@ -139,7 +123,7 @@ def create_dataloader(dataset,
                                 return_list=True)
 
 
-def do_train():
+def do_train(args):
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
@@ -221,14 +205,35 @@ def do_train():
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
+
             if global_step % 100 == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
                 evaluate(model, criterion, metric, dev_data_loader)
-                model._layers.save_pretrained(save_dir)
+                save_dir = os.path.join(args.save_dir, "model")
+                model_to_save = model._layers if isinstance(
+                    model, paddle.DataParallel) else model
+                model_to_save.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
+
+            if global_step > args.max_steps:
+                return
 
 
 if __name__ == "__main__":
-    do_train()
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
+    parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
+        "Sequences longer than this will be truncated, sequences shorter will be padded.")
+    parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
+    parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
+    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+    parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+    parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
+    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")
+    parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+    args = parser.parse_args()
+    # yapf: enable
+
+    do_train(args)

@@ -17,12 +17,9 @@ import paddle.nn as nn
 
 from ..ernie.modeling import ErniePooler
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPooling,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-)
+from ..model_outputs import (BaseModelOutputWithPooling,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput, tuple_output)
 
 __all__ = [
     'ErnieGramModel',
@@ -457,8 +454,7 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                             labels.reshape((-1, )))
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -582,8 +578,7 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
 
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,
@@ -701,8 +696,7 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
