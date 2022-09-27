@@ -39,6 +39,7 @@ from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
+from .docvqa import DocVQATask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -437,7 +438,20 @@ TASKS = {
         "default": {
             "model": "pai-painter-painting-base-zh",
         }
-    }
+    },
+    "document_question_answering": {
+        "models": {
+            "ernie-layoutx-large-pruned": {
+                "task_class":
+                DocVQATask,
+                "task_flag":
+                "document_question_answering-ernie-layoutx-large-pruned",
+            },
+        },
+        "default": {
+            "model": "ernie-layoutx-large-pruned"
+        }
+    },
 }
 
 support_schema_list = [
