@@ -94,7 +94,10 @@ class Predictor(object):
             config.set_cpu_math_library_num_threads(cpu_threads)
         elif device == "xpu":
             # set XPU configs accordingly
-            config.enable_xpu(100)
+            config.enable_xpu()
+        elif device == "npu":
+            # set NPU configs accordingly
+            config.enable_npu()
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)

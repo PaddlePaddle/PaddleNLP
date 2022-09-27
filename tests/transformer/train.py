@@ -81,6 +81,10 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument("--device", 
+                        default="gpu", 
+                        choices=["gpu", "cpu", "xpu", "npu"], 
+                        help="Device selected for inference.")
     args = parser.parse_args()
     return args
 
@@ -98,7 +102,12 @@ def do_train(args):
     else:
         rank = 0
         trainer_count = 1
-        paddle.set_device("cpu")
+        if args.device == "npu":
+            paddle.set_device("npu")
+        elif args.device == "xpu":
+            paddle.set_device("xpu")
+        else:
+            paddle.set_device("cpu")
 
     if trainer_count > 1:
         dist.init_parallel_env()
@@ -317,6 +326,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.device = ARGS.device
     pprint(args)
 
     do_train(args)

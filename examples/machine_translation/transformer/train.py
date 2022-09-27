@@ -100,6 +100,10 @@ def parse_args():
                         type=str,
                         choices=['true', 'false', 'True', 'False'],
                         help="Whether to use amp to train Transformer. ")
+    parser.add_argument("--device", 
+                        default="gpu", 
+                        choices=["gpu", "cpu", "xpu", "npu"], 
+                        help="Device selected for inference.")
     parser.add_argument(
         "--amp_level",
         default=None,
@@ -129,7 +133,12 @@ def do_train(args):
     else:
         rank = 0
         trainer_count = 1
-        paddle.set_device("cpu")
+        if args.device == "npu":
+            paddle.set_device("npu")
+        elif args.device == "xpu":
+            paddle.set_device("xpu")
+        else:
+            paddle.set_device("cpu")
 
     if trainer_count > 1:
         dist.init_parallel_env()
@@ -401,6 +410,7 @@ if __name__ == "__main__":
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     args.to_static = ARGS.to_static
+    args.device = ARGS.device
     pprint(args)
 
     args.profiler_options = ARGS.profiler_options
