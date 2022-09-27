@@ -16,6 +16,7 @@ import os
 import functools
 import inspect
 from copy import deepcopy
+from typing import Optional
 import warnings
 
 from paddle.nn import Layer
@@ -195,26 +196,18 @@ def param_in_init(func, param_field: str) -> bool:
     return param_field in result[0]
 
 
-def resolve_cache_dir(pretrained_model_name_or_path: str, kwargs: dict,
-                      pretrained_init_configuration: dict) -> str:
+def resolve_cache_dir(pretrained_model_name_or_path: str,
+                      cache_dir: Optional[str] = None) -> str:
     """resolve cache dir for PretrainedModel and PretrainedConfig
 
     Args:
         pretrained_model_name_or_path (str): the name or path of pretrained model
         kwargs (dict): the kwargs of method
-        pretrained_init_configuration (dict): the pretrained init configuration
     """
-    cache_dir = kwargs.pop("cache_dir", None)
     if cache_dir is not None:
         return cache_dir
 
     if os.path.isdir(pretrained_model_name_or_path):
         return pretrained_model_name_or_path
 
-    if pretrained_model_name_or_path in pretrained_init_configuration:
-        cache_dir = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-    else:
-        cache_dir = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                 pretrained_model_name_or_path)
-
-    return cache_dir
+    return os.path.join(MODEL_HOME, pretrained_model_name_or_path)

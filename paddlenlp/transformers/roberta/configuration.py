@@ -182,7 +182,7 @@ class RobertaConfig(PretrainedConfig):
     pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
 
     def __init__(self,
-                 vocab_size: int,
+                 vocab_size: int = 21128,
                  hidden_size: int = 768,
                  num_hidden_layers: int = 12,
                  num_attention_heads: int = 12,
@@ -197,7 +197,6 @@ class RobertaConfig(PretrainedConfig):
                  layer_norm_eps: float = 1e-12,
                  cls_token_id: int = 101,
                  **kwargs):
-        attribute_map(self, kwargs)
         super().__init__(pad_token_id=pad_token_id,
                          cls_token_id=cls_token_id,
                          **kwargs)

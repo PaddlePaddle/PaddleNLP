@@ -31,7 +31,6 @@ from ..model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
-from ..configuration_utils import parse_config
 
 __all__ = [
     'RobertaModel',
@@ -119,7 +118,9 @@ class RobertaPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
+
     pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
+    config_class = RobertaConfig
 
     pretrained_resource_files_map = {
         "model_state": {
@@ -215,22 +216,7 @@ class RobertaModel(RobertaPretrainedModel):
             Defaults to `101`.
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        # old bert model parameters
-        fields = [
-            "vocab_size", "hidden_size", "num_hidden_layers",
-            "num_attention_heads", "intermediate_size", "hidden_act",
-            "hidden_dropout_prob", "attention_probs_dropout_prob",
-            "max_position_embeddings", "type_vocab_size", "initializer_range",
-            "pad_token_id", "pool_act", "fuse"
-        ]
-
-        config: RobertaConfig = parse_config(config,
-                                             config_class=RobertaConfig,
-                                             args=args,
-                                             kwargs=kwargs,
-                                             fields=fields,
-                                             return_model=False)
+    def __init__(self, config: RobertaConfig):
         super(RobertaModel, self).__init__(config)
 
         self.pad_token_id = config.pad_token_id
@@ -400,15 +386,10 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
             An instance of RobertaModel.
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        config, roberta, kwargs = parse_config(config_or_model=config,
-                                               config_class=RobertaConfig,
-                                               args=args,
-                                               kwargs=kwargs,
-                                               return_unused_kwargs=True)
+    def __init__(self, config: RobertaConfig):
         super(RobertaForQuestionAnswering, self).__init__(config)
 
-        self.roberta = roberta if roberta is not None else RobertaModel(config)
+        self.roberta = RobertaModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
@@ -529,21 +510,13 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             of `RobertaModel` instance `roberta`. Defaults to `None`.
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        config, roberta, kwargs = parse_config(config_or_model=config,
-                                               config_class=RobertaConfig,
-                                               args=args,
-                                               kwargs=kwargs,
-                                               fields=[("num_classes", 2),
-                                                       "dropout"],
-                                               return_unused_kwargs=True)
+    def __init__(self, config: RobertaConfig):
         super(RobertaForSequenceClassification, self).__init__(config)
+        self.roberta = RobertaModel(config)
 
-        self.roberta = roberta if roberta is not None else RobertaModel(config)
-
-        dropout = kwargs.pop("dropout", None) or config.hidden_dropout_prob
-
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
@@ -614,12 +587,12 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.config.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                loss = loss_fct(logits.reshape((-1, self.config.num_labels)),
                                 labels.reshape((-1, )))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
@@ -653,20 +626,13 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
             of `RobertaModel` instance `roberta`. Defaults to `None`.
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        config, roberta, kwargs = parse_config(config_or_model=config,
-                                               config_class=RobertaConfig,
-                                               args=args,
-                                               kwargs=kwargs,
-                                               fields=[("num_classes", 2),
-                                                       "dropout"],
-                                               return_unused_kwargs=True)
-        super(RobertaForSequenceClassification, self).__init__(config)
+    def __init__(self, config: RobertaConfig):
+        super(RobertaForTokenClassification, self).__init__(config)
 
-        self.roberta = roberta if roberta is not None else RobertaModel(config)
-
-        dropout = kwargs.pop("dropout", None) or config.hidden_dropout_prob
-        self.dropout = nn.Dropout(dropout)
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
@@ -736,7 +702,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+            loss = loss_fct(logits.reshape((-1, self.config.num_labels)),
                             labels.reshape((-1, )))
         if not return_dict:
 
@@ -771,18 +737,12 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
             instance `bert`. Defaults to None.
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        config, roberta, kwargs = parse_config(config_or_model=config,
-                                               config_class=RobertaConfig,
-                                               args=args,
-                                               kwargs=kwargs,
-                                               fields=["dropout"],
-                                               return_unused_kwargs=True)
+    def __init__(self, config: RobertaConfig):
         super(RobertaForMultipleChoice, self).__init__(config)
-        self.roberta = roberta if roberta is not None else RobertaModel(config)
-        dropout = kwargs.pop("dropout", None) or config.hidden_dropout_prob
-
-        self.dropout = nn.Dropout(dropout)
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
@@ -932,13 +892,10 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
 
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        config, roberta = parse_config(config_or_model=config,
-                                       config_class=RobertaConfig,
-                                       args=args,
-                                       kwargs=kwargs)
+    def __init__(self, config: RobertaConfig):
         super(RobertaForMaskedLM, self).__init__(config)
-        self.roberta = roberta if roberta is not None else RobertaModel(config)
+
+        self.roberta = RobertaModel(config)
         self.lm_head = RobertaLMHead(config)
 
         self.apply(self.init_weights)
@@ -1069,15 +1026,9 @@ class RobertaForCausalLM(RobertaPretrainedModel):
 
     """
 
-    def __init__(self, config: Optional[RobertaConfig] = None, *args, **kwargs):
-        config, roberta, kwargs = parse_config(config_or_model=config,
-                                               config_class=RobertaConfig,
-                                               args=args,
-                                               kwargs=kwargs,
-                                               return_unused_kwargs=True)
+    def __init__(self, config: RobertaConfig):
         super().__init__(config)
-        self.roberta = roberta if roberta is not None else RobertaModel(config)
-
+        self.roberta = RobertaModel(config)
         self.lm_head = RobertaLMHead(config)
         self.apply(self.init_weights)
 

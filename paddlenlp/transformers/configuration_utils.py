@@ -722,11 +722,10 @@ class PretrainedConfig:
                                                                    os.PathLike],
                          **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path,
+                                      cache_dir=cache_dir)
+
         force_download = kwargs.pop("force_download", False)
-
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, kwargs,
-                                      cls.pretrained_init_configuration)
-
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
         resolved_config_file = None
@@ -768,7 +767,9 @@ class PretrainedConfig:
                                          pretrained_model_name_or_path,
                                          CONFIG_NAME)
             assert is_url(community_url)
-            return cls._get_config_dict(community_url, cache_dir=cache_dir)
+            return cls._get_config_dict(community_url,
+                                        cache_dir=cache_dir,
+                                        **kwargs)
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
             # Load config dict

@@ -36,8 +36,8 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from .generation_utils import GenerationMixin
-from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, param_in_init, resolve_cache_dir
-from .configuration_utils import PretrainedConfig, parse_config
+from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, resolve_cache_dir
+from .configuration_utils import PretrainedConfig
 
 __all__ = [
     'PretrainedModel',
@@ -194,6 +194,36 @@ class PretrainedModel(Layer, GenerationMixin):
     # a list of `state_dict` keys to ignore when saving the model (useful for keys that aren't
     # trained, but which are either deterministic or tied variables)
     _keys_to_ignore_on_save = None
+
+    def __init__(self, *args, **kwargs):
+        super(PretrainedModel, self).__init__()
+
+        if not self.constructed_from_pretrained_config():
+            return
+
+        # extract config from args
+        config = None
+        for arg in args:
+            if isinstance(arg, PretrainedConfig):
+                config = arg
+                break
+        if config is not None:
+            self.config: PretrainedConfig = config
+            return
+
+        # extract config from kwargs
+        if 'config' not in kwargs:
+            raise ValueError(
+                'PretarinedConfig instance not found in the arguments, you can set it as args or kwargs with config field'
+            )
+
+        config = kwargs['config']
+        if not isinstance(config, PretrainedConfig):
+            raise TypeError(
+                'config parameter should be the instance of PretraiendConfig')
+
+        self.config: PretrainedConfig = kwargs['config']
+        self.warnings_issued = {}
 
     def _post_init(self, original_init, *args, **kwargs):
         """
@@ -828,7 +858,9 @@ class PretrainedModel(Layer, GenerationMixin):
             pretrained_model_name_or_path = os.path.join(
                 COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
                 cls.resource_files_names['model_state'])
-            return pretrained_model_name_or_path
+            assert is_url(pretrained_model_name_or_path)
+            return cls._resolve_model_file_path(pretrained_model_name_or_path,
+                                                cache_dir)
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>",
@@ -1048,12 +1080,11 @@ class PretrainedModel(Layer, GenerationMixin):
         force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
+        cache_dir = kwargs.pop('cache_dir', None)
 
         cache_dir = resolve_cache_dir(
             pretrained_model_name_or_path=pretrained_model_name_or_path,
-            kwargs=kwargs,
-            pretrained_init_configuration=cls.pretrained_init_configuration,
-        )
+            cache_dir=cache_dir)
 
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model
@@ -1066,6 +1097,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 force_download=force_download,
                 **kwargs,
             )
+        config.save_pretrained(cache_dir)
 
         # 2. init the model
         init_args = config['init_args'] or ()

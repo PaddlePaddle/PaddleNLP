@@ -37,7 +37,6 @@ from ..model_outputs import (
     ModelOutput,
 )
 from .configuration import BERT_PRETRAINED_RESOURCE_FILES_MAP, BertConfig, BERT_PRETRAINED_INIT_CONFIGURATION
-from ..configuration_utils import parse_config
 
 __all__ = [
     'BertModel',
@@ -140,10 +139,6 @@ class BertPretrainedModel(PretrainedModel):
 
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
-
-    def __init__(self, config: BertConfig):
-        super().__init__()
-        self.config: BertConfig = config
 
     def init_weights(self, layer):
         """ Initialization hook """
