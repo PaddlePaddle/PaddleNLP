@@ -256,7 +256,7 @@ if [ ${MODE} = "whole_infer" ] || [ ${MODE} = "klquant_whole_infer" ]; then
             echo ${infer_run_exports[Count]} 
             echo $export_cmd
             eval $export_cmd
-            status_export=$?
+            status_export=${PIPESTATUS[0]}
             status_check $status_export "${export_cmd}" "${status_log}"
         else
             save_infer_dir=${infer_model}
@@ -363,6 +363,7 @@ else
                 if [ ${#gpu} -ge 2 ];then
                     cat ${WORK_PATH}/log/workerlog.0 > ${_train_log} 
                 fi
+                eval "cat ${_train_log}"
                 status_check ${last_status} "${cmd}" "${status_log}" "${model_name}" "${_train_log}"
 
                 set_eval_pretrain=$(func_set_params "${pretrain_model_key}" "${save_log}/${train_model_name}")
@@ -374,7 +375,9 @@ else
                     set_eval_params1=$(func_set_params "${eval_key1}" "${eval_value1}")
                     eval_cmd="${python} ${eval_py} ${set_eval_pretrain} ${set_use_gpu} ${set_eval_params1} >${_eval_log} 2>&1" 
                     eval $eval_cmd
-                    status_check $? "${eval_cmd}" "${status_log}" "${model_name}" "${_eval_log}"
+                    last_status=${PIPESTATUS[0]}
+                    eval "cat ${_eval_log}"
+                    status_check ${last_status} "${eval_cmd}" "${status_log}" "${model_name}" "${_eval_log}"
                 fi
                 # run export model
                 if [ ${run_export} != "null" ]; then 
@@ -385,7 +388,9 @@ else
                     _export_log="${LOG_PATH}/${trainer}_gpus_${gpu}_autocast_${autocast}_nodes_${nodes}_export.log"
                     export_cmd="${python} ${run_export} ${set_export_weight} ${set_save_infer_key} >${_export_log} 2>&1"
                     eval $export_cmd
-                    status_check $? "${export_cmd}" "${status_log}" "${model_name}" "${_export_log}"
+                    last_status=${PIPESTATUS[0]}
+                    eval "cat ${_export_log}"
+                    status_check ${last_status} "${export_cmd}" "${status_log}" "${model_name}" "${_export_log}"
 
                     #run inference
                     eval $env
