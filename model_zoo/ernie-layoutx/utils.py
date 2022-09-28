@@ -17,14 +17,14 @@
 import os
 import json
 import random
-import cv2
 import six
 import base64
 import hashlib
 import collections
-
+from PIL import Image
 import editdistance
 from seqeval.metrics.sequence_labeling import get_entities
+import cv2
 import scipy
 import numpy as np
 from paddlenlp.utils.log import logger
@@ -42,14 +42,13 @@ def _get_md5(string):
     return hl.hexdigest()
 
 
-def _decode_image(im_base64, to_rgb=True):
+def _decode_image(im_base64):
     """ Decode image """
     if im_base64 is not None:
         image = base64.b64decode(im_base64.encode("utf-8"))
         im = np.frombuffer(image, dtype="uint8")
         im = cv2.imdecode(im, 1)
-        if to_rgb:
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         return im
     else:
         return np.zeros([224, 224, 3], dtype=np.uint8)
@@ -58,10 +57,8 @@ def _decode_image(im_base64, to_rgb=True):
 def _resize_image(
     im,
     target_size=0,
-    max_size=0,
     interp=cv2.INTER_LINEAR,
     resize_box=False,
-    use_cv2=True,
 ):
     """Resize the image numpy."""
     if not isinstance(im, np.ndarray):
@@ -70,7 +67,6 @@ def _resize_image(
         raise ValueError("image is not 3-dimensional.")
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
-    im_size_max = np.max(im_shape[0:2])
     if isinstance(target_size, list):
         # Case for multi-scale training
         selected_size = random.choice(target_size)
@@ -78,44 +74,17 @@ def _resize_image(
         selected_size = target_size
     if float(im_size_min) == 0:
         raise ZeroDivisionError("min size of image is 0")
-    if max_size != 0:
-        im_scale = float(selected_size) / float(im_size_min)
-        # Prevent the biggest axis from being more than max_size
-        if np.round(im_scale * im_size_max) > max_size:
-            im_scale = float(max_size) / float(im_size_max)
-        im_scale_x = im_scale
-        im_scale_y = im_scale
+    resize_w = selected_size
+    resize_h = selected_size
 
-        resize_w = im_scale_x * float(im_shape[1])
-        resize_h = im_scale_y * float(im_shape[0])
-    else:
-        im_scale_x = float(selected_size) / float(im_shape[1])
-        im_scale_y = float(selected_size) / float(im_shape[0])
-
-        resize_w = selected_size
-        resize_h = selected_size
-
-    if use_cv2:
-        im = cv2.resize(im,
-                        None,
-                        None,
-                        fx=im_scale_x,
-                        fy=im_scale_y,
-                        interpolation=interp)
-    else:
-        if max_size != 0:
-            raise TypeError(
-                "If you set max_size to cap the maximum size of image,"
-                "please set use_cv2 to True to resize the image.")
-        im = im.astype("uint8")
-        im = Image.fromarray(im)
-        im = im.resize((int(resize_w), int(resize_h)), interp)
-        im = np.array(im)
-
+    im = im.astype("uint8")
+    im = Image.fromarray(im)
+    im = im.resize((int(resize_w), int(resize_h)), interp)
+    im = np.array(im)
     return im
 
 
-def _scale_same_as_image(boxes, width, height, target_size, max_size):
+def _scale_same_as_image(boxes, width, height, target_size):
     """
     Scale the bounding box of each character within maximum boundary.
     """
@@ -147,12 +116,11 @@ def _str2im(
     mean=[103.530, 116.280, 123.675],
     std=[57.375, 57.120, 58.395],
 ):
-    # step1: decode image
+    # Step1: decode image
     origin_im = _decode_image(im_base64)
-    # step2: resize image
+    # Step2: resize image
     im = _resize_image(origin_im,
                        target_size=target_size,
-                       max_size=0,
                        interp=1,
                        resize_box=False)
     return im, origin_im
@@ -295,7 +263,6 @@ class PreProcessor:
                 examples["width"][example_idx],
                 examples["height"][example_idx],
                 target_size,
-                max_size,
             )
 
             qas = examples["qas"][example_idx]
@@ -495,7 +462,6 @@ class PreProcessor:
                 examples["width"][example_idx],
                 examples["height"][example_idx],
                 target_size,
-                max_size,
             )
 
             for (i, token) in enumerate(example_text):
@@ -718,7 +684,6 @@ class PreProcessor:
                 examples["width"][example_idx],
                 examples["height"][example_idx],
                 target_size,
-                max_size,
             )
 
             qas = examples["qas"][example_idx]

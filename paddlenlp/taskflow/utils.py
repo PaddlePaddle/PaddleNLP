@@ -38,7 +38,7 @@ import paddle.nn.functional as F
 from paddle.dataset.common import md5file
 from ..utils.log import logger
 from ..utils.downloader import get_path_from_url, DownloaderCheck
-from ..utils.img_utils import (
+from ..utils.image_utils import (
     img2base64,
     check,
     two_dimension_sort_layout,
@@ -1827,12 +1827,11 @@ def pad_batch_data(insts,
     return return_list if len(return_list) > 1 else return_list[0]
 
 
-class ExtractReader(object):
+class ImageReader(object):
 
     def __init__(self,
                  super_rel_pos,
                  tokenizer,
-                 random_seed=None,
                  max_key_len=16,
                  max_seq_len=512,
                  image_size=1024,
@@ -1856,10 +1855,6 @@ class ExtractReader(object):
         self.max_seq_len = max_seq_len
         self.doc_stride = 128
         self.unique_id = 10000000
-
-        np.random.seed(random_seed)
-        random.seed(random_seed)
-        self.random_seed = random_seed
 
         self.examples = {}
         self.features = {}

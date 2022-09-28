@@ -17,6 +17,7 @@ import os
 import math
 import collections
 import base64
+from PIL import Image
 from seqeval.metrics.sequence_labeling import get_entities
 import numpy as np
 import cv2
@@ -26,7 +27,7 @@ from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 from paddleocr import PaddleOCR
-from paddlenlp.utils.img_utils import ppocr2example
+from paddlenlp.utils.image_utils import ppocr2example
 
 
 class InferBackend(object):
@@ -896,20 +897,24 @@ class Predictor(object):
         return formatted_results
 
 
-def _decode_image(im_base64, to_rgb=True):
+def _decode_image(im_base64):
     """ Decode image """
     if im_base64 is not None:
         image = base64.b64decode(im_base64.encode("utf-8"))
         im = np.frombuffer(image, dtype="uint8")
         im = cv2.imdecode(im, 1)
-        if to_rgb:
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         return im
     else:
         return np.zeros([224, 224, 3], dtype=np.uint8)
 
 
-def _resize_image(im, target_size=0, interp=cv2.INTER_LINEAR, resize_box=False):
+def _resize_image(
+    im,
+    target_size=0,
+    interp=cv2.INTER_LINEAR,
+    resize_box=False,
+):
     """Resize the image numpy."""
     if not isinstance(im, np.ndarray):
         raise TypeError("image type is not numpy.")
@@ -917,21 +922,20 @@ def _resize_image(im, target_size=0, interp=cv2.INTER_LINEAR, resize_box=False):
         raise ValueError("image is not 3-dimensional.")
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
-    im_size_max = np.max(im_shape[0:2])
-
-    selected_size = target_size
+    if isinstance(target_size, list):
+        # Case for multi-scale training
+        selected_size = random.choice(target_size)
+    else:
+        selected_size = target_size
     if float(im_size_min) == 0:
         raise ZeroDivisionError("min size of image is 0")
+    resize_w = selected_size
+    resize_h = selected_size
 
-    im_scale_x = float(selected_size) / float(im_shape[1])
-    im_scale_y = float(selected_size) / float(im_shape[0])
-
-    im = cv2.resize(im,
-                    None,
-                    None,
-                    fx=im_scale_x,
-                    fy=im_scale_y,
-                    interpolation=interp)
+    im = im.astype("uint8")
+    im = Image.fromarray(im)
+    im = im.resize((int(resize_w), int(resize_h)), interp)
+    im = np.array(im)
     return im
 
 

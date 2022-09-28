@@ -14,20 +14,20 @@
 
 import os
 import collections
-
+import paddle
 from ..transformers import AutoTokenizer
-from .utils import download_file, ExtractReader, get_dvqa_pred, find_answer_pos
+from .utils import download_file, ImageReader, get_dvqa_pred, find_answer_pos
 from .task import Task
 
 usage = r"""
             from paddlenlp import Taskflow
             docprompt = Taskflow("document_intelligence")
-            # Types of image: A string containing a local path to an image
-            docprompt([{"image": "./invoice.jpg", "question": ["发票号码是多少?", "校验码是多少?"]}])
-            # Types of image: A string containing a http link pointing to an image
-            docprompt({"image": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "question": ["发票号码是多少?", "校验码是多少?"]})
+            # Types of doc: A string containing a local path to an image
+            docprompt([{"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+            # Types of doc: A string containing a http link pointing to an image
+            docprompt({"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             '''
-            [{'question': '发票号码是多少?', 'answer': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'question': '校验码是多少?', 'answer': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
+            [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
             '''
          """
 
@@ -50,17 +50,17 @@ class DocPromptTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        self._batch_size = kwargs.get("batch_size", 1)
-        self._topn = kwargs.get("topn", 1)
-        self._use_gpu = kwargs.get("use_gpu", False)
-
         try:
             from paddleocr import PaddleOCR
         except:
             raise ImportError(
                 "Please install the dependencies first, pip install paddleocr --upgrade"
             )
-
+        self._batch_size = kwargs.get("batch_size", 1)
+        self._topn = kwargs.get("topn", 1)
+        self._use_gpu = kwargs.get("use_gpu", True)
+        if not self._use_gpu:
+            paddle.set_device('cpu')
         self._ocr = PaddleOCR(use_angle_cls=True,
                               show_log=False,
                               use_gpu=self._use_gpu)
@@ -69,9 +69,8 @@ class DocPromptTask(Task):
                       URLS[self.model][0], URLS[self.model][1])
         self._get_inference_model()
         self._construct_tokenizer()
-        self._reader = ExtractReader(super_rel_pos=False,
-                                     tokenizer=self._tokenizer,
-                                     random_seed=1)
+        self._reader = ImageReader(super_rel_pos=False,
+                                   tokenizer=self._tokenizer)
 
     def _construct_tokenizer(self):
         """
@@ -88,11 +87,11 @@ class DocPromptTask(Task):
         """
         inputs = self._check_input_text(inputs)
 
-        img_path = inputs["image"]
+        img_path = inputs["doc"]
         if not os.path.exists(img_path):
             download_file("./", img_path.rsplit("/", 1)[-1], img_path)
             img_path = img_path.rsplit("/", 1)[-1]
-        question = inputs["question"]
+        question = inputs["prompt"]
 
         ocr_result = self._ocr.ocr(img_path, cls=True)
         data_loader = self._reader.data_generator(ocr_result, img_path,
@@ -173,19 +172,34 @@ class DocPromptTask(Task):
             else:
                 preds = sorted(preds,
                                key=lambda x: x["prob"])[::-1][:self._topn]
-            all_predictions.append({"question": example_query, "answer": preds})
+            all_predictions.append({"prompt": example_query, "result": preds})
         return all_predictions
 
     def _check_input_text(self, inputs):
         inputs = inputs[0]
         if isinstance(inputs, dict):
-            if "image" not in inputs.keys():
+            if "doc" not in inputs.keys():
                 raise TypeError(
                     "Invalid inputs, the inputs should contain the image file path or image url."
-                    .format(type(inputs[0])))
+                )
+            if "prompt" not in inputs.keys():
+                raise TypeError(
+                    "Invalid inputs, the inputs should contain the prompt list."
+                )
+            # inputs = [inputs]
+        elif isinstance(inputs, list):
+            if isinstance(inputs[0], dict):
+                if "doc" not in inputs[0].keys():
+                    raise TypeError(
+                        "Invalid inputs, the inputs should contain the image file path or image url."
+                    )
+                if "prompt" not in inputs[0].keys():
+                    raise TypeError(
+                        "Invalid inputs, the inputs should contain the prompt list."
+                    )
         else:
             raise TypeError(
-                "Invalid inputs, input for document question answering should be dict, but type of {} found!"
+                "Invalid inputs, input for document question answering should be dict or list of dict, but type of {} found!"
                 .format(type(inputs)))
         return inputs
 
