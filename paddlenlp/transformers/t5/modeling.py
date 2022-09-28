@@ -1561,7 +1561,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             output_hidden_states (bool, optional):
                 See :class:`T5Model`.
             return_dict (bool, optional):
-                See :class:`T5Model`.
+                Whether or not to return a class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput`. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput` if `return_dict=True`. 
