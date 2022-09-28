@@ -412,6 +412,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         self,
         input_ids=None,
         attention_mask=None,
+        token_type_ids=None,
         use_cache=False,
         cache=None,
     ):
@@ -472,9 +473,15 @@ class CodeGenModel(CodeGenPreTrainedModel):
         if attention_mask is None:
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating attention_mask"
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            if batch_size == 1 and past_length != 0:
+                batch_size, seq_len = input_shape
+                attention_mask = paddle.ones(
+                    [batch_size, 1, 1, seq_len + past_length],
+                    dtype=paddle.get_default_dtype())
+            else:
+                attention_mask = paddle.cast(
+                    input_ids == self.pad_token_id,
+                    dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
@@ -483,6 +490,10 @@ class CodeGenModel(CodeGenPreTrainedModel):
             attention_mask.stop_gradient = True
 
         inputs_embeds = self.wte(input_ids)
+        if token_type_ids is not None:
+            token_type_embeds = self.wte(token_type_ids)
+            inputs_embeds = inputs_embeds + token_type_embeds
+
         hidden_states = self.drop(inputs_embeds)
         output_shape = input_shape[:] + [hidden_states.shape[-1]]
 
@@ -579,6 +590,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
     def forward(self,
                 input_ids=None,
                 attention_mask=None,
+                token_type_ids=None,
                 use_cache=False,
                 cache=None):
         r"""
@@ -613,6 +625,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
 
         transformer_outputs = self.transformer(input_ids,
                                                attention_mask=attention_mask,
+                                               token_type_ids=token_type_ids,
                                                use_cache=use_cache,
                                                cache=cache)
 
