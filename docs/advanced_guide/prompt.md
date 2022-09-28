@@ -401,13 +401,13 @@ prompt_model = PromptModelForSequenceClassification(model,
 - ``freeze_dropout`` : 在训练时是否固定预训练模型参数并关闭 ``dropout`` 。 当 ``freeze_dropout=True`` ，``freeze_plm`` 也为 ``True`` 。
 
 
-### 构造 PromptTrainer 训练
+### 使用PromptTrainer训练
 
 ``PromptTrainer`` 继承自 ``Trainer`` ， 封装了数据处理，模型训练、测试，训练策略等，便于训练流程的快速搭建。
 
 **配置训练参数**
 
-``PromptTuningArguments`` 继承自 ``TrainingArguments`` ，包含了提示学习的主要训练参数。其中 ``TrainingArguments`` 参数见 `Trainer API 文档 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md>`_ ，其余参数详见 [Prompt 参数列表](#Prompt参数列表) 。推荐使用 **命令行** 的形式进行参数配置，即
+``PromptTuningArguments`` 继承自 ``TrainingArguments`` ，包含了提示学习的主要训练参数。其中 ``TrainingArguments`` 参数见 `Trainer API 文档 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md>`_ ，其余参数详见 [Prompt Trainer参数列表](#PromptTrainer参数列表) 。推荐使用 **命令行** 的形式进行参数配置，即
 
 ```shell
 python xxx.py --output_dir xxx --learning_rate xxx
@@ -484,7 +484,7 @@ data_args, training_args = parser.parse_args_into_dataclasses()
 ### 附录
 
 
-#### Prompt 参数列表
+#### PromptTrainer参数列表
 
 
 | 参数              |  类型  | 默认值   |   含义                                                   |
