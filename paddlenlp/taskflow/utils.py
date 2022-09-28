@@ -48,7 +48,6 @@ from ..utils.img_utils import (
     Permute,
     NormalizeImage,
     PadBatch,
-    Gt2YoloTarget,
 )
 from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
 
@@ -1717,17 +1716,8 @@ class ProcessReader(object):
                                           {'fields': self._fields})
         self._batch_transforms = None
 
-        if use_fine_grained_loss:
-            for bt in batch_transforms:
-                if isinstance(bt, Gt2YoloTarget):
-                    bt.num_classes = num_classes
-        elif batch_transforms:
-            batch_transforms = [
-                bt for bt in batch_transforms
-                if not isinstance(bt, Gt2YoloTarget)
-            ]
-
         if batch_transforms:
+            batch_transforms = [bt for bt in batch_transforms]
             self._batch_transforms = Compose(batch_transforms,
                                              {'fields': self._fields})
 
@@ -1887,14 +1877,10 @@ class ExtractReader(object):
                     [idw * cut_width, idh * cut_height, cut_width, cut_height])
 
         sample_trans = [
-            DecodeImage(to_rgb=True),
-            ResizeImage(target_size=self.im_npos,
-                        max_size=0,
-                        interp=1,
-                        resize_box=False),
+            DecodeImage(),
+            ResizeImage(target_size=self.im_npos, interp=1),
             NormalizeImage(
                 is_channel_first=False,
-                is_scale=False,
                 mean=[103.530, 116.280, 123.675],
                 std=[57.375, 57.120, 58.395],
             ),

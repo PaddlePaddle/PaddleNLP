@@ -17,9 +17,9 @@ import os
 import math
 import collections
 import base64
-import cv2
 from seqeval.metrics.sequence_labeling import get_entities
 import numpy as np
+import cv2
 import scipy
 import paddle
 from paddlenlp.transformers import AutoTokenizer
@@ -263,7 +263,6 @@ class Predictor(object):
                 examples["width"][example_idx],
                 examples["height"][example_idx],
                 target_size,
-                max_size,
             )
 
             orig_labels = ["O"] * len(example_text)
@@ -488,7 +487,6 @@ class Predictor(object):
                 examples["width"][example_idx],
                 examples["height"][example_idx],
                 target_size,
-                max_size,
             )
 
             for (i, token) in enumerate(example_text):
@@ -619,7 +617,6 @@ class Predictor(object):
                 examples["width"][example_idx],
                 examples["height"][example_idx],
                 target_size,
-                max_size,
             )
 
             for (i, token) in enumerate(example_text):
@@ -912,11 +909,7 @@ def _decode_image(im_base64, to_rgb=True):
         return np.zeros([224, 224, 3], dtype=np.uint8)
 
 
-def _resize_image(im,
-                  target_size=0,
-                  max_size=0,
-                  interp=cv2.INTER_LINEAR,
-                  resize_box=False):
+def _resize_image(im, target_size=0, interp=cv2.INTER_LINEAR, resize_box=False):
     """Resize the image numpy."""
     if not isinstance(im, np.ndarray):
         raise TypeError("image type is not numpy.")
@@ -929,16 +922,9 @@ def _resize_image(im,
     selected_size = target_size
     if float(im_size_min) == 0:
         raise ZeroDivisionError("min size of image is 0")
-    if max_size != 0:
-        im_scale = float(selected_size) / float(im_size_min)
-        # Prevent the biggest axis from being more than max_size
-        if np.round(im_scale * im_size_max) > max_size:
-            im_scale = float(max_size) / float(im_size_max)
-        im_scale_x = im_scale
-        im_scale_y = im_scale
-    else:
-        im_scale_x = float(selected_size) / float(im_shape[1])
-        im_scale_y = float(selected_size) / float(im_shape[0])
+
+    im_scale_x = float(selected_size) / float(im_shape[1])
+    im_scale_y = float(selected_size) / float(im_shape[0])
 
     im = cv2.resize(im,
                     None,
@@ -949,7 +935,7 @@ def _resize_image(im,
     return im
 
 
-def _scale_same_as_image(boxes, width, height, target_size, max_size):
+def _scale_same_as_image(boxes, width, height, target_size):
     """
     Scale the bounding box of each character within maximum boundary.
     """
@@ -986,7 +972,6 @@ def _str2im(
     # step2: resize image
     im = _resize_image(origin_im,
                        target_size=target_size,
-                       max_size=0,
                        interp=1,
                        resize_box=False)
     return im, origin_im

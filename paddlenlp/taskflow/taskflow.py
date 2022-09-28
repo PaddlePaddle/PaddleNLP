@@ -39,7 +39,7 @@ from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
-from .docvqa import DocVQATask
+from .document_intelligence import DocPromptTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -439,17 +439,15 @@ TASKS = {
             "model": "pai-painter-painting-base-zh",
         }
     },
-    "document_question_answering": {
+    "document_intelligence": {
         "models": {
-            "ernie-layoutx-large-pruned": {
-                "task_class":
-                DocVQATask,
-                "task_flag":
-                "document_question_answering-ernie-layoutx-large-pruned",
+            "docprompt": {
+                "task_class": DocPromptTask,
+                "task_flag": "document_intelligence-docprompt",
             },
         },
         "default": {
-            "model": "ernie-layoutx-large-pruned"
+            "model": "docprompt"
         }
     },
 }

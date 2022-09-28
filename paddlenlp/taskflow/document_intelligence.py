@@ -21,25 +21,25 @@ from .task import Task
 
 usage = r"""
             from paddlenlp import Taskflow
-            docvqa = Taskflow("document_intelligence")
+            docprompt = Taskflow("document_intelligence")
             # Types of image: A string containing a local path to an image
-            docvqa([{"image": "./invoice.jpg", "question": ["发票号码是多少?", "校验码是多少?"]}])
+            docprompt([{"image": "./invoice.jpg", "question": ["发票号码是多少?", "校验码是多少?"]}])
             # Types of image: A string containing a http link pointing to an image
-            docvqa({"image": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "question": ["发票号码是多少?", "校验码是多少?"]})
+            docprompt({"image": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "question": ["发票号码是多少?", "校验码是多少?"]})
             '''
-            [{'question': '发票号码是多少?', 'answer': [{'value': 'No44527206', 'prob': 0.96}]}, {'question': '校验码的后六位是多少?', 'answer': [{'value': '01107 555427109891646', 'prob': 0.99}]}]
+            [{'question': '发票号码是多少?', 'answer': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'question': '校验码是多少?', 'answer': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
             '''
          """
 
 URLS = {
-    "ernie-layoutx-large-pruned": [
-        "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/ernie-layoutx/ernie-layoutx-large-pruned_params.tar",
+    "docprompt": [
+        "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/docprompt/docprompt_params.tar",
         "fe72df2168caa83815bd8939155105b7"
     ],
 }
 
 
-class DocVQATask(Task):
+class DocPromptTask(Task):
     """
     The document intelligence model, give the querys and predict the answers. 
     Args:
@@ -65,7 +65,7 @@ class DocVQATask(Task):
                               show_log=False,
                               use_gpu=self._use_gpu)
         self._usage = usage
-        download_file(self._task_path, "ernie-layoutx-large-pruned_params.tar",
+        download_file(self._task_path, "docprompt_params.tar",
                       URLS[self.model][0], URLS[self.model][1])
         self._get_inference_model()
         self._construct_tokenizer()
