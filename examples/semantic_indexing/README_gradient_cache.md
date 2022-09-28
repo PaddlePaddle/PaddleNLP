@@ -64,7 +64,7 @@ python train_gradient_cache_DPR.py \
    --warmup_steps 1237 \
    --epoches 40 \
    --max_grad_norm 2 \
-   --train_data_path {data_path} \
+   --train_data_path ./dataset_dir/biencoder-nq-train.json \
    --chunk_size 16 \
 ```
 
@@ -94,10 +94,10 @@ python generate_dense_embeddings.py \
 
 ```
 python generate_dense_embeddings.py \
-   --ctx_file {data/psgs_w100.tsv} \
-   --out_file {test_generate} \
-   --que_model_path {que_model_path} \
-   --con_model_path {con_model_path}
+   --ctx_file ./dataset_dir/psgs_w100.tsv \
+   --out_file test_generate \
+   --que_model_path ./save_dir/question_model_40 \
+   --con_model_path ./save_dir/context_model_40
 ```
 
 
@@ -111,12 +111,12 @@ python generate_dense_embeddings.py \
 ## 针对全部文档的检索器验证
 ```
 python dense_retriever.py --hnsw_index \
-    --out_file {out_file} \
-    --encoded_ctx_file {encoded_ctx} \
-    --ctx_file {ctx} \
-    --qa_file {nq.qa.csv} \
-    --que_model_path {que_model_path} \
-    --con_model_path {con_model_path}
+    --out_file out_file \
+    --encoded_ctx_file ./test_generate \
+    --ctx_file ./dataset_dir/psgs_w100.tsv \
+    --qa_file ./dataset_dir/nq.qa.csv \
+    --que_model_path ./save_dir/question_model_40 \
+    --con_model_path ./save_dir/context_model_40
 ```
 参数含义说明
 * `hnsw_index`：使用hnsw_index
@@ -128,38 +128,3 @@ python dense_retriever.py --hnsw_index \
 * `con_model_path`: context encoder model
 
 
-# 运行示例
-```
-mkdir dataset_dir
-#新建存放数据集的文件夹
-cd dataset_dir
-#进入dataset_dir，将后续会使用到的数据集放在这个文件夹下面
-cd ..
-#回到上一级目录
-python train_gradient_cache_DPR.py \
-   --batch_size 128 \
-   --learning_rate 2e-05 \
-   --save_dir save_biencoder
-   --warmup_steps 1237 \
-   --epoches 40 \
-   --max_grad_norm 2 \
-   --train_data_path ./dataset_dir/biencoder-nq-train.json \
-   --chunk_size 16 \
-
-
-python generate_dense_embeddings.py \
-   --ctx_file ./dataset_dir/psgs_w100.tsv \
-   --out_file test_generate \
-   --que_model_path ./save_dir/question_model_40 \
-   --con_model_path ./save_dir/context_model_40
-
-
-python dense_retriever.py --hnsw_index \
-    --out_file out_file \
-    --encoded_ctx_file ./test_generate \
-    --ctx_file ./dataset_dir/psgs_w100.tsv \
-    --qa_file ./dataset_dir/nq.qa.csv \
-    --que_model_path ./save_dir/question_model_40 \
-    --con_model_path ./save_dir/context_model_40
-
-```
