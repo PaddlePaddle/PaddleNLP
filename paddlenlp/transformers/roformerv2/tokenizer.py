@@ -20,6 +20,12 @@ from ..tokenizer_utils import PretrainedTokenizer
 
 __all__ = ["RoFormerv2Tokenizer"]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "roformer_v2_chinese_char_small": 512,
+    "roformer_v2_chinese_char_base": 512,
+    "roformer_v2_chinese_char_large": 512
+}
+
 
 class RoFormerv2Tokenizer(PretrainedTokenizer):
     """
@@ -94,7 +100,15 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+
+    # TODO(wj-Mcat): to be confirmed
+    max_model_input_sizes = {
+        "roformer_v2_chinese_char_small": 1024,
+        "roformer_v2_chinese_char_base": 1024,
+        "roformer_v2_chinese_char_large": 1024,
+    }
     padding_side = "right"
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
@@ -115,8 +129,8 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(
-            vocab=self.vocab, unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
+                                                      unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -191,8 +205,8 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
         token_ids_0 = []
         token_ids_1 = []
         return len(
-            self.build_inputs_with_special_tokens(token_ids_0, token_ids_1
-                                                  if pair else None))
+            self.build_inputs_with_special_tokens(
+                token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -302,7 +316,9 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
                     "ids is already formatted with special tokens for the model."
                 )
             return list(
-                map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
+                map(
+                    lambda x: 1
+                    if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0))
 
         if token_ids_1 is not None:

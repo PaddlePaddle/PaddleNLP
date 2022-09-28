@@ -26,6 +26,7 @@ else:
 
 
 class BiGRUWithCRF(nn.Layer):
+
     def __init__(self,
                  emb_size,
                  hidden_size,
@@ -42,7 +43,7 @@ class BiGRUWithCRF(nn.Layer):
                           hidden_size,
                           num_layers=2,
                           direction='bidirect')
-        # We need `label_num + 2` for appending BOS and EOS tag 
+        # We need `label_num + 2` for appending BOS and EOS tag
         self.fc = nn.Linear(hidden_size * 2, label_num + 2)
         self.crf = LinearChainCrf(label_num)
         self.crf_loss = LinearChainCrfLoss(self.crf)
@@ -61,12 +62,14 @@ class BiGRUWithCRF(nn.Layer):
 
 
 class ErnieCrfForTokenClassification(nn.Layer):
+
     def __init__(self, ernie, crf_lr=100):
         super().__init__()
         self.num_classes = ernie.num_classes
         self.ernie = ernie  # allow ernie to be config
-        self.crf = LinearChainCrf(
-            self.num_classes, crf_lr=crf_lr, with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_classes,
+                                  crf_lr=crf_lr,
+                                  with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
@@ -77,11 +80,10 @@ class ErnieCrfForTokenClassification(nn.Layer):
                 attention_mask=None,
                 lengths=None,
                 labels=None):
-        logits = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids)
+        logits = self.ernie(input_ids,
+                            token_type_ids=token_type_ids,
+                            attention_mask=attention_mask,
+                            position_ids=position_ids)
 
         if labels is not None:
             loss = self.crf_loss(logits, lengths, labels)

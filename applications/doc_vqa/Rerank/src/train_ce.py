@@ -63,17 +63,16 @@ def main(args):
         dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
     exe = fluid.Executor(place)
 
-    reader = reader_ce.ClassifyReader(
-        vocab_path=args.vocab_path,
-        label_map_config=args.label_map_config,
-        max_seq_len=args.max_seq_len,
-        total_num=args.train_data_size,
-        do_lower_case=args.do_lower_case,
-        in_tokens=args.in_tokens,
-        random_seed=args.random_seed,
-        tokenizer=args.tokenizer,
-        for_cn=args.for_cn,
-        task_id=args.task_id)
+    reader = reader_ce.ClassifyReader(vocab_path=args.vocab_path,
+                                      label_map_config=args.label_map_config,
+                                      max_seq_len=args.max_seq_len,
+                                      total_num=args.train_data_size,
+                                      do_lower_case=args.do_lower_case,
+                                      in_tokens=args.in_tokens,
+                                      random_seed=args.random_seed,
+                                      tokenizer=args.tokenizer,
+                                      for_cn=args.for_cn,
+                                      task_id=args.task_id)
 
     if not (args.do_train or args.do_val or args.do_test):
         raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
@@ -195,11 +194,13 @@ def main(args):
                 "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
                 "both are set! Only arg 'init_checkpoint' is made valid.")
         if args.init_checkpoint:
-            init_checkpoint(
-                exe, args.init_checkpoint, main_program=startup_prog)
+            init_checkpoint(exe,
+                            args.init_checkpoint,
+                            main_program=startup_prog)
         elif args.init_pretraining_params:
-            init_pretraining_params(
-                exe, args.init_pretraining_params, main_program=startup_prog)
+            init_pretraining_params(exe,
+                                    args.init_pretraining_params,
+                                    main_program=startup_prog)
     elif args.do_val or args.do_test:
         if not args.init_checkpoint:
             raise ValueError("args 'init_checkpoint' should be set if"
@@ -236,13 +237,12 @@ def main(args):
                     train_exe.run(fetch_list=[], program=train_program)
 
                 else:
-                    outputs = evaluate(
-                        train_exe,
-                        train_program,
-                        train_pyreader,
-                        graph_vars,
-                        "train",
-                        metric=args.metric)
+                    outputs = evaluate(train_exe,
+                                       train_program,
+                                       train_pyreader,
+                                       graph_vars,
+                                       "train",
+                                       metric=args.metric)
 
                     if args.verbose:
                         verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size(
@@ -307,12 +307,11 @@ def main(args):
     # final eval on dianostic, hack for glue-ax
     if args.diagnostic:
         test_pyreader.decorate_tensor_provider(
-            reader.data_generator(
-                args.diagnostic,
-                batch_size=args.batch_size,
-                epoch=1,
-                dev_count=1,
-                shuffle=False))
+            reader.data_generator(args.diagnostic,
+                                  batch_size=args.batch_size,
+                                  epoch=1,
+                                  dev_count=1,
+                                  shuffle=False))
 
         log.info("Final diagnostic")
         qids, preds, probs = predict(test_exe, test_prog, test_pyreader,
@@ -332,22 +331,20 @@ def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
     # evaluate dev set
     for ds in args.dev_set.split(','):
         test_pyreader.decorate_tensor_provider(
-            reader.data_generator(
-                ds,
-                batch_size=args.predict_batch_size,
-                epoch=1,
-                dev_count=1,
-                shuffle=False))
+            reader.data_generator(ds,
+                                  batch_size=args.predict_batch_size,
+                                  epoch=1,
+                                  dev_count=1,
+                                  shuffle=False))
         log.info("validation result of dataset {}:".format(ds))
-        evaluate_info = evaluate(
-            exe,
-            test_prog,
-            test_pyreader,
-            graph_vars,
-            "dev",
-            metric=args.metric)
-        log.info(evaluate_info + ', file: {}, epoch: {}, steps: {}'.format(
-            ds, epoch, steps))
+        evaluate_info = evaluate(exe,
+                                 test_prog,
+                                 test_pyreader,
+                                 graph_vars,
+                                 "dev",
+                                 metric=args.metric)
+        log.info(evaluate_info +
+                 ', file: {}, epoch: {}, steps: {}'.format(ds, epoch, steps))
 
 
 def predict_wrapper(args,
@@ -364,12 +361,11 @@ def predict_wrapper(args,
 
     for test_f, save_f in zip(test_sets, save_dirs):
         test_pyreader.decorate_tensor_provider(
-            reader.data_generator(
-                test_f,
-                batch_size=args.predict_batch_size,
-                epoch=1,
-                dev_count=1,
-                shuffle=False))
+            reader.data_generator(test_f,
+                                  batch_size=args.predict_batch_size,
+                                  epoch=1,
+                                  dev_count=1,
+                                  shuffle=False))
 
         if epoch is not None or steps is not None:
             save_path = save_f + '.' + str(epoch) + '.' + str(steps)

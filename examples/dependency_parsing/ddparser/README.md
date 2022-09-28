@@ -65,8 +65,8 @@ LAS (依存标注准备率) = number of words assigned correct head and relation
 | 名称 | 含义 |
 | --- | --- |
 | ID |  单词ID，序号从1开始 |
-| FORM | 当前单词 |  
-| LEMMA | 当前词语的原型或词干，在中文中此列与FORM相同 |  
+| FORM | 当前单词 |
+| LEMMA | 当前词语的原型或词干，在中文中此列与FORM相同 |
 | CPOSTAG | 当前词语的词性（粗粒度） |
 | POSTAG | 当前词语的词性（细粒度） |
 | FEATS | 句法特征 |

@@ -20,16 +20,16 @@ def main():
         dom = xml.dom.minidom.parseString(input_str)
         example_nodes = dom.documentElement.getElementsByTagName('SENTENCE')
         for example in example_nodes:
-            raw_text = example.getElementsByTagName('TEXT')[0].childNodes[
-                0].data
+            raw_text = example.getElementsByTagName(
+                'TEXT')[0].childNodes[0].data
             correct_text = list(raw_text)
             mistakes = example.getElementsByTagName('MISTAKE')
             for mistake in mistakes:
                 loc = int(
-                    mistake.getElementsByTagName('LOCATION')[0].childNodes[0]
-                    .data) - 1
-                correction = mistake.getElementsByTagName('CORRECTION')[
-                    0].childNodes[0].data
+                    mistake.getElementsByTagName('LOCATION')
+                    [0].childNodes[0].data) - 1
+                correction = mistake.getElementsByTagName(
+                    'CORRECTION')[0].childNodes[0].data
                 correct_text[loc] = correction
 
             correct_text = ''.join(correct_text)

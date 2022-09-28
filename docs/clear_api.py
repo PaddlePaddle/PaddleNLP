@@ -86,8 +86,8 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
             if re.search(del_str[0], file_line):
                 length = len(file_line.split('.'))
                 if length > 2:
-                    modify_line = file_line.split('.')[-1].replace(del_str[0],
-                                                                   '')
+                    modify_line = file_line.split('.')[-1].replace(
+                        del_str[0], '')
                 else:
                     modify_line = file_line.replace(del_str[0], '')
                 write_con.append(modify_line)
@@ -95,8 +95,8 @@ def modify_doc_title_dir(abspath_rstfiles_dir):
             if re.search(del_str[1], file_line):
                 length = len(file_line.split('.'))
                 if length > 2:
-                    modify_line = file_line.split('.')[-1].replace(del_str[1],
-                                                                   '')
+                    modify_line = file_line.split('.')[-1].replace(
+                        del_str[1], '')
                 else:
                     modify_line = file_line.replace(del_str[1], '')
                 write_con.append(modify_line)

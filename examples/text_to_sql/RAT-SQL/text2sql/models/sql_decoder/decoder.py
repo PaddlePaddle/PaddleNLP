@@ -34,9 +34,8 @@ def accumulate_logprobs(d, keys_and_logprobs):
         if existing is None:
             d[key] = logprob
         else:
-            d[key] = paddle.logsumexp(
-                paddle.stack(
-                    (logprob, existing), axis=0), axis=0)
+            d[key] = paddle.logsumexp(paddle.stack((logprob, existing), axis=0),
+                                      axis=0)
 
 
 @attr.s
@@ -87,8 +86,10 @@ class Text2SQLDecoder(paddle.nn.Layer):
         self.enumerate_order = enumerate_order
 
         if use_align_mat:
-            self.compute_align_loss = lambda *args: align_dec_func.compute_align_loss(self, *args)
-            self.compute_pointer_with_align = lambda *args: align_dec_func.compute_pointer_with_align(self, *args)
+            self.compute_align_loss = lambda *args: align_dec_func.compute_align_loss(
+                self, *args)
+            self.compute_pointer_with_align = lambda *args: align_dec_func.compute_pointer_with_align(
+                self, *args)
 
         if self.preproc.use_seq_elem_rules:
             self.node_type_vocab = vocab.Vocab(
@@ -168,9 +169,11 @@ class Text2SQLDecoder(paddle.nn.Layer):
             # TODO: Figure out how to get right sizes (query, key) to module
             self.copy_pointer = copy_pointer
         if multi_loss_type == 'logsumexp':
-            self.multi_loss_reduction = lambda logprobs: -paddle.logsumexp(logprobs, axis=1)
+            self.multi_loss_reduction = lambda logprobs: -paddle.logsumexp(
+                logprobs, axis=1)
         elif multi_loss_type == 'mean':
-            self.multi_loss_reduction = lambda logprobs: -paddle.mean(logprobs, axis=1)
+            self.multi_loss_reduction = lambda logprobs: -paddle.mean(logprobs,
+                                                                      axis=1)
 
         self.pointers = {}
         self.pointer_action_emb_proj = {}
@@ -214,8 +217,9 @@ class Text2SQLDecoder(paddle.nn.Layer):
             loss = F.kl_div(logits, one_hot, reduction="batchmean")
             return loss.unsqueeze(0)
         else:
-            return paddle.nn.functional.cross_entropy(
-                X, target, reduction="none")
+            return paddle.nn.functional.cross_entropy(X,
+                                                      target,
+                                                      reduction="none")
 
     @classmethod
     def _calculate_rules(cls, preproc):
@@ -267,8 +271,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
             mle_loss = self.compute_mle_loss(enc_input, example, desc_enc,
                                              debug)
         else:
-            mle_loss = self.compute_loss_from_all_ordering(enc_input, example,
-                                                           desc_enc, debug)
+            mle_loss = self.compute_loss_from_all_ordering(
+                enc_input, example, desc_enc, debug)
 
         if self.use_align_loss:
             align_loss = self.compute_align_loss(desc_enc, example)
@@ -351,7 +355,7 @@ class Text2SQLDecoder(paddle.nn.Layer):
         #        print('pop:', list(reversed(self)))
         #        item = super().pop()
         #        return item
-        #        
+        #
         #queue = List()
         #queue.append(
         #    TreeState(
@@ -362,7 +366,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
         queue = [
             TreeState(
                 node=example.tree,
-                parent_field_type=self.preproc.grammar.root_type, )
+                parent_field_type=self.preproc.grammar.root_type,
+            )
         ]
         while queue:
             item = queue.pop()
@@ -383,7 +388,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
                     queue.append(
                         TreeState(
                             node=elem,
-                            parent_field_type=parent_field_type, ))
+                            parent_field_type=parent_field_type,
+                        ))
                 continue
 
             if parent_field_type in self.preproc.grammar.pointers:
@@ -445,7 +451,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
                 queue.append(
                     TreeState(
                         node=node[field_info.name],
-                        parent_field_type=field_info.type, ))
+                        parent_field_type=field_info.type,
+                    ))
 
         loss = paddle.sum(paddle.stack(tuple(traversal.loss), axis=0), axis=0)
         if debug:
@@ -491,8 +498,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
                       parent_action_emb, desc_enc):
         """update state"""
         # desc_context: shape = batch (=1) x emb_size
-        desc_context, attention_logits = self._desc_attention(prev_state,
-                                                              desc_enc)
+        desc_context, attention_logits = self._desc_attention(
+            prev_state, desc_enc)
         # node_type_emb: shape = batch (=1) x emb_size
         node_type_emb = self.node_type_embedding(
             self._index(self.node_type_vocab, node_type))
@@ -531,9 +538,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
 
         # TODO: Mask other probabilities first?
         return list(
-            zip(
-                range(rules_start, rules_end), rule_logprobs[0, rules_start:
-                                                             rules_end]))
+            zip(range(rules_start, rules_end),
+                rule_logprobs[0, rules_start:rules_end]))
 
     def gen_token(self, node_type, prev_state, prev_action_emb, parent_h,
                   parent_action_emb, desc_enc):
@@ -580,7 +586,7 @@ class Text2SQLDecoder(paddle.nn.Layer):
         # gen: ~(unk & in desc), equivalent to  ~unk | ~in desc
         if token in self.terminal_vocab or copy_logprob is None:
             token_logits = self.terminal_logits(output)
-            # shape: 
+            # shape:
             gen_logprob = (
                 # log p(gen | output)
                 # shape: batch (=1)
@@ -593,8 +599,7 @@ class Text2SQLDecoder(paddle.nn.Layer):
 
         # loss should be -log p(...), so negate
         loss_piece = -paddle.logsumexp(
-            maybe_stack(
-                [copy_logprob, gen_logprob], axis=1), axis=1)
+            maybe_stack([copy_logprob, gen_logprob], axis=1), axis=1)
         return loss_piece
 
     def token_infer(self, output, gen_logodds, desc_enc):
@@ -606,8 +611,8 @@ class Text2SQLDecoder(paddle.nn.Layer):
         copy_loc_logits = self.copy_pointer(output, desc_enc.memory)
         # log p(loc_i | copy, output)
         # shape: batch (=1) x seq length
-        copy_loc_logprobs = paddle.nn.functional.log_softmax(
-            copy_loc_logits, axis=-1)
+        copy_loc_logprobs = paddle.nn.functional.log_softmax(copy_loc_logits,
+                                                             axis=-1)
         # log p(loc_i, copy | output)
         copy_loc_logprobs += copy_logprob
 
@@ -629,9 +634,9 @@ class Text2SQLDecoder(paddle.nn.Layer):
         # shape: batch (=1) x vocab size
         token_logprobs += gen_logprob
 
-        accumulate_logprobs(log_prob_by_word, (
-            (self.terminal_vocab[idx], token_logprobs[0, idx])
-            for idx in range(token_logprobs.shape[1])))
+        accumulate_logprobs(log_prob_by_word,
+                            ((self.terminal_vocab[idx], token_logprobs[0, idx])
+                             for idx in range(token_logprobs.shape[1])))
 
         return list(log_prob_by_word.items())
 

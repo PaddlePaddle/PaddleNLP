@@ -50,15 +50,14 @@ def do_predict(args):
     trg_idx2word = vocab.idx_to_token
 
     model = paddle.Model(
-        Seq2SeqAttnInferModel(
-            vocab_size,
-            args.hidden_size,
-            args.hidden_size,
-            args.num_layers,
-            bos_id=bos_id,
-            eos_id=eos_id,
-            beam_size=args.beam_size,
-            max_out_len=256))
+        Seq2SeqAttnInferModel(vocab_size,
+                              args.hidden_size,
+                              args.hidden_size,
+                              args.num_layers,
+                              bos_id=bos_id,
+                              eos_id=eos_id,
+                              beam_size=args.beam_size,
+                              max_out_len=256))
 
     model.prepare()
 

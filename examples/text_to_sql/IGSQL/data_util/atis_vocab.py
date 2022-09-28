@@ -56,8 +56,8 @@ class ATISVocabulary():
             filename,
             functional_types=functional_types,
             min_occur=min_occur,
-            ignore_fn=lambda x: snippets.is_snippet(x) or (anonymizer and anonymizer.is_anon_tok(x)) or (skip and x in skip)
-        )
+            ignore_fn=lambda x: snippets.is_snippet(x) or
+            (anonymizer and anonymizer.is_anon_tok(x)) or (skip and x in skip))
         self.tokens = set(self.raw_vocab.token_to_id.keys())
         self.inorder_tokens = self.raw_vocab.id_to_token
 

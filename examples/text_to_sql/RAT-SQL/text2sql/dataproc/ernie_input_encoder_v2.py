@@ -98,8 +98,9 @@ class ErnieInputEncoderV2(BaseInputEncoder):
         if self.config.num_value_col_type != 'q_num':
             orig_question_tokens = text_utils.wordseg(self.question)
             candi_nums = list(
-                set(['0', '1'] + text_utils.CandidateValueExtractor.
-                    extract_num_from_text(question)))
+                set(['0', '1'] +
+                    text_utils.CandidateValueExtractor.extract_num_from_text(
+                        question)))
             candi_nums_index = [-1] * len(candi_nums)
         else:
             orig_question_tokens, candi_nums, candi_nums_index = text_utils.wordseg_and_extract_num(
@@ -159,8 +160,9 @@ class ErnieInputEncoderV2(BaseInputEncoder):
 
         ## handle question tokens
         question_tokens = ['[CLS]'] + q_tokens_tmp
-        final_tokens = question_tokens[:self.config.
-                                       max_question_len] + ['[SEP]']
+        final_tokens = question_tokens[:self.config.max_question_len] + [
+            '[SEP]'
+        ]
 
         columns = [db.columns[i] for i in col_orders]
         if column_match_cells is not None:
@@ -204,7 +206,8 @@ class ErnieInputEncoderV2(BaseInputEncoder):
                                 ] + self.tokenizer.tokenize(mcell)
                         if self.enc_value_with_col:
                             value_indexes.extend(
-                                [column_indexes[-1], len(final_tokens)])
+                                [column_indexes[-1],
+                                 len(final_tokens)])
                         else:
                             value_indexes.append(len(final_tokens))
                         final_tokens += toks
@@ -310,13 +313,14 @@ if __name__ == "__main__":
     print([x.orig_name for x in db.columns])
     print([x.orig_name for x in db.tables])
     print(
-        parser.encode(
-            q,
-            db,
-            column_match_cells=column_match_cells,
-            candi_nums=['1', '0', '10000000'],
-            debug=True))
+        parser.encode(q,
+                      db,
+                      column_match_cells=column_match_cells,
+                      candi_nums=['1', '0', '10000000'],
+                      debug=True))
     print('*' * 100)
     print(
-        parser.encode(
-            q.split(' '), db, candi_nums=['1', '0', '10000000'], debug=True))
+        parser.encode(q.split(' '),
+                      db,
+                      candi_nums=['1', '0', '10000000'],
+                      debug=True))

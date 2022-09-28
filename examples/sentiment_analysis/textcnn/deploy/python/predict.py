@@ -49,6 +49,7 @@ def convert_example(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -123,8 +124,9 @@ if __name__ == "__main__":
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_length)
 
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
     pad_token_id = vocab.to_indices('[PAD]')
     tokenizer = JiebaTokenizer(vocab)
     label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
@@ -132,11 +134,10 @@ if __name__ == "__main__":
     # Firstly pre-processing prediction data and then do predict.
     data = ['你再骂我我真的不跟你聊了', '你看看我附近有什么好吃的', '我喜欢画画也喜欢唱歌']
 
-    results = predictor.predict(
-        data,
-        tokenizer,
-        label_map,
-        batch_size=args.batch_size,
-        pad_token_id=pad_token_id)
+    results = predictor.predict(data,
+                                tokenizer,
+                                label_map,
+                                batch_size=args.batch_size,
+                                pad_token_id=pad_token_id)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

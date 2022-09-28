@@ -68,28 +68,26 @@ class TemporalBlock(nn.Layer):
 
         super(TemporalBlock, self).__init__()
         self.conv1 = weight_norm(
-            nn.Conv1D(
-                n_inputs,
-                n_outputs,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                dilation=dilation))
+            nn.Conv1D(n_inputs,
+                      n_outputs,
+                      kernel_size,
+                      stride=stride,
+                      padding=padding,
+                      dilation=dilation))
         # Chomp1d is used to make sure the network is causal.
-        # We pad by (k-1)*d on the two sides of the input for convolution, 
+        # We pad by (k-1)*d on the two sides of the input for convolution,
         # and then use Chomp1d to remove the (k-1)*d output elements on the right.
         self.chomp1 = Chomp1d(padding)
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(dropout)
 
         self.conv2 = weight_norm(
-            nn.Conv1D(
-                n_outputs,
-                n_outputs,
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                dilation=dilation))
+            nn.Conv1D(n_outputs,
+                      n_outputs,
+                      kernel_size,
+                      stride=stride,
+                      padding=padding,
+                      dilation=dilation))
         self.chomp2 = Chomp1d(padding)
         self.relu2 = nn.ReLU()
         self.dropout2 = nn.Dropout(dropout)
@@ -124,6 +122,7 @@ class TemporalBlock(nn.Layer):
 
 
 class TCN(nn.Layer):
+
     def __init__(self, input_channel, num_channels, kernel_size=2, dropout=0.2):
         """
         Temporal Convolutional Networks is a simple convolutional architecture. It outperforms canonical recurrent networks
@@ -147,14 +146,13 @@ class TCN(nn.Layer):
             in_channels = input_channel if i == 0 else num_channels[i - 1]
             out_channels = num_channels[i]
             layers.append(
-                TemporalBlock(
-                    in_channels,
-                    out_channels,
-                    kernel_size,
-                    stride=1,
-                    dilation=dilation_size,
-                    padding=(kernel_size - 1) * dilation_size,
-                    dropout=dropout))
+                TemporalBlock(in_channels,
+                              out_channels,
+                              kernel_size,
+                              stride=1,
+                              dilation=dilation_size,
+                              padding=(kernel_size - 1) * dilation_size,
+                              dropout=dropout))
 
         self.network = nn.Sequential(*layers)
 

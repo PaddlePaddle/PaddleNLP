@@ -11,7 +11,7 @@ FasterGeneration是PaddleNLP v2.2版本加入的一个高性能推理功能，�
 - 解码速度快。最高可达非加速版generate函数的 **17倍**。HuggingFace generate函数的 **8倍**。**并支持FP16混合精度计算**。 详细性能试验数据请参见 `FasterGeneration Performence <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf>`_ 。
 - 易用性强。功能的入口为 `model.generate` ，与非加速版生成api的使用方法相同，当满足加速条件时使用jit即时编译高性能算子并用于生成，不满足则自动切换回非加速版生成api。下图展示了FasterGeneration的启动流程：
 
-.. image:: /imgs/faster_generation.png
+.. image:: ../../imgs/faster_generation.png
 
 快速开始
 -----------

@@ -57,6 +57,24 @@ BERT模型汇总
 |                                                                                  |              | and Traditional text using                                                       |
 |                                                                                  |              | Whole-Word-Masking with extented data.                                           |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-base``                                                     | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-12_H-768`_                                                |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-medium``                                                   | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-8_H-512`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-small``                                                    | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-4_H-512`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-mini``                                                     | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-4_H-256`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-tiny``                                                     | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-2_H-128`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+| ``uer/chinese-roberta-6l-768h``                                                  | Chinese      | Please refer to:                                                                 |
+|                                                                                  |              | `uer/chinese_roberta_L-6_H-768`_                                                 |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 | ``ckiplab/bert-base-chinese-pos``                                                | Chinese      | Please refer to:                                                                 |
 |                                                                                  |              | `ckiplab/bert-base-chinese-pos`_                                                 |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
@@ -521,6 +539,12 @@ BERT模型汇总
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
 .. _ckiplab/bert-base-chinese-pos: https://huggingface.co/ckiplab/bert-base-chinese-pos
+.. _uer/chinese_roberta_L-12_H-768: https://huggingface.co/uer/chinese_roberta_L-12_H-768
+.. _uer/chinese_roberta_L-6_H-768: https://huggingface.co/uer/chinese_roberta_L-6_H-768
+.. _uer/chinese_roberta_L-8_H-512: https://huggingface.co/uer/chinese_roberta_L-8_H-512
+.. _uer/chinese_roberta_L-4_H-512: https://huggingface.co/uer/chinese_roberta_L-4_H-512
+.. _uer/chinese_roberta_L-4_H-256: https://huggingface.co/uer/chinese_roberta_L-4_H-256
+.. _uer/chinese_roberta_L-2_H-128: https://huggingface.co/uer/chinese_roberta_L-2_H-128
 .. _tbs17/MathBERT: https://huggingface.co/tbs17/MathBERT
 .. _cross-encoder/ms-marco-MiniLM-L-12-v2: https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-12-v2
 .. _cl-tohoku/bert-base-japanese-char: https://huggingface.co/cl-tohoku/bert-base-japanese-char

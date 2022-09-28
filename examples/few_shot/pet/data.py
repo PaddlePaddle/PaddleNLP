@@ -31,16 +31,17 @@ def create_dataloader(dataset_origin,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 #TODO
@@ -385,14 +386,14 @@ def transform_csl(example,
         example["label_length"] = 1
 
         if pattern_id == 0:
-            example["sentence1"] = u"本文的关键词<unk>是:" + "，".join(example[
-                "keyword"]) + example["abst"]
+            example["sentence1"] = u"本文的关键词<unk>是:" + "，".join(
+                example["keyword"]) + example["abst"]
         elif pattern_id == 1:
             example["sentence1"] = example[
                 "abst"] + u"。本文的关键词<unk>是:" + "，".join(example["keyword"])
         elif pattern_id == 2:
-            example["sentence1"] = u"本文的内容<unk>是:" + "，".join(example[
-                "keyword"]) + example["abst"]
+            example["sentence1"] = u"本文的内容<unk>是:" + "，".join(
+                example["keyword"]) + example["abst"]
         elif pattern_id == 3:
             example["sentence1"] = example[
                 "abst"] + u"。本文的内容<unk>是:" + "，".join(example["keyword"])
@@ -407,14 +408,14 @@ def transform_csl(example,
         example['text_label'] = label_normalize_dict[origin_label]
 
         if pattern_id == 0:
-            example["sentence1"] = u"本文的关键词<unk>是:" + "，".join(example[
-                "keyword"]) + example["abst"]
+            example["sentence1"] = u"本文的关键词<unk>是:" + "，".join(
+                example["keyword"]) + example["abst"]
         elif pattern_id == 1:
             example["sentence1"] = example[
                 "abst"] + u"。本文的关键词<unk>是:" + "，".join(example["keyword"])
         elif pattern_id == 2:
-            example["sentence1"] = u"本文的内容<unk>是:" + "，".join(example[
-                "keyword"]) + example["abst"]
+            example["sentence1"] = u"本文的内容<unk>是:" + "，".join(
+                example["keyword"]) + example["abst"]
         elif pattern_id == 3:
             example["sentence1"] = example[
                 "abst"] + u"。本文的内容<unk>是:" + "，".join(example["keyword"])

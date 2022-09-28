@@ -50,25 +50,27 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         '--input_dir',
         default=None,
         type=str,
         required=True,
-        help='The input directory where the data will be read from.', )
+        help='The input directory where the data will be read from.',
+    )
     parser.add_argument(
         '--output_dir',
         default=None,
         type=str,
         required=True,
-        help='The output directory where the model predictions and checkpoints will be written.',
+        help=
+        'The output directory where the model predictions and checkpoints will be written.',
     )
-    parser.add_argument(
-        '--max_seq_length',
-        default=512,
-        type=int,
-        help='The max length of each sequence')
+    parser.add_argument('--max_seq_length',
+                        default=512,
+                        type=int,
+                        help='The max length of each sequence')
     parser.add_argument(
         '--mlm_prob',
         default=0.15,
@@ -78,67 +80,69 @@ def parse_args():
         '--batch_size',
         default=256,
         type=int,
-        help='Batch size per GPU/CPU for training.', )
-    parser.add_argument(
-        '--learning_rate',
-        default=2e-4,
-        type=float,
-        help='The initial learning rate for Adam.')
-    parser.add_argument(
-        '--weight_decay',
-        default=0.01,
-        type=float,
-        help='Weight decay if we apply some.')
-    parser.add_argument(
-        '--adam_epsilon',
-        default=1e-8,
-        type=float,
-        help='Epsilon for Adam optimizer.')
+        help='Batch size per GPU/CPU for training.',
+    )
+    parser.add_argument('--learning_rate',
+                        default=2e-4,
+                        type=float,
+                        help='The initial learning rate for Adam.')
+    parser.add_argument('--weight_decay',
+                        default=0.01,
+                        type=float,
+                        help='Weight decay if we apply some.')
+    parser.add_argument('--adam_epsilon',
+                        default=1e-8,
+                        type=float,
+                        help='Epsilon for Adam optimizer.')
     parser.add_argument(
         '--num_epochs',
         default=100,
         type=int,
-        help='Total number of training epochs to perform.', )
+        help='Total number of training epochs to perform.',
+    )
     parser.add_argument(
         '--max_steps',
         default=-1,
         type=int,
-        help='If > 0: set total number of training steps to perform. Override num_epochs.',
+        help=
+        'If > 0: set total number of training steps to perform. Override num_epochs.',
     )
-    parser.add_argument(
-        '--warmup_steps',
-        default=10000,
-        type=int,
-        help='Linear warmup over warmup_steps.')
-    parser.add_argument(
-        '--logging_steps',
-        type=int,
-        default=100,
-        help='Log every X updates steps.')
-    parser.add_argument(
-        '--save_steps',
-        type=int,
-        default=10000,
-        help='Save checkpoint every X updates steps.')
+    parser.add_argument('--warmup_steps',
+                        default=10000,
+                        type=int,
+                        help='Linear warmup over warmup_steps.')
+    parser.add_argument('--logging_steps',
+                        type=int,
+                        default=100,
+                        help='Log every X updates steps.')
+    parser.add_argument('--save_steps',
+                        type=int,
+                        default=10000,
+                        help='Save checkpoint every X updates steps.')
     parser.add_argument(
         '--init_from_ckpt',
         action='store_true',
-        help='Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt or will train from fresh start'
+        help=
+        'Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt or will train from fresh start'
     )
     parser.add_argument(
         '--use_amp',
         action='store_true',
         help='Whether to use float16(Automatic Mixed Precision) to train.')
-    parser.add_argument(
-        '--eager_run', type=bool, default=True, help='Use dygraph mode.')
+    parser.add_argument('--eager_run',
+                        type=bool,
+                        default=True,
+                        help='Use dygraph mode.')
     parser.add_argument(
         '--device',
         default='gpu',
         type=str,
         choices=['cpu', 'gpu'],
         help='The device to select to train the model, is must be cpu/gpu.')
-    parser.add_argument(
-        '--seed', type=int, default=1000, help='random seed for initialization')
+    parser.add_argument('--seed',
+                        type=int,
+                        default=1000,
+                        help='random seed for initialization')
     args = parser.parse_args()
     return args
 
@@ -154,6 +158,7 @@ def set_seed(seed):
 
 
 class WorkerInitObj(object):
+
     def __init__(self, seed):
         self.seed = seed
 
@@ -174,8 +179,8 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES['ernie-health']
 
     # Loads or initialize a model.
-    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys(
-    ))
+    pretrained_models = list(
+        tokenizer_class.pretrained_init_configuration.keys())
 
     if args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
@@ -191,9 +196,8 @@ def do_train(args):
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
             # Load checkpoint
             tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-            with open(
-                    os.path.join(args.model_name_or_path, 'run_states.json'),
-                    'r') as f:
+            with open(os.path.join(args.model_name_or_path, 'run_states.json'),
+                      'r') as f:
                 config_dict = json.load(f)
                 model_name = config_dict['model_name']
             if model_name in pretrained_models:
@@ -348,18 +352,21 @@ def do_train(args):
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.logging_steps == 0:
-                local_loss = dict(
-                    [(k, (t_loss[k] - log_loss[k]) / args.logging_steps)
-                     for k in ['loss', 'gen', 'rtd', 'mts', 'csp']])
+                local_loss = dict([
+                    (k, (t_loss[k] - log_loss[k]) / args.logging_steps)
+                    for k in ['loss', 'gen', 'rtd', 'mts', 'csp']
+                ])
                 if paddle.distributed.get_world_size() > 1:
                     for k in ['loss', 'gen', 'rtd', 'mts', 'csp']:
                         paddle.distributed.all_gather(loss_list[k],
                                                       local_loss[k])
                     if paddle.distributed.get_rank() == 0:
-                        tmp_loss = dict(
-                            [(k, float((paddle.stack(loss_list[k]).sum() / len(
-                                loss_list[k])).numpy()))
-                             for k in ['loss', 'gen', 'rtd', 'mts', 'csp']])
+                        tmp_loss = dict([
+                            (k,
+                             float((paddle.stack(loss_list[k]).sum() /
+                                    len(loss_list[k])).numpy()))
+                            for k in ['loss', 'gen', 'rtd', 'mts', 'csp']
+                        ])
                         log_str = (
                             'global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, '
                             'avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, '
@@ -367,8 +374,7 @@ def do_train(args):
                         ).format(global_step, num_training_steps, epoch, step,
                                  tmp_loss['loss'], tmp_loss['gen'],
                                  tmp_loss['rtd'], tmp_loss['mts'],
-                                 tmp_loss['csp'],
-                                 optimizer.get_lr(),
+                                 tmp_loss['csp'], optimizer.get_lr(),
                                  (time.time() - tic_train) / args.logging_steps)
                         logger.info(log_str)
                         log_list.append(log_str)
@@ -385,8 +391,8 @@ def do_train(args):
                         writer.add_scalar('lr', optimizer.get_lr(), global_step)
                     loss_list = defaultdict(list)
                 else:
-                    local_loss = dict(
-                        [(k, v.numpy()[0]) for k, v in local_loss.items()])
+                    local_loss = dict([(k, v.numpy()[0])
+                                       for k, v in local_loss.items()])
                     log_str = (
                         'global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, '
                         'avg_loss: {4:.15f}, generator: {5:.15f}, rtd: {6:.15f}, multi_choice: {7:.15f}, '
@@ -394,8 +400,7 @@ def do_train(args):
                     ).format(global_step, num_training_steps, epoch, step,
                              local_loss['loss'], local_loss['gen'],
                              local_loss['rtd'], local_loss['mts'],
-                             local_loss['csp'],
-                             optimizer.get_lr(),
+                             local_loss['csp'], optimizer.get_lr(),
                              (time.time() - tic_train) / args.logging_steps)
                     logger.info(log_str)
                     log_list.append(log_str)
@@ -432,17 +437,15 @@ def do_train(args):
                         'epoch': epoch,
                         'step': step,
                     }
-                    with open(
-                            os.path.join(output_dir, 'model_config.json'),
-                            'w') as f:
+                    with open(os.path.join(output_dir, 'model_config.json'),
+                              'w') as f:
                         json.dump(config_to_save, f)
-                    with open(
-                            os.path.join(output_dir, 'run_states.json'),
-                            'w') as f:
+                    with open(os.path.join(output_dir, 'run_states.json'),
+                              'w') as f:
                         json.dump(run_states, f)
-                    paddle.save(model.state_dict(),
-                                os.path.join(output_dir,
-                                             'model_state.pdparams'))
+                    paddle.save(
+                        model.state_dict(),
+                        os.path.join(output_dir, 'model_state.pdparams'))
                     tokenizer.save_pretrained(output_dir)
                     paddle.save(optimizer.state_dict(),
                                 os.path.join(output_dir, 'model_state.pdopt'))

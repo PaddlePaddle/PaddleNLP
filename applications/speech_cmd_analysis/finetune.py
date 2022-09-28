@@ -53,34 +53,31 @@ def do_train():
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    train_ds = load_dataset(
-        reader,
-        data_path=args.train_path,
-        max_seq_len=args.max_seq_len,
-        lazy=False)
-    dev_ds = load_dataset(
-        reader,
-        data_path=args.dev_path,
-        max_seq_len=args.max_seq_len,
-        lazy=False)
+    train_ds = load_dataset(reader,
+                            data_path=args.train_path,
+                            max_seq_len=args.max_seq_len,
+                            lazy=False)
+    dev_ds = load_dataset(reader,
+                          data_path=args.dev_path,
+                          max_seq_len=args.max_seq_len,
+                          lazy=False)
 
-    trans_func = partial(
-        convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_len=args.max_seq_len)
 
-    train_data_loader = create_dataloader(
-        dataset=train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(dataset=train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dataset=dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dataset=dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        trans_fn=trans_func)
 
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=args.learning_rate, parameters=model.parameters())
+    optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate,
+                                       parameters=model.parameters())
 
     criterion = paddle.nn.BCELoss()
     metric = SpanEvaluator()

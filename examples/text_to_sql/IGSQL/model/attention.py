@@ -19,6 +19,7 @@ import paddle
 import paddle.nn.functional as F
 import math
 import numpy as np
+
 np.random.seed(0)
 
 
@@ -55,11 +56,10 @@ class Attention(paddle.nn.Layer):
 
         query_weights = paddle.ParamAttr(initializer=_initializer)
 
-        self.query_linear = paddle.nn.Linear(
-            query_size,
-            self.key_size,
-            weight_attr=query_weights,
-            bias_attr=False)
+        self.query_linear = paddle.nn.Linear(query_size,
+                                             self.key_size,
+                                             weight_attr=query_weights,
+                                             bias_attr=False)
 
     def transform_arguments(self, query, keys, values):
         """ Transforms the query/key/value inputs before attention calculations.
@@ -96,8 +96,8 @@ class Attention(paddle.nn.Layer):
         if not values:
             values = keys
 
-        query_t, keys_t, values_t = self.transform_arguments(query, keys,
-                                                             values)
+        query_t, keys_t, values_t = self.transform_arguments(
+            query, keys, values)
 
         scores = paddle.t(paddle.mm(query_t, keys_t))  # len(key) x len(query)
 

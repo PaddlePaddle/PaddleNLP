@@ -42,8 +42,8 @@ def save_checkpoint(args, global_step, model, optimizer, lr_scheduler,
         state_dict["lr_scheduler"] = lr_scheduler.state_dict()
 
     if args.pp_degree > 1:
-        path = os.path.join(output_dir, "dp_{}_mp_{}_pp_{}".format(
-            dp_rank, mp_rank, pp_rank))
+        path = os.path.join(
+            output_dir, "dp_{}_mp_{}_pp_{}".format(dp_rank, mp_rank, pp_rank))
         #model.save_state_dict(path)
         paddle.save(model.state_dict(),
                     os.path.join(path, "model_state.pdparams"))
@@ -69,14 +69,15 @@ def load_checkpoint(args, model, optimizer, lr_scheduler, tokenizer, dp_rank,
 
     load_path = None
     if args.pp_degree > 1:
-        load_path = os.path.join(args.resume_dir, "dp_{}_mp_{}_pp_{}".format(
-            dp_rank, mp_rank, pp_rank))
+        load_path = os.path.join(
+            args.resume_dir, "dp_{}_mp_{}_pp_{}".format(dp_rank, mp_rank,
+                                                        pp_rank))
         #model.set_state_dir(load_path)
         model.set_state_dict(
             paddle.load(os.path.join(load_path, "model_state.pdparams")))
     else:
-        load_path = os.path.join(args.resume_dir, "dp_{}_mp_{}".format(dp_rank,
-                                                                       mp_rank))
+        load_path = os.path.join(args.resume_dir,
+                                 "dp_{}_mp_{}".format(dp_rank, mp_rank))
         model.set_state_dict(
             paddle.load(os.path.join(load_path, "model_state.pdparams")))
 

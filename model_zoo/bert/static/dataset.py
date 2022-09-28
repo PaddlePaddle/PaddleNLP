@@ -26,10 +26,11 @@ def create_pretraining_dataset(input_file,
                                data_holders,
                                worker_init=None,
                                places=None):
-    train_data = PretrainingDataset(
-        input_file=input_file, max_pred_length=max_pred_length)
-    train_batch_sampler = paddle.io.BatchSampler(
-        train_data, batch_size=args.batch_size, shuffle=True)
+    train_data = PretrainingDataset(input_file=input_file,
+                                    max_pred_length=max_pred_length)
+    train_batch_sampler = paddle.io.BatchSampler(train_data,
+                                                 batch_size=args.batch_size,
+                                                 shuffle=True)
 
     def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
@@ -63,33 +64,39 @@ def create_pretraining_dataset(input_file,
             out[-1] = out[-1].astype(np.float16)
         return out
 
-    train_data_loader = DataLoader(
-        dataset=train_data,
-        places=places,
-        feed_list=data_holders,
-        batch_sampler=train_batch_sampler,
-        collate_fn=_collate_data,
-        num_workers=0,
-        worker_init_fn=worker_init,
-        return_list=False)
+    train_data_loader = DataLoader(dataset=train_data,
+                                   places=places,
+                                   feed_list=data_holders,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=_collate_data,
+                                   num_workers=0,
+                                   worker_init_fn=worker_init,
+                                   return_list=False)
     return train_data_loader, input_file
 
 
 def create_data_holder(args):
-    input_ids = paddle.static.data(
-        name="input_ids", shape=[-1, -1], dtype="int64")
-    segment_ids = paddle.static.data(
-        name="segment_ids", shape=[-1, -1], dtype="int64")
-    input_mask = paddle.static.data(
-        name="input_mask", shape=[-1, 1, 1, -1], dtype="float32")
-    masked_lm_positions = paddle.static.data(
-        name="masked_lm_positions", shape=[-1], dtype="int32")
-    masked_lm_labels = paddle.static.data(
-        name="masked_lm_labels", shape=[-1, 1], dtype="int64")
-    next_sentence_labels = paddle.static.data(
-        name="next_sentence_labels", shape=[-1, 1], dtype="int64")
-    masked_lm_scale = paddle.static.data(
-        name="masked_lm_scale", shape=[-1, 1], dtype="float32")
+    input_ids = paddle.static.data(name="input_ids",
+                                   shape=[-1, -1],
+                                   dtype="int64")
+    segment_ids = paddle.static.data(name="segment_ids",
+                                     shape=[-1, -1],
+                                     dtype="int64")
+    input_mask = paddle.static.data(name="input_mask",
+                                    shape=[-1, 1, 1, -1],
+                                    dtype="float32")
+    masked_lm_positions = paddle.static.data(name="masked_lm_positions",
+                                             shape=[-1],
+                                             dtype="int32")
+    masked_lm_labels = paddle.static.data(name="masked_lm_labels",
+                                          shape=[-1, 1],
+                                          dtype="int64")
+    next_sentence_labels = paddle.static.data(name="next_sentence_labels",
+                                              shape=[-1, 1],
+                                              dtype="int64")
+    masked_lm_scale = paddle.static.data(name="masked_lm_scale",
+                                         shape=[-1, 1],
+                                         dtype="float32")
     return [
         input_ids, segment_ids, input_mask, masked_lm_positions,
         masked_lm_labels, next_sentence_labels, masked_lm_scale
@@ -97,6 +104,7 @@ def create_data_holder(args):
 
 
 class PretrainingDataset(Dataset):
+
     def __init__(self, input_file, max_pred_length):
         self.input_file = input_file
         self.max_pred_length = max_pred_length
@@ -124,8 +132,8 @@ class PretrainingDataset(Dataset):
         ]
         # TODO: whether to use reversed mask by changing 1s and 0s to be
         # consistent with nv bert
-        input_mask = (1 - np.reshape(
-            input_mask.astype(np.float32), [1, 1, input_mask.shape[0]])) * -1e4
+        input_mask = (1 - np.reshape(input_mask.astype(np.float32),
+                                     [1, 1, input_mask.shape[0]])) * -1e4
 
         index = self.max_pred_length
         # store number of  masked tokens in index

@@ -33,8 +33,8 @@ class Encoder(nn.Layer):
         """
         super(Encoder, self).__init__()
         self.config = config
-        # Don't add ernie to self, oterwise, there will be more copies of ernie weights 
-        # self.ernie = ernie 
+        # Don't add ernie to self, oterwise, there will be more copies of ernie weights
+        # self.ernie = ernie
 
     @classmethod
     def factory(cls, config, ernie):
@@ -61,6 +61,7 @@ class Encoder(nn.Layer):
 
 
 class ErnieSageV2Encoder(Encoder):
+
     def __init__(self, config, ernie):
         """ Ernie sage v2 encoder
 
@@ -69,25 +70,23 @@ class ErnieSageV2Encoder(Encoder):
             ernie (nn.Layer): the ernie model.
         """
         super(ErnieSageV2Encoder, self).__init__(config)
-        # Don't add ernie to self, oterwise, there will be more copies of ernie weights 
+        # Don't add ernie to self, oterwise, there will be more copies of ernie weights
         # self.ernie = ernie
         self.convs = nn.LayerList()
         initializer = None
         fc_lr = self.config.lr / 0.001
-        erniesage_conv = ErnieSageV2Conv(
-            ernie,
-            ernie.config["hidden_size"],
-            self.config.hidden_size,
-            learning_rate=fc_lr,
-            cls_token_id=self.config.cls_token_id,
-            aggr_func="sum")
+        erniesage_conv = ErnieSageV2Conv(ernie,
+                                         ernie.config["hidden_size"],
+                                         self.config.hidden_size,
+                                         learning_rate=fc_lr,
+                                         cls_token_id=self.config.cls_token_id,
+                                         aggr_func="sum")
         self.convs.append(erniesage_conv)
         for i in range(1, self.config.num_layers):
-            layer = GraphSageConv(
-                self.config.hidden_size,
-                self.config.hidden_size,
-                learning_rate=fc_lr,
-                aggr_func="sum")
+            layer = GraphSageConv(self.config.hidden_size,
+                                  self.config.hidden_size,
+                                  learning_rate=fc_lr,
+                                  aggr_func="sum")
             self.convs.append(layer)
 
         if self.config.final_fc:

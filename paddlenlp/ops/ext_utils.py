@@ -25,8 +25,9 @@ from distutils.dep_util import newer_group
 
 from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 from paddle.utils.cpp_extension.extension_utils import _jit_compile, _import_module_from_library
-from paddle.utils.cpp_extension.cpp_extension import (
-    CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension)
+from paddle.utils.cpp_extension.cpp_extension import (CUDA_HOME, CppExtension,
+                                                      BuildExtension as
+                                                      PaddleBuildExtension)
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.file_lock import decorate as file_lock
@@ -54,6 +55,7 @@ def _get_files(path):
 
 
 class CMakeExtension(Extension):
+
     def __init__(self, name, source_dir=None):
         # A CMakeExtension needs a source_dir instead of a file list.
         Extension.__init__(self, name, sources=[])
@@ -72,8 +74,8 @@ class CMakeExtension(Extension):
         if ext_builder.compiler.compiler_type == "msvc":
             raise NotImplementedError
         cmake_args = getattr(self, "cmake_args", []) + [
-            "-DCMAKE_BUILD_TYPE={}".format("Debug"
-                                           if ext_builder.debug else "Release"),
+            "-DCMAKE_BUILD_TYPE={}".format(
+                "Debug" if ext_builder.debug else "Release"),
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={}".format(ext_builder.build_lib),
         ]
         build_args = []
@@ -92,16 +94,14 @@ class CMakeExtension(Extension):
 
         # Redirect stdout/stderr to mute, especially when allowing errors
         stdout = getattr(self, "_std_out_handle", None)
-        subprocess.check_call(
-            ["cmake", self.source_dir] + cmake_args,
-            cwd=ext_builder.build_temp,
-            stdout=stdout,
-            stderr=stdout)
-        subprocess.check_call(
-            ["cmake", "--build", "."] + build_args,
-            cwd=ext_builder.build_temp,
-            stdout=stdout,
-            stderr=stdout)
+        subprocess.check_call(["cmake", self.source_dir] + cmake_args,
+                              cwd=ext_builder.build_temp,
+                              stdout=stdout,
+                              stderr=stdout)
+        subprocess.check_call(["cmake", "--build", "."] + build_args,
+                              cwd=ext_builder.build_temp,
+                              stdout=stdout,
+                              stderr=stdout)
 
     def get_target_filename(self):
         """
@@ -119,12 +119,14 @@ class CMakeExtension(Extension):
 
 
 class FasterTransformerExtension(CMakeExtension):
+
     def __init__(self, name, source_dir=None, need_parallel=False):
         super(FasterTransformerExtension, self).__init__(name, source_dir)
         self.sources = _get_files(
-            os.path.
-            join(self.source_dir, "faster_transformer", "src")) + _get_files(
-                os.path.join(self.source_dir, "patches", "FasterTransformer"))
+            os.path.join(self.source_dir, "faster_transformer",
+                         "src")) + _get_files(
+                             os.path.join(self.source_dir, "patches",
+                                          "FasterTransformer"))
         self._std_out_handle = None
         # Env variable may not work as expected, since jit compile by `load`
         # would not re-built if source code is not update.
@@ -158,9 +160,8 @@ class FasterTransformerExtension(CMakeExtension):
             # to `CMAKE_BINARY_DIR/lib`, thus copy the lib back to `build_ext.build_lib`.
             # Maybe move this copy to CMakeList.
             # `copy_tree` or `copy_file`, boost lib might be included
-            ext_builder.copy_tree(
-                os.path.join(ext_builder.build_temp, "lib"),
-                ext_builder.build_lib)
+            ext_builder.copy_tree(os.path.join(ext_builder.build_temp, "lib"),
+                                  ext_builder.build_lib)
             # TODO(guosheng): Maybe we should delete the build dir especially
             # when it is in the dir of paddlenlp package.
             # os.remove(ext_builder.build_temp)
@@ -238,8 +239,9 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
     for key, value in kwargs.items():
         kwargs_str += key + "=" + (f"'{value}'" if isinstance(value, str) else
                                    str(value)) + ","
-    content = template.format(
-        name=name, kwargs_str=kwargs_str, build_dir=build_dir)
+    content = template.format(name=name,
+                              kwargs_str=kwargs_str,
+                              build_dir=build_dir)
 
     with open(file_path, 'w') as f:
         f.write(content)
@@ -270,8 +272,8 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # like this:
         build_dir = os.path.join(
             PPNLP_HOME, 'extensions',
-            hashlib.md5(str(Path(__file__).parent.resolve()).encode(
-                'utf-8')).hexdigest())
+            hashlib.md5(str(
+                Path(__file__).parent.resolve()).encode('utf-8')).hexdigest())
     build_base_dir = os.path.abspath(
         os.path.expanduser(os.path.join(build_dir, name)))
     if not os.path.exists(build_base_dir):
@@ -293,8 +295,8 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         if not force:
             ext_sources = extension.sources
             if all(
-                    os.path.exists(f) and
-                    not newer_group(ext_sources, f, 'newer')
+                    os.path.exists(f)
+                    and not newer_group(ext_sources, f, 'newer')
                     for f in out_filepath):
                 logger.debug("skipping '%s' extension (up-to-date) build" %
                              name)

@@ -75,10 +75,10 @@ class Vocab(object):
         for special_token_name in special_iter:
             # Test if kwarg specifies a special token
             if not special_token_name.endswith('_token'):
-                raise ValueError('{} is invalid. Only keyword arguments '
-                                 'that end in \'_token\' are supported '
-                                 'to declare special tokens.'.format(
-                                     special_token_name))
+                raise ValueError(
+                    '{} is invalid. Only keyword arguments '
+                    'that end in \'_token\' are supported '
+                    'to declare special tokens.'.format(special_token_name))
 
             special_token = kwargs[special_token_name]
             if special_token is not None and special_token not in special_tokens:
@@ -113,7 +113,8 @@ class Vocab(object):
             if token_to_idx:
                 self._sort_index_according_to_user_specification(token_to_idx)
             if unk_token:
-                self._token_to_idx.default_factory = lambda: self._token_to_idx[unk_token]
+                self._token_to_idx.default_factory = lambda: self._token_to_idx[
+                    unk_token]
 
         # _expose_tokens_as_attributes
         self._identifiers_to_tokens = kwargs
@@ -210,8 +211,8 @@ class Vocab(object):
 
         if isinstance(indices, (np.ndarray)) and len(indices.shape) > 1:
             raise ValueError(
-                'Token indices is invalid. Expected 1D array, but received {}D array. '.
-                format(len(indices.shape)))
+                'Token indices is invalid. Expected 1D array, but received {}D array. '
+                .format(len(indices.shape)))
 
         tokens = []
         for idx in indices:
@@ -263,9 +264,14 @@ class Vocab(object):
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self._token_to_idx[tokens]
+            return self._token_to_idx[
+                tokens] if tokens in self._token_to_idx else self._token_to_idx[
+                    self.unk_token]
         else:
-            return [self._token_to_idx[token] for token in tokens]
+            return [
+                self._token_to_idx[token] if token in self._token_to_idx else
+                self._token_to_idx[self.unk_token] for token in tokens
+            ]
 
     def __len__(self):
         return len(self._idx_to_token)
@@ -499,16 +505,15 @@ class Vocab(object):
         counter = collections.Counter()
         for tokens in iterator:
             counter.update(tokens)
-        vocab = Vocab(
-            counter,
-            max_size=max_size,
-            min_freq=min_freq,
-            token_to_idx=token_to_idx,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            **kwargs)
+        vocab = Vocab(counter,
+                      max_size=max_size,
+                      min_freq=min_freq,
+                      token_to_idx=token_to_idx,
+                      unk_token=unk_token,
+                      pad_token=pad_token,
+                      bos_token=bos_token,
+                      eos_token=eos_token,
+                      **kwargs)
         return vocab
 
     @staticmethod
@@ -561,11 +566,10 @@ class Vocab(object):
             for index, line in enumerate(f):
                 token = line.rstrip('\n')
                 token_to_idx[token] = int(index)
-        vocab = Vocab.from_dict(
-            token_to_idx,
-            unk_token=unk_token,
-            pad_token=pad_token,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            **kwargs)
+        vocab = Vocab.from_dict(token_to_idx,
+                                unk_token=unk_token,
+                                pad_token=pad_token,
+                                bos_token=bos_token,
+                                eos_token=eos_token,
+                                **kwargs)
         return vocab

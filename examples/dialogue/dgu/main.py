@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import random
 import time
@@ -55,6 +69,7 @@ def save_ckpt(model, optimizer, output_dir, name):
 
 
 class DGULossFunction(nn.Layer):
+
     def __init__(self, task_name):
         super(DGULossFunction, self).__init__()
 
@@ -121,12 +136,11 @@ def train(args, model, train_data_loader, dev_data_loader, metric, n_procs,
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
     ]
-    optimizer = AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
+    optimizer = AdamW(learning_rate=lr_scheduler,
+                      parameters=model.parameters(),
+                      weight_decay=args.weight_decay,
+                      apply_decay_param_fun=lambda x: x in decay_params,
+                      grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm))
     loss_fn = DGULossFunction(args.task_name)
 
     load_ckpt(args, model, optimizer)
@@ -198,16 +212,17 @@ def create_data_loader(args, dataset_class, trans_func, batchify_fn, mode):
     dataset = dataset_class(args.data_dir, mode)
     dataset = MapDataset(dataset).map(trans_func, lazy=True)
     if mode == 'train':
-        batch_sampler = DistributedBatchSampler(
-            dataset, batch_size=args.batch_size, shuffle=True)
+        batch_sampler = DistributedBatchSampler(dataset,
+                                                batch_size=args.batch_size,
+                                                shuffle=True)
     else:
-        batch_sampler = BatchSampler(
-            dataset, batch_size=args.test_batch_size, shuffle=False)
-    data_loader = DataLoader(
-        dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+        batch_sampler = BatchSampler(dataset,
+                                     batch_size=args.test_batch_size,
+                                     shuffle=False)
+    data_loader = DataLoader(dataset,
+                             batch_sampler=batch_sampler,
+                             collate_fn=batchify_fn,
+                             return_list=True)
     return data_loader
 
 
@@ -222,14 +237,12 @@ def main(args):
 
     dataset_class, metric_class = TASK_CLASSES[args.task_name]
     tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
-    trans_func = partial(
-        dataset_class.convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_len)
-    test_trans_func = partial(
-        dataset_class.convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.test_max_seq_len)
+    trans_func = partial(dataset_class.convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_len)
+    test_trans_func = partial(dataset_class.convert_example,
+                              tokenizer=tokenizer,
+                              max_seq_length=args.test_max_seq_len)
     metric = metric_class()
 
     if args.task_name in ('udc', 'dstc2', 'atis_intent', 'mrda', 'swda'):
@@ -257,8 +270,9 @@ def main(args):
         train_data_loader = create_data_loader(args, dataset_class, trans_func,
                                                batchify_fn, 'train')
         if args.do_eval:
-            dev_data_loader = create_data_loader(
-                args, dataset_class, test_trans_func, batchify_fn, 'dev')
+            dev_data_loader = create_data_loader(args, dataset_class,
+                                                 test_trans_func, batchify_fn,
+                                                 'dev')
         else:
             dev_data_loader = None
         train(args, model, train_data_loader, dev_data_loader, metric,
@@ -266,8 +280,9 @@ def main(args):
 
     if args.do_test:
         if rank == 0:
-            test_data_loader = create_data_loader(
-                args, dataset_class, test_trans_func, batchify_fn, 'test')
+            test_data_loader = create_data_loader(args, dataset_class,
+                                                  test_trans_func, batchify_fn,
+                                                  'test')
             if args.do_train:
                 # If do_eval=True, use best model to evaluate the test data.
                 # Otherwise, use final model to evaluate the test data.

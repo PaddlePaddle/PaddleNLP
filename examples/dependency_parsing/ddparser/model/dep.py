@@ -61,8 +61,10 @@ class BiAffineParser(nn.Layer):
 
         # Biaffine layer
         self.arc_attn = BiAffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
-        self.rel_attn = BiAffine(
-            n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
+        self.rel_attn = BiAffine(n_in=n_mlp_rel,
+                                 n_out=n_rels,
+                                 bias_x=True,
+                                 bias_y=True)
 
     def forward(self, words, feats):
 
@@ -82,11 +84,11 @@ class BiAffineParser(nn.Layer):
         s_rel = paddle.transpose(self.rel_attn(rel_d, rel_h), perm=[0, 2, 3, 1])
         # Set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = paddle.unsqueeze(mask, 1)
-        s_arc = s_arc * s_arc_mask + paddle.scale(
-            paddle.cast(s_arc_mask, 'int32'),
-            scale=1e5,
-            bias=-1,
-            bias_after_scale=False)
+        s_arc = s_arc * s_arc_mask + paddle.scale(paddle.cast(
+            s_arc_mask, 'int32'),
+                                                  scale=1e5,
+                                                  bias=-1,
+                                                  bias_after_scale=False)
         return s_arc, s_rel, words
 
 
@@ -99,7 +101,8 @@ class MLP(nn.Layer):
         self.linear = nn.Linear(
             n_in,
             n_out,
-            weight_attr=nn.initializer.XavierNormal(), )
+            weight_attr=nn.initializer.XavierNormal(),
+        )
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1)
         self.dropout = SharedDropout(p=dropout)
 
@@ -133,26 +136,20 @@ class BiAffine(nn.Layer):
         b = x.shape[0]
         o = self.weight.shape[0]
         # Shape x: (batch_size, output_size, num_tokens, input_size + bias_x)
-        x = paddle.expand(
-            paddle.unsqueeze(
-                x, axis=1),
-            shape=(x.shape[0], o, x.shape[1], x.shape[2]))
+        x = paddle.expand(paddle.unsqueeze(x, axis=1),
+                          shape=(x.shape[0], o, x.shape[1], x.shape[2]))
         # Shape y: (batch_size, output_size, num_tokens, input_size + bias_y)
-        y = paddle.expand(
-            paddle.unsqueeze(
-                y, axis=1),
-            shape=(y.shape[0], o, y.shape[1], y.shape[2]))
+        y = paddle.expand(paddle.unsqueeze(y, axis=1),
+                          shape=(y.shape[0], o, y.shape[1], y.shape[2]))
         # Shape weight: (batch_size, output_size, input_size + bias_x, input_size + bias_y)
-        weight = paddle.expand(
-            paddle.unsqueeze(
-                self.weight, axis=0),
-            shape=(b, self.weight.shape[0], self.weight.shape[1],
-                   self.weight.shape[2]))
+        weight = paddle.expand(paddle.unsqueeze(self.weight, axis=0),
+                               shape=(b, self.weight.shape[0],
+                                      self.weight.shape[1],
+                                      self.weight.shape[2]))
 
         # Shape: (batch_size, output_size, num_tokens, num_tokens)
-        s = paddle.matmul(
-            paddle.matmul(x, weight), paddle.transpose(
-                y, perm=[0, 1, 3, 2]))
+        s = paddle.matmul(paddle.matmul(x, weight),
+                          paddle.transpose(y, perm=[0, 1, 3, 2]))
         # Remove dim 1 if n_out == 1
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)

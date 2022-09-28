@@ -23,6 +23,7 @@ import unittest
 
 
 class TestBigBirdTokenizer(CpuCommonTest):
+
     def set_input(self):
         self.max_seq_len = 40
         self.max_pred_len = 3
@@ -69,6 +70,7 @@ class TestBigBirdTokenizer(CpuCommonTest):
 
 
 class TestBigBirdTokenizerLongMaxPredLen(TestBigBirdTokenizer):
+
     def set_input(self):
         self.max_seq_len = 40
         self.max_pred_len = 8
@@ -89,6 +91,7 @@ class TestBigBirdTokenizerLongMaxPredLen(TestBigBirdTokenizer):
 
 
 class TestBigBirdTokenizerGetInputIdsValueError(TestBigBirdTokenizer):
+
     def set_text(self):
         self.text = dict()
 
@@ -98,6 +101,7 @@ class TestBigBirdTokenizerGetInputIdsValueError(TestBigBirdTokenizer):
 
 
 class TestBigBirdTokenizerGetInputIdsTextInt(TestBigBirdTokenizer):
+
     def set_text(self):
         self.text = [
             1153, 4558, 3766, 2747, 427, 3830, 419, 530, 16474, 1677, 6464,
@@ -108,6 +112,7 @@ class TestBigBirdTokenizerGetInputIdsTextInt(TestBigBirdTokenizer):
 
 
 class TestBigBirdTokenizerGetInputIdsTextStr(TestBigBirdTokenizer):
+
     def set_text(self):
         self.text = [
             '▁An', '▁extremely', '▁powerful', '▁film', '▁that', '▁certainly',
@@ -121,6 +126,7 @@ class TestBigBirdTokenizerGetInputIdsTextStr(TestBigBirdTokenizer):
 
 
 class TestBigBirdTokenizerUnusaulText(CpuCommonTest):
+
     def setUp(self):
         self.tokenizer = BigBirdTokenizer.from_pretrained(
             'bigbird-base-uncased')
@@ -149,12 +155,14 @@ class TestBigBirdTokenizerUnusaulText(CpuCommonTest):
 
 
 class TestBigBirdTokenizerNotExistFile(CpuCommonTest):
+
     @util.assert_raises(ValueError)
     def test_not_exist_file(self):
         self.tokenizer = BigBirdTokenizer(sentencepiece_model_file='')
 
 
 class TestBigBirdTokenizerUNK(CpuCommonTest):
+
     def setUp(self):
         self.tokenizer = BigBirdTokenizer.from_pretrained(
             'bigbird-base-uncased')
@@ -165,7 +173,7 @@ class TestBigBirdTokenizerUNK(CpuCommonTest):
                 'of watching it The recent UK television adaptation was shameful  '\
                 'too ordinary and bland This original manages to imprint itself '\
                 'in your memory 中'
-        # Chinese words don't exist in the provided vocabs 
+        # Chinese words don't exist in the provided vocabs
         tokens = self.tokenizer(self.text)
         self.check_output_equal('<unk>' in tokens, True)
 

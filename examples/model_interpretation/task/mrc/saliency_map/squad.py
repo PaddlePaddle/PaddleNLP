@@ -64,6 +64,7 @@ class RCInterpret(DatasetBuilder):
 
 
 class DuReaderChecklist(DatasetBuilder):
+
     def _read(self, filename):
         with open(filename, "r", encoding="utf8") as f:
             input_data = json.load(f)["data"]
@@ -106,10 +107,10 @@ class DuReaderChecklist(DatasetBuilder):
 def compute_prediction_checklist(examples,
                                  features,
                                  predictions,
-                                 version_2_with_negative: bool=False,
-                                 n_best_size: int=20,
-                                 max_answer_length: int=30,
-                                 cls_threshold: float=0.5):
+                                 version_2_with_negative: bool = False,
+                                 n_best_size: int = 20,
+                                 max_answer_length: int = 30,
+                                 cls_threshold: float = 0.5):
     """
     Post-processes the predictions of a question-answering model to convert them to answers that are substrings of the
     original contexts. This is the base postprocessing functions for models that only return start and end logits.
@@ -150,7 +151,7 @@ def compute_prediction_checklist(examples,
     for i, feature in enumerate(features):
         features_per_example[feature["example_id"]].append(
             i
-        )  # feature: dict(keys: 'input_ids', 'token_type_ids', 'offset_mapping', 'overflow_to_sample', 'example_id')  
+        )  # feature: dict(keys: 'input_ids', 'token_type_ids', 'offset_mapping', 'overflow_to_sample', 'example_id')
 
     # The dictionaries we have to fill.
     all_predictions = collections.OrderedDict()
@@ -184,7 +185,7 @@ def compute_prediction_checklist(examples,
             #     print('offset_mapping: %s' % offset_mapping)
 
             # Optional `token_is_max_context`, if provided we will remove answers that do not have the maximum context
-            # available in the current feature.          
+            # available in the current feature.
             token_is_max_context = features[feature_index].get(
                 "token_is_max_context", None)
 
@@ -195,7 +196,7 @@ def compute_prediction_checklist(examples,
                 score_answerable = feature_answerable_score[-1]
                 answerable_probs = feature_answerable_score
 
-            # Update minimum null prediction.    
+            # Update minimum null prediction.
             feature_null_score = start_logits[0] + end_logits[0]
             if min_null_prediction is None or min_null_prediction[
                     "score"] > feature_null_score:
@@ -208,21 +209,23 @@ def compute_prediction_checklist(examples,
                 }
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[
-                -1:-n_best_size - 1:-1].tolist()  # list(n_best_size) 从大到小
-            end_indexes = np.argsort(end_logits)[
-                -1:-n_best_size - 1:-1].tolist()  # list(n_best_size) 从大到小
+            start_indexes = np.argsort(
+                start_logits)[-1:-n_best_size -
+                              1:-1].tolist()  # list(n_best_size) 从大到小
+            end_indexes = np.argsort(
+                end_logits)[-1:-n_best_size -
+                            1:-1].tolist()  # list(n_best_size) 从大到小
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
                     # to part of the input_ids that are not in the context.
-                    if (start_index >= len(offset_mapping) or
-                            end_index >= len(offset_mapping) or
-                            offset_mapping[start_index] is None
+                    if (start_index >= len(offset_mapping)
+                            or end_index >= len(offset_mapping)
+                            or offset_mapping[start_index] is None
                             or  # CLS、Question和第一个SEP的位置
                             offset_mapping[end_index] is None or
-                            offset_mapping[start_index] ==
-                        (0, 0) or  # 第二个SEP的位置
+                            offset_mapping[start_index] == (0,
+                                                            0) or  # 第二个SEP的位置
                             offset_mapping[end_index] == (0, 0)):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
@@ -239,8 +242,10 @@ def compute_prediction_checklist(examples,
                                     offset_mapping[end_index][1]),
                         "score":
                         start_logits[start_index] + end_logits[end_index],
-                        "start_logit": start_logits[start_index],
-                        "end_logit": end_logits[end_index],
+                        "start_logit":
+                        start_logits[start_index],
+                        "end_logit":
+                        end_logits[end_index],
                     })
         if version_2_with_negative:
             # Add the minimum null prediction
@@ -251,10 +256,11 @@ def compute_prediction_checklist(examples,
                 answerable_probs[1]
             ])
 
+
 # Only keep the best `n_best_size` predictions.
-        predictions = sorted(
-            prelim_predictions, key=lambda x: x["score"],
-            reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions,
+                             key=lambda x: x["score"],
+                             reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
         if version_2_with_negative and not any(p["offsets"] == (0, 0)
@@ -266,21 +272,22 @@ def compute_prediction_checklist(examples,
         for pred in predictions:
             # offsets = pred.pop("offsets")
             offsets = pred["offsets"]
-            pred["text"] = context[offsets[0]:offsets[1]] if context[offsets[
-                0]:offsets[1]] != "" else "no answer"
+            pred["text"] = context[offsets[0]:offsets[1]] if context[
+                offsets[0]:offsets[1]] != "" else "no answer"
 
         # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
         # failure.
-        if len(predictions) == 0 or (len(predictions) == 1 and
-                                     predictions[0]["text"] == "no answer"):
-            predictions.insert(0, {
-                "feature_index": (0, 0),
-                "offsets": (0, 0),
-                "text": "no answer",
-                "start_logit": 0.0,
-                "end_logit": 0.0,
-                "score": 0.0
-            })
+        if len(predictions) == 0 or (len(predictions) == 1
+                                     and predictions[0]["text"] == "no answer"):
+            predictions.insert(
+                0, {
+                    "feature_index": (0, 0),
+                    "offsets": (0, 0),
+                    "text": "no answer",
+                    "start_logit": 0.0,
+                    "end_logit": 0.0,
+                    "score": 0.0
+                })
 
         # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
         # the LogSumExp trick).
@@ -311,8 +318,8 @@ def compute_prediction_checklist(examples,
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
         all_nbest_json[example["id"]] = [{
-            k: (float(v)
-                if isinstance(v, (np.float16, np.float32, np.float64)) else v)
+            k: (float(v) if isinstance(v, (np.float16, np.float32,
+                                           np.float64)) else v)
             for k, v in pred.items()
         } for pred in predictions]
 
@@ -364,7 +371,8 @@ def compute_prediction(examples,
     all_start_logits, all_end_logits = predictions
 
     assert len(predictions[0]) == len(
-        features), "Number of predictions should be equal to number of features."
+        features
+    ), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
     features_per_example = collections.defaultdict(list)
@@ -411,20 +419,20 @@ def compute_prediction(examples,
                 }
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1:-n_best_size - 1:
-                                                     -1].tolist()
-            end_indexes = np.argsort(end_logits)[-1:-n_best_size - 1:-1].tolist(
-            )
+            start_indexes = np.argsort(start_logits)[-1:-n_best_size -
+                                                     1:-1].tolist()
+            end_indexes = np.argsort(end_logits)[-1:-n_best_size -
+                                                 1:-1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
                     # to part of the input_ids that are not in the context.
-                    if (start_index >= len(offset_mapping) or
-                            end_index >= len(offset_mapping) or
-                            offset_mapping[start_index] is None or
-                            offset_mapping[end_index] is None or
-                            offset_mapping[start_index] == (0, 0) or
-                            offset_mapping[end_index] == (0, 0)):
+                    if (start_index >= len(offset_mapping)
+                            or end_index >= len(offset_mapping)
+                            or offset_mapping[start_index] is None
+                            or offset_mapping[end_index] is None
+                            or offset_mapping[start_index] == (0, 0)
+                            or offset_mapping[end_index] == (0, 0)):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
@@ -440,8 +448,10 @@ def compute_prediction(examples,
                                     offset_mapping[end_index][1]),
                         "score":
                         start_logits[start_index] + end_logits[end_index],
-                        "start_logit": start_logits[start_index],
-                        "end_logit": end_logits[end_index],
+                        "start_logit":
+                        start_logits[start_index],
+                        "end_logit":
+                        end_logits[end_index],
                     })
         if version_2_with_negative:
             # Add the minimum null prediction
@@ -449,9 +459,9 @@ def compute_prediction(examples,
             null_score = min_null_prediction["score"]
 
         # Only keep the best `n_best_size` predictions.
-        predictions = sorted(
-            prelim_predictions, key=lambda x: x["score"],
-            reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions,
+                             key=lambda x: x["score"],
+                             reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
         if version_2_with_negative and not any(p["offsets"] == (0, 0)
@@ -466,15 +476,16 @@ def compute_prediction(examples,
 
         # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
         # failure.
-        if len(predictions) == 0 or (len(predictions) == 1 and
-                                     predictions[0]["text"] == ""):
-            predictions.insert(0, {
-                "feature_index": (0, 0),
-                "text": "empty",
-                "start_logit": 0.0,
-                "end_logit": 0.0,
-                "score": 0.0
-            })
+        if len(predictions) == 0 or (len(predictions) == 1
+                                     and predictions[0]["text"] == ""):
+            predictions.insert(
+                0, {
+                    "feature_index": (0, 0),
+                    "text": "empty",
+                    "start_logit": 0.0,
+                    "end_logit": 0.0,
+                    "score": 0.0
+                })
 
         # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
         # the LogSumExp trick).
@@ -510,8 +521,8 @@ def compute_prediction(examples,
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
         all_nbest_json[example["id"]] = [{
-            k: (float(v)
-                if isinstance(v, (np.float16, np.float32, np.float64)) else v)
+            k: (float(v) if isinstance(v, (np.float16, np.float32,
+                                           np.float64)) else v)
             for k, v in pred.items()
         } for pred in predictions]
 

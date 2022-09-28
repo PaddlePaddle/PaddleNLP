@@ -19,7 +19,6 @@ import random
 import time
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 
@@ -65,16 +64,17 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=True)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=True)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset,
-        batch_sampler=sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      return_list=True,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 
@@ -85,18 +85,18 @@ if __name__ == "__main__":
     if not os.path.exists(args.vocab_path):
         raise RuntimeError('The vocab_path  can not be found in the path %s' %
                            args.vocab_path)
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
 
     # Loads dataset.
-    train_ds, dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["train", "dev", "test"])
+    train_ds, dev_ds, test_ds = load_dataset("lcqmc",
+                                             splits=["train", "dev", "test"])
 
     # Constructs the newtork.
-    model = SimNet(
-        network=args.network,
-        vocab_size=len(vocab),
-        num_classes=len(train_ds.label_list))
+    model = SimNet(network=args.network,
+                   vocab_size=len(vocab),
+                   num_classes=len(train_ds.label_list))
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
@@ -107,29 +107,26 @@ if __name__ == "__main__":
         Stack(dtype="int64"),  # title_seq_lens
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    tokenizer = ppnlp.data.JiebaTokenizer(vocab)
+    tokenizer = JiebaTokenizer(vocab)
     trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=False)
-    train_loader = create_dataloader(
-        train_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='train',
-        batchify_fn=batchify_fn)
-    dev_loader = create_dataloader(
-        dev_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='validation',
-        batchify_fn=batchify_fn)
-    test_loader = create_dataloader(
-        test_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='test',
-        batchify_fn=batchify_fn)
+    train_loader = create_dataloader(train_ds,
+                                     trans_fn=trans_fn,
+                                     batch_size=args.batch_size,
+                                     mode='train',
+                                     batchify_fn=batchify_fn)
+    dev_loader = create_dataloader(dev_ds,
+                                   trans_fn=trans_fn,
+                                   batch_size=args.batch_size,
+                                   mode='validation',
+                                   batchify_fn=batchify_fn)
+    test_loader = create_dataloader(test_ds,
+                                    trans_fn=trans_fn,
+                                    batch_size=args.batch_size,
+                                    mode='test',
+                                    batchify_fn=batchify_fn)
 
-    optimizer = paddle.optimizer.Adam(
-        parameters=model.parameters(), learning_rate=args.lr)
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
+                                      learning_rate=args.lr)
 
     # Defines loss and metric.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -147,4 +144,5 @@ if __name__ == "__main__":
         train_loader,
         dev_loader,
         epochs=args.epochs,
-        save_dir=args.save_dir, )
+        save_dir=args.save_dir,
+    )

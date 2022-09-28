@@ -14,6 +14,7 @@
 
 
 class ExponentialMovingAverage(object):
+
     def __init__(self, model, decay=0.999):
         self.model = model
         self.decay = decay
@@ -29,8 +30,8 @@ class ExponentialMovingAverage(object):
         for name, param in self.model.named_parameters():
             if not param.stop_gradient:
                 assert name in self.shadow
-                new_average = (1.0 - self.decay
-                               ) * param + self.decay + self.shadow[name]
+                new_average = (
+                    1.0 - self.decay) * param + self.decay + self.shadow[name]
                 self.shadow[name] = new_average.clone()
 
     def apply_shadow(self):

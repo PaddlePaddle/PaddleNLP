@@ -145,8 +145,8 @@ def evaluate(model, metric, data_loader):
                                      pos_ids)
         start_ids = paddle.cast(start_ids, 'float32')
         end_ids = paddle.cast(end_ids, 'float32')
-        num_correct, num_infer, num_label = metric.compute(start_prob, end_prob,
-                                                           start_ids, end_ids)
+        num_correct, num_infer, num_label = metric.compute(
+            start_prob, end_prob, start_ids, end_ids)
         metric.update(num_correct, num_infer, num_label)
     precision, recall, f1 = metric.accumulate()
     model.train()
@@ -162,16 +162,15 @@ def convert_example(example, tokenizer, max_seq_len):
         result_list
     }
     """
-    encoded_inputs = tokenizer(
-        text=[example["prompt"]],
-        text_pair=[example["content"]],
-        stride=len(example["prompt"]),
-        truncation=True,
-        max_seq_len=max_seq_len,
-        pad_to_max_seq_len=True,
-        return_attention_mask=True,
-        return_position_ids=True,
-        return_dict=False)
+    encoded_inputs = tokenizer(text=[example["prompt"]],
+                               text_pair=[example["content"]],
+                               stride=len(example["prompt"]),
+                               truncation=True,
+                               max_seq_len=max_seq_len,
+                               pad_to_max_seq_len=True,
+                               return_attention_mask=True,
+                               return_position_ids=True,
+                               return_dict=False)
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -308,9 +307,8 @@ def add_negative_example(examples, texts, prompts, label_set, negative_ratio):
             if actual_ratio <= negative_ratio:
                 idxs = [k for k in range(len(redundants_list))]
             else:
-                idxs = random.sample(
-                    range(0, len(redundants_list)),
-                    negative_ratio * len(examples[i]))
+                idxs = random.sample(range(0, len(redundants_list)),
+                                     negative_ratio * len(examples[i]))
 
             for idx in idxs:
                 negtive_result = {
@@ -328,7 +326,7 @@ def construct_relation_prompt_set(entity_name_set, predicate_set):
     relation_prompt_set = set()
     for entity_name in entity_name_set:
         for predicate in predicate_set:
-            # The relation prompt is constructed as follows: 
+            # The relation prompt is constructed as follows:
             # subject + "的" + predicate
             relation_prompt = entity_name + "的" + predicate
             relation_prompt_set.add(relation_prompt)
@@ -415,7 +413,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
                 predicate = relation["type"]
                 subject_id = relation["from_id"]
                 object_id = relation["to_id"]
-                # The relation prompt is constructed as follows: 
+                # The relation prompt is constructed as follows:
                 # subject + "的" + predicate
                 prompt = entity_map[subject_id]["name"] + "的" + predicate
                 result = {
@@ -449,13 +447,14 @@ def convert_ext_examples(raw_examples, negative_ratio):
                                            negative_ratio)
     if len(predicate_set) != 0:
         print(f"Constructing relation prompts...")
-        relation_prompt_set = construct_relation_prompt_set(entity_name_set,
-                                                            predicate_set)
+        relation_prompt_set = construct_relation_prompt_set(
+            entity_name_set, predicate_set)
 
         print(f"Adding negative samples for second stage prompt...")
-        relation_examples = add_negative_example(
-            relation_examples, texts, relation_prompts, relation_prompt_set,
-            negative_ratio)
+        relation_examples = add_negative_example(relation_examples, texts,
+                                                 relation_prompts,
+                                                 relation_prompt_set,
+                                                 negative_ratio)
     return entity_examples, relation_examples
 
 
@@ -469,14 +468,15 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)

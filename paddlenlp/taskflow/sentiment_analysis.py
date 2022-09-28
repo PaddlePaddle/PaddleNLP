@@ -98,10 +98,10 @@ class SentaTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='token_ids'),
-            paddle.static.InputSpec(
-                shape=[None], dtype="int64", name='length')
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='token_ids'),
+            paddle.static.InputSpec(shape=[None], dtype="int64", name='length')
         ]
 
     def _construct_model(self, model):
@@ -113,12 +113,11 @@ class SentaTask(Task):
         num_classes = 2
 
         # Select the senta network for the inference
-        model_instance = LSTMModel(
-            vocab_size,
-            num_classes,
-            direction='bidirect',
-            padding_idx=pad_token_id,
-            pooling_type='max')
+        model_instance = LSTMModel(vocab_size,
+                                   num_classes,
+                                   direction='bidirect',
+                                   padding_idx=pad_token_id,
+                                   pooling_type='max')
         model_path = os.path.join(self._task_path, "model_state.pdparams")
 
         # Load the model parameter for the predict
@@ -132,8 +131,9 @@ class SentaTask(Task):
         Construct the tokenizer for the predictor.
         """
         vocab_path = os.path.join(self._task_path, "vocab.txt")
-        vocab = Vocab.load_vocabulary(
-            vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+        vocab = Vocab.load_vocabulary(vocab_path,
+                                      unk_token='[UNK]',
+                                      pad_token='[PAD]')
 
         vocab_size = len(vocab)
         pad_token_id = vocab.to_indices('[PAD]')
@@ -166,7 +166,9 @@ class SentaTask(Task):
             examples.append((ids, lens))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
+            Pad(axis=0,
+                pad_val=self._tokenizer.vocab.token_to_idx.get('[PAD]', 0)
+                ),  # input_ids
             Stack(dtype='int64'),  # seq_len
         ): fn(samples)
         batches = [
@@ -259,8 +261,9 @@ class SkepTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = SkepSequenceModel.from_pretrained(
-            self._task_path, num_classes=len(self._label_map))
+        model_instance = SkepSequenceModel.from_pretrained(self._task_path,
+                                                           num_classes=len(
+                                                               self._label_map))
         self._model = model_instance
         self._model.eval()
 
@@ -269,10 +272,10 @@ class SkepTask(Task):
        Construct the input spec for the convert dygraph model to static model.
        """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64")  # segment_ids
         ]
 
     def _construct_tokenizer(self, model):
@@ -299,8 +302,8 @@ class SkepTask(Task):
         examples = []
         filter_inputs = []
         for input_data in inputs:
-            if not (isinstance(input_data, str) and
-                    len(input_data.strip()) > 0):
+            if not (isinstance(input_data, str)
+                    and len(input_data.strip()) > 0):
                 continue
             filter_inputs.append(input_data)
             encoded_inputs = self._tokenizer(text=input_data, max_seq_len=128)
@@ -310,7 +313,8 @@ class SkepTask(Task):
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # token type ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id
+                ),  # token type ids
         ): [data for data in fn(samples)]
         batches = [
             examples[idx:idx + batch_size]

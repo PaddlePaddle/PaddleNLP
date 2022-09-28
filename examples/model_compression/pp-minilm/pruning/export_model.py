@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.fluid.core as core
+from paddle.common_ops_import import core
 
 from paddlenlp.transformers import PPMiniLMModel
 from paddlenlp.utils.log import logger
@@ -56,10 +56,9 @@ def ppminilm_forward(self,
     if attention_mask is None:
         attention_mask = paddle.unsqueeze(
             (input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
-    embedding_output = self.embeddings(
-        input_ids=input_ids,
-        position_ids=position_ids,
-        token_type_ids=token_type_ids)
+    embedding_output = self.embeddings(input_ids=input_ids,
+                                       position_ids=position_ids,
+                                       token_type_ids=token_type_ids)
 
     encoder_outputs = self.encoder(embedding_output, attention_mask)
     sequence_output = encoder_outputs
@@ -80,7 +79,8 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default=None,
@@ -91,53 +91,57 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         "--task_name",
         default=None,
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()),
+    )
     parser.add_argument(
         "--sub_model_output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the sub model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the sub model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--static_sub_model",
         default=None,
         type=str,
-        help="The output directory where the sub static model will be written. If set to None, not export static model",
+        help=
+        "The output directory where the sub static model will be written. If set to None, not export static model",
     )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--n_gpu",
-        type=int,
-        default=1,
-        help="number of gpus to use, 0 for cpu.")
-    parser.add_argument(
-        '--width_mult',
-        type=float,
-        default=1.0,
-        help="width mult you want to export")
-    parser.add_argument(
-        '--depth_mult',
-        type=float,
-        default=1.0,
-        help="depth mult you want to export")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--n_gpu",
+                        type=int,
+                        default=1,
+                        help="number of gpus to use, 0 for cpu.")
+    parser.add_argument('--width_mult',
+                        type=float,
+                        default=1.0,
+                        help="width mult you want to export")
+    parser.add_argument('--depth_mult',
+                        type=float,
+                        default=1.0,
+                        help="depth mult you want to export")
     parser.add_argument(
         "--use_faster_tokenizer",
         type=distutils.util.strtobool,
         default=True,
-        help="Whether to use FasterTokenizer to accelerate training or further inference."
+        help=
+        "Whether to use FasterTokenizer to accelerate training or further inference."
     )
     args = parser.parse_args()
     return args
@@ -165,12 +169,12 @@ def do_export(args):
 
     num_labels = cfg_dict['num_classes']
 
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_labels)
+    model = model_class.from_pretrained(args.model_name_or_path,
+                                        num_classes=num_labels)
     model.use_faster_tokenizer = args.use_faster_tokenizer
 
-    origin_model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=num_labels)
+    origin_model = model_class.from_pretrained(args.model_name_or_path,
+                                               num_classes=num_labels)
 
     os.rename(config_path + '_bak', config_path)
 

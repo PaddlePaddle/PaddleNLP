@@ -36,8 +36,9 @@ class MultiLabelReport(Metric):
         best_score = 0
         for threshold in [i * 0.01 for i in range(100)]:
             self.y_pred = y_prob > threshold
-            score = f1_score(
-                y_pred=self.y_pred, y_true=self.y_true, average=self.average)
+            score = f1_score(y_pred=self.y_pred,
+                             y_true=self.y_true,
+                             average=self.average)
             if score > best_score:
                 best_score = score
         return best_score
@@ -60,8 +61,9 @@ class MultiLabelReport(Metric):
             self.y_true = labels.numpy()
 
     def accumulate(self):
-        auc = roc_auc_score(
-            y_score=self.y_prob, y_true=self.y_true, average=self.average)
+        auc = roc_auc_score(y_score=self.y_prob,
+                            y_true=self.y_true,
+                            average=self.average)
         f1_score = self.f1_score(y_prob=self.y_prob)
         return auc, f1_score
 

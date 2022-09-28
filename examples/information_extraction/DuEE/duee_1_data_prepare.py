@@ -48,8 +48,8 @@ def data_process(path, model="trigger", is_predict=False):
                         event_type = event["event_type"]
                         start = event["trigger_start_index"]
                         trigger = event["trigger"]
-                        labels = label_data(labels, start,
-                                            len(trigger), event_type)
+                        labels = label_data(labels, start, len(trigger),
+                                            event_type)
                     output.append("{}\t{}".format('\002'.join(text_a),
                                                   '\002'.join(labels)))
                 elif model == "role":
@@ -59,8 +59,8 @@ def data_process(path, model="trigger", is_predict=False):
                             role_type = arg["role"]
                             argument = arg["argument"]
                             start = arg["argument_start_index"]
-                            labels = label_data(labels, start,
-                                                len(argument), role_type)
+                            labels = label_data(labels, start, len(argument),
+                                                role_type)
                         output.append("{}\t{}".format('\002'.join(text_a),
                                                       '\002'.join(labels)))
     return output
@@ -100,8 +100,8 @@ if __name__ == "__main__":
     print('input path {}'.format(schema_path))
     tags_trigger = schema_process(schema_path, "trigger")
     write_by_lines(tags_trigger_path, tags_trigger)
-    print("save trigger tag {} at {}".format(
-        len(tags_trigger), tags_trigger_path))
+    print("save trigger tag {} at {}".format(len(tags_trigger),
+                                             tags_trigger_path))
     tags_role = schema_process(schema_path, "role")
     write_by_lines(tags_role_path, tags_role)
     print("save trigger tag {} at {}".format(len(tags_role), tags_role_path))
@@ -124,8 +124,8 @@ if __name__ == "__main__":
     write_by_lines("{}/dev.tsv".format(trigger_save_dir), dev_tri)
     test_tri = data_process("{}/duee_test1.json".format(data_dir), "trigger")
     write_by_lines("{}/test.tsv".format(trigger_save_dir), test_tri)
-    print("train {} dev {} test {}".format(
-        len(train_tri), len(dev_tri), len(test_tri)))
+    print("train {} dev {} test {}".format(len(train_tri), len(dev_tri),
+                                           len(test_tri)))
     print("\n----role------for dir {} to {}".format(data_dir, role_save_dir))
     train_role = data_process("{}/duee_train.json".format(data_dir), "role")
     write_by_lines("{}/train.tsv".format(role_save_dir), train_role)
@@ -133,6 +133,6 @@ if __name__ == "__main__":
     write_by_lines("{}/dev.tsv".format(role_save_dir), dev_role)
     test_role = data_process("{}/duee_test1.json".format(data_dir), "role")
     write_by_lines("{}/test.tsv".format(role_save_dir), test_role)
-    print("train {} dev {} test {}".format(
-        len(train_role), len(dev_role), len(test_role)))
+    print("train {} dev {} test {}".format(len(train_role), len(dev_role),
+                                           len(test_role)))
     print("=================end schema process==============")

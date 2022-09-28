@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import argparse
 from collections import namedtuple
@@ -72,18 +86,15 @@ def interact(args):
         else:
             context.append(user_utt)
             example = Example(src=" [SEP] ".join(context), data_id=0)
-            record = plato_reader._convert_example_to_record(
-                example, is_infer=True)
+            record = plato_reader._convert_example_to_record(example,
+                                                             is_infer=True)
             data = plato_reader._pad_batch_records([record], is_infer=True)
             inputs = gen_inputs(data, args.latent_type_size)
             inputs['tgt_ids'] = inputs['tgt_ids'].astype('int64')
             pred = model(inputs)[0]
             bot_response = pred["response"]
-            print(
-                colored(
-                    "[Bot]:", "blue", attrs=["bold"]),
-                colored(
-                    bot_response, attrs=["bold"]))
+            print(colored("[Bot]:", "blue", attrs=["bold"]),
+                  colored(bot_response, attrs=["bold"]))
             context.append(bot_response)
     return
 

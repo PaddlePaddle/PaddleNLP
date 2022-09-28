@@ -22,13 +22,16 @@ _LOGGER = logging.getLogger()
 
 
 class ErnieSeqClsOp(Op):
+
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-medium-zh", use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
+                                                       use_faster=True)
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
-        self.fetch_names = ["linear_113.tmp_1", ]
+        self.fetch_names = [
+            "linear_113.tmp_1",
+        ]
 
     def preprocess(self, input_dicts, data_id, log_id):
         # convert input format
@@ -41,17 +44,17 @@ class ErnieSeqClsOp(Op):
         data = [i.decode('utf-8') for i in data]
 
         # tokenizer + pad
-        data = self.tokenizer(
-            data, max_length=128, padding=True, truncation=True)
+        data = self.tokenizer(data,
+                              max_length=128,
+                              padding=True,
+                              truncation=True)
         input_ids = data["input_ids"]
         token_type_ids = data["token_type_ids"]
         # print("input_ids:", input_ids)
         # print("token_type_ids", token_type_ids)
         return {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64")
+            "input_ids": np.array(input_ids, dtype="int64"),
+            "token_type_ids": np.array(token_type_ids, dtype="int64")
         }, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
@@ -80,6 +83,7 @@ class ErnieSeqClsOp(Op):
 
 
 class ErnieSeqClsService(WebService):
+
     def get_pipeline_response(self, read_op):
         return ErnieSeqClsOp(name="seq_cls", input_ops=[read_op])
 

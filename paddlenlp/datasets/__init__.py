@@ -43,3 +43,5 @@ from .xnli_cn import *
 from .xnli import *
 from .cblue import *
 from .conll2002 import *
+from .wos import *
+from .cail2018_small import *

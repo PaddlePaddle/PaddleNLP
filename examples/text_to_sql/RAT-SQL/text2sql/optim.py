@@ -27,7 +27,9 @@ param_name_to_exclue_from_weight_decay = re.compile(
 
 def get_warmup_and_linear_decay(max_steps, warmup_steps):
     """ERNIE/demo/utils.py"""
-    return lambda step: min(step / warmup_steps, 1. - (step - warmup_steps) / (max_steps - warmup_steps))
+    return lambda step: min(
+        step / warmup_steps, 1. - (step - warmup_steps) /
+        (max_steps - warmup_steps))
 
 
 def init_optimizer(model, config, train_steps, scale_params_lr=None):
@@ -44,7 +46,8 @@ def init_optimizer(model, config, train_steps, scale_params_lr=None):
         lr_scheduler,
         parameters=model.parameters(),
         weight_decay=config.weight_decay,
-        apply_decay_param_fun=lambda n: not param_name_to_exclue_from_weight_decay.match(n),
+        apply_decay_param_fun=lambda n:
+        not param_name_to_exclue_from_weight_decay.match(n),
         grad_clip=paddle.nn.ClipGradByGlobalNorm(config.grad_clip))
     return optimizer
 
@@ -53,10 +56,9 @@ if __name__ == "__main__":
     """run some simple test cases"""
     import types
     model = paddle.vision.models.LeNet()
-    config = types.SimpleNamespace(
-        learning_rate=1e-3,
-        warmup_proportion=0.1,
-        weight_decay=0.2,
-        grad_clip=1.0)
+    config = types.SimpleNamespace(learning_rate=1e-3,
+                                   warmup_proportion=0.1,
+                                   weight_decay=0.2,
+                                   grad_clip=1.0)
     optim = init_optimizer(model, config, train_steps=10000)
     print(optim)

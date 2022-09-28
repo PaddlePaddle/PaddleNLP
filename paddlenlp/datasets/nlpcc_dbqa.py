@@ -39,15 +39,15 @@ class NLPCC_DBQA(DatasetBuilder):
     MD5 = "a5f69c2462136ef4d1707e4e2551a57b"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('nlpcc-dbqa', 'nlpcc-dbqa', 'train.tsv'),
-            '4f84fefce1a8f52c8d9248d1ff5ab9bd'),
-        'dev': META_INFO(
-            os.path.join('nlpcc-dbqa', 'nlpcc-dbqa', 'dev.tsv'),
-            '3831beb0d42c29615d06343538538f53'),
-        'test': META_INFO(
-            os.path.join('nlpcc-dbqa', 'nlpcc-dbqa', 'test.tsv'),
-            'e224351353b1f6a15837008b5d0da703'),
+        'train':
+        META_INFO(os.path.join('nlpcc-dbqa', 'nlpcc-dbqa', 'train.tsv'),
+                  '4f84fefce1a8f52c8d9248d1ff5ab9bd'),
+        'dev':
+        META_INFO(os.path.join('nlpcc-dbqa', 'nlpcc-dbqa', 'dev.tsv'),
+                  '3831beb0d42c29615d06343538538f53'),
+        'test':
+        META_INFO(os.path.join('nlpcc-dbqa', 'nlpcc-dbqa', 'test.tsv'),
+                  'e224351353b1f6a15837008b5d0da703'),
     }
 
     def _get_data(self, mode, **kwargs):

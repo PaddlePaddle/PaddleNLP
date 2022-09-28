@@ -13,14 +13,17 @@ python -u  -m paddle.distributed.launch \
     run_pretrain_trainer.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
+    --split 949,50,1 \
     --max_seq_length 512 \
     --per_device_train_batch_size 64 \
     --per_device_eval_batch_size 64 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
     --max_steps 1000000 \
     --save_steps 50000 \
     --weight_decay 0.01 \

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import sys
+
 args = sys.argv
 
 import os
@@ -45,23 +46,26 @@ def interpret_args():
 
     parser.add_argument('--data_directory', type=str, default='processed_data')
 
-    parser.add_argument(
-        '--processed_train_filename', type=str, default='train.pkl')
+    parser.add_argument('--processed_train_filename',
+                        type=str,
+                        default='train.pkl')
     parser.add_argument('--processed_dev_filename', type=str, default='dev.pkl')
-    parser.add_argument(
-        '--processed_validation_filename', type=str, default='validation.pkl')
-    parser.add_argument(
-        '--processed_test_filename', type=str, default='test.pkl')
+    parser.add_argument('--processed_validation_filename',
+                        type=str,
+                        default='validation.pkl')
+    parser.add_argument('--processed_test_filename',
+                        type=str,
+                        default='test.pkl')
 
     parser.add_argument('--database_schema_filename', type=str, default=None)
     parser.add_argument('--embedding_filename', type=str, default=None)
 
-    parser.add_argument(
-        '--input_vocabulary_filename', type=str, default='input_vocabulary.pkl')
-    parser.add_argument(
-        '--output_vocabulary_filename',
-        type=str,
-        default='output_vocabulary.pkl')
+    parser.add_argument('--input_vocabulary_filename',
+                        type=str,
+                        default='input_vocabulary.pkl')
+    parser.add_argument('--output_vocabulary_filename',
+                        type=str,
+                        default='output_vocabulary.pkl')
 
     parser.add_argument('--input_key', type=str, default='utterance')
 
@@ -81,8 +85,10 @@ def interpret_args():
     parser.add_argument('--use_bert', type=bool, default=True)
     parser.add_argument("--bert_input_version", type=str, default='v1')
     parser.add_argument('--fine_tune_bert', type=bool, default=True)
-    parser.add_argument(
-        '--lr_bert', default=1e-5, type=float, help='BERT model learning rate.')
+    parser.add_argument('--lr_bert',
+                        default=1e-5,
+                        type=float,
+                        help='BERT model learning rate.')
 
     ### Debugging/logging parameters
     parser.add_argument('--reload_embedding', type=bool, default=False)
@@ -105,15 +111,17 @@ def interpret_args():
     parser.add_argument('--snippet_num_layers', type=int, default=1)
 
     parser.add_argument('--maximum_utterances', type=int, default=5)
-    parser.add_argument(
-        '--state_positional_embeddings', type=bool, default=True)
+    parser.add_argument('--state_positional_embeddings',
+                        type=bool,
+                        default=True)
     parser.add_argument('--positional_embedding_size', type=int, default=50)
 
     parser.add_argument('--snippet_age_embedding', type=bool, default=False)
     parser.add_argument('--snippet_age_embedding_size', type=int, default=64)
     parser.add_argument('--max_snippet_age_embedding', type=int, default=4)
-    parser.add_argument(
-        '--previous_decoder_snippet_encoding', type=bool, default=False)
+    parser.add_argument('--previous_decoder_snippet_encoding',
+                        type=bool,
+                        default=False)
 
     parser.add_argument('--discourse_level_lstm', type=bool, default=True)
 
@@ -126,8 +134,8 @@ def interpret_args():
 
     ### Training parameters
     parser.add_argument('--batch_size', type=int, default=16)
-    parser.add_argument(
-        '--train_maximum_sql_length', type=int, default=400)  #200
+    parser.add_argument('--train_maximum_sql_length', type=int,
+                        default=400)  #200
     parser.add_argument('--train_evaluation_size', type=int, default=100)
 
     parser.add_argument('--dropout_amount', type=float, default=0.5)
@@ -154,8 +162,9 @@ def interpret_args():
     parser.add_argument('--enable_testing', type=bool, default=False)
     parser.add_argument('--use_predicted_queries', type=bool, default=False)
     parser.add_argument('--evaluate_split', type=str, default='valid')
-    parser.add_argument(
-        '--evaluate_with_gold_forcing', type=bool, default=False)
+    parser.add_argument('--evaluate_with_gold_forcing',
+                        type=bool,
+                        default=False)
     parser.add_argument('--eval_maximum_sql_length', type=int, default=400)
     parser.add_argument('--results_note', type=str, default='')
     parser.add_argument('--compute_metrics', type=bool, default=False)

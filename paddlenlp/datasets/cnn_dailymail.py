@@ -55,15 +55,18 @@ class CnnDailymail(DatasetBuilder):
     lazy = False
     META_INFO = collections.namedtuple("META_INFO", ("file", "url", "md5"))
     SPLITS = {
-        "train": META_INFO(
+        "train":
+        META_INFO(
             "all_train.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_train.txt",
             "c8ca98cfcb6cf3f99a404552568490bc"),
-        "dev": META_INFO(
+        "dev":
+        META_INFO(
             "all_val.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_val.txt",
             "83a3c483b3ed38b1392285bed668bfee"),
-        "test": META_INFO(
+        "test":
+        META_INFO(
             "all_test.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_test.txt",
             "4f3ac04669934dbc746b7061e68a0258")
@@ -199,8 +202,8 @@ class CnnDailymail(DatasetBuilder):
             dir_path = os.path.join(default_root, k)
             if not os.path.exists(dir_path):
                 get_path_from_url(v["url"], default_root, v["md5"])
-            unique_endpoints = _get_unique_endpoints(ParallelEnv()
-                                                     .trainer_endpoints[:])
+            unique_endpoints = _get_unique_endpoints(
+                ParallelEnv().trainer_endpoints[:])
             if ParallelEnv().current_endpoint in unique_endpoints:
                 file_num = len(os.listdir(os.path.join(dir_path, "stories")))
                 if file_num != v["file_num"]:

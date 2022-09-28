@@ -35,15 +35,15 @@ class LCQMC(DatasetBuilder):
     MD5 = "7069fa0cffbd2110845869c61f83814a"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('lcqmc', 'lcqmc', 'train.tsv'),
-            '479d94fe575981f236319f2a5b8b3c03'),
-        'dev': META_INFO(
-            os.path.join('lcqmc', 'lcqmc', 'dev.tsv'),
-            '089329fb44ef26155baef9c9c8c823ba'),
-        'test': META_INFO(
-            os.path.join('lcqmc', 'lcqmc', 'test.tsv'),
-            'a4a483f2f871d57e0f3894fca0d0f8f0'),
+        'train':
+        META_INFO(os.path.join('lcqmc', 'lcqmc', 'train.tsv'),
+                  '479d94fe575981f236319f2a5b8b3c03'),
+        'dev':
+        META_INFO(os.path.join('lcqmc', 'lcqmc', 'dev.tsv'),
+                  '089329fb44ef26155baef9c9c8c823ba'),
+        'test':
+        META_INFO(os.path.join('lcqmc', 'lcqmc', 'test.tsv'),
+                  'a4a483f2f871d57e0f3894fca0d0f8f0'),
     }
 
     def _get_data(self, mode, **kwargs):

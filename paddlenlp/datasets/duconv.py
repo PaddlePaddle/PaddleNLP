@@ -35,18 +35,18 @@ class DuConv(DatasetBuilder):
     MD5 = 'ef496871787f66718e567d62bd8f3546'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('DuConv', 'train.txt'),
-            '26192809b8740f620b95c9e18c65edf4'),
-        'dev': META_INFO(
-            os.path.join('DuConv', 'dev.txt'),
-            '2e5ee6396b0467309cad75d37d6460b1'),
-        'test_1': META_INFO(
-            os.path.join('DuConv', 'test_1.txt'),
-            '8ec83a72318d004691962647905cc345'),
-        'test_2': META_INFO(
-            os.path.join('DuConv', 'test_2.txt'),
-            'e8d5f04a5d0a03ab110b1605d0a632ad')
+        'train':
+        META_INFO(os.path.join('DuConv', 'train.txt'),
+                  '26192809b8740f620b95c9e18c65edf4'),
+        'dev':
+        META_INFO(os.path.join('DuConv', 'dev.txt'),
+                  '2e5ee6396b0467309cad75d37d6460b1'),
+        'test_1':
+        META_INFO(os.path.join('DuConv', 'test_1.txt'),
+                  '8ec83a72318d004691962647905cc345'),
+        'test_2':
+        META_INFO(os.path.join('DuConv', 'test_2.txt'),
+                  'e8d5f04a5d0a03ab110b1605d0a632ad')
     }
 
     def _get_data(self, mode, **kwargs):

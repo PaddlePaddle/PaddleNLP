@@ -30,11 +30,13 @@ from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
-    Trainer, )
+    Trainer,
+)
 from paddlenlp.trainer import EvalPrediction, get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
-    AutoModelForQuestionAnswering, )
+    AutoModelForQuestionAnswering,
+)
 from paddlenlp.utils.log import logger
 from datasets import load_metric, load_dataset
 
@@ -43,11 +45,13 @@ from question_answering import (
     QuestionAnsweringTrainer,
     CrossEntropyLossForSQuAD,
     prepare_train_features,
-    prepare_validation_features, )
+    prepare_validation_features,
+)
 from utils import (
     ALL_DATASETS,
     DataArguments,
-    ModelArguments, )
+    ModelArguments,
+)
 
 
 def main():
@@ -73,8 +77,8 @@ def main():
             training_args.output_dir
     ) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(
-                os.listdir(training_args.output_dir)) > 0:
+        if last_checkpoint is None and len(os.listdir(
+                training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
                 "Use --overwrite_output_dir to overcome.")
@@ -107,7 +111,7 @@ def main():
     label_list = getattr(raw_datasets['train'], "label_list", None)
     data_args.label_list = label_list
 
-    # Define tokenizer, model, loss function. 
+    # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path)
@@ -130,43 +134,44 @@ def main():
                 desc="train dataset map pre-processing"):
             # Dataset pre-process
             train_dataset = train_dataset.map(
-                partial(
-                    prepare_train_features, tokenizer=tokenizer,
-                    args=data_args),
+                partial(prepare_train_features,
+                        tokenizer=tokenizer,
+                        args=data_args),
                 batched=True,
                 num_proc=4,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
-                desc="Running tokenizer on train dataset", )
+                desc="Running tokenizer on train dataset",
+            )
 
     if training_args.do_eval:
         eval_examples = raw_datasets["validation"]
         with training_args.main_process_first(
                 desc="evaluate dataset map pre-processing"):
             eval_dataset = eval_examples.map(
-                partial(
-                    prepare_validation_features,
-                    tokenizer=tokenizer,
-                    args=data_args),
+                partial(prepare_validation_features,
+                        tokenizer=tokenizer,
+                        args=data_args),
                 batched=True,
                 num_proc=4,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
-                desc="Running tokenizer on validation dataset", )
+                desc="Running tokenizer on validation dataset",
+            )
     if training_args.do_predict:
         predict_examples = raw_datasets["test"]
         with training_args.main_process_first(
                 desc="test dataset map pre-processing"):
             predict_dataset = predict_examples.map(
-                partial(
-                    prepare_validation_features,
-                    tokenizer=tokenizer,
-                    args=data_args),
+                partial(prepare_validation_features,
+                        tokenizer=tokenizer,
+                        args=data_args),
                 batched=True,
                 num_proc=4,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
-                desc="Running tokenizer on prediction dataset", )
+                desc="Running tokenizer on prediction dataset",
+            )
 
     # Define data collector
     data_collator = DataCollatorWithPadding(tokenizer)
@@ -180,7 +185,8 @@ def main():
             predictions=predictions,
             n_best_size=data_args.n_best_size,
             max_answer_length=data_args.max_answer_length,
-            null_score_diff_threshold=data_args.null_score_diff_threshold, )
+            null_score_diff_threshold=data_args.null_score_diff_threshold,
+        )
 
         # # Format the result to the format the metric expects.
         # formatted_predictions = [{
@@ -195,10 +201,9 @@ def main():
         return EvalPrediction(predictions=predictions, label_ids=references)
 
     def compute_metrics(p: EvalPrediction):
-        ret = squad_evaluate(
-            examples=p.label_ids,
-            preds=p.predictions,
-            is_whitespace_splited=False)
+        ret = squad_evaluate(examples=p.label_ids,
+                             preds=p.predictions,
+                             is_whitespace_splited=False)
         return dict(ret)
         # return metric.compute(predictions=p.predictions, references=p.label_ids)
 
@@ -212,7 +217,8 @@ def main():
         data_collator=data_collator,
         post_process_function=post_processing_function,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics, )
+        compute_metrics=compute_metrics,
+    )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -251,19 +257,18 @@ def main():
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
         input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64")  # segment_ids
         ]
 
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir,
                                                        "export")
-        paddlenlp.transformers.export_model(
-            model=trainer.model,
-            input_spec=input_spec,
-            path=model_args.export_model_dir)
+        paddlenlp.transformers.export_model(model=trainer.model,
+                                            input_spec=input_spec,
+                                            path=model_args.export_model_dir)
 
 
 if __name__ == "__main__":

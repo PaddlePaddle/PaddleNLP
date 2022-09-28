@@ -16,11 +16,10 @@ from __future__ import print_function
 import sys
 import paddle
 from paddle.optimizer import Optimizer
-from paddle.fluid.clip import ClipGradByGlobalNorm
-from paddle.fluid.dygraph import base as imperative_base
-from paddle.fluid import framework
-from paddle.fluid.framework import Variable
-from paddle.fluid import core
+from paddle.nn import ClipGradByGlobalNorm
+from paddle import framework
+from paddle.static import Variable
+from paddle.framework import core
 from paddle.fluid import layers
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
@@ -41,11 +40,12 @@ def _obtain_optimizer_parameters_list(optimizer):
 
 
 class HybridParallelClipGrad:
+
     def __init__(self, clip, hcg):
         self._clip = clip
         self._hcg = hcg
 
-    @imperative_base.no_grad
+    @paddle.no_grad
     def _dygraph_clip(self, params_grads):
         params_and_grads = []
         sum_square_list_dist = []
@@ -64,8 +64,8 @@ class HybridParallelClipGrad:
             sum_square = layers.reduce_sum(square)
 
             not_shared_enable = (not hasattr(p, 'is_firstly_shared')) or (
-                hasattr(p, 'is_firstly_shared') and
-                getattr(p, 'is_firstly_shared', True))
+                hasattr(p, 'is_firstly_shared')
+                and getattr(p, 'is_firstly_shared', True))
 
             if not_shared_enable:
                 if p.is_distributed:
@@ -79,9 +79,9 @@ class HybridParallelClipGrad:
         global_norm_var_dist = layers.reduce_sum(global_norm_var_dist)
 
         global_norm_var_not_dist = layers.concat(
-            sum_square_list_not_dist) if len(
-                sum_square_list_not_dist) != 0 else layers.concat(
-                    [paddle.to_tensor([0.])])
+            sum_square_list_not_dist
+        ) if len(sum_square_list_not_dist) != 0 else layers.concat(
+            [paddle.to_tensor([0.])])
         global_norm_var_not_dist = layers.reduce_sum(global_norm_var_not_dist)
 
         # add all reduce to get global norm of distributed params_and_grads
@@ -106,12 +106,13 @@ class HybridParallelClipGrad:
         global_norm_var = layers.sqrt(global_norm_var_dist +
                                       global_norm_var_not_dist)
 
-        max_global_norm = layers.fill_constant(
-            shape=[1], dtype=global_norm_var.dtype, value=self.clip_norm)
-        clip_var = layers.elementwise_div(
-            x=max_global_norm,
-            y=layers.elementwise_max(
-                x=global_norm_var, y=max_global_norm))
+        max_global_norm = layers.fill_constant(shape=[1],
+                                               dtype=global_norm_var.dtype,
+                                               value=self.clip_norm)
+        clip_var = layers.elementwise_div(x=max_global_norm,
+                                          y=layers.elementwise_max(
+                                              x=global_norm_var,
+                                              y=max_global_norm))
         for p, g in params_grads:
             if g is None:
                 continue
@@ -139,7 +140,7 @@ class MOEOptimizer:
             self._inner_opt._grad_clip = HybridParallelClipGrad(
                 self._inner_opt._grad_clip, hcg)
 
-    @imperative_base.no_grad
+    @paddle.no_grad
     @framework.dygraph_only
     def step(self):
         parameters_list = _obtain_optimizer_parameters_list(self._inner_opt)

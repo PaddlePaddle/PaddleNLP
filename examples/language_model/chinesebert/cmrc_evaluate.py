@@ -108,8 +108,8 @@ def evaluate(ground_truth_file, prediction_file):
                 answers = [x["text"] for x in qas['answers']]
 
                 if query_id not in prediction_file:
-                    sys.stderr.write('Unanswered question: {}\n'.format(
-                        query_id))
+                    sys.stderr.write(
+                        'Unanswered question: {}\n'.format(query_id))
                     skip_count += 1
                     continue
 
@@ -167,14 +167,12 @@ def get_result(ground_truth_file, prediction_file):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Evaluation Script for CMRC 2018')
-    parser.add_argument(
-        '--dataset_file',
-        default="cmrc2018_public/dev.json",
-        help='Official dataset file')
-    parser.add_argument(
-        '--prediction_file',
-        default="all_predictions.json",
-        help='Your prediction File')
+    parser.add_argument('--dataset_file',
+                        default="cmrc2018_public/dev.json",
+                        help='Official dataset file')
+    parser.add_argument('--prediction_file',
+                        default="all_predictions.json",
+                        help='Your prediction File')
     args = parser.parse_args()
     ground_truth_file = json.load(open(args.dataset_file, 'rb'))
     prediction_file = json.load(open(args.prediction_file, 'rb'))

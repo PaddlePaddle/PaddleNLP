@@ -41,6 +41,7 @@ def parse_args():
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -74,8 +75,8 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy(
+            ) if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
@@ -95,8 +96,8 @@ def main():
     predictor = Predictor.create_predictor(args)
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(
-        os.path.dirname(args.model_path))
+    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(
+        args.model_path))
     if args.model_type == "gpt":
         ds = [
             "Question: Who is the CEO of Apple? Answer:",

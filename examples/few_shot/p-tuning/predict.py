@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 from model import ErnieForPretraining
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
@@ -80,17 +80,17 @@ def do_predict(model, tokenizer, data_loader, label_normalize_dict):
         src_ids, token_type_ids, masked_positions = batch
 
         # [bs * label_length, vocab_size]
-        prediction_probs = model.predict(
-            input_ids=src_ids,
-            token_type_ids=token_type_ids,
-            masked_positions=masked_positions)
+        prediction_probs = model.predict(input_ids=src_ids,
+                                         token_type_ids=token_type_ids,
+                                         masked_positions=masked_positions)
 
         batch_size = len(src_ids)
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(
-            prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs,
+                                          shape=[batch_size, -1,
+                                                 vocab_size]).numpy()
 
         # [label_num, label_length]
         label_ids = np.array(
@@ -133,17 +133,17 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
         src_ids, token_type_ids, masked_positions, candidate_label_ids = batch
 
         # [bs * label_length, vocab_size]
-        prediction_probs = model.predict(
-            input_ids=src_ids,
-            token_type_ids=token_type_ids,
-            masked_positions=masked_positions)
+        prediction_probs = model.predict(input_ids=src_ids,
+                                         token_type_ids=token_type_ids,
+                                         masked_positions=masked_positions)
 
         batch_size = len(src_ids)
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(
-            prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs,
+                                          shape=[batch_size, -1,
+                                                 vocab_size]).numpy()
 
         candidate_num = candidate_label_ids.shape[1]
 
@@ -151,7 +151,7 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
         y_pred = np.ones(shape=[batch_size, candidate_num])
 
         for label_idx in range(candidate_num):
-            # [bathc_size, label_length(4)] 
+            # [bathc_size, label_length(4)]
             single_candidate_label_ids = candidate_label_ids[:, label_idx, :]
             # Calculate joint distribution of candidate labels
             for index in range(label_length):
@@ -187,8 +187,9 @@ predict_file = {
 
 
 def write_iflytek(task_name, output_file, pred_labels):
-    test_ds, train_few_all = load_dataset(
-        "fewclue", name=args.task_name, splits=("test", "train_few_all"))
+    test_ds, train_few_all = load_dataset("fewclue",
+                                          name=args.task_name,
+                                          splits=("test", "train_few_all"))
 
     def label2id(train_few_all):
         label2id = {}
@@ -237,8 +238,9 @@ def write_csldcp(task_name, output_file, pred_labels):
 
 
 def write_tnews(task_name, output_file, pred_labels):
-    test_ds, train_few_all = load_dataset(
-        "fewclue", name=args.task_name, splits=("test", "train_few_all"))
+    test_ds, train_few_all = load_dataset("fewclue",
+                                          name=args.task_name,
+                                          splits=("test", "train_few_all"))
 
     def label2id(train_few_all):
         label2id = {}
@@ -350,19 +352,18 @@ if __name__ == "__main__":
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
 
     # Task related transform operations, eg: numbert label -> text_label, english -> chinese
-    transform_fn = partial(
-        transform_fn_dict[args.task_name],
-        label_normalize_dict=label_norm_dict,
-        is_test=True)
+    transform_fn = partial(transform_fn_dict[args.task_name],
+                           label_normalize_dict=label_norm_dict,
+                           is_test=True)
 
     # Some fewshot_learning strategy is defined by transform_fn
     # Note: Set lazy=False to transform example inplace immediately,
-    # because transform_fn should only be executed only once when 
+    # because transform_fn should only be executed only once when
     # iterate multi-times for train_ds
     test_ds = test_ds.map(transform_fn, lazy=False)
 
-    model = ErnieForPretraining.from_pretrained('ernie-1.0')
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     # Load parameters of best model on test_public.json of current task
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -386,22 +387,21 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
             Stack(dtype="int64"),  # masked_positions
-            Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
+            Stack(dtype="int64"
+                  ),  # candidate_labels_ids [candidate_num, label_length]
         ): [data for data in fn(samples)]
 
-    trans_func = partial(
-        convert_example_fn,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        p_embedding_num=args.p_embedding_num,
-        is_test=True)
+    trans_func = partial(convert_example_fn,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         p_embedding_num=args.p_embedding_num,
+                         is_test=True)
 
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='eval',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    test_data_loader = create_dataloader(test_ds,
+                                         mode='eval',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=batchify_fn,
+                                         trans_fn=trans_func)
 
     y_pred_labels = predict_fn(model, tokenizer, test_data_loader,
                                label_norm_dict)

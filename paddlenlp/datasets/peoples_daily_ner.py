@@ -34,15 +34,15 @@ class PeoplesDailyNER(DatasetBuilder):
     MD5 = 'a44ff9c4b37b48add9ddc17994d5620c'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('peoples_daily_ner', 'train.tsv'),
-            '67d3c93a37daba60ef43c03271f119d7'),
-        'dev': META_INFO(
-            os.path.join('peoples_daily_ner', 'dev.tsv'),
-            'ec772f3ba914bca5269f6e785bb3375d'),
-        'test': META_INFO(
-            os.path.join('peoples_daily_ner', 'test.tsv'),
-            '2f27ae68b5f61d6553ffa28bb577c8a7')
+        'train':
+        META_INFO(os.path.join('peoples_daily_ner', 'train.tsv'),
+                  '67d3c93a37daba60ef43c03271f119d7'),
+        'dev':
+        META_INFO(os.path.join('peoples_daily_ner', 'dev.tsv'),
+                  'ec772f3ba914bca5269f6e785bb3375d'),
+        'test':
+        META_INFO(os.path.join('peoples_daily_ner', 'test.tsv'),
+                  '2f27ae68b5f61d6553ffa28bb577c8a7')
     }
 
     def _get_data(self, mode, **kwargs):

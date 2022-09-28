@@ -33,21 +33,18 @@ from data import read_text_pair, convert_example, create_dataloader
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--text_pair_file",
-        type=str,
-        required=True,
-        help="The full path of input file")
-    parser.add_argument(
-        "--output_emb_size",
-        default=None,
-        type=int,
-        help="output_embedding_size")
-    parser.add_argument(
-        "--params_path",
-        type=str,
-        required=True,
-        help="The path to model parameters to be loaded.")
+    parser.add_argument("--text_pair_file",
+                        type=str,
+                        required=True,
+                        help="The full path of input file")
+    parser.add_argument("--output_emb_size",
+                        default=None,
+                        type=int,
+                        help="output_embedding_size")
+    parser.add_argument("--params_path",
+                        type=str,
+                        required=True,
+                        help="The path to model parameters to be loaded.")
     parser.add_argument(
         "--max_seq_length",
         default=64,
@@ -55,26 +52,28 @@ def parse_args():
         help="The maximum total input sequence length after tokenization. "
         "Sequences longer than this will be truncated, sequences shorter will be padded."
     )
-    parser.add_argument(
-        "--dropout", default=0.0, type=float, help="Dropout probability.")
-    parser.add_argument(
-        "--batch_size",
-        default=32,
-        type=int,
-        help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--dropout",
+                        default=0.0,
+                        type=float,
+                        help="Dropout probability.")
+    parser.add_argument("--batch_size",
+                        default=32,
+                        type=int,
+                        help="Batch size per GPU/CPU for training.")
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-    parser.add_argument(
-        "--pad_to_max_seq_len",
-        action="store_true",
-        help="Whether to pad to max_seq_len.")
-    parser.add_argument(
-        "--use_fp16", action="store_true", help="Whether to use fp16.")
+    parser.add_argument("--pad_to_max_seq_len",
+                        action="store_true",
+                        help="Whether to pad to max_seq_len.")
+    parser.add_argument("--use_fp16",
+                        action="store_true",
+                        help="Whether to use fp16.")
 
     args = parser.parse_args()
     return args
 
 
 class SemanticIndexingPredictor(nn.Layer):
+
     def __init__(self,
                  pretrained_model,
                  output_emb_size,
@@ -89,8 +88,9 @@ class SemanticIndexingPredictor(nn.Layer):
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(
-                768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(768,
+                                                      output_emb_size,
+                                                      weight_attr=weight_attr)
 
         self.use_fp16 = use_fp16
 
@@ -109,10 +109,9 @@ class SemanticIndexingPredictor(nn.Layer):
         position_ids = seq_length - ones
         position_ids.stop_gradient = True
 
-        embedding_output = self.ptm.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        embedding_output = self.ptm.embeddings(input_ids=input_ids,
+                                               position_ids=position_ids,
+                                               token_type_ids=token_type_ids)
 
         if self.use_fp16:
             embedding_output = paddle.cast(embedding_output, 'float16')
@@ -138,10 +137,12 @@ class SemanticIndexingPredictor(nn.Layer):
                 query_position_ids=None,
                 title_token_type_ids=None,
                 title_position_ids=None):
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, query_position_ids)
-        title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids, title_token_type_ids, title_position_ids)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids)
+        title_cls_embedding = self.get_pooled_embedding(title_input_ids,
+                                                        title_token_type_ids,
+                                                        title_position_ids)
 
         cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
                                 axis=-1)
@@ -162,11 +163,10 @@ def do_predict(args):
     paddle.seed(args.seed)
     tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        pad_to_max_seq_len=args.pad_to_max_seq_len)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         pad_to_max_seq_len=args.pad_to_max_seq_len)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -175,23 +175,22 @@ def do_predict(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.text_pair_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.text_pair_file,
+                            lazy=False)
 
-    valid_data_loader = create_dataloader(
-        valid_ds,
-        mode="predict",
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    valid_data_loader = create_dataloader(valid_ds,
+                                          mode="predict",
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
     pretrained_model = ErnieModel.from_pretrained("ernie-1.0")
 
-    model = SemanticIndexingPredictor(
-        pretrained_model,
-        args.output_emb_size,
-        dropout=args.dropout,
-        use_fp16=args.use_fp16)
+    model = SemanticIndexingPredictor(pretrained_model,
+                                      args.output_emb_size,
+                                      dropout=args.dropout,
+                                      use_fp16=args.use_fp16)
     model.eval()
     model.load(args.params_path)
     model = enable_faster_encoder(model, use_fp16=args.use_fp16)

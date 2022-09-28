@@ -39,52 +39,52 @@ def parse_args():
         help="The model name to specify which gpt to use. It can be " +
         ", ".join(MODEL_CLASSES.keys()))
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size.")
-    parser.add_argument(
-        "--max_length", default=50, type=int, help="Maximum output length.")
+    parser.add_argument("--max_length",
+                        default=50,
+                        type=int,
+                        help="Maximum output length.")
     parser.add_argument(
         "--topk",
         default=1,
         type=int,
-        help="The number of highest probability tokens to keep for top-k-sampling."
-    )
-    parser.add_argument(
-        "--topp",
-        default=1.0,
-        type=float,
-        help="The cumulative probability for top-p-filtering.")
-    parser.add_argument(
-        "--temperature",
-        default=1.0,
-        type=float,
-        help="The temperature to set.")
-    parser.add_argument(
-        "--tensor_para_size",
-        default=2,
-        type=int,
-        help="The size for tensor parallel.")
-    parser.add_argument(
-        "--layer_para_size",
-        default=1,
-        type=int,
-        help="The size for layer parallel.")
+        help=
+        "The number of highest probability tokens to keep for top-k-sampling.")
+    parser.add_argument("--topp",
+                        default=1.0,
+                        type=float,
+                        help="The cumulative probability for top-p-filtering.")
+    parser.add_argument("--temperature",
+                        default=1.0,
+                        type=float,
+                        help="The temperature to set.")
+    parser.add_argument("--tensor_para_size",
+                        default=2,
+                        type=int,
+                        help="The size for tensor parallel.")
+    parser.add_argument("--layer_para_size",
+                        default=1,
+                        type=int,
+                        help="The size for layer parallel.")
     parser.add_argument(
         "--layer_para_batch_size",
         default=None,
         type=int,
         help="The local batch size for pipeline parallel."
         "It is suggested to use `batch_size // layer_para_size`.")
-    parser.add_argument(
-        "--use_fp16",
-        action="store_true",
-        help="Whether to use fp16 to predict.")
-    parser.add_argument(
-        "--profile", action="store_true", help="Whether to profile.")
+    parser.add_argument("--use_fp16",
+                        action="store_true",
+                        help="Whether to use fp16 to predict.")
+    parser.add_argument("--profile",
+                        action="store_true",
+                        help="Whether to profile.")
     args = parser.parse_args()
     return args
 
 
 def profile(batch_size, total_step=50, warmup_step=10, rank=0):
+
     def _wrapper(func):
+
         def _impl(*args, **kwargs):
             for i in range(total_step):
                 if i == warmup_step:
@@ -109,10 +109,10 @@ def profile(batch_size, total_step=50, warmup_step=10, rank=0):
 def main(args):
     if args.use_fp16:
         paddle.set_default_dtype("float16")
-    enable_ft_para(args.tensor_para_size, args.layer_para_size,
-                   args.batch_size // args.layer_para_size
-                   if args.layer_para_batch_size is None else
-                   args.layer_para_batch_size)
+    enable_ft_para(
+        args.tensor_para_size, args.layer_para_size,
+        args.batch_size // args.layer_para_size
+        if args.layer_para_batch_size is None else args.layer_para_batch_size)
     # TODO(guosheng): Maybe device can be set in `enable_ft_para`
     paddle.set_device("gpu:" + str(get_ft_para_conf().rank))
 
@@ -121,8 +121,8 @@ def main(args):
         MODEL_CLASSES[model_name][0].generate = profile(args.batch_size)(
             MODEL_CLASSES[model_name][0].generate)
     tokenizer = MODEL_CLASSES[model_name][-1].from_pretrained(model_name)
-    model = MODEL_CLASSES[model_name][0].from_pretrained(
-        model_name, load_state_as_np=True)
+    model = MODEL_CLASSES[model_name][0].from_pretrained(model_name,
+                                                         load_state_as_np=True)
     model.eval()
 
     # NOTE: When using prompt, open this and replace the text with what you want.
@@ -135,20 +135,19 @@ def main(args):
     input_ids = [input_ids] * args.batch_size
 
     inputs_ids = paddle.to_tensor(input_ids, dtype='int32')
-    outputs, _ = model.generate(
-        input_ids=inputs_ids,
-        max_length=args.max_length,
-        decode_strategy='sampling',
-        top_k=args.topk,
-        top_p=args.topp,
-        temperature=args.temperature,
-        use_faster=True)
+    outputs, _ = model.generate(input_ids=inputs_ids,
+                                max_length=args.max_length,
+                                decode_strategy='sampling',
+                                top_k=args.topk,
+                                top_p=args.topp,
+                                temperature=args.temperature,
+                                use_faster=True)
 
     # Only make the first process to output.
     if get_ft_para_conf().rank == 0:
         for i in range(len(outputs)):
-            result = tokenizer.convert_ids_to_string(outputs[i].numpy().tolist(
-            ))
+            result = tokenizer.convert_ids_to_string(
+                outputs[i].numpy().tolist())
             print("Result:", result)
 
 

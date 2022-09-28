@@ -19,12 +19,18 @@ from pydub import AudioSegment
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Convert other audio formats to wav.')
-    parser.add_argument(
-        '--audio_file', type=str, required=True, help='Path to source audio.')
-    parser.add_argument(
-        '--wav_file', type=str, default=None, help='Path to save .wav file.')
-    parser.add_argument(
-        '--audio_format', type=str, default=None, help='The file extension.')
+    parser.add_argument('--audio_file',
+                        type=str,
+                        required=True,
+                        help='Path to source audio.')
+    parser.add_argument('--wav_file',
+                        type=str,
+                        default=None,
+                        help='Path to save .wav file.')
+    parser.add_argument('--audio_format',
+                        type=str,
+                        default=None,
+                        help='The file extension.')
     args = parser.parse_args()
 
     supported = ['mp3', 'm4a', 'wav']
@@ -64,8 +70,8 @@ if __name__ == '__main__':
         if not os.path.exists(args.wav_file):
             os.makedirs(args.wav_file)
         wav_files = [
-            os.path.join(args.wav_file, os.path.basename(x)[:-3] + 'wav')
-            for x in src_files
+            os.path.join(args.wav_file,
+                         os.path.basename(x)[:-3] + 'wav') for x in src_files
         ]
 
     for src_file, wav_file in zip(src_files, wav_files):

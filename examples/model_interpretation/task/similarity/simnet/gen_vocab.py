@@ -15,14 +15,15 @@
 # coding=utf-8
 
 import sys
+
 sys.path.append("../../..")
 from paddlenlp.datasets import load_dataset
 from collections import defaultdict
 import spacy
 
 if sys.argv[1] == 'ch':
-    train_ds, dev_ds, test_ds = load_dataset(
-        "lcqmc", splits=["train", "dev", "test"])
+    train_ds, dev_ds, test_ds = load_dataset("lcqmc",
+                                             splits=["train", "dev", "test"])
 
     vocab = defaultdict(int)
     for example in train_ds.data:

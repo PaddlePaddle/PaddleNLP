@@ -35,17 +35,20 @@ class CAIL2019_SCM(DatasetBuilder):
     '''
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
-        'train': META_INFO(
+        'train':
+        META_INFO(
             os.path.join('cail2019_scm_train.json'),
             'd50a105f9689e72be7d79adbba0ae224',
             'https://bj.bcebos.com/paddlenlp/datasets/cail2019/scm/cail2019_scm_train.json'
         ),
-        'dev': META_INFO(
+        'dev':
+        META_INFO(
             os.path.join('cail2019_scm_dev.json'),
             'e36a295c1cb8c6b9fb28015907a42d9e',
             'https://bj.bcebos.com/paddlenlp/datasets/cail2019/scm/cail2019_scm_dev.json'
         ),
-        'test': META_INFO(
+        'test':
+        META_INFO(
             os.path.join('cail2019_scm_test.json'),
             '91a6cf060e1283f05fcc6a2027238379',
             'https://bj.bcebos.com/paddlenlp/datasets/cail2019/scm/cail2019_scm_test.json'

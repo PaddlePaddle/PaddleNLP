@@ -186,9 +186,8 @@ def encode_sequence(sequence, rnns, embedder, dropout_amount=0.):
 
 
 def mask_fill(input, mask, value):
-    return input * paddle.cast(paddle.logical_not(mask),
-                               input.dtype) + paddle.cast(mask,
-                                                          input.dtype) * value
+    return input * paddle.cast(paddle.logical_not(
+        mask), input.dtype) + paddle.cast(mask, input.dtype) * value
 
 
 def LSTM_output_transfer(utterance_states, final_utterance_state):
@@ -202,10 +201,10 @@ def LSTM_output_transfer(utterance_states, final_utterance_state):
 
     if len(final_utterance_state) != 0:
         (hidden_state, cell_memory) = final_utterance_state
-        hidden_states = paddle.concat(
-            [hidden_state[0], hidden_state[1]], axis=-1).squeeze(0)
-        cell_memories = paddle.concat(
-            [cell_memory[0], cell_memory[1]], axis=-1).squeeze(0)
+        hidden_states = paddle.concat([hidden_state[0], hidden_state[1]],
+                                      axis=-1).squeeze(0)
+        cell_memories = paddle.concat([cell_memory[0], cell_memory[1]],
+                                      axis=-1).squeeze(0)
         final_utterance_state = (hidden_states.squeeze(0),
                                  cell_memories.squeeze(0))
     return utterance_states, final_utterance_state

@@ -29,12 +29,12 @@ class SIGHAN_CN(DatasetBuilder):
     MD5 = "cd67b9b36a5908f848cbf04b5d83c005"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('sighan-cn', 'train.txt'),
-            '5eb7b7847722f3bf69bf978d1a5f99cc'),
-        'dev': META_INFO(
-            os.path.join('sighan-cn', 'dev.txt'),
-            'bc34d119aeb7ca022aa66e2f448ded95'),
+        'train':
+        META_INFO(os.path.join('sighan-cn', 'train.txt'),
+                  '5eb7b7847722f3bf69bf978d1a5f99cc'),
+        'dev':
+        META_INFO(os.path.join('sighan-cn', 'dev.txt'),
+                  'bc34d119aeb7ca022aa66e2f448ded95'),
     }
 
     def _get_data(self, mode, **kwargs):

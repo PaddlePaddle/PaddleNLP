@@ -82,10 +82,14 @@ def evaluate(model, criterion, metric, data_loader):
 
         logits = model(input_ids, token_type_ids, position_ids)
 
-        ent_loss = criterion(
-            logits[0], ent_label[0], weight=ent_mask, reduction='sum')
-        spo_loss = criterion(
-            logits[1], spo_label[0], weight=spo_mask, reduction='sum')
+        ent_loss = criterion(logits[0],
+                             ent_label[0],
+                             weight=ent_mask,
+                             reduction='sum')
+        spo_loss = criterion(logits[1],
+                             spo_label[0],
+                             weight=spo_mask,
+                             reduction='sum')
         loss = ent_loss + spo_loss
         losses.append(loss.numpy())
         lengths = paddle.sum(masks, axis=-1)
@@ -109,22 +113,25 @@ def do_train():
 
     train_ds, dev_ds = load_dataset('cblue', 'CMeIE', splits=['train', 'dev'])
 
-    model = ElectraForSPO.from_pretrained(
-        'ernie-health-chinese', num_classes=len(train_ds.label_list))
+    model = ElectraForSPO.from_pretrained('ernie-health-chinese',
+                                          num_classes=len(train_ds.label_list))
     tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
 
-    trans_func = partial(
-        convert_example_spo,
-        tokenizer=tokenizer,
-        num_classes=len(train_ds.label_list),
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example_spo,
+                         tokenizer=tokenizer,
+                         num_classes=len(train_ds.label_list),
+                         max_seq_length=args.max_seq_length)
 
     def batchify_fn(data):
         _batchify_fn = lambda samples, fn=Dict({
-            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-            'position_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-            'attention_mask': Pad(axis=0, pad_val=0, dtype='float32'),
+            'input_ids':
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+            'token_type_ids':
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+            'position_ids':
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
+            'attention_mask':
+            Pad(axis=0, pad_val=0, dtype='float32'),
         }): fn(samples)
         ent_label = [x['ent_label'] for x in data]
         spo_label = [x['spo_label'] for x in data]
@@ -153,8 +160,8 @@ def do_train():
         #    [..., [0, ..., 1, ..., 0], ...], # for predicate '相关（导致）'
         #    ...]                             # the value at [23, 1, 10] is set as 1
         #
-        one_hot_ent_label = np.zeros(
-            [batch_size, batch_len, 2], dtype=np.float32)
+        one_hot_ent_label = np.zeros([batch_size, batch_len, 2],
+                                     dtype=np.float32)
         one_hot_spo_label = np.zeros(
             [batch_size, num_classes, batch_len, batch_len], dtype=np.float32)
         for idx, ent_idxs in enumerate(ent_label):
@@ -177,19 +184,17 @@ def do_train():
         spo_label = [one_hot_spo_label, spo_label]
         return input_ids, token_type_ids, position_ids, masks, ent_label, spo_label
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     if args.init_from_ckpt:
         if not os.path.isfile(args.init_from_ckpt):
@@ -244,12 +249,17 @@ def do_train():
 
             with paddle.amp.auto_cast(
                     args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu'], ):
+                    custom_white_list=['layer_norm', 'softmax', 'gelu'],
+            ):
                 logits = model(input_ids, token_type_ids, position_ids)
-                ent_loss = criterion(
-                    logits[0], ent_label[0], weight=ent_mask, reduction='sum')
-                spo_loss = criterion(
-                    logits[1], spo_label[0], weight=spo_mask, reduction='sum')
+                ent_loss = criterion(logits[0],
+                                     ent_label[0],
+                                     weight=ent_mask,
+                                     reduction='sum')
+                spo_loss = criterion(logits[1],
+                                     spo_label[0],
+                                     weight=spo_mask,
+                                     reduction='sum')
 
                 loss = ent_loss + spo_loss
 

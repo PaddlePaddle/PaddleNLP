@@ -29,6 +29,7 @@ from data import read, load_dict, convert_example_to_feature
 
 
 class Predictor(object):
+
     def __init__(self, args):
         self.predictor, self.input_handles, self.output_handles = self.create_predictor(
             args)
@@ -69,14 +70,12 @@ class Predictor(object):
                 config.tensorrt_engine_enabled()))
         if args.collect_shape:
             config.collect_shape_range_info(
-                os.path.join(
-                    os.path.dirname(args.model_path),
-                    'collect_shape_range_info.pbtxt'))
+                os.path.join(os.path.dirname(args.model_path),
+                             'collect_shape_range_info.pbtxt'))
         else:
             config.enable_tuned_tensorrt_dynamic_shape(
-                os.path.join(
-                    os.path.dirname(args.model_path),
-                    "collect_shape_range_info.pbtxt"), True)
+                os.path.join(os.path.dirname(args.model_path),
+                             "collect_shape_range_info.pbtxt"), True)
 
         predictor = paddle.inference.create_predictor(config)
         input_handles = [
@@ -92,8 +91,8 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy(
+            ) if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
@@ -154,29 +153,29 @@ if __name__ == "__main__":
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
-    trans_func = partial(
-        convert_example_to_feature,
-        tokenizer=tokenizer,
-        label2id=label2id,
-        max_seq_len=args.max_seq_len,
-        is_test=False)
+    trans_func = partial(convert_example_to_feature,
+                         tokenizer=tokenizer,
+                         label2id=label2id,
+                         max_seq_len=args.max_seq_len,
+                         is_test=False)
     test_ds = test_ds.map(trans_func, lazy=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+            ),  # segment
         Stack(dtype="int64"),  # seq_len
         Stack(dtype="int64")  # label
     ): fn(samples)
 
-    batch_sampler = paddle.io.BatchSampler(
-        test_ds, batch_size=args.batch_size, shuffle=False)
-    data_loader = paddle.io.DataLoader(
-        dataset=test_ds,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    batch_sampler = paddle.io.BatchSampler(test_ds,
+                                           batch_size=args.batch_size,
+                                           shuffle=False)
+    data_loader = paddle.io.DataLoader(dataset=test_ds,
+                                       batch_sampler=batch_sampler,
+                                       collate_fn=batchify_fn,
+                                       num_workers=0,
+                                       return_list=True)
 
     predictor = Predictor(args)
 

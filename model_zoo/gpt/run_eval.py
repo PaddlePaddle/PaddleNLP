@@ -27,7 +27,9 @@ from paddlenlp.transformers import GPTModel
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
 
-MODEL_CLASSES = {"gpt": (GPTForPretraining, GPTTokenizer), }
+MODEL_CLASSES = {
+    "gpt": (GPTForPretraining, GPTTokenizer),
+}
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -45,6 +47,7 @@ parser.add_argument("--logging_steps", type=int, default=100, help="Log every X 
 
 
 class LM_Eval_Dataset(paddle.io.Dataset):
+
     def __init__(self, tokens, seq_len, pad_idx, overlapping_eval=None):
         self.tokens = tokens
         self.seq_len = seq_len
@@ -69,8 +72,8 @@ class LM_Eval_Dataset(paddle.io.Dataset):
         tokens = tokens[:-1]
         seq_length = len(tokens)
         # attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-                                                                 seq_length))
+        attention_mask = np.tri(seq_length, seq_length).reshape(
+            (1, seq_length, seq_length))
 
         # the pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
@@ -100,6 +103,7 @@ class LM_Eval_Dataset(paddle.io.Dataset):
 
 
 class Lambada_Eval_Dataset(paddle.io.Dataset):
+
     def __init__(self, tokens, labels, seq_len, pad_idx):
         self.seq_len = seq_len
         self.pad_idx = pad_idx
@@ -116,8 +120,8 @@ class Lambada_Eval_Dataset(paddle.io.Dataset):
 
         seq_length = len(tokens)
         # attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-                                                                 seq_length))
+        attention_mask = np.tri(seq_length, seq_length).reshape(
+            (1, seq_length, seq_length))
 
         # the pad and eos tokens do not contribute the loss
         position_ids = np.arange(0, seq_length, dtype="int64")
@@ -222,11 +226,11 @@ def create_eval_dataset(args):
     args.num_examples = len(val_dataset)
     args.num_original_tokens = num_original_tokens
     args.num_tokenized_tokens = num_tokenized_tokens
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=eval_batch_size,
-        drop_last=False,
-        collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()))
+    val_dataloader = DataLoader(val_dataset,
+                                batch_size=eval_batch_size,
+                                drop_last=False,
+                                collate_fn=Tuple(Stack(), Stack(), Stack(),
+                                                 Stack(), Stack()))
 
     return val_dataloader
 
@@ -238,8 +242,8 @@ def do_eval(args):
 
     if args.init_checkpoint_path is not None:
         model = GPTForPretraining(
-            GPTModel(**model_class.pretrained_init_configuration[
-                args.model_name]))
+            GPTModel(
+                **model_class.pretrained_init_configuration[args.model_name]))
 
         logger.info("Load model checkpoint from %s" % args.init_checkpoint_path)
         model_dict = paddle.load(os.path.join(args.init_checkpoint_path))
@@ -264,21 +268,22 @@ def do_eval(args):
             else:
                 outputs = paddle.argmax(preds, -1)
                 acc = paddle.cast(outputs == labels, 'float32')
-                acc = paddle.where(
-                    paddle.cast(loss_mask, 'bool'), acc, paddle.ones_like(acc))
+                acc = paddle.where(paddle.cast(loss_mask, 'bool'), acc,
+                                   paddle.ones_like(acc))
                 acc = paddle.sum(paddle.prod(acc, -1))
                 total_score += acc.numpy()
             if step % args.logging_steps == 0:
-                logger.info("step %d, batch: %d, %s: %f, speed: %.2f step/s" %
-                            (step, step, score_name, total_score,
-                             args.logging_steps / (time.time() - tic_eval)))
+                logger.info(
+                    "step %d, batch: %d, %s: %f, speed: %.2f step/s" %
+                    (step, step, score_name, total_score, args.logging_steps /
+                     (time.time() - tic_eval)))
                 tic_eval = time.time()
 
     if not args.cloze_eval:
         total_loss = float(total_score)
         ppl = math.exp(min(20, total_loss))
-        token_ratio = (args.num_tokenized_tokens - 1) / (
-            args.num_original_tokens - 1)
+        token_ratio = (args.num_tokenized_tokens -
+                       1) / (args.num_original_tokens - 1)
         adjusted_ppl = math.exp(min(20, total_loss * token_ratio))
         string = ' validation results on {} | '.format(args.eval_path)
         string += 'avg loss: {:.4E} | '.format(total_loss)

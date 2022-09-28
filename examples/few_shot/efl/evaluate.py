@@ -34,8 +34,8 @@ def do_evaluate(model, tokenizer, data_loader, task_label_description):
     for batch in data_loader:
         src_ids, token_type_ids, true_labels = batch
         # Prediction_probs:[bs * class_num, 2]
-        prediction_probs = model(
-            input_ids=src_ids, token_type_ids=token_type_ids).numpy()
+        prediction_probs = model(input_ids=src_ids,
+                                 token_type_ids=token_type_ids).numpy()
 
         all_prediction_probs.append(prediction_probs)
         all_labels.append(true_labels.numpy())

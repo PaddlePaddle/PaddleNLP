@@ -42,13 +42,16 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 

@@ -18,6 +18,7 @@ from paddlenlp.transformers import ErniePretrainedModel
 
 
 class UIE(ErniePretrainedModel):
+
     def __init__(self, encoding_model):
         super(UIE, self).__init__()
         self.encoder = encoding_model

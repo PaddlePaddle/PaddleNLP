@@ -23,21 +23,24 @@ parser.add_argument(
     type=str,
     required=True,
     default='./output',
-    help="Path of saved model files. Program file and parameter files are saved in this directory."
+    help=
+    "Path of saved model files. Program file and parameter files are saved in this directory."
 )
 parser.add_argument(
     "--model_filename",
     type=str,
     required=True,
     default='inference.get_pooled_embedding.pdmodel',
-    help="The name of file to load the inference program. If it is None, the default filename __model__ will be used."
+    help=
+    "The name of file to load the inference program. If it is None, the default filename __model__ will be used."
 )
 parser.add_argument(
     "--params_filename",
     type=str,
     required=True,
     default='inference.get_pooled_embedding.pdiparams',
-    help="The name of file to load all parameters. It is only used for the case that all parameters were saved in a single binary file. If parameters were saved in separate files, set it as None. Default: None."
+    help=
+    "The name of file to load all parameters. It is only used for the case that all parameters were saved in a single binary file. If parameters were saved in separate files, set it as None. Default: None."
 )
 parser.add_argument(
     "--server_path",
@@ -53,19 +56,22 @@ parser.add_argument(
     "--feed_alias_names",
     type=str,
     default=None,
-    help='set alias names for feed vars, split by comma \',\', you should run --show_proto to check the number of feed vars'
+    help=
+    'set alias names for feed vars, split by comma \',\', you should run --show_proto to check the number of feed vars'
 )
 parser.add_argument(
     "--fetch_alias_names",
     type=str,
     default=None,
-    help='set alias names for feed vars, split by comma \',\', you should run --show_proto to check the number of fetch vars'
+    help=
+    'set alias names for feed vars, split by comma \',\', you should run --show_proto to check the number of fetch vars'
 )
 parser.add_argument(
     "--show_proto",
     type=bool,
     default=False,
-    help='If yes, you can preview the proto and then determine your feed var alias name and fetch var alias name.'
+    help=
+    'If yes, you can preview the proto and then determine your feed var alias name and fetch var alias name.'
 )
 
 if __name__ == "__main__":

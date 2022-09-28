@@ -206,11 +206,10 @@ class Explanation(object):
         from IPython.core.display import display, HTML
         display(
             HTML(
-                self.as_html(
-                    labels=labels,
-                    predict_proba=predict_proba,
-                    show_predicted_value=show_predicted_value,
-                    **kwargs)))
+                self.as_html(labels=labels,
+                             predict_proba=predict_proba,
+                             show_predicted_value=show_predicted_value,
+                             **kwargs)))
 
     def save_to_file(self,
                      file_path,
@@ -228,11 +227,10 @@ class Explanation(object):
         """
         file_ = open(file_path, 'w', encoding='utf8')
         file_.write(
-            self.as_html(
-                labels=labels,
-                predict_proba=predict_proba,
-                show_predicted_value=show_predicted_value,
-                **kwargs))
+            self.as_html(labels=labels,
+                         predict_proba=predict_proba,
+                         show_predicted_value=show_predicted_value,
+                         **kwargs))
         file_.close()
 
     def as_html(self,
@@ -264,14 +262,15 @@ class Explanation(object):
             labels = self.available_labels()
 
         this_dir, _ = os.path.split(__file__)
-        bundle = open(
-            os.path.join(this_dir, 'bundle.js'), encoding="utf8").read()
+        bundle = open(os.path.join(this_dir, 'bundle.js'),
+                      encoding="utf8").read()
 
         out = u'''<html>
         <meta http-equiv="content-type" content="text/html; charset=UTF8">
         <head><script>%s </script></head><body>''' % bundle
-        random_id = id_generator(
-            size=15, random_state=check_random_state(self.random_state))
+        random_id = id_generator(size=15,
+                                 random_state=check_random_state(
+                                     self.random_state))
         out += u'''
         <div class="lime top_div" id="top_div%s"></div>
         ''' % random_id
@@ -283,8 +282,8 @@ class Explanation(object):
                                 .classed('lime predict_proba', true);
             var pp_svg = pp_div.append('svg').style('width', '100%%');
             var pp = new lime.PredictProba(pp_svg, %s, %s);
-            ''' % (jsonize([str(x) for x in self.class_names]),
-                   jsonize(list(self.predict_proba.astype(float))))
+            ''' % (jsonize([str(x) for x in self.class_names
+                            ]), jsonize(list(self.predict_proba.astype(float))))
 
         predict_value_js = ''
         if self.mode == "regression" and show_predicted_value:
@@ -295,9 +294,9 @@ class Explanation(object):
                                         .classed('lime predicted_value', true);
                     var pp_svg = pp_div.append('svg').style('width', '100%%');
                     var pp = new lime.PredictedValue(pp_svg, %s, %s, %s);
-                    ''' % (jsonize(float(self.predicted_value)),
-                           jsonize(float(self.min_value)),
-                           jsonize(float(self.max_value)))
+                    ''' % (jsonize(float(
+                self.predicted_value)), jsonize(float(
+                    self.min_value)), jsonize(float(self.max_value)))
 
         exp_js = '''var exp_div;
             var exp = new lime.Explanation(%s);
@@ -325,8 +324,9 @@ class Explanation(object):
             html_data = self.local_exp[self.dummy_label]
 
         raw_js += self.domain_mapper.visualize_instance_html(
-            html_data, labels[0] if self.mode == "classification" else
-            self.dummy_label, 'raw_div', 'exp', **kwargs)
+            html_data,
+            labels[0] if self.mode == "classification" else self.dummy_label,
+            'raw_div', 'exp', **kwargs)
         out += u'''
         <script>
         var top_div = d3.select('#top_div%s').classed('lime top_div', true);

@@ -23,7 +23,7 @@ import time
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--similar_text_pair", type=str,
-                    default='', help="The full path of similat pair file")
+                    default='', help="The full path of similar pair file")
 parser.add_argument("--recall_result_file", type=str,
                     default='', help="The full path of recall result file")
 parser.add_argument("--recall_num", type=int, default=10,
@@ -76,8 +76,6 @@ if __name__ == "__main__":
                 relevance_labels.append(1)
             else:
                 relevance_labels.append(0)
-        # print(len(rs))
-        # print(rs[:50])
 
     recall_N = []
     recall_num = [1, 5, 10, 20, 50]
@@ -92,4 +90,3 @@ if __name__ == "__main__":
         print('recall@{}={}'.format(key, val))
         res.append(str(val))
     result.write('\t'.join(res) + '\n')
-    # print("\t".join(recall_N))

@@ -69,17 +69,18 @@ def run_evaluate(data_loader,
             break
     model.train()
     average_loss = sum(all_loss) / len(all_loss)
-    logger.info("%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                % (task_name, global_step, epoch, eval_step, average_loss,
-                   iter_steps / (time.time() - local_time)))
+    logger.info(
+        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s" %
+        (task_name, global_step, epoch, eval_step, average_loss, iter_steps /
+         (time.time() - local_time)))
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
 
 
 def get_train_data_file(args):
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_idx.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_idx.npz"))
     ]
     files = [x.replace("_idx.npz", "") for x in files]
     if len(files) == 0:
@@ -91,8 +92,8 @@ def get_train_data_file(args):
 
     files = [
         os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-        if (os.path.isfile(os.path.join(args.input_dir, f)) and str(f).endswith(
-            "_ids.npz"))
+        if (os.path.isfile(os.path.join(args.input_dir, f))
+            and str(f).endswith("_ids.npz"))
     ]
 
     files = [x.replace("_ids.npz", "") for x in files]
@@ -109,8 +110,9 @@ def do_train(args):
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     set_seed(args)
     # Now, we only support data parallel in dygraph mode for now.
-    topo = Topology(
-        device_rank=worker_index, world_size=worker_num, dp_degree=worker_num)
+    topo = Topology(device_rank=worker_index,
+                    world_size=worker_num,
+                    dp_degree=worker_num)
 
     default_global_batch_size = topo.data_info.size * args.micro_batch_size
     default_global_tokens_num = default_global_batch_size * args.max_seq_len
@@ -122,8 +124,9 @@ def do_train(args):
     log_writer_path = os.path.join(
         args.output_dir, "train_log",
         "{}_globalbsz_{}_amp_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.micro_batch_size *
-            topo.data_info.size, False, False, worker_index).lower())
+            args.model_name_or_path,
+            args.micro_batch_size * topo.data_info.size, False, False,
+            worker_index).lower())
     if os.path.exists(log_writer_path):
         import shutil
         shutil.rmtree(log_writer_path)
@@ -260,8 +263,8 @@ def do_train(args):
                 profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_freq == 0:
-                    speed = args.logging_freq / (
-                        train_reader_cost + train_run_cost)
+                    speed = args.logging_freq / (train_reader_cost +
+                                                 train_run_cost)
                     avg_reader_cost = train_reader_cost / args.logging_freq
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
@@ -271,8 +274,8 @@ def do_train(args):
                          speed * default_global_tokens_num / worker_num,
                          optimizer.get_lr()))
                     log_writer.add_scalar("loss", loss_numpy, global_step)
-                    log_writer.add_scalar("learning_rate",
-                                          optimizer.get_lr(), global_step)
+                    log_writer.add_scalar("learning_rate", optimizer.get_lr(),
+                                          global_step)
 
                     tic_train = time.time()
                     train_reader_cost = 0.0
@@ -302,9 +305,9 @@ def do_train(args):
                         logger.info("Save model to %s" % output_dir)
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(optimizer.state_dict(),
-                                    os.path.join(output_dir,
-                                                 "model_state.pdopt"))
+                        paddle.save(
+                            optimizer.state_dict(),
+                            os.path.join(output_dir, "model_state.pdopt"))
 
                 if global_step >= args.max_steps:
                     run_evaluate(test_data_loader, model, criterion,

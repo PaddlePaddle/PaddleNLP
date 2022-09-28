@@ -26,17 +26,18 @@ def create_dataloader(dataset,
         dataset = dataset.map(trans_fn)
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def convert_example(example,
@@ -65,10 +66,9 @@ def convert_example(example,
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(
-            text=text,
-            max_seq_len=max_seq_length,
-            pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text,
+                                   max_seq_len=max_seq_length,
+                                   pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -119,8 +119,7 @@ def get_latest_checkpoint(args):
     trained_steps = [int(s) for s in subdirectories if valid_checkpoint(s)]
 
     if len(trained_steps) > 0:
-        return os.path.join(args.save_dir,
-                            str(max(trained_steps)),
+        return os.path.join(args.save_dir, str(max(trained_steps)),
                             "model_state.pdparams"), max(trained_steps)
 
     return args.init_from_ckpt, 0
@@ -147,8 +146,8 @@ def get_latest_ann_data(ann_data_dir):
         latest_ann_data_file = os.path.join(ann_data_dir,
                                             str(max(ann_data_steps)),
                                             "new_ann_data")
-        logger.info("Using lateset ann_data_file:{}".format(
-            latest_ann_data_file))
+        logger.info(
+            "Using lateset ann_data_file:{}".format(latest_ann_data_file))
         return latest_ann_data_file, max(ann_data_steps)
 
     logger.info("no new ann_data, return (None, -1)")

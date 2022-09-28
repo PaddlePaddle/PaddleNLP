@@ -19,6 +19,8 @@ import string
 import json
 import numpy as np
 
+from ..utils.log import logger
+
 
 def compute_prediction(examples,
                        features,
@@ -65,7 +67,8 @@ def compute_prediction(examples,
     all_start_logits, all_end_logits = predictions
 
     assert len(predictions[0]) == len(
-        features), "Number of predictions should be equal to number of features."
+        features
+    ), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
     example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
@@ -113,20 +116,20 @@ def compute_prediction(examples,
                 }
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1:-n_best_size - 1:
-                                                     -1].tolist()
-            end_indexes = np.argsort(end_logits)[-1:-n_best_size - 1:-1].tolist(
-            )
+            start_indexes = np.argsort(start_logits)[-1:-n_best_size -
+                                                     1:-1].tolist()
+            end_indexes = np.argsort(end_logits)[-1:-n_best_size -
+                                                 1:-1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
                     # to part of the input_ids that are not in the context.
-                    if (start_index >= len(offset_mapping) or
-                            end_index >= len(offset_mapping) or
-                            offset_mapping[start_index] is None or
-                            offset_mapping[end_index] is None or
-                            len(offset_mapping[start_index]) == 0 or
-                            len(offset_mapping[end_index]) == 0):
+                    if (start_index >= len(offset_mapping)
+                            or end_index >= len(offset_mapping)
+                            or offset_mapping[start_index] is None
+                            or offset_mapping[end_index] is None
+                            or len(offset_mapping[start_index]) == 0
+                            or len(offset_mapping[end_index]) == 0):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
@@ -141,8 +144,10 @@ def compute_prediction(examples,
                                     offset_mapping[end_index][1]),
                         "score":
                         start_logits[start_index] + end_logits[end_index],
-                        "start_logit": start_logits[start_index],
-                        "end_logit": end_logits[end_index],
+                        "start_logit":
+                        start_logits[start_index],
+                        "end_logit":
+                        end_logits[end_index],
                     })
         if version_2_with_negative:
             # Add the minimum null prediction
@@ -150,9 +155,9 @@ def compute_prediction(examples,
             null_score = min_null_prediction["score"]
 
         # Only keep the best `n_best_size` predictions.
-        predictions = sorted(
-            prelim_predictions, key=lambda x: x["score"],
-            reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions,
+                             key=lambda x: x["score"],
+                             reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
         if version_2_with_negative and not any(p["offsets"] == (0, 0)
@@ -167,8 +172,8 @@ def compute_prediction(examples,
 
         # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
         # failure.
-        if len(predictions) == 0 or (len(predictions) == 1 and
-                                     predictions[0]["text"] == ""):
+        if len(predictions) == 0 or (len(predictions) == 1
+                                     and predictions[0]["text"] == ""):
             predictions.insert(0, {
                 "text": "empty",
                 "start_logit": 0.0,
@@ -208,8 +213,8 @@ def compute_prediction(examples,
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
         all_nbest_json[example["id"]] = [{
-            k: (float(v)
-                if isinstance(v, (np.float16, np.float32, np.float64)) else v)
+            k: (float(v) if isinstance(v, (np.float16, np.float32,
+                                           np.float64)) else v)
             for k, v in pred.items()
         } for pred in predictions]
 
@@ -304,7 +309,7 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
             # For unanswerable questions, only correct answer is empty string
             gold_answers = ['']
         if qid not in preds:
-            print('Missing prediction for %s' % qid)
+            logger.info('Missing prediction for %s' % qid)
             continue
         a_pred = preds[qid]
         # Take max over all gold answers
@@ -419,16 +424,17 @@ def squad_evaluate(examples,
                                        na_prob_thresh)
     out_eval = make_eval_dict(exact_thresh, f1_thresh)
     if has_ans_qids:
-        has_ans_eval = make_eval_dict(
-            exact_thresh, f1_thresh, qid_list=has_ans_qids)
+        has_ans_eval = make_eval_dict(exact_thresh,
+                                      f1_thresh,
+                                      qid_list=has_ans_qids)
         merge_eval(out_eval, has_ans_eval, 'HasAns')
     if no_ans_qids:
-        no_ans_eval = make_eval_dict(
-            exact_thresh, f1_thresh, qid_list=no_ans_qids)
+        no_ans_eval = make_eval_dict(exact_thresh,
+                                     f1_thresh,
+                                     qid_list=no_ans_qids)
         merge_eval(out_eval, no_ans_eval, 'NoAns')
         find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs,
                              qid_to_has_ans)
-
-    print(json.dumps(out_eval, indent=2))
+    logger.info(json.dumps(out_eval, indent=2))
 
     return out_eval

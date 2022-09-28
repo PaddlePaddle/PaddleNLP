@@ -39,12 +39,11 @@ class EncDecModel(nn.Layer):
 
         assert model_version in ('v2', ), "model_version only support v2"
         self.encoder = encoder_v2.Text2SQLEncoderV2(config)
-        self.decoder = decoder_v2.Text2SQLDecoder(
-            label_encoder,
-            dropout=0.2,
-            desc_attn='mha',
-            use_align_mat=True,
-            use_align_loss=True)
+        self.decoder = decoder_v2.Text2SQLDecoder(label_encoder,
+                                                  dropout=0.2,
+                                                  desc_attn='mha',
+                                                  use_align_mat=True,
+                                                  use_align_loss=True)
 
     def forward(self, inputs, labels=None, db=None, is_train=True):
         if is_train:

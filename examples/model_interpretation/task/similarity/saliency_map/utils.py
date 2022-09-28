@@ -25,6 +25,7 @@ import paddle
 
 
 class UnpackDataLoader(paddle.io.DataLoader):
+
     def __init__(self, *args, **kwargs):
         super(UnpackDataLoader, self).__init__(*args, batch_size=1, **kwargs)
 
@@ -42,4 +43,6 @@ def create_if_not_exists(dir):
 
 
 def get_warmup_and_linear_decay(max_steps, warmup_steps):
-    return lambda step: min(step / warmup_steps, 1. - (step - warmup_steps) / (max_steps - warmup_steps))
+    return lambda step: min(
+        step / warmup_steps, 1. - (step - warmup_steps) /
+        (max_steps - warmup_steps))

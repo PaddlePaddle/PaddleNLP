@@ -19,6 +19,7 @@ from paddlenlp.transformers.ernie.modeling import ErniePretrainedModel, ErniePre
 
 
 class ErnieForPretraining(ErniePretrainedModel):
+
     def __init__(self, ernie):
         super(ErnieForPretraining, self).__init__()
         self.ernie = ernie
@@ -37,11 +38,10 @@ class ErnieForPretraining(ErniePretrainedModel):
                 attention_mask=None,
                 masked_positions=None):
         with paddle.static.amp.fp16_guard():
-            outputs = self.ernie(
-                input_ids,
-                token_type_ids=token_type_ids,
-                position_ids=position_ids,
-                attention_mask=attention_mask)
+            outputs = self.ernie(input_ids,
+                                 token_type_ids=token_type_ids,
+                                 position_ids=position_ids,
+                                 attention_mask=attention_mask)
 
             sequence_output, pooled_output = outputs[:2]
 
@@ -60,18 +60,18 @@ class ErnieForPretraining(ErniePretrainedModel):
                 attention_mask=None,
                 masked_positions=None):
 
-        prediction_logits = self.forward(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            masked_positions=masked_positions)
+        prediction_logits = self.forward(input_ids=input_ids,
+                                         token_type_ids=token_type_ids,
+                                         position_ids=position_ids,
+                                         attention_mask=attention_mask,
+                                         masked_positions=masked_positions)
 
         softmax_fn = paddle.nn.Softmax()
         return softmax_fn(prediction_logits)
 
 
 class ErnieMLMCriterion(paddle.nn.Layer):
+
     def __init__(self):
         super(ErnieMLMCriterion, self).__init__()
 

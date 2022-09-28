@@ -69,8 +69,8 @@ def read_database_schema(database_schema_filename, schema_tokens, column_names,
         for i, (table_id, column_name) in enumerate(column_names_original):
             if table_id >= 0:
                 table_name = table_names_original[table_id]
-                column_name_surface_form = '{}.{}'.format(table_name,
-                                                          column_name)
+                column_name_surface_form = '{}.{}'.format(
+                    table_name, column_name)
             else:
                 # this is just *
                 column_name_surface_form = column_name
@@ -117,8 +117,8 @@ def remove_from_with_join(format_sql_2):
             sub_sql_tokens = sub_sql.split()
             for t_i, t in enumerate(sub_sql_tokens):
                 if t == 'as':
-                    table_to_name[sub_sql_tokens[t_i + 1]] = sub_sql_tokens[t_i
-                                                                            - 1]
+                    table_to_name[sub_sql_tokens[t_i +
+                                                 1]] = sub_sql_tokens[t_i - 1]
                     table_list.append(sub_sql_tokens[t_i - 1])
                 elif t == ')' and new_sub_sql is None:
                     # new_sub_sql keeps some trailing parts after ')'
@@ -141,8 +141,8 @@ def remove_from_with_join(format_sql_2):
                     format_sql_3.append(sub_sub_sql)
                     format_sql_3.append(new_sub_sql)
                 elif 'join' not in sub_sql:
-                    assert len(sub_sql.split()) == 2 or len(sub_sql.split(
-                    )) == 1
+                    assert len(sub_sql.split()) == 2 or len(
+                        sub_sql.split()) == 1
                     if len(sub_sql.split()) == 2:
                         used_tables_list.append([sub_sql.split()[1]])
 
@@ -177,13 +177,13 @@ def remove_from_without_join(format_sql_3, column_names, schema_tokens):
                     tokens = format_sql_4[i].split()
                     for ii, token in enumerate(tokens):
                         if token in column_names and tokens[ii - 1] != '.':
-                            if (ii + 1 < len(tokens) and
-                                    tokens[ii + 1] != '.' and tokens[ii + 1] !=
-                                    '(') or ii + 1 == len(tokens):
+                            if (ii + 1 < len(tokens) and tokens[ii + 1] != '.'
+                                    and tokens[ii + 1] != '('
+                                ) or ii + 1 == len(tokens):
                                 if '{}.{}'.format(table_name,
                                                   token) in schema_tokens:
-                                    tokens[ii] = '{} . {}'.format(table_name,
-                                                                  token)
+                                    tokens[ii] = '{} . {}'.format(
+                                        table_name, token)
                     format_sql_4[i] = ' '.join(tokens)
 
             format_sql_4.append(sub_sql)
@@ -205,8 +205,8 @@ def remove_from_without_join(format_sql_3, column_names, schema_tokens):
             tokens = format_sql_4[i].split()
             for ii, token in enumerate(tokens):
                 if token in column_names and tokens[ii - 1] != '.':
-                    if (ii + 1 < len(tokens) and tokens[ii + 1] != '.' and
-                            tokens[ii + 1] != '(') or ii + 1 == len(tokens):
+                    if (ii + 1 < len(tokens) and tokens[ii + 1] != '.'
+                            and tokens[ii + 1] != '(') or ii + 1 == len(tokens):
                         if '{}.{}'.format(table_name, token) in schema_tokens:
                             tokens[ii] = '{} . {}'.format(table_name, token)
             format_sql_4[i] = ' '.join(tokens)
@@ -227,8 +227,8 @@ def add_table_name(format_sql_3, used_tables, column_names, schema_tokens):
             tokens = sub_sql.split()
             for ii, token in enumerate(tokens):
                 if token in column_names and tokens[ii - 1] != '.':
-                    if (ii + 1 < len(tokens) and tokens[ii + 1] != '.' and
-                            tokens[ii + 1] != '(') or ii + 1 == len(tokens):
+                    if (ii + 1 < len(tokens) and tokens[ii + 1] != '.'
+                            and tokens[ii + 1] != '(') or ii + 1 == len(tokens):
                         if '{}.{}'.format(table_name, token) in schema_tokens:
                             tokens[ii] = '{} . {}'.format(table_name, token)
             format_sql_4.append(' '.join(tokens))
@@ -258,8 +258,8 @@ def add_table_name(format_sql_3, used_tables, column_names, schema_tokens):
             if token == '*':
                 continue
             if token in column_names and tokens[ii - 1] != '.':
-                if (ii + 1 < len(tokens) and tokens[ii + 1] != '.' and
-                        tokens[ii + 1] != '(') or ii + 1 == len(tokens):
+                if (ii + 1 < len(tokens) and tokens[ii + 1] != '.'
+                        and tokens[ii + 1] != '(') or ii + 1 == len(tokens):
                     table_name = get_table_name_for(token)
                     if table_name:
                         tokens[ii] = '{} . {}'.format(table_name, token)
@@ -277,16 +277,18 @@ def check_oov(format_sql_final, output_vocab, schema_tokens):
 
 def normalize_space(format_sql):
     format_sql_1 = [
-        ' '.join(sub_sql.strip().replace(',', ' , ').replace('.', ' . ')
-                 .replace('(', ' ( ').replace(')', ' ) ').split())
+        ' '.join(sub_sql.strip().replace(',', ' , ').replace(
+            '.', ' . ').replace('(', ' ( ').replace(')', ' ) ').split())
         for sub_sql in format_sql.split('\n')
     ]
     format_sql_1 = '\n'.join(format_sql_1)
 
     format_sql_2 = format_sql_1.replace('\njoin', ' join').replace(
         ',\n', ', ').replace(' where', '\nwhere').replace(
-            ' intersect', '\nintersect').replace('\nand', ' and').replace(
-                'order by t2 .\nstart desc', 'order by t2 . start desc')
+            ' intersect',
+            '\nintersect').replace('\nand',
+                                   ' and').replace('order by t2 .\nstart desc',
+                                                   'order by t2 . start desc')
 
     format_sql_2 = format_sql_2.replace(
         'select\noperator', 'select operator'
@@ -321,16 +323,17 @@ def normalize_space(format_sql):
                                                                 '. where')
 
     format_sql_2 = format_sql_2.replace('group by', 'group_by').replace(
-        'order by', 'order_by').replace('! =', '!=').replace('limit value',
-                                                             'limit_value')
+        'order by',
+        'order_by').replace('! =', '!=').replace('limit value', 'limit_value')
     return format_sql_2
 
 
 def normalize_final_sql(format_sql_5):
     format_sql_final = format_sql_5.replace('\n', ' ').replace(
-        ' . ', '.').replace('group by', 'group_by').replace(
-            'order by', 'order_by').replace('! =', '!=').replace('limit value',
-                                                                 'limit_value')
+        ' . ', '.').replace('group by',
+                            'group_by').replace('order by', 'order_by').replace(
+                                '! =', '!=').replace('limit value',
+                                                     'limit_value')
 
     # normalize two bad sqls
     if 't1' in format_sql_final or 't2' in format_sql_final or 't3' in format_sql_final or 't4' in format_sql_final:
@@ -509,9 +512,11 @@ def read_data_json(split_json, interaction_list, database_schemas, column_names,
 
             if remove_from:
                 try:
-                    turn_sql_parse = parse_sql(
-                        turn_sql, db_id, column_names[db_id], output_vocab,
-                        schema_tokens[db_id], database_schemas[db_id])
+                    turn_sql_parse = parse_sql(turn_sql, db_id,
+                                               column_names[db_id],
+                                               output_vocab,
+                                               schema_tokens[db_id],
+                                               database_schemas[db_id])
                 except:
                     print('continue')
                     continue
@@ -538,14 +543,16 @@ def read_spider(spider_dir, database_schemas, column_names, output_vocab,
     interaction_list = {}
 
     train_json = os.path.join(spider_dir, 'train.json')
-    interaction_list = read_spider_split(
-        train_json, interaction_list, database_schemas, column_names,
-        output_vocab, schema_tokens, remove_from)
+    interaction_list = read_spider_split(train_json, interaction_list,
+                                         database_schemas, column_names,
+                                         output_vocab, schema_tokens,
+                                         remove_from)
 
     dev_json = os.path.join(spider_dir, 'dev.json')
-    interaction_list = read_spider_split(
-        dev_json, interaction_list, database_schemas, column_names,
-        output_vocab, schema_tokens, remove_from)
+    interaction_list = read_spider_split(dev_json, interaction_list,
+                                         database_schemas, column_names,
+                                         output_vocab, schema_tokens,
+                                         remove_from)
 
     return interaction_list
 
@@ -694,8 +701,9 @@ def preprocess(dataset, remove_from=False):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dataset", choices=('spider', 'sparc', 'cosql'), default='sparc')
+    parser.add_argument("--dataset",
+                        choices=('spider', 'sparc', 'cosql'),
+                        default='sparc')
     parser.add_argument('--remove_from', action='store_true', default=False)
     args = parser.parse_args()
     preprocess(args.dataset, args.remove_from)

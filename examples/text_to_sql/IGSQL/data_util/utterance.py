@@ -21,6 +21,7 @@ OUTPUT_KEY = "sql"
 
 
 class Utterance:
+
     def process_input_seq(self, anonymize, anonymizer, anon_tok_to_ent):
         assert not anon_tok_to_ent or anonymize
         assert not anonymize or anonymizer
@@ -82,8 +83,8 @@ class Utterance:
                  anonymizer=None):
         # Get output and input sequences from the dictionary representation.
         output_sequences = example[OUTPUT_KEY]
-        self.original_input_seq = tokenizers.nl_tokenize(example[
-            params.input_key])
+        self.original_input_seq = tokenizers.nl_tokenize(
+            example[params.input_key])
         self.available_snippets = available_snippets
         self.keep = False
 

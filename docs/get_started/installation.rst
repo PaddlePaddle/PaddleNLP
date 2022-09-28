@@ -31,7 +31,7 @@ Anaconda是一个开源的Python发行版本，其包含了conda、Python等180�
 :::::::::
 运行下载的安装包(以.exe为后辍)，根据引导完成安装, 用户可自行修改安装目录（如下图）。
 
-.. image:: /imgs/anaconda_windows.png 
+.. image:: ../imgs/anaconda_windows.png
 
 第三步 使用
 :::::::::
@@ -92,3 +92,20 @@ github代码会跟随开发进度不断更新
   git clone https://github.com/PaddlePaddle/PaddleNLP.git
   cd PaddleNLP
   git checkout develop
+
+使用Docker镜像体验PaddleNLP
+^^^^^^^^
+
+如果您没有Docker运行环境，请参考 `Docker官网`_ 进行安装
+
+.. _Docker官网: https://www.docker.com
+
+PaddleNLP提供了带有最新代码的docker镜像供您使用，您只需要*拉取docker镜像*，然后*运行docker镜像*，无需其他任何额外操作，即可开始使用PaddleNLP的所有功能。
+
+在 `Docker Hub`_ 中获取这些镜像及相应的使用指南，包括CPU、GPU、ROCm版本。
+
+.. _Docker Hub: https://hub.docker.com/repository/docker/paddlecloud/paddlenlp
+
+如果您对自动化制作docker镜像感兴趣，或有自定义需求，请访问 `PaddlePaddle/PaddleCloud`_ 做进一步了解。
+
+.. _PaddlePaddle/PaddleCloud: https://github.com/PaddlePaddle/PaddleCloud/tree/main/tekton

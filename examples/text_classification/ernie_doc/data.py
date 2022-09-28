@@ -101,11 +101,13 @@ def pad_batch_data(insts,
 
 
 class TextPreprocessor(object):
+
     def __call__(self, text):
         raise NotImplementedError("TextPreprocessor object can't be called")
 
 
 class ImdbTextPreprocessor(TextPreprocessor):
+
     def __call__(self, text):
         text = text.strip().replace('<br /><br />', ' ')
         text = text.replace('\t', '')
@@ -113,6 +115,7 @@ class ImdbTextPreprocessor(TextPreprocessor):
 
 
 class HYPTextPreprocessor(TextPreprocessor):
+
     def __init__(self):
         self.bs4 = try_import('bs4')
 
@@ -123,6 +126,7 @@ class HYPTextPreprocessor(TextPreprocessor):
 
 
 class ClassifierIterator(object):
+
     def __init__(self,
                  dataset,
                  batch_size,
@@ -203,8 +207,7 @@ class ClassifierIterator(object):
                               doc_span.length] + ["[SEP]"] + ["[CLS]"]
             token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
             features.append(
-                Feature(
-                    src_ids=token_ids, label_id=label, qid=qid, cal_loss=1))
+                Feature(src_ids=token_ids, label_id=label, qid=qid, cal_loss=1))
 
         if self.repeat_input:
             features_repeat = features
@@ -253,8 +256,8 @@ class ClassifierIterator(object):
                 [-1, 1])
             need_cal_loss = np.array([1]).astype("int64")
         else:
-            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
-                "int64").reshape([-1, 1])
+            batch_gather_idx = np.array(list(range(
+                len(batch_records)))).astype("int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
 
         # Padding
@@ -276,8 +279,8 @@ class ClassifierIterator(object):
         for index, example in enumerate(examples):
             max_len = max(max_len, len(example.src_ids))
             if self.in_tokens:
-                to_append = (len(batch_records) + 1
-                             ) * max_len <= self.batch_size
+                to_append = (len(batch_records) +
+                             1) * max_len <= self.batch_size
             else:
                 to_append = len(batch_records) < self.batch_size
             if to_append:
@@ -287,8 +290,8 @@ class ClassifierIterator(object):
             else:
                 yield self._pad_batch_records(batch_records, gather_idx)
                 batch_records, max_len = [example], len(example.src_ids)
-                gather_idx = [index % self.batch_size
-                              ] if example.cal_loss == 1 else []
+                gather_idx = [index %
+                              self.batch_size] if example.cal_loss == 1 else []
         yield self._pad_batch_records(batch_records, gather_idx)
 
     def _create_instances(self):
@@ -320,9 +323,8 @@ class ClassifierIterator(object):
         if self.mode != "train":
             if self._cnt_list(pre_batch_list):
                 pre_batch_list += [
-                    []
-                    for _ in range(self.batch_size * self.trainer_num -
-                                   self._cnt_list(pre_batch_list))
+                    [] for _ in range(self.batch_size * self.trainer_num -
+                                      self._cnt_list(pre_batch_list))
                 ]
                 sample_batch = self._get_samples(pre_batch_list, is_last=True)
                 for batch_records in self._prepare_batch_data(sample_batch):
@@ -339,8 +341,8 @@ class ClassifierIterator(object):
         if self.num_examples is None:
             self.num_examples = 0
             for qid, example in enumerate(self.dataset):
-                self.num_examples += len(
-                    self._convert_to_features(example, qid))
+                self.num_examples += len(self._convert_to_features(
+                    example, qid))
         return self.num_examples
 
 
@@ -363,19 +365,18 @@ class MRCIterator(ClassifierIterator):
                  random_seed=None,
                  doc_stride=128,
                  max_query_length=64):
-        super(MRCIterator, self).__init__(
-            dataset,
-            batch_size,
-            tokenizer,
-            trainer_num,
-            trainer_id,
-            max_seq_length,
-            memory_len,
-            repeat_input,
-            in_tokens,
-            mode,
-            random_seed,
-            preprocess_text_fn=None)
+        super(MRCIterator, self).__init__(dataset,
+                                          batch_size,
+                                          tokenizer,
+                                          trainer_num,
+                                          trainer_id,
+                                          max_seq_length,
+                                          memory_len,
+                                          repeat_input,
+                                          in_tokens,
+                                          mode,
+                                          random_seed,
+                                          preprocess_text_fn=None)
         self.doc_stride = doc_stride
         self.max_query_length = max_query_length
         self.examples = []
@@ -429,13 +430,12 @@ class MRCIterator(ClassifierIterator):
             else:
                 doc_tokens = tokenize_chinese_chars(context)
 
-            example = Example(
-                qas_id=qas_id,
-                question_text=question_text,
-                doc_tokens=doc_tokens,
-                orig_answer_text=orig_answer_text,
-                start_position=start_pos,
-                end_position=end_pos)
+            example = Example(qas_id=qas_id,
+                              question_text=question_text,
+                              doc_tokens=doc_tokens,
+                              orig_answer_text=orig_answer_text,
+                              start_position=start_pos,
+                              end_position=end_pos)
             examples.append(example)
         return examples
 
@@ -499,8 +499,8 @@ class MRCIterator(ClassifierIterator):
                 tokens.append("[CLS]")
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    token_to_orig_map[i + 1] = tok_to_orig_index[
-                        split_token_index]
+                    token_to_orig_map[i +
+                                      1] = tok_to_orig_index[split_token_index]
                     is_max_context = self._check_is_max_context(
                         doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[i + 1] = is_max_context
@@ -519,8 +519,8 @@ class MRCIterator(ClassifierIterator):
                     doc_start = doc_span.start
                     doc_end = doc_span.start + doc_span.length - 1
                     out_of_span = False
-                    if not (tok_start_position >= doc_start and
-                            tok_end_position <= doc_end):
+                    if not (tok_start_position >= doc_start
+                            and tok_end_position <= doc_end):
                         out_of_span = True
                     if out_of_span:
                         start_position = 0
@@ -530,23 +530,21 @@ class MRCIterator(ClassifierIterator):
                         start_position = tok_start_position - doc_start + doc_offset
                         end_position = tok_end_position - doc_start + doc_offset
 
-                feature = Feature(
-                    qid=unique_id,
-                    example_index=example_index,
-                    doc_span_index=doc_span_index,
-                    tokens=tokens,
-                    token_to_orig_map=token_to_orig_map,
-                    token_is_max_context=token_is_max_context,
-                    src_ids=token_ids,
-                    start_position=start_position,
-                    end_position=end_position,
-                    cal_loss=1)
+                feature = Feature(qid=unique_id,
+                                  example_index=example_index,
+                                  doc_span_index=doc_span_index,
+                                  tokens=tokens,
+                                  token_to_orig_map=token_to_orig_map,
+                                  token_is_max_context=token_is_max_context,
+                                  src_ids=token_ids,
+                                  start_position=start_position,
+                                  end_position=end_position,
+                                  cal_loss=1)
                 features.append(feature)
                 features_each.append(feature)
                 if example_index % 1000 == 0:
-                    print(
-                        "processing {} examples".format(example_index),
-                        flush=True)
+                    print("processing {} examples".format(example_index),
+                          flush=True)
 
                 unique_id += 1
             # Repeat
@@ -623,8 +621,8 @@ class MRCIterator(ClassifierIterator):
                 "int64").reshape([-1, 1])
         else:
             batch_size = len(batch_token_ids)
-            batch_start_position = np.zeros(
-                shape=[batch_size, 1], dtype="int64")
+            batch_start_position = np.zeros(shape=[batch_size, 1],
+                                            dtype="int64")
             batch_end_position = np.zeros(shape=[batch_size, 1], dtype="int64")
 
         batch_qids = [record.qid for record in batch_records]
@@ -635,8 +633,8 @@ class MRCIterator(ClassifierIterator):
                 [-1, 1])
             need_cal_loss = np.array([1]).astype("int64")
         else:
-            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
-                "int64").reshape([-1, 1])
+            batch_gather_idx = np.array(list(range(
+                len(batch_records)))).astype("int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
 
         # padding
@@ -646,8 +644,9 @@ class MRCIterator(ClassifierIterator):
             pad_max_len=self.max_seq_length,
             return_input_mask=True)
         padded_task_ids = np.zeros_like(padded_token_ids, dtype="int64")
-        padded_position_ids = get_related_pos(
-            padded_task_ids, self.max_seq_length, self.memory_len)
+        padded_position_ids = get_related_pos(padded_task_ids,
+                                              self.max_seq_length,
+                                              self.memory_len)
 
         return_list = [
             padded_token_ids, padded_position_ids, padded_task_ids, input_mask,
@@ -685,9 +684,8 @@ class MRCIterator(ClassifierIterator):
         if self.mode != "train":
             if self._cnt_list(pre_batch_list):
                 pre_batch_list += [
-                    []
-                    for _ in range(self.batch_size * self.trainer_num -
-                                   self._cnt_list(pre_batch_list))
+                    [] for _ in range(self.batch_size * self.trainer_num -
+                                      self._cnt_list(pre_batch_list))
                 ]
                 sample_batch = self._get_samples(pre_batch_list, is_last=True)
                 for batch_records in self._prepare_batch_data(sample_batch):
@@ -715,10 +713,10 @@ class MCQIterator(MRCIterator):
                  max_query_length=64,
                  choice_num=4):
         self.choice_num = choice_num
-        super(MCQIterator, self).__init__(
-            dataset, batch_size, tokenizer, trainer_num, trainer_id,
-            max_seq_length, memory_len, repeat_input, in_tokens, mode,
-            random_seed)
+        super(MCQIterator,
+              self).__init__(dataset, batch_size, tokenizer, trainer_num,
+                             trainer_id, max_seq_length, memory_len,
+                             repeat_input, in_tokens, mode, random_seed)
 
     def _truncate_seq_pair(self, tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
@@ -752,12 +750,11 @@ class MCQIterator(MRCIterator):
                 choice.append('')
             label = qa['label']
 
-            example = Example(
-                qas_id=qas_id,
-                context=context,
-                question=question,
-                choice=choice,
-                label=label)
+            example = Example(qas_id=qas_id,
+                              context=context,
+                              question=question,
+                              choice=choice,
+                              label=label)
             examples.append(example)
         return examples
 
@@ -777,8 +774,8 @@ class MCQIterator(MRCIterator):
             question_choice_pairs = \
                 [self._truncate_seq_pair(question_tokens, choice_tokens, self.max_query_length - 2)
                  for choice_tokens in choice_tokens_lst]
-            total_qc_num = sum(
-                [(len(q) + len(c)) for q, c in question_choice_pairs])
+            total_qc_num = sum([(len(q) + len(c))
+                                for q, c in question_choice_pairs])
             max_tokens_for_doc = self.max_seq_length - total_qc_num - 4
             _DocSpan = namedtuple("DocSpan", ["start", "length"])
             doc_spans = []
@@ -800,8 +797,9 @@ class MCQIterator(MRCIterator):
                     segment_tokens = ['[CLS]']
                     token_type_ids = [0]
 
-                    segment_tokens += context_tokens[
-                        doc_span.start:doc_span.start + doc_span.length]
+                    segment_tokens += context_tokens[doc_span.
+                                                     start:doc_span.start +
+                                                     doc_span.length]
                     token_type_ids += [0] * doc_span.length
 
                     segment_tokens += ['[SEP]']
@@ -821,12 +819,11 @@ class MCQIterator(MRCIterator):
 
                     input_ids = self.tokenizer.convert_tokens_to_ids(
                         segment_tokens)
-                    feature = Feature(
-                        qid=example.qas_id,
-                        label=example.label,
-                        src_ids=input_ids,
-                        segment_ids=token_type_ids,
-                        cal_loss=1)
+                    feature = Feature(qid=example.qas_id,
+                                      label=example.label,
+                                      src_ids=input_ids,
+                                      segment_ids=token_type_ids,
+                                      cal_loss=1)
                     qa_features.append(feature)
 
                 features.append(qa_features)
@@ -863,8 +860,8 @@ class MCQIterator(MRCIterator):
                 [-1, 1])
             need_cal_loss = np.array([1]).astype("int64")
         else:
-            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
-                "int64").reshape([-1, 1])
+            batch_gather_idx = np.array(list(range(
+                len(batch_records)))).astype("int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
 
         batch_task_ids = [[record.segment_ids for record in records]
@@ -887,8 +884,9 @@ class MCQIterator(MRCIterator):
                 pad_idx=self.tokenizer.pad_token_id,
                 pad_max_len=self.max_seq_length)
 
-            padded_position_ids = get_related_pos(
-                padded_task_ids, self.max_seq_length, self.memory_len)
+            padded_position_ids = get_related_pos(padded_task_ids,
+                                                  self.max_seq_length,
+                                                  self.memory_len)
 
             batch_padded_token_ids.append(padded_token_ids)
             batch_input_mask.append(input_mask)
@@ -926,8 +924,8 @@ class MCQIterator(MRCIterator):
                 index += 1
 
             if self.in_tokens:
-                to_append = (len(batch_records) + 1
-                             ) * self.choice_num * max_len <= self.batch_size
+                to_append = (len(batch_records) +
+                             1) * self.choice_num * max_len <= self.batch_size
             else:
                 to_append = len(batch_records) < self.batch_size
             if to_append:
@@ -970,6 +968,7 @@ class MCQIterator(MRCIterator):
 
 
 class SemanticMatchingIterator(MRCIterator):
+
     def _convert_qa_to_examples(self):
         Example = namedtuple('Example',
                              ['qid', 'text_a', 'text_b', 'text_c', 'label'])
@@ -979,12 +978,11 @@ class SemanticMatchingIterator(MRCIterator):
                 map(lambda x: x.replace('\n', '').strip(),
                     [qa["text_a"], qa["text_b"], qa["text_c"]]))
 
-            example = Example(
-                qid=qid,
-                text_a=text_a,
-                text_b=text_b,
-                text_c=text_c,
-                label=qa["label"])
+            example = Example(qid=qid,
+                              text_a=text_a,
+                              text_b=text_b,
+                              text_c=text_c,
+                              label=qa["label"])
             examples += [example]
         return examples
 
@@ -1044,14 +1042,13 @@ class SemanticMatchingIterator(MRCIterator):
 
                 input_ids1 = self.tokenizer.convert_tokens_to_ids(tokens1)
                 input_ids2 = self.tokenizer.convert_tokens_to_ids(tokens2)
-                feature = Feature(
-                    qid=example.qid,
-                    label=example.label,
-                    src_ids=input_ids1,
-                    segment_ids=token_type_ids1,
-                    pair_src_ids=input_ids2,
-                    pair_segment_ids=token_type_ids2,
-                    cal_loss=1)
+                feature = Feature(qid=example.qid,
+                                  label=example.label,
+                                  src_ids=input_ids1,
+                                  segment_ids=token_type_ids1,
+                                  pair_src_ids=input_ids2,
+                                  pair_segment_ids=token_type_ids2,
+                                  cal_loss=1)
 
                 features.append(feature)
                 features_each.append(feature)
@@ -1081,13 +1078,13 @@ class SemanticMatchingIterator(MRCIterator):
             pad_idx=self.tokenizer.pad_token_id,
             pad_max_len=self.max_seq_length,
             return_input_mask=True)
-        padded_task_ids = pad_batch_data(
-            batch_task_ids,
-            pad_idx=self.tokenizer.pad_token_id,
-            pad_max_len=self.max_seq_length)
+        padded_task_ids = pad_batch_data(batch_task_ids,
+                                         pad_idx=self.tokenizer.pad_token_id,
+                                         pad_max_len=self.max_seq_length)
 
-        padded_position_ids = get_related_pos(
-            padded_task_ids, self.max_seq_length, self.memory_len)
+        padded_position_ids = get_related_pos(padded_task_ids,
+                                              self.max_seq_length,
+                                              self.memory_len)
 
         return [
             padded_token_ids, padded_position_ids, padded_task_ids, input_mask
@@ -1109,8 +1106,8 @@ class SemanticMatchingIterator(MRCIterator):
                 [-1, 1])
             need_cal_loss = np.array([1]).astype("int64")
         else:
-            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
-                "int64").reshape([-1, 1])
+            batch_gather_idx = np.array(list(range(
+                len(batch_records)))).astype("int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
 
         return_list = self._create_pad_ids(batch_records) \
@@ -1120,6 +1117,7 @@ class SemanticMatchingIterator(MRCIterator):
 
 
 class SequenceLabelingIterator(ClassifierIterator):
+
     def __init__(self,
                  dataset,
                  batch_size,
@@ -1133,19 +1131,18 @@ class SequenceLabelingIterator(ClassifierIterator):
                  mode="train",
                  random_seed=None,
                  no_entity_id=-1):
-        super(SequenceLabelingIterator, self).__init__(
-            dataset,
-            batch_size,
-            tokenizer,
-            trainer_num,
-            trainer_id,
-            max_seq_length,
-            memory_len,
-            repeat_input,
-            in_tokens,
-            mode,
-            random_seed,
-            preprocess_text_fn=None)
+        super(SequenceLabelingIterator, self).__init__(dataset,
+                                                       batch_size,
+                                                       tokenizer,
+                                                       trainer_num,
+                                                       trainer_id,
+                                                       max_seq_length,
+                                                       memory_len,
+                                                       repeat_input,
+                                                       in_tokens,
+                                                       mode,
+                                                       random_seed,
+                                                       preprocess_text_fn=None)
         self.no_entity_id = no_entity_id
 
     def _convert_to_features(self, example, qid):
@@ -1179,8 +1176,8 @@ class SequenceLabelingIterator(ClassifierIterator):
                                doc_span.length] + [self.no_entity_id]
 
             features.append(
-                Feature(
-                    src_ids=token_ids, label_ids=label, qid=qid, cal_loss=1))
+                Feature(src_ids=token_ids, label_ids=label, qid=qid,
+                        cal_loss=1))
 
         if self.repeat_input:
             features_repeat = features
@@ -1209,8 +1206,8 @@ class SequenceLabelingIterator(ClassifierIterator):
                 [-1, 1])
             need_cal_loss = np.array([1]).astype("int64")
         else:
-            batch_gather_idx = np.array(list(range(len(batch_records)))).astype(
-                "int64").reshape([-1, 1])
+            batch_gather_idx = np.array(list(range(
+                len(batch_records)))).astype("int64").reshape([-1, 1])
             need_cal_loss = np.array([0]).astype("int64")
         # Padding
         padded_token_ids, input_mask = pad_batch_data(

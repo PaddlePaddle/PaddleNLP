@@ -43,7 +43,8 @@ def get_args():
         "--ckpt_path",
         default=None,
         type=str,
-        required=True, )
+        required=True,
+    )
     parser.add_argument(
         "--task_name",
         type=str,
@@ -53,19 +54,23 @@ def get_args():
         ],
         default="cola",
         required=True,
-        help="task_name.", )
+        help="task_name.",
+    )
 
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
+        help="Batch size per GPU/CPU for training.",
+    )
     args = parser.parse_args()
     args.task_name = args.task_name.lower()
     return args
@@ -75,7 +80,8 @@ def predict(data_loader, model, id2label=None):
     outputs = []
     progress_bar = tqdm(
         range(len(data_loader)),
-        desc="Predition Iteration", )
+        desc="Predition Iteration",
+    )
     with paddle.no_grad():
         for batch in data_loader:
             input_ids, segment_ids = batch
@@ -101,8 +107,7 @@ def predict2file(args):
         test_ds_matched, test_ds_mismatched = load_dataset(
             "glue", "mnli", splits=["test_matched", "test_mismatched"])
         id2label = dict(
-            zip(
-                range(len(test_ds_matched.label_list)),
+            zip(range(len(test_ds_matched.label_list)),
                 test_ds_matched.label_list))
     else:
         test_ds = load_dataset("glue", args.task_name, splits="test")
@@ -117,14 +122,16 @@ def predict2file(args):
     tokenizer = MPNetTokenizer.from_pretrained(args.ckpt_path)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id), ): fn(samples)
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+    ): fn(samples)
 
     trans_func = partial(
         convert_example,
         tokenizer=tokenizer,
         label_list=None,
         max_seq_length=args.max_seq_length,
-        is_test=True, )
+        is_test=True,
+    )
 
     if args.task_name == "mnli":
         test_ds_matched = test_ds_matched.map(trans_func, lazy=True)
@@ -136,7 +143,8 @@ def predict2file(args):
             batch_sampler=test_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=2,
-            return_list=True, )
+            return_list=True,
+        )
         test_batch_sampler_mismatched = paddle.io.BatchSampler(
             test_ds_mismatched, batch_size=args.batch_size, shuffle=False)
         test_data_loader_mismatched = DataLoader(
@@ -144,7 +152,8 @@ def predict2file(args):
             batch_sampler=test_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=2,
-            return_list=True, )
+            return_list=True,
+        )
         file_m = os.path.join("template", task2filename[args.task_name][0])
         file_mm = os.path.join("template", task2filename[args.task_name][1])
         matched_outputs = predict(test_data_loader_matched, model, id2label)
@@ -154,14 +163,16 @@ def predict2file(args):
         writetsv(mismatched_outputs, file_mm)
     else:
         test_ds = test_ds.map(trans_func, lazy=True)
-        test_batch_sampler = paddle.io.BatchSampler(
-            test_ds, batch_size=args.batch_size, shuffle=False)
+        test_batch_sampler = paddle.io.BatchSampler(test_ds,
+                                                    batch_size=args.batch_size,
+                                                    shuffle=False)
         test_data_loader = DataLoader(
             dataset=test_ds,
             batch_sampler=test_batch_sampler,
             collate_fn=batchify_fn,
             num_workers=2,
-            return_list=True, )
+            return_list=True,
+        )
         predict_outputs = predict(test_data_loader, model, id2label)
 
         file = os.path.join("template", task2filename[args.task_name])

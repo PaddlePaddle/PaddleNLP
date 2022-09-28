@@ -72,19 +72,21 @@ class MsraNer(datasets.GeneratorBasedBuilder):
     """MSRA NER dataset."""
 
     BUILDER_CONFIGS = [
-        MsraNerConfig(
-            name="msra_ner",
-            version=datasets.Version("1.0.0"),
-            description="MSRA NER dataset"),
+        MsraNerConfig(name="msra_ner",
+                      version=datasets.Version("1.0.0"),
+                      description="MSRA NER dataset"),
     ]
 
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features({
-                "id": datasets.Value("string"),
-                "tokens": datasets.Sequence(datasets.Value("string")),
-                "ner_tags": datasets.Sequence(
+                "id":
+                datasets.Value("string"),
+                "tokens":
+                datasets.Sequence(datasets.Value("string")),
+                "ner_tags":
+                datasets.Sequence(
                     datasets.features.ClassLabel(names=[
                         "O",
                         "B-PER",
@@ -96,8 +98,10 @@ class MsraNer(datasets.GeneratorBasedBuilder):
                     ])),
             }),
             supervised_keys=None,
-            homepage="https://www.microsoft.com/en-us/download/details.aspx?id=52531",
-            citation=_CITATION, )
+            homepage=
+            "https://www.microsoft.com/en-us/download/details.aspx?id=52531",
+            citation=_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         """Returns SplitGenerators."""

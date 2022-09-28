@@ -71,15 +71,15 @@ class LinearChainCrf(nn.Layer):
         if self._initial_alpha is None or batch_size > self._initial_alpha.shape[
                 0]:
             # Initialized by a small value.
-            initial_alpha = paddle.full(
-                (batch_size, self.num_tags - 1),
-                dtype='float32',
-                fill_value=-10000.)
+            initial_alpha = paddle.full((batch_size, self.num_tags - 1),
+                                        dtype='float32',
+                                        fill_value=-10000.)
             # alpha_start fill_value = 0. > -10000., means the first one step START gets the most score.
-            alpha_start = paddle.full(
-                (batch_size, 1), dtype='float32', fill_value=0.)
-            self._initial_alpha = paddle.concat(
-                [initial_alpha, alpha_start], axis=1)
+            alpha_start = paddle.full((batch_size, 1),
+                                      dtype='float32',
+                                      fill_value=0.)
+            self._initial_alpha = paddle.concat([initial_alpha, alpha_start],
+                                                axis=1)
         return self._initial_alpha[:batch_size, :]
 
     def forward(self, inputs, lengths):
@@ -180,9 +180,8 @@ class LinearChainCrf(nn.Layer):
             [batch_size, seq_len])
 
         mask = paddle.cast(
-            sequence_mask(
-                self._get_batch_seq_index(batch_size, seq_len), lengths),
-            'float32')
+            sequence_mask(self._get_batch_seq_index(batch_size, seq_len),
+                          lengths), 'float32')
         mask = mask[:, :seq_len]
 
         mask_scores = scores * mask
@@ -195,22 +194,19 @@ class LinearChainCrf(nn.Layer):
         if self.with_start_stop_tag:
             # Add START and STOP on either side of the labels
             start_tensor, stop_tensor = self._get_start_stop_tensor(batch_size)
-            labels_ext = paddle.concat(
-                [start_tensor, labels, stop_tensor], axis=1)
+            labels_ext = paddle.concat([start_tensor, labels, stop_tensor],
+                                       axis=1)
             mask = paddle.cast(
-                sequence_mask(
-                    self._get_batch_seq_index(batch_size, seq_len),
-                    lengths + 1), 'int64')
-            pad_stop = paddle.full(
-                (batch_size, seq_len + 2),
-                dtype='int64',
-                fill_value=self.stop_idx)
+                sequence_mask(self._get_batch_seq_index(batch_size, seq_len),
+                              lengths + 1), 'int64')
+            pad_stop = paddle.full((batch_size, seq_len + 2),
+                                   dtype='int64',
+                                   fill_value=self.stop_idx)
             labels_ext = (1 - mask) * pad_stop + mask * labels_ext
         else:
             mask = paddle.cast(
-                sequence_mask(
-                    self._get_batch_seq_index(batch_size, seq_len), lengths),
-                'int64')
+                sequence_mask(self._get_batch_seq_index(batch_size, seq_len),
+                              lengths), 'int64')
             labels_ext = labels
 
         start_tag_indices = labels_ext[:, :-1]
@@ -220,9 +216,9 @@ class LinearChainCrf(nn.Layer):
         transition_indices = start_tag_indices * self.num_tags + stop_tag_indices
         flattened_transition_indices = transition_indices.reshape([-1])
         flattened_transition_params = paddle.flatten(self.transitions)
-        scores = paddle.gather(
-            flattened_transition_params,
-            flattened_transition_indices).reshape([batch_size, -1])
+        scores = paddle.gather(flattened_transition_params,
+                               flattened_transition_indices).reshape(
+                                   [batch_size, -1])
         mask_scores = scores * mask[:, 1:]
 
         # Accumulate the transition score
@@ -233,15 +229,16 @@ class LinearChainCrf(nn.Layer):
     def _get_start_stop_tensor(self, batch_size):
         if self._start_tensor is None or self._stop_tensor is None or batch_size != self._start_tensor.shape[
                 0]:
-            self._start_tensor = paddle.full(
-                (batch_size, 1), dtype='int64', fill_value=self.start_idx)
-            self._stop_tensor = paddle.full(
-                (batch_size, 1), dtype='int64', fill_value=self.stop_idx)
+            self._start_tensor = paddle.full((batch_size, 1),
+                                             dtype='int64',
+                                             fill_value=self.start_idx)
+            self._stop_tensor = paddle.full((batch_size, 1),
+                                            dtype='int64',
+                                            fill_value=self.stop_idx)
         return self._start_tensor, self._stop_tensor
 
     def _get_batch_index(self, batch_size):
-        if self._batch_index is None or batch_size != self._batch_index.shape[
-                0]:
+        if self._batch_index is None or batch_size != self._batch_index.shape[0]:
             self._batch_index = paddle.arange(end=batch_size, dtype="int64")
         return self._batch_index
 
@@ -273,7 +270,7 @@ class LinearChainCrfLoss(nn.Layer):
     def __init__(self, crf):
         super(LinearChainCrfLoss, self).__init__()
         self.crf = crf
-        if isinstance(crf, paddle.fluid.framework.ParamBase):
+        if isinstance(crf, paddle.Tensor):
             raise ValueError(
                 "From paddlenlp >= 2.0.0b4, the first param of LinearChainCrfLoss shoule be a LinearChainCrf object. For input parameter 'crf.transitions', you can remove '.transitions' to 'crf'"
             )
@@ -306,8 +303,8 @@ class LinearChainCrfLoss(nn.Layer):
                 )
                 self.has_warn = True
         loss = nn.functional.relu(
-            self.crf.forward(inputs, lengths) - self.crf.gold_score(
-                inputs, labels, lengths))
+            self.crf.forward(inputs, lengths) -
+            self.crf.gold_score(inputs, labels, lengths))
         return loss
 
 
@@ -344,17 +341,19 @@ class ViterbiDecoder(nn.Layer):
         if self._initial_alpha is None or batch_size > paddle.shape(
                 self._initial_alpha)[0]:
             # Initialized by a small value.
-            initial_alpha = paddle.full(
-                [batch_size, self.num_tags - 1],
-                dtype='float32',
-                fill_value=-10000.)
+            initial_alpha = paddle.full([batch_size, self.num_tags - 1],
+                                        dtype='float32',
+                                        fill_value=-10000.)
             # alpha_start fill_value = 0. > -10000., means the first one step START gets the most score.
-            alpha_start = paddle.full(
-                [batch_size, 1], dtype='float32', fill_value=0.)
-            self._initial_alpha = paddle.concat(
-                [initial_alpha, alpha_start], axis=1)
-        return paddle.slice(
-            self._initial_alpha, axes=[0], starts=[0], ends=[batch_size])
+            alpha_start = paddle.full([batch_size, 1],
+                                      dtype='float32',
+                                      fill_value=0.)
+            self._initial_alpha = paddle.concat([initial_alpha, alpha_start],
+                                                axis=1)
+        return paddle.slice(self._initial_alpha,
+                            axes=[0],
+                            starts=[0],
+                            ends=[batch_size])
 
     def forward(self, inputs, lengths):
         """
@@ -384,7 +383,7 @@ class ViterbiDecoder(nn.Layer):
         historys = []
         left_length = lengths.clone()
         max_seq_len = left_length.max()
-        # no need to expand the 'mask' in the following iteration 
+        # no need to expand the 'mask' in the following iteration
         left_length = left_length.unsqueeze(-1).expand([batch_size, n_label])
 
         if self.with_start_stop_tag:
@@ -404,7 +403,7 @@ class ViterbiDecoder(nn.Layer):
             # alpha_max: batch_size, n_labels
             # We don't include the emission scores here because the max does not depend on them (we add them in below)
             alpha_max = alpha_trn_sum.max(1)
-            # If with_start_stop_tag, the first antecedent tag must be START, else the first label has not antecedent tag. 
+            # If with_start_stop_tag, the first antecedent tag must be START, else the first label has not antecedent tag.
             # So we can record the path from i=1.
             if i >= 1:
                 alpha_argmax = alpha_trn_sum.argmax(1)
@@ -443,8 +442,8 @@ class ViterbiDecoder(nn.Layer):
             last_ids_update = paddle.gather(hist.flatten(),
                                             gather_idx) * tag_mask
             zero_len_mask = paddle.cast((left_length == 0), 'int64')
-            last_ids_update = last_ids_update * (1 - zero_len_mask
-                                                 ) + last_ids * zero_len_mask
+            last_ids_update = last_ids_update * (
+                1 - zero_len_mask) + last_ids * zero_len_mask
             batch_path.append(last_ids_update)
             tag_mask = paddle.cast((left_length >= 0), 'int64')
             last_ids = last_ids_update + last_ids * (1 - tag_mask)

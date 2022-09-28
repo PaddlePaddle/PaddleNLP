@@ -44,8 +44,9 @@ class ErnieForCSC(nn.Layer):
         self.pad_token_id = self.ernie.config["pad_token_id"]
         self.pinyin_vocab_size = pinyin_vocab_size
         self.pad_pinyin_id = pad_pinyin_id
-        self.pinyin_embeddings = nn.Embedding(
-            self.pinyin_vocab_size, emb_size, padding_idx=pad_pinyin_id)
+        self.pinyin_embeddings = nn.Embedding(self.pinyin_vocab_size,
+                                              emb_size,
+                                              padding_idx=pad_pinyin_id)
         self.detection_layer = nn.Linear(hidden_size, 2)
         self.correction_layer = nn.Linear(hidden_size, vocab_size)
         self.softmax = nn.Softmax()
@@ -104,19 +105,18 @@ class ErnieForCSC(nn.Layer):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.detection_layer.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.detection_layer.weight.dtype) * -1e4,
                 axis=[1, 2])
 
-        embedding_output = self.ernie.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        embedding_output = self.ernie.embeddings(input_ids=input_ids,
+                                                 position_ids=position_ids,
+                                                 token_type_ids=token_type_ids)
         pinyin_embedding_output = self.pinyin_embeddings(pinyin_ids)
 
         # Detection module aims to detect whether each Chinese charater has spelling error.
         detection_outputs = self.ernie.encoder(embedding_output, attention_mask)
-        # detection_error_probs shape: [B, T, 2]. It indicates the erroneous probablity of each 
+        # detection_error_probs shape: [B, T, 2]. It indicates the erroneous probablity of each
         # word in the sequence from 0 to 1.
         detection_error_probs = self.softmax(
             self.detection_layer(detection_outputs))
@@ -126,7 +126,7 @@ class ErnieForCSC(nn.Layer):
 
         correction_outputs = self.ernie.encoder(word_pinyin_embedding_output,
                                                 attention_mask)
-        # correction_logits shape: [B, T, V]. It indicates the correct score of each token in vocab 
+        # correction_logits shape: [B, T, V]. It indicates the correct score of each token in vocab
         # according to each word in the sequence.
         correction_logits = self.correction_layer(correction_outputs)
 

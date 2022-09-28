@@ -20,6 +20,7 @@ from . import vocabulary as vocab
 
 
 class UtteranceItem():
+
     def __init__(self, interaction, index):
         self.interaction = interaction
         self.utterance_index = index
@@ -67,16 +68,14 @@ class UtteranceItem():
 
     def original_gold_queries(self):
         return [
-            q[0]
-            for q in self.interaction.utterances[self.utterance_index]
-            .all_gold_queries
+            q[0] for q in self.interaction.utterances[
+                self.utterance_index].all_gold_queries
         ]
 
     def gold_tables(self):
         return [
-            q[1]
-            for q in self.interaction.utterances[self.utterance_index]
-            .all_gold_queries
+            q[1] for q in self.interaction.utterances[
+                self.utterance_index].all_gold_queries
         ]
 
     def gold_query(self):
@@ -125,6 +124,7 @@ class UtteranceItem():
 
 
 class UtteranceBatch():
+
     def __init__(self, items):
         self.items = items
 
@@ -144,6 +144,7 @@ class UtteranceBatch():
 
 
 class PredUtteranceItem():
+
     def __init__(self, input_sequence, interaction_item, previous_query, index,
                  available_snippets):
         self.input_seq_to_use = input_sequence
@@ -159,8 +160,8 @@ class PredUtteranceItem():
         if maximum == 0:
             return histories
         histories = []
-        for utterance in self.interaction_item.processed_utterances[:
-                                                                    self.index]:
+        for utterance in self.interaction_item.processed_utterances[:self.
+                                                                    index]:
             histories.append(utterance.input_sequence())
         if len(histories) > maximum:
             histories = histories[-maximum:]
@@ -184,6 +185,7 @@ class PredUtteranceItem():
 
 
 class InteractionItem():
+
     def __init__(self,
                  interaction,
                  max_input_length=float('inf'),
@@ -275,10 +277,9 @@ class InteractionItem():
                       previous_snippets=[],
                       simple=False):
         if not snippets:
-            self.add_snippets(
-                predicted_sequence,
-                previous_snippets=previous_snippets,
-                simple=simple)
+            self.add_snippets(predicted_sequence,
+                              previous_snippets=previous_snippets,
+                              simple=simple)
         else:
             for snippet in snippets:
                 snippet.assign_id(len(self.snippet_bank))
@@ -294,8 +295,8 @@ class InteractionItem():
                 snippets = sql_util.get_subtrees_simple(
                     sequence, oldsnippets=previous_snippets)
             else:
-                snippets = sql_util.get_subtrees(
-                    sequence, oldsnippets=previous_snippets)
+                snippets = sql_util.get_subtrees(sequence,
+                                                 oldsnippets=previous_snippets)
             for snippet in snippets:
                 snippet.assign_id(len(self.snippet_bank))
                 self.snippet_bank.append(snippet)
@@ -342,6 +343,7 @@ class InteractionItem():
 
 
 class InteractionBatch():
+
     def __init__(self, items):
         self.items = items
 

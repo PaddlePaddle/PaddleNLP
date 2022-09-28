@@ -32,11 +32,10 @@ def parse_args():
         default="plato-xl",
         type=str,
         help="The model name to specify the PLATO/UnifiedTransformer to use. ")
-    parser.add_argument(
-        "--inference_model_dir",
-        default="./infer_model/",
-        type=str,
-        help="Path to save inference model of gpt. ")
+    parser.add_argument("--inference_model_dir",
+                        default="./infer_model/",
+                        type=str,
+                        help="Path to save inference model of gpt. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -47,40 +46,39 @@ def parse_args():
         default=1.0,
         type=float,
         help="The probability threshold to procedure top_p sampling. ")
-    parser.add_argument(
-        "--max_out_len", default=64, type=int, help="Maximum output length. ")
-    parser.add_argument(
-        "--min_out_len", default=1, type=int, help="Minimum output length. ")
-    parser.add_argument(
-        "--temperature",
-        default=1.0,
-        type=float,
-        help="The temperature to set. ")
-    parser.add_argument(
-        "--num_return_sequences",
-        default=1,
-        type=int,
-        help="The number of returned sequences. ")
-    parser.add_argument(
-        "--use_fp16_decoding",
-        action="store_true",
-        help="Whether to use fp16 decoding to predict. ")
-    parser.add_argument(
-        "--decoding_strategy",
-        default="sampling",
-        choices=["sampling", "beam_search"],
-        type=str,
-        help="The main strategy to decode. ")
+    parser.add_argument("--max_out_len",
+                        default=64,
+                        type=int,
+                        help="Maximum output length. ")
+    parser.add_argument("--min_out_len",
+                        default=1,
+                        type=int,
+                        help="Minimum output length. ")
+    parser.add_argument("--temperature",
+                        default=1.0,
+                        type=float,
+                        help="The temperature to set. ")
+    parser.add_argument("--num_return_sequences",
+                        default=1,
+                        type=int,
+                        help="The number of returned sequences. ")
+    parser.add_argument("--use_fp16_decoding",
+                        action="store_true",
+                        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--decoding_strategy",
+                        default="sampling",
+                        choices=["sampling", "beam_search"],
+                        type=str,
+                        help="The main strategy to decode. ")
     parser.add_argument(
         "--num_beams",
         default=4,
         type=int,
         help="The number of candidate to procedure beam search. ")
-    parser.add_argument(
-        "--diversity_rate",
-        default=0.0,
-        type=float,
-        help="The diversity rate to procedure beam search. ")
+    parser.add_argument("--diversity_rate",
+                        default=0.0,
+                        type=float,
+                        help="The diversity rate to procedure beam search. ")
 
     args = parser.parse_args()
     return args
@@ -94,37 +92,32 @@ def do_predict(args):
         paddle.set_default_dtype("float16")
 
     model_name = 'plato-xl'
-    model = UnifiedTransformerLMHeadModel.from_pretrained(
-        model_name, load_state_as_np=True)
+    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name,
+                                                          load_state_as_np=True)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 
-    plato = FasterUnifiedTransformer(
-        model=model, use_fp16_decoding=args.use_fp16_decoding)
+    plato = FasterUnifiedTransformer(model=model,
+                                     use_fp16_decoding=args.use_fp16_decoding)
     # Set evaluate mode
     plato.eval()
 
-    # Convert dygraph model to static graph model 
+    # Convert dygraph model to static graph model
     plato = paddle.jit.to_static(
         plato,
         input_spec=[
             # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
             # token_type_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
             # attention_mask
-            paddle.static.InputSpec(
-                shape=[None, 1, None, None], dtype="float32"),
+            paddle.static.InputSpec(shape=[None, 1, None, None],
+                                    dtype="float32"),
             # seq_len
-            paddle.static.InputSpec(
-                shape=[None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None], dtype="int32"),
             # role_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
             # position_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
             args.max_out_len,
             args.min_out_len,
             args.topk,

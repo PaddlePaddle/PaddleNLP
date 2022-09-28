@@ -32,10 +32,9 @@ def build_index(args, data_loader, model):
     #
     # M - is tightly connected with internal dimensionality of the data. Strongly affects memory consumption (~M)
     # Higher M leads to higher accuracy/run_time at fixed ef/efConstruction
-    index.init_index(
-        max_elements=args.hnsw_max_elements,
-        ef_construction=args.hnsw_ef,
-        M=args.hnsw_m)
+    index.init_index(max_elements=args.hnsw_max_elements,
+                     ef_construction=args.hnsw_ef,
+                     M=args.hnsw_m)
 
     # Controlling the recall by setting ef:
     # higher ef leads to better accuracy, but slower search

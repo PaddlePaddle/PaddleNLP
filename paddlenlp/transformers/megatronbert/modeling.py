@@ -82,7 +82,6 @@ class MegatronBertPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "megatronbert-cased": {
             "attention_probs_dropout_prob": 0.1,
@@ -113,7 +112,6 @@ class MegatronBertPretrainedModel(PretrainedModel):
             "pad_token_id": 0
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "megatronbert-cased":
@@ -134,8 +132,8 @@ class MegatronBertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
+                    std=self.initializer_range if hasattr(
+                        self, "initializer_range") else
                     self.megatronbert.config["initializer_range"],
                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
@@ -154,8 +152,9 @@ class MegatronBertEmbeddings(nn.Layer):
                  hidden_dropout_prob=0.1,
                  position_embedding_type="absolute"):
         super(MegatronBertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -181,8 +180,8 @@ class MegatronBertEmbeddings(nn.Layer):
         seq_length = input_shape[1]
 
         if position_ids is None:
-            position_ids = self.position_ids[:, past_key_values_length:
-                                             seq_length +
+            position_ids = self.position_ids[:,
+                                             past_key_values_length:seq_length +
                                              past_key_values_length]
 
         if token_type_ids is None:
@@ -202,6 +201,7 @@ class MegatronBertEmbeddings(nn.Layer):
 
 
 class MegatronBertSelfAttention(nn.Layer):
+
     def __init__(self,
                  hidden_size=1024,
                  num_attention_heads=16,
@@ -244,10 +244,10 @@ class MegatronBertSelfAttention(nn.Layer):
 
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
             seq_length = hidden_states.shape[1]
-            position_ids_l = paddle.arange(
-                end=seq_length, dtype='int64').reshape((-1, 1))
-            position_ids_r = paddle.arange(
-                end=seq_length, dtype='int64').reshape((1, -1))
+            position_ids_l = paddle.arange(end=seq_length,
+                                           dtype='int64').reshape((-1, 1))
+            position_ids_r = paddle.arange(end=seq_length,
+                                           dtype='int64').reshape((1, -1))
             distance = position_ids_l - position_ids_r
             positional_embedding = self.distance_embedding(
                 distance + self.max_position_embeddings - 1)
@@ -257,10 +257,12 @@ class MegatronBertSelfAttention(nn.Layer):
                                                   positional_embedding)
                 attention_scores = attention_scores + relative_position_scores
             elif self.position_embedding_type == "relative_key_query":
-                relative_position_scores_query = einsum(
-                    "bhld,lrd->bhlr", query_layer, positional_embedding)
-                relative_position_scores_key = einsum(
-                    "bhrd,lrd->bhlr", key_layer, positional_embedding)
+                relative_position_scores_query = einsum("bhld,lrd->bhlr",
+                                                        query_layer,
+                                                        positional_embedding)
+                relative_position_scores_key = einsum("bhrd,lrd->bhlr",
+                                                      key_layer,
+                                                      positional_embedding)
                 attention_scores = attention_scores + relative_position_scores_query + relative_position_scores_key
 
         attention_scores = attention_scores / math.sqrt(
@@ -288,10 +290,12 @@ class MegatronBertSelfAttention(nn.Layer):
 
 
 class MegatronBertSelfOutput(nn.Layer):
+
     def __init__(
-            self,
-            hidden_size=1024,
-            hidden_dropout_prob=0.1, ):
+        self,
+        hidden_size=1024,
+        hidden_dropout_prob=0.1,
+    ):
         super(MegatronBertSelfOutput, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
@@ -303,6 +307,7 @@ class MegatronBertSelfOutput(nn.Layer):
 
 
 class MegatronBertAttention(nn.Layer):
+
     def __init__(self,
                  hidden_size=1024,
                  num_attention_heads=16,
@@ -331,6 +336,7 @@ class MegatronBertAttention(nn.Layer):
 
 
 class MegatronBertIntermediate(nn.Layer):
+
     def __init__(self, hidden_size, intermediate_size, hidden_act):
         super(MegatronBertIntermediate, self).__init__()
         self.dense = nn.Linear(hidden_size, intermediate_size)
@@ -343,6 +349,7 @@ class MegatronBertIntermediate(nn.Layer):
 
 
 class MegatronBertOutput(nn.Layer):
+
     def __init__(self,
                  intermediate_size,
                  hidden_dropout_prob=0.1,
@@ -358,6 +365,7 @@ class MegatronBertOutput(nn.Layer):
 
 
 class MegatronBertLayer(nn.Layer):
+
     def __init__(self,
                  hidden_size=1024,
                  hidden_act="gelu",
@@ -406,6 +414,7 @@ class MegatronBertLayer(nn.Layer):
 
 
 class MegatronBertEncoder(nn.Layer):
+
     def __init__(self,
                  hidden_size=1024,
                  hidden_act="gelu",
@@ -447,6 +456,7 @@ class MegatronBertEncoder(nn.Layer):
 
 
 class MegatronBertPooler(nn.Layer):
+
     def __init__(self, hidden_size=1024):
         super(MegatronBertPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -642,8 +652,8 @@ class MegatronBertModel(MegatronBertPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
@@ -652,12 +662,11 @@ class MegatronBertModel(MegatronBertPretrainedModel):
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype='int64')
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(
-            embedding_output, attention_mask=attention_mask)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
+        encoder_outputs = self.encoder(embedding_output,
+                                       attention_mask=attention_mask)
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
 
@@ -683,11 +692,12 @@ class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-            self,
-            input_ids=None,
-            token_type_ids=None,
-            position_ids=None,
-            attention_mask=None, ):
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+    ):
         r"""
         The MegatronBertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -730,11 +740,10 @@ class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
                 end_logits  = outputs[1]
         """
 
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         sequence_output = outputs[0]
 
@@ -763,8 +772,8 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
         self.num_labels = num_labels
 
         self.megatronbert = megatronbert
-        self.dropout = nn.Dropout(self.megatronbert.config[
-            'hidden_dropout_prob'])
+        self.dropout = nn.Dropout(
+            self.megatronbert.config['hidden_dropout_prob'])
         self.classifier = nn.Linear(self.megatronbert.config['hidden_size'],
                                     num_labels)
 
@@ -804,11 +813,10 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         pooled_output = outputs[1]
 
@@ -819,6 +827,7 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
 
 
 class MegatronBertPredictionHeadTransform(nn.Layer):
+
     def __init__(self, hidden_size, hidden_act):
         super(MegatronBertPredictionHeadTransform, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -833,10 +842,11 @@ class MegatronBertPredictionHeadTransform(nn.Layer):
 
 
 class MegatronBertLMPredictionHead(nn.Layer):
+
     def __init__(self, hidden_size, vocab_size, hidden_act):
         super(MegatronBertLMPredictionHead, self).__init__()
-        self.transform = MegatronBertPredictionHeadTransform(hidden_size,
-                                                             hidden_act)
+        self.transform = MegatronBertPredictionHeadTransform(
+            hidden_size, hidden_act)
 
         # The output weights are the same as the input embeddings, but there is
         # an output-only bias for each token.
@@ -856,12 +866,12 @@ class MegatronBertLMPredictionHead(nn.Layer):
 
 
 class MegatronBertOnlyMLMHead(nn.Layer):
+
     def __init__(self, hidden_size, vocab_size, hidden_act):
         super(MegatronBertOnlyMLMHead, self).__init__()
-        self.predictions = MegatronBertLMPredictionHead(
-            hidden_size=hidden_size,
-            vocab_size=vocab_size,
-            hidden_act=hidden_act)
+        self.predictions = MegatronBertLMPredictionHead(hidden_size=hidden_size,
+                                                        vocab_size=vocab_size,
+                                                        hidden_act=hidden_act)
 
     def forward(self, sequence_output):
         prediction_scores = self.predictions(sequence_output)
@@ -869,6 +879,7 @@ class MegatronBertOnlyMLMHead(nn.Layer):
 
 
 class MegatronBertOnlyNSPHead(nn.Layer):
+
     def __init__(self, hidden_size):
         super(MegatronBertOnlyNSPHead, self).__init__()
         self.seq_relationship = nn.Linear(hidden_size, 2)
@@ -879,12 +890,12 @@ class MegatronBertOnlyNSPHead(nn.Layer):
 
 
 class MegatronBertPreTrainingHeads(nn.Layer):
+
     def __init__(self, hidden_size, vocab_size, hidden_act):
         super(MegatronBertPreTrainingHeads, self).__init__()
-        self.predictions = MegatronBertLMPredictionHead(
-            hidden_size=hidden_size,
-            vocab_size=vocab_size,
-            hidden_act=hidden_act)
+        self.predictions = MegatronBertLMPredictionHead(hidden_size=hidden_size,
+                                                        vocab_size=vocab_size,
+                                                        hidden_act=hidden_act)
         self.seq_relationship = nn.Linear(hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
@@ -959,15 +970,14 @@ class MegatronBertForPreTraining(MegatronBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 prediction_scores, seq_relationship_score = model(**inputs)
         """
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         sequence_output, pooled_output = outputs[:2]
-        prediction_scores, seq_relationship_score = self.cls(sequence_output,
-                                                             pooled_output)
+        prediction_scores, seq_relationship_score = self.cls(
+            sequence_output, pooled_output)
 
         output = (prediction_scores, seq_relationship_score)
         return output
@@ -1031,11 +1041,10 @@ class MegatronBertForCausalLM(MegatronBertPretrainedModel):
                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                prediction_scores = model(**inputs)
        """
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output)
@@ -1065,11 +1074,12 @@ class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-            self,
-            input_ids=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None, ):
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+    ):
         r"""
         The MegatronBertForMaskedLM forward method, overrides the __call__() special method.
 
@@ -1102,11 +1112,10 @@ class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
                prediction_scores = model(**inputs)
         """
 
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output)
@@ -1168,11 +1177,10 @@ class MegatronBertForNextSentencePrediction(MegatronBertPretrainedModel):
                seq_relationship_scores = model(**inputs)
         """
 
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         pooled_output = outputs[1]
 
@@ -1194,8 +1202,8 @@ class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
         super(MegatronBertForMultipleChoice, self).__init__()
 
         self.megatronbert = megatronbert
-        self.dropout = nn.Dropout(self.megatronbert.config[
-            'hidden_dropout_prob'])
+        self.dropout = nn.Dropout(
+            self.megatronbert.config['hidden_dropout_prob'])
         self.classifier = nn.Linear(self.megatronbert.config['hidden_size'], 1)
 
         # Initialize weights and apply final processing
@@ -1248,11 +1256,10 @@ class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
         position_ids = position_ids.reshape(
             (-1, position_ids.shape[-1])) if position_ids is not None else None
 
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         pooled_output = outputs[1]
 
@@ -1279,8 +1286,8 @@ class MegatronBertForTokenClassification(MegatronBertPretrainedModel):
         super(MegatronBertForTokenClassification, self).__init__()
         self.num_labels = num_labels
         self.megatronbert = megatronbert
-        self.dropout = nn.Dropout(self.megatronbert.config[
-            'hidden_dropout_prob'])
+        self.dropout = nn.Dropout(
+            self.megatronbert.config['hidden_dropout_prob'])
         self.classifier = nn.Linear(self.megatronbert.config['hidden_size'],
                                     self.num_labels)
         self.apply(self.init_weights)
@@ -1320,11 +1327,10 @@ class MegatronBertForTokenClassification(MegatronBertPretrainedModel):
                reshaped_logits = model(**inputs)
         """
 
-        outputs = self.megatronbert(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids)
+        outputs = self.megatronbert(input_ids,
+                                    attention_mask=attention_mask,
+                                    token_type_ids=token_type_ids,
+                                    position_ids=position_ids)
 
         sequence_output = outputs[0]
 

@@ -33,8 +33,8 @@ def _get_ppnlp_home():
                 return home_path
             else:
                 raise RuntimeError(
-                    'The environment variable PPNLP_HOME {} is not a directory.'.
-                    format(home_path))
+                    'The environment variable PPNLP_HOME {} is not a directory.'
+                    .format(home_path))
         else:
             return home_path
     return os.path.join(_get_user_home(), '.paddlenlp')
@@ -43,7 +43,7 @@ def _get_ppnlp_home():
 def _get_sub_home(directory, parent_home=_get_ppnlp_home()):
     home = os.path.join(parent_home, directory)
     if not os.path.exists(home):
-        os.makedirs(home)
+        os.makedirs(home, exist_ok=True)
     return home
 
 

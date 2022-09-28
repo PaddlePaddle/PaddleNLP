@@ -34,6 +34,7 @@ def is_integer(number):
 
 
 class CosineAnnealingWithWarmupDecay(LRScheduler):
+
     def __init__(self,
                  max_lr,
                  min_lr,
@@ -45,8 +46,8 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
         self.warmup_step = warmup_step
         self.max_lr = max_lr
         self.min_lr = min_lr
-        super(CosineAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch,
-                                                             verbose)
+        super(CosineAnnealingWithWarmupDecay,
+              self).__init__(max_lr, last_epoch, verbose)
 
     def get_lr(self):
         if self.warmup_step > 0 and self.last_epoch <= self.warmup_step:
@@ -63,6 +64,7 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
 
 
 class LinearAnnealingWithWarmupDecay(LRScheduler):
+
     def __init__(self,
                  max_lr,
                  min_lr,
@@ -75,8 +77,8 @@ class LinearAnnealingWithWarmupDecay(LRScheduler):
         self.warmup_step = warmup_step
         self.max_lr = max_lr
         self.min_lr = min_lr
-        super(LinearAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch,
-                                                             verbose)
+        super(LinearAnnealingWithWarmupDecay,
+              self).__init__(max_lr, last_epoch, verbose)
 
     def get_lr(self):
         if self.warmup_step > 0 and self.last_epoch <= self.warmup_step:
@@ -136,9 +138,10 @@ class LinearDecayWithWarmup(LambdaDecay):
         def lr_lambda(current_step):
             if current_step < warmup_steps:
                 return float(current_step) / float(max(1, warmup_steps))
-            return max(0.0,
-                       float(total_steps - current_step) /
-                       float(max(1, total_steps - warmup_steps)))
+            return max(
+                0.0,
+                float(total_steps - current_step) /
+                float(max(1, total_steps - warmup_steps)))
 
         super(LinearDecayWithWarmup, self).__init__(learning_rate, lr_lambda,
                                                     last_epoch, verbose)
@@ -268,11 +271,14 @@ class CosineDecayWithWarmup(LambdaDecay):
             if with_hard_restarts:
                 if progress >= 1.0:
                     return 0.0
-                return max(0.0, 0.5 * (1.0 + math.cos(math.pi * (
-                    (float(num_cycles) * progress) % 1.0))))
+                return max(
+                    0.0, 0.5 *
+                    (1.0 + math.cos(math.pi *
+                                    ((float(num_cycles) * progress) % 1.0))))
 
-            return max(0.0, 0.5 * (
-                1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+            return max(
+                0.0, 0.5 *
+                (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
         super(CosineDecayWithWarmup, self).__init__(learning_rate, lr_lambda,
                                                     last_epoch, verbose)

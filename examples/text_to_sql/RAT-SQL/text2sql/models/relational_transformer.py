@@ -33,21 +33,23 @@ def _build_linear(n_in, n_out, name=None, init=None):
     return nn.Linear(
         n_in,
         n_out,
-        weight_attr=paddle.ParamAttr(
-            name='%s.w_0' % name if name is not None else None,
-            initializer=init),
-        bias_attr='%s.b_0' % name if name is not None else None, )
+        weight_attr=paddle.ParamAttr(name='%s.w_0' %
+                                     name if name is not None else None,
+                                     initializer=init),
+        bias_attr='%s.b_0' % name if name is not None else None,
+    )
 
 
 def _build_ln(n_in, name):
     return nn.LayerNorm(
         normalized_shape=n_in,
-        weight_attr=paddle.ParamAttr(
-            name='%s_layer_norm_scale' % name if name is not None else None,
-            initializer=nn.initializer.Constant(1.)),
-        bias_attr=paddle.ParamAttr(
-            name='%s_layer_norm_bias' % name if name is not None else None,
-            initializer=nn.initializer.Constant(0.)), )
+        weight_attr=paddle.ParamAttr(name='%s_layer_norm_scale' %
+                                     name if name is not None else None,
+                                     initializer=nn.initializer.Constant(1.)),
+        bias_attr=paddle.ParamAttr(name='%s_layer_norm_bias' %
+                                   name if name is not None else None,
+                                   initializer=nn.initializer.Constant(0.)),
+    )
 
 
 def new_name(name, postfix):
@@ -154,6 +156,7 @@ def relative_attention_values(weight, value, relation):
 
 
 class RelationalAttentionLayer(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(RelationalAttentionLayer, self).__init__()
         initializer = nn.initializer.TruncatedNormal(
@@ -167,14 +170,14 @@ class RelationalAttentionLayer(nn.Layer):
                             d_model // n_head) * n_head
         self.n_head = n_head
         self.d_key = d_model_q // n_head
-        self.q = _build_linear(d_model, d_model_q,
-                               new_name(name, 'query_fc'), initializer)
-        self.k = _build_linear(d_model, d_model_q,
-                               new_name(name, 'key_fc'), initializer)
-        self.v = _build_linear(d_model, d_model_v,
-                               new_name(name, 'value_fc'), initializer)
-        self.o = _build_linear(d_model_v, d_model,
-                               new_name(name, 'output_fc'), initializer)
+        self.q = _build_linear(d_model, d_model_q, new_name(name, 'query_fc'),
+                               initializer)
+        self.k = _build_linear(d_model, d_model_q, new_name(name, 'key_fc'),
+                               initializer)
+        self.v = _build_linear(d_model, d_model_v, new_name(name, 'value_fc'),
+                               initializer)
+        self.o = _build_linear(d_model_v, d_model, new_name(name, 'output_fc'),
+                               initializer)
         self.dropout = nn.Dropout(p=cfg['attention_probs_dropout_prob'])
 
     def forward(self,
@@ -312,6 +315,7 @@ class RelationalPointerNet(nn.Layer):
 
 
 class PositionwiseFeedForwardLayer(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(PositionwiseFeedForwardLayer, self).__init__()
         initializer = nn.initializer.TruncatedNormal(
@@ -323,9 +327,10 @@ class PositionwiseFeedForwardLayer(nn.Layer):
             d_model,
             d_ffn,
             new_name(name, 'fc_0'),
-            initializer, )
-        self.o = _build_linear(d_ffn, d_model,
-                               new_name(name, 'fc_1'), initializer)
+            initializer,
+        )
+        self.o = _build_linear(d_ffn, d_model, new_name(name, 'fc_1'),
+                               initializer)
         prob = cfg.get('intermediate_dropout_prob', 0.)
         self.dropout = nn.Dropout(p=prob)
 
@@ -343,8 +348,9 @@ class RelationalTransformerBlock(nn.Layer):
         super(RelationalTransformerBlock, self).__init__()
         d_model = cfg['hidden_size']
         n_heads = cfg['num_attention_heads']
-        self.attn = RelationalAttentionLayer(
-            cfg, name=new_name(name, 'multi_head_att'))
+        self.attn = RelationalAttentionLayer(cfg,
+                                             name=new_name(
+                                                 name, 'multi_head_att'))
         self.ln1 = _build_ln(d_model, name=new_name(name, 'post_att'))
         self.ffn = PositionwiseFeedForwardLayer(cfg, name=new_name(name, 'ffn'))
         self.ln2 = _build_ln(d_model, name=new_name(name, 'post_ffn'))
@@ -360,14 +366,13 @@ class RelationalTransformerBlock(nn.Layer):
         relation_k = self.relation_k_emb(relations)
         relation_v = self.relation_k_emb(relations)
 
-        attn_out, cache = self.attn(
-            inputs,
-            inputs,
-            inputs,
-            relation_k,
-            relation_v,
-            attn_bias,
-            past_cache=past_cache)  #self attn
+        attn_out, cache = self.attn(inputs,
+                                    inputs,
+                                    inputs,
+                                    relation_k,
+                                    relation_v,
+                                    attn_bias,
+                                    past_cache=past_cache)  #self attn
         attn_out = self.dropout(attn_out)
         hidden = attn_out + inputs
         hidden = self.ln1(hidden)  # dropout/ add/ norm
@@ -380,6 +385,7 @@ class RelationalTransformerBlock(nn.Layer):
 
 
 class RelationalTransformerEncoder(nn.Layer):
+
     def __init__(self, cfg, name=None):
         super(RelationalTransformerEncoder, self).__init__()
         n_layers = cfg['num_hidden_layers']
@@ -438,9 +444,9 @@ if __name__ == "__main__":
 
     model = RelationalTransformerEncoder(cfg)
     print(model)
-    inputs = paddle.to_tensor(
-        list(range(24)), dtype='float32').reshape([2, 3, 4])
-    relations = paddle.to_tensor(
-        list(range(18)), dtype='int64').reshape([2, 3, 3])
+    inputs = paddle.to_tensor(list(range(24)),
+                              dtype='float32').reshape([2, 3, 4])
+    relations = paddle.to_tensor(list(range(18)),
+                                 dtype='int64').reshape([2, 3, 3])
     hidden, _, _ = model(inputs, relations)
     print(hidden)

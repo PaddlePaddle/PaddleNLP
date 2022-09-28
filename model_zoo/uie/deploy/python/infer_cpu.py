@@ -27,18 +27,25 @@ def parse_args():
         "--model_path_prefix",
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--position_prob",
         default=0.5,
         type=float,
-        help="Probability threshold for start/end index probabiliry.", )
+        help="Probability threshold for start/end index probabiliry.",
+    )
     parser.add_argument(
         "--max_seq_len",
         default=512,
         type=int,
-        help="The maximum input sequence length. Sequences longer than this will be split automatically.",
+        help=
+        "The maximum input sequence length. Sequences longer than this will be split automatically.",
     )
+    parser.add_argument("--batch_size",
+                        default=4,
+                        type=int,
+                        help="Batch size per CPU for inference.")
     args = parser.parse_args()
     return args
 

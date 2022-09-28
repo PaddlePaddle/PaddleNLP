@@ -60,8 +60,10 @@ class MrpcProcessor(object):
             text_b = tokenization(line[2])['input_ids']
             label = int(line[3])
             examples.append(
-                InputExample(
-                    guid=guid, text_a=text_a, text_b=text_b, label=label))
+                InputExample(guid=guid,
+                             text_a=text_a,
+                             text_b=text_b,
+                             label=label))
         return examples
 
     @classmethod
@@ -107,8 +109,10 @@ class XNLIProcessor(object):
                 text_b = tokenization(text_b)['input_ids']
                 label = self.get_labels().index(line[2].strip())
                 examples.append(
-                    InputExample(
-                        guid=guid, text_a=text_a, text_b=text_b, label=label))
+                    InputExample(guid=guid,
+                                 text_a=text_a,
+                                 text_b=text_b,
+                                 label=label))
             else:
                 text_a = ' '.join(line[6].strip().split(' '))
                 text_b = ' '.join(line[7].strip().split(' '))
@@ -118,8 +122,10 @@ class XNLIProcessor(object):
                 text_a = tokenization(text_a)['input_ids']
                 text_b = tokenization(text_b)['input_ids']
                 examples.append(
-                    InputExample(
-                        guid=guid, text_a=text_a, text_b=text_b, label=label))
+                    InputExample(guid=guid,
+                                 text_a=text_a,
+                                 text_b=text_b,
+                                 label=label))
         return examples
 
     @classmethod
@@ -147,12 +153,11 @@ class DataGenerator(Dataset):
         text_b_token_type_ids = [1] * len(text_b)
         label = [self.features[item].label]
 
-        return dict(
-            text_a=text_a,
-            text_b=text_b,
-            text_a_token_type_ids=text_a_token_type_ids,
-            text_b_token_type_ids=text_b_token_type_ids,
-            label=label)
+        return dict(text_a=text_a,
+                    text_b=text_b,
+                    text_a_token_type_ids=text_a_token_type_ids,
+                    text_b_token_type_ids=text_b_token_type_ids,
+                    label=label)
 
     def __len__(self):
         return len(self.features)

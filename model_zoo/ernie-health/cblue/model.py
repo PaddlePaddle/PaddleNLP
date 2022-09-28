@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
 import paddle.nn as nn
 from paddlenlp.transformers import ElectraPretrainedModel
@@ -25,8 +39,8 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
         self.num_classes_oth = num_classes[0]
         self.num_classes_sym = num_classes[1]
         self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.electra.config['hidden_dropout_prob'])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  electra.config['hidden_dropout_prob'])
         self.classifier_oth = nn.Linear(self.electra.config['hidden_size'],
                                         self.num_classes_oth)
         self.classifier_sym = nn.Linear(self.electra.config['hidden_size'],
@@ -94,8 +108,8 @@ class ElectraForSPO(ElectraPretrainedModel):
         super(ElectraForSPO, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.electra.config['hidden_dropout_prob'])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  electra.config['hidden_dropout_prob'])
         self.classifier = nn.Linear(self.electra.config['hidden_size'], 2)
         self.span_attention = MultiHeadAttentionForSPO(
             self.electra.config['hidden_size'], num_classes)

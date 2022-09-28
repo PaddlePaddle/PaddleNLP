@@ -59,6 +59,7 @@ def preprocess_prediction_data(text, tokenizer):
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -112,7 +113,8 @@ class Predictor(object):
             examples.append((input_id, seq_len))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)),  # input_id
+            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)
+                ),  # input_id
             Stack()  # seq_len
         ): fn(samples)
 
@@ -157,11 +159,10 @@ if __name__ == "__main__":
     tokenizer = JiebaTokenizer(vocab)
     label_map = {0: 'negative', 1: 'positive'}
 
-    results = predictor.predict(
-        data,
-        tokenizer,
-        label_map,
-        batch_size=args.batch_size,
-        network=args.network)
+    results = predictor.predict(data,
+                                tokenizer,
+                                label_map,
+                                batch_size=args.batch_size,
+                                network=args.network)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

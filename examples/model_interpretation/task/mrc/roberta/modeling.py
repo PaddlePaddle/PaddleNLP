@@ -18,8 +18,10 @@ import paddle.nn as nn
 import numpy as np
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
 sys.path.append('../..')
 from task.transformer import TransformerEncoderLayer, TransformerEncoder
+
 sys.path.remove('../..')
 
 __all__ = [
@@ -44,8 +46,9 @@ class RobertaEmbeddings(nn.Layer):
                  type_vocab_size=16,
                  pad_token_id=0):
         super(RobertaEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
@@ -73,6 +76,7 @@ class RobertaEmbeddings(nn.Layer):
 
 
 class RobertaPooler(nn.Layer):
+
     def __init__(self, hidden_size):
         super(RobertaPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -177,12 +181,11 @@ class RobertaPretrainedModel(PretrainedModel):
             # only support dygraph, use truncated_normal and make it inplace
             # and configurable later
             layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
-                    self.roberta.config["initializer_range"],
-                    shape=layer.weight.shape))
+                paddle.tensor.normal(mean=0.0,
+                                     std=self.initializer_range if hasattr(
+                                         self, "initializer_range") else
+                                     self.roberta.config["initializer_range"],
+                                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -260,9 +263,10 @@ class RobertaModel(RobertaPretrainedModel):
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = RobertaEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id)
+        self.embeddings = RobertaEmbeddings(vocab_size, hidden_size,
+                                            hidden_dropout_prob,
+                                            max_position_embeddings,
+                                            type_vocab_size, pad_token_id)
         encoder_layer = TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -345,20 +349,19 @@ class RobertaModel(RobertaPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e9,
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e9,
                 axis=[1, 2])
         # CLS: 101; SEP: 102; PAD: 0
-        baseline_ids = paddle.to_tensor(
-            [101] + [0] * (input_ids.shape[1] - 2) + [102],
-            dtype=input_ids.dtype,
-            place=input_ids.place,
-            stop_gradient=input_ids.stop_gradient)
+        baseline_ids = paddle.to_tensor([101] + [0] * (input_ids.shape[1] - 2) +
+                                        [102],
+                                        dtype=input_ids.dtype,
+                                        place=input_ids.place,
+                                        stop_gradient=input_ids.stop_gradient)
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
         baseline_embedding_output = self.embeddings(
             input_ids=baseline_ids,
             position_ids=position_ids,
@@ -551,6 +554,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
 
 
 class CrossEntropyLossForChecklist(nn.Layer):
+
     def __init__(self):
         super(CrossEntropyLossForChecklist, self).__init__()
 
@@ -562,12 +566,15 @@ class CrossEntropyLossForChecklist(nn.Layer):
         end_position = paddle.unsqueeze(end_position, axis=-1)
         answerable_label = paddle.unsqueeze(answerable_label, axis=-1)
 
-        start_loss = nn.functional.cross_entropy(
-            input=start_logits, label=start_position, soft_label=False)
-        end_loss = nn.functional.cross_entropy(
-            input=end_logits, label=end_position, soft_label=False)
-        cls_loss = nn.functional.cross_entropy(
-            input=cls_logits, label=answerable_label, soft_label=False)
+        start_loss = nn.functional.cross_entropy(input=start_logits,
+                                                 label=start_position,
+                                                 soft_label=False)
+        end_loss = nn.functional.cross_entropy(input=end_logits,
+                                               label=end_position,
+                                               soft_label=False)
+        cls_loss = nn.functional.cross_entropy(input=cls_logits,
+                                               label=answerable_label,
+                                               soft_label=False)
 
         mrc_loss = (start_loss + end_loss) / 2
         loss = (mrc_loss + cls_loss) / 2
@@ -594,8 +601,8 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         super(RobertaForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.roberta = roberta  # allow roberta to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.roberta.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  roberta.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roberta.config["hidden_size"],
                                     num_classes)
         self.softmax = nn.Softmax()
@@ -635,11 +642,10 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output, _, _ = self.roberta(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        _, pooled_output, _, _ = self.roberta(input_ids,
+                                              token_type_ids=token_type_ids,
+                                              position_ids=position_ids,
+                                              attention_mask=attention_mask)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -689,8 +695,8 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         super(RobertaForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.roberta = roberta  # allow roberta to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.roberta.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  roberta.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roberta.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -729,11 +735,10 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _ = self.roberta(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, _ = self.roberta(input_ids,
+                                          token_type_ids=token_type_ids,
+                                          position_ids=position_ids,
+                                          attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)

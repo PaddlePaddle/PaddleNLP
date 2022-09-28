@@ -14,49 +14,52 @@ import reader
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./configs/transformer.big.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./configs/transformer.big.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help=
+        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
     parser.add_argument(
         "--test_file",
         nargs='+',
         default=None,
         type=str,
-        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+        help=
+        "The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
     )
-    parser.add_argument(
-        "--without_ft",
-        action="store_true",
-        help="Whether to use FasterTransformer to do predict. ")
+    parser.add_argument("--without_ft",
+                        action="store_true",
+                        help="Whether to use FasterTransformer to do predict. ")
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help=
+        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
+        help=
+        "The unknown token. It should be provided when use custom vocab_file. ")
     parser.add_argument(
         "--bos_token",
         default=None,
         type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
+        help="The bos token. It should be provided when use custom vocab_file. "
+    )
     parser.add_argument(
         "--eos_token",
         default=None,
         type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
+        help="The eos token. It should be provided when use custom vocab_file. "
+    )
     args = parser.parse_args()
     return args
 
@@ -117,8 +120,8 @@ def do_predict(args):
     assert args.init_from_params, (
         "Please set init_from_params to load the infer model.")
 
-    transformer.load(
-        os.path.join(args.init_from_params, "transformer.pdparams"))
+    transformer.load(os.path.join(args.init_from_params,
+                                  "transformer.pdparams"))
 
     # Set evaluate mode
     transformer.eval()

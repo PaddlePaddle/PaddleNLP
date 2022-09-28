@@ -23,7 +23,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -72,24 +72,17 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(
-        read_text_pair, data_path=args.train_set_file, lazy=False)
+    train_ds = load_dataset(read_text_pair,
+                            data_path=args.train_set_file,
+                            lazy=False)
 
-    # If you wanna use bert/roberta pretrained model,
-    # pretrained_model = ppnlp.transformers.BertModel.from_pretrained('bert-base-chinese')
-    # pretrained_model = ppnlp.transformers.RobertaModel.from_pretrained('roberta-wwm-ext')
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        'ernie-1.0')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 
-    # If you wanna use bert/roberta pretrained model,
-    # tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained('bert-base-chinese')
-    # tokenizer = ppnlp.transformers.RobertaTokenizer.from_pretrained('roberta-wwm-ext')
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -98,18 +91,16 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    model = SemanticIndexBatchNeg(
-        pretrained_model,
-        margin=args.margin,
-        scale=args.scale,
-        output_emb_size=args.output_emb_size)
+    model = SemanticIndexBatchNeg(pretrained_model,
+                                  margin=args.margin,
+                                  scale=args.scale,
+                                  output_emb_size=args.output_emb_size)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -147,11 +138,10 @@ def do_train():
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
-                loss = model(
-                    query_input_ids=query_input_ids,
-                    title_input_ids=title_input_ids,
-                    query_token_type_ids=query_token_type_ids,
-                    title_token_type_ids=title_token_type_ids)
+                loss = model(query_input_ids=query_input_ids,
+                             title_input_ids=title_input_ids,
+                             query_token_type_ids=query_token_type_ids,
+                             title_token_type_ids=title_token_type_ids)
 
             if args.use_amp:
                 scaled = scaler.scale(loss)
@@ -165,8 +155,8 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss,
-                       10 / (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, 10 /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
             lr_scheduler.step()

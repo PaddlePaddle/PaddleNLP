@@ -41,8 +41,8 @@ def strip_whitespace_front(token_list):
     found_valid = False
 
     for token in token_list:
-        if not (token.is_whitespace or
-                token.ttype == token_types.Punctuation) or found_valid:
+        if not (token.is_whitespace
+                or token.ttype == token_types.Punctuation) or found_valid:
             found_valid = True
             new_token_list.append(token)
 
@@ -133,9 +133,9 @@ def find_subtrees(sequence,
                 current_subtree = []
                 for i, token in enumerate(subtokens):
                     if token.value == "OR" or (
-                            token.value == "AND" and i - 4 >= 0 and
-                            i - 4 < len(subtokens) and
-                            subtokens[i - 4].value != "BETWEEN"):
+                            token.value == "AND" and i - 4 >= 0
+                            and i - 4 < len(subtokens)
+                            and subtokens[i - 4].value != "BETWEEN"):
                         and_subtrees.append(current_subtree)
                         current_subtree = []
                     else:
@@ -169,15 +169,15 @@ def find_subtrees(sequence,
                         seq = token_list_to_seq(select_toks +
                                                 [sequence.tokens[i + 2]])
 
-                    if seq not in current_subtrees and len(seq) > 0 and seq[
-                            0] in interesting_selects:
+                    if seq not in current_subtrees and len(
+                            seq) > 0 and seq[0] in interesting_selects:
                         current_subtrees.append(seq)
 
                     select_toks = []
 
             # Recursively find subtrees in the children of the node.
-            find_subtrees(token, current_subtrees, is_where, where_parent or
-                          keep_conj_subtrees)
+            find_subtrees(token, current_subtrees, is_where, where_parent
+                          or keep_conj_subtrees)
 
 
 def get_subtrees(sql, oldsnippets=[]):
@@ -236,8 +236,9 @@ def get_subtrees_simple(sql, oldsnippets=[]):
     # get subtrees
     subtrees = []
     for sub_sql in format_sql.split('\n'):
-        sub_sql = sub_sql.replace('(', ' ( ').replace(')', ' ) ').replace(',',
-                                                                          ' , ')
+        sub_sql = sub_sql.replace('(',
+                                  ' ( ').replace(')',
+                                                 ' ) ').replace(',', ' , ')
 
         subtree = sub_sql.strip().split()
         if len(subtree) > 1:

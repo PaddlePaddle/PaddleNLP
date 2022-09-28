@@ -3,7 +3,7 @@
 This code is the Paddle v2.0 implementation of *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*.
 The code adapts and aligns with [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer).
 
-To reach the state-of-the-art performance stated in the source paper, please use the default hyper-parameters listed in *config.py*.  
+To reach the state-of-the-art performance stated in the source paper, please use the default hyper-parameters listed in *config.py*.
 
 ## Model performance (with pointer generation and coverage loss enabled)
 After training for 100k iterations with *batch_size=8*, the Paddle implementation achieves a ROUGE-1-f1 of 0.3980 (0.3907 by [a previous Pytorch implmentation](https://github.com/atulkum/pointer_summarizer) and 0.3953 by [the source paper](https://arxiv.org/abs/1704.04368)).

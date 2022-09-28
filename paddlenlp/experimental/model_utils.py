@@ -45,16 +45,17 @@ def load_vocabulary(filepath):
 
 
 class FasterPretrainedModel(PretrainedModel):
+
     def to_static(self, output_path):
         self.eval()
 
         # Convert to static graph with specific input description
-        model = paddle.jit.to_static(
-            self,
-            input_spec=[
-                paddle.static.InputSpec(
-                    shape=[None, None], dtype=core.VarDesc.VarType.STRINGS)
-            ])
+        model = paddle.jit.to_static(self,
+                                     input_spec=[
+                                         paddle.static.InputSpec(
+                                             shape=[None, None],
+                                             dtype=core.VarDesc.VarType.STRINGS)
+                                     ])
         paddle.jit.save(model, output_path)
         logger.info("Already save the static model to the path %s" %
                     output_path)
@@ -109,8 +110,8 @@ class FasterPretrainedModel(PretrainedModel):
                 resource_files[file_id] = map_list[
                     pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
-                cls.pretrained_init_configuration[
-                    pretrained_model_name_or_path])
+                cls.pretrained_init_configuration[pretrained_model_name_or_path]
+            )
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
@@ -187,8 +188,8 @@ class FasterPretrainedModel(PretrainedModel):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop(
                         "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}"
-                        ).format(cls.base_model_class.__name__)
+                            "pretrained base model should be {}").format(
+                                cls.base_model_class.__name__)
                     base_arg_index = i
                     base_arg = arg
                     break
@@ -196,8 +197,8 @@ class FasterPretrainedModel(PretrainedModel):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop(
                         "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}"
-                        ).format(cls.base_model_class.__name__)
+                            "pretrained base model should be {}").format(
+                                cls.base_model_class.__name__)
                     base_arg_index = arg_name
                     base_arg = arg
                     break
@@ -280,8 +281,9 @@ class FasterPretrainedModel(PretrainedModel):
                 "Weights of {} not initialized from pretrained model: {}".
                 format(model.__class__.__name__, missing_keys))
         if len(unexpected_keys) > 0:
-            logger.info("Weights from pretrained model not used in {}: {}".
-                        format(model.__class__.__name__, unexpected_keys))
+            logger.info(
+                "Weights from pretrained model not used in {}: {}".format(
+                    model.__class__.__name__, unexpected_keys))
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model
@@ -329,7 +331,8 @@ class FasterPretrainedModel(PretrainedModel):
         # Save model
         if paddle.in_dynamic_mode():
             file_name = os.path.join(
-                save_dir, list(self.resource_files_names.values())[0])
+                save_dir,
+                list(self.resource_files_names.values())[0])
             paddle.save(self.state_dict(), file_name)
         else:
             logger.warning(

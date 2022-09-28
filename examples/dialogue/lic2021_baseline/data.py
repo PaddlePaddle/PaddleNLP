@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import random
 import numpy as np
 import gzip
@@ -11,6 +25,7 @@ from paddlenlp.transformers.tokenizer_utils import convert_to_unicode
 
 
 class DialogueDataset(IterableDataset):
+
     def __init__(self,
                  filepattern,
                  batch_size,
@@ -100,8 +115,8 @@ class DialogueDataset(IterableDataset):
                     if self.mode == 'test':
                         to_append = len(batch) < self.batch_size
                     else:
-                        to_append = (len(batch) + 1
-                                     ) * max_len <= self.batch_size
+                        to_append = (len(batch) +
+                                     1) * max_len <= self.batch_size
                     if to_append:
                         batch.append(sample)
                     else:
@@ -113,12 +128,10 @@ class DialogueDataset(IterableDataset):
     def pad_batch_data(self, batch):
         """Pad the instances to the max sequence length in batch. """
         max_len = max(map(len, batch))
-        batch_data = np.array(
-            [
-                list(data) + [self.pad_id] * (max_len - len(data))
-                for data in batch
-            ],
-            dtype='int64')
+        batch_data = np.array([
+            list(data) + [self.pad_id] * (max_len - len(data)) for data in batch
+        ],
+                              dtype='int64')
         return batch_data
 
     def gen_tgt_label_and_pos(self, batch_token_ids, batch_tgt_start_idx):
@@ -130,8 +143,8 @@ class DialogueDataset(IterableDataset):
             need_cal = True
             tgt_label.extend(sent[sent_b_index + 1:])
             tgt_pos.extend([
-                sent_index * max_len + i
-                for i in range(sent_b_index, len(sent) - 1)
+                sent_index * max_len + i for i in range(sent_b_index,
+                                                        len(sent) - 1)
             ])
         tgt_label = np.array(tgt_label).astype("int64")
         tgt_pos = np.array(tgt_pos).astype("int64")
@@ -167,12 +180,12 @@ class DialogueDataset(IterableDataset):
 
             if self.mode == 'test':
                 # [batch_size, 1]
-                tgt_ids = np.array(
-                    [[self.bos_id]] * len(token_ids), dtype="int64")
+                tgt_ids = np.array([[self.bos_id]] * len(token_ids),
+                                   dtype="int64")
                 tgt_type = np.ones((len(token_ids), 1), dtype="int64")
                 tgt_pos = np.array(tgt_start_idx, dtype="int64").reshape(-1, 1)
-                tgt_generation_mask = generation_mask[:, 0:1, :].astype(
-                    "float32")
+                tgt_generation_mask = generation_mask[:,
+                                                      0:1, :].astype("float32")
 
                 pad_token_ids = np.concatenate((pad_token_ids, tgt_ids), axis=1)
                 pad_type_ids = np.concatenate((pad_type_ids, tgt_type), axis=1)
@@ -184,15 +197,15 @@ class DialogueDataset(IterableDataset):
                     (generation_mask.shape[0], generation_mask.shape[1], 1),
                     dtype="float32")
                 append_mask[:, -1, :] = 1.0
-                generation_mask = np.concatenate(
-                    (generation_mask, append_mask), axis=2)
+                generation_mask = np.concatenate((generation_mask, append_mask),
+                                                 axis=2)
                 generation_mask = (generation_mask - 1.0) * 1e9
                 generation_mask = np.expand_dims(generation_mask, axis=1)
                 yield (pad_token_ids, pad_type_ids, pad_pos_ids,
                        generation_mask)
             else:
-                tgt_label, tgt_pos = self.gen_tgt_label_and_pos(token_ids,
-                                                                tgt_start_idx)
+                tgt_label, tgt_pos = self.gen_tgt_label_and_pos(
+                    token_ids, tgt_start_idx)
                 generation_mask = (generation_mask - 1.0) * 1e9
                 generation_mask = np.expand_dims(generation_mask, axis=1)
                 yield (pad_token_ids, pad_type_ids, pad_pos_ids,

@@ -34,13 +34,11 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_
 import types
 from utils import get_timers, set_timers
 from types import MethodType
-from paddle import _C_ops
-from paddle.fluid import core
-from paddle.fluid.dygraph import to_variable
+from paddle import _legacy_C_ops
+from paddle.fluid.framework import core, in_dygraph_mode
 import paddle.distributed as dist
 from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
 from paddle.incubate.distributed.models import moe
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
 
@@ -62,8 +60,8 @@ def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     paddle.seed(basic_seed + data_world_rank)
 
     from paddle.distributed.fleet import meta_parallel
-    meta_parallel.model_parallel_random_seed(basic_seed + data_world_rank + 1000
-                                             * mp_rank)
+    meta_parallel.model_parallel_random_seed(basic_seed + data_world_rank +
+                                             1000 * mp_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
@@ -88,14 +86,13 @@ def run_evaluate(args,
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
         tokens, loss_mask, labels = batch
-        with paddle.amp.auto_cast(
-                args.use_pure_fp16,
-                custom_black_list=[
-                    "reduce_sum",
-                    "c_softmax_with_cross_entropy",
-                    "elementwise_div",
-                ],
-                level='O2'):
+        with paddle.amp.auto_cast(args.use_pure_fp16,
+                                  custom_black_list=[
+                                      "reduce_sum",
+                                      "c_softmax_with_cross_entropy",
+                                      "elementwise_div",
+                                  ],
+                                  level='O2'):
             preds = model(tokens)
         preds = paddle.cast(preds, dtype="float32")
         loss = criterion(preds, labels, loss_mask)
@@ -105,14 +102,16 @@ def run_evaluate(args,
             break
 
     average_loss = sum(all_loss) / len(all_loss)
-    logger.info("%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                % (task_name, global_step, epoch, eval_step, average_loss,
-                   iter_steps / (time.time() - local_time)))
+    logger.info(
+        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s" %
+        (task_name, global_step, epoch, eval_step, average_loss, iter_steps /
+         (time.time() - local_time)))
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
     model.train()
 
 
 def initialize_model_and_expert_group(hcg):
+
     def get_expert_parallel_world_size(self):
         return self.get_data_parallel_world_size(
         ) * self.get_model_parallel_world_size()
@@ -141,17 +140,15 @@ def initialize_mp_dp_parameters(model, hcg):
         if "expert_" in param.name:
             continue
         if not param.is_distributed:
-            paddle.distributed.broadcast(
-                param.detach(),
-                src=mp_src_rank,
-                group=mp_group,
-                use_calc_stream=True)
+            paddle.distributed.broadcast(param.detach(),
+                                         src=mp_src_rank,
+                                         group=mp_group,
+                                         sync_op=True)
 
-        paddle.distributed.broadcast(
-            param.detach(),
-            src=dp_src_rank,
-            group=dp_group,
-            use_calc_stream=True)
+        paddle.distributed.broadcast(param.detach(),
+                                     src=dp_src_rank,
+                                     group=dp_group,
+                                     sync_op=True)
 
 
 def unscale_method(self, optimizer):
@@ -172,29 +169,32 @@ def unscale_method(self, optimizer):
     else:
         param_grads_fp16 = [
             param._grad_ivar() for param in optimizer._parameter_list
-            if (param._grad_ivar() is not None
-                ) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP16)
+            if (param._grad_ivar() is not None) and (
+                param._grad_ivar().dtype == core.VarDesc.VarType.FP16)
         ]
         param_grads_fp32 = [
             param._grad_ivar() for param in optimizer._parameter_list
-            if (param._grad_ivar() is not None
-                ) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
+            if (param._grad_ivar() is not None) and (
+                param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
         ]
-    temp_found_inf_fp16 = to_variable(np.array([0]).astype(np.bool))
-    temp_found_inf_fp32 = to_variable(np.array([0]).astype(np.bool))
+    temp_found_inf_fp16 = paddle.to_tensor(np.array([0]).astype(np.bool))
+    temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool))
 
     if len(param_grads_fp16):
-        _C_ops.check_finite_and_unscale(param_grads_fp16, self._scale,
-                                        param_grads_fp16, temp_found_inf_fp16)
+        _legacy_C_ops.check_finite_and_unscale(param_grads_fp16, self._scale,
+                                               param_grads_fp16,
+                                               temp_found_inf_fp16)
     if len(param_grads_fp32):
-        _C_ops.check_finite_and_unscale(param_grads_fp32, self._scale,
-                                        param_grads_fp32, temp_found_inf_fp32)
+        _legacy_C_ops.check_finite_and_unscale(param_grads_fp32, self._scale,
+                                               param_grads_fp32,
+                                               temp_found_inf_fp32)
     self._found_inf = 1 if temp_found_inf_fp16 or temp_found_inf_fp32 else 0
 
     if dist.get_world_size() > 1:
         is_found_inf = paddle.to_tensor([self._found_inf], dtype="int32")
-        paddle.distributed.all_reduce(
-            is_found_inf, op=paddle.distributed.ReduceOp.MAX, group=None)
+        paddle.distributed.all_reduce(is_found_inf,
+                                      op=paddle.distributed.ReduceOp.MAX,
+                                      group=None)
         self._found_inf = is_found_inf.numpy()[0]
 
 
@@ -206,7 +206,7 @@ def all_reduce_parameters(params, group):
     with paddle.framework.no_grad():
         for p in params:
             grad = p.grad.scale_(div_factor)
-            paddle.distributed.all_reduce(grad, use_calc_stream=True)
+            paddle.distributed.all_reduce(grad, sync_op=True)
 
 
 def parameters_classify(model, use_sharding=False):
@@ -238,10 +238,9 @@ def parameters_classify(model, use_sharding=False):
 
     print("all parameters length:", len(model.parameters()))
     print(
-        "decay_gate_params len: {}, decay_expert_params len: {}, decay_other_params len: {}".
-        format(
-            len(decay_gate_params),
-            len(decay_expert_params), len(decay_other_params)))
+        "decay_gate_params len: {}, decay_expert_params len: {}, decay_other_params len: {}"
+        .format(len(decay_gate_params), len(decay_expert_params),
+                len(decay_other_params)))
     print("gate_params len: {}, expert_params len: {}, other_params len: {}".
           format(len(gate_params), len(expert_params), len(other_params)))
 
@@ -337,6 +336,8 @@ def do_train(args):
     }
 
     fleet.init(is_collective=True, strategy=strategy)
+
+    nranks = paddle.distributed.get_world_size()
 
     # obtain rank message of hybrid parallel
     hcg = fleet.get_hybrid_communicate_group()
@@ -448,8 +449,10 @@ def do_train(args):
             ) else ShardingScaler
             scaler = wrap_scale_func(scaler)
 
-        model = paddle.amp.decorate(
-            models=model, optimizers=None, level='O2', save_dtype='float32')
+        model = paddle.amp.decorate(models=model,
+                                    optimizers=None,
+                                    level='O2',
+                                    save_dtype='float32')
 
     opt_fused_tensors, decay_fused_tensors, reduce_fused_tensors, gate_fused_tensors, \
         expert_fusion_names = parameters_classify(model, use_sharding=(args.sharding_degree > 1))
@@ -473,7 +476,7 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params,  #decay_params,
         multi_precision=args.use_pure_fp16)
 
-    #in order to restore reader. 
+    #in order to restore reader.
     pass_num = 0
     file_id = 0
     start_epoch = 0
@@ -482,14 +485,14 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1 and args.resume_dir is None:
         print(">> initialize....")
         if args.sharding_degree > 1:
-            model, optimizer = group_sharded_parallel(
-                model, optimizer, sharding_group, args.sharding_offload)
+            model, optimizer = group_sharded_parallel(model, optimizer,
+                                                      sharding_group,
+                                                      args.sharding_offload)
             for p in gate_fused_tensors:
-                dist.broadcast(
-                    p,
-                    src=sharding_group.ranks[0],
-                    group=sharding_group,
-                    use_calc_stream=True)
+                dist.broadcast(p,
+                               src=sharding_group.ranks[0],
+                               group=sharding_group,
+                               sync_op=True)
             # Multi stream operation will be supported later
             dist.wait(tensor=p, group=sharding_group, use_calc_stream=True)
         else:
@@ -519,8 +522,8 @@ def do_train(args):
     for epoch in range(start_epoch, args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_"
-                not in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f))
+                and "npz_" not in str(f))
         ]
         files.sort()
         num_files = len(files)
@@ -540,7 +543,7 @@ def do_train(args):
             test_data_loader = test_data_loader()
 
             for step, batch in enumerate(train_data_loader()):
-                # to remove the train data that has been studyed.  
+                # to remove the train data that has been studyed.
                 if step < global_step - pass_num: continue
 
                 global_step += 1
@@ -576,8 +579,8 @@ def do_train(args):
                         ]
                         bal_loss = paddle.concat(aux_loss_list)
                         if bal_loss.dtype == paddle.float16:
-                            bal_loss = paddle.cast(
-                                bal_loss, dtype=paddle.float32)
+                            bal_loss = paddle.cast(bal_loss,
+                                                   dtype=paddle.float32)
                         bal_loss = bal_loss.mean()
                         loss_mbs += bal_loss * args.balance_loss_weight
                     loss_mbs = loss_mbs / accumulate_steps
@@ -617,9 +620,10 @@ def do_train(args):
                     else:
                         bal_loss = -1
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
                         % (global_step, epoch, step, avg_loss, bal_loss, speed,
-                           speed * default_global_tokens_num, learning_rate))
+                           speed * default_global_tokens_num, speed *
+                           default_global_tokens_num / nranks, learning_rate))
                     log_writer.add_scalar("loss", float(loss), global_step)
                     log_writer.add_scalar("learning_rate", learning_rate,
                                           global_step)
@@ -627,16 +631,16 @@ def do_train(args):
                     tic_train = time.time()
                     timer_log(args.logging_freq)
 
-                if (global_step % args.save_steps == 0 or
-                        global_step >= args.max_steps):
+                if (global_step % args.save_steps == 0
+                        or global_step >= args.max_steps):
                     loss_scale = scaler._scale if args.use_pure_fp16 else None
                     save_checkpoint(args, global_step, model, optimizer,
                                     lr_scheduler, tokenizer, loss_scale,
                                     dp_rank, mp_rank, pp_rank, pass_num,
                                     file_id, epoch)
                     print(
-                        "save checkpoint for step_{} successfully...loss_scale = {}".
-                        format(global_step, loss_scale))
+                        "save checkpoint for step_{} successfully...loss_scale = {}"
+                        .format(global_step, loss_scale))
 
                 if global_step % args.eval_freq == 0:
                     # Since the valid data broardcast to all devices, we do evaluate on all device.
@@ -652,7 +656,7 @@ def do_train(args):
                     del train_data_loader
                     return
 
-            # to record sum of the length of train_data_loader that has been read. 
+            # to record sum of the length of train_data_loader that has been read.
             pass_num += len(train_data_loader())
             del train_data_loader
 

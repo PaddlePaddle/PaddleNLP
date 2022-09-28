@@ -24,6 +24,12 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
     from paddle.text import ViterbiDecoder
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
+
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             CausalLMOutputWithCrossAttentions, tuple_output)
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -45,8 +51,9 @@ class SkepEmbeddings(nn.Layer):
                  type_vocab_size=16,
                  pad_token_id=0):
         super(SkepEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.word_embeddings = nn.Embedding(vocab_size,
+                                            hidden_size,
+                                            padding_idx=pad_token_id)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.type_vocab_size = type_vocab_size
@@ -111,7 +118,6 @@ class SkepPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "skep_ernie_1.0_large_ch": {
             "attention_probs_dropout_prob": 0.1,
@@ -156,7 +162,6 @@ class SkepPretrainedModel(PretrainedModel):
             "pad_token_id": 1,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "skep_ernie_1.0_large_ch":
@@ -176,12 +181,11 @@ class SkepPretrainedModel(PretrainedModel):
             # and configurable later
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.skep.config["initializer_range"],
-                        shape=layer.weight.shape))
+                    paddle.tensor.normal(mean=0.0,
+                                         std=self.initializer_range if hasattr(
+                                             self, "initializer_range") else
+                                         self.skep.config["initializer_range"],
+                                         shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-5
 
@@ -263,9 +267,10 @@ class SkepModel(SkepPretrainedModel):
         super(SkepModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = SkepEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, pad_token_id)
+        self.embeddings = SkepEmbeddings(vocab_size, hidden_size,
+                                         hidden_dropout_prob,
+                                         max_position_embeddings,
+                                         type_vocab_size, pad_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -282,7 +287,10 @@ class SkepModel(SkepPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The SkepModel forward method, overrides the `__call__()` special method.
 
@@ -317,9 +325,23 @@ class SkepModel(SkepPretrainedModel):
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`sequence_output`, `pooled_output`).
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
+
+            if the reuslt is tuple: Returns tuple (`sequence_output`, `pooled_output`).
 
             With the fields:
 
@@ -348,17 +370,48 @@ class SkepModel(SkepPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids.astype("int64") == self.pad_token_id
-                 ).astype(self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids.astype("int64") == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(embedding_output, attention_mask)
-        sequence_output = encoder_outputs
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
+        encoder_outputs = self.encoder(
+            embedding_output,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        if isinstance(encoder_outputs, type(input_ids)):
+            encoder_outputs = (encoder_outputs, )
+
+        sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
-        return sequence_output, pooled_output
+        if not return_dict:
+            return (sequence_output, pooled_output) + encoder_outputs[1:]
+        return BaseModelOutputWithPoolingAndCrossAttentions(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            past_key_values=encoder_outputs.past_key_values,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions)
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        """get skep input word embedding
+
+        Returns:
+            nn.Embedding: the input word embedding of skep mdoel
+        """
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, embedding: nn.Embedding) -> nn.Embedding:
+        """set skep input embedding
+
+        Returns:
+            nn.Embedding: the instance of new word embedding
+        """
+        self.embeddings.word_embeddings = embedding
 
 
 class SkepForSequenceClassification(SkepPretrainedModel):
@@ -382,8 +435,8 @@ class SkepForSequenceClassification(SkepPretrainedModel):
         super(SkepForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.skep.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.skep.
+                                  config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.skep.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -392,7 +445,11 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The SkepForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -405,10 +462,25 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 See :class:`SkepModel`.
             attention_mask (Tensor, optional):
                 See :class:`SkepModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
-            Shape as `[batch_size, num_classes]` and dtype as float32.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput`.
 
         Example:
             .. code-block::
@@ -424,15 +496,42 @@ class SkepForSequenceClassification(SkepPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output = self.skep(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.skep(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
+
+        pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        return logits
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return tuple_output(output, loss)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class SkepForTokenClassification(SkepPretrainedModel):
@@ -456,8 +555,8 @@ class SkepForTokenClassification(SkepPretrainedModel):
         super(SkepForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.skep.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.skep.
+                                  config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.skep.config["hidden_size"],
                                     num_classes)
         self.apply(self.init_weights)
@@ -466,7 +565,11 @@ class SkepForTokenClassification(SkepPretrainedModel):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The SkepForTokenClassification forward method, overrides the __call__() special method.
 
@@ -479,10 +582,22 @@ class SkepForTokenClassification(SkepPretrainedModel):
                 See :class:`SkepModel`.
             attention_mask (Tensor, optional):
                 See :class:`SkepModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
 
         Example:
             .. code-block::
@@ -498,18 +613,38 @@ class SkepForTokenClassification(SkepPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _ = self.skep(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.skep(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
+
+        sequence_output = outputs[0]
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        return logits
+
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
+
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return tuple_output(output, loss)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
-class SkepCrfForTokenClassification(nn.Layer):
+class SkepCrfForTokenClassification(SkepPretrainedModel):
     r"""
     SKEPCRF Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
@@ -519,10 +654,9 @@ class SkepCrfForTokenClassification(nn.Layer):
             An instance of SkepModel.
         num_classes (int):
             The number of classes.
-
     """
 
-    def __init__(self, skep, num_classes):
+    def __init__(self, skep: SkepModel, num_classes: int = 3):
         super().__init__()
         self.num_classes = num_classes
         self.skep = skep  # allow skep to be config
@@ -536,11 +670,11 @@ class SkepCrfForTokenClassification(nn.Layer):
             gru_hidden_size * 2,
             self.num_classes,
             weight_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Uniform(
-                    low=-0.1, high=0.1),
+                initializer=nn.initializer.Uniform(low=-0.1, high=0.1),
                 regularizer=paddle.regularizer.L2Decay(coeff=1e-4)))
-        self.crf = LinearChainCrf(
-            self.num_classes, crf_lr=0.2, with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_classes,
+                                  crf_lr=0.2,
+                                  with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
@@ -550,7 +684,10 @@ class SkepCrfForTokenClassification(nn.Layer):
                 position_ids=None,
                 attention_mask=None,
                 seq_lens=None,
-                labels=None):
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         The SkepCrfForTokenClassification forward method, overrides the __call__() special method.
 
@@ -570,9 +707,22 @@ class SkepCrfForTokenClassification(nn.Layer):
             labels (Tensor, optional):
                 The input label tensor.
                 Its data type should be int64 and its shape is `[batch_size, sequence_length]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `loss` if `labels` is not None. Otherwise, returns tensor `prediction`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
+            if return_dict is False, Returns tensor `loss` if `labels` is not None. Otherwise, returns tensor `prediction`.
 
             - `loss` (Tensor):
                 The crf loss. Its data type is float32 and its shape is `[batch_size]`.
@@ -582,19 +732,44 @@ class SkepCrfForTokenClassification(nn.Layer):
                 Its data type is int64 and its shape is `[batch_size, sequence_length]`.
 
         """
-        sequence_output, _ = self.skep(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        outputs = self.skep(input_ids,
+                            token_type_ids=token_type_ids,
+                            position_ids=position_ids,
+                            attention_mask=attention_mask,
+                            output_attentions=output_attentions,
+                            output_hidden_states=output_hidden_states,
+                            return_dict=return_dict)
 
-        bigru_output, _ = self.gru(
-            sequence_output)  #, sequence_length=seq_lens)
+        bigru_output, _ = self.gru(outputs[0])  #, sequence_length=seq_lens)
         emission = self.fc(bigru_output)
 
+        if seq_lens is None:
+            # compute seq length according to the attention mask
+            if attention_mask is not None:
+                seq_lens = paddle.sum(attention_mask,
+                                      axis=1,
+                                      dtype=paddle.int64)
+            else:
+                input_ids_shape = paddle.shape(input_ids)
+                seq_lens = paddle.ones(shape=[input_ids_shape[0]],
+                                       dtype=paddle.int64) * input_ids_shape[1]
+
+        loss, prediction = None, None
         if labels is not None:
             loss = self.crf_loss(emission, seq_lens, labels)
-            return loss
         else:
             _, prediction = self.viterbi_decoder(emission, seq_lens)
+
+        # FIXME(wj-Mcat): the output of this old version model is single tensor when return_dict is False
+        if not return_dict:
+            # when loss is None, return prediction
+            if labels is not None:
+                return loss
             return prediction
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=prediction,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )

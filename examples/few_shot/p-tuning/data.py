@@ -30,17 +30,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def convert_example(example,
@@ -100,8 +101,8 @@ def convert_example(example,
     ]
 
     if "sentence2" in example:
-        encoded_inputs = tokenizer(
-            text=example["sentence2"], max_seq_len=max_seq_length)
+        encoded_inputs = tokenizer(text=example["sentence2"],
+                                   max_seq_len=max_seq_length)
         sentence2_src_ids = encoded_inputs["input_ids"][1:]
         src_ids += sentence2_src_ids
         token_type_ids += [1] * len(sentence2_src_ids)
@@ -295,8 +296,8 @@ def transform_ocnli(example, label_normalize_dict=None, is_test=False):
 def transform_csl(example, label_normalize_dict=None, is_test=False):
     if is_test:
         example["label_length"] = 1
-        example["sentence1"] = "本文的关键词是:" + "，".join(example[
-            "keyword"]) + example["abst"]
+        example["sentence1"] = "本文的关键词是:" + "，".join(
+            example["keyword"]) + example["abst"]
 
         del example["abst"]
         del example["keyword"]
@@ -307,8 +308,8 @@ def transform_csl(example, label_normalize_dict=None, is_test=False):
         # Normalize some of the labels, eg. English -> Chinese
         example['text_label'] = label_normalize_dict[origin_label]
 
-        example["sentence1"] = "本文的关键词是:" + "，".join(example[
-            "keyword"]) + example["abst"]
+        example["sentence1"] = "本文的关键词是:" + "，".join(
+            example["keyword"]) + example["abst"]
 
         del example["label"]
         del example["abst"]

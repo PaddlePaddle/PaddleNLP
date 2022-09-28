@@ -141,8 +141,9 @@ class BertJapaneseTokenizer(BertTokenizer):
                 .format(vocab_file))
 
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.ids_to_tokens = collections.OrderedDict(
-            [(ids, tok) for tok, ids in self.vocab.idx_to_token.items()])
+        self.ids_to_tokens = collections.OrderedDict([
+            (ids, tok) for tok, ids in self.vocab.idx_to_token.items()
+        ])
 
         self.do_word_tokenize = do_word_tokenize
         self.word_tokenizer_type = word_tokenizer_type
@@ -207,8 +208,7 @@ class BertJapaneseTokenizer(BertTokenizer):
 
         if self.do_subword_tokenize:
             split_tokens = [
-                sub_token
-                for token in tokens
+                sub_token for token in tokens
                 for sub_token in self.wordpiece_tokenizer.tokenize(token)
             ]
         else:
@@ -221,12 +221,13 @@ class MecabTokenizer:
     """Runs basic tokenization with MeCab morphological parser."""
 
     def __init__(
-            self,
-            do_lower_case=False,
-            never_split=None,
-            normalize_text=True,
-            mecab_dic="ipadic",
-            mecab_option=None, ):
+        self,
+        do_lower_case=False,
+        never_split=None,
+        normalize_text=True,
+        mecab_dic="ipadic",
+        mecab_option=None,
+    ):
         """
         Constructs a MecabTokenizer.
 

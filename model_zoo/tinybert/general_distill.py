@@ -70,26 +70,28 @@ def parse_args():
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--teacher_model_type",
         default="bert",
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--input_dir",
         default=None,
         type=str,
         required=True,
-        help="The input directory where the data will be read from.", )
-    parser.add_argument(
-        "--teacher_model_name_or_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model.")
+        help="The input directory where the data will be read from.",
+    )
+    parser.add_argument("--teacher_model_name_or_path",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model.")
     parser.add_argument(
         "--student_model_name_or_path",
         default=None,
@@ -100,85 +102,90 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
+            ], [])),
+    )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--glue_dir",
         default="/root/.paddlenlp/datasets/Glue/",
         type=str,
         required=False,
-        help="The Glue directory.", )
+        help="The Glue directory.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=1e-4,
-        type=float,
-        help="The initial learning rate for AdamW.")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=1e-4,
+                        type=float,
+                        help="The initial learning rate for AdamW.")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
+        help="Total number of training epochs to perform.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=100,
+                        help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
+        help="Batch size per GPU/CPU for training.",
+    )
     parser.add_argument(
         "--T",
         default=1,
         type=int,
-        help="Temperature for softmax", )
-    parser.add_argument(
-        "--weight_decay",
-        default=0.01,
-        type=float,
-        help="Weight decay if we apply some.")
+        help="Temperature for softmax",
+    )
+    parser.add_argument("--weight_decay",
+                        default=0.01,
+                        type=float,
+                        help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
         default=10000,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.0,
-        type=float,
-        help="Linear warmup proportion over total steps.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-8,
-        type=float,
-        help="Epsilon for AdamW optimizer.")
+        help=
+        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--warmup_proportion",
+                        default=0.0,
+                        type=float,
+                        help="Linear warmup proportion over total steps.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-8,
+                        type=float,
+                        help="Epsilon for AdamW optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -195,6 +202,7 @@ def set_seed(args):
 
 
 class WorkerInitObj(object):
+
     def __init__(self, seed):
         self.seed = seed
 
@@ -205,13 +213,13 @@ class WorkerInitObj(object):
 
 def create_pretraining_dataset(input_file, shared_list, args, worker_init,
                                tokenizer):
-    train_data = PretrainingDataset(
-        input_file=input_file,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    train_data = PretrainingDataset(input_file=input_file,
+                                    tokenizer=tokenizer,
+                                    max_seq_length=args.max_seq_length)
     # files have been sharded, no need to dispatch again
-    train_batch_sampler = paddle.io.BatchSampler(
-        train_data, batch_size=args.batch_size, shuffle=True)
+    train_batch_sampler = paddle.io.BatchSampler(train_data,
+                                                 batch_size=args.batch_size,
+                                                 shuffle=True)
 
     # DataLoader cannot be pickled because of its place.
     # If it can be pickled, use global function instead of lambda and use
@@ -220,17 +228,17 @@ def create_pretraining_dataset(input_file, shared_list, args, worker_init,
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
     ): fn(samples)
 
-    train_data_loader = DataLoader(
-        dataset=train_data,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        worker_init_fn=worker_init,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_data,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   worker_init_fn=worker_init,
+                                   return_list=True)
     return train_data_loader, input_file
 
 
 class PretrainingDataset(paddle.io.Dataset):
+
     def __init__(self, input_file, tokenizer, max_seq_length):
         self.input_file = input_file
         f = open(input_file, 'r')
@@ -263,10 +271,12 @@ def do_train(args):
 
     # For student
     model_class, _ = MODEL_CLASSES[args.model_type]
-    if args.student_model_name_or_path in (
-            'tinybert-4l-312d', 'tinybert-6l-768d', 'tinybert-4l-312d-v2',
-            'tinybert-6l-768d-v2', 'tinybert-4l-312d-zh', 'tinybert-6l-768d-zh'
-    ):
+    if args.student_model_name_or_path in ('tinybert-4l-312d',
+                                           'tinybert-6l-768d',
+                                           'tinybert-4l-312d-v2',
+                                           'tinybert-6l-768d-v2',
+                                           'tinybert-4l-312d-zh',
+                                           'tinybert-6l-768d-zh'):
         student = model_class.from_pretrained(args.student_model_name_or_path)
     else:
         tinybert = TinyBertModel(vocab_size=21128, num_hidden_layers=6)
@@ -312,10 +322,12 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
 
-    teacher = to_distill(
-        teacher, return_attentions=True, return_layer_outputs=True)
-    student = to_distill(
-        student, return_attentions=True, return_layer_outputs=True)
+    teacher = to_distill(teacher,
+                         return_attentions=True,
+                         return_layer_outputs=True)
+    student = to_distill(student,
+                         return_attentions=True,
+                         return_layer_outputs=True)
 
     global_step = 0
     tic_train = time.time()
@@ -334,10 +346,10 @@ def do_train(args):
         if paddle.distributed.get_world_size() > num_files:
             remainder = paddle.distributed.get_world_size() % num_files
 
-            data_file = files[(
-                f_start_id * paddle.distributed.get_world_size() +
-                paddle.distributed.get_rank() + remainder * f_start_id) %
-                              num_files]
+            data_file = files[
+                (f_start_id * paddle.distributed.get_world_size() +
+                 paddle.distributed.get_rank() + remainder * f_start_id) %
+                num_files]
         else:
             data_file = files[(f_start_id * paddle.distributed.get_world_size()
                                + paddle.distributed.get_rank()) % num_files]
@@ -368,10 +380,9 @@ def do_train(args):
             if not single_file and f_id == f_start_id:
                 continue
             if paddle.distributed.get_world_size() > num_files:
-                data_file = files[(
-                    f_id * paddle.distributed.get_world_size() +
-                    paddle.distributed.get_rank() + remainder * f_id) %
-                                  num_files]
+                data_file = files[(f_id * paddle.distributed.get_world_size() +
+                                   paddle.distributed.get_rank() +
+                                   remainder * f_id) % num_files]
             else:
                 data_file = files[(f_id * paddle.distributed.get_world_size() +
                                    paddle.distributed.get_rank()) % num_files]

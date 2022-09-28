@@ -50,6 +50,7 @@ from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_stage3 import
 
 
 class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
+
     @imperative_base.no_grad
     def _dygraph_clip(self, params_grads):
         normal_params_grads = []
@@ -71,20 +72,18 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
         global_norm_var_normal, sum_dtype \
             = self.get_l2_norm_pow(normal_params_grads)
         if global_norm_var_normal is not None:
-            collective.all_reduce(
-                global_norm_var_normal,
-                op=collective.ReduceOp.SUM,
-                group=self.moe_group)
+            collective.all_reduce(global_norm_var_normal,
+                                  op=collective.ReduceOp.SUM,
+                                  group=self.moe_group)
 
         global_norm_var_moe = None
         if len(moe_params_grads) > 0:
             global_norm_var_moe, _ \
                 = self.get_l2_norm_pow(moe_params_grads, sum_dtype)
             if global_norm_var_moe is not None:
-                collective.all_reduce(
-                    global_norm_var_moe,
-                    op=collective.ReduceOp.SUM,
-                    group=self.moe_group)
+                collective.all_reduce(global_norm_var_moe,
+                                      op=collective.ReduceOp.SUM,
+                                      group=self.moe_group)
 
         if global_norm_var_normal is None and global_norm_var_moe is None:
             return params_grads
@@ -102,12 +101,13 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
 
         params_and_grads = []
         global_norm_var = layers.sqrt(global_norm_var)
-        max_global_norm = layers.fill_constant(
-            shape=[1], dtype=global_norm_var.dtype, value=self.clip_norm)
-        clip_var = layers.elementwise_div(
-            x=max_global_norm,
-            y=layers.elementwise_max(
-                x=global_norm_var, y=max_global_norm))
+        max_global_norm = layers.fill_constant(shape=[1],
+                                               dtype=global_norm_var.dtype,
+                                               value=self.clip_norm)
+        clip_var = layers.elementwise_div(x=max_global_norm,
+                                          y=layers.elementwise_max(
+                                              x=global_norm_var,
+                                              y=max_global_norm))
         for p, g in params_grads:
             if g is None:
                 continue
@@ -157,29 +157,25 @@ def group_sharded_parallel(model,
 
     # convert model/optimizer
     if in_dygraph_mode():
-        optimizer = GroupShardedOptimizerStage2(
-            params=sharded_params,
-            optim=optimizer,
-            group=group,
-            offload=offload)
-        model = GroupShardedStage2(
-            model,
-            optimizer,
-            group=group,
-            sync_buffers=sync_buffers,
-            buffer_max_size=buffer_max_size)
+        optimizer = GroupShardedOptimizerStage2(params=sharded_params,
+                                                optim=optimizer,
+                                                group=group,
+                                                offload=offload)
+        model = GroupShardedStage2(model,
+                                   optimizer,
+                                   group=group,
+                                   sync_buffers=sync_buffers,
+                                   buffer_max_size=buffer_max_size)
     else:
-        optimizer = ShardingOptimizerStage2(
-            params=sharded_params,
-            optim=optimizer,
-            group=group,
-            offload=offload)
-        model = ShardingStage2(
-            model,
-            optimizer,
-            group=group,
-            sync_buffers=sync_buffers,
-            buffer_max_size=buffer_max_size)
+        optimizer = ShardingOptimizerStage2(params=sharded_params,
+                                            optim=optimizer,
+                                            group=group,
+                                            offload=offload)
+        model = ShardingStage2(model,
+                               optimizer,
+                               group=group,
+                               sync_buffers=sync_buffers,
+                               buffer_max_size=buffer_max_size)
 
     clear_func = model._clear_gradients
     for opt in model._sharding_optimizers:

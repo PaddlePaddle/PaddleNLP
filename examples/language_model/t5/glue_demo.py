@@ -17,6 +17,7 @@ from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 
 
 class Demo:
+
     def __init__(self, model_name_or_path="t5-base", max_predict_len=5):
         self.tokenizer = T5Tokenizer.from_pretrained(model_name_or_path)
         print("Loading the model parameters, please wait...")
@@ -33,8 +34,8 @@ class Demo:
 
         ids = self.tokenizer(inputs)["input_ids"]
         input_ids = paddle.to_tensor([ids], dtype="int64")
-        outputs = self.model.generate(
-            input_ids, max_length=max_predict_len)[0][0]
+        outputs = self.model.generate(input_ids,
+                                      max_length=max_predict_len)[0][0]
         decode_outputs = self.tokenizer.decode(
             outputs, skip_special_tokens=True).strip()
         print(f"input text: {inputs}")
@@ -65,18 +66,18 @@ if __name__ == "__main__":
         max_predict_len = label_length_map[text.split()[0]]
         demo.generate(text, max_predict_len=max_predict_len)
 
-    # input text: sst2 sentence: contains no wit , only labored gags 
+    # input text: sst2 sentence: contains no wit , only labored gags
     # label: negative
     # ==================================================
-    # input text: sst2 sentence: that loves its characters and communicates something rather beautiful about human nature 
+    # input text: sst2 sentence: that loves its characters and communicates something rather beautiful about human nature
     # label: positive
     # ==================================================
     # input text: cola sentence: Mickey looked it up.
     # label: acceptable
     # ==================================================
-    # input text: sst2 sentence: remains utterly satisfied to remain the same throughout 
+    # input text: sst2 sentence: remains utterly satisfied to remain the same throughout
     # label: positive
     # ==================================================
-    # input text: sst2 sentence: a well-made and often lovely depiction of the mysteries of friendship 
+    # input text: sst2 sentence: a well-made and often lovely depiction of the mysteries of friendship
     # label: positive
     # ==================================================

@@ -40,10 +40,11 @@ class PredictionInputWithSchema(
 
 
 class TokenPrediction(
-        namedtuple('TokenPrediction', (
-            'scores', 'aligned_tokens', 'utterance_attention_results',
-            'schema_attention_results', 'query_attention_results',
-            'copy_switch', 'query_scores', 'query_tokens', 'decoder_state'))):
+        namedtuple(
+            'TokenPrediction',
+            ('scores', 'aligned_tokens', 'utterance_attention_results',
+             'schema_attention_results', 'query_attention_results',
+             'copy_switch', 'query_scores', 'query_tokens', 'decoder_state'))):
     """A token prediction."""
     __slots__ = ()
 
@@ -53,8 +54,8 @@ def score_schema_tokens(input_schema, schema_states, scorer):
     scores = paddle.t(paddle.mm(paddle.t(scorer),
                                 schema_states))  # num_tokens x 1
     if scores.shape[0] != len(input_schema):
-        raise ValueError("Got " + str(scores.shape[0]) + " scores for " + str(
-            len(input_schema)) + " schema tokens")
+        raise ValueError("Got " + str(scores.shape[0]) + " scores for " +
+                         str(len(input_schema)) + " schema tokens")
     return scores, input_schema.column_names_surface_form
 
 
@@ -62,8 +63,8 @@ def score_query_tokens(previous_query, previous_query_states, scorer):
     scores = paddle.t(paddle.mm(paddle.t(scorer),
                                 previous_query_states))  # num_tokens x 1
     if scores.shape[0] != len(previous_query):
-        raise ValueError("Got " + str(scores.shape[0]) + " scores for " + str(
-            len(previous_query)) + " query tokens")
+        raise ValueError("Got " + str(scores.shape[0]) + " scores for " +
+                         str(len(previous_query)) + " query tokens")
     return scores, previous_query
 
 
@@ -83,8 +84,9 @@ class TokenPredictor(paddle.nn.Layer):
         super().__init__()
         self.params = params
         self.vocabulary = vocabulary
-        self.attention_module = Attention(
-            params.decoder_state_size, attention_key_size, attention_key_size)
+        self.attention_module = Attention(params.decoder_state_size,
+                                          attention_key_size,
+                                          attention_key_size)
 
         bias_initializer = paddle.nn.initializer.Uniform(low=-0.1, high=0.1)
 
@@ -116,9 +118,9 @@ class TokenPredictor(paddle.nn.Layer):
         scores = paddle.t(self.vocabulary_Linear(state))
 
         if scores.shape[0] != len(self.vocabulary.inorder_tokens):
-            raise ValueError("Got " + str(scores.shape[
-                0]) + " scores for " + str(
-                    len(self.vocabulary.inorder_tokens)) + " vocabulary items")
+            raise ValueError("Got " + str(scores.shape[0]) + " scores for " +
+                             str(len(self.vocabulary.inorder_tokens)) +
+                             " vocabulary items")
 
         return scores, self.vocabulary.inorder_tokens
 
@@ -170,8 +172,8 @@ class SchemaTokenPredictor(TokenPredictor):
             self.start_query_attention_vector = self.create_parameter(
                 [params.encoder_state_size],
                 dtype='float32',
-                default_initializer=paddle.nn.initializer.Uniform(
-                    low=-0.1, high=0.1))
+                default_initializer=paddle.nn.initializer.Uniform(low=-0.1,
+                                                                  high=0.1))
 
         state_transform_weights = paddle.ParamAttr(initializer=_initializer)
         if params.use_schema_attention and self.params.use_query_attention:
@@ -275,20 +277,17 @@ class SchemaTokenPredictor(TokenPredictor):
                     None, None, query_attention_results)
 
         if self.params.use_schema_attention and self.params.use_query_attention:
-            state_and_attn = paddle.concat(
-                [
-                    decoder_state, utterance_attention_results.vector,
-                    schema_attention_results.vector,
-                    query_attention_results.vector
-                ],
-                axis=0)
+            state_and_attn = paddle.concat([
+                decoder_state, utterance_attention_results.vector,
+                schema_attention_results.vector, query_attention_results.vector
+            ],
+                                           axis=0)
         elif self.params.use_schema_attention:
-            state_and_attn = paddle.concat(
-                [
-                    decoder_state, utterance_attention_results.vector,
-                    schema_attention_results.vector
-                ],
-                axis=0)
+            state_and_attn = paddle.concat([
+                decoder_state, utterance_attention_results.vector,
+                schema_attention_results.vector
+            ],
+                                           axis=0)
         else:
             state_and_attn = paddle.concat(
                 [decoder_state, utterance_attention_results.vector], axis=0)
@@ -325,13 +324,12 @@ class SchemaTokenPredictor(TokenPredictor):
         if self.params.use_previous_query and len(previous_queries) > 0:
             if self.params.use_copy_switch:
                 copy_switch = self._get_copy_switch(state_and_attn)
-            for turn, (
-                    previous_query, previous_query_state
-            ) in enumerate(zip(previous_queries, previous_query_states)):
+            for turn, (previous_query, previous_query_state) in enumerate(
+                    zip(previous_queries, previous_query_states)):
 
                 assert len(previous_query) == len(previous_query_state)
-                previous_query_state = paddle.stack(
-                    previous_query_state, axis=1)
+                previous_query_state = paddle.stack(previous_query_state,
+                                                    axis=1)
                 query_scores, query_tokens = score_query_tokens(
                     previous_query, previous_query_state,
                     self._get_query_token_scorer(intermediate_state))
@@ -342,10 +340,11 @@ class SchemaTokenPredictor(TokenPredictor):
                 [final_scores, copy_score[2] * query_scores], axis=0)
             aligned_tokens += query_tokens
 
-        return TokenPrediction(
-            final_scores, aligned_tokens, utterance_attention_results,
-            schema_attention_results, query_attention_results, copy_switch,
-            query_scores, query_tokens, decoder_state)
+        return TokenPrediction(final_scores, aligned_tokens,
+                               utterance_attention_results,
+                               schema_attention_results,
+                               query_attention_results, copy_switch,
+                               query_scores, query_tokens, decoder_state)
 
 
 class AnonymizationTokenPredictor(TokenPredictor):
@@ -407,8 +406,8 @@ class AnonymizationTokenPredictor(TokenPredictor):
             input_sequence, attention_results.scores)
 
         if anonymized_scores:
-            final_scores = paddle.concat(
-                [final_scores, anonymized_scores], axis=0)
+            final_scores = paddle.concat([final_scores, anonymized_scores],
+                                         axis=0)
             aligned_tokens.extend(anonymized_tokens)
 
         final_scores = final_scores.squeeze()

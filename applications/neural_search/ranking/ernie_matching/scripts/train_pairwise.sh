@@ -1,5 +1,5 @@
 # gpu
-python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
+python -u -m paddle.distributed.launch --gpus="0,1,2,3" train_pairwise.py \
         --device gpu \
         --save_dir ./checkpoints \
         --batch_size 32 \
@@ -7,7 +7,7 @@ python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
         --margin 0.1 \
         --eval_step 100 \
         --train_file sort/train_pairwise.csv \
-        --test_file sort/test_pairwise.csv
+        --test_file sort/dev_pairwise.csv
 
 # cpu
 # python train_pairwise.py \
@@ -18,4 +18,4 @@ python -u -m paddle.distributed.launch --gpus "0,2,3,4" train_pairwise.py \
 #         --margin 0.1 \
 #         --eval_step 100 \
 #         --train_file sort/train_pairwise.csv \
-#         --test_file sort/test_pairwise.csv
+#         --test_file sort/dev_pairwise.csv

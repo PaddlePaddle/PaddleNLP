@@ -27,21 +27,18 @@ def compute_align_loss(model, desc_enc, example):
     root_node = example.tree
     rel_cols = list(
         reversed([
-            val
-            for val in model.ast_wrapper.find_all_descendants_of_type(root_node,
-                                                                      'column')
+            val for val in model.ast_wrapper.find_all_descendants_of_type(
+                root_node, 'column')
         ]))
     rel_tabs = list(
         reversed([
-            val
-            for val in model.ast_wrapper.find_all_descendants_of_type(root_node,
-                                                                      'table')
+            val for val in model.ast_wrapper.find_all_descendants_of_type(
+                root_node, 'table')
         ]))
     rel_vals = np.abs(
         list(
             reversed([
-                val
-                for val in model.ast_wrapper.find_all_descendants_of_type(
+                val for val in model.ast_wrapper.find_all_descendants_of_type(
                     root_node, 'value')
             ])))
 
@@ -71,14 +68,16 @@ def compute_align_loss(model, desc_enc, example):
 def compute_pointer_with_align(model, node_type, prev_state, prev_action_emb,
                                parent_h, parent_action_emb, desc_enc):
     """compute_pointer_with_align"""
-    new_state, attention_weights = model._update_state(
-        node_type, prev_state, prev_action_emb, parent_h, parent_action_emb,
-        desc_enc)
+    new_state, attention_weights = model._update_state(node_type, prev_state,
+                                                       prev_action_emb,
+                                                       parent_h,
+                                                       parent_action_emb,
+                                                       desc_enc)
     # output shape: batch (=1) x emb_size
     output = new_state[0]
     memory_pointer_logits = model.pointers[node_type](output, desc_enc.memory)
-    memory_pointer_probs = paddle.nn.functional.softmax(
-        memory_pointer_logits, axis=1)
+    memory_pointer_probs = paddle.nn.functional.softmax(memory_pointer_logits,
+                                                        axis=1)
     # pointer_logits shape: batch (=1) x num choices
     if node_type == "column":
         pointer_probs = paddle.mm(memory_pointer_probs, desc_enc.m2c_align_mat)

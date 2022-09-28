@@ -17,7 +17,6 @@ import argparse
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Stack, Tuple, Vocab
 
 from model import SimNet
@@ -83,14 +82,16 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
 if __name__ == "__main__":
     paddle.set_device(args.device)
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
     tokenizer = JiebaTokenizer(vocab)
     label_map = {0: 'dissimilar', 1: 'similar'}
 
     # Constructs the newtork.
-    model = SimNet(
-        network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
+    model = SimNet(network=args.network,
+                   vocab_size=len(vocab),
+                   num_classes=len(label_map))
 
     # Loads model parameters.
     state_dict = paddle.load(args.params_path)
@@ -104,12 +105,11 @@ if __name__ == "__main__":
         ['小蝌蚪找妈妈怎么样', '小蝌蚪找妈妈是谁画的'],
     ]
     examples = preprocess_prediction_data(data, tokenizer)
-    results = predict(
-        model,
-        examples,
-        label_map=label_map,
-        batch_size=args.batch_size,
-        pad_token_id=vocab.token_to_idx.get('[PAD]', 0))
+    results = predict(model,
+                      examples,
+                      label_map=label_map,
+                      batch_size=args.batch_size,
+                      pad_token_id=vocab.token_to_idx.get('[PAD]', 0))
 
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

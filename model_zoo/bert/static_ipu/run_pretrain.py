@@ -26,10 +26,11 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from scipy.stats import truncnorm
 
 from dataset_ipu import PretrainingHDF5DataLoader
-from modeling import (
-    BertModel, DeviceScope, IpuBertConfig, IpuBertPretrainingMLMAccAndLoss,
-    IpuBertPretrainingMLMHeads, IpuBertPretrainingNSPAccAndLoss,
-    IpuBertPretrainingNSPHeads)
+from modeling import (BertModel, DeviceScope, IpuBertConfig,
+                      IpuBertPretrainingMLMAccAndLoss,
+                      IpuBertPretrainingMLMHeads,
+                      IpuBertPretrainingNSPAccAndLoss,
+                      IpuBertPretrainingNSPHeads)
 from utils import load_custom_ops, parse_args, ProgressBar, ProgressFunc
 
 
@@ -45,22 +46,27 @@ def set_seed(seed):
 
 def create_data_holder(args):
     bs = args.micro_batch_size
-    indices = paddle.static.data(
-        name="indices", shape=[bs * args.seq_len], dtype="int32")
-    segments = paddle.static.data(
-        name="segments", shape=[bs * args.seq_len], dtype="int32")
-    positions = paddle.static.data(
-        name="positions", shape=[bs * args.seq_len], dtype="int32")
-    mask_tokens_mask_idx = paddle.static.data(
-        name="mask_tokens_mask_idx", shape=[bs, 1], dtype="int32")
-    sequence_mask_idx = paddle.static.data(
-        name="sequence_mask_idx", shape=[bs, 1], dtype="int32")
-    masked_lm_ids = paddle.static.data(
-        name="masked_lm_ids",
-        shape=[bs, args.max_predictions_per_seq],
-        dtype="int32")
-    next_sentence_labels = paddle.static.data(
-        name="next_sentence_labels", shape=[bs], dtype="int32")
+    indices = paddle.static.data(name="indices",
+                                 shape=[bs * args.seq_len],
+                                 dtype="int32")
+    segments = paddle.static.data(name="segments",
+                                  shape=[bs * args.seq_len],
+                                  dtype="int32")
+    positions = paddle.static.data(name="positions",
+                                   shape=[bs * args.seq_len],
+                                   dtype="int32")
+    mask_tokens_mask_idx = paddle.static.data(name="mask_tokens_mask_idx",
+                                              shape=[bs, 1],
+                                              dtype="int32")
+    sequence_mask_idx = paddle.static.data(name="sequence_mask_idx",
+                                           shape=[bs, 1],
+                                           dtype="int32")
+    masked_lm_ids = paddle.static.data(name="masked_lm_ids",
+                                       shape=[bs, args.max_predictions_per_seq],
+                                       dtype="int32")
+    next_sentence_labels = paddle.static.data(name="next_sentence_labels",
+                                              shape=[bs],
+                                              dtype="int32")
     return [
         indices, segments, positions, mask_tokens_mask_idx, sequence_mask_idx,
         masked_lm_ids, next_sentence_labels
@@ -231,21 +237,24 @@ def main(args):
     # Encoder Layers
     bert_model = BertModel(config, custom_ops)
     encoders, word_embedding = bert_model(
-        indices, segments, positions,
-        [mask_tokens_mask_idx, sequence_mask_idx])
+        indices, segments, positions, [mask_tokens_mask_idx, sequence_mask_idx])
 
     # PretrainingHeads
-    mlm_heads = IpuBertPretrainingMLMHeads(
-        args.hidden_size, args.vocab_size, args.max_position_embeddings,
-        args.max_predictions_per_seq, args.seq_len)
-    nsp_heads = IpuBertPretrainingNSPHeads(
-        args.hidden_size, args.max_predictions_per_seq, args.seq_len)
+    mlm_heads = IpuBertPretrainingMLMHeads(args.hidden_size, args.vocab_size,
+                                           args.max_position_embeddings,
+                                           args.max_predictions_per_seq,
+                                           args.seq_len)
+    nsp_heads = IpuBertPretrainingNSPHeads(args.hidden_size,
+                                           args.max_predictions_per_seq,
+                                           args.seq_len)
 
     # AccAndLoss
-    nsp_criterion = IpuBertPretrainingNSPAccAndLoss(
-        args.micro_batch_size, args.ignore_index, custom_ops)
-    mlm_criterion = IpuBertPretrainingMLMAccAndLoss(
-        args.micro_batch_size, args.ignore_index, custom_ops)
+    nsp_criterion = IpuBertPretrainingNSPAccAndLoss(args.micro_batch_size,
+                                                    args.ignore_index,
+                                                    custom_ops)
+    mlm_criterion = IpuBertPretrainingMLMAccAndLoss(args.micro_batch_size,
+                                                    args.ignore_index,
+                                                    custom_ops)
 
     with config.nsp_scope:
         nsp_out = nsp_heads(encoders)
@@ -260,12 +269,11 @@ def main(args):
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, args.max_steps,
                                          args.warmup_steps)
     # optimizer
-    optimizer = paddle.optimizer.Lamb(
-        learning_rate=lr_scheduler,
-        lamb_weight_decay=args.weight_decay,
-        beta1=args.beta1,
-        beta2=args.beta2,
-        epsilon=args.adam_epsilon)
+    optimizer = paddle.optimizer.Lamb(learning_rate=lr_scheduler,
+                                      lamb_weight_decay=args.weight_decay,
+                                      beta1=args.beta1,
+                                      beta2=args.beta2,
+                                      epsilon=args.adam_epsilon)
     optimizer.minimize(total_loss)
 
     # Static executor
@@ -300,8 +308,8 @@ def main(args):
     fetch_list = [mlm_acc.name, mlm_loss.name, nsp_acc.name, nsp_loss.name]
 
     # Compile program for IPU
-    ipu_compiler = paddle.static.IpuCompiledProgram(
-        main_program, ipu_strategy=ipu_strategy)
+    ipu_compiler = paddle.static.IpuCompiledProgram(main_program,
+                                                    ipu_strategy=ipu_strategy)
     logging.info(f'start compiling, please wait some minutes')
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
@@ -367,9 +375,9 @@ def main(args):
 
         if global_step % args.save_steps == 0:
             ipu_compiler._backend.weights_to_host()
-            paddle.static.save(main_program.org_program,
-                               os.path.join(args.output_dir,
-                                            'step_{}'.format(global_step)))
+            paddle.static.save(
+                main_program.org_program,
+                os.path.join(args.output_dir, 'step_{}'.format(global_step)))
 
         if global_step >= args.max_steps:
             ipu_compiler._backend.weights_to_host()
@@ -387,20 +395,18 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(name)s %(levelname)s %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S %a')
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+                        datefmt='%Y-%m-%d %H:%M:%S %a')
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir, exist_ok=True)
 
     if args.wandb:
         import wandb
-        wandb.init(
-            project="paddle-base-bert",
-            settings=wandb.Settings(console='off'),
-            name='paddle-base-bert')
+        wandb.init(project="paddle-base-bert",
+                   settings=wandb.Settings(console='off'),
+                   name='paddle-base-bert')
         wandb_config = vars(args)
         wandb_config["global_batch_size"] = args.batch_size
         wandb.config.update(args)

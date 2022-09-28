@@ -1,5 +1,4 @@
 import paddle
-import paddle.fluid as fluid
 import paddle.distributed as dist
 
 

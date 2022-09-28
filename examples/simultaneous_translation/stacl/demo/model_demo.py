@@ -47,9 +47,9 @@ class SimultaneousTransformerDemo(SimultaneousTransformer):
         src_slf_attn_bias = base_attn_bias
         src_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = paddle.tile(base_attn_bias, [1, 1, 1, 1])
-        src_pos = paddle.cast(
-            src_word != self.bos_id, dtype="int64") * paddle.arange(
-                start=0, end=src_max_len)
+        src_pos = paddle.cast(src_word != self.bos_id,
+                              dtype="int64") * paddle.arange(start=0,
+                                                             end=src_max_len)
         src_emb = self.src_word_embedding(src_word)
         src_pos_emb = self.src_pos_embedding(src_pos)
         src_emb = src_emb + src_pos_emb
@@ -60,28 +60,33 @@ class SimultaneousTransformerDemo(SimultaneousTransformer):
 
         # constant number
         batch_size = enc_outputs[-1].shape[0]
-        max_len = (
-            enc_outputs[-1].shape[1] + 20) if max_len is None else max_len
-        end_token_tensor = paddle.full(
-            shape=[batch_size, 1], fill_value=self.eos_id, dtype="int64")
+        max_len = (enc_outputs[-1].shape[1] +
+                   20) if max_len is None else max_len
+        end_token_tensor = paddle.full(shape=[batch_size, 1],
+                                       fill_value=self.eos_id,
+                                       dtype="int64")
 
         predict_ids = []
-        log_probs = paddle.full(
-            shape=[batch_size, 1], fill_value=0, dtype="float32")
+        log_probs = paddle.full(shape=[batch_size, 1],
+                                fill_value=0,
+                                dtype="float32")
         if not bos_id:
-            trg_word = paddle.full(
-                shape=[batch_size, 1], fill_value=self.bos_id, dtype="int64")
+            trg_word = paddle.full(shape=[batch_size, 1],
+                                   fill_value=self.bos_id,
+                                   dtype="int64")
         else:
-            trg_word = paddle.full(
-                shape=[batch_size, 1], fill_value=bos_id, dtype="int64")
+            trg_word = paddle.full(shape=[batch_size, 1],
+                                   fill_value=bos_id,
+                                   dtype="int64")
 
         # init states (caches) for transformer
         if not caches:
             caches = self.decoder.gen_cache(enc_outputs[-1], do_zip=False)
 
         for i in range(max_len):
-            trg_pos = paddle.full(
-                shape=trg_word.shape, fill_value=i, dtype="int64")
+            trg_pos = paddle.full(shape=trg_word.shape,
+                                  fill_value=i,
+                                  dtype="int64")
             trg_emb = self.trg_word_embedding(trg_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb
@@ -102,8 +107,8 @@ class SimultaneousTransformerDemo(SimultaneousTransformer):
                     dec_input, [_e], None,
                     trg_src_attn_bias[:, :, :, :_e.shape[1]], caches)
 
-            dec_output = paddle.reshape(
-                dec_output, shape=[-1, dec_output.shape[-1]])
+            dec_output = paddle.reshape(dec_output,
+                                        shape=[-1, dec_output.shape[-1]])
 
             logits = self.linear(dec_output)
             step_log_probs = paddle.log(F.softmax(logits, axis=-1))

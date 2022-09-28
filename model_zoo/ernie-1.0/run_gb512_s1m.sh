@@ -15,8 +15,10 @@ python -u  -m paddle.distributed.launch \
     run_pretrain.py \
     --model_type "ernie" \
     --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
+    --split 949,50,1 \
     --max_seq_len 512 \
     --micro_batch_size 64 \
     --use_amp true \

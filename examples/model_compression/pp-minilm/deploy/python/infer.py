@@ -38,67 +38,81 @@ def parse_args():
         default='afqmc',
         type=str,
         help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_type",
         default='ppminilm',
         type=str,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_name_or_path",
         default='ppminilm-6l-768h',
         type=str,
-        help="The directory or name of model.", )
+        help="The directory or name of model.",
+    )
     parser.add_argument(
         "--model_path",
         default='./quant_models/model',
         type=str,
         required=True,
-        help="The path prefix of inference model to be used.", )
+        help="The path prefix of inference model to be used.",
+    )
     parser.add_argument(
         "--device",
         default="gpu",
         choices=["gpu", "cpu", "xpu"],
-        help="Device selected for inference.", )
+        help="Device selected for inference.",
+    )
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size for predict.", )
+        help="Batch size for predict.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
     parser.add_argument(
         "--perf_warmup_steps",
         default=20,
         type=int,
-        help="Warmup steps for performance test.", )
+        help="Warmup steps for performance test.",
+    )
     parser.add_argument(
         "--use_trt",
         action='store_true',
-        help="Whether to use inference engin TensorRT.", )
+        help="Whether to use inference engin TensorRT.",
+    )
     parser.add_argument(
         "--perf",
         action='store_true',
-        help="Whether to test performance.", )
+        help="Whether to test performance.",
+    )
     parser.add_argument(
         "--collect_shape",
         action='store_true',
-        help="Whether collect shape range info.", )
+        help="Whether collect shape range info.",
+    )
     parser.add_argument(
         "--use_faster_tokenizer",
         type=distutils.util.strtobool,
         default=True,
-        help="Whether to use FasterTokenizer to accelerate training or further inference."
+        help=
+        "Whether to use FasterTokenizer to accelerate training or further inference."
     )
     parser.add_argument(
         "--int8",
         action='store_true',
-        help="Whether to use int8 inference.", )
+        help="Whether to use int8 inference.",
+    )
     args = parser.parse_args()
     return args
 
@@ -116,6 +130,7 @@ def evaluate(outputs, metric, data_loader):
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -279,9 +294,8 @@ class Predictor(object):
                     logits = self.predict_batch([batches[i]])
                 else:
                     logits = self.predict_batch([batches1[i], batches2[i]])
-                correct = metric.compute(
-                    paddle.to_tensor(logits),
-                    paddle.to_tensor(batched_labels[i]))
+                correct = metric.compute(paddle.to_tensor(logits),
+                                         paddle.to_tensor(batched_labels[i]))
                 metric.update(correct)
 
             res = metric.accumulate()
@@ -291,11 +305,10 @@ class Predictor(object):
                               label_list):
         examples = []
         for example in data:
-            example = convert_example(
-                example,
-                label_list,
-                tokenizer,
-                max_seq_length=args.max_seq_length)
+            example = convert_example(example,
+                                      label_list,
+                                      tokenizer,
+                                      max_seq_length=args.max_seq_length)
             examples.append(example)
 
         return examples
@@ -307,16 +320,18 @@ class Predictor(object):
         ]
         if args.perf:
             for i, batch in enumerate(batches):
-                examples = self.convert_predict_batch(
-                    args, batch, tokenizer, batchify_fn, dataset.label_list)
+                examples = self.convert_predict_batch(args, batch, tokenizer,
+                                                      batchify_fn,
+                                                      dataset.label_list)
                 input_ids, segment_ids, label = batchify_fn(examples)
                 output = self.predict_batch([input_ids, segment_ids])
                 if i > args.perf_warmup_steps:
                     break
             time1 = time.time()
             for batch in batches:
-                examples = self.convert_predict_batch(
-                    args, batch, tokenizer, batchify_fn, dataset.label_list)
+                examples = self.convert_predict_batch(args, batch, tokenizer,
+                                                      batchify_fn,
+                                                      dataset.label_list)
                 input_ids, segment_ids, _ = batchify_fn(examples)
                 output = self.predict_batch([input_ids, segment_ids])
 
@@ -327,12 +342,13 @@ class Predictor(object):
             metric = METRIC_CLASSES[args.task_name]()
             metric.reset()
             for i, batch in enumerate(batches):
-                examples = self.convert_predict_batch(
-                    args, batch, tokenizer, batchify_fn, dataset.label_list)
+                examples = self.convert_predict_batch(args, batch, tokenizer,
+                                                      batchify_fn,
+                                                      dataset.label_list)
                 input_ids, segment_ids, label = batchify_fn(examples)
                 output = self.predict_batch([input_ids, segment_ids])
-                correct = metric.compute(
-                    paddle.to_tensor(output), paddle.to_tensor(label))
+                correct = metric.compute(paddle.to_tensor(output),
+                                         paddle.to_tensor(label))
                 metric.update(correct)
 
             res = metric.accumulate()
@@ -355,8 +371,9 @@ def main():
     if not args.use_faster_tokenizer:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     else:
-        trans_func = partial(
-            convert_example, label_list=dev_ds.label_list, is_test=False)
+        trans_func = partial(convert_example,
+                             label_list=dev_ds.label_list,
+                             is_test=False)
         dev_ds = dev_ds.map(trans_func, lazy=True)
     if not args.use_faster_tokenizer:
         batchify_fn = lambda samples, fn=Tuple(

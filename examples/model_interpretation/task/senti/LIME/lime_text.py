@@ -56,10 +56,9 @@ class TextDomainMapper(explanation.DomainMapper):
             examples: ('bad', 1) or ('bad_3-6-12', 1)
         """
         if positions:
-            exp = [('%s_%s' % (
-                self.indexed_string.word(x[0]),
-                '-'.join(map(str, self.indexed_string.string_position(x[0])))),
-                    x[1]) for x in exp]
+            exp = [('%s_%s' % (self.indexed_string.word(x[0]), '-'.join(
+                map(str, self.indexed_string.string_position(x[0])))), x[1])
+                   for x in exp]
         else:
             exp = [(self.indexed_string.word(x[0]), x[1]) for x in exp]
         return exp
@@ -83,8 +82,8 @@ class TextDomainMapper(explanation.DomainMapper):
         """
         if not text:
             return u''
-        text = (self.indexed_string.raw_string()
-                .encode('utf-8', 'xmlcharrefreplace').decode('utf-8'))
+        text = (self.indexed_string.raw_string().encode(
+            'utf-8', 'xmlcharrefreplace').decode('utf-8'))
         text = re.sub(r'[<>&]', '|', text)
         exp = [(self.indexed_string.word(x[0]),
                 self.indexed_string.string_position(x[0]), x[1]) for x in exp]
@@ -161,8 +160,9 @@ class IndexedString(object):
         for i, word in enumerate(self.as_np):
             if word in non_vocab:
                 continue
-            if (valid_word(word) and self.language == 'en') or (
-                    not valid_word(word) and self.language == 'ch'):
+            if (valid_word(word)
+                    and self.language == 'en') or (not valid_word(word)
+                                                   and self.language == 'ch'):
                 non_vocab.add(word)
                 continue
             if bow:
@@ -407,8 +407,9 @@ class LimeTextExplainer(object):
         kernel_fn = partial(kernel, kernel_width=kernel_width)
 
         self.random_state = check_random_state(random_state)
-        self.base = lime_base.LimeBase(
-            kernel_fn, verbose, random_state=self.random_state)
+        self.base = lime_base.LimeBase(kernel_fn,
+                                       verbose,
+                                       random_state=self.random_state)
         self.class_names = class_names
         self.vocabulary = None
         self.feature_selection = feature_selection
@@ -482,10 +483,9 @@ class LimeTextExplainer(object):
 
         if self.class_names is None:
             self.class_names = [str(x) for x in range(yss[0].shape[0])]
-        ret_exp = explanation.Explanation(
-            domain_mapper=domain_mapper,
-            class_names=self.class_names,
-            random_state=self.random_state)
+        ret_exp = explanation.Explanation(domain_mapper=domain_mapper,
+                                          class_names=self.class_names,
+                                          random_state=self.random_state)
         ret_exp.predict_proba = yss[0]
         if top_labels:
             labels = np.argsort(yss[0])[-top_labels:]
@@ -604,7 +604,7 @@ class LimeTextExplainer(object):
 
                 token_ids_list.append(token_ids)
             else:
-                if len(text) == 0:  # TODO 
+                if len(text) == 0:  # TODO
                     text = perturb_text[0]
                 tokens = tokenizer.tokenize(text)
                 token_ids = tokenizer.convert_tokens_to_ids(tokens)
@@ -654,12 +654,12 @@ class LimeTextExplainer(object):
 
         epoch_num = math.ceil(len(token_ids_np) / batch)
         for idx in range(epoch_num):
-            token_ids_tensor = paddle.fluid.core_avx.VarBase(
+            token_ids_tensor = paddle.Tensor(
                 value=token_ids_np[idx * batch:(idx + 1) * batch],
-                place=paddle.fluid.core.CUDAPlace(0),
+                place=paddle.CUDAPlace(0),
                 stop_gradient=True)
             if if_lstm:
-                seq_len_tensor = paddle.fluid.core_avx.VarBase(
+                seq_len_tensor = paddle.Tensor(
                     value=seq_len_np[idx * batch:(idx + 1) * batch],
                     place=token_ids_tensor.place,
                     stop_gradient=token_ids_tensor.stop_gradient)
@@ -667,7 +667,7 @@ class LimeTextExplainer(object):
                     token_ids_tensor,
                     seq_len_tensor)[0]  # label: Tensor[num_samples, 2]
             else:
-                s_ids_tensor = paddle.fluid.core_avx.VarBase(
+                s_ids_tensor = paddle.Tensor(
                     value=s_ids_np[idx * batch:(idx + 1) * batch],
                     place=token_ids_tensor.place,
                     stop_gradient=token_ids_tensor.stop_gradient)

@@ -34,10 +34,12 @@ class LCSTSNew(DatasetBuilder):
 
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
-        'train': META_INFO(
+        'train':
+        META_INFO(
             os.path.join('train.json'), '4e06fd1cfd5e7f0380499df8cbe17237',
             'https://bj.bcebos.com/paddlenlp/datasets/LCSTS_new/train.json'),
-        'dev': META_INFO(
+        'dev':
+        META_INFO(
             os.path.join('dev.json'), '9c39d49d25d5296bdc537409208ddc85',
             'https://bj.bcebos.com/paddlenlp/datasets/LCSTS_new/dev.json')
     }

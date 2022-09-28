@@ -61,8 +61,9 @@ class TrainTreeTraversal(TreeTraversal):
 
         def compute_loss(self, outer, token, extra_tokens):
             """compute loss"""
-            return outer.model.gen_token_loss(
-                self.lstm_output, self.gen_logodds, token, outer.desc_enc)
+            return outer.model.gen_token_loss(self.lstm_output,
+                                              self.gen_logodds, token,
+                                              outer.desc_enc)
 
     def __init__(self, model, desc_enc, debug=False):
         """__init__"""
@@ -88,10 +89,10 @@ class TrainTreeTraversal(TreeTraversal):
         if self.debug:
             choices = []
             probs = []
-            for rule_idx, logprob in sorted(
-                    self.model.rule_infer(node_type, rule_logits),
-                    key=operator.itemgetter(1),
-                    reverse=True):
+            for rule_idx, logprob in sorted(self.model.rule_infer(
+                    node_type, rule_logits),
+                                            key=operator.itemgetter(1),
+                                            reverse=True):
                 _, rule = self.model.preproc.all_rules[rule_idx]
                 choices.append(rule)
                 probs.append(logprob.exp().item())
@@ -108,8 +109,8 @@ class TrainTreeTraversal(TreeTraversal):
         if node_type == 'value':
             loss_weight = 2.0
         self.choice_point = self.XentChoicePoint(logits, weight=loss_weight)
-        self.attention_choice = self.XentChoicePoint(
-            attention_logits, weight=loss_weight)
+        self.attention_choice = self.XentChoicePoint(attention_logits,
+                                                     weight=loss_weight)
 
     def update_using_last_choice(self, last_choice, extra_choice_info,
                                  attention_offset):
@@ -120,8 +121,8 @@ class TrainTreeTraversal(TreeTraversal):
             return
 
         if self.debug and isinstance(self.choice_point, self.XentChoicePoint):
-            valid_choice_indices = [last_choice] + ([] if extra_choice_info is
-                                                    None else extra_choice_info)
+            valid_choice_indices = [last_choice] + (
+                [] if extra_choice_info is None else extra_choice_info)
             self.history[-1].valid_choices = [
                 self.model.preproc.all_rules[rule_idx][1]
                 for rule_idx in valid_choice_indices
@@ -133,8 +134,9 @@ class TrainTreeTraversal(TreeTraversal):
 
         if attention_offset is not None and self.attention_choice is not None:
             self.loss = self.loss.append(
-                self.attention_choice.compute_loss(
-                    self, attention_offset, extra_indices=None))
+                self.attention_choice.compute_loss(self,
+                                                   attention_offset,
+                                                   extra_indices=None))
 
         self.choice_point = None
         self.attention_choice = None

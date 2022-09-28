@@ -99,10 +99,12 @@ class DialogueTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='input_ids'),
-            paddle.static.InputSpec(
-                shape=[None], dtype="int64", name='token_type_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None],
+                                    dtype="int64",
+                                    name='token_type_ids'),
         ]
 
     def _construct_model(self, model):
@@ -136,8 +138,9 @@ class DialogueTask(Task):
                 (batch_size, max_len, max_len), dtype='float32') * -1e4
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
-                mask_data[-seq_len:, -seq_len:] = np.array(
-                    batch_attention_mask[i], dtype='float32')
+                mask_data[-seq_len:,
+                          -seq_len:] = np.array(batch_attention_mask[i],
+                                                dtype='float32')
             # In order to ensure the correct broadcasting mechanism, expand one
             # dimension to the second dimension (n_head of Transformer).
             attention_mask = np.expand_dims(attention_mask, axis=1)
@@ -185,8 +188,9 @@ class DialogueTask(Task):
                 (batch_size, max_len, max_len), dtype='float32') * -1e4
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
-                mask_data[-seq_len:, -seq_len:] = np.array(
-                    batch_attention_mask[i], dtype='float32')
+                mask_data[-seq_len:,
+                          -seq_len:] = np.array(batch_attention_mask[i],
+                                                dtype='float32')
             # In order to ensure the correct broadcasting mechanism, expand one
             # dimension to the second dimension (n_head of Transformer).
             attention_mask = np.expand_dims(attention_mask, axis=1)
@@ -236,11 +240,10 @@ class DialogueTask(Task):
         """
         Convert input strings to tokens.
         """
-        return self._tokenizer.dialogue_encode(
-            texts,
-            max_seq_len=max_seq_len,
-            add_start_token_as_response=True,
-            is_split_into_words=False)
+        return self._tokenizer.dialogue_encode(texts,
+                                               max_seq_len=max_seq_len,
+                                               add_start_token_as_response=True,
+                                               is_split_into_words=False)
 
     def _preprocess(self, inputs):
         """
@@ -272,22 +275,21 @@ class DialogueTask(Task):
         for batch in inputs["batches"]:
             input_ids, token_type_ids, position_ids, attention_mask = map(
                 paddle.to_tensor, batch)
-            ids, scores = self._model.generate(
-                input_ids=input_ids,
-                token_type_ids=token_type_ids,
-                position_ids=position_ids,
-                attention_mask=attention_mask,
-                max_length=64,
-                min_length=1,
-                decode_strategy='sampling',
-                temperature=1.0,
-                top_k=5,
-                top_p=1.0,
-                num_beams=0,
-                length_penalty=1.0,
-                early_stopping=False,
-                use_faster=False,
-                num_return_sequences=1)
+            ids, scores = self._model.generate(input_ids=input_ids,
+                                               token_type_ids=token_type_ids,
+                                               position_ids=position_ids,
+                                               attention_mask=attention_mask,
+                                               max_length=64,
+                                               min_length=1,
+                                               decode_strategy='sampling',
+                                               temperature=1.0,
+                                               top_k=5,
+                                               top_p=1.0,
+                                               num_beams=0,
+                                               length_penalty=1.0,
+                                               early_stopping=False,
+                                               use_faster=False,
+                                               num_return_sequences=1)
             all_ids.extend([ids])
             all_scores.extend([scores])
         inputs['ids'] = all_ids
@@ -353,14 +355,14 @@ class DialogueTask(Task):
 
         if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
             raise ValueError(
-                "the length of `ids` is {}, but the `num_return_sequences` is {}".
-                format(len(ids), num_return_sequences))
+                "the length of `ids` is {}, but the `num_return_sequences` is {}"
+                .format(len(ids), num_return_sequences))
 
         group = []
         tmp = []
         for pred, score in zip(ids, scores):
-            pred_token_ids, pred_tokens = self._post_process_response(pred,
-                                                                      tokenizer)
+            pred_token_ids, pred_tokens = self._post_process_response(
+                pred, tokenizer)
             num_token = len(pred_token_ids)
             if keep_space:
                 response = " ".join(pred_tokens)
@@ -394,12 +396,11 @@ class DialogueTask(Task):
         results = []
         for ids, scores, text in zip(all_ids, all_scores, texts):
             results.extend(
-                self._select_response(
-                    ids,
-                    scores,
-                    self._tokenizer,
-                    num_return_sequences=1,
-                    keep_space=False))
+                self._select_response(ids,
+                                      scores,
+                                      self._tokenizer,
+                                      num_return_sequences=1,
+                                      keep_space=False))
 
         if self._interactive_mode:
             self.context.append(results[0].strip())

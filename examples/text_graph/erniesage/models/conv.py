@@ -44,6 +44,7 @@ class GraphSageConv(nn.Layer):
             weight_attr=paddle.ParamAttr(learning_rate=learning_rate))
 
     def forward(self, graph, feature, act=None):
+
         def _send_func(src_feat, dst_feat, edge_feat):
             return {"msg": src_feat["h"]}
 
@@ -112,17 +113,17 @@ class ErnieSageV2Conv(nn.Layer):
             Tensor Dict: tensor dict which use 'msg' as the key.
         """
         # input_ids
-        cls = paddle.full(
-            shape=[src_feat["term_ids"].shape[0], 1],
-            dtype="int64",
-            fill_value=self.cls_token_id)
+        cls = paddle.full(shape=[src_feat["term_ids"].shape[0], 1],
+                          dtype="int64",
+                          fill_value=self.cls_token_id)
         src_ids = paddle.concat([cls, src_feat["term_ids"]], 1)
 
         dst_ids = dst_feat["term_ids"]
 
         # sent_ids
         sent_ids = paddle.concat(
-            [paddle.zeros_like(src_ids), paddle.ones_like(dst_ids)], 1)
+            [paddle.zeros_like(src_ids),
+             paddle.ones_like(dst_ids)], 1)
         term_ids = paddle.concat([src_ids, dst_ids], 1)
 
         # build position_ids
@@ -150,10 +151,9 @@ class ErnieSageV2Conv(nn.Layer):
         msg = graph.send(self.ernie_send, node_feat={"term_ids": term_ids})
         neigh_feature = graph.recv(reduce_func=_recv_func, msg=msg)
 
-        cls = paddle.full(
-            shape=[term_ids.shape[0], 1],
-            dtype="int64",
-            fill_value=self.cls_token_id)
+        cls = paddle.full(shape=[term_ids.shape[0], 1],
+                          dtype="int64",
+                          fill_value=self.cls_token_id)
         term_ids = paddle.concat([cls, term_ids], 1)
         term_ids.stop_gradient = True
         outputs = self.ernie(term_ids, paddle.zeros_like(term_ids))

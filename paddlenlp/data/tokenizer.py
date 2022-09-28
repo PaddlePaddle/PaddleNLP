@@ -23,6 +23,7 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class BaseTokenizer(object):
+
     def __init__(self, vocab):
         self.vocab = vocab
 

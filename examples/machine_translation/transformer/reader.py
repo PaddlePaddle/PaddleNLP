@@ -35,10 +35,9 @@ def min_max_filer(data, max_len, min_len=0):
 
 def create_data_loader(args, places=None):
     if args.train_file is not None and args.dev_file is not None:
-        datasets = load_dataset(
-            'wmt14ende',
-            data_files=[args.train_file, args.dev_file],
-            splits=('train', 'dev'))
+        datasets = load_dataset('wmt14ende',
+                                data_files=[args.train_file, args.dev_file],
+                                splits=('train', 'dev'))
     elif args.train_file is None and args.dev_file is None:
         datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
     else:
@@ -46,11 +45,10 @@ def create_data_loader(args, places=None):
             "--train_file and --dev_file must be both or neither set. ")
 
     if args.vocab_file is not None:
-        src_vocab = Vocab.load_vocabulary(
-            filepath=args.vocab_file,
-            unk_token=args.unk_token,
-            bos_token=args.bos_token,
-            eos_token=args.eos_token)
+        src_vocab = Vocab.load_vocabulary(filepath=args.vocab_file,
+                                          unk_token=args.unk_token,
+                                          bos_token=args.bos_token,
+                                          eos_token=args.eos_token)
     elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
     else:
@@ -58,8 +56,8 @@ def create_data_loader(args, places=None):
     trg_vocab = src_vocab
 
     padding_vocab = (
-        lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
-    )
+        lambda x:
+        (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor)
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
@@ -75,8 +73,7 @@ def create_data_loader(args, places=None):
     data_loaders = [(None)] * 2
     for i, dataset in enumerate(datasets):
         dataset = dataset.map(convert_samples, lazy=False).filter(
-            partial(
-                min_max_filer, max_len=args.max_length))
+            partial(min_max_filer, max_len=args.max_length))
         batch_sampler = TransformerBatchSampler(
             dataset=dataset,
             batch_size=args.batch_size,
@@ -92,35 +89,33 @@ def create_data_loader(args, places=None):
             pad_seq=args.pad_seq,
             bsz_multi=args.bsz_multi)
 
-        data_loader = DataLoader(
-            dataset=dataset,
-            places=places,
-            batch_sampler=batch_sampler,
-            collate_fn=partial(
-                prepare_train_input,
-                bos_idx=args.bos_idx,
-                eos_idx=args.eos_idx,
-                pad_idx=args.bos_idx,
-                pad_seq=args.pad_seq,
-                dtype=args.input_dtype),
-            num_workers=args.num_workers)
+        data_loader = DataLoader(dataset=dataset,
+                                 places=places,
+                                 batch_sampler=batch_sampler,
+                                 collate_fn=partial(prepare_train_input,
+                                                    bos_idx=args.bos_idx,
+                                                    eos_idx=args.eos_idx,
+                                                    pad_idx=args.bos_idx,
+                                                    pad_seq=args.pad_seq,
+                                                    dtype=args.input_dtype),
+                                 num_workers=args.num_workers)
         data_loaders[i] = (data_loader)
     return data_loaders
 
 
 def create_infer_loader(args):
     if args.test_file is not None:
-        dataset = load_dataset(
-            'wmt14ende', data_files=[args.test_file], splits=['test'])
+        dataset = load_dataset('wmt14ende',
+                               data_files=[args.test_file],
+                               splits=['test'])
     else:
         dataset = load_dataset('wmt14ende', splits=('test'))
 
     if args.vocab_file is not None:
-        src_vocab = Vocab.load_vocabulary(
-            filepath=args.vocab_file,
-            unk_token=args.unk_token,
-            bos_token=args.bos_token,
-            eos_token=args.eos_token)
+        src_vocab = Vocab.load_vocabulary(filepath=args.vocab_file,
+                                          unk_token=args.unk_token,
+                                          bos_token=args.bos_token,
+                                          eos_token=args.eos_token)
     elif not args.benchmark:
         src_vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
     else:
@@ -128,8 +123,8 @@ def create_infer_loader(args):
     trg_vocab = src_vocab
 
     padding_vocab = (
-        lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
-    )
+        lambda x:
+        (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor)
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
@@ -147,28 +142,25 @@ def create_infer_loader(args):
     batch_sampler = SamplerHelper(dataset).batch(
         batch_size=args.infer_batch_size, drop_last=False)
 
-    data_loader = DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=partial(
-            prepare_infer_input,
-            bos_idx=args.bos_idx,
-            eos_idx=args.eos_idx,
-            pad_idx=args.bos_idx,
-            pad_seq=args.pad_seq,
-            dtype=args.input_dtype),
-        num_workers=args.num_workers,
-        return_list=True)
+    data_loader = DataLoader(dataset=dataset,
+                             batch_sampler=batch_sampler,
+                             collate_fn=partial(prepare_infer_input,
+                                                bos_idx=args.bos_idx,
+                                                eos_idx=args.eos_idx,
+                                                pad_idx=args.bos_idx,
+                                                pad_seq=args.pad_seq,
+                                                dtype=args.input_dtype),
+                             num_workers=args.num_workers,
+                             return_list=True)
     return data_loader, trg_vocab.to_tokens
 
 
 def adapt_vocab_size(args):
     if args.vocab_file is not None:
-        src_vocab = Vocab.load_vocabulary(
-            filepath=args.vocab_file,
-            unk_token=args.unk_token,
-            bos_token=args.bos_token,
-            eos_token=args.eos_token)
+        src_vocab = Vocab.load_vocabulary(filepath=args.vocab_file,
+                                          unk_token=args.unk_token,
+                                          bos_token=args.bos_token,
+                                          eos_token=args.eos_token)
     else:
         dataset = load_dataset('wmt14ende', splits=('test'))
         if not args.benchmark:
@@ -178,8 +170,8 @@ def adapt_vocab_size(args):
     trg_vocab = src_vocab
 
     padding_vocab = (
-        lambda x: (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor
-    )
+        lambda x:
+        (x + args.pad_factor - 1) // args.pad_factor * args.pad_factor)
     args.src_vocab_size = padding_vocab(len(src_vocab))
     args.trg_vocab_size = padding_vocab(len(trg_vocab))
 
@@ -194,22 +186,21 @@ def prepare_train_input(insts,
     Put all padded data needed by training into a list.
     """
     word_pad = Pad(pad_idx, dtype=dtype)
-    src_max_len = (
-        max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
-    trg_max_len = (
-        max([len(inst[1]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
+    src_max_len = (max([len(inst[0])
+                        for inst in insts]) + pad_seq) // pad_seq * pad_seq
+    trg_max_len = (max([len(inst[1])
+                        for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([
         inst[0] + [eos_idx] + [pad_idx] * (src_max_len - 1 - len(inst[0]))
         for inst in insts
     ])
     trg_word = word_pad([[bos_idx] + inst[1] + [pad_idx] *
                          (trg_max_len - 1 - len(inst[1])) for inst in insts])
-    lbl_word = np.expand_dims(
-        word_pad([
-            inst[1] + [eos_idx] + [pad_idx] * (trg_max_len - 1 - len(inst[1]))
-            for inst in insts
-        ]),
-        axis=2)
+    lbl_word = np.expand_dims(word_pad([
+        inst[1] + [eos_idx] + [pad_idx] * (trg_max_len - 1 - len(inst[1]))
+        for inst in insts
+    ]),
+                              axis=2)
 
     data_inputs = [src_word, trg_word, lbl_word]
 
@@ -226,14 +217,16 @@ def prepare_infer_input(insts,
     Put all padded data needed by beam search decoder into a list.
     """
     word_pad = Pad(pad_idx, dtype=dtype)
-    src_max_len = (
-        max([len(inst[0]) for inst in insts]) + pad_seq) // pad_seq * pad_seq
+    src_max_len = (max([len(inst[0])
+                        for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([
         inst[0] + [eos_idx] + [pad_idx] * (src_max_len - 1 - len(inst[0]))
         for inst in insts
     ])
 
-    return [src_word, ]
+    return [
+        src_word,
+    ]
 
 
 class SortType(object):
@@ -243,6 +236,7 @@ class SortType(object):
 
 
 class SentenceBatchCreator(object):
+
     def __init__(self, batch_size):
         self.batch = []
         self._batch_size = batch_size
@@ -256,6 +250,7 @@ class SentenceBatchCreator(object):
 
 
 class TokenBatchCreator(object):
+
     def __init__(self, batch_size, bsz_multi=1):
         self._batch = []
         self.max_len = -1
@@ -266,7 +261,7 @@ class TokenBatchCreator(object):
         cur_len = info.max_len
         max_len = max(self.max_len, cur_len)
         if max_len * (len(self._batch) + 1) > self._batch_size:
-            # Make sure the batch size won't be empty. 
+            # Make sure the batch size won't be empty.
             mode_len = max(
                 len(self._batch) // self._bsz_multi * self._bsz_multi,
                 len(self._batch) % self._bsz_multi)
@@ -285,6 +280,7 @@ class TokenBatchCreator(object):
 
 
 class SampleInfo(object):
+
     def __init__(self, i, lens, pad_seq=1):
         self.i = i
         # Take bos and eos into account
@@ -296,6 +292,7 @@ class SampleInfo(object):
 
 
 class TransformerBatchSampler(BatchSampler):
+
     def __init__(self,
                  dataset,
                  batch_size,
@@ -380,8 +377,8 @@ class TransformerBatchSampler(BatchSampler):
 
         # for multi-device
         for batch_id, batch in enumerate(batches):
-            if not self._distribute_mode or (
-                    batch_id % self._nranks == self._local_rank):
+            if not self._distribute_mode or (batch_id % self._nranks
+                                             == self._local_rank):
                 batch_indices = [info.i for info in batch]
                 yield batch_indices
         if self._distribute_mode and len(batches) % self._nranks != 0:
@@ -393,9 +390,8 @@ class TransformerBatchSampler(BatchSampler):
         if hasattr(self, "batch_number"):  #
             return self.batch_number
         if not self._use_token_batch:
-            batch_number = (
-                len(self._dataset) + self._batch_size * self._nranks - 1) // (
-                    self._batch_size * self._nranks)
+            batch_number = (len(self._dataset) + self._batch_size * self._nranks
+                            - 1) // (self._batch_size * self._nranks)
         else:
             # For uncertain batch number, the actual value is self.batch_number
             batch_number = sys.maxsize

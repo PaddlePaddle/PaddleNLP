@@ -15,7 +15,6 @@ import argparse
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Vocab
 
 from model import TextCNNModel
@@ -53,9 +52,8 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
     batches = [
         data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
     ]
-    batchify_fn = lambda samples, fn=Pad(
-        axis=0, pad_val=pad_token_id
-    ): [data for data in fn(samples)]
+    batchify_fn = lambda samples, fn=Pad(axis=0, pad_val=pad_token_id
+                                         ): [data for data in fn(samples)]
 
     results = []
     model.eval()
@@ -74,8 +72,9 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # Load vocab.
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
     label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
 
     # Construct the newtork.
@@ -83,11 +82,10 @@ if __name__ == "__main__":
     num_classes = len(label_map)
     pad_token_id = vocab.to_indices('[PAD]')
 
-    model = TextCNNModel(
-        vocab_size,
-        num_classes,
-        padding_idx=pad_token_id,
-        ngram_filter_sizes=(1, 2, 3))
+    model = TextCNNModel(vocab_size,
+                         num_classes,
+                         padding_idx=pad_token_id,
+                         ngram_filter_sizes=(1, 2, 3))
 
     # Load model parameters.
     state_dict = paddle.load(args.params_path)
@@ -99,11 +97,10 @@ if __name__ == "__main__":
     tokenizer = JiebaTokenizer(vocab)
     examples = preprocess_prediction_data(data, tokenizer, pad_token_id)
 
-    results = predict(
-        model,
-        examples,
-        label_map=label_map,
-        batch_size=args.batch_size,
-        pad_token_id=pad_token_id)
+    results = predict(model,
+                      examples,
+                      label_map=label_map,
+                      batch_size=args.batch_size,
+                      pad_token_id=pad_token_id)
     for idx, text in enumerate(data):
         print('Data: {} \t Label: {}'.format(text, results[idx]))

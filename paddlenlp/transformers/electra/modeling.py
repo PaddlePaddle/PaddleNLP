@@ -13,13 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Tuple
+from dataclasses import dataclass
 import paddle
+from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import TransformerEncoderLayer, TransformerEncoder
 from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (BaseModelOutput, SequenceClassifierOutput,
+                             TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             tuple_output)
 
 __all__ = [
     'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
@@ -64,6 +72,7 @@ ACT2FN = {
 
 
 class TransformerEncoderLayerPro(TransformerEncoderLayer):
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -75,9 +84,10 @@ class TransformerEncoderLayerPro(TransformerEncoderLayer):
                  normalize_before=False,
                  weight_attr=None,
                  bias_attr=None):
-        super(TransformerEncoderLayerPro, self).__init__(
-            d_model, nhead, dim_feedforward, dropout, activation, attn_dropout,
-            act_dropout, normalize_before, weight_attr, bias_attr)
+        super(TransformerEncoderLayerPro,
+              self).__init__(d_model, nhead, dim_feedforward, dropout,
+                             activation, attn_dropout, act_dropout,
+                             normalize_before, weight_attr, bias_attr)
 
     def forward(self, src, src_mask=None, cache=None, output_attentions=False):
         self.self_attn.need_weights = output_attentions
@@ -115,6 +125,7 @@ class TransformerEncoderLayerPro(TransformerEncoderLayer):
 
 
 class TransformerEncoderPro(TransformerEncoder):
+
     def __init__(self, encoder_layer, num_layers, norm=None):
         super(TransformerEncoderPro, self).__init__(encoder_layer, num_layers,
                                                     norm)
@@ -124,34 +135,53 @@ class TransformerEncoderPro(TransformerEncoder):
                 src_mask=None,
                 cache=None,
                 output_attentions=False,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                return_dict=False):
         src_mask = _convert_attention_mask(src_mask, src.dtype)
 
         output = src
         new_caches = []
-        all_attentions = []
-        all_hidden_states = []
+        all_attentions = [] if output_attentions else None
+        all_hidden_states = [] if output_hidden_states else None
         for i, mod in enumerate(self.layers):
+
+            if output_hidden_states:
+                all_hidden_states.append(output)
+
             if cache is None:
-                output = mod(output, src_mask=src_mask)
+                output = mod(output,
+                             src_mask=src_mask,
+                             output_attentions=output_attentions)
             else:
                 output, new_cache = mod(output,
                                         src_mask=src_mask,
-                                        cache=cache[i])
+                                        cache=cache[i],
+                                        output_attentions=output_attentions)
                 new_caches.append(new_cache)
             if output_attentions:
                 all_attentions.append(output[1])
                 output = output[0]
-            if output_hidden_states:
-                all_hidden_states.append(output)
+
+        if output_hidden_states:
+            all_hidden_states.append(output)
 
         if self.norm is not None:
             output = self.norm(output)
 
-        if output_attentions or output_hidden_states:
-            output = (output, all_attentions, all_hidden_states)
+            if output_hidden_states:
+                all_hidden_states[-1] = output
 
-        return output if cache is None else (output, new_caches)
+        if not return_dict:
+            if output_attentions or output_hidden_states:
+                output = (output, all_attentions, all_hidden_states)
+
+            return output if cache is None else (output, new_caches)
+
+        return BaseModelOutput(
+            last_hidden_state=output,
+            hidden_states=all_hidden_states,
+            attentions=all_attentions,
+        )
 
 
 class ElectraEmbeddings(nn.Layer):
@@ -237,7 +267,6 @@ class ElectraPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     base_model_prefix = "electra"
-    model_config_file = "model_config.json"
 
     # pretrained general configuration
     gen_weight = 1.0
@@ -340,7 +369,6 @@ class ElectraPretrainedModel(PretrainedModel):
             "layer_norm_eps": 1e-5
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "electra-small":
@@ -382,12 +410,11 @@ class ElectraPretrainedModel(PretrainedModel):
         """ Initialize the weights """
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range") else
-                    self.electra.config["initializer_range"],
-                    shape=layer.weight.shape))
+                paddle.tensor.normal(mean=0.0,
+                                     std=self.initializer_range if hasattr(
+                                         self, "initializer_range") else
+                                     self.electra.config["initializer_range"],
+                                     shape=layer.weight.shape))
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
@@ -406,17 +433,18 @@ class ElectraPretrainedModel(PretrainedModel):
             raise ValueError(
                 "when tie input/output embeddings, the shape of output embeddings: {}"
                 "should be equal to shape of input embeddings: {}"
-                "or should be equal to the shape of transpose input embeddings: {}".
-                format(output_embeddings.weight.shape, input_embeddings.weight.
-                       shape, input_embeddings.weight.t().shape))
+                "or should be equal to the shape of transpose input embeddings: {}"
+                .format(output_embeddings.weight.shape,
+                        input_embeddings.weight.shape,
+                        input_embeddings.weight.t().shape))
         if getattr(output_embeddings, "bias", None) is not None:
             if output_embeddings.weight.shape[
                     -1] != output_embeddings.bias.shape[0]:
                 raise ValueError(
                     "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
                     "please check output_embeddings configuration".format(
-                        output_embeddings.weight.shape[
-                            -1], output_embeddings.bias.shape[0]))
+                        output_embeddings.weight.shape[-1],
+                        output_embeddings.bias.shape[0]))
 
 
 @register_base_model
@@ -491,9 +519,10 @@ class ElectraModel(ElectraPretrainedModel):
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
-        self.embeddings = ElectraEmbeddings(
-            vocab_size, embedding_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, layer_norm_eps)
+        self.embeddings = ElectraEmbeddings(vocab_size, embedding_size,
+                                            hidden_dropout_prob,
+                                            max_position_embeddings,
+                                            type_vocab_size, layer_norm_eps)
 
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
@@ -522,7 +551,8 @@ class ElectraModel(ElectraPretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 output_attentions=False,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                return_dict=False):
         r'''
         The ElectraModel forward method, overrides the `__call__()` special method.
 
@@ -555,6 +585,15 @@ class ElectraModel(ElectraPretrainedModel):
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `encoder_outputs`, which is the output at the last layer of the model.
@@ -577,17 +616,16 @@ class ElectraModel(ElectraPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id
-                 ).astype(paddle.get_default_dtype()) * -1e4,
+                (input_ids == self.pad_token_id).astype(
+                    paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
         else:
             if attention_mask.ndim == 2:
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids,
+                                           token_type_ids=token_type_ids)
 
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
@@ -596,8 +634,8 @@ class ElectraModel(ElectraPretrainedModel):
             embedding_output,
             attention_mask,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
-
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
         return encoder_outputs
 
 
@@ -656,11 +694,11 @@ class ElectraDiscriminator(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        discriminator_sequence_output = self.electra(
-            input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(input_ids, token_type_ids,
+                                                     position_ids,
+                                                     attention_mask)
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
-
         return logits
 
 
@@ -697,11 +735,18 @@ class ElectraGenerator(ElectraPretrainedModel):
     def get_input_embeddings(self):
         return self.electra.embeddings.word_embeddings
 
+    def set_input_embeddings(self, value):
+        self.electra.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                labels=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
 
         Args:
@@ -713,7 +758,15 @@ class ElectraGenerator(ElectraPretrainedModel):
                 See :class:`ElectraModel`.
             attention_mask (Tensor, optional):
                 See :class:`ElectraModel`.
-
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
         Returns:
             Tensor: Returns tensor `prediction_scores`, the scores of Electra Generator.
             Its data type should be int64 and its shape is [batch_size, sequence_length, vocab_size].
@@ -732,21 +785,46 @@ class ElectraGenerator(ElectraPretrainedModel):
                 prediction_scores = model(**inputs)
 
         """
-        generator_sequence_output = self.electra(input_ids, token_type_ids,
-                                                 position_ids, attention_mask)
+        generator_sequence_output = self.electra(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        if isinstance(generator_sequence_output, type(input_ids)):
+            generator_sequence_output = (generator_sequence_output, )
 
         prediction_scores = self.generator_predictions(
-            generator_sequence_output)
+            generator_sequence_output[0])
         if not self.tie_word_embeddings:
             prediction_scores = self.generator_lm_head(prediction_scores)
         else:
-            prediction_scores = paddle.add(paddle.matmul(
-                prediction_scores,
-                self.get_input_embeddings().weight,
-                transpose_y=True),
-                                           self.generator_lm_head_bias)
+            prediction_scores = paddle.add(
+                paddle.matmul(prediction_scores,
+                              self.get_input_embeddings().weight,
+                              transpose_y=True), self.generator_lm_head_bias)
+        loss = None
+        # Masked language modeling softmax layer
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
+            loss = loss_fct(
+                prediction_scores.reshape(
+                    [-1, self.electra.config["vocab_size"]]),
+                labels.reshape([-1]))
 
-        return prediction_scores
+        if not return_dict:
+            output = (prediction_scores, ) + generator_sequence_output[1:]
+            return tuple_output(output, loss)
+
+        return MaskedLMOutput(
+            loss=loss,
+            logits=prediction_scores,
+            hidden_states=generator_sequence_output.hidden_states,
+            attentions=generator_sequence_output.attentions,
+        )
 
 
 class ElectraClassificationHead(nn.Layer):
@@ -861,16 +939,18 @@ class ErnieHealthDiscriminator(ElectraPretrainedModel):
 
         """
 
-        discriminator_sequence_output = self.electra(
-            input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.electra(input_ids, token_type_ids,
+                                                     position_ids,
+                                                     attention_mask)
 
         logits_rtd = self.discriminator_rtd(discriminator_sequence_output)
 
         cands_embs = self.electra.embeddings.word_embeddings(candidate_ids)
         hidden_mts = self.discriminator_mts(discriminator_sequence_output)
         hidden_mts = self.activation_mts(hidden_mts)
-        hidden_mts = paddle.matmul(
-            hidden_mts.unsqueeze(2), cands_embs, transpose_y=True).squeeze(2)
+        hidden_mts = paddle.matmul(hidden_mts.unsqueeze(2),
+                                   cands_embs,
+                                   transpose_y=True).squeeze(2)
         logits_mts = paddle.add(hidden_mts,
                                 self.bias_mts(candidate_ids).squeeze(3))
 
@@ -913,11 +993,17 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             activation=activation)
         self.init_weights()
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        labels=None,
+        output_attentions: bool = None,
+        output_hidden_states: bool = None,
+        return_dict: bool = None,
+    ):
         r"""
         The ElectraForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -930,6 +1016,15 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
                 See :class:`ElectraModel`.
             attention_mask (list, optional):
                 See :class:`ElectraModel`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
@@ -950,12 +1045,43 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.electra(input_ids, token_type_ids, position_ids,
-                                       attention_mask)
+        sequence_output = self.electra(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
-        logits = self.classifier(sequence_output)
+        if isinstance(sequence_output, type(input_ids)):
+            sequence_output = (sequence_output, )
 
-        return logits
+        logits = self.classifier(sequence_output[0])
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits, ) + sequence_output[1:]
+            return tuple_output(output, loss)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 class ElectraForTokenClassification(ElectraPretrainedModel):
@@ -978,8 +1104,8 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
         super(ElectraForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.electra.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"],
                                     self.num_classes)
         self.init_weights()
@@ -988,7 +1114,11 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
                 input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
-                attention_mask=None):
+                attention_mask=None,
+                labels: Optional[Tensor] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The ElectraForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1001,6 +1131,19 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
                 See :class:`ElectraModel`.
             attention_mask (list, optional):
                 See :class:`ElectraModel`.
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
@@ -1021,13 +1164,36 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.electra(input_ids, token_type_ids, position_ids,
-                                       attention_mask)
+        sequence_output = self.electra(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
-        sequence_output = self.dropout(sequence_output)
-        logits = self.classifier(sequence_output)
+        if isinstance(sequence_output, type(input_ids)):
+            sequence_output = (sequence_output, )
 
-        return logits
+        logits = self.classifier(self.dropout(sequence_output[0]))
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape([-1, self.num_classes]),
+                            labels.reshape([-1]))
+
+        if not return_dict:
+            output = (logits, ) + sequence_output[1:]
+            return tuple_output(output, loss)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 class ElectraForTotalPretraining(ElectraPretrainedModel):
@@ -1157,8 +1323,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     def get_discriminator_inputs(self, inputs, raw_inputs, generator_logits,
                                  generator_labels, use_softmax_sample):
         # get generator token result
-        sampled_tokens = (self.sample_from_softmax(generator_logits,
-                                                   use_softmax_sample)).detach()
+        sampled_tokens = (self.sample_from_softmax(
+            generator_logits, use_softmax_sample)).detach()
         sampled_tokids = paddle.argmax(sampled_tokens, axis=-1)
         # update token only at mask position
         # generator_labels : [B, L], L contains -100(unmasked) or token value(masked)
@@ -1177,14 +1343,14 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     def sample_from_softmax(self, logits, use_softmax_sample=True):
         if use_softmax_sample:
             #uniform_noise = paddle.uniform(logits.shape, dtype="float32", min=0, max=1)
-            uniform_noise = paddle.rand(
-                logits.shape, dtype=paddle.get_default_dtype())
+            uniform_noise = paddle.rand(logits.shape,
+                                        dtype=paddle.get_default_dtype())
             gumbel_noise = -paddle.log(-paddle.log(uniform_noise + 1e-9) + 1e-9)
         else:
             gumbel_noise = paddle.zeros_like(logits)
         # softmax_sample equal to sampled_tokids.unsqueeze(-1)
-        softmax_sample = paddle.argmax(
-            F.softmax(logits + gumbel_noise), axis=-1)
+        softmax_sample = paddle.argmax(F.softmax(logits + gumbel_noise),
+                                       axis=-1)
         # one hot
         return F.one_hot(softmax_sample, logits.shape[-1])
 
@@ -1267,8 +1433,8 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
                                          position_ids, attention_mask)
 
         if attention_mask is None:
-            attention_mask = (
-                input_ids != self.discriminator.electra.config["pad_token_id"])
+            attention_mask = (input_ids !=
+                              self.discriminator.electra.config["pad_token_id"])
         else:
             attention_mask = attention_mask.astype("bool")
 
@@ -1276,6 +1442,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
 
 
 class ElectraPooler(nn.Layer):
+
     def __init__(self, hidden_size, pool_act="gelu"):
         super(ElectraPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -1336,9 +1503,10 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
         }
     }
 
-    def get_discriminator_inputs_ernie_health(
-            self, inputs, raw_inputs, generator_logits, generator_labels,
-            use_softmax_sample):
+    def get_discriminator_inputs_ernie_health(self, inputs, raw_inputs,
+                                              generator_logits,
+                                              generator_labels,
+                                              use_softmax_sample):
         updated_inputs, labels, sampled_tokids = self.get_discriminator_inputs(
             inputs, raw_inputs, generator_logits, generator_labels,
             use_softmax_sample)
@@ -1374,14 +1542,15 @@ class ErnieHealthForTotalPretraining(ElectraForTotalPretraining):
             if neg_sample_one_hot is not None:
                 excluded_ids = excluded_ids + neg_sample_one_hot * -10000
             if use_softmax_sample:
-                uniform_noise = paddle.rand(
-                    logits.shape, dtype=paddle.get_default_dtype())
+                uniform_noise = paddle.rand(logits.shape,
+                                            dtype=paddle.get_default_dtype())
                 gumbel_noise = -paddle.log(-paddle.log(uniform_noise + 1e-9) +
                                            1e-9)
             else:
                 gumbel_noise = paddle.zeros_like(logits)
-            sampled_ids = paddle.argmax(
-                F.softmax(logits + gumbel_noise + excluded_ids), axis=-1)
+            sampled_ids = paddle.argmax(F.softmax(logits + gumbel_noise +
+                                                  excluded_ids),
+                                        axis=-1)
             # One-hot encoding of sample_ids.
             neg_sample_one_hot = F.one_hot(sampled_ids, logits.shape[-1])
             if neg_samples_ids is None:
@@ -1445,16 +1614,22 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         self.electra = electra
         self.sequence_summary = ElectraPooler(
             self.electra.config["hidden_size"], pool_act="gelu")
-        self.dropout = nn.Dropout(dropout if dropout is not None else
-                                  self.electra.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  electra.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.electra.config["hidden_size"], 1)
         self.init_weights()
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        labels: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The ElectraForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1467,6 +1642,19 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
                 See :class:`ElectraModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
                 See :class:`ElectraModel` and shape as [batch_size, num_choice, sequence_length].
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
@@ -1536,15 +1724,42 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
             attention_mask = attention_mask.reshape(
                 (-1, attention_mask.shape[-1]))
 
-        sequence_output = self.electra(input_ids, token_type_ids, position_ids,
-                                       attention_mask)
-        pooled_output = self.sequence_summary(sequence_output)
+        sequence_output = self.electra(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        if isinstance(sequence_output, type(input_ids)):
+            sequence_output = (sequence_output, )
+
+        pooled_output = self.sequence_summary(sequence_output[0])
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape(
             (-1, self.num_choices))  # logits: (bs, num_choice)
 
-        return reshaped_logits
+        loss = None
+        output = (reshaped_logits, ) + sequence_output[1:]
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+            output = (loss, ) + output
+
+        if not return_dict:
+            output = (reshaped_logits, ) + sequence_output[1:]
+            return tuple_output(output, loss)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=reshaped_logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 class ElectraPretrainingCriterion(paddle.nn.Layer):
@@ -1718,7 +1933,7 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
                 paddle.get_default_dtype())
             umask_positions = paddle.where(attention_mask, umask_positions,
                                            mask_positions)
-            # Mask has different meanings here. It denotes [mask] token in 
+            # Mask has different meanings here. It denotes [mask] token in
             # generator and denotes [pad] token in discriminator.
             disc_rtd_loss = paddle.where(attention_mask, disc_rtd_loss,
                                          mask_positions)
@@ -1730,9 +1945,8 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
 
         # MTS discriminator loss
         replaced_positions = discriminator_labels.astype("bool")
-        mts_labels = paddle.zeros(
-            [logits_mts.shape[0] * logits_mts.shape[1]],
-            dtype=generator_labels.dtype).detach()
+        mts_labels = paddle.zeros([logits_mts.shape[0] * logits_mts.shape[1]],
+                                  dtype=generator_labels.dtype).detach()
         disc_mts_loss = self.disc_mts_loss_fct(
             paddle.reshape(logits_mts, [-1, logits_mts.shape[-1]]), mts_labels)
         disc_mts_loss = paddle.reshape(disc_mts_loss, [-1, seq_length])
@@ -1748,8 +1962,9 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
         # CSP discriminator loss
         logits_csp = F.normalize(logits_csp, axis=-1)
         # Gather from all devices (split first)
-        logit_csp_0, logit_csp_1 = paddle.split(
-            logits_csp, num_or_sections=2, axis=0)
+        logit_csp_0, logit_csp_1 = paddle.split(logits_csp,
+                                                num_or_sections=2,
+                                                axis=0)
         if paddle.distributed.get_world_size() > 1:
             csp_list_0, csp_list_1 = [], []
             paddle.distributed.all_gather(csp_list_0, logit_csp_0)
@@ -1766,12 +1981,11 @@ class ErnieHealthPretrainingCriterion(paddle.nn.Layer):
         mask = -1e4 * paddle.eye(logits_csp.shape[0])
         logits_csp = logits_csp + mask
         # Create labels for bundle
-        csp_labels = paddle.concat(
-            [
-                paddle.arange(batch_size, 2 * batch_size),
-                paddle.arange(batch_size)
-            ],
-            axis=0)
+        csp_labels = paddle.concat([
+            paddle.arange(batch_size, 2 * batch_size),
+            paddle.arange(batch_size)
+        ],
+                                   axis=0)
         # Calculate SimCLR loss
         disc_csp_loss = self.disc_csp_loss_fct(logits_csp, csp_labels)
         disc_csp_loss = disc_csp_loss.sum() / (batch_size * 2)
@@ -1799,11 +2013,18 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
         self.classifier = nn.Linear(self.electra.config["hidden_size"], 2)
         self.init_weights()
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The ElectraForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1816,6 +2037,23 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
                 See :class:`ElectraModel`.
             attention_mask (list, optional):
                 See :class:`ElectraModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
         Returns:
             tuple: Returns tuple (`start_logits`, `end_logits`).
 
@@ -1850,12 +2088,46 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
             input_ids,
             token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask)
-        logits = self.classifier(sequence_output)
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        if isinstance(sequence_output, type(input_ids)):
+            sequence_output = (sequence_output, )
+
+        logits = self.classifier(sequence_output[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+        if not return_dict:
+            output = (start_logits, end_logits) + sequence_output[2:]
+            return tuple_output(output, total_loss)
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 # ElectraForMaskedLM is the same as ElectraGenerator

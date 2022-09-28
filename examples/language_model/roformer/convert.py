@@ -60,18 +60,16 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--pytorch_checkpoint_path",
-        default="roformer_chinese_base/pytorch_model.bin",
-        type=str,
-        required=True,
-        help="Path to the Pytorch checkpoint path.")
-    parser.add_argument(
-        "--paddle_dump_path",
-        default="roformer_chinese_base/model_state.pdparams",
-        type=str,
-        required=True,
-        help="Path to the output Paddle model.")
+    parser.add_argument("--pytorch_checkpoint_path",
+                        default="roformer_chinese_base/pytorch_model.bin",
+                        type=str,
+                        required=True,
+                        help="Path to the Pytorch checkpoint path.")
+    parser.add_argument("--paddle_dump_path",
+                        default="roformer_chinese_base/model_state.pdparams",
+                        type=str,
+                        required=True,
+                        help="Path to the output Paddle model.")
     args = parser.parse_args()
     convert_pytorch_checkpoint_to_paddle(args.pytorch_checkpoint_path,
                                          args.paddle_dump_path)

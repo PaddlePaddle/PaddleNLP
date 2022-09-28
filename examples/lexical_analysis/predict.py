@@ -43,19 +43,18 @@ def infer(args):
     paddle.set_device(args.device)
 
     # create dataset.
-    infer_ds = load_dataset(datafiles=(os.path.join(args.data_dir,
-                                                    'infer.tsv')))
+    infer_ds = load_dataset(
+        datafiles=(os.path.join(args.data_dir, 'infer.tsv')))
     word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
     label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
     # q2b.dic is used to replace DBC case to SBC case
     normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
 
-    trans_func = partial(
-        convert_example,
-        max_seq_len=args.max_seq_len,
-        word_vocab=word_vocab,
-        label_vocab=label_vocab,
-        normlize_vocab=normlize_vocab)
+    trans_func = partial(convert_example,
+                         max_seq_len=args.max_seq_len,
+                         word_vocab=word_vocab,
+                         label_vocab=label_vocab,
+                         normlize_vocab=normlize_vocab)
     infer_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
@@ -64,20 +63,18 @@ def infer(args):
     ): fn(samples)
 
     # Create sampler for dataloader
-    infer_sampler = paddle.io.BatchSampler(
-        dataset=infer_ds,
-        batch_size=args.batch_size,
-        shuffle=False,
-        drop_last=False)
-    infer_loader = paddle.io.DataLoader(
-        dataset=infer_ds,
-        batch_sampler=infer_sampler,
-        return_list=True,
-        collate_fn=batchify_fn)
+    infer_sampler = paddle.io.BatchSampler(dataset=infer_ds,
+                                           batch_size=args.batch_size,
+                                           shuffle=False,
+                                           drop_last=False)
+    infer_loader = paddle.io.DataLoader(dataset=infer_ds,
+                                        batch_sampler=infer_sampler,
+                                        return_list=True,
+                                        collate_fn=batchify_fn)
 
     # Define the model network
-    model = BiGruCrf(args.emb_dim, args.hidden_size,
-                     len(word_vocab), len(label_vocab))
+    model = BiGruCrf(args.emb_dim, args.hidden_size, len(word_vocab),
+                     len(label_vocab))
 
     # Load the model and start predicting
     model_dict = paddle.load(args.init_checkpoint)
@@ -88,9 +85,8 @@ def infer(args):
     for batch in infer_loader:
         token_ids, length = batch
         preds = model(token_ids, length)
-        result = parse_result(token_ids.numpy(),
-                              preds.numpy(),
-                              length.numpy(), word_vocab, label_vocab)
+        result = parse_result(token_ids.numpy(), preds.numpy(), length.numpy(),
+                              word_vocab, label_vocab)
         results += result
 
     sent_tags = []

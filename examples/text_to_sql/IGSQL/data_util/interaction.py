@@ -22,6 +22,7 @@ from .utterance import Utterance, OUTPUT_KEY, ANON_INPUT_KEY
 
 
 class Schema:
+
     def __init__(self, table_schema, simple=False):
         if simple:
             self.helper1(table_schema)
@@ -105,8 +106,8 @@ class Schema:
         for i, (table_id, column_name) in enumerate(column_names_original):
             if table_id >= 0:
                 table_name = table_names_original[table_id]
-                column_name_surface_form = '{}.{}'.format(table_name,
-                                                          column_name)
+                column_name_surface_form = '{}.{}'.format(
+                    table_name, column_name)
             else:
                 column_name_surface_form = column_name
             column_name_surface_form = column_name_surface_form.lower()
@@ -202,6 +203,7 @@ class Schema:
 
 
 class Interaction:
+
     def __init__(self, utterances, schema, snippets, anon_tok_to_ent,
                  identifier, params):
         self.utterances = utterances
@@ -272,6 +274,7 @@ class Interaction:
 
 
 def load_function(parameters, nl_to_sql_dict, anonymizer, database_schema=None):
+
     def fn(interaction_example):
         keep = False
 

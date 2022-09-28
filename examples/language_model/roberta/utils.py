@@ -18,6 +18,7 @@ from paddlenlp.data import Stack, Tuple, Pad, Dict
 
 
 class DataCollatorMLM():
+
     def __init__(self, tokenizer, batch_pad=None):
         self.batch_pad = batch_pad
         self.mask_token_id = tokenizer.mask_token_id
@@ -25,10 +26,12 @@ class DataCollatorMLM():
         self.token_len = tokenizer.vocab_size
         if batch_pad is None:
             self.batch_pad = lambda samples, fn=Dict({
-                'input_ids': Pad(axis=0, pad_val=self.pad_token_id, dtype='int64'),  # input
+                'input_ids':
+                Pad(axis=0, pad_val=self.pad_token_id, dtype='int64'),  # input
                 # 'token_type_ids': Pad(axis=0, pad_val=0, dtype='int64'),  # segment
-                'special_tokens_mask': Pad(axis=0, pad_val=True, dtype='int64')  # segment
-                }): fn(samples)
+                'special_tokens_mask':
+                Pad(axis=0, pad_val=True, dtype='int64')  # segment
+            }): fn(samples)
         else:
             self.batch_pad = batch_pad
 
@@ -36,11 +39,8 @@ class DataCollatorMLM():
         examples = self.batch_pad(examples)
         examples = [paddle.to_tensor(e) for e in examples]
         examples[0], labels = self._mask_tokens(
-            examples[0],
-            paddle.cast(
-                examples[1], dtype=bool),
-            self.mask_token_id,
-            self.token_len)
+            examples[0], paddle.cast(examples[1], dtype=bool),
+            self.mask_token_id, self.token_len)
         examples.append(labels)
         return examples
 
@@ -58,15 +58,15 @@ class DataCollatorMLM():
         probability_matrix = paddle.full(labels.shape, mlm_prob)
         probability_matrix[special_tokens_mask] = 0
 
-        masked_indices = paddle.cast(
-            paddle.bernoulli(probability_matrix), dtype=bool)
+        masked_indices = paddle.cast(paddle.bernoulli(probability_matrix),
+                                     dtype=bool)
         labels[
             ~masked_indices] = ignore_label  # We only compute loss on masked tokens
 
         # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-        indices_replaced = paddle.cast(
-            paddle.bernoulli(paddle.full(labels.shape, 0.8)),
-            dtype=bool) & masked_indices
+        indices_replaced = paddle.cast(paddle.bernoulli(
+            paddle.full(labels.shape, 0.8)),
+                                       dtype=bool) & masked_indices
         inputs[indices_replaced] = mask_token_id
 
         # 10% of the time, we replace masked input tokens with random word

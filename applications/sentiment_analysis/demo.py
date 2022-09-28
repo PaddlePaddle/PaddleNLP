@@ -59,10 +59,9 @@ def predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label):
 
         input_text = input_text.strip().replace(" ", "")
         # processing input text
-        encoded_inputs = tokenizer(
-            list(input_text),
-            is_split_into_words=True,
-            max_seq_len=args.ext_max_seq_len)
+        encoded_inputs = tokenizer(list(input_text),
+                                   is_split_into_words=True,
+                                   max_seq_len=args.ext_max_seq_len)
         input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
         token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
 
@@ -81,11 +80,10 @@ def predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label):
             aspect_text = concate_aspect_and_opinion(input_text, aspect,
                                                      opinion_words)
 
-            encoded_inputs = tokenizer(
-                aspect_text,
-                text_pair=input_text,
-                max_seq_len=args.cls_max_seq_len,
-                return_length=True)
+            encoded_inputs = tokenizer(aspect_text,
+                                       text_pair=input_text,
+                                       max_seq_len=args.cls_max_seq_len,
+                                       return_length=True)
             input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
             token_type_ids = paddle.to_tensor(
                 [encoded_inputs["token_type_ids"]])

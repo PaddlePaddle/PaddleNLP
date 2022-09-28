@@ -44,8 +44,8 @@ def doccano2SA(doccano_file,
     if len(splits) != 0 and len(splits) != 2:
         raise ValueError("Only []/ len(splits)==2 accepted for splits.")
 
-    if splits and (splits[0] >= splits[1] or splits[0] >= 1.0 or
-                   splits[1] >= 1.0 or splits[0] <= 0. or splits[1] <= 0):
+    if splits and (splits[0] >= splits[1] or splits[0] >= 1.0
+                   or splits[1] >= 1.0 or splits[0] <= 0. or splits[1] <= 0):
         raise ValueError(
             "Please set correct splits, the element in it should be in (0,1), and splits[1]>splits[0]."
         )
@@ -146,25 +146,21 @@ def doccano2SA(doccano_file,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--doccano_file",
-        type=str,
-        default="./data/doccano.json",
-        help="The doccano file exported from doccano platform.")
-    parser.add_argument(
-        "--save_ext_dir",
-        type=str,
-        default="./data/ext_data1",
-        help="The path of ext data that you wanna save.")
-    parser.add_argument(
-        "--save_cls_dir",
-        type=str,
-        default="./data/cls_data1",
-        help="The path of cls data that you wanna save.")
+    parser.add_argument("--doccano_file",
+                        type=str,
+                        default="./data/doccano.json",
+                        help="The doccano file exported from doccano platform.")
+    parser.add_argument("--save_ext_dir",
+                        type=str,
+                        default="./data/ext_data1",
+                        help="The path of ext data that you wanna save.")
+    parser.add_argument("--save_cls_dir",
+                        type=str,
+                        default="./data/cls_data1",
+                        help="The path of cls data that you wanna save.")
     args = parser.parse_args()
 
-    doccano2SA(
-        args.doccano_file,
-        args.save_ext_dir,
-        args.save_cls_dir,
-        is_shuffle=True)
+    doccano2SA(args.doccano_file,
+               args.save_ext_dir,
+               args.save_cls_dir,
+               is_shuffle=True)

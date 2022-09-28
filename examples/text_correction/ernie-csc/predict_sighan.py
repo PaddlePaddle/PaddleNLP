@@ -63,8 +63,8 @@ def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
                     result += ', 0'
                 else:
                     assert len(pred_result) == len(
-                        words), "pred_result: {}, words: {}".format(pred_result,
-                                                                    words)
+                        words), "pred_result: {}, words: {}".format(
+                            pred_result, words)
                     for i, word in enumerate(pred_result):
                         if word != words[i]:
                             result += ', {}, {}'.format(i + 1, word)
@@ -75,37 +75,38 @@ def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
 def do_predict(args):
     paddle.set_device(args.device)
 
-    pinyin_vocab = Vocab.load_vocabulary(
-        args.pinyin_vocab_file_path, unk_token='[UNK]', pad_token='[PAD]')
+    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path,
+                                         unk_token='[UNK]',
+                                         pad_token='[PAD]')
 
     tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
     ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = ErnieForCSC(
-        ernie,
-        pinyin_vocab_size=len(pinyin_vocab),
-        pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
+    model = ErnieForCSC(ernie,
+                        pinyin_vocab_size=len(pinyin_vocab),
+                        pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
     eval_ds = load_dataset(read_test_ds, data_path=args.test_file, lazy=False)
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        pinyin_vocab=pinyin_vocab,
-        max_seq_length=args.max_seq_length,
-        is_test=True)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         pinyin_vocab=pinyin_vocab,
+                         max_seq_length=args.max_seq_length,
+                         is_test=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # segment
-        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token], dtype='int64'),  # pinyin
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+            ),  # segment
+        Pad(axis=0,
+            pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token],
+            dtype='int64'),  # pinyin
         Stack(axis=0, dtype='int64'),  # length
     ): [data for data in fn(samples)]
 
-    test_data_loader = create_dataloader(
-        eval_ds,
-        mode='test',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    test_data_loader = create_dataloader(eval_ds,
+                                         mode='test',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=batchify_fn,
+                                         trans_fn=trans_func)
 
     if args.ckpt_path:
         model_dict = paddle.load(args.ckpt_path)

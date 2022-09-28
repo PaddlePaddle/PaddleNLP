@@ -21,9 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
-from paddle.fluid.framework import in_dygraph_mode
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddle.fluid.initializer import Normal, Constant, NumpyArrayInitializer
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
@@ -37,8 +35,6 @@ from paddle.incubate.distributed.models import moe
 MoeLayer = moe.MoELayer
 from utils import get_timers
 
-from paddle.distributed.fleet.meta_parallel.pp_utils.utils import _initialize_recompute_setting, _initialize_recompute_hcg
-
 __all__ = [
     'GPTModel',
     "GPTPretrainedModel",
@@ -50,6 +46,7 @@ __all__ = [
 
 
 class ExpertLayer(nn.Layer):
+
     def __init__(self,
                  d_model,
                  d_hidden,
@@ -277,8 +274,10 @@ class MultiHeadAttention(nn.Layer):
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
                                                cache)
         # scale dot product attention
-        product = layers.matmul(
-            x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        product = layers.matmul(x=q,
+                                y=k,
+                                transpose_y=True,
+                                alpha=self.head_dim**-0.5)
 
         # if attn_mask is not None:
         # product = product + attn_mask
@@ -288,11 +287,10 @@ class MultiHeadAttention(nn.Layer):
 
         if self.dropout:
             with get_rng_state_tracker().rng_state('local_seed'):
-                weights = F.dropout(
-                    weights,
-                    self.dropout,
-                    training=self.training,
-                    mode="upscale_in_train")
+                weights = F.dropout(weights,
+                                    self.dropout,
+                                    training=self.training,
+                                    mode="upscale_in_train")
 
         out = tensor.matmul(weights, v)
 
@@ -410,7 +408,9 @@ class TransformerDecoderLayer(nn.Layer):
                  top_k=2,
                  hcg=None,
                  gate=None,
-                 recompute_interval=0):
+                 recompute_interval=0,
+                 recompute_partition=False,
+                 recompute_offload=False):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
@@ -430,23 +430,21 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
-        self.self_attn = MultiHeadAttention(
-            d_model,
-            nhead,
-            dropout=attn_dropout,
-            weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0],
-            num_partitions=num_partitions)
+        self.self_attn = MultiHeadAttention(d_model,
+                                            nhead,
+                                            dropout=attn_dropout,
+                                            weight_attr=weight_attrs[0],
+                                            bias_attr=bias_attrs[0],
+                                            num_partitions=num_partitions)
 
         if expert_mode:
             import os
             experts_list = nn.LayerList()
             for expi in range(num_experts):
-                exp_layer = ExpertLayer(
-                    d_model,
-                    dim_feedforward // top_k,
-                    windex=expi,
-                    num_expert=num_experts)
+                exp_layer = ExpertLayer(d_model,
+                                        dim_feedforward // top_k,
+                                        windex=expi,
+                                        num_expert=num_experts)
                 experts_list.append(exp_layer)
 
             moe_group_size = hcg.get_expert_parallel_world_size()
@@ -456,13 +454,19 @@ class TransformerDecoderLayer(nn.Layer):
                 "type": "gshard",
                 "top_k": top_k,
             }
-            self.moe_mlp = MoeLayer(
-                d_model=d_model,
-                experts=experts_list,
-                gate_config=gate_config,
-                moe_group=moe_group,
-                mp_group=mp_group,
-                recompute_interval=self.recompute_interval)
+
+            recompute_ctx = {
+                "mp_group": mp_group,
+                "offload": recompute_offload,
+                "partition": recompute_partition
+            }
+            self.moe_mlp = MoeLayer(d_model=d_model,
+                                    experts=experts_list,
+                                    gate=gate_config,
+                                    moe_group=moe_group,
+                                    mp_group=mp_group,
+                                    recompute_interval=self.recompute_interval,
+                                    recompute_ctx=recompute_ctx)
         else:
             self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
                 d_model,
@@ -516,8 +520,7 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             with get_rng_state_tracker().rng_state('global_seed'):
                 tgt = self.dropout2(
-                    self.linear2(F.gelu(
-                        self.linear1(tgt), approximate=True)))
+                    self.linear2(F.gelu(self.linear1(tgt), approximate=True)))
 
         tgt = residual + tgt
 
@@ -527,8 +530,8 @@ class TransformerDecoderLayer(nn.Layer):
         return tgt if use_cache is False else (tgt, incremental_cache)
 
     def gen_cache(self, memory):
-        incremental_cache = self.self_attn.gen_cache(
-            memory, type=self.self_attn.Cache)
+        incremental_cache = self.self_attn.gen_cache(memory,
+                                                     type=self.self_attn.Cache)
         return incremental_cache
 
 
@@ -555,10 +558,9 @@ class GPTEmbeddings(nn.Layer):
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
-            weight_attr=paddle.ParamAttr(
-                name="pos_embeddings",
-                initializer=nn.initializer.Normal(
-                    mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(name="pos_embeddings",
+                                         initializer=nn.initializer.Normal(
+                                             mean=0.0, std=initializer_range)))
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -729,12 +731,11 @@ class GPTPretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range") else
-                        self.gpt.config["initializer_range"],
-                        shape=layer.weight.shape))
+                    paddle.tensor.normal(mean=0.0,
+                                         std=self.initializer_range if hasattr(
+                                             self, "initializer_range") else
+                                         self.gpt.config["initializer_range"],
+                                         shape=layer.weight.shape))
 
 
 @register_base_model
@@ -775,14 +776,10 @@ class GPTModel(GPTPretrainedModel):
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
 
-        if recompute_interval > 0:
-            _initialize_recompute_hcg(hcg)
-            _initialize_recompute_setting(recompute_offload,
-                                          recompute_partition)
-
-        self.embeddings = GPTEmbeddings(
-            vocab_size, hidden_size, hidden_dropout_prob,
-            max_position_embeddings, type_vocab_size, self.initializer_range)
+        self.embeddings = GPTEmbeddings(vocab_size, hidden_size,
+                                        hidden_dropout_prob,
+                                        max_position_embeddings,
+                                        type_vocab_size, self.initializer_range)
 
         decoder_layers = nn.LayerList()
         for i in range(num_hidden_layers):
@@ -805,13 +802,14 @@ class GPTModel(GPTPretrainedModel):
                     top_k=top_k,
                     hcg=hcg,
                     gate=gate,
-                    recompute_interval=recompute_interval))
+                    recompute_interval=recompute_interval,
+                    recompute_partition=recompute_partition,
+                    recompute_offload=recompute_offload))
 
-        self.decoder = TransformerDecoder(
-            decoder_layers,
-            num_hidden_layers,
-            norm="LayerNorm",
-            hidden_size=hidden_size)
+        self.decoder = TransformerDecoder(decoder_layers,
+                                          num_hidden_layers,
+                                          norm="LayerNorm",
+                                          hidden_size=hidden_size)
 
         self.apply(self.init_weights)
         self.checkpoints = []
@@ -827,16 +825,16 @@ class GPTModel(GPTPretrainedModel):
             past_length = 0
             if cache is not None:
                 past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(
-                past_length,
-                paddle.shape(input_ids)[-1] + past_length,
-                dtype='int64')
+            position_ids = paddle.arange(past_length,
+                                         paddle.shape(input_ids)[-1] +
+                                         past_length,
+                                         dtype='int64')
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.fluid.layers.expand_as(position_ids,
-                                                         input_ids)
-        embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids)
+            position_ids = paddle.fluid.layers.expand_as(
+                position_ids, input_ids)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           position_ids=position_ids)
 
         encoder_outputs = self.decoder(
             embedding_output,
@@ -878,8 +876,9 @@ class GPTForPretraining(GPTPretrainedModel):
         else:
             encoder_outputs = outputs
 
-        logits = parallel_matmul(
-            encoder_outputs, self.gpt.embeddings.word_embeddings.weight, True)
+        logits = parallel_matmul(encoder_outputs,
+                                 self.gpt.embeddings.word_embeddings.weight,
+                                 True)
 
         if use_cache:
             return logits, cached_kvs
@@ -925,7 +924,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     def __init__(self, gpt, max_predict_len):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
-        self.max_predict_len = max_predict_len
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype='int32')
         self.apply(self.init_weights)
 
     def model(self,
@@ -944,10 +943,9 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(
-            encoder_outputs,
-            self.gpt.embeddings.word_embeddings.weight,
-            transpose_y=True)
+        logits = paddle.matmul(encoder_outputs,
+                               self.gpt.embeddings.word_embeddings.weight,
+                               transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
@@ -961,8 +959,9 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
         while (cur_len < self.max_predict_len):
-            output, cached_kvs = self.model(
-                nid, use_cache=True, cache=cached_kvs)
+            output, cached_kvs = self.model(nid,
+                                            use_cache=True,
+                                            cache=cached_kvs)
 
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
@@ -973,6 +972,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
 
 class GPTLMHead(nn.Layer):
+
     def __init__(self, hidden_size, vocab_size, embedding_weights=None):
         super(GPTLMHead, self).__init__()
         self.decoder_weight = self.create_parameter(
@@ -981,12 +981,14 @@ class GPTLMHead(nn.Layer):
             is_bias=True) if embedding_weights is None else embedding_weights
 
     def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight, transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states,
+                                      self.decoder_weight,
+                                      transpose_y=True)
         return logits
 
 
 class GPTLMHeadModel(GPTPretrainedModel):
+
     def __init__(self, gpt):
         super(GPTLMHeadModel, self).__init__()
         self.gpt = gpt
@@ -1115,37 +1117,35 @@ class GPTForPretrainingPipe(PipelineLayer):
         self.descs = []
 
         self.descs.append(
-            SharedLayerDesc(
-                'embed',
-                EmbeddingPipe,
-                shared_weight_attr='embedding_weight',
-                vocab_size=vocab_size,
-                hidden_size=hidden_size,
-                hidden_dropout_prob=hidden_dropout_prob,
-                max_position_embeddings=max_position_embeddings,
-                type_vocab_size=type_vocab_size,
-                initializer_range=0.02))
+            SharedLayerDesc('embed',
+                            EmbeddingPipe,
+                            shared_weight_attr='embedding_weight',
+                            vocab_size=vocab_size,
+                            hidden_size=hidden_size,
+                            hidden_dropout_prob=hidden_dropout_prob,
+                            max_position_embeddings=max_position_embeddings,
+                            type_vocab_size=type_vocab_size,
+                            initializer_range=0.02))
 
         for _ in range(num_hidden_layers):
             self.descs.append(
-                LayerDesc(
-                    TransformerDecoderLayer,
-                    d_model=hidden_size,
-                    nhead=num_attention_heads,
-                    dim_feedforward=intermediate_size,
-                    dropout=hidden_dropout_prob,
-                    activation=hidden_act,
-                    attn_dropout=attention_probs_dropout_prob,
-                    act_dropout=hidden_dropout_prob,
-                    weight_attr=paddle.ParamAttr(
-                        initializer=nn.initializer.Normal(
-                            mean=0.0, std=initializer_range)),
-                    bias_attr=None,
-                    num_partitions=num_partitions,
-                    expert_mode=expert_mode,
-                    num_experts=num_experts,
-                    top_k=top_k,
-                    hcg=hcg))
+                LayerDesc(TransformerDecoderLayer,
+                          d_model=hidden_size,
+                          nhead=num_attention_heads,
+                          dim_feedforward=intermediate_size,
+                          dropout=hidden_dropout_prob,
+                          activation=hidden_act,
+                          attn_dropout=attention_probs_dropout_prob,
+                          act_dropout=hidden_dropout_prob,
+                          weight_attr=paddle.ParamAttr(
+                              initializer=nn.initializer.Normal(
+                                  mean=0.0, std=initializer_range)),
+                          bias_attr=None,
+                          num_partitions=num_partitions,
+                          expert_mode=expert_mode,
+                          num_experts=num_experts,
+                          top_k=top_k,
+                          hcg=hcg))
 
         self.descs.append(LayerDesc(nn.LayerNorm, normalized_shape=hidden_size))
 
@@ -1153,23 +1153,25 @@ class GPTForPretrainingPipe(PipelineLayer):
             return parallel_matmul(output, embedding.embedding_weight, True)
 
         self.descs.append(
-            SharedLayerDesc(
-                'embed',
-                EmbeddingPipe,
-                forward_func=_logits_helper,
-                shared_weight_attr='embedding_weight',
-                vocab_size=vocab_size,
-                hidden_size=hidden_size,
-                hidden_dropout_prob=hidden_dropout_prob,
-                max_position_embeddings=max_position_embeddings,
-                type_vocab_size=type_vocab_size,
-                initializer_range=0.02))
+            SharedLayerDesc('embed',
+                            EmbeddingPipe,
+                            forward_func=_logits_helper,
+                            shared_weight_attr='embedding_weight',
+                            vocab_size=vocab_size,
+                            hidden_size=hidden_size,
+                            hidden_dropout_prob=hidden_dropout_prob,
+                            max_position_embeddings=max_position_embeddings,
+                            type_vocab_size=type_vocab_size,
+                            initializer_range=0.02))
 
-        super().__init__(
-            layers=self.descs,
-            loss_fn=GPTPretrainingCriterionPipe(),
-            topology=topology,
-            seg_method="layer:TransformerDecoderLayer",
-            recompute_interval=recompute_interval,
-            recompute_partition=False,
-            recompute_offload=False)
+        super().__init__(layers=self.descs,
+                         loss_fn=GPTPretrainingCriterionPipe(),
+                         topology=topology,
+                         seg_method="layer:TransformerDecoderLayer",
+                         recompute_interval=recompute_interval,
+                         recompute_ctx={
+                             "mp_group":
+                             fleet.fleet._hcg.get_model_parallel_group(),
+                             "offload": False,
+                             "partition": False
+                         })

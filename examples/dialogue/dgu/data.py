@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import numpy as np
 from typing import List
@@ -5,7 +19,7 @@ from typing import List
 from paddle.io import Dataset
 
 # The input data bigin with '[CLS]', using '[SEP]' split conversation content(
-# Previous part, current part, following part, etc.). If there are multiple 
+# Previous part, current part, following part, etc.). If there are multiple
 # conversation in split part, using 'INNER_SEP' to further split.
 INNER_SEP = '[unused0]'
 
@@ -69,9 +83,7 @@ class UDCv1(Dataset):
     def convert_example(cls, example, tokenizer, max_seq_length=512):
         """ Convert a glue example into necessary features. """
 
-        def _truncate_and_concat(text_a: List[str],
-                                 text_b: str,
-                                 tokenizer,
+        def _truncate_and_concat(text_a: List[str], text_b: str, tokenizer,
                                  max_seq_length):
             tokens_b = tokenizer.tokenize(text_b)
             tokens_b = tokens_b[:min(cls.MAX_LEN_OF_RESPONSE, len(tokens_b))]
@@ -81,8 +93,8 @@ class UDCv1(Dataset):
                 tokens_a.append(INNER_SEP)
             tokens_a = tokens_a[:-1]
             if len(tokens_a) > max_seq_length - len(tokens_b) - 3:
-                tokens_a = tokens_a[len(tokens_a) - max_seq_length + len(
-                    tokens_b) + 3:]
+                tokens_a = tokens_a[len(tokens_a) - max_seq_length +
+                                    len(tokens_b) + 3:]
             tokens, segment_ids = [], []
             tokens.extend([tokenizer.cls_token] + tokens_a +
                           [tokenizer.sep_token])
@@ -120,6 +132,7 @@ class DSTC2(Dataset):
         self.read_data()
 
     def read_data(self):
+
         def _concat_dialogues(examples):
             """concat multi turns dialogues"""
             new_examples = []
@@ -345,6 +358,7 @@ class ATIS_DID(Dataset):
 
 
 def read_da_data(data_dir, mode):
+
     def _concat_dialogues(examples):
         """concat multi turns dialogues"""
         new_examples = []
@@ -397,12 +411,8 @@ def read_da_data(data_dir, mode):
     return data
 
 
-def truncate_and_concat(pre_txt: List[str],
-                        cur_txt: str,
-                        suf_txt: List[str],
-                        tokenizer,
-                        max_seq_length,
-                        max_len_of_cur_text):
+def truncate_and_concat(pre_txt: List[str], cur_txt: str, suf_txt: List[str],
+                        tokenizer, max_seq_length, max_len_of_cur_text):
     cur_tokens = tokenizer.tokenize(cur_txt)
     cur_tokens = cur_tokens[:min(max_len_of_cur_text, len(cur_tokens))]
     pre_tokens = []

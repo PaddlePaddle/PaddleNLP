@@ -31,12 +31,11 @@ summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
-    parser.add_argument(
-        "--model_name_or_path",
-        default="bart-base",
-        type=str,
-        required=True,
-        help="Path to pre-trained model. ")
+    parser.add_argument("--model_name_or_path",
+                        default="bart-base",
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model. ")
     parser.add_argument(
         "--dataset_name",
         default="cnn_dailymail",
@@ -60,36 +59,35 @@ def parse_args():
         "--min_target_length",
         default=0,
         type=int,
-        help="The minimum total sequence length for target text when generating. "
-    )
+        help=
+        "The minimum total sequence length for target text when generating. ")
     parser.add_argument(
         "--max_target_length",
         default=142,
         type=int,
         help="The maximum total sequence length for target text after "
         "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
-        "during ``evaluate`` and ``predict``.", )
-    parser.add_argument(
-        '--decode_strategy',
-        default='greedy_search',
-        type=str,
-        help='The decode strategy in generation.')
+        "during ``evaluate`` and ``predict``.",
+    )
+    parser.add_argument('--decode_strategy',
+                        default='greedy_search',
+                        type=str,
+                        help='The decode strategy in generation.')
     parser.add_argument(
         '--top_k',
         default=2,
         type=int,
-        help='The number of highest probability vocabulary tokens to keep for top-k sampling.'
+        help=
+        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
     )
-    parser.add_argument(
-        '--top_p',
-        default=1.0,
-        type=float,
-        help='The cumulative probability for top-p sampling.')
-    parser.add_argument(
-        '--num_beams',
-        default=1,
-        type=int,
-        help='The number of beams for beam search.')
+    parser.add_argument('--top_p',
+                        default=1.0,
+                        type=float,
+                        help='The cumulative probability for top-p sampling.')
+    parser.add_argument('--num_beams',
+                        default=1,
+                        type=int,
+                        help='The number of beams for beam search.')
     parser.add_argument(
         '--length_penalty',
         default=0.6,
@@ -99,13 +97,13 @@ def parse_args():
         '--early_stopping',
         default=False,
         type=eval,
-        help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
+        help=
+        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
     )
-    parser.add_argument(
-        "--diversity_rate",
-        default=0.0,
-        type=float,
-        help="The diversity of beam search. ")
+    parser.add_argument("--diversity_rate",
+                        default=0.0,
+                        type=float,
+                        help="The diversity of beam search. ")
     parser.add_argument(
         '--faster',
         action='store_true',
@@ -113,15 +111,18 @@ def parse_args():
     parser.add_argument(
         '--use_fp16_decoding',
         action='store_true',
-        help='Whether to use fp16 when using faster transformer. Only works when using faster transformer. '
+        help=
+        'Whether to use fp16 when using faster transformer. Only works when using faster transformer. '
     )
     parser.add_argument(
         "--batch_size",
         default=64,
         type=int,
         help="Batch size per GPU/CPU for testing or evaluation.")
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -133,12 +134,12 @@ def parse_args():
         default=True,
         type=bool,
         help="Whether to ignore the tokens corresponding to "
-        "padded labels in the loss computation or not.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
+        "padded labels in the loss computation or not.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
     args = parser.parse_args()
     return args
 
@@ -180,14 +181,14 @@ def generate(args):
     ): fn(samples)
 
     dataset = dataset.map(trans_func, lazy=True)
-    batch_sampler = BatchSampler(
-        dataset, batch_size=args.batch_size, shuffle=False)
-    data_loader = DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        num_workers=0,
-        collate_fn=batchify_fn,
-        return_list=True)
+    batch_sampler = BatchSampler(dataset,
+                                 batch_size=args.batch_size,
+                                 shuffle=False)
+    data_loader = DataLoader(dataset=dataset,
+                             batch_sampler=batch_sampler,
+                             num_workers=0,
+                             collate_fn=batchify_fn,
+                             return_list=True)
     data_loader.pin_memory = False
 
     model.eval()
@@ -197,19 +198,18 @@ def generate(args):
     all_labels = []
     for step, batch in enumerate(data_loader):
         input_ids, _, mem_seq_lens, _, labels = batch
-        preds, _ = model.generate(
-            input_ids=input_ids,
-            seq_lens=mem_seq_lens,
-            max_length=args.max_target_length,
-            min_length=args.min_target_length,
-            decode_strategy=args.decode_strategy,
-            top_k=args.top_k,
-            top_p=args.top_p,
-            num_beams=args.num_beams,
-            length_penalty=args.length_penalty,
-            early_stopping=args.early_stopping,
-            diversity_rate=args.diversity_rate,
-            use_faster=args.faster)
+        preds, _ = model.generate(input_ids=input_ids,
+                                  seq_lens=mem_seq_lens,
+                                  max_length=args.max_target_length,
+                                  min_length=args.min_target_length,
+                                  decode_strategy=args.decode_strategy,
+                                  top_k=args.top_k,
+                                  top_p=args.top_p,
+                                  num_beams=args.num_beams,
+                                  length_penalty=args.length_penalty,
+                                  early_stopping=args.early_stopping,
+                                  diversity_rate=args.diversity_rate,
+                                  use_faster=args.faster)
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %

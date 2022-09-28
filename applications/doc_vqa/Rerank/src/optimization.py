@@ -96,11 +96,11 @@ def optimization(loss,
                 learning_rate=scheduled_lr)
         else:
             optimizer = fluid.optimizer.Adam(learning_rate=scheduled_lr)
-        optimizer._learning_rate_map[fluid.default_main_program(
-        )] = scheduled_lr
+        optimizer._learning_rate_map[
+            fluid.default_main_program()] = scheduled_lr
 
-    fluid.clip.set_gradient_clip(
-        clip=fluid.clip.GradientClipByGlobalNorm(clip_norm=1.0))
+    fluid.clip.set_gradient_clip(clip=fluid.clip.GradientClipByGlobalNorm(
+        clip_norm=1.0))
 
     def exclude_from_weight_decay(name):
         if name.find("layer_norm") > -1:
@@ -119,8 +119,8 @@ def optimization(loss,
 
     if dist_strategy is not None:
         # use fleet api
-        optimizer = fleet.distributed_optimizer(
-            optimizer, strategy=dist_strategy)
+        optimizer = fleet.distributed_optimizer(optimizer,
+                                                strategy=dist_strategy)
 
     _, param_grads = optimizer.minimize(loss)
 

@@ -101,20 +101,40 @@ from .tinybert.tokenizer import *
 from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
+from .ernie_vil.modeling import *
+from .ernie_vil.procesing import *
+from .ernie_vil.tokenizer import *
+from .ernie_vil.procesing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .xlm.modeling import *
+from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .optimization import *
+from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
+from .codegen.modeling import *
+from .codegen.tokenizer import *
+from .artist.modeling import *
+from .artist.tokenizer import *
+from .dallebart.modeling import *
+from .dallebart.tokenizer import *
+from .clip.modeling import *
+from .clip.feature_extraction import *
+from .clip.tokenizer import *
+from .clip.procesing import *
+from .gptj.modeling import *
+from .gptj.tokenizer import *
 
 # For faster tokenizer
-from ..utils.import_utils import is_faster_tokenizers_available
-if is_faster_tokenizers_available():
+from ..utils.import_utils import is_faster_tokenizer_available
+if is_faster_tokenizer_available():
     from .bert.faster_tokenizer import *
     from .ernie.faster_tokenizer import *
+    from .tinybert.faster_tokenizer import *

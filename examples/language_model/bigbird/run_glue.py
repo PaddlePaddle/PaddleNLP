@@ -147,8 +147,9 @@ def evaluate(model, loss_fct, metric, data_loader):
         input_ids, segment_ids, labels = batch[:3]
         rand_mask_idx_list = batch[3:]
         # run forward
-        logits = model(
-            input_ids, segment_ids, rand_mask_idx_list=rand_mask_idx_list)
+        logits = model(input_ids,
+                       segment_ids,
+                       rand_mask_idx_list=rand_mask_idx_list)
         loss = loss_fct(logits, labels)
         correct = metric.compute(logits, labels)
         metric.update(correct)
@@ -162,7 +163,8 @@ def evaluate(model, loss_fct, metric, data_loader):
                 res[1],
                 res[2],
                 res[3],
-                res[4], ))
+                res[4],
+            ))
     elif isinstance(metric, Mcc):
         logger.info("eval loss: %f, mcc: %s, " % (loss.numpy(), res[0]))
     elif isinstance(metric, PearsonAndSpearman):
@@ -192,31 +194,28 @@ def do_train(args):
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
     # In finetune task, bigbird performs better when setting dropout to zero.
-    model = model_class.from_pretrained(
-        args.model_name_or_path,
-        num_classes=num_classes,
-        attn_dropout=0.0,
-        hidden_dropout_prob=0.0)
+    model = model_class.from_pretrained(args.model_name_or_path,
+                                        num_classes=num_classes,
+                                        attn_dropout=0.0,
+                                        hidden_dropout_prob=0.0)
     if worker_num > 1:
         model = paddle.DataParallel(model)
     config = getattr(model, model_class.base_model_prefix).config
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=args.max_encoder_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         label_list=train_ds.label_list,
+                         max_seq_length=args.max_encoder_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
     batchify_fn = partial(collect_data, dataset=train_ds, config=config)
 
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
 
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
@@ -243,14 +242,14 @@ def do_train(args):
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds, batch_size=args.batch_size, shuffle=False)
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                                   batch_size=args.batch_size,
+                                                   shuffle=False)
+        dev_data_loader = DataLoader(dataset=dev_ds,
+                                     batch_sampler=dev_batch_sampler,
+                                     collate_fn=batchify_fn,
+                                     num_workers=0,
+                                     return_list=True)
 
     num_training_steps = args.max_steps if args.max_steps > 0 else (
         len(train_data_loader) * args.epochs)
@@ -286,8 +285,9 @@ def do_train(args):
             input_ids, segment_ids, labels = batch[:3]
             rand_mask_idx_list = batch[3:]
             # run forward
-            logits = model(
-                input_ids, segment_ids, rand_mask_idx_list=rand_mask_idx_list)
+            logits = model(input_ids,
+                           segment_ids,
+                           rand_mask_idx_list=rand_mask_idx_list)
             loss = loss_fct(logits, labels)
             # run backward and update params
             loss.backward()
@@ -315,9 +315,9 @@ def do_train(args):
                     logger.info("eval done total : %s s" %
                                 (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "%s_ft_model_%d.pdparams" %
-                                              (args.task_name, global_step))
+                    output_dir = os.path.join(
+                        args.output_dir, "%s_ft_model_%d.pdparams" %
+                        (args.task_name, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel

@@ -36,8 +36,10 @@ def find_entity(text_raw, id_, predictions, tok_to_orig_start_index,
                     j += 1
                 else:
                     break
-            entity = ''.join(text_raw[tok_to_orig_start_index[i]:
-                                      tok_to_orig_end_index[i + j] + 1])
+            entity = ''.join(
+                text_raw[tok_to_orig_start_index[i]:tok_to_orig_end_index[i +
+                                                                          j] +
+                         1])
             entity_list.append(entity)
     return list(set(entity_list))
 
@@ -93,15 +95,18 @@ def decoding(example_batch, id2spo, logits_batch, seq_len_batch,
                 for subject_ in subjects:
                     for object_ in objects:
                         spo_list.append({
-                            "predicate": id2spo['predicate'][id_],
+                            "predicate":
+                            id2spo['predicate'][id_],
                             "object_type": {
                                 '@value': id2spo['object_type'][id_]
                             },
-                            'subject_type': id2spo['subject_type'][id_],
+                            'subject_type':
+                            id2spo['subject_type'][id_],
                             "object": {
                                 '@value': object_
                             },
-                            "subject": subject_
+                            "subject":
+                            subject_
                         })
             else:
                 #  traverse all complex relation and look through their corresponding affiliated objects
@@ -125,9 +130,10 @@ def decoding(example_batch, id2spo, logits_batch, seq_len_batch,
                                                        predictions,
                                                        tok_to_orig_start_index,
                                                        tok_to_orig_end_index)[0]
-                            object_type_dict[id2spo['object_type'][
-                                id_affi].split('_')[1]] = id2spo['object_type'][
-                                    id_affi].split('_')[0]
+                            object_type_dict[
+                                id2spo['object_type'][id_affi].split('_')
+                                [1]] = id2spo['object_type'][id_affi].split(
+                                    '_')[0]
                         elif id_ == 26:
                             for id_affi in [27, 28, 29]:
                                 if id_affi in subject_id_list:
@@ -136,11 +142,16 @@ def decoding(example_batch, id2spo, logits_batch, seq_len_batch,
                                     object_type_dict[id2spo['object_type'][id_affi].split('_')[1]] = \
                                     id2spo['object_type'][id_affi].split('_')[0]
                         spo_list.append({
-                            "predicate": id2spo['predicate'][id_],
-                            "object_type": object_type_dict,
-                            "subject_type": id2spo['subject_type'][id_],
-                            "object": object_dict,
-                            "subject": subject_
+                            "predicate":
+                            id2spo['predicate'][id_],
+                            "object_type":
+                            object_type_dict,
+                            "subject_type":
+                            id2spo['subject_type'][id_],
+                            "object":
+                            object_dict,
+                            "subject":
+                            subject_
                         })
 
         formatted_instance['text'] = example['text']
@@ -166,18 +177,20 @@ def write_prediction_results(formatted_outputs, file_path):
 
 def get_precision_recall_f1(golden_file, predict_file):
     r = os.popen(
-        'python3 ./re_official_evaluation.py --golden_file={} --predict_file={}'.
-        format(golden_file, predict_file))
+        'python3 ./re_official_evaluation.py --golden_file={} --predict_file={}'
+        .format(golden_file, predict_file))
     result = r.read()
     r.close()
     precision = float(
-        re.search("\"precision\", \"value\":.*?}", result).group(0).lstrip(
-            "\"precision\", \"value\":").rstrip("}"))
+        re.search(
+            "\"precision\", \"value\":.*?}",
+            result).group(0).lstrip("\"precision\", \"value\":").rstrip("}"))
     recall = float(
-        re.search("\"recall\", \"value\":.*?}", result).group(0).lstrip(
-            "\"recall\", \"value\":").rstrip("}"))
+        re.search("\"recall\", \"value\":.*?}",
+                  result).group(0).lstrip("\"recall\", \"value\":").rstrip("}"))
     f1 = float(
-        re.search("\"f1-score\", \"value\":.*?}", result).group(0).lstrip(
-            "\"f1-score\", \"value\":").rstrip("}"))
+        re.search(
+            "\"f1-score\", \"value\":.*?}",
+            result).group(0).lstrip("\"f1-score\", \"value\":").rstrip("}"))
 
     return precision, recall, f1

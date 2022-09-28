@@ -31,11 +31,13 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
-    Trainer, )
+    Trainer,
+)
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.transformers import (
     AutoTokenizer,
-    AutoModelForSequenceClassification, )
+    AutoModelForSequenceClassification,
+)
 from paddlenlp.utils.log import logger
 
 sys.path.insert(0, os.path.abspath("."))
@@ -43,7 +45,8 @@ from sequence_classification import seq_trans_fn, clue_trans_fn
 from utils import (
     ALL_DATASETS,
     DataArguments,
-    ModelArguments, )
+    ModelArguments,
+)
 
 
 def main():
@@ -70,8 +73,8 @@ def main():
             training_args.output_dir
     ) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(
-                os.listdir(training_args.output_dir)) > 0:
+        if last_checkpoint is None and len(os.listdir(
+                training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
                 "Use --overwrite_output_dir to overcome.")
@@ -98,13 +101,14 @@ def main():
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
         dataset_config[0],
-        None if len(dataset_config) <= 1 else dataset_config[1], )
+        None if len(dataset_config) <= 1 else dataset_config[1],
+    )
 
     data_args.label_list = getattr(raw_datasets['train'], "label_list", None)
     num_classes = 1 if raw_datasets["train"].label_list == None else len(
         raw_datasets['train'].label_list)
 
-    # Define tokenizer, model, loss function. 
+    # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_classes=num_classes)
@@ -153,7 +157,8 @@ def main():
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics, )
+        compute_metrics=compute_metrics,
+    )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -189,18 +194,17 @@ def main():
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
         input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64")  # segment_ids
         ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir,
                                                        "export")
-        paddlenlp.transformers.export_model(
-            model=trainer.model,
-            input_spec=input_spec,
-            path=model_args.export_model_dir)
+        paddlenlp.transformers.export_model(model=trainer.model,
+                                            input_spec=input_spec,
+                                            path=model_args.export_model_dir)
 
 
 if __name__ == "__main__":

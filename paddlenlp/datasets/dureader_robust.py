@@ -35,15 +35,15 @@ class DuReaderRobust(DatasetBuilder):
     MD5 = '82f3d191a115ec17808856866787606e'
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('dureader_robust-data', 'train.json'),
-            '800a3dcb742f9fdf9b11e0a83433d4be'),
-        'dev': META_INFO(
-            os.path.join('dureader_robust-data', 'dev.json'),
-            'ae73cec081eaa28a735204c4898a2222'),
-        'test': META_INFO(
-            os.path.join('dureader_robust-data', 'test.json'),
-            'e0e8aa5c7b6d11b6fc3935e29fc7746f')
+        'train':
+        META_INFO(os.path.join('dureader_robust-data', 'train.json'),
+                  '800a3dcb742f9fdf9b11e0a83433d4be'),
+        'dev':
+        META_INFO(os.path.join('dureader_robust-data', 'dev.json'),
+                  'ae73cec081eaa28a735204c4898a2222'),
+        'test':
+        META_INFO(os.path.join('dureader_robust-data', 'test.json'),
+                  'e0e8aa5c7b6d11b6fc3935e29fc7746f')
     }
 
     def _get_data(self, mode, **kwargs):

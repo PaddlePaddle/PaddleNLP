@@ -22,6 +22,7 @@ import unittest
 
 
 class TestJiebaTokenizer(CpuCommonTest):
+
     def setUp(self):
         test_data_file = create_test_data(__file__)
         self.vocab = Vocab.load_vocabulary(test_data_file, unk_token='[UNK]')

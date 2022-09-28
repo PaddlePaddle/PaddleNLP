@@ -53,18 +53,12 @@ class RDropLoss(nn.Layer):
         Returns:
             Tensor: Returns tensor `loss`, the rdrop loss of p and q.
         """
-        p_loss = F.kl_div(
-            F.log_softmax(
-                p, axis=-1),
-            F.softmax(
-                q, axis=-1),
-            reduction=self.reduction)
-        q_loss = F.kl_div(
-            F.log_softmax(
-                q, axis=-1),
-            F.softmax(
-                p, axis=-1),
-            reduction=self.reduction)
+        p_loss = F.kl_div(F.log_softmax(p, axis=-1),
+                          F.softmax(q, axis=-1),
+                          reduction=self.reduction)
+        q_loss = F.kl_div(F.log_softmax(q, axis=-1),
+                          F.softmax(p, axis=-1),
+                          reduction=self.reduction)
 
         # pad_mask is for seq-level tasks
         if pad_mask is not None:

@@ -65,8 +65,8 @@ def analysis(args, instance, gold_list):
         text_correct = 1 if ins['rationale_pred'] == golden_label else 0
         text_exclusive_correct = 1 if ins[
             'no_rationale_pred'] == golden_label else 0
-        New_P_correct = 1 if (text_correct == 1 and
-                              text_exclusive_correct == 0) else 0
+        New_P_correct = 1 if (text_correct == 1
+                              and text_exclusive_correct == 0) else 0
         New_P_list.append(New_P_correct)
 
     total_New_P = np.sum(New_P_list) / len(gold_list) if len(gold_list) else 0

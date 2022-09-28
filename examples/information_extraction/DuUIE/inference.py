@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import os
 import math
@@ -35,7 +50,10 @@ def post_processing(x):
 
 
 class Predictor:
-    def __init__(self, model_path, max_source_length=256,
+
+    def __init__(self,
+                 model_path,
+                 max_source_length=256,
                  max_target_length=192) -> None:
         self.tokenizer = T5BertTokenizer.from_pretrained(model_path)
         self.model = T5ForConditionalGeneration.from_pretrained(model_path)
@@ -45,6 +63,7 @@ class Predictor:
 
     @paddle.no_grad()
     def predict(self, text, schema):
+
         def to_tensor(x):
             return paddle.to_tensor(x, dtype='int64')
 
@@ -52,14 +71,14 @@ class Predictor:
 
         text = [ssi + x for x in text]
 
-        inputs = self.tokenizer(
-            text,
-            return_token_type_ids=False,
-            return_attention_mask=True,
-            max_seq_len=self.max_source_length)
+        inputs = self.tokenizer(text,
+                                return_token_type_ids=False,
+                                return_attention_mask=True,
+                                max_seq_len=self.max_source_length)
 
         inputs = {
-            'input_ids': to_tensor(
+            'input_ids':
+            to_tensor(
                 Pad(pad_val=self.tokenizer.pad_token_id)(inputs['input_ids'])),
             'attention_mask':
             to_tensor(Pad(pad_val=0)(inputs['attention_mask'])),
@@ -68,7 +87,8 @@ class Predictor:
         pred, _ = self.model.generate(
             input_ids=inputs['input_ids'],
             attention_mask=inputs['attention_mask'],
-            max_length=self.max_target_length, )
+            max_length=self.max_target_length,
+        )
 
         pred = self.tokenizer.batch_decode(pred.numpy())
 
@@ -86,15 +106,18 @@ def find_to_predict_folder(folder_name):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--data', '-d', required=True, help='Folder need to been predicted.')
-    parser.add_argument(
-        '--model', '-m', required=True, help='Trained model for inference')
-    parser.add_argument(
-        '--max_source_length',
-        default=384,
-        type=int,
-        help='Max source length for inference, ssi + text')
+    parser.add_argument('--data',
+                        '-d',
+                        required=True,
+                        help='Folder need to been predicted.')
+    parser.add_argument('--model',
+                        '-m',
+                        required=True,
+                        help='Trained model for inference')
+    parser.add_argument('--max_source_length',
+                        default=384,
+                        type=int,
+                        help='Max source length for inference, ssi + text')
     parser.add_argument('--max_target_length', default=192, type=int)
     parser.add_argument('--batch_size', default=512, type=int)
     parser.add_argument(
@@ -110,10 +133,9 @@ def main():
     data_folder = find_to_predict_folder(options.data)
     model_path = options.model
 
-    predictor = Predictor(
-        model_path=model_path,
-        max_source_length=options.max_source_length,
-        max_target_length=options.max_target_length)
+    predictor = Predictor(model_path=model_path,
+                          max_source_length=options.max_source_length,
+                          max_target_length=options.max_target_length)
 
     for task_folder in data_folder:
 
@@ -123,7 +145,8 @@ def main():
         sel2record = SEL2Record(
             schema_dict=SEL2Record.load_schema_dict(task_folder),
             map_config=MapConfig.load_by_name(options.map_config),
-            tokenizer=predictor.tokenizer, )
+            tokenizer=predictor.tokenizer,
+        )
 
         test_filename = os.path.join(f"{task_folder}", "test.json")
         if not os.path.exists(test_filename):

@@ -29,7 +29,9 @@ from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_typ
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
 
-__all__ = ["PdArgumentParser", ]
+__all__ = [
+    "PdArgumentParser",
+]
 
 
 # From https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
@@ -57,8 +59,8 @@ class PdArgumentParser(ArgumentParser):
 
     dataclass_types: Iterable[DataClassType]
 
-    def __init__(self,
-                 dataclass_types: Union[DataClassType, Iterable[DataClassType]],
+    def __init__(self, dataclass_types: Union[DataClassType,
+                                              Iterable[DataClassType]],
                  **kwargs):
         """
         Args:
@@ -98,9 +100,8 @@ class PdArgumentParser(ArgumentParser):
                 )
             if bool not in field.type.__args__:
                 # filter `NoneType` in Union (except for `Union[bool, NoneType]`)
-                field.type = (field.type.__args__[0]
-                              if isinstance(None, field.type.__args__[1]) else
-                              field.type.__args__[1])
+                field.type = (field.type.__args__[0] if isinstance(
+                    None, field.type.__args__[1]) else field.type.__args__[1])
                 origin_type = getattr(field.type, "__origin__", field.type)
 
         # A variable to store kwargs for a boolean field, if needed
@@ -151,14 +152,13 @@ class PdArgumentParser(ArgumentParser):
         # Order is important for arguments with the same destination!
         # We use a copy of earlier kwargs because the original kwargs have changed a lot before reaching down
         # here and we do not need those changes/additional keys.
-        if field.default is True and (field.type is bool or
-                                      field.type is Optional[bool]):
+        if field.default is True and (field.type is bool
+                                      or field.type is Optional[bool]):
             bool_kwargs["default"] = False
-            parser.add_argument(
-                f"--no_{field.name}",
-                action="store_false",
-                dest=field.name,
-                **bool_kwargs)
+            parser.add_argument(f"--no_{field.name}",
+                                action="store_false",
+                                dest=field.name,
+                                **bool_kwargs)
 
     def _add_dataclass_arguments(self, dtype: DataClassType):
         if hasattr(dtype, "_argument_group_name"):
@@ -219,8 +219,7 @@ class PdArgumentParser(ArgumentParser):
 
             if args_file.exists():
                 fargs = args_file.read_text().split()
-                args = fargs + args if args is not None else fargs + sys.argv[
-                    1:]
+                args = fargs + args if args is not None else fargs + sys.argv[1:]
                 # in case of duplicate arguments the first one has precedence
                 # so we append rather than prepend.
         namespace, remaining_args = self.parse_known_args(args=args)

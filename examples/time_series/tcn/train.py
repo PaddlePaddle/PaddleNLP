@@ -44,15 +44,17 @@ def train():
     else:
         paddle.set_device("cpu")
 
-    train_dataset = CovidDataset(
-        args.data_path, args.test_data_size, args.seq_length, mode="train")
+    train_dataset = CovidDataset(args.data_path,
+                                 args.test_data_size,
+                                 args.seq_length,
+                                 mode="train")
 
     network = TCNNetwork(input_size=1)
 
     model = paddle.Model(network)
 
-    optimizer = paddle.optimizer.Adam(
-        learning_rate=args.lr, parameters=model.parameters())
+    optimizer = paddle.optimizer.Adam(learning_rate=args.lr,
+                                      parameters=model.parameters())
 
     loss = paddle.nn.MSELoss(reduction='sum')
 

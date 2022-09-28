@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import pickle
 import paddle
@@ -41,7 +55,7 @@ def match_encoder_param(convert_parameter_name_dict,
                 convert_parameter_name_dict[dygraph_format_name.format(i, dygraph_proj_name, dygraph_param_name)] = \
                     static_format_name.format(i, static_proj_name, static_param_name)
 
-    # Secondly, converts the encoder ffn parameter.     
+    # Secondly, converts the encoder ffn parameter.
     dygraph_ffn_linear_format_name = "encoder.layers.{}.linear{}.{}"
     static_ffn_linear_format_name = static_para_prefix + "encoder_layer_{}_ffn_fc_{}.{}_0"
     for i in range(0, layer_num):

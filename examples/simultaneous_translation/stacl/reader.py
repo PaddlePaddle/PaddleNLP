@@ -45,21 +45,18 @@ def create_data_loader(args, places=None):
     data_files = {'train': args.training_file, 'dev': args.validation_file}
 
     datasets = [
-        load_dataset(
-            read, src_tgt_file=filename, lazy=False)
+        load_dataset(read, src_tgt_file=filename, lazy=False)
         for split, filename in data_files.items()
     ]
 
-    src_vocab = Vocab.load_vocabulary(
-        args.src_vocab_fpath,
-        bos_token=args.special_token[0],
-        eos_token=args.special_token[1],
-        unk_token=args.special_token[2])
-    trg_vocab = Vocab.load_vocabulary(
-        args.trg_vocab_fpath,
-        bos_token=args.special_token[0],
-        eos_token=args.special_token[1],
-        unk_token=args.special_token[2])
+    src_vocab = Vocab.load_vocabulary(args.src_vocab_fpath,
+                                      bos_token=args.special_token[0],
+                                      eos_token=args.special_token[1],
+                                      unk_token=args.special_token[2])
+    trg_vocab = Vocab.load_vocabulary(args.trg_vocab_fpath,
+                                      bos_token=args.special_token[0],
+                                      eos_token=args.special_token[1],
+                                      unk_token=args.special_token[2])
 
     args.src_vocab_size = len(src_vocab)
     args.trg_vocab_size = len(trg_vocab)
@@ -77,8 +74,7 @@ def create_data_loader(args, places=None):
     data_loaders = [(None)] * 2
     for i, dataset in enumerate(datasets):
         dataset = dataset.map(convert_samples, lazy=False).filter(
-            partial(
-                min_max_filer, max_len=args.max_length))
+            partial(min_max_filer, max_len=args.max_length))
 
         sampler = SamplerHelper(dataset)
 
@@ -90,13 +86,13 @@ def create_data_loader(args, places=None):
         else:
             if args.shuffle:
                 sampler = sampler.shuffle(seed=args.random_seed)
-            max_key = (lambda x, data_source: max(
-                len(data_source[x][0]), len(data_source[x][1])))
+            max_key = (lambda x, data_source: max(len(data_source[x][0]),
+                                                  len(data_source[x][1])))
             if args.sort_type == SortType.POOL:
                 sampler = sampler.sort(key=max_key, buffer_size=args.pool_size)
 
-        batch_size_fn = lambda new, count, sofar, data_source: max(sofar, len(data_source[new][0]),
-                                                                   len(data_source[new][1]))
+        batch_size_fn = lambda new, count, sofar, data_source: max(
+            sofar, len(data_source[new][0]), len(data_source[new][1]))
         batch_sampler = sampler.batch(
             batch_size=args.batch_size,
             drop_last=False,
@@ -109,13 +105,12 @@ def create_data_loader(args, places=None):
         if i == 0:
             batch_sampler = batch_sampler.shard()
 
-        data_loader = DataLoader(
-            dataset=dataset,
-            places=places,
-            batch_sampler=batch_sampler,
-            collate_fn=partial(
-                prepare_train_input, pad_idx=args.bos_idx),
-            num_workers=0)
+        data_loader = DataLoader(dataset=dataset,
+                                 places=places,
+                                 batch_sampler=batch_sampler,
+                                 collate_fn=partial(prepare_train_input,
+                                                    pad_idx=args.bos_idx),
+                                 num_workers=0)
 
         data_loaders[i] = (data_loader)
 
@@ -123,21 +118,23 @@ def create_data_loader(args, places=None):
 
 
 def create_infer_loader(args, places=None):
-    data_files = {'test': args.predict_file, }
-    dataset = load_dataset(
-        read, src_tgt_file=data_files['test'], only_src=True, lazy=False)
+    data_files = {
+        'test': args.predict_file,
+    }
+    dataset = load_dataset(read,
+                           src_tgt_file=data_files['test'],
+                           only_src=True,
+                           lazy=False)
 
-    src_vocab = Vocab.load_vocabulary(
-        args.src_vocab_fpath,
-        bos_token=args.special_token[0],
-        eos_token=args.special_token[1],
-        unk_token=args.special_token[2])
+    src_vocab = Vocab.load_vocabulary(args.src_vocab_fpath,
+                                      bos_token=args.special_token[0],
+                                      eos_token=args.special_token[1],
+                                      unk_token=args.special_token[2])
 
-    trg_vocab = Vocab.load_vocabulary(
-        args.trg_vocab_fpath,
-        bos_token=args.special_token[0],
-        eos_token=args.special_token[1],
-        unk_token=args.special_token[2])
+    trg_vocab = Vocab.load_vocabulary(args.trg_vocab_fpath,
+                                      bos_token=args.special_token[0],
+                                      eos_token=args.special_token[1],
+                                      unk_token=args.special_token[2])
 
     args.src_vocab_size = len(src_vocab)
     args.trg_vocab_size = len(trg_vocab)
@@ -150,17 +147,16 @@ def create_infer_loader(args, places=None):
 
     dataset = dataset.map(convert_samples, lazy=False)
 
-    batch_sampler = SamplerHelper(dataset).batch(
-        batch_size=args.batch_size, drop_last=False)
+    batch_sampler = SamplerHelper(dataset).batch(batch_size=args.batch_size,
+                                                 drop_last=False)
 
-    data_loader = DataLoader(
-        dataset=dataset,
-        places=places,
-        batch_sampler=batch_sampler,
-        collate_fn=partial(
-            prepare_infer_input, pad_idx=args.bos_idx),
-        num_workers=0,
-        return_list=True)
+    data_loader = DataLoader(dataset=dataset,
+                             places=places,
+                             batch_sampler=batch_sampler,
+                             collate_fn=partial(prepare_infer_input,
+                                                pad_idx=args.bos_idx),
+                             num_workers=0,
+                             return_list=True)
 
     return data_loader, trg_vocab.to_tokens
 
@@ -185,7 +181,9 @@ def prepare_infer_input(insts, pad_idx):
     word_pad = Pad(pad_idx)
     src_word = word_pad([inst[0] for inst in insts])
 
-    return [src_word, ]
+    return [
+        src_word,
+    ]
 
 
 class SortType(object):

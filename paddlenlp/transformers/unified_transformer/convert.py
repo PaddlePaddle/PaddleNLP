@@ -28,7 +28,7 @@ def setup_args():
 
 def convert(args):
     paddle.enable_static()
-    prog_state = paddle.fluid.io.load_program_state(args.param_path)
+    prog_state = paddle.static.load_program_state(args.param_path)
     new_state = {}
     for k in prog_state:
         if k.endswith("_embedding"):

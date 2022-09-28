@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import paddle
 import numpy as np
@@ -32,8 +46,8 @@ class TritonPythonModel:
           * model_version: Model version
           * model_name: Model name
         """
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-medium-zh", use_faster=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
+                                                       use_faster=True)
         # You must parse model_config. JSON string is not parsed here
         self.model_config = json.loads(args['model_config'])
         print("model_config:", self.model_config)
@@ -77,11 +91,13 @@ class TritonPythonModel:
                                                      self.input_names[0])
             data = data.as_numpy()
             data = [i[0].decode('utf-8') for i in data]
-            data = self.tokenizer(
-                data, max_length=128, padding=True, truncation=True)
+            data = self.tokenizer(data,
+                                  max_length=128,
+                                  padding=True,
+                                  truncation=True)
             input_ids = np.array(data["input_ids"], dtype=self.output_dtype[0])
-            token_type_ids = np.array(
-                data["token_type_ids"], dtype=self.output_dtype[1])
+            token_type_ids = np.array(data["token_type_ids"],
+                                      dtype=self.output_dtype[1])
 
             # print("input_ids:", input_ids)
             # print("token_type_ids:", token_type_ids)

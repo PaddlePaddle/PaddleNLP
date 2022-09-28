@@ -3,6 +3,7 @@ from paddlenlp.utils.log import logger
 
 
 class BenchmarkBase(object):
+
     def __init__(self):
         self.num_batch = 0
 

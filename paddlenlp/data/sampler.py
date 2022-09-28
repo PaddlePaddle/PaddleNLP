@@ -90,7 +90,7 @@ class SamplerHelper(object):
         self._length = length
 
     def apply(self, fn):
-        # Transformation functions would be performed. It includes 
+        # Transformation functions would be performed. It includes
         # :meth:`shuffle`, :meth:`sort`, :meth:`fit` and :meth:`shard`.
         # Args:
         #     fn (callable): Transformation functions to be performed.
@@ -315,8 +315,7 @@ class SamplerHelper(object):
             minibatch, size_so_far = [], 0
             for idx in iter(self):
                 minibatch.append(idx)
-                size_so_far = batch_size_fn(idx,
-                                            len(minibatch), size_so_far,
+                size_so_far = batch_size_fn(idx, len(minibatch), size_so_far,
                                             data_source)
                 if key(size_so_far, len(minibatch)) == batch_size:
                     yield minibatch
@@ -413,8 +412,8 @@ class SamplerHelper(object):
         return sampler
 
     def list(self):
-        # Produce a sampler with a `listiterator` when calling `iter`. Since 
-        # `list` would fetch all contents at time, thus it can get accurate 
+        # Produce a sampler with a `listiterator` when calling `iter`. Since
+        # `list` would fetch all contents at time, thus it can get accurate
         # length.
 
         def _impl():

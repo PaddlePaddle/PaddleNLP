@@ -22,7 +22,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 
@@ -63,10 +63,10 @@ def predict(model, data_loader):
             title_input_ids = paddle.to_tensor(title_input_ids)
             title_token_type_ids = paddle.to_tensor(title_token_type_ids)
 
-            vecs_query = model(
-                input_ids=query_input_ids, token_type_ids=query_token_type_ids)
-            vecs_title = model(
-                input_ids=title_input_ids, token_type_ids=title_token_type_ids)
+            vecs_query = model(input_ids=query_input_ids,
+                               token_type_ids=query_token_type_ids)
+            vecs_title = model(input_ids=title_input_ids,
+                               token_type_ids=title_token_type_ids)
             vecs_query = vecs_query[1].numpy()
             vecs_title = vecs_title[1].numpy()
 
@@ -84,16 +84,13 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    model = ppnlp.transformers.BertModel.from_pretrained(
-        'simbert-base-chinese', pool_act='linear')
-    tokenizer = ppnlp.transformers.BertTokenizer.from_pretrained(
-        'simbert-base-chinese')
+    model = AutoModel.from_pretrained('simbert-base-chinese', pool_act='linear')
+    tokenizer = AutoTokenizer.from_pretrained('simbert-base-chinese')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        phase="predict")
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length,
+                         phase="predict")
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -102,20 +99,21 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.input_file,
+                            lazy=False)
 
-    valid_data_loader = create_dataloader(
-        valid_ds,
-        mode='predict',
-        batch_size=args.batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    valid_data_loader = create_dataloader(valid_ds,
+                                          mode='predict',
+                                          batch_size=args.batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
     y_sims = predict(model, valid_data_loader)
 
-    valid_ds = load_dataset(
-        read_text_pair, data_path=args.input_file, lazy=False)
+    valid_ds = load_dataset(read_text_pair,
+                            data_path=args.input_file,
+                            lazy=False)
 
     for idx, prob in enumerate(y_sims):
         text_pair = valid_ds[idx]

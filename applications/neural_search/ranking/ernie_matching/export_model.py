@@ -14,49 +14,44 @@
 
 import argparse
 import os
-from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
-
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from model import PairwiseMatching
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, required=True, default='./checkpoint/model_900/model_state.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
+parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="The pretrained model used for training")
 args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    # If you want to use ernie1.0 model, plesace uncomment the following code
-    # tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
-    # pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained("ernie-1.0")
-
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     model = PairwiseMatching(pretrained_model)
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
-
+    else:
+        raise ValueError(
+            "Please set --params_path with correct pretrained model file")
     model.eval()
 
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64")  # segment_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64")  # segment_ids
         ])
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")

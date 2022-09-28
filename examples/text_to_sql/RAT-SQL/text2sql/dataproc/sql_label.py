@@ -54,11 +54,7 @@ class SQL(object):
     dtype_str = 'text'
     dtype_num = 'real'
 
-    def __init__(self,
-                 cond_conn_op: int,
-                 agg: list,
-                 sel: list,
-                 conds: list,
+    def __init__(self, cond_conn_op: int, agg: list, sel: list, conds: list,
                  **kwargs):
         """doc"""
         self.cond_conn_op = cond_conn_op
@@ -120,8 +116,8 @@ class SQL(object):
         repr_str = ''
         repr_str += "sel: {}\n".format(self.sel)
         repr_str += "agg: {}\n".format([self.agg_sql_dict[a] for a in self.agg])
-        repr_str += "cond_conn_op: '{}'\n".format(self.conn_sql_dict[
-            self.cond_conn_op])
+        repr_str += "cond_conn_op: '{}'\n".format(
+            self.conn_sql_dict[self.cond_conn_op])
         repr_str += "conds: {}".format(
             [[cond[0], self.op_sql_dict[cond[1]], cond[2]]
              for cond in self.conds])
@@ -197,8 +193,9 @@ def decode(sel_num, sel_col, sel_agg, where_num, where_conn, where_op,
         col_value = [None] * len(where_op)
     # use dict to find label number, equals to label+1
     sel_num = SQL.sel_num_dict[int(sel_num)]
-    sorted_sel_index = sorted(
-        range(len(sel_col)), key=lambda i: sel_col[i], reverse=True)
+    sorted_sel_index = sorted(range(len(sel_col)),
+                              key=lambda i: sel_col[i],
+                              reverse=True)
     sel_col = [int(col_id) for col_id in sorted_sel_index][:sel_num]
     sel_agg = [int(sel_agg[col_id]) for col_id in sorted_sel_index][:sel_num]
 
@@ -206,23 +203,25 @@ def decode(sel_num, sel_col, sel_agg, where_num, where_conn, where_op,
     where_conn = int(where_conn)
     cond_probs = []
     conds = []
-    for col_id, (
-            cond_op, cond_prob,
-            value_id) in enumerate(zip(where_op, where_op_prob, col_value)):
+    for col_id, (cond_op, cond_prob,
+                 value_id) in enumerate(zip(where_op, where_op_prob,
+                                            col_value)):
         if cond_op < len(SQL.op_sql_dict):
             cond_probs.append(cond_prob)
             value = get_value_by_id(col_id, value_id, header_match_cells)
             conds.append([col_id, int(cond_op), value])
     if cond_num < len(conds):
-        sorted_cond_index = sorted(
-            range(len(cond_probs)), key=lambda i: cond_probs[i], reverse=True)
+        sorted_cond_index = sorted(range(len(cond_probs)),
+                                   key=lambda i: cond_probs[i],
+                                   reverse=True)
         conds = [conds[i] for i in sorted_cond_index[:cond_num]]
 
     if group_num is None:
         group_num = 0
     if group_num > 0:
-        sorted_group_index = sorted(
-            range(len(group_col)), key=lambda i: group_col[i], reverse=True)
+        sorted_group_index = sorted(range(len(group_col)),
+                                    key=lambda i: group_col[i],
+                                    reverse=True)
         group_col = [int(col_id) for col_id in sorted_group_index[:group_num]]
     else:
         group_col = []
@@ -235,11 +234,13 @@ def decode(sel_num, sel_col, sel_agg, where_num, where_conn, where_op,
         for idx, (col_id, _, _) in enumerate(conds):
             if having_agg[col_id] > 0:
                 having_agg_info.append([
-                    idx, int(having_agg[col_id]), float(having_agg_prob[col_id])
+                    idx,
+                    int(having_agg[col_id]),
+                    float(having_agg_prob[col_id])
                 ])
                 #cond_num -= 1
-        if len(having_agg_info) > 0 and having_agg_info[0][
-                2] >= g_having_agg_threshold:
+        if len(having_agg_info
+               ) > 0 and having_agg_info[0][2] >= g_having_agg_threshold:
             # 按 agg 概率最大排序
             having_agg_info.sort(key=lambda x: x[2], reverse=True)
             idx, agg, _ = having_agg_info[0]
@@ -251,8 +252,9 @@ def decode(sel_num, sel_col, sel_agg, where_num, where_conn, where_op,
         order_by = []
         limit = '0'
     else:
-        sorted_order_index = sorted(
-            range(len(order_col)), key=lambda i: order_col[i], reverse=True)
+        sorted_order_index = sorted(range(len(order_col)),
+                                    key=lambda i: order_col[i],
+                                    reverse=True)
         order_col = [int(col_id) for col_id in sorted_order_index[:1]]
         order_agg = [
             int(order_agg[col_id]) for col_id in sorted_order_index[:1]

@@ -62,6 +62,7 @@ datasets.load_dataset = load_from_ppnlp
 
 
 class DatasetTuple:
+
     def __init__(self, splits):
         self.identifier_map, identifiers = self._gen_identifier_map(splits)
         self.tuple_cls = namedtuple('datasets', identifiers)
@@ -116,8 +117,8 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     try:
         hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
     except FileNotFoundError:
-        raise FileNotFoundError("Couldn't find the dataset script for '" + path
-                                + "' on PaddleNLP or HuggingFace")
+        raise FileNotFoundError("Couldn't find the dataset script for '" +
+                                path + "' on PaddleNLP or HuggingFace")
     else:
         label_list = []
         if isinstance(hf_datasets, DatasetDict):
@@ -133,8 +134,8 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
                 for feature in hf_datasets[i].features.values():
                     if isinstance(feature, ClassLabel):
                         label_list = feature.names
-                datasets[split] = MapDataset(
-                    hf_datasets[i], label_list=label_list)
+                datasets[split] = MapDataset(hf_datasets[i],
+                                             label_list=label_list)
         else:
             for feature in hf_datasets.features.values():
                 if isinstance(feature, ClassLabel):
@@ -197,8 +198,10 @@ def load_dataset(path_or_read_func,
         try:
             reader_cls = import_main_class(path_or_read_func)
         except ModuleNotFoundError:
-            datasets = load_from_hf(
-                path_or_read_func, name=name, splits=splits, **kwargs)
+            datasets = load_from_hf(path_or_read_func,
+                                    name=name,
+                                    splits=splits,
+                                    **kwargs)
         else:
             reader_instance = reader_cls(lazy=lazy, name=name, **kwargs)
 
@@ -226,11 +229,12 @@ def load_dataset(path_or_read_func,
 
             for split_name in selected_splits:
                 if split_name not in split_names and split_name != None:
-                    raise ValueError('Invalid split "{}". Should be one of {}.'.
-                                     format(split_name, list(split_names)))
+                    raise ValueError(
+                        'Invalid split "{}". Should be one of {}.'.format(
+                            split_name, list(split_names)))
 
-            datasets = reader_instance.read_datasets(
-                data_files=data_files, splits=splits)
+            datasets = reader_instance.read_datasets(data_files=data_files,
+                                                     splits=splits)
         return datasets
 
 
@@ -268,8 +272,9 @@ class MapDataset(Dataset):
         Basic function of `MapDataset` to get sample from dataset with a given 
         index.
         """
-        return self._transform(self.new_data[
-            idx]) if self._transform_pipline else self.new_data[idx]
+        return self._transform(
+            self.new_data[idx]
+        ) if self._transform_pipline else self.new_data[idx]
 
     def __len__(self):
         """
@@ -291,19 +296,17 @@ class MapDataset(Dataset):
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 1:
             shards = [
-                self._shard(
-                    num_shards=num_workers, index=index, contiguous=True)
-                for index in range(num_workers)
+                self._shard(num_shards=num_workers,
+                            index=index,
+                            contiguous=True) for index in range(num_workers)
             ]
             kwds_per_shard = [
-                dict(
-                    self=shards[rank], fn=fn) for rank in range(num_workers)
+                dict(self=shards[rank], fn=fn) for rank in range(num_workers)
             ]
             pool = Pool(num_workers, initargs=(RLock(), ))
 
             results = [
-                pool.apply_async(
-                    self.__class__._filter, kwds=kwds)
+                pool.apply_async(self.__class__._filter, kwds=kwds)
                 for kwds in kwds_per_shard
             ]
             transformed_shards = [r.get() for r in results]
@@ -325,8 +328,9 @@ class MapDataset(Dataset):
         return self
 
     def shard(self, num_shards=None, index=None, contiguous=False):
-        self.new_data = self._shard(
-            num_shards=num_shards, index=index, contiguous=contiguous).data
+        self.new_data = self._shard(num_shards=num_shards,
+                                    index=index,
+                                    contiguous=contiguous).data
         return self
 
     def _shard(self, num_shards=None, index=None, contiguous=False):
@@ -388,19 +392,18 @@ class MapDataset(Dataset):
         assert num_workers >= 0, "num_workers should be a non-negative value"
         if num_workers > 1:
             shards = [
-                self._shard(
-                    num_shards=num_workers, index=index, contiguous=True)
-                for index in range(num_workers)
+                self._shard(num_shards=num_workers,
+                            index=index,
+                            contiguous=True) for index in range(num_workers)
             ]
             kwds_per_shard = [
-                dict(
-                    self=shards[rank], fn=fn, lazy=False, batched=batched)
+                dict(self=shards[rank], fn=fn, lazy=False, batched=batched)
                 for rank in range(num_workers)
             ]
             pool = Pool(num_workers, initargs=(RLock(), ))
             results = [
-                pool.apply_async(
-                    self.__class__._map, kwds=kwds) for kwds in kwds_per_shard
+                pool.apply_async(self.__class__._map, kwds=kwds)
+                for kwds in kwds_per_shard
             ]
             transformed_shards = [r.get() for r in results]
             pool.close()
@@ -468,9 +471,9 @@ class IterDataset(IterableDataset):
         num_samples = 0
         if inspect.isfunction(self.data):
             for example in self.data():
-                if (not self._filter_pipline or
-                        self._filter(self._filter_pipline)
-                    ) and self._shard_filter(num_samples=num_samples):
+                if (not self._filter_pipline or self._filter(
+                        self._filter_pipline)) and self._shard_filter(
+                            num_samples=num_samples):
                     yield self._transform(
                         example) if self._transform_pipline else example
                 num_samples += 1
@@ -480,9 +483,9 @@ class IterDataset(IterableDataset):
                     'Reciving generator as data source, data can only be iterated once'
                 )
             for example in self.data:
-                if (not self._filter_pipline or
-                        self._filter(self._filter_pipline)
-                    ) and self._shard_filter(num_samples=num_samples):
+                if (not self._filter_pipline or self._filter(
+                        self._filter_pipline)) and self._shard_filter(
+                            num_samples=num_samples):
                     yield self._transform(
                         example) if self._transform_pipline else example
                 num_samples += 1
@@ -562,6 +565,7 @@ class DatasetBuilder:
         self.config = config
 
     def read_datasets(self, splits=None, data_files=None):
+
         def remove_if_exit(filepath):
             if isinstance(filepath, (list, tuple)):
                 for file in filepath:
@@ -577,13 +581,13 @@ class DatasetBuilder:
 
         if data_files is None:
             if splits is None:
-                splits = list(self.BUILDER_CONFIGS[self.name]['splits'].keys(
-                )) if hasattr(self,
-                              "BUILDER_CONFIGS") else list(self.SPLITS.keys())
+                splits = list(self.BUILDER_CONFIGS[
+                    self.name]['splits'].keys()) if hasattr(
+                        self, "BUILDER_CONFIGS") else list(self.SPLITS.keys())
 
-            assert isinstance(splits, str) or (
-                isinstance(splits, list) and isinstance(splits[0], str)
-            ) or (
+            assert isinstance(
+                splits, str
+            ) or (isinstance(splits, list) and isinstance(splits[0], str)) or (
                 isinstance(splits, tuple) and isinstance(splits[0], str)
             ), "`splits` should be a string or list of string or a tuple of string."
 
@@ -624,9 +628,10 @@ class DatasetBuilder:
                 datasets[split] = self.read(filename=filename, split=split)
         else:
             assert isinstance(data_files, str) or isinstance(
-                data_files, tuple) or isinstance(
-                    data_files, list
-                ), "`data_files` should be a string or tuple or list of strings."
+                data_files, tuple
+            ) or isinstance(
+                data_files, list
+            ), "`data_files` should be a string or tuple or list of strings."
             if isinstance(data_files, str):
                 data_files = [data_files]
             default_split = 'train'
@@ -638,8 +643,8 @@ class DatasetBuilder:
                     data_files
                 ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
                 for i in range(len(data_files)):
-                    datasets[splits[i]] = self.read(
-                        filename=data_files[i], split=splits[i])
+                    datasets[splits[i]] = self.read(filename=data_files[i],
+                                                    split=splits[i])
             else:
                 datasets = DatasetTuple(
                     ["split" + str(i) for i in range(len(data_files))])
@@ -730,15 +735,13 @@ class DatasetBuilder:
                     else:
                         yield example
 
-            return IterDataset(
-                generate_examples(),
-                label_list=label_list,
-                vocab_info=vocab_info)
+            return IterDataset(generate_examples(),
+                               label_list=label_list,
+                               vocab_info=vocab_info)
         else:
             examples = self._read(
-                filename,
-                split) if self._read.__code__.co_argcount > 2 else self._read(
-                    filename)
+                filename, split
+            ) if self._read.__code__.co_argcount > 2 else self._read(filename)
 
             # Then some validation.
             if not isinstance(examples, list):
@@ -771,8 +774,9 @@ class DatasetBuilder:
                         examples[idx][label_col] = _convert_label_to_id(
                             examples[idx][label_col], label_dict)
 
-            return MapDataset(
-                examples, label_list=label_list, vocab_info=vocab_info)
+            return MapDataset(examples,
+                              label_list=label_list,
+                              vocab_info=vocab_info)
 
     def _read(self, filename: str, *args):
         """
@@ -806,6 +810,7 @@ class DatasetBuilder:
 
 
 class SimpleBuilder(DatasetBuilder):
+
     def __init__(self, lazy, read_func):
         self._read = read_func
         self.lazy = lazy

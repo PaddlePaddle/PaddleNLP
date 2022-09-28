@@ -80,8 +80,8 @@ def test_ner_dataset(client):
 
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
             paddle.to_tensor(seq_len), preds, label_list)
-        metric.update(num_infer_chunks.numpy(),
-                      num_label_chunks.numpy(), num_correct_chunks.numpy())
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
+                      num_correct_chunks.numpy())
         idx += batch_size
         print(idx)
 
@@ -104,12 +104,15 @@ def test_demo(client):
     value = json.loads(ret.value[0])
     print_ret(value, text1)
 
-    text2 = [[
-        '从', '首', '都', '利', '隆', '圭', '乘', '车', '向', '湖', '边', '小', '镇', '萨',
-        '利', '马', '进', '发', '时', '，', '不', '到', '１', '０', '０', '公', '里', '的',
-        '道', '路', '上', '坑', '坑', '洼', '洼', '，', '又', '逢', '阵', '雨', '迷', '蒙',
-        '，', '令', '人', '不', '时', '发', '出', '路', '难', '行', '的', '慨', '叹', '。'
-    ], ]
+    text2 = [
+        [
+            '从', '首', '都', '利', '隆', '圭', '乘', '车', '向', '湖', '边', '小', '镇',
+            '萨', '利', '马', '进', '发', '时', '，', '不', '到', '１', '０', '０', '公',
+            '里', '的', '道', '路', '上', '坑', '坑', '洼', '洼', '，', '又', '逢', '阵',
+            '雨', '迷', '蒙', '，', '令', '人', '不', '时', '发', '出', '路', '难', '行',
+            '的', '慨', '叹', '。'
+        ],
+    ]
     ret = client.predict(feed_dict={"tokens": text2})
     value = json.loads(ret.value[0])
     print_ret(value, text2)

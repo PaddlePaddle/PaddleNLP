@@ -35,11 +35,10 @@ def quant_post(args):
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
-    trans_func = partial(
-        convert_example_to_feature,
-        tokenizer=tokenizer,
-        label2id=label2id,
-        max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example_to_feature,
+                         tokenizer=tokenizer,
+                         label2id=label2id,
+                         max_seq_len=args.max_seq_len)
     train_ds = train_ds.map(trans_func, lazy=True)
 
     def batch_generator_func():

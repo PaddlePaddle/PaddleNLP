@@ -46,8 +46,9 @@ def load_from_file(args):
     for golden_line in golden_f.readlines():
         golden_dict = json.loads(golden_line)
         sent_id = golden_dict['sent_id']
-        golden_raw_rationale[
-            sent_id] = [int(x) for x in golden_dict['rationales']]
+        golden_raw_rationale[sent_id] = [
+            int(x) for x in golden_dict['rationales']
+        ]
 
     for pred_line in pred_f.readlines():
         pred_dict = json.loads(pred_line)
@@ -99,8 +100,9 @@ def calc_model_f1(golden_dict, pred_dict):
             'f1': f1
         }
 
-    macro_f1 = sum(score['f1'] for score in scores.values()) / len(
-        golden_dict) if len(golden_dict) else 0
+    macro_f1 = sum(score['f1']
+                   for score in scores.values()) / len(golden_dict) if len(
+                       golden_dict) else 0
 
     return macro_f1, scores
 

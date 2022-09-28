@@ -34,9 +34,8 @@ def evaluate(model, dataset, infer_results, name='DuSQL', eval_value=True):
         metric.update(dataset.get_by_qid(qid)[0], pred_query)
 
     eval_result = metric.finalize()
-    print(
-        'evaluating result:', json.dumps(
-            eval_result['total_scores'], indent=4))
+    print('evaluating result:', json.dumps(eval_result['total_scores'],
+                                           indent=4))
     with open('output/debug.json', 'w') as ofs:
         import random
         random.shuffle(eval_result['per_item'])

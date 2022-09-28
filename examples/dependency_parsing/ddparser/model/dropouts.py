@@ -55,15 +55,15 @@ class IndependentDropout(nn.Layer):
         """Forward network"""
         if self.training and self.p > 0:
             masks = [
-                paddle.uniform(
-                    shape=x.shape[:2], min=0, max=1) >= self.p for x in items
+                paddle.uniform(shape=x.shape[:2], min=0, max=1) >= self.p
+                for x in items
             ]
             masks = [paddle.cast(x, 'float32') for x in masks]
             total = paddle.add(*masks)
             scale = len(items) / paddle.maximum(total, paddle.ones_like(total))
             masks = [mask * scale for mask in masks]
             items = [
-                item * paddle.unsqueeze(
-                    mask, axis=-1) for item, mask in zip(items, masks)
+                item * paddle.unsqueeze(mask, axis=-1)
+                for item, mask in zip(items, masks)
             ]
         return items

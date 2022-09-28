@@ -59,7 +59,8 @@ def predict(data, label_map, batch_size):
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # token type ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+            ),  # token type ids
     ): fn(samples)
 
     # Seperates data into some batches.
@@ -76,11 +77,12 @@ def predict(data, label_map, batch_size):
     results = []
     for batch in batches:
         input_ids, token_type_ids = batchify_fn(batch)
-        fetch_map = client.predict(
-            feed={"input_ids": input_ids,
-                  "token_type_ids": token_type_ids},
-            fetch=["save_infer_model/scale_0.tmp_1"],
-            batch=True)
+        fetch_map = client.predict(feed={
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids
+        },
+                                   fetch=["save_infer_model/scale_0.tmp_1"],
+                                   batch=True)
         output_data = np.array(fetch_map["save_infer_model/scale_0.tmp_1"])
         probs = softmax(output_data, axis=1)
         idx = np.argmax(probs, axis=1)

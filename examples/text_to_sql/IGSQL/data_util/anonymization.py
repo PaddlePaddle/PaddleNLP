@@ -173,8 +173,8 @@ class Anonymizer:
             `list`: The anonymized sequence.
         """
         # Sort the token-tok-entity dict by the length of the modality.
-        sorted_dict = sorted(
-            tok_to_entity_dict.items(), key=lambda k: len(k[1][key]))[::-1]
+        sorted_dict = sorted(tok_to_entity_dict.items(),
+                             key=lambda k: len(k[1][key]))[::-1]
 
         anonymized_sequence = copy.deepcopy(sequence)
 
@@ -196,8 +196,8 @@ class Anonymizer:
                 found = False
                 for startidx in range(
                         len(anonymized_sequence) - len(our_modality) + 1):
-                    if anonymized_sequence[startidx:startidx + len(
-                            our_modality)] == our_modality:
+                    if anonymized_sequence[startidx:startidx +
+                                           len(our_modality)] == our_modality:
                         anonymized_sequence = anonymized_sequence[:startidx] + [
                             token
                         ] + anonymized_sequence[startidx + len(our_modality):]
@@ -212,8 +212,8 @@ class Anonymizer:
 
             # For every span in the sequence, check whether it is in the anon map
             # for this modality
-            sorted_anon_map = sorted(
-                self.anonymization_map, key=lambda k: len(k[key]))[::-1]
+            sorted_anon_map = sorted(self.anonymization_map,
+                                     key=lambda k: len(k[key]))[::-1]
 
             for pair in sorted_anon_map:
                 our_modality = pair[key]
@@ -234,8 +234,8 @@ class Anonymizer:
 
                             anonymized_sequence = anonymized_sequence[:startidx] + [
                                 new_token
-                            ] + anonymized_sequence[startidx + len(
-                                our_modality):]
+                            ] + anonymized_sequence[startidx +
+                                                    len(our_modality):]
                             found = True
                             break
                     assert found, "Thought " \

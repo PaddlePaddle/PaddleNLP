@@ -33,8 +33,10 @@ from squad import compute_prediction
 from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBPETokenizer
 
 from roberta.modeling import RobertaForQuestionAnswering
+
 sys.path.append('../../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version
+
 sys.path.remove('../../..')
 
 log = logging.getLogger(__name__)
@@ -44,58 +46,53 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 def get_args():
     parser = argparse.ArgumentParser('mrc task with roberta')
-    parser.add_argument(
-        '--base_model',
-        required=True,
-        choices=['roberta_base', 'roberta_large'])
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretrained model directory or tag')
-    parser.add_argument(
-        '--max_seq_len',
-        type=int,
-        default=128,
-        help='max sentence length, should not greater than 512')
+    parser.add_argument('--base_model',
+                        required=True,
+                        choices=['roberta_base', 'roberta_large'])
+    parser.add_argument('--from_pretrained',
+                        type=str,
+                        required=True,
+                        help='pretrained model directory or tag')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=128,
+                        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=32, help='batchsize')
     parser.add_argument('--epoch', type=int, default=3, help='epoch')
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        required=True,
-        help='data directory includes train / develop data')
-    parser.add_argument(
-        '--init_checkpoint',
-        type=str,
-        default=None,
-        help='checkpoint to warm start from')
+    parser.add_argument('--data_dir',
+                        type=str,
+                        required=True,
+                        help='data directory includes train / develop data')
+    parser.add_argument('--init_checkpoint',
+                        type=str,
+                        default=None,
+                        help='checkpoint to warm start from')
     parser.add_argument(
         '--use_amp',
         action='store_true',
-        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+        help=
+        'only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
     )
     parser.add_argument(
         '--n-samples',
         type=int,
         default=25,
         help='number of samples used for smooth gradient method')
-    parser.add_argument(
-        '--output_dir',
-        type=Path,
-        required=True,
-        help='interpretable output directory')
+    parser.add_argument('--output_dir',
+                        type=Path,
+                        required=True,
+                        help='interpretable output directory')
     parser.add_argument(
         "--doc_stride",
         type=int,
         default=128,
-        help="When splitting up a long document into chunks, how much stride to take between chunks."
+        help=
+        "When splitting up a long document into chunks, how much stride to take between chunks."
     )
-    parser.add_argument(
-        "--language",
-        type=str,
-        required=True,
-        help="language that the model based on")
+    parser.add_argument("--language",
+                        type=str,
+                        required=True,
+                        help="language that the model based on")
     args = parser.parse_args()
     return args
 
@@ -108,24 +105,23 @@ def map_fn_DuCheckList(examples, args, tokenizer):
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     if args.language == 'en':
         contexts = [
-            examples[i]['context'].encode(
-                'ascii', errors='replace').decode('UTF-8')
+            examples[i]['context'].encode('ascii',
+                                          errors='replace').decode('UTF-8')
             for i in range(len(examples))
         ]
         questions = [
-            examples[i]['question'].encode(
-                'ascii', errors='replace').decode('UTF-8')
+            examples[i]['question'].encode('ascii',
+                                           errors='replace').decode('UTF-8')
             for i in range(len(examples))
         ]
     else:
         contexts = [examples[i]['context'] for i in range(len(examples))]
         questions = [examples[i]['question'] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_len)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_len)
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
 
@@ -148,8 +144,8 @@ def map_fn_DuCheckList(examples, args, tokenizer):
         else:
             n = tokenized_example['offset_mapping'].index(
                 (0, 0), 1) + 2  # context start position
-            m = len(tokenized_example[
-                'offset_mapping']) - 1  # context end position + 1
+            m = len(tokenized_example['offset_mapping']
+                    ) - 1  # context end position + 1
             tokenized_examples[i]["offset_mapping"] = [
                 (o if n <= k <= m else None)
                 for k, o in enumerate(tokenized_example["offset_mapping"])
@@ -167,18 +163,19 @@ def init_roberta_var(args):
     map_fn = partial(map_fn_DuCheckList, args=args, tokenizer=tokenizer)
     dev_ds = RCInterpret().read(args.data_dir)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    batchify_fn = lambda samples, fn=Dict({
-                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-                "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id )
-            }): fn(samples)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+        }): fn(samples)
 
-    dev_dataloader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    dev_dataloader = paddle.io.DataLoader(dataset=dev_ds,
+                                          batch_sampler=dev_batch_sampler,
+                                          collate_fn=batchify_fn,
+                                          return_list=True)
 
     return model, tokenizer, dev_dataloader, dev_ds
 
@@ -212,13 +209,11 @@ def evaluate(model, data_loader, args):
     # Can also write all_nbest_json and scores_diff_json files if needed
     with open(os.path.join(args.output_dir, 'predict_ans'), 'w') as f_ans_pred:
         f_ans_pred.write(
-            json.dumps(
-                all_predictions, ensure_ascii=False, indent=4) + "\n")
+            json.dumps(all_predictions, ensure_ascii=False, indent=4) + "\n")
     with open(os.path.join(args.output_dir, 'predict_feature_index'),
               'w') as f_feature_index:
         f_feature_index.write(
-            json.dumps(
-                all_feature_index, ensure_ascii=False, indent=4) + "\n")
+            json.dumps(all_feature_index, ensure_ascii=False, indent=4) + "\n")
 
     #squad_evaluate(examples=data_loader.dataset.data, preds=all_predictions, na_probs=scores_diff_json)
     #model.train()

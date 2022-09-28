@@ -21,71 +21,74 @@ import reader
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, help="Batch size. ")
-    parser.add_argument(
-        "--config",
-        default="./configs/transformer.big.yaml",
-        type=str,
-        help="Path of the config file. ")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["gpu", "xpu", "cpu"],
-        help="Device to use during inference. ")
-    parser.add_argument(
-        "--use_mkl",
-        default=False,
-        type=eval,
-        choices=[True, False],
-        help="Whether to use mkl. ")
-    parser.add_argument(
-        "--threads",
-        default=1,
-        type=int,
-        help="The number of threads when enable mkl. ")
-    parser.add_argument(
-        "--model_dir", default="", type=str, help="Path of the model. ")
+    parser.add_argument("--config",
+                        default="./configs/transformer.big.yaml",
+                        type=str,
+                        help="Path of the config file. ")
+    parser.add_argument("--device",
+                        default="gpu",
+                        type=str,
+                        choices=["gpu", "xpu", "cpu"],
+                        help="Device to use during inference. ")
+    parser.add_argument("--use_mkl",
+                        default=False,
+                        type=eval,
+                        choices=[True, False],
+                        help="Whether to use mkl. ")
+    parser.add_argument("--threads",
+                        default=1,
+                        type=int,
+                        help="The number of threads when enable mkl. ")
+    parser.add_argument("--model_dir",
+                        default="",
+                        type=str,
+                        help="Path of the model. ")
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help=
+        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
-    parser.add_argument(
-        "--profile", action="store_true", help="Whether to profile. ")
+    parser.add_argument("--profile",
+                        action="store_true",
+                        help="Whether to profile. ")
     parser.add_argument(
         "--test_file",
         nargs='+',
         default=None,
         type=str,
-        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+        help=
+        "The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
     )
-    parser.add_argument(
-        "--save_log_path",
-        default="./transformer/output/",
-        type=str,
-        help="The path to save logs when profile is enabled. ")
+    parser.add_argument("--save_log_path",
+                        default="./transformer/output/",
+                        type=str,
+                        help="The path to save logs when profile is enabled. ")
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help=
+        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
+        help=
+        "The unknown token. It should be provided when use custom vocab_file. ")
     parser.add_argument(
         "--bos_token",
         default=None,
         type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
+        help="The bos token. It should be provided when use custom vocab_file. "
+    )
     parser.add_argument(
         "--eos_token",
         default=None,
         type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
+        help="The eos token. It should be provided when use custom vocab_file. "
+    )
     args = parser.parse_args()
     return args
 
@@ -107,6 +110,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 
 
 class Predictor(object):
+
     def __init__(self, predictor, input_handles, output_handles, autolog=None):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -115,7 +119,10 @@ class Predictor(object):
         self.use_auto_log = not isinstance(self.autolog, recorder.Recorder)
 
     @classmethod
-    def create_predictor(cls, args, config=None, profile=False,
+    def create_predictor(cls,
+                         args,
+                         config=None,
+                         profile=False,
                          model_name=None):
         if config is None:
             config = inference.Config(
@@ -171,8 +178,8 @@ class Predictor(object):
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy() if isinstance(
-                input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy(
+            ) if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
         output = [
             output_handle.copy_to_cpu() for output_handle in self.output_handles
@@ -229,10 +236,10 @@ class Predictor(object):
             else:
                 self.autolog.get_device_info(
                     cpu_rss_mb=cpu_rss_mb / len(test_loader),
-                    gpu_rss_mb=gpu_rss_mb / len(test_loader)
-                    if self.autolog.use_gpu else 0,
-                    gpu_util=gpu_util / len(test_loader)
-                    if self.autolog.use_gpu else 0)
+                    gpu_rss_mb=gpu_rss_mb /
+                    len(test_loader) if self.autolog.use_gpu else 0,
+                    gpu_util=gpu_util /
+                    len(test_loader) if self.autolog.use_gpu else 0)
 
         return outputs
 
@@ -241,8 +248,9 @@ def do_inference(args):
     # Define data loader
     test_loader, to_tokens = reader.create_infer_loader(args)
 
-    predictor = Predictor.create_predictor(
-        args=args, profile=args.profile, model_name=args.model_name)
+    predictor = Predictor.create_predictor(args=args,
+                                           profile=args.profile,
+                                           model_name=args.model_name)
     sequence_outputs = predictor.predict(test_loader, to_tokens, args.n_best,
                                          args.bos_idx, args.eos_idx)
 

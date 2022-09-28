@@ -72,8 +72,8 @@ def tokenize_stories(stories_dir, tokenized_stories_dir):
     print("Making list of files to tokenize...")
     with open("mapping.txt", "w") as f:
         for s in stories:
-            f.write("%s \t %s\n" % (os.path.join(stories_dir, s),
-                                    os.path.join(tokenized_stories_dir, s)))
+            f.write("%s \t %s\n" % (os.path.join(
+                stories_dir, s), os.path.join(tokenized_stories_dir, s)))
     command = [
         'java', 'edu.stanford.nlp.process.PTBTokenizer', '-ioFileList',
         '-preserveLines', 'mapping.txt'
@@ -171,8 +171,9 @@ def write_to_bin(url_file, out_file, makevocab=False):
     with open(out_file, 'w') as writer:
         for idx, s in enumerate(story_fnames):
             if idx % 1000 == 0:
-                print("Writing story %i of %i; %.2f percent done" % (
-                    idx, num_stories, float(idx) * 100.0 / float(num_stories)))
+                print(
+                    "Writing story %i of %i; %.2f percent done" %
+                    (idx, num_stories, float(idx) * 100.0 / float(num_stories)))
 
             # Look in the tokenized story dirs to find the .story file corresponding to this url
             if os.path.isfile(os.path.join(cnn_tokenized_stories_dir, s)):
@@ -264,10 +265,9 @@ if __name__ == '__main__':
     # Read the tokenized stories, do a little postprocessing then write to bin files
     write_to_bin(all_test_urls, os.path.join(finished_files_dir, "test.json"))
     write_to_bin(all_val_urls, os.path.join(finished_files_dir, "val.json"))
-    write_to_bin(
-        all_train_urls,
-        os.path.join(finished_files_dir, "train.json"),
-        makevocab=True)
+    write_to_bin(all_train_urls,
+                 os.path.join(finished_files_dir, "train.json"),
+                 makevocab=True)
 
     # Chunk the data. This splits each of train.json, val.json and test.json into smaller chunks, each containing e.g. 1000 examples, and saves them in finished_files/chunks
     chunk_all()

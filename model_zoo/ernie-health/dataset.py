@@ -19,6 +19,7 @@ import paddle
 
 
 class MedicalCorpus(paddle.io.Dataset):
+
     def __init__(self, data_path, tokenizer):
         self.data_path = data_path
         self.tokenizer = tokenizer
@@ -35,8 +36,8 @@ class MedicalCorpus(paddle.io.Dataset):
         # Get all prefix of .npy/.npz files in the current and next-level directories.
         files = [
             os.path.join(data_path, f) for f in os.listdir(data_path)
-            if (os.path.isfile(os.path.join(data_path, f)) and '_idx.npz' in
-                str(f))
+            if (os.path.isfile(os.path.join(data_path, f))
+                and '_idx.npz' in str(f))
         ]
         files = [x.replace('_idx.npz', '') for x in files]
         return files
@@ -52,8 +53,9 @@ class MedicalCorpus(paddle.io.Dataset):
                     raise ValueError('File Not found, %s' %
                                      (file_name + suffix))
 
-            token_ids = np.load(
-                file_name + '_ids.npy', mmap_mode='r', allow_pickle=True)
+            token_ids = np.load(file_name + '_ids.npy',
+                                mmap_mode='r',
+                                allow_pickle=True)
             samples.append(token_ids)
 
             split_ids = np.load(file_name + '_idx.npz')
@@ -88,6 +90,7 @@ class MedicalCorpus(paddle.io.Dataset):
 
 
 class DataCollatorForErnieHealth(object):
+
     def __init__(self, tokenizer, mlm_prob, max_seq_length, return_dict=False):
         self.tokenizer = tokenizer
         self.mlm_prob = mlm_prob
@@ -130,8 +133,9 @@ class DataCollatorForErnieHealth(object):
         # self.mlm_prob, while that of others is zero.
         data = self.add_special_tokens_and_set_maskprob(token_ids, is_suffix)
         token_ids, is_suffix, prob_matrix = data
-        token_ids = paddle.to_tensor(
-            token_ids, dtype='int64', stop_gradient=True)
+        token_ids = paddle.to_tensor(token_ids,
+                                     dtype='int64',
+                                     stop_gradient=True)
         masked_token_ids = token_ids.clone()
         labels = token_ids.clone()
 
@@ -142,12 +146,11 @@ class DataCollatorForErnieHealth(object):
         is_suffix_mask = (is_suffix == 1)
         word_mask_index_tmp = word_mask_index
         while word_mask_index_tmp.sum() > 0:
-            word_mask_index_tmp = np.concatenate(
-                [
-                    np.zeros((word_mask_index.shape[0], 1)),
-                    word_mask_index_tmp[:, :-1]
-                ],
-                axis=1)
+            word_mask_index_tmp = np.concatenate([
+                np.zeros(
+                    (word_mask_index.shape[0], 1)), word_mask_index_tmp[:, :-1]
+            ],
+                                                 axis=1)
             word_mask_index_tmp = word_mask_index_tmp * is_suffix_mask
             word_mask_index += word_mask_index_tmp
         word_mask_index = word_mask_index.astype('bool')
@@ -160,13 +163,12 @@ class DataCollatorForErnieHealth(object):
 
         # 10% replaced with random token ids.
         token_random_index = paddle.to_tensor(
-            paddle.bernoulli(paddle.full(labels.shape, 0.5)).astype('bool')
-            .numpy() & word_mask_index & ~token_mask_index)
-        random_tokens = paddle.randint(
-            low=0,
-            high=self.tokenizer.vocab_size,
-            shape=labels.shape,
-            dtype='int64')
+            paddle.bernoulli(paddle.full(labels.shape, 0.5)).astype(
+                'bool').numpy() & word_mask_index & ~token_mask_index)
+        random_tokens = paddle.randint(low=0,
+                                       high=self.tokenizer.vocab_size,
+                                       shape=labels.shape,
+                                       dtype='int64')
         masked_token_ids = paddle.where(token_random_index, random_tokens,
                                         masked_token_ids)
 
@@ -214,23 +216,23 @@ def create_dataloader(dataset,
     """
 
     if mode == 'train' and use_gpu:
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=True)
-        dataloader = paddle.io.DataLoader(
-            dataset,
-            batch_sampler=sampler,
-            return_list=True,
-            collate_fn=data_collator,
-            num_workers=0)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=True)
+        dataloader = paddle.io.DataLoader(dataset,
+                                          batch_sampler=sampler,
+                                          return_list=True,
+                                          collate_fn=data_collator,
+                                          num_workers=0)
     else:
         shuffle = True if mode == 'train' else False
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-        dataloader = paddle.io.DataLoader(
-            dataset,
-            batch_sampler=sampler,
-            return_list=True,
-            collate_fn=data_collator,
-            num_workers=0)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+        dataloader = paddle.io.DataLoader(dataset,
+                                          batch_sampler=sampler,
+                                          return_list=True,
+                                          collate_fn=data_collator,
+                                          num_workers=0)
 
     return dataloader

@@ -33,6 +33,7 @@ MODEL_CLASSES = {
 
 
 class Demo:
+
     def __init__(self,
                  model_type="gpt-cn",
                  model_name_or_path="gpt-cpm-large-cn",

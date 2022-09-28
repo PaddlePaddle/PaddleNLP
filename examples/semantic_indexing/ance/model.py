@@ -23,6 +23,7 @@ from base_model import SemanticIndexBase
 
 
 class SemanticIndexANCE(SemanticIndexBase):
+
     def __init__(self,
                  pretrained_model,
                  dropout=None,
@@ -45,9 +46,10 @@ class SemanticIndexANCE(SemanticIndexBase):
                 neg_sample_position_ids=None,
                 neg_sample_attention_mask=None):
 
-        text_cls_embedding = self.get_pooled_embedding(
-            text_input_ids, text_token_type_ids, text_position_ids,
-            text_attention_mask)
+        text_cls_embedding = self.get_pooled_embedding(text_input_ids,
+                                                       text_token_type_ids,
+                                                       text_position_ids,
+                                                       text_attention_mask)
 
         pos_sample_cls_embedding = self.get_pooled_embedding(
             pos_sample_input_ids, pos_sample_token_type_ids,
@@ -67,12 +69,13 @@ class SemanticIndexANCE(SemanticIndexBase):
                                            neg_sample_cls_embedding,
                                            axis=-1)
 
-        labels = paddle.full(
-            shape=[text_cls_embedding.shape[0]],
-            fill_value=1.0,
-            dtype=paddle.get_default_dtype())
+        labels = paddle.full(shape=[text_cls_embedding.shape[0]],
+                             fill_value=1.0,
+                             dtype=paddle.get_default_dtype())
 
-        loss = F.margin_ranking_loss(
-            pos_sample_sim, global_neg_sample_sim, labels, margin=self.margin)
+        loss = F.margin_ranking_loss(pos_sample_sim,
+                                     global_neg_sample_sim,
+                                     labels,
+                                     margin=self.margin)
 
         return loss

@@ -3,6 +3,7 @@ from paddlenlp.transformers import CTRLLMHeadModel, CTRLTokenizer
 
 
 class Demo:
+
     def __init__(self,
                  model_name_or_path="ctrl",
                  max_predict_len=128,
@@ -37,8 +38,9 @@ class Demo:
 
 
 if __name__ == "__main__":
-    demo = Demo(
-        model_name_or_path="ctrl", max_predict_len=128, repetition_penalty=1.2)
+    demo = Demo(model_name_or_path="ctrl",
+                max_predict_len=128,
+                repetition_penalty=1.2)
     input_text_list = [
         "Diet English : I lost 10 kgs! ; German : ", "Reviews Rating: 5.0",
         "Questions Q: What is the capital of India?",

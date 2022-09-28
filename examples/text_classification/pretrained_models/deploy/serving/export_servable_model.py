@@ -19,21 +19,18 @@ import paddle_serving_client.io as serving_io
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--inference_model_dir",
-        type=str,
-        default="./export/",
-        help="The directory of the inference model.")
-    parser.add_argument(
-        "--model_file",
-        type=str,
-        default='inference.pdmodel',
-        help="The inference model file name.")
-    parser.add_argument(
-        "--params_file",
-        type=str,
-        default='inference.pdiparams',
-        help="The input inference parameters file name.")
+    parser.add_argument("--inference_model_dir",
+                        type=str,
+                        default="./export/",
+                        help="The directory of the inference model.")
+    parser.add_argument("--model_file",
+                        type=str,
+                        default='inference.pdmodel',
+                        help="The inference model file name.")
+    parser.add_argument("--params_file",
+                        type=str,
+                        default='inference.pdiparams',
+                        help="The input inference parameters file name.")
     return parser.parse_args()
 
 

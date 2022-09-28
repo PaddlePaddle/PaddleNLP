@@ -23,8 +23,8 @@ try:
     from paddle.text import ViterbiDecoder
 except:
     raise ImportError(
-        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".
-        format(paddle.version.full_version))
+        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}"
+        .format(paddle.version.full_version))
 
 
 class BiGruCrf(nn.Layer):
@@ -58,10 +58,10 @@ class BiGruCrf(nn.Layer):
         self.word_embedding = nn.Embedding(
             num_embeddings=self.vocab_size,
             embedding_dim=self.word_emb_dim,
-            weight_attr=paddle.ParamAttr(
-                learning_rate=self.emb_lr,
-                initializer=nn.initializer.Uniform(
-                    low=-self.init_bound, high=self.init_bound)))
+            weight_attr=paddle.ParamAttr(learning_rate=self.emb_lr,
+                                         initializer=nn.initializer.Uniform(
+                                             low=-self.init_bound,
+                                             high=self.init_bound)))
 
         self.gru = nn.GRU(
             input_size=self.word_emb_dim,
@@ -69,12 +69,12 @@ class BiGruCrf(nn.Layer):
             num_layers=2,
             direction='bidirectional',
             weight_ih_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Uniform(
-                    low=-self.init_bound, high=self.init_bound),
+                initializer=nn.initializer.Uniform(low=-self.init_bound,
+                                                   high=self.init_bound),
                 regularizer=paddle.regularizer.L2Decay(coeff=1e-4)),
             weight_hh_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Uniform(
-                    low=-self.init_bound, high=self.init_bound),
+                initializer=nn.initializer.Uniform(low=-self.init_bound,
+                                                   high=self.init_bound),
                 regularizer=paddle.regularizer.L2Decay(coeff=1e-4)))
 
         self.fc = nn.Linear(

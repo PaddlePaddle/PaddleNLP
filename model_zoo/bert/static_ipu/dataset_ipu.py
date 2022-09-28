@@ -33,6 +33,7 @@ def shuffle_dict(dic, len):
 
 
 class PretrainingHDF5DataLoader:
+
     def __init__(self,
                  input_files,
                  max_seq_length=128,
@@ -78,9 +79,9 @@ class PretrainingHDF5DataLoader:
         self.split_files = np.array_split(self.files, self.num_workers)
         # feed_worker will load data from h5py files, and do remask process
         self.feed_workers = [
-            multiprocessing.Process(
-                target=self.fill_buffer_loop,
-                args=(self.split_files[idx], self.process_buffers[idx]))
+            multiprocessing.Process(target=self.fill_buffer_loop,
+                                    args=(self.split_files[idx],
+                                          self.process_buffers[idx]))
             for idx in range(self.num_workers)
         ]
         for p in self.feed_workers:
@@ -178,8 +179,8 @@ class PretrainingHDF5DataLoader:
 
             result = {}
             for k in KEYS:
-                result[k] = np.concatenate(
-                    [item[k] for item in curr_batch], axis=0)
+                result[k] = np.concatenate([item[k] for item in curr_batch],
+                                           axis=0)
             process_buffer.put(self.do_remask(result))
 
             return data, file_index, data_index
@@ -202,12 +203,12 @@ class PretrainingHDF5DataLoader:
 
         # post process
         batch_size, seq_len = input_ids.shape
-        formatted_pos = self.pad_position_value * np.ones_like(samples[
-            'input_ids'])
+        formatted_pos = self.pad_position_value * np.ones_like(
+            samples['input_ids'])
         formatted_input = np.zeros_like(input_ids)
         formatted_seg = np.zeros_like(segment_ids)
-        formatted_mask_labels = np.zeros(
-            (batch_size, self.max_mask_tokens), dtype=masked_lm_ids.dtype)
+        formatted_mask_labels = np.zeros((batch_size, self.max_mask_tokens),
+                                         dtype=masked_lm_ids.dtype)
 
         valid_seq_positions = []
         valid_mask_positions = masked_lm_weights == 1
@@ -221,17 +222,16 @@ class PretrainingHDF5DataLoader:
         valid_seq_len = np.minimum(
             np.sum(valid_seq_positions, axis=1) + self.max_mask_tokens,
             self.max_seq_length).reshape(-1, 1)
-        unmasked_len = np.minimum(
-            np.sum(valid_seq_positions, axis=1),
-            self.max_seq_length - self.max_mask_tokens)
+        unmasked_len = np.minimum(np.sum(valid_seq_positions, axis=1),
+                                  self.max_seq_length - self.max_mask_tokens)
         for i in range(batch_size):
             target_mask_indices = np.arange(valid_mask_len[i])
-            target_seq_indices = self.max_mask_tokens + np.arange(unmasked_len[
-                i])
-            source_mask_indices = masked_lm_positions[i][valid_mask_positions[
-                i]]
-            source_seq_indices = np.arange(seq_len)[valid_seq_positions[
-                i]][:unmasked_len[i]]
+            target_seq_indices = self.max_mask_tokens + np.arange(
+                unmasked_len[i])
+            source_mask_indices = masked_lm_positions[i][
+                valid_mask_positions[i]]
+            source_seq_indices = np.arange(seq_len)[
+                valid_seq_positions[i]][:unmasked_len[i]]
 
             target_indices = np.hstack(
                 [target_mask_indices, target_seq_indices])
@@ -244,8 +244,10 @@ class PretrainingHDF5DataLoader:
             formatted_mask_labels[i] = masked_lm_ids[i, :self.max_mask_tokens]
 
         return [
-            formatted_input.astype(np.int32), formatted_seg.astype(np.int32),
-            formatted_pos.astype(np.int32), valid_mask_len.astype(np.int32),
+            formatted_input.astype(np.int32),
+            formatted_seg.astype(np.int32),
+            formatted_pos.astype(np.int32),
+            valid_mask_len.astype(np.int32),
             valid_seq_len.astype(np.int32),
             formatted_mask_labels.astype(np.int32),
             next_sentence_labels.astype(np.int32)
@@ -276,8 +278,9 @@ if __name__ == "__main__":
     np.random.seed(seed)
     paddle.seed(seed)
 
-    data_loader = PretrainingHDF5DataLoader(
-        input_files, batch_size=65536, shuffle=True)
+    data_loader = PretrainingHDF5DataLoader(input_files,
+                                            batch_size=65536,
+                                            shuffle=True)
 
     for idx, batch in enumerate(data_loader):
         print(f"{idx}: {batch[0].shape()}")

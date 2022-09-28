@@ -24,6 +24,7 @@ from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_be
 
 
 class F1(object):
+
     def __init__(self, positive_label=1):
         self.positive_label = positive_label
         self.reset()
@@ -62,6 +63,7 @@ class F1(object):
 
 
 class EM_AND_F1(object):
+
     def __init__(self):
         self.nltk = try_import('nltk')
         self.re = try_import('re')
@@ -237,10 +239,9 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                             start_logit=result.start_logits[start_index],
                             end_logit=result.end_logits[end_index]))
 
-        prelim_predictions = sorted(
-            prelim_predictions,
-            key=lambda x: (x.start_logit + x.end_logit),
-            reverse=True)
+        prelim_predictions = sorted(prelim_predictions,
+                                    key=lambda x: (x.start_logit + x.end_logit),
+                                    reverse=True)
 
         _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
             "NbestPrediction", ["text", "start_logit", "end_logit"])
@@ -252,8 +253,8 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index + 1
-                                                              )]
+                tok_tokens = feature.tokens[pred.start_index:(pred.end_index +
+                                                              1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
                 orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end +
@@ -280,17 +281,15 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                 seen_predictions[final_text] = True
 
             nbest.append(
-                _NbestPrediction(
-                    text=final_text,
-                    start_logit=pred.start_logit,
-                    end_logit=pred.end_logit))
+                _NbestPrediction(text=final_text,
+                                 start_logit=pred.start_logit,
+                                 end_logit=pred.end_logit))
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
             nbest.append(
-                _NbestPrediction(
-                    text="empty", start_logit=0.0, end_logit=0.0))
+                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         total_scores = []
         best_non_null_entry = None

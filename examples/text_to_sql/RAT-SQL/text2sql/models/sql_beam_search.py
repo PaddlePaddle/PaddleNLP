@@ -39,8 +39,9 @@ def beam_search_with_heuristics(model,
     """
     orig_inputs = inputs['orig_inputs'][0]
     #inference_state, next_choices = model.inference(inputs, orig_inputs.db)
-    inference_state, next_choices = model(
-        inputs, db=orig_inputs.db, is_train=False)
+    inference_state, next_choices = model(inputs,
+                                          db=orig_inputs.db,
+                                          is_train=False)
     beam = [Hypothesis4Filtering(inference_state, next_choices)]
 
     cached_finished_seqs = []  # cache filtered trajectories
@@ -81,14 +82,15 @@ def beam_search_with_heuristics(model,
                 assert next_choices is not None
                 beam_prefix.append(
                     Hypothesis4Filtering(inference_state, next_choices,
-                                         cum_score, hyp.choice_history +
-                                         [choice], hyp.score_history +
-                                         [choice_score], column_history))
+                                         cum_score,
+                                         hyp.choice_history + [choice],
+                                         hyp.score_history + [choice_score],
+                                         column_history))
 
         prefixes2fill_from.sort(key=operator.attrgetter('score'), reverse=True)
         # assert len(prefixes) == beam_size
 
-        # emuerating 
+        # emuerating
         beam_from = prefixes2fill_from
         max_size = 6
         unfiltered_finished = []
@@ -125,17 +127,19 @@ def beam_search_with_heuristics(model,
                 next_choices = inference_state.step(choice)
                 if next_choices is None:
                     unfiltered_finished.append(
-                        Hypothesis4Filtering(
-                            inference_state, None, cum_score, hyp.choice_history
-                            + [choice], hyp.score_history + [choice_score], hyp.
-                            column_history, table_history, key_column_history))
+                        Hypothesis4Filtering(inference_state, None, cum_score,
+                                             hyp.choice_history + [choice],
+                                             hyp.score_history + [choice_score],
+                                             hyp.column_history, table_history,
+                                             key_column_history))
                 else:
                     beam_from.append(
-                        Hypothesis4Filtering(
-                            inference_state, next_choices, cum_score,
-                            hyp.choice_history + [choice], hyp.score_history +
-                            [choice_score], hyp.column_history, table_history,
-                            key_column_history))
+                        Hypothesis4Filtering(inference_state, next_choices,
+                                             cum_score,
+                                             hyp.choice_history + [choice],
+                                             hyp.score_history + [choice_score],
+                                             hyp.column_history, table_history,
+                                             key_column_history))
         # [END] for step in range(max_steps)
 
         unfiltered_finished.sort(key=operator.attrgetter('score'), reverse=True)
@@ -203,8 +207,8 @@ def beam_search_with_heuristics(model,
 
         if filtered_:
             cached_finished_seqs = cached_finished_seqs + filtered_
-            cached_finished_seqs.sort(
-                key=operator.attrgetter('score'), reverse=True)
+            cached_finished_seqs.sort(key=operator.attrgetter('score'),
+                                      reverse=True)
 
         if prefixes_ and len(prefixes_[0].choice_history) < 200:
             beam_prefix = prefixes_
@@ -324,13 +328,13 @@ def beam_search_with_oracle_column(model, inputs, preproc_item, beam_size,
             if next_choices is None:
                 finished.append(
                     Hypothesis(inference_state, None, cum_score,
-                               hyp.choice_history + [choice], hyp.score_history
-                               + [choice_score]))
+                               hyp.choice_history + [choice],
+                               hyp.score_history + [choice_score]))
             else:
                 beam.append(
                     Hypothesis(inference_state, next_choices, cum_score,
-                               hyp.choice_history + [choice], hyp.score_history
-                               + [choice_score]))
+                               hyp.choice_history + [choice],
+                               hyp.score_history + [choice_score]))
     if (len(col_queue_copy) + len(tab_queue_copy)) != predict_counter:
         # print("The number of column/tables are not matched")
         pass
@@ -351,7 +355,8 @@ def beam_search_with_oracle_sketch(model, inputs, preproc_item, beam_size,
     queue = [
         TreeState(
             node=preproc_item[1].tree,
-            parent_field_type=model.decoder.preproc.grammar.root_type, )
+            parent_field_type=model.decoder.preproc.grammar.root_type,
+        )
     ]
 
     while queue:
@@ -373,8 +378,7 @@ def beam_search_with_oracle_sketch(model, inputs, preproc_item, beam_size,
 
             for i, elem in reversed(list(enumerate(node))):
                 queue.append(
-                    TreeState(
-                        node=elem, parent_field_type=parent_field_type))
+                    TreeState(node=elem, parent_field_type=parent_field_type))
 
             hyp = Hypothesis(inference_state, None, 0,
                              hyp.choice_history + [rule_idx],
@@ -439,8 +443,7 @@ def beam_search_with_oracle_sketch(model, inputs, preproc_item, beam_size,
             if field_info.name not in node:
                 continue
             queue.append(
-                TreeState(
-                    node=node[field_info.name],
-                    parent_field_type=field_info.type))
+                TreeState(node=node[field_info.name],
+                          parent_field_type=field_info.type))
 
     return [hyp]

@@ -11,32 +11,39 @@ from .model_base import BenchmarkBase
 
 sys.path.append(
     os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
-            os.pardir, "examples", "machine_translation")))
+        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
+                     os.pardir, "examples", "machine_translation")))
 from seq2seq.data import create_train_loader
 from seq2seq.seq2seq_attn import Seq2SeqAttnModel, CrossEntropyCriterion
 
 
 class Seq2SeqBenchmark(BenchmarkBase):
+
     def __init__(self):
         super().__init__()
 
     @staticmethod
     def add_args(args, parser):
-        parser.add_argument(
-            '--num_layers', type=int, default=2, help='Number of layers. ')
-        parser.add_argument(
-            '--hidden_size', type=int, default=512, help='Hidden size. ')
-        parser.add_argument(
-            '--dropout', type=float, default=0.2, help='Dropout rate. ')
-        parser.add_argument(
-            '--init_scale', type=float, default=0.1, help='Initial scale. ')
-        parser.add_argument(
-            '--max_len',
-            type=int,
-            default=args.max_seq_len,
-            help='Number of layers. ')
+        parser.add_argument('--num_layers',
+                            type=int,
+                            default=2,
+                            help='Number of layers. ')
+        parser.add_argument('--hidden_size',
+                            type=int,
+                            default=512,
+                            help='Hidden size. ')
+        parser.add_argument('--dropout',
+                            type=float,
+                            default=0.2,
+                            help='Dropout rate. ')
+        parser.add_argument('--init_scale',
+                            type=float,
+                            default=0.1,
+                            help='Initial scale. ')
+        parser.add_argument('--max_len',
+                            type=int,
+                            default=args.max_seq_len,
+                            help='Number of layers. ')
 
     def create_data_loader(self, args, **kwargs):
         (train_loader, eval_loader, self.src_vocab_size, self.tgt_vocab_size,

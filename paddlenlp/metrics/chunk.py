@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from collections import defaultdict
 
 import numpy as np
@@ -119,11 +133,12 @@ class ChunkEvaluator(paddle.metric.Metric):
         return num_infer_chunks, num_label_chunks, num_correct_chunks
 
     def _is_number_or_matrix(self, var):
+
         def _is_number_(var):
-            return isinstance(
-                var, int) or isinstance(var, np.int64) or isinstance(
-                    var, float) or (isinstance(var, np.ndarray) and
-                                    var.shape == (1, ))
+            return isinstance(var,
+                              int) or isinstance(var, np.int64) or isinstance(
+                                  var, float) or (isinstance(var, np.ndarray)
+                                                  and var.shape == (1, ))
 
         return _is_number_(var) or isinstance(var, np.ndarray)
 
@@ -171,8 +186,9 @@ class ChunkEvaluator(paddle.metric.Metric):
             self.num_infer_chunks) if self.num_infer_chunks else 0.
         recall = float(self.num_correct_chunks /
                        self.num_label_chunks) if self.num_label_chunks else 0.
-        f1_score = float(2 * precision * recall / (
-            precision + recall)) if self.num_correct_chunks else 0.
+        f1_score = float(
+            2 * precision * recall /
+            (precision + recall)) if self.num_correct_chunks else 0.
         return precision, recall, f1_score
 
     def reset(self):

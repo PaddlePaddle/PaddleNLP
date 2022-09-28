@@ -38,86 +38,82 @@ from LIME.lime_text import LimeTextExplainer
 from rnn.model import LSTMModel, SelfInteractiveAttention, BiLSTMAttentionModel
 from rnn.utils import CharTokenizer, convert_example
 from saliency_map.utils import create_if_not_exists, get_warmup_and_linear_decay
+
 sys.path.append('..')
 from roberta.modeling import RobertaForSequenceClassification
+
 sys.path.remove('..')
 sys.path.remove('../task/senti')
 sys.path.append('../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version
+
 sys.path.remove('../..')
 
 
 def get_args():
     parser = argparse.ArgumentParser('sentiment analysis prediction')
 
-    parser.add_argument(
-        '--base_model',
-        required=True,
-        choices=['roberta_base', 'roberta_large', 'lstm'])
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretrained model directory or tag')
-    parser.add_argument(
-        '--max_seq_len',
-        type=int,
-        default=128,
-        help='max sentence length, should not greater than 512')
+    parser.add_argument('--base_model',
+                        required=True,
+                        choices=['roberta_base', 'roberta_large', 'lstm'])
+    parser.add_argument('--from_pretrained',
+                        type=str,
+                        required=True,
+                        help='pretrained model directory or tag')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=128,
+                        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=1, help='batchsize')
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        required=True,
-        help='data directory includes train / develop data')
+    parser.add_argument('--data_dir',
+                        type=str,
+                        required=True,
+                        help='data directory includes train / develop data')
     parser.add_argument('--eval', action='store_true')
 
-    parser.add_argument(
-        '--init_checkpoint',
-        type=str,
-        default=None,
-        help='checkpoint to warm start from')
-    parser.add_argument(
-        '--wd',
-        type=float,
-        default=0.01,
-        help='weight decay, aka L2 regularizer')
+    parser.add_argument('--init_checkpoint',
+                        type=str,
+                        default=None,
+                        help='checkpoint to warm start from')
+    parser.add_argument('--wd',
+                        type=float,
+                        default=0.01,
+                        help='weight decay, aka L2 regularizer')
     parser.add_argument(
         '--use_amp',
         action='store_true',
-        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+        help=
+        'only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
     )
-    parser.add_argument(
-        '--inter_mode',
-        type=str,
-        default="attention",
-        choices=[
-            "attention", "simple_gradient", "smooth_gradient",
-            "integrated_gradient", "lime"
-        ],
-        help='appoint the mode of interpretable.')
+    parser.add_argument('--inter_mode',
+                        type=str,
+                        default="attention",
+                        choices=[
+                            "attention", "simple_gradient", "smooth_gradient",
+                            "integrated_gradient", "lime"
+                        ],
+                        help='appoint the mode of interpretable.')
     parser.add_argument(
         '--n-samples',
         type=int,
         default=25,
         help='number of samples used for smooth gradient method')
-    parser.add_argument(
-        '--output_dir',
-        type=Path,
-        required=True,
-        help='interpretable output directory')
+    parser.add_argument('--output_dir',
+                        type=Path,
+                        required=True,
+                        help='interpretable output directory')
     parser.add_argument('--start_id', type=int, default=0)
     parser.add_argument("--vocab_path", type=str)
-    parser.add_argument(
-        '--language',
-        type=str,
-        required=True,
-        help='Language that the model is built for')
+    parser.add_argument('--language',
+                        type=str,
+                        required=True,
+                        help='Language that the model is built for')
     args = parser.parse_args()
     return args
 
 
 class SentiData(DatasetBuilder):
+
     def _read(self, filename, language):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
@@ -150,13 +146,16 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(
-            dataset=dataset, batch_size=batch_size, shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(
-        dataset, batch_sampler=sampler, collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      collate_fn=batchify_fn)
     return dataloader
 
 
@@ -182,26 +181,25 @@ def truncate_offset(seg, start_offset, end_offset):
 
 
 def init_lstm_var(args):
-    vocab = Vocab.load_vocabulary(
-        args.vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path,
+                                  unk_token='[UNK]',
+                                  pad_token='[PAD]')
     tokenizer = CharTokenizer(vocab, args.language, '../punctuations')
     padding_idx = vocab.token_to_idx.get('[PAD]', 0)
 
-    trans_fn = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        is_test=True,
-        language=args.language)
+    trans_fn = partial(convert_example,
+                       tokenizer=tokenizer,
+                       is_test=True,
+                       language=args.language)
 
-    #init attention layer    
+    #init attention layer
     lstm_hidden_size = 196
     attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-    model = BiLSTMAttentionModel(
-        attention_layer=attention,
-        vocab_size=len(tokenizer.vocab),
-        lstm_hidden_size=lstm_hidden_size,
-        num_classes=2,
-        padding_idx=padding_idx)
+    model = BiLSTMAttentionModel(attention_layer=attention,
+                                 vocab_size=len(tokenizer.vocab),
+                                 lstm_hidden_size=lstm_hidden_size,
+                                 num_classes=2,
+                                 padding_idx=padding_idx)
 
     # Reads data and generates mini-batches.
     dev_ds = SentiData().read(os.path.join(args.data_dir, 'dev'), args.language)
@@ -210,12 +208,11 @@ def init_lstm_var(args):
         Stack(dtype="int64"),  # seq len
     ): [data for data in fn(samples)]
 
-    dev_loader = create_dataloader(
-        dev_ds,
-        trans_fn=trans_fn,
-        batch_size=args.batch_size,
-        mode='validation',
-        batchify_fn=batchify_fn)
+    dev_loader = create_dataloader(dev_ds,
+                                   trans_fn=trans_fn,
+                                   batch_size=args.batch_size,
+                                   mode='validation',
+                                   batchify_fn=batchify_fn)
 
     return model, tokenizer, dev_loader
 
@@ -239,18 +236,19 @@ def init_roberta_var(args):
 
     dev_ds = SentiData().read(os.path.join(args.data_dir, 'dev'), args.language)
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id)
-    }): fn(samples)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id)
+        }): fn(samples)
 
-    dataloader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    dataloader = paddle.io.DataLoader(dataset=dev_ds,
+                                      batch_sampler=dev_batch_sampler,
+                                      collate_fn=batchify_fn,
+                                      return_list=True)
 
     return model, tokenizer, dataloader
 
@@ -273,7 +271,8 @@ if __name__ == "__main__":
         model.train()  # 为了取梯度，加载模型时dropout设为0
         print('load model from %s' % args.init_checkpoint)
 
-        get_sub_word_ids = lambda word: map(str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
+        get_sub_word_ids = lambda word: map(
+            str, tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word)))
 
         for step, d in tqdm(enumerate(dataloader)):
             if step + 1 < args.start_id:
@@ -299,13 +298,14 @@ if __name__ == "__main__":
 
             result['id'] = dataloader.dataset.data[step]['id']
 
-            probs, atts, embedded = model.forward_interpet(*fwd_args,
-                                                           **fwd_kwargs)
+            probs, atts, embedded = model.forward_interpet(
+                *fwd_args, **fwd_kwargs)
             pred_label = paddle.argmax(probs, axis=-1).tolist()[0]
 
             result['pred_label'] = pred_label
             result['probs'] = [
-                float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()
+                float(format(prob, '.5f'))
+                for prob in probs.numpy()[0].tolist()
             ]
             if args.language == 'en':
                 result['context'] = tokenizer.convert_tokens_to_string(tokens)

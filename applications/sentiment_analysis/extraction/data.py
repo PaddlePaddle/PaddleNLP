@@ -45,11 +45,10 @@ def convert_example_to_feature(example,
                                label2id,
                                max_seq_len=512,
                                is_test=False):
-    encoded_inputs = tokenizer(
-        list(example["text"]),
-        is_split_into_words=True,
-        max_seq_len=max_seq_len,
-        return_length=True)
+    encoded_inputs = tokenizer(list(example["text"]),
+                               is_split_into_words=True,
+                               max_seq_len=max_seq_len,
+                               return_length=True)
 
     if not is_test:
         label = [label2id["O"]] + [

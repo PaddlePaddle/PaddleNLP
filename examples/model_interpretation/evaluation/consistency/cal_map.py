@@ -27,11 +27,10 @@ def get_args():
     parser = argparse.ArgumentParser('map eval')
     parser.add_argument('--pred_path', required=True)
     parser.add_argument('--golden_path', required=True)
-    parser.add_argument(
-        '--language',
-        type=str,
-        required=True,
-        help='language that the model is built for')
+    parser.add_argument('--language',
+                        type=str,
+                        required=True,
+                        help='language that the model is built for')
     args = parser.parse_args()
     return args
 
@@ -115,8 +114,9 @@ def _calc_map(evids, key, ins_num):
                     adv_attriRank_list = list(adv['rationale_token'][key])
                     length_adv = len(adv_attriRank_list)
 
-                    sum_precs = _calc_MAP_by_bin_paper(
-                        1, length_adv, adv_attriRank_list, ori_attriRank_list)
+                    sum_precs = _calc_MAP_by_bin_paper(1, length_adv,
+                                                       adv_attriRank_list,
+                                                       ori_attriRank_list)
                     t_map += sum_precs
 
     return t_map / ins_num, ori_num + adv_num

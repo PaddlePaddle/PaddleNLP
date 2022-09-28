@@ -4,7 +4,7 @@
 * [背景介绍](#背景介绍)
 * [SimCSE](#SimCSE)
     * [1. 技术方案和评估指标](#技术方案)
-    * [2. 环境依赖](#环境依赖)  
+    * [2. 环境依赖](#环境依赖)
     * [3. 代码结构](#代码结构)
     * [4. 数据准备](#数据准备)
     * [5. 模型训练](#模型训练)
@@ -50,10 +50,10 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 
 **效果评估**
 
-|  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
+|  策略 | 模型| Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |
 | ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
-|  SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE无监督训练|
-
+|  SimCSE | ernie 1.0 |42.374 | 57.505| 62.641| 67.09|72.331|
+|  SimCSE | rocketqa-zh-base-query-encoder |**50.108** | **64.005**| **68.288**| **72.306**|**77.306**|
 
 <a name="环境依赖"></a>
 
@@ -157,7 +157,7 @@ simcse/
 
 |Model|训练参数配置|硬件|MD5|
 | ------------ | ------------ | ------------ |-----------|
-|[SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|7c46d9b15a214292e3897c0eb70d0c9f|
+|[SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">ernie 1.0 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|7c46d9b15a214292e3897c0eb70d0c9f|
 
 ### 训练环境说明
 
@@ -188,7 +188,8 @@ python -u -m paddle.distributed.launch --gpus '0,1,2,3' \
 	--dropout 0.2 \
     --output_emb_size 256 \
 	--train_set_file "./recall/train_unsupervised.csv" \
-	--test_set_file "./recall/dev.csv"
+	--test_set_file "./recall/dev.csv" \
+    --model_name_or_path "rocketqa-zh-base-query-encoder"
 ```
 也可以使用bash脚本：
 
@@ -213,6 +214,7 @@ sh scripts/train.sh
 * `init_from_ckpt`：可选，模型参数路径，热启动模型训练；默认为None。
 * `seed`：可选，随机种子，默认为1000.
 * `device`: 选用什么设备进行训练，可选cpu或gpu。如使用gpu训练则参数gpus指定GPU卡号。
+* `model_name_or_path`: 预训练模型，用于模型和`Tokenizer`的参数初始化。
 
 程序运行时将会自动进行训练，评估。同时训练过程中会自动保存模型在指定的`save_dir`中。
 如：
@@ -255,7 +257,8 @@ python -u -m paddle.distributed.launch --gpus "6" --log_dir "recall_log/" \
         --device gpu \
         --recall_result_dir "recall_result_dir" \
         --recall_result_file "recall_result.txt" \
-        --params_path "checkpoints/model_20000/model_state.pdparams" \
+        --params_path "checkpoints/model_12000/model_state.pdparams" \
+        --model_name_or_path rocketqa-zh-base-query-encoder \
         --hnsw_m 100 \
         --hnsw_ef 100 \
         --batch_size 64 \
@@ -314,7 +317,7 @@ recall@50=74.848
 修改 inference.py 文件里面输入文本 id2corpus 和模型路径 params_path:
 
 ```
-params_path='checkpoints/model_20000/model_state.pdparams'
+params_path='checkpoints/model_12000/model_state.pdparams'
 id2corpus={0:'国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
 ```
 然后运行
@@ -352,7 +355,8 @@ root_dir="checkpoints"
 python -u -m paddle.distributed.launch --gpus "3" \
     predict.py \
     --device gpu \
-    --params_path "${root_dir}/model_20000/model_state.pdparams" \
+    --params_path "${root_dir}/model_12000/model_state.pdparams" \
+    --model_name_or_path rocketqa-zh-base-query-encoder \
     --output_emb_size 256 \
     --batch_size 128 \
     --max_seq_length 64 \
@@ -362,6 +366,7 @@ python -u -m paddle.distributed.launch --gpus "3" \
 参数含义说明
 * `device`: 使用 cpu/gpu 进行训练
 * `params_path`： 预训练模型的参数文件名
+* `model_name_or_path`: 预训练模型，用于模型和`Tokenizer`的参数初始化。
 * `output_emb_size`: Transformer 顶层输出的文本向量维度
 * `text_pair_file`: 由文本 Pair 构成的待预测数据集
 
@@ -388,7 +393,9 @@ sh scripts/predict.sh
 首先把动态图模型转换为静态图：
 
 ```
-python export_model.py --params_path checkpoints/model_20000/model_state.pdparams --output_path=./output
+python export_model.py --params_path checkpoints/model_12000/model_state.pdparams \
+                       --model_name_or_path rocketqa-zh-base-query-encoder \
+                       --output_path=./output
 ```
 也可以运行下面的bash脚本：
 
@@ -431,7 +438,11 @@ sh deploy.sh
 
 [0.5649663209915161, 0.03284594044089317]
 ```
+## FAQ
 
+#### SimCSE模型怎么部署？
+
++ SimCSE使用的模型跟 In-batch Negatives 训练出来的模型网络结构是一样的，使用 In-batch Negatives 的部署流程即可，参考[In-batch Negatives](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/recall/in_batch_negative/deploy/python)
 
 ## Reference
 [1] Gao, Tianyu, Xingcheng Yao, and Danqi Chen. “SimCSE: Simple Contrastive Learning of Sentence Embeddings.” ArXiv:2104.08821 [Cs], April 18, 2021. http://arxiv.org/abs/2104.08821.

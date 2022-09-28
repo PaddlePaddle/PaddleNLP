@@ -28,6 +28,7 @@ class TreeState:
 
 
 class TreeTraversal:
+
     class Handler:
         handlers = {}
 
@@ -96,7 +97,8 @@ class TreeTraversal:
             node_type=root_type,
             parent_action_emb=self.model.zero_rule_emb,
             parent_h=self.model.zero_recurrent_emb,
-            parent_field_name=None, )
+            parent_field_name=None,
+        )
         self.next_item_id = 1
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
@@ -185,11 +187,11 @@ class TreeTraversal:
             self.prev_action_emb,
             self.cur_item.parent_h,
             self.cur_item.parent_action_emb,
-            self.desc_enc, )
-        self.cur_item = attr.evolve(
-            self.cur_item,
-            state=TreeTraversal.State.SUM_TYPE_APPLY,
-            parent_h=output)
+            self.desc_enc,
+        )
+        self.cur_item = attr.evolve(self.cur_item,
+                                    state=TreeTraversal.State.SUM_TYPE_APPLY,
+                                    parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
         choices = self.rule_choice(self.cur_item.node_type, rule_logits)
@@ -206,7 +208,8 @@ class TreeTraversal:
             self.cur_item,
             node_type=singular_type,
             parent_action_emb=self.prev_action_emb,
-            state=TreeTraversal.State.CHILDREN_INQUIRE, )
+            state=TreeTraversal.State.CHILDREN_INQUIRE,
+        )
         return None, True
 
     @Handler.register_handler(State.CHILDREN_INQUIRE)
@@ -230,11 +233,11 @@ class TreeTraversal:
             self.prev_action_emb,
             self.cur_item.parent_h,
             self.cur_item.parent_action_emb,
-            self.desc_enc, )
-        self.cur_item = attr.evolve(
-            self.cur_item,
-            state=TreeTraversal.State.CHILDREN_APPLY,
-            parent_h=output)
+            self.desc_enc,
+        )
+        self.cur_item = attr.evolve(self.cur_item,
+                                    state=TreeTraversal.State.CHILDREN_APPLY,
+                                    parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
         choices = self.rule_choice(self.cur_item.node_type, rule_logits)
@@ -254,12 +257,14 @@ class TreeTraversal:
                 node_type=None,
                 parent_action_emb=None,
                 parent_h=None,
-                parent_field_name=None, ))
+                parent_field_name=None,
+            ))
         for field_info, present in reversed(
                 list(
                     zip(
                         self.model.ast_wrapper.singular_types[node_type].fields,
-                        children_presence, ))):
+                        children_presence,
+                    ))):
             if not present:
                 continue
 
@@ -293,7 +298,8 @@ class TreeTraversal:
                     node_type=child_type,
                     parent_action_emb=self.prev_action_emb,
                     parent_h=self.cur_item.parent_h,
-                    parent_field_name=field_info.name, ))
+                    parent_field_name=field_info.name,
+                ))
             self.next_item_id += 1
 
         # pop queue 的最后一个元素，并赋值给 self.cur_item
@@ -312,11 +318,11 @@ class TreeTraversal:
             self.prev_action_emb,
             self.cur_item.parent_h,
             self.cur_item.parent_action_emb,
-            self.desc_enc, )
-        self.cur_item = attr.evolve(
-            self.cur_item,
-            state=TreeTraversal.State.LIST_LENGTH_APPLY,
-            parent_h=output)
+            self.desc_enc,
+        )
+        self.cur_item = attr.evolve(self.cur_item,
+                                    state=TreeTraversal.State.LIST_LENGTH_APPLY,
+                                    parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
         choices = self.rule_choice(list_type, rule_logits)
@@ -352,7 +358,8 @@ class TreeTraversal:
                     node_type=child_node_type,
                     parent_action_emb=self.prev_action_emb,
                     parent_h=self.cur_item.parent_h,
-                    parent_field_name=self.cur_item.parent_field_name, ))
+                    parent_field_name=self.cur_item.parent_field_name,
+                ))
             self.next_item_id += 1
 
         advanced = self.pop()
@@ -376,7 +383,8 @@ class TreeTraversal:
             self.prev_action_emb,
             self.cur_item.parent_h,
             self.cur_item.parent_action_emb,
-            self.desc_enc, )
+            self.desc_enc,
+        )
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_gen_token
         choices = self.token_choice(output, gen_logodds)
         return choices, False
@@ -391,11 +399,11 @@ class TreeTraversal:
             self.prev_action_emb,
             self.cur_item.parent_h,
             self.cur_item.parent_action_emb,
-            self.desc_enc, )
-        self.cur_item = attr.evolve(
-            self.cur_item,
-            state=TreeTraversal.State.POINTER_APPLY,
-            parent_h=output)
+            self.desc_enc,
+        )
+        self.cur_item = attr.evolve(self.cur_item,
+                                    state=TreeTraversal.State.POINTER_APPLY,
+                                    parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_pointer
         choices = self.pointer_choice(self.cur_item.node_type, logits,

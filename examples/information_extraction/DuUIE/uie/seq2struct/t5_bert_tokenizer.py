@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 from typing import Optional, Union, List
 
@@ -39,7 +54,8 @@ class T5BertTokenizer(BertTokenizer):
             mask_token=mask_token,
             tokenize_chinese_chars=tokenize_chinese_chars,
             strip_accents=strip_accents,
-            **kwargs, )
+            **kwargs,
+        )
         if space_token not in self._additional_special_tokens:
             self._additional_special_tokens += [space_token]
 
@@ -61,8 +77,8 @@ class T5BertTokenizer(BertTokenizer):
 
         if len(split_bracket.split(text)) > 1:
             new_text_list = [split_bracket.split(text)[0]]
-            for item in zip(
-                    split_bracket.findall(text), split_bracket.split(text)[1:]):
+            for item in zip(split_bracket.findall(text),
+                            split_bracket.split(text)[1:]):
                 new_text_list += [item[0].strip(), item[1]]
             text = "".join(new_text_list)
         text = text.replace(' ', self._space_token)
@@ -79,8 +95,9 @@ class T5BertTokenizer(BertTokenizer):
             return token_ids + [self.eos_token_id]
 
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int],
-            token_ids_1: Optional[List[int]]=None) -> List[int]:
+            self,
+            token_ids_0: List[int],
+            token_ids_1: Optional[List[int]] = None) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. A sequence has the following format:
@@ -106,7 +123,7 @@ class T5BertTokenizer(BertTokenizer):
 
     def _decode(self,
                 token_ids: Union[List[int], Tensor],
-                skip_special_tokens: bool=False,
+                skip_special_tokens: bool = False,
                 **kwargs) -> str:
         if isinstance(token_ids, Tensor):
             tokens = self.convert_ids_to_tokens(
@@ -125,7 +142,7 @@ class T5BertTokenizer(BertTokenizer):
 
     def decode(self,
                token_ids: Union[List[int], Tensor],
-               skip_special_tokens: bool=False,
+               skip_special_tokens: bool = False,
                **kwargs) -> str:
         return self._decode(token_ids, skip_special_tokens)
 

@@ -25,7 +25,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 from model import ErnieForPretraining
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
@@ -155,7 +155,7 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
         y_pred = np.ones(shape=[batch_size, candidate_num])
 
         for label_idx in range(candidate_num):
-            # [bathc_size, label_length(4)] 
+            # [bathc_size, label_length(4)]
             single_candidate_label_ids = candidate_label_ids[:, label_idx, :]
             # Calculate joint distribution of candidate labels
             for index in range(label_length):
@@ -377,12 +377,12 @@ if __name__ == "__main__":
 
     # Some fewshot_learning strategy is defined by transform_fn
     # Note: Set lazy=False to transform example inplace immediately,
-    # because transform_fn should only be executed only once when 
+    # because transform_fn should only be executed only once when
     # iterate multi-times for train_ds
     test_ds = test_ds.map(transform_fn, lazy=False)
 
-    model = ErnieForPretraining.from_pretrained('ernie-1.0')
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     # Load parameters of best model on test_public.json of current task
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):

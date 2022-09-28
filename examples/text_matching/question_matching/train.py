@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -82,10 +82,9 @@ def evaluate(model, criterion, metric, data_loader):
     for batch in data_loader:
         input_ids, token_type_ids, labels = batch
         total_num += len(labels)
-        logits, _ = model(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            do_evaluate=True)
+        logits, _ = model(input_ids=input_ids,
+                          token_type_ids=token_type_ids,
+                          do_evaluate=True)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
@@ -107,21 +106,22 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(
-        read_text_pair, data_path=args.train_set, is_test=False, lazy=False)
+    train_ds = load_dataset(read_text_pair,
+                            data_path=args.train_set,
+                            is_test=False,
+                            lazy=False)
 
-    dev_ds = load_dataset(
-        read_text_pair, data_path=args.dev_set, is_test=False, lazy=False)
+    dev_ds = load_dataset(read_text_pair,
+                          data_path=args.dev_set,
+                          is_test=False,
+                          lazy=False)
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_pair_input
@@ -129,19 +129,17 @@ def do_train():
         Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(
-        train_ds,
-        mode='train',
-        batch_size=args.train_batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    train_data_loader = create_dataloader(train_ds,
+                                          mode='train',
+                                          batch_size=args.train_batch_size,
+                                          batchify_fn=batchify_fn,
+                                          trans_fn=trans_func)
 
-    dev_data_loader = create_dataloader(
-        dev_ds,
-        mode='dev',
-        batch_size=args.eval_batch_size,
-        batchify_fn=batchify_fn,
-        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(dev_ds,
+                                        mode='dev',
+                                        batch_size=args.eval_batch_size,
+                                        batchify_fn=batchify_fn,
+                                        trans_fn=trans_func)
 
     model = QuestionMatching(pretrained_model, rdrop_coef=args.rdrop_coef)
 
@@ -179,8 +177,8 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
-            logits1, kl_loss = model(
-                input_ids=input_ids, token_type_ids=token_type_ids)
+            logits1, kl_loss = model(input_ids=input_ids,
+                                     token_type_ids=token_type_ids)
             correct = metric.compute(logits1, labels)
             metric.update(correct)
             acc = metric.accumulate()
@@ -195,8 +193,9 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.4f, ce_loss: %.4f., kl_loss: %.4f, accu: %.4f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, ce_loss, kl_loss, acc,
-                       10 / (time.time() - tic_train)))
+                    %
+                    (global_step, epoch, step, loss, ce_loss, kl_loss, acc, 10 /
+                     (time.time() - tic_train)))
                 tic_train = time.time()
 
             loss.backward()

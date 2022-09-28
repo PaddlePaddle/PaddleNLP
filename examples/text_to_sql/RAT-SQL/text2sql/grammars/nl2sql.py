@@ -29,10 +29,9 @@ from text2sql.utils import ast_util
 
 def bimap(first, second):
     return {f: s
-            for f, s in zip(first, second)}, {
-                s: f
-                for f, s in zip(first, second)
-            }
+            for f, s in zip(first, second)
+            }, {s: f
+                for f, s in zip(first, second)}
 
 
 def filter_nones(d):
@@ -142,10 +141,11 @@ class NL2SQLLanguage(object):
 
     def parse_sql(self, sql, optional=False):
         return filter_nones({
-            '_type': 'sql',
-            'select': self.parse_select(sql['sel'], sql['agg']),
-            **
-            ({
+            '_type':
+            'sql',
+            'select':
+            self.parse_select(sql['sel'], sql['agg']),
+            **({
                 'from': {
                     '_type': 'from',
                     'table_units': [{
@@ -153,23 +153,28 @@ class NL2SQLLanguage(object):
                         'table_id': 0
                     }]
                 }
-            } if self.output_from else {}),
-            "sql_where": filter_nones({
-                '_type': 'sql_where',
-                'where': self.parse_cond(
-                    sql['conds'], ['', 'and', 'or'][sql['cond_conn_op']]),
+            } if self.output_from else {}), "sql_where":
+            filter_nones({
+                '_type':
+                'sql_where',
+                'where':
+                self.parse_cond(sql['conds'], ['', 'and',
+                                               'or'][sql['cond_conn_op']]),
             }),
-            "sql_groupby": filter_nones({
+            "sql_groupby":
+            filter_nones({
                 '_type': 'sql_groupby',
                 'group_by': [],
                 'having': None,
             }),
-            "sql_orderby": filter_nones({
+            "sql_orderby":
+            filter_nones({
                 '_type': 'sql_orderby',
                 'order_by': None,
                 'limit': None,
             }),
-            'sql_ieu': filter_nones({
+            'sql_ieu':
+            filter_nones({
                 '_type': 'sql_ieu',
                 'intersect': None,
                 'except': None,
@@ -385,7 +390,8 @@ class NL2SQLUnparser:
         if negated:
             tokens.append('NOT')
         tokens += [
-            self.COND_TYPES_B[cond['_type']], self.unparse_val(cond['val1'])
+            self.COND_TYPES_B[cond['_type']],
+            self.unparse_val(cond['val1'])
         ]
         return ' '.join(tokens)
 
@@ -449,10 +455,9 @@ class NL2SQLUnparser:
             if table_id in covered_tables:
                 continue
             try:
-                path = nx.shortest_path(
-                    self.schema.foreign_key_graph,
-                    source=start_table_id,
-                    target=table_id)
+                path = nx.shortest_path(self.schema.foreign_key_graph,
+                                        source=start_table_id,
+                                        target=table_id)
             except (nx.NetworkXNoPath, nx.NodeNotFound):
                 covered_tables.add(table_id)
                 continue
@@ -584,8 +589,7 @@ class NL2SQLUnparser:
                 for cond_idx in sorted(cond_indices_by_table[table_id]):
                     if cond_idx in output_cond_indices:
                         continue
-                    if tables_involved_by_cond_idx[
-                            cond_idx] <= output_table_ids:
+                    if tables_involved_by_cond_idx[cond_idx] <= output_table_ids:
                         conds_to_output.append(all_conds[cond_idx])
                         output_cond_indices.add(cond_idx)
                 if conds_to_output:

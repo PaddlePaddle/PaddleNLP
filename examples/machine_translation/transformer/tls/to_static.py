@@ -22,10 +22,12 @@ import paddle
 
 
 def create_input_specs():
-    src_word = paddle.static.InputSpec(
-        name="src_word", shape=[None, None], dtype="int64")
-    trg_word = paddle.static.InputSpec(
-        name="trg_word", shape=[None, None], dtype="int64")
+    src_word = paddle.static.InputSpec(name="src_word",
+                                       shape=[None, None],
+                                       dtype="int64")
+    trg_word = paddle.static.InputSpec(name="trg_word",
+                                       shape=[None, None],
+                                       dtype="int64")
     return [src_word, trg_word]
 
 
@@ -34,4 +36,5 @@ def apply_to_static(config, model):
     if support_to_static:
         specs = create_input_specs()
         model = to_static(model, input_spec=specs)
+        print("Successfully to apply @to_static with specs: {}".format(specs))
     return model

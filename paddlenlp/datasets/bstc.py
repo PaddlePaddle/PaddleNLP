@@ -90,10 +90,9 @@ class BSTC(DatasetBuilder):
                 ]
                 filenames.sort(key=lambda x: int(x[:-5]))
                 for filename in filenames:
-                    with open(
-                            os.path.join(source_full_dir, filename),
-                            'r',
-                            encoding='utf-8') as f:
+                    with open(os.path.join(source_full_dir, filename),
+                              'r',
+                              encoding='utf-8') as f:
                         for line in f.readlines():
                             line = line.strip()
                             if not line:
@@ -108,18 +107,16 @@ class BSTC(DatasetBuilder):
                 dir_list.sort(key=lambda x: int(x))
                 for dir_name in dir_list:
                     filenames = [
-                        f
-                        for f in os.listdir(
+                        f for f in os.listdir(
                             os.path.join(source_full_dir, dir_name))
                         if not f.startswith('.')
                     ]
                     filenames.sort(key=lambda x: int(x[x.find('-') + 1:-5]))
                     for filename in filenames:
-                        with open(
-                                os.path.join(source_full_dir, dir_name,
-                                             filename),
-                                'r',
-                                encoding='utf-8') as f:
+                        with open(os.path.join(source_full_dir, dir_name,
+                                               filename),
+                                  'r',
+                                  encoding='utf-8') as f:
                             for line in f.readlines():
                                 line = line.strip()
                                 if not line:
@@ -138,17 +135,15 @@ class BSTC(DatasetBuilder):
                 f for f in os.listdir(target_full_dir) if f.endswith('txt')
             ]
             assert len(source_filenames) == len(target_filenames)
-            source_filenames.sort(
-                key=lambda x: int(x[:-4]) if self.name == 'transcription_translation' else int(x[:-8])
-            )
+            source_filenames.sort(key=lambda x: int(x[:-4]) if self.name ==
+                                  'transcription_translation' else int(x[:-8]))
             target_filenames.sort(key=lambda x: int(x[:-4]))
             for src_file, tgt_file in zip(source_filenames, target_filenames):
                 if self.name == 'transcription_translation':
                     src_list = []
-                    with open(
-                            os.path.join(source_full_dir, src_file),
-                            'r',
-                            encoding='utf-8') as src_f:
+                    with open(os.path.join(source_full_dir, src_file),
+                              'r',
+                              encoding='utf-8') as src_f:
                         src_part = []
                         for src_line in src_f.readlines():
                             src_line = src_line.strip()
@@ -164,10 +159,9 @@ class BSTC(DatasetBuilder):
                             src_list.append(src_part)
                 elif self.name == 'asr':
                     src_list = []
-                    with open(
-                            os.path.join(source_full_dir, src_file),
-                            'r',
-                            encoding='utf-8') as src_f:
+                    with open(os.path.join(source_full_dir, src_file),
+                              'r',
+                              encoding='utf-8') as src_f:
                         src_part = []
                         for src_line in src_f.readlines():
                             src_line = src_line.strip()
@@ -184,10 +178,9 @@ class BSTC(DatasetBuilder):
                         'Argument name should be one of [transcription_translation, asr].'
                     )
                 tgt_list = []
-                with open(
-                        os.path.join(target_full_dir, tgt_file),
-                        'r',
-                        encoding='utf-8') as tgt_f:
+                with open(os.path.join(target_full_dir, tgt_file),
+                          'r',
+                          encoding='utf-8') as tgt_f:
                     lines = tgt_f.readlines()
                     for idx, tgt_line in enumerate(lines):
                         tgt_line = tgt_line.strip()

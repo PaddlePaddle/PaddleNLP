@@ -49,12 +49,11 @@ def prepare_train_features(examples, tokenizer, args):
     contexts = [examples[i]['context'] for i in range(len(examples))]
     questions = [examples[i]['question'] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length,
-        return_attention_mask=True)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_length,
+                                   return_attention_mask=True)
 
     # Let's label those examples!
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -96,8 +95,8 @@ def prepare_train_features(examples, tokenizer, args):
             token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char and
-                    offsets[token_end_index][1] >= end_char):
+            if not (offsets[token_start_index][0] <= start_char
+                    and offsets[token_end_index][1] >= end_char):
                 tokenized_examples[i]["start_positions"] = cls_index
                 tokenized_examples[i]["end_positions"] = cls_index
             else:
@@ -123,12 +122,11 @@ def prepare_validation_features(examples, tokenizer, args):
     contexts = [examples[i]['context'] for i in range(len(examples))]
     questions = [examples[i]['question'] for i in range(len(examples))]
 
-    tokenized_examples = tokenizer(
-        questions,
-        contexts,
-        stride=args.doc_stride,
-        max_seq_len=args.max_seq_length,
-        return_attention_mask=True)
+    tokenized_examples = tokenizer(questions,
+                                   contexts,
+                                   stride=args.doc_stride,
+                                   max_seq_len=args.max_seq_length,
+                                   return_attention_mask=True)
 
     # For validation, there is no need to compute start and end positions
     for i, tokenized_example in enumerate(tokenized_examples):
@@ -186,18 +184,17 @@ def evaluate(model, data_loader, args):
     # Can also write all_nbest_json and scores_diff_json files if needed
     with open('prediction.json', "w", encoding='utf-8') as writer:
         writer.write(
-            json.dumps(
-                all_predictions, ensure_ascii=False, indent=4) + "\n")
+            json.dumps(all_predictions, ensure_ascii=False, indent=4) + "\n")
 
-    squad_evaluate(
-        examples=data_loader.dataset.data,
-        preds=all_predictions,
-        na_probs=scores_diff_json)
+    squad_evaluate(examples=data_loader.dataset.data,
+                   preds=all_predictions,
+                   na_probs=scores_diff_json)
 
     model.train()
 
 
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
+
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
 
@@ -206,10 +203,10 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)
-        start_loss = paddle.nn.functional.cross_entropy(
-            input=start_logits, label=start_position)
-        end_loss = paddle.nn.functional.cross_entropy(
-            input=end_logits, label=end_position)
+        start_loss = paddle.nn.functional.cross_entropy(input=start_logits,
+                                                        label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(input=end_logits,
+                                                      label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
 
@@ -224,15 +221,19 @@ def run(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     if args.version_2_with_negative:
-        train_ds = load_dataset(
-            'squad', splits='train_v2', data_files=args.train_file)
-        dev_ds = load_dataset(
-            'squad', splits='dev_v2', data_files=args.predict_file)
+        train_ds = load_dataset('squad',
+                                splits='train_v2',
+                                data_files=args.train_file)
+        dev_ds = load_dataset('squad',
+                              splits='dev_v2',
+                              data_files=args.predict_file)
     else:
-        train_ds = load_dataset(
-            'squad', splits='train_v1', data_files=args.train_file)
-        dev_ds = load_dataset(
-            'squad', splits='dev_v1', data_files=args.predict_file)
+        train_ds = load_dataset('squad',
+                                splits='train_v1',
+                                data_files=args.train_file)
+        dev_ds = load_dataset('squad',
+                              splits='dev_v1',
+                              data_files=args.predict_file)
     set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
@@ -244,31 +245,34 @@ def run(args):
         model = paddle.DataParallel(model)
 
     if args.do_train:
-        train_ds.map(partial(
-            prepare_train_features, tokenizer=tokenizer, args=args),
+        train_ds.map(partial(prepare_train_features,
+                             tokenizer=tokenizer,
+                             args=args),
                      batched=True)
         train_batch_sampler = paddle.io.DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=True)
-        train_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            "start_positions": Stack(dtype="int64"),
-            "end_positions": Stack(dtype="int64")
-        }): fn(samples)
+        train_batchify_fn = lambda samples, fn=Dict(
+            {
+                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+                "token_type_ids": Pad(axis=0,
+                                      pad_val=tokenizer.pad_token_type_id),
+                "start_positions": Stack(dtype="int64"),
+                "end_positions": Stack(dtype="int64")
+            }): fn(samples)
 
-        train_data_loader = DataLoader(
-            dataset=train_ds,
-            batch_sampler=train_batch_sampler,
-            collate_fn=train_batchify_fn,
-            return_list=True)
+        train_data_loader = DataLoader(dataset=train_ds,
+                                       batch_sampler=train_batch_sampler,
+                                       collate_fn=train_batchify_fn,
+                                       return_list=True)
 
         num_training_steps = args.max_steps if args.max_steps > 0 else len(
             train_data_loader) * args.num_train_epochs
         num_train_epochs = math.ceil(num_training_steps /
                                      len(train_data_loader))
 
-        lr_scheduler = LinearDecayWithWarmup(
-            args.learning_rate, num_training_steps, args.warmup_proportion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
+                                             num_training_steps,
+                                             args.warmup_proportion)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
@@ -291,8 +295,8 @@ def run(args):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 input_ids, token_type_ids, start_positions, end_positions = batch
-                logits = model(
-                    input_ids=input_ids, token_type_ids=token_type_ids)
+                logits = model(input_ids=input_ids,
+                               token_type_ids=token_type_ids)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
@@ -322,22 +326,25 @@ def run(args):
                         break
 
     if args.do_predict and rank == 0:
-        dev_ds.map(partial(
-            prepare_validation_features, tokenizer=tokenizer, args=args),
+        dev_ds.map(partial(prepare_validation_features,
+                           tokenizer=tokenizer,
+                           args=args),
                    batched=True)
-        dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds, batch_size=args.batch_size, shuffle=False)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                                   batch_size=args.batch_size,
+                                                   shuffle=False)
 
         dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
+            "input_ids":
+            Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids":
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
         }): fn(samples)
 
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=dev_batchify_fn,
-            return_list=True)
+        dev_data_loader = DataLoader(dataset=dev_ds,
+                                     batch_sampler=dev_batch_sampler,
+                                     collate_fn=dev_batchify_fn,
+                                     return_list=True)
 
         evaluate(model, dev_data_loader, args)
 

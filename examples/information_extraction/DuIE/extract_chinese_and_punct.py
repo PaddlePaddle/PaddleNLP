@@ -63,6 +63,7 @@ EN_PUNCTS = [[0x0021, 0x002F], [0x003A, 0x0040], [0x005B, 0x0060],
 
 
 class ChineseAndPunctuationExtractor(object):
+
     def __init__(self):
         self.chinese_re = self.build_re()
 

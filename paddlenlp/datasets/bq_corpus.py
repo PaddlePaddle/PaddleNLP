@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
 import json
 import os
@@ -24,15 +38,15 @@ class BQCorpus(DatasetBuilder):
     MD5 = "abe6c480b96cb705b4d24bd522848009"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('bq_corpus', 'bq_corpus', 'train.tsv'),
-            'd37683e9ee778ee2f4326033b654adb9'),
-        'dev': META_INFO(
-            os.path.join('bq_corpus', 'bq_corpus', 'dev.tsv'),
-            '8a71f2a69453646921e9ee1aa457d1e4'),
-        'test': META_INFO(
-            os.path.join('bq_corpus', 'bq_corpus', 'test.tsv'),
-            'c797995baa248b144ceaa4018b191e52'),
+        'train':
+        META_INFO(os.path.join('bq_corpus', 'bq_corpus', 'train.tsv'),
+                  'd37683e9ee778ee2f4326033b654adb9'),
+        'dev':
+        META_INFO(os.path.join('bq_corpus', 'bq_corpus', 'dev.tsv'),
+                  '8a71f2a69453646921e9ee1aa457d1e4'),
+        'test':
+        META_INFO(os.path.join('bq_corpus', 'bq_corpus', 'test.tsv'),
+                  'c797995baa248b144ceaa4018b191e52'),
     }
 
     def _get_data(self, mode, **kwargs):

@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from collections import defaultdict
 from copy import deepcopy
 from typing import Dict, List
@@ -96,6 +111,7 @@ class Metric:
 
 
 class Scorer:
+
     @staticmethod
     def load_gold_list(gold_list, offset_key=None):
         raise NotImplementedError
@@ -113,6 +129,7 @@ class Scorer:
 
 
 class EntityScorer(Scorer):
+
     @staticmethod
     def load_gold_list(gold_list: List[List[Dict]]):
         """ Load gold instance to `string` and `offset`
@@ -218,10 +235,8 @@ class EntityScorer(Scorer):
                 (offset, string) X (gold, pred, tp, P, R, F1)
         """
         metrics = {
-            'string': Metric(
-                verbose=verbose, match_mode=match_mode),
-            'offset': Metric(
-                verbose=verbose, match_mode=match_mode),
+            'string': Metric(verbose=verbose, match_mode=match_mode),
+            'offset': Metric(verbose=verbose, match_mode=match_mode),
         }
         for pred, gold in zip(pred_instance_list, gold_instance_list):
 
@@ -247,6 +262,7 @@ class EntityScorer(Scorer):
 
 
 class RelationScorer(Scorer):
+
     @staticmethod
     def load_gold_list(gold_list: List[List[Dict]]):
         """[summary]
@@ -282,13 +298,15 @@ class RelationScorer(Scorer):
                     record['args'][0]['type'],
                     tuple_offset(record['args'][0]['offset']),
                     record['args'][1]['type'],
-                    tuple_offset(record['args'][1]['offset']), )]
+                    tuple_offset(record['args'][1]['offset']),
+                )]
                 gold_instance['string'] += [(
                     record['type'],
                     record['args'][0]['type'],
                     record['args'][0]['text'],
                     record['args'][1]['type'],
-                    record['args'][1]['text'], )]
+                    record['args'][1]['text'],
+                )]
             gold_instance_list += [gold_instance]
 
         return gold_instance_list
@@ -360,17 +378,13 @@ class RelationScorer(Scorer):
         """
         # Span Boundary and Type
         metrics = {
-            'offset': Metric(
-                verbose=verbose, match_mode=match_mode),
-            'string': Metric(
-                verbose=verbose, match_mode=match_mode),
+            'offset': Metric(verbose=verbose, match_mode=match_mode),
+            'string': Metric(verbose=verbose, match_mode=match_mode),
         }
         # Span Boundary Only
         boundary_metrics = {
-            'offset': Metric(
-                verbose=verbose, match_mode=match_mode),
-            'string': Metric(
-                verbose=verbose, match_mode=match_mode),
+            'offset': Metric(verbose=verbose, match_mode=match_mode),
+            'string': Metric(verbose=verbose, match_mode=match_mode),
         }
         for pred, gold in zip(pred_instance_list, gold_instance_list):
 
@@ -381,14 +395,16 @@ class RelationScorer(Scorer):
                 # Span Boundary and Type
                 metrics[eval_key].count_instance(
                     gold_list=gold.get(eval_key, []),
-                    pred_list=pred.get(eval_key, []), )
+                    pred_list=pred.get(eval_key, []),
+                )
 
             post_string_tp, post_offset_tp = metrics['string'].tp, metrics[
                 'offset'].tp
             if verbose and (post_offset_tp - pre_offset_tp !=
                             post_string_tp - pre_string_tp):
-                warning_tp_increment(
-                    gold=gold, pred=pred, prefix='Relation Strict')
+                warning_tp_increment(gold=gold,
+                                     pred=pred,
+                                     prefix='Relation Strict')
 
             pre_string_tp, pre_offset_tp = boundary_metrics[
                 'string'].tp, boundary_metrics['offset'].tp
@@ -399,12 +415,14 @@ class RelationScorer(Scorer):
                     gold_list=[(x[0], x[2], x[4])
                                for x in gold.get(eval_key, [])],
                     pred_list=[(x[0], x[2], x[4])
-                               for x in pred.get(eval_key, [])], )
+                               for x in pred.get(eval_key, [])],
+                )
             post_string_tp, post_offset_tp = boundary_metrics[
                 'string'].tp, boundary_metrics['offset'].tp
             if verbose and post_offset_tp - pre_offset_tp != post_string_tp - pre_string_tp:
-                warning_tp_increment(
-                    gold=gold, pred=pred, prefix='Relation Boundary')
+                warning_tp_increment(gold=gold,
+                                     pred=pred,
+                                     prefix='Relation Boundary')
 
         results = dict()
         for eval_key in metrics:
@@ -417,6 +435,7 @@ class RelationScorer(Scorer):
 
 
 class EventScorer(Scorer):
+
     @staticmethod
     def load_gold_list(gold_list):
         """[summary]
@@ -457,16 +476,15 @@ class EventScorer(Scorer):
                 gold_instance['offset_trigger'] += [
                     (record['type'], tuple_offset(record['offset']))
                 ]
-                gold_instance['string_trigger'] += [
-                    (record['type'], record['text'])
-                ]
+                gold_instance['string_trigger'] += [(record['type'],
+                                                     record['text'])]
                 for arg in record['args']:
-                    gold_instance['offset_role'] += [(
-                        record['type'], arg['type'],
-                        tuple_offset(arg['offset']))]
-                    gold_instance['string_role'] += [
-                        (record['type'], arg['type'], arg['text'])
+                    gold_instance['offset_role'] += [
+                        (record['type'], arg['type'],
+                         tuple_offset(arg['offset']))
                     ]
+                    gold_instance['string_role'] += [(record['type'],
+                                                      arg['type'], arg['text'])]
             gold_instance_list += [gold_instance]
         return gold_instance_list
 
@@ -505,8 +523,9 @@ class EventScorer(Scorer):
                 pred_instance['offset_trigger'] += [(event_type, trigger_offset)
                                                     ]
                 for role_type, role_offset in offset_pred['roles']:
-                    pred_instance['offset_role'] += [(
-                        event_type, role_type, tuple_offset(role_offset))]
+                    pred_instance['offset_role'] += [
+                        (event_type, role_type, tuple_offset(role_offset))
+                    ]
 
             for string_pred in pred['string']:
                 event_type, trigger_string = string_pred['type'], string_pred[
@@ -555,16 +574,12 @@ class EventScorer(Scorer):
                 (offset, string) X (trigger, role) X (gold, pred, tp, P, R, F1)
         """
         trigger_metrics = {
-            'offset': Metric(
-                verbose=verbose, match_mode=match_mode),
-            'string': Metric(
-                verbose=verbose, match_mode=match_mode),
+            'offset': Metric(verbose=verbose, match_mode=match_mode),
+            'string': Metric(verbose=verbose, match_mode=match_mode),
         }
         role_metrics = {
-            'offset': Metric(
-                verbose=verbose, match_mode=match_mode),
-            'string': Metric(
-                verbose=verbose, match_mode=match_mode),
+            'offset': Metric(verbose=verbose, match_mode=match_mode),
+            'string': Metric(verbose=verbose, match_mode=match_mode),
         }
 
         for pred, gold in zip(pred_instance_list, gold_instance_list):

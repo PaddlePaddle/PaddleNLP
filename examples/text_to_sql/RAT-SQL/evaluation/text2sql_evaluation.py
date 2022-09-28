@@ -127,7 +127,7 @@ def tokenize(string, single_equal=False, math=True):
     if single_equal:
         sep1 = re.compile(r'([ \+\-\*/\(\)=,><;])')  # 单字节运算符
     else:
-        sep1 = re.compile(r'([ \+\-\*/\(\),><;])')  # 单字节运算符          
+        sep1 = re.compile(r'([ \+\-\*/\(\),><;])')  # 单字节运算符
     sep2 = re.compile('(' + '|'.join(two_bytes_op) + ')')  # 多字节运算符
     tokens_tmp = _resplit(tokens_tmp, lambda x: x.split(' '),
                           lambda x: x.startswith('"'))
@@ -147,17 +147,17 @@ def tokenize(string, single_equal=False, math=True):
         idx = 1
         while idx < len(tokens):
             if tokens[idx] == '(' and tokens[
-                    idx - 1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[
-                        idx - 1] != '=':
+                    idx -
+                    1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[idx -
+                                                                   1] != '=':
                 # 兼容单引号，这里可能有问题
                 while idx < len(tokens):
                     tmp_tok = tokens.pop(idx)
                     tokens[idx - 1] += tmp_tok
                     if tmp_tok == ')':
                         break
-            elif tokens[idx] in (
-                    '+', '-'
-            ) and tokens[idx - 1] in COND_OPS and idx + 1 < len(tokens):
+            elif tokens[idx] in ('+', '-') and tokens[
+                    idx - 1] in COND_OPS and idx + 1 < len(tokens):
                 tokens[idx] += tokens[idx + 1]
                 tokens.pop(idx + 1)
                 idx += 1
@@ -317,7 +317,10 @@ def parse_table_unit(toks, start_idx, tables_with_alias, schema):
     return idx, schema.id_map[key], key
 
 
-def parse_value(toks, start_idx, tables_with_alias, schema,
+def parse_value(toks,
+                start_idx,
+                tables_with_alias,
+                schema,
                 default_tables=None):
     """
     Args:
@@ -426,8 +429,8 @@ def parse_condition(toks,
 
         conds.append((agg_id, op_id, val_unit, val1, val2))
 
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                           (")", ";") or toks[idx] in JOIN_KEYWORDS):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx]
+                           in (")", ";") or toks[idx] in JOIN_KEYWORDS):
             break
 
         if idx < len_ and toks[idx] in LOGIC_AND_OR:
@@ -521,8 +524,8 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
             assert last_table is not None, 'last_table should be a table name strin, not None'
             tables_with_alias['b'] = last_table
             idx += 1
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or
-                           toks[idx] in (")", ";")):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS
+                           or toks[idx] in (")", ";")):
             break
 
     return [idx, table_units, conds, default_tables]
@@ -563,8 +566,8 @@ def parse_group_by(toks, start_idx, tables_with_alias, schema, default_tables):
     assert toks[idx] == 'by'
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                              (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
+                              or toks[idx] in (")", ";")):
         idx, col_unit = parse_col_unit(toks, idx, tables_with_alias, schema,
                                        default_tables)
         col_units.append(col_unit)
@@ -594,8 +597,8 @@ def parse_order_by(toks, start_idx, tables_with_alias, schema, default_tables):
     assert toks[idx] == 'by'
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                              (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
+                              or toks[idx] in (")", ";")):
         agg_id = AGG_OPS.index("none")
         if toks[idx] in AGG_OPS:
             agg_id = AGG_OPS.index(toks[idx])
@@ -757,8 +760,9 @@ class Evaluator(object):
 
     def _eval_exact_match(self, pred, gold, value_match=True):
         """eval_exact_match"""
-        partial_scores = self.eval_partial_match(
-            pred, gold, value_match=value_match)
+        partial_scores = self.eval_partial_match(pred,
+                                                 gold,
+                                                 value_match=value_match)
         self.partial_scores = partial_scores
 
         for _, score in partial_scores.items():
@@ -815,15 +819,17 @@ class Evaluator(object):
             new_gold = gold_tmp['union']
             gold_tmp['union'] = None
             new_gold['union'] = gold_tmp
-            return self._eval_exact_match(
-                pred, new_gold, value_match=value_match)
+            return self._eval_exact_match(pred,
+                                          new_gold,
+                                          value_match=value_match)
         elif gold['intersect'] is not None:
             gold_tmp = copy.deepcopy(gold)
             new_gold = gold_tmp['intersect']
             gold_tmp['intersect'] = None
             new_gold['intersect'] = gold_tmp
-            return self._eval_exact_match(
-                pred, new_gold, value_match=value_match)
+            return self._eval_exact_match(pred,
+                                          new_gold,
+                                          value_match=value_match)
         else:
             return 0
 
@@ -878,8 +884,9 @@ class Evaluator(object):
             'pred_total': pred_total
         }
 
-        gold_total, pred_total, cnt = eval_having(
-            pred, gold, value_match=value_match)
+        gold_total, pred_total, cnt = eval_having(pred,
+                                                  gold,
+                                                  value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
         res['having'] = {
             'acc': acc,
@@ -889,8 +896,9 @@ class Evaluator(object):
             'pred_total': pred_total
         }
 
-        gold_total, pred_total, cnt = eval_order(
-            pred, gold, value_match=value_match)
+        gold_total, pred_total, cnt = eval_order(pred,
+                                                 gold,
+                                                 value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
         res['order'] = {
             'acc': acc,
@@ -910,8 +918,9 @@ class Evaluator(object):
             'pred_total': pred_total
         }
 
-        gold_total, pred_total, cnt = eval_IUEN(
-            pred, gold, value_match=value_match)
+        gold_total, pred_total, cnt = eval_IUEN(pred,
+                                                gold,
+                                                value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
         res['IUEN'] = {
             'acc': acc,
@@ -980,8 +989,9 @@ class Schema(object):
         id_map = {'*': "__all__"}
         for key, vals in schema.items():
             for val in vals:
-                id_map[key.lower() + "." + val.lower()] = "__" + key.lower(
-                ) + "." + val.lower() + "__"
+                id_map[
+                    key.lower() + "." +
+                    val.lower()] = "__" + key.lower() + "." + val.lower() + "__"
 
         for key in schema:
             id_map[key.lower()] = "__" + key.lower() + "__"
@@ -1099,14 +1109,12 @@ def eval_where(pred, gold, value_match=True):
     Returns:
     """
     pred_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
-            pred['where'][::2], key=lambda x: [str(i) for i in x])
+        unit for unit in sorted(pred['where'][::2],
+                                key=lambda x: [str(i) for i in x])
     ])
     gold_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
-            gold['where'][::2], key=lambda x: [str(i) for i in x])
+        unit for unit in sorted(gold['where'][::2],
+                                key=lambda x: [str(i) for i in x])
     ])
     gold_wo_agg = [unit[2] for unit in gold_conds]
     pred_total = len(pred_conds)
@@ -1158,21 +1166,19 @@ def eval_having(pred, gold, value_match=True):
         return [1, 1, 0]
 
     pred_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
-            pred['having'][::2], key=lambda x: [str(i) for i in x])
+        unit for unit in sorted(pred['having'][::2],
+                                key=lambda x: [str(i) for i in x])
     ])
     gold_conds = copy.deepcopy([
-        unit
-        for unit in sorted(
-            gold['having'][::2], key=lambda x: [str(i) for i in x])
+        unit for unit in sorted(gold['having'][::2],
+                                key=lambda x: [str(i) for i in x])
     ])
 
     pred_total = len(pred['having'][::2])
     gold_total = len(gold['having'][::2])
     cnt = 0
-    for pred_cond, gold_cond in zip(
-            sorted(pred['having'][::2]), sorted(gold['having'][::2])):
+    for pred_cond, gold_cond in zip(sorted(pred['having'][::2]),
+                                    sorted(gold['having'][::2])):
         if eval_cond(pred_cond, gold_cond, value_match) == 1:
             cnt += 1
 
@@ -1247,7 +1253,7 @@ def get_nestedSQL(sql):
             nested.append(cond_unit[3])
         if type(cond_unit[4]) is dict:
             nested.append(cond_unit[4])
-    ## 
+    ##
     for from_nest_sql in [
             table_unit[1] for table_unit in sql['from']['table_units']
             if table_unit[0] == 'sql'
@@ -1287,12 +1293,15 @@ def eval_IUEN(pred, gold, value_match=True):
 
     Returns:
     """
-    lt1, pt1, cnt1 = eval_nested(
-        pred['intersect'], gold['intersect'], value_match=value_match)
-    lt2, pt2, cnt2 = eval_nested(
-        pred['except'], gold['except'], value_match=value_match)
-    lt3, pt3, cnt3 = eval_nested(
-        pred['union'], gold['union'], value_match=value_match)
+    lt1, pt1, cnt1 = eval_nested(pred['intersect'],
+                                 gold['intersect'],
+                                 value_match=value_match)
+    lt2, pt2, cnt2 = eval_nested(pred['except'],
+                                 gold['except'],
+                                 value_match=value_match)
+    lt3, pt3, cnt3 = eval_nested(pred['union'],
+                                 gold['union'],
+                                 value_match=value_match)
     gold_total = lt1 + lt2 + lt3
     pred_total = pt1 + pt2 + pt3
     cnt = cnt1 + cnt2 + cnt3
@@ -1338,8 +1347,8 @@ def get_keywords(sql):
 
     # in keyword
     if len([
-            cond_unit for cond_unit in cond_units
-            if cond_unit[1] == COND_OPS.index('in')
+            cond_unit
+            for cond_unit in cond_units if cond_unit[1] == COND_OPS.index('in')
     ]) > 0:
         res.add('in')
 
@@ -1531,10 +1540,9 @@ def rebuild_order_by_col(valid_col_units, order_by, kmap):
         return order_by
 
     direction, val_units = order_by
-    new_val_units = [
-        (agg_id, rebuild_val_unit_col(valid_col_units, val_unit, kmap))
-        for agg_id, val_unit in val_units
-    ]
+    new_val_units = [(agg_id,
+                      rebuild_val_unit_col(valid_col_units, val_unit, kmap))
+                     for agg_id, val_unit in val_units]
     return direction, new_val_units
 
 
@@ -1803,24 +1811,28 @@ def evaluate_complex(table, gold, predict, mode='exact', single_equal=False):
             pred_sql = g_empty_sql
             eval_err_num += 1
 
-        exact_score = evaluator.eval_exact_match(
-            pred_sql, gold_sql, value_match=True)
-        exact_score_novalue = evaluator.eval_exact_match(
-            pred_sql, gold_sql, value_match=False)
+        exact_score = evaluator.eval_exact_match(pred_sql,
+                                                 gold_sql,
+                                                 value_match=True)
+        exact_score_novalue = evaluator.eval_exact_match(pred_sql,
+                                                         gold_sql,
+                                                         value_match=False)
         if exact_score == 0:
             logging.debug("error instance %s:\npred: %s\ngold: %s" %
                           (ins_id, pred_str, gold_str))
         scores['all']['exact'] += exact_score
         scores_novalue['all']['exact'] += exact_score_novalue
-        score = evaluator.eval_partial_match(
-            pred_sql, gold_sql, value_match=True)
+        score = evaluator.eval_partial_match(pred_sql,
+                                             gold_sql,
+                                             value_match=True)
         for k, v in score.items():
             for k1, v1 in v.items():
                 if k1 in scores[k].keys():
                     scores[k][k1] += v1
 
-        score_novalue = evaluator.eval_partial_match(
-            pred_sql, gold_sql, value_match=False)
+        score_novalue = evaluator.eval_partial_match(pred_sql,
+                                                     gold_sql,
+                                                     value_match=False)
         for k, v in score_novalue.items():
             for k1, v1 in v.items():
                 if k1 in scores_novalue[k].keys():
@@ -1847,11 +1859,11 @@ def evaluate_complex(table, gold, predict, mode='exact', single_equal=False):
             scores_novalue[k]['rec'] = scores_novalue[k][
                 'rec'] / scores_novalue['all']['count'] * 1.0
             scores_novalue[k]['f1'] = 2 * scores_novalue[k][
-                'acc'] * scores_novalue[k]['rec'] / (
-                    scores_novalue[k]['acc'] + scores_novalue[k]['rec'])
+                'acc'] * scores_novalue[k]['rec'] / (scores_novalue[k]['acc'] +
+                                                     scores_novalue[k]['rec'])
     scores['all']['acc'] = scores['all']['exact'] / scores['all']['count']
-    scores_novalue['all']['acc'] = scores_novalue['all'][
-        'exact'] / scores_novalue['all']['count']
+    scores_novalue['all'][
+        'acc'] = scores_novalue['all']['exact'] / scores_novalue['all']['count']
 
     return scores, scores_novalue
 
@@ -1861,14 +1873,23 @@ def evaluate(table, gold, predict, mode='exact', dataset='DuSQL'):
     dataset:['CSpider', 'DuSQL', 'NL2SQL']
     """
     if dataset == 'NL2SQL':
-        scores, scores_novalue = evaluate_NL2SQL(
-            table, gold, predict, mode=mode, single_equal=True)
+        scores, scores_novalue = evaluate_NL2SQL(table,
+                                                 gold,
+                                                 predict,
+                                                 mode=mode,
+                                                 single_equal=True)
     elif dataset == 'DuSQL':
-        scores, scores_novalue = evaluate_complex(
-            table, gold, predict, mode=mode, single_equal=True)
+        scores, scores_novalue = evaluate_complex(table,
+                                                  gold,
+                                                  predict,
+                                                  mode=mode,
+                                                  single_equal=True)
     else:
-        scores, scores_novalue = evaluate_complex(
-            table, gold, predict, mode=mode, single_equal=True)
+        scores, scores_novalue = evaluate_complex(table,
+                                                  gold,
+                                                  predict,
+                                                  mode=mode,
+                                                  single_equal=True)
     return scores, scores_novalue
 
 
@@ -1878,24 +1899,26 @@ if __name__ == "__main__":
     arg_parser.add_argument('-g', '--gold', dest='gold', type=str)
     arg_parser.add_argument('-p', '--pred', dest='pred', type=str)
     arg_parser.add_argument('-t', '--table', dest='table', type=str)
-    arg_parser.add_argument(
-        '-d',
-        '--dataset',
-        choices=('NL2SQL', 'CSpider', 'DuSQL'),
-        required=True,
-        type=str)
+    arg_parser.add_argument('-d',
+                            '--dataset',
+                            choices=('NL2SQL', 'CSpider', 'DuSQL'),
+                            required=True,
+                            type=str)
     arg_parser.add_argument('--debug', default=False, action="store_true")
     args = arg_parser.parse_args()
 
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
-        format='%(levelname)s: %(asctime)s %(filename)s [%(funcName)s:%(lineno)d][%(process)d] %(message)s',
+        format=
+        '%(levelname)s: %(asctime)s %(filename)s [%(funcName)s:%(lineno)d][%(process)d] %(message)s',
         datefmt='%m-%d %H:%M:%S',
         filename='eval.log',
         filemode='a')
 
-    out, out_novalue = evaluate(
-        args.table, args.gold, args.pred, dataset=args.dataset)
+    out, out_novalue = evaluate(args.table,
+                                args.gold,
+                                args.pred,
+                                dataset=args.dataset)
     print('with value:')
     print(out['all'])
     print('*' * 20)

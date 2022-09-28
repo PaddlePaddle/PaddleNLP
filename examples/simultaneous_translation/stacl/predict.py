@@ -26,11 +26,10 @@ from model import SimultaneousTransformer
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./config/transformer.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./config/transformer.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     args = parser.parse_args()
     return args
 

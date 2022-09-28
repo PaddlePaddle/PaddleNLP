@@ -28,6 +28,7 @@ CHAR_DELIMITER = "\002"
 
 
 def load_dataset(datafiles):
+
     def read(data_path):
         with open(data_path, 'r', encoding='utf-8') as fp:
             if "infer" in data_path:
@@ -42,8 +43,9 @@ def load_dataset(datafiles):
                     words = words.split(CHAR_DELIMITER)
                     labels = labels.split(CHAR_DELIMITER)
                     assert len(words) == len(
-                        labels), "The word %s is not match with the label %s" % (
-                            words, labels)
+                        labels
+                    ), "The word %s is not match with the label %s" % (words,
+                                                                       labels)
                     yield [words, labels]
 
     if isinstance(datafiles, str):
@@ -111,16 +113,16 @@ def convert_example(example,
         tokens, labels = example[0], None
     tokens = tokens[:max_seq_len]
 
-    token_ids = convert_tokens_to_ids(
-        tokens,
-        word_vocab,
-        oov_replace_token="OOV",
-        normlize_vocab=normlize_vocab)
+    token_ids = convert_tokens_to_ids(tokens,
+                                      word_vocab,
+                                      oov_replace_token="OOV",
+                                      normlize_vocab=normlize_vocab)
     length = len(token_ids)
     if labels is not None:
         labels = labels[:max_seq_len]
-        label_ids = convert_tokens_to_ids(
-            labels, label_vocab, oov_replace_token="O")
+        label_ids = convert_tokens_to_ids(labels,
+                                          label_vocab,
+                                          oov_replace_token="O")
         return token_ids, length, label_ids
     else:
         return token_ids, length

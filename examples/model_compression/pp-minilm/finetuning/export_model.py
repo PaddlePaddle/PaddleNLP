@@ -32,18 +32,19 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_path",
         default="best_clue_model",
         type=str,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
-    parser.add_argument(
-        "--save_inference_model_with_tokenizer",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to save inference model with tokenizer.")
+    parser.add_argument("--save_inference_model_with_tokenizer",
+                        type=distutils.util.strtobool,
+                        default=True,
+                        help="Whether to save inference model with tokenizer.")
 
     args = parser.parse_args()
     return args

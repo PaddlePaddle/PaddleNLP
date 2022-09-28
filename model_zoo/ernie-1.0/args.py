@@ -34,6 +34,11 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
         sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
+    parser.add_argument("--tokenizer_name_or_path", default=None, type=str,
+        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
+        sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
+    parser.add_argument("--continue_training", default=False, type=bool,
+        help="Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models.")
 
     # Train I/O config
     parser.add_argument("--input_dir", default=None, type=str, required=True, help="The input directory where the data will be read from.", )
@@ -77,6 +82,7 @@ def parse_args(MODEL_CLASSES):
 
     # AMP config
     parser.add_argument("--use_amp", type=str2bool, nargs='?', const=False, help="Enable mixed precision training.")
+    parser.add_argument("--fp16_opt_level", type=str, default="O2", help="Mixed precision training optimization level.")
     parser.add_argument("--enable_addto", type=str2bool, nargs='?', const=True, default=True, help="Whether to enable the addto strategy for gradient accumulation or not. This is only used for AMP training.")
     parser.add_argument("--scale_loss", type=float, default=32768, help="The value of scale_loss for fp16. This is only used for AMP training.")
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1, help="The hidden dropout prob.")
@@ -90,23 +96,33 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
-    # Argument for bert
+    # Argument for bert/ernie
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1, help="Short sequence prob.")
+    parser.add_argument("--favor_longer_ngram", type=str2bool, default=False, help="Short sequence prob.")
+    parser.add_argument("--max_ngrams", type=int, default=3, help="Short sequence prob.")
+
     # yapf: enable
 
     args = parser.parse_args()
+
+    if args.tokenizer_name_or_path is None:
+        args.tokenizer_name_or_path = args.model_name_or_path
     args.test_iters = args.eval_iters * 10
 
     if args.check_accuracy:
         if args.hidden_dropout_prob != 0:
             args.hidden_dropout_prob = .0
             logger.warning(
-                "The hidden_dropout_prob should set to 0 for accuracy checking.")
+                "The hidden_dropout_prob should set to 0 for accuracy checking."
+            )
         if args.attention_probs_dropout_prob != 0:
             args.attention_probs_dropout_prob = .0
             logger.warning(
                 "The attention_probs_dropout_prob should set to 0 for accuracy checking."
             )
+    if args.dp_degree * args.mp_degree * args.pp_degree * args.sharding_degree == 1:
+        if paddle.distributed.get_world_size() > 1:
+            args.dp_degree = paddle.distributed.get_world_size()
 
     return args

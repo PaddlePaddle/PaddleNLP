@@ -30,38 +30,36 @@ def convert_example(example,
     """
     inputs = example[text_column]
     targets = example[summary_column]
-    labels = tokenizer(
-        targets,
-        max_length=max_target_length,
-        padding='max_length',
-        truncation=True)
+    labels = tokenizer(targets,
+                       max_length=max_target_length,
+                       padding='max_length',
+                       truncation=True)
     decoder_input_ids = [decoder_start_token_id] + labels["input_ids"][:-1]
     if ignore_pad_token_for_loss:
         labels["input_ids"] = [(l if l != tokenizer.pad_token_id else -100)
                                for l in labels["input_ids"]]
     if is_train:
-        model_inputs = tokenizer(
-            inputs,
-            max_length=max_source_length,
-            padding='max_length',
-            truncation=True,
-            return_attention_mask=True,
-            return_length=False)
+        model_inputs = tokenizer(inputs,
+                                 max_length=max_source_length,
+                                 padding='max_length',
+                                 truncation=True,
+                                 return_attention_mask=True,
+                                 return_length=False)
         return model_inputs["input_ids"], model_inputs[
             "attention_mask"], decoder_input_ids, labels["input_ids"]
     else:
-        model_inputs = tokenizer(
-            inputs,
-            max_length=max_source_length,
-            padding='max_length',
-            truncation=True,
-            return_attention_mask=True,
-            return_length=True)
+        model_inputs = tokenizer(inputs,
+                                 max_length=max_source_length,
+                                 padding='max_length',
+                                 truncation=True,
+                                 return_attention_mask=True,
+                                 return_length=True)
         return model_inputs["input_ids"], model_inputs["attention_mask"], \
         model_inputs["length"], decoder_input_ids, labels["input_ids"]
 
 
 def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
+
     def compute_rouge(predictions,
                       references,
                       rouge_types=None,
@@ -69,8 +67,8 @@ def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):
         if rouge_types is None:
             rouge_types = ["rouge1", "rouge2", "rougeLsum"]
 
-        scorer = rouge_scorer.RougeScorer(
-            rouge_types=rouge_types, use_stemmer=use_stemmer)
+        scorer = rouge_scorer.RougeScorer(rouge_types=rouge_types,
+                                          use_stemmer=use_stemmer)
         aggregator = scoring.BootstrapAggregator()
 
         for ref, pred in zip(references, predictions):

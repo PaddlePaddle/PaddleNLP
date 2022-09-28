@@ -26,9 +26,8 @@ TASKS = [
     "QuestionAnswering",
 ]
 
-config = yaml.load(
-    open(osp.join(osp.abspath("."), "./config.yml"), 'r'),
-    Loader=yaml.FullLoader)
+config = yaml.load(open(osp.join(osp.abspath("."), "./config.yml"), 'r'),
+                   Loader=yaml.FullLoader)
 default_args = config["DefaultArgs"]
 
 ALL_DATASETS = {}
@@ -45,6 +44,7 @@ for task_type in TASKS:
 
 
 class Dict(object):
+
     def __init__(self, fn):
         assert isinstance(fn, (dict)), 'Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn ' \
                                    'Received fn=%s' % (str(fn))
@@ -94,7 +94,8 @@ class DataArguments:
             "help":
             "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
-        }, )
+        },
+    )
 
     # Additional configs for QA task.
     doc_stride: int = field(
@@ -102,29 +103,34 @@ class DataArguments:
         metadata={
             "help":
             "When splitting up a long document into chunks, how much stride to take between chunks."
-        }, )
+        },
+    )
 
     n_best_size: int = field(
         default=20,
         metadata={
             "help":
             "The total number of n-best predictions to generate in the nbest_predictions.json output file."
-        }, )
+        },
+    )
 
     max_query_length: int = field(
         default=64,
-        metadata={"help": "Max query length."}, )
+        metadata={"help": "Max query length."},
+    )
 
     max_answer_length: int = field(
         default=30,
-        metadata={"help": "Max answer length."}, )
+        metadata={"help": "Max answer length."},
+    )
 
     do_lower_case: bool = field(
         default=False,
         metadata={
             "help":
             "Whether to lower case the input text. Should be True for uncased models and False for cased models."
-        }, )
+        },
+    )
     overwrite_cache: bool = field(
         default=False,
         metadata={"help": "Overwrite the cached training and evaluation sets"})
@@ -132,7 +138,8 @@ class DataArguments:
         default=None,
         metadata={
             "help": "The number of processes to use for the preprocessing."
-        }, )
+        },
+    )
     null_score_diff_threshold: float = field(
         default=0.0,
         metadata={
@@ -140,7 +147,8 @@ class DataArguments:
             "The threshold used to select the null answer: if the best answer has a score that is less than "
             "the score of the null answer minus this threshold, the null answer is selected for this example. "
             "Only useful when `version_2_with_negative=True`."
-        }, )
+        },
+    )
 
 
 @dataclass
@@ -149,10 +157,11 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
 
-    model_name_or_path: str = field(metadata={
-        "help":
-        "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-    })
+    model_name_or_path: str = field(
+        metadata={
+            "help":
+            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        })
     config_name: Optional[str] = field(
         default=None,
         metadata={
@@ -167,9 +176,11 @@ class ModelArguments:
         })
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Path to directory to store the dataset cache."}, )
+        metadata={"help": "Path to directory to store the dataset cache."},
+    )
     export_model_dir: Optional[str] = field(
         default=None,
         metadata={
             "help": "Path to directory to store the exported inference model."
-        }, )
+        },
+    )

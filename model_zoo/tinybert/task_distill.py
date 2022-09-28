@@ -68,21 +68,24 @@ def parse_args():
         type=str,
         required=True,
         help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()), )
+        ", ".join(METRIC_CLASSES.keys()),
+    )
     parser.add_argument(
         "--model_type",
         default="tinybert",
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--teacher_model_type",
         default="bert",
         type=str,
         required=True,
         help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()), )
+        ", ".join(MODEL_CLASSES.keys()),
+    )
     parser.add_argument(
         "--student_model_name_or_path",
         default=None,
@@ -93,100 +96,106 @@ def parse_args():
             sum([
                 list(classes[-1].pretrained_init_configuration.keys())
                 for classes in MODEL_CLASSES.values()
-            ], [])), )
-    parser.add_argument(
-        "--teacher_path",
-        default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model.")
+            ], [])),
+    )
+    parser.add_argument("--teacher_path",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Path to pre-trained model.")
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
         required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+        help=
+        "The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--glue_dir",
         default="/root/.paddlenlp/datasets/Glue/",
         type=str,
         required=False,
-        help="The Glue directory.", )
+        help="The Glue directory.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.", )
-    parser.add_argument(
-        "--learning_rate",
-        default=1e-4,
-        type=float,
-        help="The initial learning rate for Adam.")
+        help=
+        "The maximum total input sequence length after tokenization. Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
+    )
+    parser.add_argument("--learning_rate",
+                        default=1e-4,
+                        type=float,
+                        help="The initial learning rate for Adam.")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
-        help="Total number of training epochs to perform.", )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=100,
-        help="Log every X updates steps.")
-    parser.add_argument(
-        "--save_steps",
-        type=int,
-        default=100,
-        help="Save checkpoint every X updates steps.")
+        help="Total number of training epochs to perform.",
+    )
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=100,
+                        help="Log every X updates steps.")
+    parser.add_argument("--save_steps",
+                        type=int,
+                        default=100,
+                        help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--batch_size",
         default=32,
         type=int,
-        help="Batch size per GPU/CPU for training.", )
+        help="Batch size per GPU/CPU for training.",
+    )
     parser.add_argument(
         "--T",
         default=1,
         type=int,
-        help="Temperature for softmax", )
+        help="Temperature for softmax",
+    )
     parser.add_argument(
         "--use_aug",
         action="store_true",
-        help="Whether to use augmentation data to train.", )
+        help="Whether to use augmentation data to train.",
+    )
     parser.add_argument(
         "--intermediate_distill",
         action="store_true",
-        help="Whether distilling intermediate layers. If False, it means prediction layer distillation.",
+        help=
+        "Whether distilling intermediate layers. If False, it means prediction layer distillation.",
     )
-    parser.add_argument(
-        "--weight_decay",
-        default=0.0,
-        type=float,
-        help="Weight decay if we apply some.")
+    parser.add_argument("--weight_decay",
+                        default=0.0,
+                        type=float,
+                        help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
-        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion"
-    )
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.1,
-        type=float,
-        help="Linear warmup proportion over total steps.")
-    parser.add_argument(
-        "--adam_epsilon",
-        default=1e-6,
-        type=float,
-        help="Epsilon for Adam optimizer.")
+        help=
+        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--warmup_proportion",
+                        default=0.1,
+                        type=float,
+                        help="Linear warmup proportion over total steps.")
+    parser.add_argument("--adam_epsilon",
+                        default=1e-6,
+                        type=float,
+                        help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help=
+        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument(
-        "--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument("--seed",
+                        default=42,
+                        type=int,
+                        help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -217,21 +226,20 @@ def evaluate(model, metric, data_loader):
         metric.update(correct)
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
-        print(
-            "acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, " % (
-                res[0],
-                res[1],
-                res[2],
-                res[3],
-                res[4], ),
-            end='')
+        print("acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, " % (
+            res[0],
+            res[1],
+            res[2],
+            res[3],
+            res[4],
+        ),
+              end='')
     elif isinstance(metric, Mcc):
         print("mcc: %s, " % (res[0]), end='')
     elif isinstance(metric, PearsonAndSpearman):
-        print(
-            "pearson: %s, spearman: %s, pearson and spearman: %s, " %
-            (res[0], res[1], res[2]),
-            end='')
+        print("pearson: %s, spearman: %s, pearson and spearman: %s, " %
+              (res[0], res[1], res[2]),
+              end='')
     else:
         print("acc: %s, " % (res), end='')
     model.train()
@@ -255,10 +263,9 @@ def convert_example(example,
     if (int(is_test) + len(example)) == 2:
         example = tokenizer(example['sentence'], max_seq_len=max_seq_length)
     else:
-        example = tokenizer(
-            example['sentence1'],
-            text_pair=example['sentence2'],
-            max_seq_len=max_seq_length)
+        example = tokenizer(example['sentence1'],
+                            text_pair=example['sentence2'],
+                            max_seq_len=max_seq_length)
 
     if not is_test:
         return example['input_ids'], example['token_type_ids'], label
@@ -280,17 +287,17 @@ def do_train(args):
     if args.use_aug:
         aug_data_file = os.path.join(
             os.path.join(args.glue_dir, args.task_name), "train_aug.tsv"),
-        train_ds = load_dataset(
-            'glue', args.task_name, data_files=aug_data_file)
+        train_ds = load_dataset('glue',
+                                args.task_name,
+                                data_files=aug_data_file)
     else:
         train_ds = load_dataset('glue', args.task_name, splits='train')
     tokenizer = tokenizer_class.from_pretrained(args.student_model_name_or_path)
 
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        label_list=train_ds.label_list,
-        max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example,
+                         tokenizer=tokenizer,
+                         label_list=train_ds.label_list,
+                         max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
@@ -299,12 +306,11 @@ def do_train(args):
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
         Stack(dtype="int64" if train_ds.label_list else "float32")  # label
     ): fn(samples)
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=0,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=batchify_fn,
+                                   num_workers=0,
+                                   return_list=True)
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
             'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
@@ -330,21 +336,21 @@ def do_train(args):
     else:
         dev_ds = load_dataset('glue', args.task_name, splits='dev')
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(
-            dev_ds, batch_size=args.batch_size, shuffle=False)
-        dev_data_loader = DataLoader(
-            dataset=dev_ds,
-            batch_sampler=dev_batch_sampler,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            return_list=True)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                                   batch_size=args.batch_size,
+                                                   shuffle=False)
+        dev_data_loader = DataLoader(dataset=dev_ds,
+                                     batch_sampler=dev_batch_sampler,
+                                     collate_fn=batchify_fn,
+                                     num_workers=0,
+                                     return_list=True)
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    student = model_class.from_pretrained(
-        args.student_model_name_or_path, num_classes=num_classes)
+    student = model_class.from_pretrained(args.student_model_name_or_path,
+                                          num_classes=num_classes)
     teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
-    teacher = teacher_model_class.from_pretrained(
-        args.teacher_path, num_classes=num_classes)
+    teacher = teacher_model_class.from_pretrained(args.teacher_path,
+                                                  num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
         student = paddle.DataParallel(student, find_unused_parameters=True)
@@ -383,16 +389,14 @@ def do_train(args):
 
     metric = metric_class()
 
-    teacher = to_distill(
-        teacher,
-        return_attentions=True,
-        return_qkv=False,
-        return_layer_outputs=True)
-    student = to_distill(
-        student,
-        return_attentions=True,
-        return_qkv=False,
-        return_layer_outputs=True)
+    teacher = to_distill(teacher,
+                         return_attentions=True,
+                         return_qkv=False,
+                         return_layer_outputs=True)
+    student = to_distill(student,
+                         return_attentions=True,
+                         return_qkv=False,
+                         return_layer_outputs=True)
     pad_token_id = 0
     global_step = 0
     tic_train = time.time()
@@ -456,8 +460,8 @@ def do_train(args):
                 else:
                     res = evaluate(student, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                if (best_res < res and global_step < num_training_steps or
-                        global_step == num_training_steps
+                if (best_res < res and global_step < num_training_steps
+                        or global_step == num_training_steps
                     ) and paddle.distributed.get_rank() == 0:
                     if global_step < num_training_steps:
                         output_dir = os.path.join(

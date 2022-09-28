@@ -46,23 +46,23 @@ class XNLI(DatasetBuilder):
 
     For more information, please visit https://github.com/facebookresearch/XNLI
     """
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'data_md5', 'url',
-                                                     'zipfile_md5'))
+    META_INFO = collections.namedtuple(
+        'META_INFO', ('file', 'data_md5', 'url', 'zipfile_md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('XNLI-MT-1.0', 'XNLI-MT-1.0', 'multinli'), '',
-            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-MT-1.0.zip',
-            'fa3d8d6c3d1866cedc45680ba93c296e'),
-        'dev': META_INFO(
-            os.path.join('XNLI-1.0', 'XNLI-1.0', 'xnli.dev.tsv'),
-            '4c23601abba3e3e222e19d1c6851649e',
-            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
-            '53393158739ec671c34f205efc7d1666'),
-        'test': META_INFO(
-            os.path.join('XNLI-1.0', 'XNLI-1.0', 'xnli.test.tsv'),
-            'fbc26e90f7e892e24dde978a2bd8ece6',
-            'https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
-            '53393158739ec671c34f205efc7d1666'),
+        'train':
+        META_INFO(os.path.join('XNLI-MT-1.0', 'XNLI-MT-1.0', 'multinli'), '',
+                  'https://bj.bcebos.com/paddlenlp/datasets/XNLI-MT-1.0.zip',
+                  'fa3d8d6c3d1866cedc45680ba93c296e'),
+        'dev':
+        META_INFO(os.path.join('XNLI-1.0', 'XNLI-1.0', 'xnli.dev.tsv'),
+                  '4c23601abba3e3e222e19d1c6851649e',
+                  'https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
+                  '53393158739ec671c34f205efc7d1666'),
+        'test':
+        META_INFO(os.path.join('XNLI-1.0', 'XNLI-1.0', 'xnli.test.tsv'),
+                  'fbc26e90f7e892e24dde978a2bd8ece6',
+                  'https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip',
+                  '53393158739ec671c34f205efc7d1666'),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -73,8 +73,8 @@ class XNLI(DatasetBuilder):
         if mode == 'train':
             if not os.path.exists(fullname):
                 get_path_from_url(url, default_root, zipfile_hash)
-            unique_endpoints = _get_unique_endpoints(ParallelEnv()
-                                                     .trainer_endpoints[:])
+            unique_endpoints = _get_unique_endpoints(
+                ParallelEnv().trainer_endpoints[:])
             if ParallelEnv().current_endpoint in unique_endpoints:
                 file_num = len(os.listdir(fullname))
                 if file_num != len(ALL_LANGUAGES):
@@ -112,13 +112,13 @@ class XNLI(DatasetBuilder):
             if language == "all_languages":
                 with ExitStack() as stack:
                     files = [
-                        stack.enter_context(open(
-                            file, 'r', encoding="utf-8")) for file in files
+                        stack.enter_context(open(file, 'r', encoding="utf-8"))
+                        for file in files
                     ]
                     readers = [
-                        csv.DictReader(
-                            file, delimiter="\t", quoting=csv.QUOTE_NONE)
-                        for file in files
+                        csv.DictReader(file,
+                                       delimiter="\t",
+                                       quoting=csv.QUOTE_NONE) for file in files
                     ]
                     for row_idx, rows in enumerate(zip(*readers)):
                         if not rows[0]["label"]:
@@ -126,8 +126,9 @@ class XNLI(DatasetBuilder):
                         data = {
                             "premise": {},
                             "hypothesis": {},
-                            "label": rows[0]["label"].replace("contradictory",
-                                                              "contradiction")
+                            "label":
+                            rows[0]["label"].replace("contradictory",
+                                                     "contradiction")
                         }
                         for lang, row in zip(languages, rows):
                             if not row["premise"] or not row["hypo"]:
@@ -138,24 +139,29 @@ class XNLI(DatasetBuilder):
             else:
                 for idx, file in enumerate(files):
                     with open(file, 'r', encoding="utf-8") as f:
-                        reader = csv.DictReader(
-                            f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                        reader = csv.DictReader(f,
+                                                delimiter="\t",
+                                                quoting=csv.QUOTE_NONE)
                         for row_idx, row in enumerate(reader):
                             if not row["premise"] or not row["hypo"] or not row[
                                     "label"]:
                                 continue
                             yield {
-                                "premise": row["premise"],
-                                "hypothesis": row["hypo"],
-                                "label": row["label"].replace("contradictory",
-                                                              "contradiction"),
+                                "premise":
+                                row["premise"],
+                                "hypothesis":
+                                row["hypo"],
+                                "label":
+                                row["label"].replace("contradictory",
+                                                     "contradiction"),
                             }
         else:
             if language == "all_languages":
                 rows_per_pair_id = collections.defaultdict(list)
                 with open(filename, encoding="utf-8") as f:
-                    reader = csv.DictReader(
-                        f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                    reader = csv.DictReader(f,
+                                            delimiter="\t",
+                                            quoting=csv.QUOTE_NONE)
                     for row in reader:
                         rows_per_pair_id[row["pairID"]].append(row)
 
@@ -175,8 +181,9 @@ class XNLI(DatasetBuilder):
                     yield data
             else:
                 with open(filename, encoding="utf-8") as f:
-                    reader = csv.DictReader(
-                        f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                    reader = csv.DictReader(f,
+                                            delimiter="\t",
+                                            quoting=csv.QUOTE_NONE)
                     for row in reader:
                         if row["language"] == language:
                             if not row["sentence1"] or not row[

@@ -27,6 +27,6 @@
 
 下面是基于Bert的文本分类任务的数据处理流程图：
 
-.. image:: /imgs/data_preprocess_pipline.png
+.. image:: ../imgs/data_preprocess_pipline.png
 
 关于数据处理的详细信息，请查阅 :doc:`./data_preprocess` 。

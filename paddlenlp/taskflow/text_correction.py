@@ -102,9 +102,15 @@ class CSCTask(Task):
             )
         self._pypinyin = pypinyin
         self._batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'),  # input
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype='int64'),  # segment
-            Pad(axis=0, pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.pad_token], dtype='int64'),  # pinyin
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
+                ),  # input
+            Pad(axis=0,
+                pad_val=self._tokenizer.pad_token_type_id,
+                dtype='int64'),  # segment
+            Pad(axis=0,
+                pad_val=self._pinyin_vocab.token_to_idx[self._pinyin_vocab.
+                                                        pad_token],
+                dtype='int64'),  # pinyin
             Stack(axis=0, dtype='int64'),  # length
         ): [data for data in fn(samples)]
         self._num_workers = self.kwargs[
@@ -123,16 +129,19 @@ class CSCTask(Task):
        Construct the input spec for the convert dygraph model to static model.
        """
         self._input_spec = [
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='input_ids'),
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64", name='pinyin_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='pinyin_ids'),
         ]
 
     def _construct_vocabs(self):
         pinyin_vocab_path = os.path.join(self._task_path, "pinyin_vocab.txt")
-        self._pinyin_vocab = Vocab.load_vocabulary(
-            pinyin_vocab_path, unk_token='[UNK]', pad_token='[PAD]')
+        self._pinyin_vocab = Vocab.load_vocabulary(pinyin_vocab_path,
+                                                   unk_token='[UNK]',
+                                                   pad_token='[PAD]')
 
     def _construct_model(self, model):
         """
@@ -228,8 +237,8 @@ class CSCTask(Task):
         results = self._auto_joiner(results, self.input_mapping, is_dict=True)
         for result in results:
             errors_result = []
-            for i, (source_token, target_token
-                    ) in enumerate(zip(result['source'], result['target'])):
+            for i, (source_token, target_token) in enumerate(
+                    zip(result['source'], result['target'])):
                 if source_token != target_token:
                     errors_result.append({
                         'position': i,
@@ -249,10 +258,9 @@ class CSCTask(Task):
         token_type_ids = [0] * len(input_ids)
 
         # Use pad token in pinyin emb to map word emb [CLS], [SEP]
-        pinyins = self._pypinyin.lazy_pinyin(
-            source,
-            style=self._pypinyin.Style.TONE3,
-            neutral_tone_with_five=True)
+        pinyins = self._pypinyin.lazy_pinyin(source,
+                                             style=self._pypinyin.Style.TONE3,
+                                             neutral_tone_with_five=True)
 
         pinyin_ids = [0]
         # Align pinyin and chinese char
@@ -289,11 +297,12 @@ class CSCTask(Task):
 
         pred_result = ""
         for j, word in enumerate(words):
-            candidates = self._tokenizer.convert_ids_to_tokens(corr_pred[
-                j] if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
+            candidates = self._tokenizer.convert_ids_to_tokens(
+                corr_pred[j]
+                if corr_pred[j] < self._tokenizer.vocab_size else UNK_id)
             word_icc = is_chinese_char(ord(word))
-            cand_icc = is_chinese_char(ord(candidates)) if len(
-                candidates) == 1 else False
+            cand_icc = is_chinese_char(
+                ord(candidates)) if len(candidates) == 1 else False
             if not word_icc or det_pred[j] == 0\
                 or candidates in [UNK, '[PAD]']\
                 or (word_icc and not cand_icc):

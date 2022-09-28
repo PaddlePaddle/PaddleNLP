@@ -81,8 +81,10 @@ class CBLUE(DatasetBuilder):
 
     BUILDER_CONFIGS = {
         'CMeEE': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/CMeEE.zip',
-            'md5': '2f21afc5d95918346b673f84eecd06b1',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/CMeEE.zip',
+            'md5':
+            '2f21afc5d95918346b673f84eecd06b1',
             'splits': {
                 'train': [
                     os.path.join('CMeEE', 'CMeEE_train.json'),
@@ -106,8 +108,10 @@ class CBLUE(DatasetBuilder):
             ], ['B-sym', 'I-sym', 'E-sym', 'S-sym', 'O']]
         },
         'CMeIE': {
-            'url': 'https://paddlenlp.bj.bcebos.com/datasets/cblue/CMeIE.zip',
-            'md5': '444569dfc31580c8cfa18843d0a1bd59',
+            'url':
+            'https://paddlenlp.bj.bcebos.com/datasets/cblue/CMeIE.zip',
+            'md5':
+            '444569dfc31580c8cfa18843d0a1bd59',
             'splits': {
                 'train': [
                     os.path.join('CMeIE', 'CMeIE_train.json'),
@@ -214,7 +218,8 @@ class CBLUE(DatasetBuilder):
         'KUAKE-QIC': {
             'url':
             'https://paddlenlp.bj.bcebos.com/datasets/cblue/KUAKE-QIC.zip',
-            'md5': '7661e3a6b5daf4ee025ba407669788d8',
+            'md5':
+            '7661e3a6b5daf4ee025ba407669788d8',
             'splits': {
                 'train': [
                     os.path.join('KUAKE-QIC', 'KUAKE-QIC_train.json'),
@@ -329,8 +334,8 @@ class CBLUE(DatasetBuilder):
                         ent_list.append(obj)
                         spo_list.append((sub, rel, obj))
 
-                        sub_idx, obj_idx = self._search_spo_index(data['text'],
-                                                                  sub, obj)
+                        sub_idx, obj_idx = self._search_spo_index(
+                            data['text'], sub, obj)
                         if sub_idx is not None and obj_idx is not None:
                             sub = tuple((sub_idx, sub_idx + len(sub) - 1))
                             obj = tuple((obj_idx, obj_idx + len(obj) - 1))

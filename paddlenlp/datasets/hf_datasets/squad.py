@@ -70,20 +70,28 @@ class Squad(datasets.GeneratorBasedBuilder):
         SquadConfig(
             name="plain_text",
             version=datasets.Version("1.0.0", ""),
-            description="Plain text", ),
+            description="Plain text",
+        ),
     ]
 
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features({
-                "id": datasets.Value("string"),
-                "title": datasets.Value("string"),
-                "context": datasets.Value("string"),
-                "question": datasets.Value("string"),
-                "answers": datasets.features.Sequence({
-                    "text": datasets.Value("string"),
-                    "answer_start": datasets.Value("int32"),
+                "id":
+                datasets.Value("string"),
+                "title":
+                datasets.Value("string"),
+                "context":
+                datasets.Value("string"),
+                "question":
+                datasets.Value("string"),
+                "answers":
+                datasets.features.Sequence({
+                    "text":
+                    datasets.Value("string"),
+                    "answer_start":
+                    datasets.Value("int32"),
                 }),
             }),
             # No default supervised_keys (as we have to pass both question
@@ -92,11 +100,11 @@ class Squad(datasets.GeneratorBasedBuilder):
             homepage="https://rajpurkar.github.io/SQuAD-explorer/",
             citation=_CITATION,
             task_templates=[
-                QuestionAnsweringExtractive(
-                    question_column="question",
-                    context_column="context",
-                    answers_column="answers")
-            ], )
+                QuestionAnsweringExtractive(question_column="question",
+                                            context_column="context",
+                                            answers_column="answers")
+            ],
+        )
 
     def _split_generators(self, dl_manager):
         downloaded_files = dl_manager.download_and_extract(_URLS)

@@ -29,8 +29,11 @@ __all__ = [
 
 
 def guard(device):
+
     def decorator(Layer):
+
         class WrapperClass(Layer):
+
             def __init__(self, *args, **kw):
                 with paddle.static.device_guard(device):
                     print("Init {} on {}".format(Layer.__name__, device))
@@ -91,11 +94,10 @@ class ParallelEmbedding(nn.Layer):
         self._weight_attr = weight_attr
         self._name = name
 
-        self.weight = self.create_parameter(
-            attr=self._weight_attr,
-            shape=self._size,
-            dtype=self._dtype,
-            is_bias=False)
+        self.weight = self.create_parameter(attr=self._weight_attr,
+                                            shape=self._size,
+                                            dtype=self._dtype,
+                                            is_bias=False)
         self.weight.is_distributed = True
 
         startup_block = paddle.static.default_startup_program().global_block()
@@ -125,12 +127,11 @@ class ParallelEmbedding(nn.Layer):
                 use_calc_stream=True,
                 use_model_parallel=True)
         else:
-            output = paddle.nn.functional.embedding(
-                x,
-                weight=self.weight,
-                padding_idx=None,
-                sparse=False,
-                name=self._name)
+            output = paddle.nn.functional.embedding(x,
+                                                    weight=self.weight,
+                                                    padding_idx=None,
+                                                    sparse=False,
+                                                    name=self._name)
         return output
 
 
@@ -192,12 +193,11 @@ class ColumnParallelLiner(nn.Layer):
         else:
             name = name + "_by_col_rank_%d" % inner_rank
 
-        self.linear = paddle.nn.Linear(
-            num_rows,
-            num_cols,
-            weight_attr=param_attr,
-            bias_attr=bias_attr,
-            name=name)
+        self.linear = paddle.nn.Linear(num_rows,
+                                       num_cols,
+                                       weight_attr=param_attr,
+                                       bias_attr=bias_attr,
+                                       name=name)
 
         weight = self.linear.weight
         weight.is_distributed = True
@@ -230,8 +230,8 @@ class ColumnParallelLiner(nn.Layer):
         if self.gather_out is False:
             return output_parallel
 
-        return paddle.distributed.collective._c_concat(
-            output_parallel, group=group)
+        return paddle.distributed.collective._c_concat(output_parallel,
+                                                       group=group)
 
 
 class RowParallelLiner(nn.Layer):
@@ -313,11 +313,10 @@ class RowParallelLiner(nn.Layer):
         # if a linear layer is splited by row, each rank would hold a complete bias
 
         if bias_attr is not False:
-            self.bias = self.create_parameter(
-                shape=[num_cols],
-                attr=bias_attr,
-                dtype=self._dtype,
-                is_bias=True)
+            self.bias = self.create_parameter(shape=[num_cols],
+                                              attr=bias_attr,
+                                              dtype=self._dtype,
+                                              is_bias=True)
         else:
             self.bias = None
 

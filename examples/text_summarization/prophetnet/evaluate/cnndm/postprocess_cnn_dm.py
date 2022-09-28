@@ -14,13 +14,13 @@ parser.add_argument(
     "--duplicate_rate",
     type=float,
     default=0.7,
-    help="If the duplicat rate (compared with history) is large, we can discard the current sentence."
+    help=
+    "If the duplicat rate (compared with history) is large, we can discard the current sentence."
 )
-parser.add_argument(
-    "--trunc_len",
-    type=int,
-    default=0,
-    help="Truncate line by the maximum length.")
+parser.add_argument("--trunc_len",
+                    type=int,
+                    default=0,
+                    help="Truncate line by the maximum length.")
 args = parser.parse_args()
 
 fin = open(args.generated, 'r', encoding='utf-8')
@@ -86,9 +86,9 @@ def fix_tokenization(text):
                 i + 1] == "." and input_tokens[i + 2] == ".":
             output_tokens.append("...")
             i += 3
-        elif tok == "," and len(output_tokens) > 0 and _is_digit(output_tokens[
-                -1]) and i < len(input_tokens) - 1 and _is_digit(input_tokens[
-                    i + 1]):
+        elif tok == "," and len(output_tokens) > 0 and _is_digit(
+                output_tokens[-1]) and i < len(input_tokens) - 1 and _is_digit(
+                    input_tokens[i + 1]):
             # $ 3 , 000 -> $ 3,000
             output_tokens[-1] += ',' + input_tokens[i + 1]
             i += 2
@@ -97,11 +97,11 @@ def fix_tokenization(text):
             # 3 . 03 -> $ 3.03
             output_tokens[-1] += '.' + input_tokens[i + 1]
             i += 2
-        elif tok == "." and len(output_tokens) > 0 and len(output_tokens[
-                -1]) == 1 and output_tokens[-1].isupper() and i < len(
-                    input_tokens) - 2 and len(input_tokens[
-                        i + 1]) == 1 and input_tokens[i + 1].isupper(
-                        ) and input_tokens[i + 2] == '.':
+        elif tok == "." and len(output_tokens) > 0 and len(
+                output_tokens[-1]) == 1 and output_tokens[-1].isupper(
+                ) and i < len(input_tokens) - 2 and len(
+                    input_tokens[i + 1]) == 1 and input_tokens[
+                        i + 1].isupper() and input_tokens[i + 2] == '.':
             # U . N . -> U.N.
             k = i + 3
             while k + 2 < len(input_tokens):
@@ -127,8 +127,8 @@ def fix_tokenization(text):
             else:
                 output_tokens.append("-")
                 i += 1
-        elif prev_dash and len(output_tokens) > 0 and tok[
-                0] not in string.punctuation:
+        elif prev_dash and len(
+                output_tokens) > 0 and tok[0] not in string.punctuation:
             output_tokens[-1] += tok
             i += 1
         else:
@@ -167,15 +167,13 @@ def test_rouge(cand, ref):
         for i in range(cnt):
             if len(references[i]) < 1:
                 continue
-            with open(
-                    tmp_dir + "/candidate/cand.{}.txt".format(i),
-                    "w",
-                    encoding="utf-8") as f:
+            with open(tmp_dir + "/candidate/cand.{}.txt".format(i),
+                      "w",
+                      encoding="utf-8") as f:
                 f.write(candidates[i])
-            with open(
-                    tmp_dir + "/reference/ref.{}.txt".format(i),
-                    "w",
-                    encoding="utf-8") as f:
+            with open(tmp_dir + "/reference/ref.{}.txt".format(i),
+                      "w",
+                      encoding="utf-8") as f:
                 f.write(references[i])
         r = Rouge155(temp_dir=temp_dir)
         r.model_dir = tmp_dir + "/reference/"
@@ -193,10 +191,12 @@ def test_rouge(cand, ref):
 
 def rouge_results_to_str(results_dict):
     return ">> ROUGE-F(1/2/l): {:.2f}/{:.2f}/{:.2f}\nROUGE-R(1/2/3/l): {:.2f}/{:.2f}/{:.2f}\n".format(
-        results_dict["rouge_1_f_score"] * 100, results_dict["rouge_2_f_score"] *
-        100, results_dict["rouge_l_f_score"] * 100,
-        results_dict["rouge_1_recall"] * 100, results_dict["rouge_2_recall"] *
-        100, results_dict["rouge_l_recall"] * 100)
+        results_dict["rouge_1_f_score"] * 100,
+        results_dict["rouge_2_f_score"] * 100,
+        results_dict["rouge_l_f_score"] * 100,
+        results_dict["rouge_1_recall"] * 100,
+        results_dict["rouge_2_recall"] * 100,
+        results_dict["rouge_l_recall"] * 100)
 
 
 def count_tokens(tokens):

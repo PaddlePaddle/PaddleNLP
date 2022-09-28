@@ -107,7 +107,7 @@ def build_vocab(texts,
     # -2 for the pad_token and unk_token which will be added to vocab.
     if num_words is not None and len(wcounts) > (num_words - 2):
         wcounts = wcounts[:(num_words - 2)]
-    # add the special pad_token and unk_token to the vocabulary 
+    # add the special pad_token and unk_token to the vocabulary
     sorted_voc = [pad_token, unk_token]
     sorted_voc.extend(wc[0] for wc in wcounts)
     word_index = dict(zip(sorted_voc, list(range(len(sorted_voc)))))

@@ -23,6 +23,7 @@ from base_model import SemanticIndexBase
 
 
 class SemanticIndexBatchNeg(SemanticIndexBase):
+
     def __init__(self,
                  pretrained_model,
                  dropout=None,
@@ -45,22 +46,24 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
                 title_position_ids=None,
                 title_attention_mask=None):
 
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, query_position_ids,
-            query_attention_mask)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids,
+                                                        query_attention_mask)
 
-        title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids, title_token_type_ids, title_position_ids,
-            title_attention_mask)
+        title_cls_embedding = self.get_pooled_embedding(title_input_ids,
+                                                        title_token_type_ids,
+                                                        title_position_ids,
+                                                        title_attention_mask)
 
-        cosine_sim = paddle.matmul(
-            query_cls_embedding, title_cls_embedding, transpose_y=True)
+        cosine_sim = paddle.matmul(query_cls_embedding,
+                                   title_cls_embedding,
+                                   transpose_y=True)
 
         # substract margin from all positive samples cosine_sim()
-        margin_diag = paddle.full(
-            shape=[query_cls_embedding.shape[0]],
-            fill_value=self.margin,
-            dtype=paddle.get_default_dtype())
+        margin_diag = paddle.full(shape=[query_cls_embedding.shape[0]],
+                                  fill_value=self.margin,
+                                  dtype=paddle.get_default_dtype())
 
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 

@@ -15,6 +15,7 @@ from bigru_crf.model import BiGruCrf
 
 
 class BiGruCrfBenchmark(BenchmarkBase):
+
     def __init__(self):
         super().__init__()
 
@@ -30,16 +31,14 @@ class BiGruCrfBenchmark(BenchmarkBase):
             type=float,
             default=0.2,
             help="The learning rate ratio that affects CRF layers.")
-        parser.add_argument(
-            "--emb_dim",
-            type=int,
-            default=128,
-            help="The dimension in which a word is embedded.")
-        parser.add_argument(
-            "--hidden_size",
-            type=int,
-            default=128,
-            help="The number of hidden nodes in the GRU layer.")
+        parser.add_argument("--emb_dim",
+                            type=int,
+                            default=128,
+                            help="The dimension in which a word is embedded.")
+        parser.add_argument("--hidden_size",
+                            type=int,
+                            default=128,
+                            help="The number of hidden nodes in the GRU layer.")
 
         return parser
 
@@ -52,12 +51,11 @@ class BiGruCrfBenchmark(BenchmarkBase):
         return train_loader, test_loader
 
     def build_model(self, args, **kwargs):
-        model = BiGruCrf(
-            args.emb_dim,
-            args.hidden_size,
-            len(self.word_vocab),
-            len(self.label_vocab),
-            crf_lr=args.crf_lr)
+        model = BiGruCrf(args.emb_dim,
+                         args.hidden_size,
+                         len(self.word_vocab),
+                         len(self.label_vocab),
+                         crf_lr=args.crf_lr)
 
         return model
 

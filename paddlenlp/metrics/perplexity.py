@@ -90,8 +90,10 @@ class Perplexity(paddle.metric.Metric):
         """
         if label.dim() == 2:
             label = paddle.unsqueeze(label, axis=2)
-        ce = F.cross_entropy(
-            input=pred, label=label, reduction='none', soft_label=False)
+        ce = F.cross_entropy(input=pred,
+                             label=label,
+                             reduction='none',
+                             soft_label=False)
         ce = paddle.squeeze(ce, axis=[2])
         if seq_mask is not None:
             ce = ce * seq_mask

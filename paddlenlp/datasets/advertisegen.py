@@ -33,10 +33,12 @@ class AdvertiseGen(DatasetBuilder):
 
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
     SPLITS = {
-        'train': META_INFO(
+        'train':
+        META_INFO(
             os.path.join('train.json'), 'c0cc79f912099faa6175d28d3ddafafe',
             'https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/train.json'),
-        'dev': META_INFO(
+        'dev':
+        META_INFO(
             os.path.join('dev.json'), '5fda84828628a9722da5436485601df3',
             'https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/dev.json')
     }

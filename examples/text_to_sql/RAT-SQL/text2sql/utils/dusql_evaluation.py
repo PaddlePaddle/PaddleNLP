@@ -150,9 +150,8 @@ def tokenize(string):
                     tokens[idx - 1] += tmp_tok
                     if tmp_tok == ')':
                         break
-            elif tokens[idx] in (
-                    '+', '-'
-            ) and tokens[idx - 1] in COND_OPS and idx + 1 < len(tokens):
+            elif tokens[idx] in ('+', '-') and tokens[
+                    idx - 1] in COND_OPS and idx + 1 < len(tokens):
                 tokens[idx] += tokens[idx + 1]
                 tokens.pop(idx + 1)
                 idx += 1
@@ -290,7 +289,10 @@ def parse_table_unit(toks, start_idx, tables_with_alias, schema):
     return idx, schema.id_map[key], key
 
 
-def parse_value(toks, start_idx, tables_with_alias, schema,
+def parse_value(toks,
+                start_idx,
+                tables_with_alias,
+                schema,
                 default_tables=None):
     idx = start_idx
     len_ = len(toks)
@@ -386,8 +388,8 @@ def parse_condition(toks,
 
         conds.append((agg_id, op_id, val_unit, val1, val2))
 
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                           (")", ";") or toks[idx] in JOIN_KEYWORDS):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx]
+                           in (")", ";") or toks[idx] in JOIN_KEYWORDS):
             break
 
         if idx < len_ and toks[idx] in LOGIC_AND_OR:
@@ -472,8 +474,8 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
             assert last_table is not None, 'last_table should be a table name strin, not None'
             tables_with_alias['b'] = last_table
             idx += 1
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or
-                           toks[idx] in (")", ";")):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS
+                           or toks[idx] in (")", ";")):
             break
 
     return [idx, table_units, conds, default_tables]
@@ -504,8 +506,8 @@ def parse_group_by(toks, start_idx, tables_with_alias, schema, default_tables):
     assert toks[idx] == 'by'
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                              (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
+                              or toks[idx] in (")", ";")):
         idx, col_unit = parse_col_unit(toks, idx, tables_with_alias, schema,
                                        default_tables)
         col_units.append(col_unit)
@@ -530,8 +532,8 @@ def parse_order_by(toks, start_idx, tables_with_alias, schema, default_tables):
     assert toks[idx] == 'by'
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in
-                              (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
+                              or toks[idx] in (")", ";")):
         agg_id = AGG_OPS.index("none")
         if toks[idx] in AGG_OPS:
             agg_id = AGG_OPS.index(toks[idx])
@@ -961,8 +963,9 @@ class Schema(object):
         id_map = {'*': "__all__"}
         for key, vals in schema.items():
             for val in vals:
-                id_map[key.lower() + "." + val.lower()] = "__" + key.lower(
-                ) + "." + val.lower() + "__"
+                id_map[
+                    key.lower() + "." +
+                    val.lower()] = "__" + key.lower() + "." + val.lower() + "__"
 
         for key in schema:
             id_map[key.lower()] = "__" + key.lower() + "__"
@@ -1030,6 +1033,7 @@ def eval_nested_cond(pred_cond, gold_cond):
 
 
 def eval_cond(pred, gold):
+
     def _equal(p, g):
         if str(p) == str(g):
             return True
@@ -1054,13 +1058,11 @@ def eval_cond(pred, gold):
 
 def eval_where(pred, gold):
     pred_conds = list(
-        sorted(
-            [unit for unit in pred['where'][::2]],
-            key=lambda x: [str(i) for i in x]))
+        sorted([unit for unit in pred['where'][::2]],
+               key=lambda x: [str(i) for i in x]))
     gold_conds = list(
-        sorted(
-            [unit for unit in gold['where'][::2]],
-            key=lambda x: [str(i) for i in x]))
+        sorted([unit for unit in gold['where'][::2]],
+               key=lambda x: [str(i) for i in x]))
     #gold_wo_agg = [unit[2] for unit in gold_conds]
     pred_total = len(pred_conds)
     gold_total = len(gold_conds)
@@ -1112,8 +1114,8 @@ def eval_having(pred, gold):
     pred_total = len(pred['having'][::2])
     gold_total = len(gold['having'][::2])
     cnt = 0
-    for pred_cond, gold_cond in zip(
-            sorted(pred['having'][::2]), sorted(gold['having'][::2])):
+    for pred_cond, gold_cond in zip(sorted(pred['having'][::2]),
+                                    sorted(gold['having'][::2])):
         if eval_cond(pred_cond, gold_cond) == 1:
             cnt += 1
 
@@ -1135,6 +1137,7 @@ def eval_order(pred, gold):
 
 
 def eval_and_or(pred, gold):
+
     def _extract(conds):
         """extract condition and/or"""
         op_set = set()
@@ -1168,7 +1171,7 @@ def get_nestedSQL(sql):
             nested.append(cond_unit[3])
         if type(cond_unit[4]) is dict:
             nested.append(cond_unit[4])
-    ## 
+    ##
     for from_nest_sql in [
             table_unit[1] for table_unit in sql['from']['table_units']
             if table_unit[0] == 'sql'
@@ -1242,8 +1245,8 @@ def get_keywords(sql):
 
     # in keyword
     if len([
-            cond_unit for cond_unit in cond_units
-            if cond_unit[1] == COND_OPS.index('in')
+            cond_unit
+            for cond_unit in cond_units if cond_unit[1] == COND_OPS.index('in')
     ]) > 0:
         res.add('in')
 
@@ -1337,8 +1340,9 @@ def rebuild_cond_unit_col(valid_col_units, cond_unit, kmap, eval_value):
 def rebuild_condition_col(valid_col_units, condition, kmap, eval_value):
     for idx in range(len(condition)):
         if idx % 2 == 0:
-            condition[idx] = rebuild_cond_unit_col(
-                valid_col_units, condition[idx], kmap, eval_value)
+            condition[idx] = rebuild_cond_unit_col(valid_col_units,
+                                                   condition[idx], kmap,
+                                                   eval_value)
     return condition
 
 
@@ -1357,7 +1361,8 @@ def rebuild_from_col(valid_col_units, from_, kmap, eval_value=True):
     if from_ is None:
         return from_
 
-    fn_proc = lambda x: rebuild_table_unit_col(valid_col_units, x, kmap, eval_value)
+    fn_proc = lambda x: rebuild_table_unit_col(valid_col_units, x, kmap,
+                                               eval_value)
     from_['table_units'] = [
         fn_proc(table_unit) for table_unit in from_['table_units']
     ]
@@ -1381,10 +1386,9 @@ def rebuild_order_by_col(valid_col_units, order_by, kmap):
         return order_by
 
     direction, val_units = order_by
-    new_val_units = [
-        (agg_id, rebuild_val_unit_col(valid_col_units, val_unit, kmap))
-        for agg_id, val_unit in val_units
-    ]
+    new_val_units = [(agg_id,
+                      rebuild_val_unit_col(valid_col_units, val_unit, kmap))
+                     for agg_id, val_unit in val_units]
     return direction, new_val_units
 
 

@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 
 
 class SemanticIndexBase(nn.Layer):
+
     def __init__(self,
                  pretrained_model,
                  dropout=None,
@@ -32,16 +33,17 @@ class SemanticIndexBase(nn.Layer):
         self.ptm = pretrained_model
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
 
-        # if output_emb_size is not None, then add Linear layer to reduce embedding_size, 
-        # we recommend set output_emb_size = 256 considering the trade-off beteween 
+        # if output_emb_size is not None, then add Linear layer to reduce embedding_size,
+        # we recommend set output_emb_size = 256 considering the trade-off beteween
         # recall performance and efficiency
 
         self.output_emb_size = output_emb_size
         if output_emb_size > 0:
             weight_attr = paddle.ParamAttr(
                 initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(
-                768, output_emb_size, weight_attr=weight_attr)
+            self.emb_reduce_linear = paddle.nn.Linear(768,
+                                                      output_emb_size,
+                                                      weight_attr=weight_attr)
 
         self.use_fp16 = use_fp16
 
@@ -54,8 +56,8 @@ class SemanticIndexBase(nn.Layer):
         if self.use_fp16:
             if attention_mask is None:
                 attention_mask = paddle.unsqueeze(
-                    (input_ids == self.ptm.pad_token_id
-                     ).astype(self.ptm.pooler.dense.weight.dtype) * -1e4,
+                    (input_ids == self.ptm.pad_token_id).astype(
+                        self.ptm.pooler.dense.weight.dtype) * -1e4,
                     axis=[1, 2])
 
             embedding_output = self.ptm.embeddings(
@@ -105,13 +107,15 @@ class SemanticIndexBase(nn.Layer):
                    title_position_ids=None,
                    title_attention_mask=None):
 
-        query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids, query_token_type_ids, query_position_ids,
-            query_attention_mask)
+        query_cls_embedding = self.get_pooled_embedding(query_input_ids,
+                                                        query_token_type_ids,
+                                                        query_position_ids,
+                                                        query_attention_mask)
 
-        title_cls_embedding = self.get_pooled_embedding(
-            title_input_ids, title_token_type_ids, title_position_ids,
-            title_attention_mask)
+        title_cls_embedding = self.get_pooled_embedding(title_input_ids,
+                                                        title_token_type_ids,
+                                                        title_position_ids,
+                                                        title_attention_mask)
 
         cosine_sim = paddle.sum(query_cls_embedding * title_cls_embedding,
                                 axis=-1)

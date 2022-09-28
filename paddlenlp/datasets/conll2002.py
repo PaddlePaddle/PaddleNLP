@@ -41,12 +41,15 @@ class Conll2002(DatasetBuilder):
     BUILDER_CONFIGS = {
         'es': {
             'splits': {
-                'train': META_INFO('esp.train', BASE_URL + 'esp.train',
-                                   'c8c6b342371b9de2f83a93767d352c17'),
-                'dev': META_INFO('esp.testa', BASE_URL + 'esp.testa',
-                                 'de0578160dde26ec68cc580595587dde'),
-                'test': META_INFO('esp.testb', BASE_URL + 'esp.testb',
-                                  'c8d35f340685a2ce6559ee90d78f9e37')
+                'train':
+                META_INFO('esp.train', BASE_URL + 'esp.train',
+                          'c8c6b342371b9de2f83a93767d352c17'),
+                'dev':
+                META_INFO('esp.testa', BASE_URL + 'esp.testa',
+                          'de0578160dde26ec68cc580595587dde'),
+                'test':
+                META_INFO('esp.testb', BASE_URL + 'esp.testb',
+                          'c8d35f340685a2ce6559ee90d78f9e37')
             },
             'pos_tags': [
                 "AO",
@@ -113,12 +116,15 @@ class Conll2002(DatasetBuilder):
         },
         'nl': {
             'splits': {
-                'train': META_INFO('ned.train', BASE_URL + 'ned.train',
-                                   'b6189d04eb34597d2a98ca5cec477605'),
-                'dev': META_INFO('ned.testa', BASE_URL + 'ned.testa',
-                                 '626900497823fdbc4f84335518cb85ce'),
-                'test': META_INFO('ned.testb', BASE_URL + 'ned.testb',
-                                  'c37de92da20c68c6418a73dd42e322dc')
+                'train':
+                META_INFO('ned.train', BASE_URL + 'ned.train',
+                          'b6189d04eb34597d2a98ca5cec477605'),
+                'dev':
+                META_INFO('ned.testa', BASE_URL + 'ned.testa',
+                          '626900497823fdbc4f84335518cb85ce'),
+                'test':
+                META_INFO('ned.testb', BASE_URL + 'ned.testb',
+                          'c37de92da20c68c6418a73dd42e322dc')
             },
             'pos_tags': [
                 "Adj", "Adv", "Art", "Conj", "Int", "Misc", "N", "Num", "Prep",

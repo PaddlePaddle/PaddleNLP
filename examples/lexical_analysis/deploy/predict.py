@@ -19,7 +19,6 @@ import argparse
 import numpy as np
 
 import paddle
-import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 # yapf: disable
@@ -64,11 +63,10 @@ def convert_example(tokens, max_seq_len, word_vocab, normlize_vocab=None):
     """Convert tokens of sequences to token ids"""
     tokens = tokens[:max_seq_len]
 
-    token_ids = convert_tokens_to_ids(
-        tokens,
-        word_vocab,
-        oov_replace_token="OOV",
-        normlize_vocab=normlize_vocab)
+    token_ids = convert_tokens_to_ids(tokens,
+                                      word_vocab,
+                                      oov_replace_token="OOV",
+                                      normlize_vocab=normlize_vocab)
     length = len(token_ids)
     return token_ids, length
 
@@ -139,6 +137,7 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
 
 
 class Predictor(object):
+
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -185,11 +184,10 @@ class Predictor(object):
 
         for text in data:
             tokens = list(text.strip())
-            token_ids, length = convert_example(
-                tokens,
-                self.max_seq_length,
-                word_vocab=word_vocab,
-                normlize_vocab=normlize_vocab)
+            token_ids, length = convert_example(tokens,
+                                                self.max_seq_length,
+                                                word_vocab=word_vocab,
+                                                normlize_vocab=normlize_vocab)
             examples.append((token_ids, length))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -221,21 +219,19 @@ if __name__ == "__main__":
     label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
     normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
     infer_ds = []
-    with open(
-            os.path.join(args.data_dir, 'infer.tsv'), "r",
-            encoding="utf-8") as fp:
+    with open(os.path.join(args.data_dir, 'infer.tsv'), "r",
+              encoding="utf-8") as fp:
         for line in fp.readlines():
             infer_ds += [line.strip()]
     predictor = Predictor(args.model_file, args.params_file, args.device,
                           args.max_seq_len)
     start = time.time()
     for _ in range(args.epochs):
-        results = predictor.predict(
-            infer_ds,
-            word_vocab,
-            label_vocab,
-            normlize_vocab,
-            batch_size=args.batch_size)
+        results = predictor.predict(infer_ds,
+                                    word_vocab,
+                                    label_vocab,
+                                    normlize_vocab,
+                                    batch_size=args.batch_size)
     end = time.time()
     for idx, result in enumerate(results):
         print('Text: {}'.format(infer_ds[idx]))

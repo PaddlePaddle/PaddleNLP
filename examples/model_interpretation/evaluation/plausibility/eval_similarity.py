@@ -51,10 +51,12 @@ def load_from_file(args):
         golden_dict = json.loads(golden_line)
         id = golden_dict['sent_id']
         # golden_rationale id
-        golden_q_rationales[
-            id] = [int(x) for x in golden_dict['rationale_q_idx']]
-        golden_t_rationales[
-            id] = [int(x) for x in golden_dict['rationale_t_idx']]
+        golden_q_rationales[id] = [
+            int(x) for x in golden_dict['rationale_q_idx']
+        ]
+        golden_t_rationales[id] = [
+            int(x) for x in golden_dict['rationale_t_idx']
+        ]
         golden_labels[id] = int(golden_dict['sent_label'])
 
     for pred_line in pred_f.readlines():

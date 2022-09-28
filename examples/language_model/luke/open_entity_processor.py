@@ -21,6 +21,7 @@ ENTITY_TOKEN = "[ENTITY]"
 
 
 class InputExample(object):
+
     def __init__(self, id_, text, span, labels):
         self.id = id_
         self.text = text
@@ -29,16 +30,18 @@ class InputExample(object):
 
 
 class InputFeatures(object):
+
     def __init__(
-            self,
-            word_ids,
-            word_segment_ids,
-            word_attention_mask,
-            entity_ids,
-            entity_position_ids,
-            entity_segment_ids,
-            entity_attention_mask,
-            labels, ):
+        self,
+        word_ids,
+        word_segment_ids,
+        word_attention_mask,
+        entity_ids,
+        entity_position_ids,
+        entity_segment_ids,
+        entity_attention_mask,
+        labels,
+    ):
         self.word_ids = word_ids
         self.word_segment_ids = word_segment_ids
         self.word_attention_mask = word_attention_mask
@@ -50,6 +53,7 @@ class InputFeatures(object):
 
 
 class DatasetProcessor(object):
+
     def get_train_examples(self, data_dir):
         return self._create_examples(data_dir, "train")
 
@@ -84,7 +88,8 @@ def convert_examples_to_features(examples, label_list, tokenizer,
         ("-LSB-", "("),
         ("-RRB-", ")"),
         ("-RCB-", ")"),
-        ("-RSB-", ")"), )
+        ("-RSB-", ")"),
+    )
     features = []
     for example in tqdm(examples):
 
@@ -116,8 +121,8 @@ def convert_examples_to_features(examples, label_list, tokenizer,
         entity_segment_ids = [0, 0]
         entity_position_ids = list(range(mention_start,
                                          mention_end))[:max_mention_length]
-        entity_position_ids += [-1] * (
-            max_mention_length - mention_end + mention_start)
+        entity_position_ids += [-1] * (max_mention_length - mention_end +
+                                       mention_start)
         entity_position_ids = [entity_position_ids, [-1] * max_mention_length]
 
         labels = [0] * len(label_map)
@@ -134,6 +139,7 @@ def convert_examples_to_features(examples, label_list, tokenizer,
                 entity_position_ids=entity_position_ids,
                 entity_segment_ids=entity_segment_ids,
                 entity_attention_mask=entity_attention_mask,
-                labels=labels, ))
+                labels=labels,
+            ))
 
     return features

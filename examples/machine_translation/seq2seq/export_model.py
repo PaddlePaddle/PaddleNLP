@@ -28,17 +28,16 @@ def main():
         args)
 
     # Build model and load trained parameters
-    model = Seq2SeqAttnInferModel(
-        src_vocab_size,
-        tgt_vocab_size,
-        args.hidden_size,
-        args.hidden_size,
-        args.num_layers,
-        args.dropout,
-        bos_id=bos_id,
-        eos_id=eos_id,
-        beam_size=args.beam_size,
-        max_out_len=256)
+    model = Seq2SeqAttnInferModel(src_vocab_size,
+                                  tgt_vocab_size,
+                                  args.hidden_size,
+                                  args.hidden_size,
+                                  args.num_layers,
+                                  args.dropout,
+                                  bos_id=bos_id,
+                                  eos_id=eos_id,
+                                  beam_size=args.beam_size,
+                                  max_out_len=256)
 
     # Load the trained model
     model.set_state_dict(paddle.load(args.init_from_ckpt))
@@ -49,10 +48,8 @@ def main():
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),  # src
-            paddle.static.InputSpec(
-                shape=[None], dtype="int64")  # src length
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # src
+            paddle.static.InputSpec(shape=[None], dtype="int64")  # src length
         ])
     # Save converted static graph model
     paddle.jit.save(model, args.export_path)

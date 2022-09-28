@@ -194,16 +194,16 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
         idx = 1
         while idx < len(tokens):
             if tokens[idx] == '(' and tokens[
-                    idx - 1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[
-                        idx - 1] != '=':
+                    idx -
+                    1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[idx -
+                                                                   1] != '=':
                 while idx < len(tokens):
                     tmp_tok = tokens.pop(idx)
                     tokens[idx - 1] += tmp_tok
                     if tmp_tok == ')':
                         break
-            elif tokens[idx] in (
-                    '+', '-'
-            ) and tokens[idx - 1] in COND_OPS and idx + 1 < len(tokens):
+            elif tokens[idx] in ('+', '-') and tokens[
+                    idx - 1] in COND_OPS and idx + 1 < len(tokens):
                 tokens[idx] += tokens[idx + 1]
                 tokens.pop(idx + 1)
                 idx += 1
@@ -324,9 +324,8 @@ def query2sql(query, cols, single_equal=False, with_value=True):
             '"' + c[2].strip('\"') + '"'
         ] for c in conds]
     else:
-        sql["conds"] = [[
-            cols.index(_format_col(c[0])), sql_op_dict[c[1]], "1"
-        ] for c in conds]
+        sql["conds"] = [[cols.index(_format_col(c[0])), sql_op_dict[c[1]], "1"]
+                        for c in conds]
 
     sql_sels = [(sql_agg_dict[i[0]], cols.index(_format_col(i[1])))
                 for i in sels]
@@ -345,9 +344,9 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
             table_dict[table['db_id']] = table
 
     # load qa
-    with open(
-            gold, 'r', encoding='utf-8') as f1, open(
-                predict, 'r', encoding='utf-8') as f2:
+    with open(gold, 'r', encoding='utf-8') as f1, open(predict,
+                                                       'r',
+                                                       encoding='utf-8') as f2:
         gold_list = [l.strip().split('\t') for l in f1 if len(l.strip()) > 0]
         gold_dict = dict([(x[0], x[1:]) for x in gold_list])
 
@@ -386,10 +385,12 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
         try:
             sql_gold = sql_gold.replace('==', '=')
             sql_pred = sql_pred.replace('==', '=')
-            components_gold, sels_gold = query2sql(
-                sql_gold, cols, single_equal=single_equal)
-            components_pred, sels_pred = query2sql(
-                sql_pred, cols, single_equal=single_equal)
+            components_gold, sels_gold = query2sql(sql_gold,
+                                                   cols,
+                                                   single_equal=single_equal)
+            components_pred, sels_pred = query2sql(sql_pred,
+                                                   cols,
+                                                   single_equal=single_equal)
 
             cnt, pred_total, gold_total = compare_set(sels_gold, sels_pred)
             score_sels, _, _ = get_scores(cnt, pred_total, gold_total)
@@ -417,10 +418,10 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
             ##raise e
             continue
 
-    scores["all"] = dict(
-        [("count", total), ("exact", right), ("acc", right * 1.0 / total)])
-    scores["select"] = dict(
-        [("count", total), ("exact", cnt_sel), ("acc", cnt_sel * 1.0 / total)])
+    scores["all"] = dict([("count", total), ("exact", right),
+                          ("acc", right * 1.0 / total)])
+    scores["select"] = dict([("count", total), ("exact", cnt_sel),
+                             ("acc", cnt_sel * 1.0 / total)])
     scores["condition"] = dict([("count", total), ("exact", cnt_cond),
                                 ("acc", cnt_cond * 1.0 / total)])
     scores["connection"] = dict([("count", total), ("exact", cnt_conn),

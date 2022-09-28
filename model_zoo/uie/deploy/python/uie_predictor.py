@@ -16,20 +16,20 @@ import six
 import os
 import math
 import numpy as np
-import paddle
 import paddle2onnx
 import onnxruntime as ort
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
-from model import UIE
 
 
 class InferBackend(object):
+
     def __init__(self,
                  model_path_prefix,
                  device='cpu',
                  use_quantize=False,
-                 use_fp16=False):
+                 use_fp16=False,
+                 device_id=0):
         print(">>> [InferBackend] Creating Engine ...")
         onnx_model = paddle2onnx.command.c_paddle_to_onnx(
             model_file=model_path_prefix + ".pdmodel",
@@ -42,7 +42,7 @@ class InferBackend(object):
             f.write(onnx_model)
 
         if device == "gpu":
-            providers = ['CUDAExecutionProvider']
+            providers = [('CUDAExecutionProvider', {'device_id': device_id})]
             print(">>> [InferBackend] Use GPU to inference ...")
             if use_fp16:
                 print(">>> [InferBackend] Use FP16 to inference ...")
@@ -60,18 +60,14 @@ class InferBackend(object):
             print(">>> [InferBackend] Use CPU to inference ...")
 
         sess_options = ort.SessionOptions()
-        self.predictor = ort.InferenceSession(
-            onnx_model, sess_options=sess_options, providers=providers)
+        self.predictor = ort.InferenceSession(onnx_model,
+                                              sess_options=sess_options,
+                                              providers=providers)
         if device == "gpu":
-            try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
-            except AssertionError:
-                raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
-                    "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
-                    "Please run the following commands to reinstall: \n "
-                    "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
-                )
+            assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
+                "Please run the following commands to reinstall: \n " \
+                "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
         print(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
@@ -80,11 +76,12 @@ class InferBackend(object):
 
 
 class UIEPredictor(object):
+
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
             print(
                 ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                type(args.device))
             exit(0)
         if args.device not in ['cpu', 'gpu']:
             print(
@@ -92,16 +89,18 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-3.0-base-zh", use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
+        self._batch_size = args.batch_size
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
-        self.inference_backend = InferBackend(
-            args.model_path_prefix, device=args.device, use_fp16=args.use_fp16)
+        self.inference_backend = InferBackend(args.model_path_prefix,
+                                              device=args.device,
+                                              use_fp16=args.use_fp16,
+                                              device_id=args.device_id)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -153,60 +152,52 @@ class UIEPredictor(object):
             "prompt": short_texts_prompts[i]
         } for i in range(len(short_input_texts))]
 
-        input_ids = []
-        token_type_ids = []
-        position_ids = []
-        attention_mask = []
-        offset_maps = []
-        for example in short_inputs:
-            encoded_inputs = self._tokenizer(
-                text=[example["prompt"]],
-                text_pair=[example["text"]],
-                stride=len(example["prompt"]),
-                truncation=True,
-                max_seq_len=self._max_seq_len,
-                pad_to_max_seq_len=True,
-                return_attention_mask=True,
-                return_position_ids=True,
-                return_dict=False)
-            encoded_inputs = encoded_inputs[0]
+        prompts = []
+        texts = []
+        for s in short_inputs:
+            prompts.append(s['prompt'])
+            texts.append(s['text'])
+        encoded_inputs = self._tokenizer(text=prompts,
+                                         text_pair=texts,
+                                         truncation=True,
+                                         max_seq_len=self._max_seq_len,
+                                         pad_to_max_seq_len=True,
+                                         return_attention_mask=True,
+                                         return_position_ids=True,
+                                         return_tensors='np',
+                                         return_offsets_mapping=True)
+        offset_maps = encoded_inputs["offset_mapping"]
 
-            input_ids.append(encoded_inputs["input_ids"])
-            token_type_ids.append(encoded_inputs["token_type_ids"])
-            position_ids.append(encoded_inputs["position_ids"])
-            attention_mask.append(encoded_inputs["attention_mask"])
-            offset_maps.append(encoded_inputs["offset_mapping"])
+        start_probs = []
+        end_probs = []
+        for idx in range(0, len(texts), self._batch_size):
+            l, r = idx, idx + self._batch_size
+            input_dict = {
+                "input_ids":
+                encoded_inputs['input_ids'][l:r].astype('int64'),
+                "token_type_ids":
+                encoded_inputs['token_type_ids'][l:r].astype('int64'),
+                "pos_ids":
+                encoded_inputs['position_ids'][l:r].astype('int64'),
+                "att_mask":
+                encoded_inputs["attention_mask"][l:r].astype('int64')
+            }
+            start_prob, end_prob = self._infer(input_dict)
+            start_prob = start_prob.tolist()
+            end_prob = end_prob.tolist()
+            start_probs.extend(start_prob)
+            end_probs.extend(end_prob)
+        start_ids_list = get_bool_ids_greater_than(start_probs,
+                                                   limit=self._position_prob,
+                                                   return_prob=True)
+        end_ids_list = get_bool_ids_greater_than(end_probs,
+                                                 limit=self._position_prob,
+                                                 return_prob=True)
 
-        input_dict = {
-            "input_ids": np.array(
-                input_ids, dtype="int64"),
-            "token_type_ids": np.array(
-                token_type_ids, dtype="int64"),
-            "pos_ids": np.array(
-                position_ids, dtype="int64"),
-            "att_mask": np.array(
-                attention_mask, dtype="int64")
-        }
-        offset_maps = np.array(offset_maps, dtype="int64")
-
-        start_prob, end_prob = self._infer(input_dict)
-
-        start_ids_list = get_bool_ids_greater_than(
-            start_prob, limit=self._position_prob, return_prob=True)
-        end_ids_list = get_bool_ids_greater_than(
-            end_prob, limit=self._position_prob, return_prob=True)
-
-        input_ids = input_dict['input_ids']
         sentence_ids = []
         probs = []
-        for start_ids, end_ids, ids, offset_map in zip(start_ids_list,
-                                                       end_ids_list,
-                                                       input_ids.tolist(),
-                                                       offset_maps.tolist()):
-            for i in reversed(range(len(ids))):
-                if ids[i] != 0:
-                    ids = ids[:i]
-                    break
+        for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list,
+                                                  offset_maps.tolist()):
             span_list = get_span(start_ids, end_ids, with_prob=True)
             sentence_id, prob = get_id_and_prob(span_list, offset_map)
             sentence_ids.append(sentence_id)
@@ -285,8 +276,9 @@ class UIEPredictor(object):
                     if len(short_results[v]) == 0:
                         continue
                     if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0][
-                            'text']] = [1, short_results[v][0]['probability']]
+                        cls_options[short_results[v][0]['text']] = [
+                            1, short_results[v][0]['probability']
+                        ]
                     else:
                         cls_options[short_results[v][0]['text']][0] += 1
                         cls_options[short_results[v][0]['text']][
@@ -295,8 +287,10 @@ class UIEPredictor(object):
                     cls_res, cls_info = max(cls_options.items(),
                                             key=lambda x: x[1])
                     concat_results.append([{
-                        'text': cls_res,
-                        'probability': cls_info[1] / cls_info[0]
+                        'text':
+                        cls_res,
+                        'probability':
+                        cls_info[1] / cls_info[0]
                     }])
                 else:
                     concat_results.append([])
@@ -437,8 +431,8 @@ class UIEPredictor(object):
                             for k in range(
                                     len(relations[i][j]["relations"][
                                         node.name])):
-                                new_relations[i].append(relations[i][j][
-                                    "relations"][node.name][k])
+                                new_relations[i].append(
+                                    relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for _ in range(len(data))]
@@ -513,21 +507,29 @@ def cut_chinese_sent(para):
     return para.split("\n")
 
 
-def get_id_and_prob(spans, offset_map):
-    prompt_length = 0
-    for i in range(1, len(offset_map)):
-        if offset_map[i] != [0, 0]:
-            prompt_length += 1
-        else:
-            break
+def get_id_and_prob(span_set, offset_mapping):
+    """
+    Return text id and probability of predicted spans
 
-    for i in range(1, prompt_length + 1):
-        offset_map[i][0] -= (prompt_length + 1)
-        offset_map[i][1] -= (prompt_length + 1)
+    Args: 
+        span_set (set): set of predicted spans.
+        offset_mapping (list[int]): list of pair preserving the
+                index of start and end char in original text pair (prompt + text) for each token.
+    Returns: 
+        sentence_id (list[tuple]): index of start and end char in original text.
+        prob (list[float]): probabilities of predicted spans.
+    """
+    prompt_end_token_id = offset_mapping[1:].index([0, 0])
+    bias = offset_mapping[prompt_end_token_id][1] + 1
+    for index in range(1, prompt_end_token_id + 1):
+        offset_mapping[index][0] -= bias
+        offset_mapping[index][1] -= bias
 
     sentence_id = []
     prob = []
-    for start, end in spans:
+    for start, end in span_set:
         prob.append(start[1] * end[1])
-        sentence_id.append((offset_map[start[0]][0], offset_map[end[0]][1]))
+        start_id = offset_mapping[start[0]][0]
+        end_id = offset_mapping[end[0]][1]
+        sentence_id.append((start_id, end_id))
     return sentence_id, prob

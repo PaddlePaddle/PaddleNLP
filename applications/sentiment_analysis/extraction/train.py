@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import sys
+
 sys.path.append("../")
 
 import os
@@ -49,39 +50,40 @@ def train():
     dev_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    trans_func = partial(
-        convert_example_to_feature,
-        tokenizer=tokenizer,
-        label2id=label2id,
-        max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example_to_feature,
+                         tokenizer=tokenizer,
+                         label2id=label2id,
+                         max_seq_len=args.max_seq_len)
     train_ds = train_ds.map(trans_func, lazy=False)
     dev_ds = dev_ds.map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
-        Stack(dtype="int64"),
-        Pad(axis=0, pad_val= -1, dtype="int64")
-    ): fn(samples)
+        Stack(dtype="int64"), Pad(axis=0, pad_val=-1, dtype="int64")): fn(
+            samples)
 
-    train_batch_sampler = paddle.io.BatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    train_loader = paddle.io.DataLoader(
-        train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(
-        dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
+    train_batch_sampler = paddle.io.BatchSampler(train_ds,
+                                                 batch_size=args.batch_size,
+                                                 shuffle=True)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    train_loader = paddle.io.DataLoader(train_ds,
+                                        batch_sampler=train_batch_sampler,
+                                        collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(dev_ds,
+                                      batch_sampler=dev_batch_sampler,
+                                      collate_fn=batchify_fn)
 
     # configure model training
     model = SkepForTokenClassification.from_pretrained(
         model_name, num_classes=len(label2id))
 
     num_training_steps = len(train_loader) * args.num_epochs
-    lr_scheduler = LinearDecayWithWarmup(
-        learning_rate=args.learning_rate,
-        total_steps=num_training_steps,
-        warmup=args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(learning_rate=args.learning_rate,
+                                         total_steps=num_training_steps,
+                                         warmup=args.warmup_proportion)
     decay_params = [
         p.name for n, p in model.named_parameters()
         if not any(nd in n for nd in ["bias", "norm"])
@@ -104,10 +106,9 @@ def train():
             input_ids, token_type_ids, _, labels = batch_data
             # logits: batch_size, seql_len, num_tags
             logits = model(input_ids, token_type_ids=token_type_ids)
-            loss = F.cross_entropy(
-                logits.reshape([-1, len(label2id)]),
-                labels.reshape([-1]),
-                ignore_index=-1)
+            loss = F.cross_entropy(logits.reshape([-1, len(label2id)]),
+                                   labels.reshape([-1]),
+                                   ignore_index=-1)
 
             loss.backward()
             lr_scheduler.step()
@@ -118,8 +119,8 @@ def train():
                 print(
                     f"epoch: {epoch} - global_step: {global_step}/{num_training_steps} - loss:{loss.numpy().item():.6f}"
                 )
-            if (global_step > 0 and global_step % args.eval_steps == 0
-                ) or global_step == num_training_steps:
+            if (global_step > 0 and global_step % args.eval_steps
+                    == 0) or global_step == num_training_steps:
                 precision, recall, f1 = evaluate(model, dev_loader, metric)
                 model.train()
                 if f1 > best_f1:

@@ -39,6 +39,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
+
     def __init__(self, model_dir, device):
         model_file = model_dir + "/inference.pdmodel"
         params_file = model_dir + "/inference.pdiparams"
@@ -48,11 +49,12 @@ class Predictor(object):
         if not os.path.exists(params_file):
             raise ValueError("not find params file path {}".format(params_file))
         config = paddle.inference.Config(model_file, params_file)
+        # Disable IR optimization for NPTag
+        config.switch_ir_optim(False)
 
         if device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
-            config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -85,8 +87,10 @@ class Predictor(object):
         ]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'),  # token_type_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
+                ),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
+                ),  # token_type_ids
             Stack(dtype='int64'),  # label_indices
         ): fn(samples)
 

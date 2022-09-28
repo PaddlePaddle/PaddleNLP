@@ -63,17 +63,15 @@ class STACLTokenizer:
                                    bpe_args.glossaries)
         self.is_chinese = is_chinese
 
-        self.src_vocab = Vocab.load_vocabulary(
-            args.src_vocab_fpath,
-            bos_token=args.special_token[0],
-            eos_token=args.special_token[1],
-            unk_token=args.special_token[2])
+        self.src_vocab = Vocab.load_vocabulary(args.src_vocab_fpath,
+                                               bos_token=args.special_token[0],
+                                               eos_token=args.special_token[1],
+                                               unk_token=args.special_token[2])
 
-        self.trg_vocab = Vocab.load_vocabulary(
-            args.trg_vocab_fpath,
-            bos_token=args.special_token[0],
-            eos_token=args.special_token[1],
-            unk_token=args.special_token[2])
+        self.trg_vocab = Vocab.load_vocabulary(args.trg_vocab_fpath,
+                                               bos_token=args.special_token[0],
+                                               eos_token=args.special_token[1],
+                                               unk_token=args.special_token[2])
 
         args.src_vocab_size = len(self.src_vocab)
         args.trg_vocab_size = len(self.trg_vocab)
@@ -211,13 +209,12 @@ def process(args, tokenizer, transformers, waitks):
     button.place(x=0, y=0)
 
     # for chinese input
-    lbl1 = Label(
-        window,
-        text="Chinese input:",
-        fg="green",
-        font=font_label,
-        anchor=E,
-        width=28)
+    lbl1 = Label(window,
+                 text="Chinese input:",
+                 fg="green",
+                 font=font_label,
+                 anchor=E,
+                 width=28)
     lbl1.place(x=0, y=60)
     txt = Entry(window, font=font_align)
     txt.place(x=250, y=50, width=800, height=50)
@@ -230,27 +227,28 @@ def process(args, tokenizer, transformers, waitks):
     x, y = 250, 120
 
     # for jieba+BPE
-    lbl2_s = Label(
-        window,
-        text="Jieba+BPE:",
-        fg="black",
-        font=font_label,
-        anchor=E,
-        width=28)
+    lbl2_s = Label(window,
+                   text="Jieba+BPE:",
+                   fg="black",
+                   font=font_label,
+                   anchor=E,
+                   width=28)
     lbl2_s.place(x=s_x, y=s_y)
-    lbl2 = Label(
-        window, text="", font=font_align, background="pale green", anchor=E)
+    lbl2 = Label(window,
+                 text="",
+                 font=font_align,
+                 background="pale green",
+                 anchor=E)
     lbl2.place(x=x, y=y, width=800, height=50)
 
     # for wait-1
     waitnum = '1'
-    lbl3_s = Label(
-        window,
-        text="Simultaneous\nTranslation (wait " + waitnum + "):",
-        fg="red",
-        font=font_label,
-        anchor=E,
-        width=28)
+    lbl3_s = Label(window,
+                   text="Simultaneous\nTranslation (wait " + waitnum + "):",
+                   fg="red",
+                   font=font_label,
+                   anchor=E,
+                   width=28)
     lbl3_s.place(x=s_x, y=s_y + 70)
 
     lbl3 = Label(window, text="", font=font_align, background="linen")
@@ -258,38 +256,35 @@ def process(args, tokenizer, transformers, waitks):
 
     # for wait-3
     waitnum = '3'
-    lbl4_s = Label(
-        window,
-        text="Simultaneous\nTranslation (wait " + waitnum + "):",
-        fg="red",
-        font=font_label,
-        anchor=E,
-        width=28)
+    lbl4_s = Label(window,
+                   text="Simultaneous\nTranslation (wait " + waitnum + "):",
+                   fg="red",
+                   font=font_label,
+                   anchor=E,
+                   width=28)
     lbl4_s.place(x=s_x, y=s_y + 140)
     lbl4 = Label(window, text="", font=font_align, background="linen")
     lbl4.place(x=x, y=y + 145, width=800, height=50)
 
     # for wait-5
     waitnum = '5'
-    lbl5_s = Label(
-        window,
-        text="Simultaneous\nTranslation (wait " + waitnum + "):",
-        fg="red",
-        font=font_label,
-        anchor=E,
-        width=28)
+    lbl5_s = Label(window,
+                   text="Simultaneous\nTranslation (wait " + waitnum + "):",
+                   fg="red",
+                   font=font_label,
+                   anchor=E,
+                   width=28)
     lbl5_s.place(x=s_x, y=s_y + 210)
     lbl5 = Label(window, text="", font=font_align, background="linen")
     lbl5.place(x=x, y=y + 215, width=800, height=50)
 
     # for  wait--1
-    lbl6_s = Label(
-        window,
-        text="Full Sentence\nTranslation (wait -1):",
-        fg="blue",
-        font=font_label,
-        anchor=E,
-        width=28)
+    lbl6_s = Label(window,
+                   text="Full Sentence\nTranslation (wait -1):",
+                   fg="blue",
+                   font=font_label,
+                   anchor=E,
+                   width=28)
     lbl6_s.place(x=s_x, y=s_y + 280)
 
     lbl6 = Label(window, text="", font=font_align, background="sky blue")
@@ -311,38 +306,37 @@ def process(args, tokenizer, transformers, waitks):
         while i < len(tokenized_src):
             user_input_bpe.append(bpe_str[i])
             user_input_tokenized.append(tokenized_src[i])
-            lbl2.configure(
-                text=cut_line((lbl2.cget("text") + ' ' + bpe_str[i]).strip(),
-                              20),
-                fg="black",
-                anchor=W,
-                justify=LEFT)
+            lbl2.configure(text=cut_line(
+                (lbl2.cget("text") + ' ' + bpe_str[i]).strip(), 20),
+                           fg="black",
+                           anchor=W,
+                           justify=LEFT)
             window.update()
             if bpe_str[i] in ['。', '？', '！']:
                 is_last = True
             translate(args, tokenizer, user_input_tokenized, transformers,
                       waitks, decoder_max_length, is_last, caches, bos_id,
                       all_result)
-            lbl3.configure(
-                text=cut_line(' '.join(all_result[0]).replace('@@ ', ''), 11),
-                fg="red",
-                anchor=W,
-                justify=LEFT)
-            lbl4.configure(
-                text=cut_line(' '.join(all_result[1]).replace('@@ ', ''), 11),
-                fg="red",
-                anchor=W,
-                justify=LEFT)
-            lbl5.configure(
-                text=cut_line(' '.join(all_result[2]).replace('@@ ', ''), 11),
-                fg="red",
-                anchor=W,
-                justify=LEFT)
-            lbl6.configure(
-                text=cut_line(' '.join(all_result[3]).replace('@@ ', ''), 11),
-                fg="blue",
-                anchor=W,
-                justify=LEFT)
+            lbl3.configure(text=cut_line(
+                ' '.join(all_result[0]).replace('@@ ', ''), 11),
+                           fg="red",
+                           anchor=W,
+                           justify=LEFT)
+            lbl4.configure(text=cut_line(
+                ' '.join(all_result[1]).replace('@@ ', ''), 11),
+                           fg="red",
+                           anchor=W,
+                           justify=LEFT)
+            lbl5.configure(text=cut_line(
+                ' '.join(all_result[2]).replace('@@ ', ''), 11),
+                           fg="red",
+                           anchor=W,
+                           justify=LEFT)
+            lbl6.configure(text=cut_line(
+                ' '.join(all_result[3]).replace('@@ ', ''), 11),
+                           fg="blue",
+                           anchor=W,
+                           justify=LEFT)
             window.update()
             if is_last:
                 caches = [None] * len(waitks)
@@ -392,12 +386,11 @@ def process(args, tokenizer, transformers, waitks):
             chunk_len = int(16000 * 2 / 1000 * chunk_ms)
 
             pa = PyAudio()
-            stream = pa.open(
-                format=paInt16,
-                channels=1,
-                rate=16000,
-                input=True,
-                frames_per_buffer=chunk_len // 2)
+            stream = pa.open(format=paInt16,
+                             channels=1,
+                             rate=16000,
+                             input=True,
+                             frames_per_buffer=chunk_len // 2)
 
             while True:
                 frames = []
@@ -492,8 +485,9 @@ def process(args, tokenizer, transformers, waitks):
             end_time = time.time()
             if end_time - start_time > 10 and ws_app:
                 close_websocket(ws_app)
-                logger.info('ws_app started at: {} closed at: {}, cost {}s.'.
-                            format(start_time, end_time, end_time - start_time))
+                logger.info(
+                    'ws_app started at: {} closed at: {}, cost {}s.'.format(
+                        start_time, end_time, end_time - start_time))
             if 'result' in message:
                 start_time = time.time()
                 text = message['result']
@@ -503,42 +497,37 @@ def process(args, tokenizer, transformers, waitks):
                 while i < len(tokenized_src):
                     user_input_bpe.append(bpe_str[i])
                     user_input_tokenized.append(tokenized_src[i])
-                    lbl2.configure(
-                        text=cut_line(
-                            (lbl2.cget("text") + ' ' + bpe_str[i]).strip(), 20),
-                        fg="black",
-                        anchor=W,
-                        justify=LEFT)
+                    lbl2.configure(text=cut_line(
+                        (lbl2.cget("text") + ' ' + bpe_str[i]).strip(), 20),
+                                   fg="black",
+                                   anchor=W,
+                                   justify=LEFT)
                     window.update()
                     if bpe_str[i] in ['。', '？', '！']:
                         is_last = True
                     translate(args, tokenizer, user_input_tokenized,
                               transformers, waitks, decoder_max_length, is_last,
                               caches, bos_id, all_result)
-                    lbl3.configure(
-                        text=cut_line(' '.join(all_result[0]).replace('@@ ',
-                                                                      ''), 11),
-                        fg="red",
-                        anchor=W,
-                        justify=LEFT)
-                    lbl4.configure(
-                        text=cut_line(' '.join(all_result[1]).replace('@@ ',
-                                                                      ''), 11),
-                        fg="red",
-                        anchor=W,
-                        justify=LEFT)
-                    lbl5.configure(
-                        text=cut_line(' '.join(all_result[2]).replace('@@ ',
-                                                                      ''), 11),
-                        fg="red",
-                        anchor=W,
-                        justify=LEFT)
-                    lbl6.configure(
-                        text=cut_line(' '.join(all_result[3]).replace('@@ ',
-                                                                      ''), 11),
-                        fg="blue",
-                        anchor=W,
-                        justify=LEFT)
+                    lbl3.configure(text=cut_line(
+                        ' '.join(all_result[0]).replace('@@ ', ''), 11),
+                                   fg="red",
+                                   anchor=W,
+                                   justify=LEFT)
+                    lbl4.configure(text=cut_line(
+                        ' '.join(all_result[1]).replace('@@ ', ''), 11),
+                                   fg="red",
+                                   anchor=W,
+                                   justify=LEFT)
+                    lbl5.configure(text=cut_line(
+                        ' '.join(all_result[2]).replace('@@ ', ''), 11),
+                                   fg="red",
+                                   anchor=W,
+                                   justify=LEFT)
+                    lbl6.configure(text=cut_line(
+                        ' '.join(all_result[3]).replace('@@ ', ''), 11),
+                                   fg="blue",
+                                   anchor=W,
+                                   justify=LEFT)
                     window.update()
                     if is_last:
                         caches = [None] * len(waitks)
@@ -557,12 +546,11 @@ def process(args, tokenizer, transformers, waitks):
         global start_time
         start_time = time.time()
         global ws_app
-        ws_app = websocket.WebSocketApp(
-            uri,
-            on_open=on_open,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close)
+        ws_app = websocket.WebSocketApp(uri,
+                                        on_open=on_open,
+                                        on_message=on_message,
+                                        on_error=on_error,
+                                        on_close=on_close)
         ws_app.run_forever()
 
     def clear():
@@ -609,27 +597,28 @@ def process(args, tokenizer, transformers, waitks):
     txt.bind('<Return>', set_val)
     button_on.bind('<Button-1>', set_val_voice)
 
-    desc1 = Label(
-        window,
-        text='使用说明：1. 在Chinese input输入中文，按【回车键】开始实时翻译，'
-        '遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出；',
-        anchor=E)
+    desc1 = Label(window,
+                  text='使用说明：1. 在Chinese input输入中文，按【回车键】开始实时翻译，'
+                  '遇到【。！？】结束整句，按【CLEAR】清空所有的输入和输出；',
+                  anchor=E)
     desc1.place(x=s_x + 100, y=s_y + 380)
 
     backspace_cnt = 19
     if is_win:
         backspace_cnt = 15
 
-    desc2 = Label(
-        window,
-        text=' ' * backspace_cnt + '2. 按【REC】开始录音并开始实时翻译，遇到【。！？】结束整句，'
-        '按【CLEAR】清空所有的输入和输出。',
-        anchor=E)
+    desc2 = Label(window,
+                  text=' ' * backspace_cnt + '2. 按【REC】开始录音并开始实时翻译，遇到【。！？】结束整句，'
+                  '按【CLEAR】清空所有的输入和输出。',
+                  anchor=E)
     if open_speech:
         desc2.place(x=s_x + 100, y=s_y + 410)
 
-    button_clear = Button(
-        window, text='CLEAR', relief="raised", cursor="hand2", command=clear)
+    button_clear = Button(window,
+                          text='CLEAR',
+                          relief="raised",
+                          cursor="hand2",
+                          command=clear)
 
     button_clear.place(x=x + 840, y=y + 380)
 
@@ -638,11 +627,10 @@ def process(args, tokenizer, transformers, waitks):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./transformer_demo.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./transformer_demo.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     args = parser.parse_args()
     return args
 

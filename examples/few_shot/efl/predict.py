@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
@@ -74,8 +74,8 @@ def do_predict(model, tokenizer, data_loader, task_label_description):
         src_ids, token_type_ids = batch
 
         # Prediction_probs:[bs, 2]
-        prediction_probs = model(
-            input_ids=src_ids, token_type_ids=token_type_ids).numpy()
+        prediction_probs = model(input_ids=src_ids,
+                                 token_type_ids=token_type_ids).numpy()
 
         all_prediction_probs.append(prediction_probs)
 
@@ -234,9 +234,9 @@ if __name__ == "__main__":
     test_ds = processor.get_test_datasets(test_ds,
                                           TASK_LABELS_DESC[args.task_name])
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=2)
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'ernie-3.0-medium-zh', num_classes=2)
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     # [src_ids, token_type_ids]
     predict_batchify_fn = lambda samples, fn=Tuple(
@@ -244,18 +244,16 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
     ): [data for data in fn(samples)]
 
-    predict_trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        max_seq_length=args.max_seq_length,
-        is_test=True)
+    predict_trans_func = partial(convert_example,
+                                 tokenizer=tokenizer,
+                                 max_seq_length=args.max_seq_length,
+                                 is_test=True)
 
-    test_data_loader = create_dataloader(
-        test_ds,
-        mode='eval',
-        batch_size=args.batch_size,
-        batchify_fn=predict_batchify_fn,
-        trans_fn=predict_trans_func)
+    test_data_loader = create_dataloader(test_ds,
+                                         mode='eval',
+                                         batch_size=args.batch_size,
+                                         batchify_fn=predict_batchify_fn,
+                                         trans_fn=predict_trans_func)
 
     # Load parameters of best model on test_public.json of current task
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):

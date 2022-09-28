@@ -76,6 +76,7 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class CharTokenizer:
+
     def __init__(self, vocab, language, vocab_path):
         self.tokenizer = list
         self.vocab = vocab

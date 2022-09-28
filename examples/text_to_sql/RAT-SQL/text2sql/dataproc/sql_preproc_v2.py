@@ -118,6 +118,7 @@ class SQLPreproc(object):
             self.format_sql_value = self.fix_sql_value
 
     def _get_val_index(self, val, value_dict):
+
         def _float(val):
             try:
                 return True, str(int(float(val)))
@@ -171,9 +172,8 @@ class SQLPreproc(object):
                 val1 = 0
                 logging.debug('lost value: %s. candidates: %s', cond[3],
                               ', '.join(value_dict.keys()))
-                logging.debug(
-                    'sql is: %s', json.dumps(
-                        sql_json, ensure_ascii=False))
+                logging.debug('sql is: %s',
+                              json.dumps(sql_json, ensure_ascii=False))
             if val2 == -1:
                 val2 = 0
             cond[3] = val1
@@ -236,9 +236,8 @@ class SQLPreproc(object):
                 val1 = 0
                 logging.info('lost value: %s. candidates: %s', cond[3],
                              ', '.join(value_dict.keys()))
-                logging.debug(
-                    'sql is: %s', json.dumps(
-                        sql_json, ensure_ascii=False))
+                logging.debug('sql is: %s',
+                              json.dumps(sql_json, ensure_ascii=False))
             if val2 == -1:
                 val2 = 0
             cond[3] = val1
@@ -392,8 +391,8 @@ class SQLPreproc(object):
             self.field_presence_infos[node_type].add(field_presence_info)
 
             for field_info in self.ast_wrapper.singular_types[node_type].fields:
-                field_value = node.get(field_info.name, []
-                                       if field_info.seq else None)
+                field_value = node.get(field_info.name,
+                                       [] if field_info.seq else None)
                 to_enqueue = []
                 if field_info.seq:
                     # Rules of the form:

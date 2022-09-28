@@ -1,4 +1,19 @@
 #!/bin/bash
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 source test_tipc/common_func.sh
 
 FILENAME=$1
@@ -27,6 +42,10 @@ if [ ${MODE} = "lite_train_lite_infer" ];then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
         wget -nc -P ./data/ https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd .. 
+    fi
+
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
     fi
 
     if [[ ${model_name} =~ transformer* ]]; then
@@ -92,6 +111,10 @@ elif [ ${MODE} = "whole_train_whole_infer" ];then
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd ..
     fi
 
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
+    fi
+
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
         sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
@@ -150,6 +173,10 @@ elif [ ${MODE} = "lite_train_whole_infer" ];then
         rm -rf ./data/lexical_analysis_dataset_tiny ./data/lexical_analysis_dataset_tiny.tar.gz
         wget -nc -P ./data/ https://bj.bcebos.com/paddlenlp/datasets/lexical_analysis_dataset_tiny.tar.gz --no-check-certificate
         cd ./data/ && tar xfz lexical_analysis_dataset_tiny.tar.gz && cd ..
+    fi
+
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
     fi
 
     if [[ ${model_name} =~ transformer* ]]; then
@@ -228,6 +255,10 @@ elif [ ${MODE} = "whole_infer" ];then
         cd ./test_tipc/bigru_crf && tar xfz bigru_crf_infer_model.tgz && cd ../..
     fi
 
+    if [ ${model_name} == "ernie_information_extraction" ]; then
+        python ../examples/information_extraction/waybill_ie/download.py --data_dir ./waybill_ie
+    fi
+    
     if [[ ${model_name} =~ transformer* ]]; then
         cd ../examples/machine_translation/transformer/
         sed -i "s/^max_out_len.*/max_out_len: 256/g" configs/transformer.base.yaml
@@ -292,8 +323,19 @@ elif [ ${MODE} = "benchmark_train" ];then
         python -m pip install h5py -i https://mirror.baidu.com/pypi/simple
     fi
 
-    if [[ ${model_name} =~ gpt* ]]; then
+    if [[ ${model_name} == "gpt2" ]]; then
         cd ../examples/language_model/gpt/data_tools/
+        sed -i "s/python3/python/g" Makefile
+        sed -i "s/python-config/python3.7m-config/g" Makefile
+        cd -
+        mkdir -p data && cd data
+        wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
+        wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
+        cd -
+    fi
+
+    if [[ ${model_name} == "gpt3" ]]; then
+        cd ../examples/language_model/gpt-3/data_tools/
         sed -i "s/python3/python/g" Makefile
         sed -i "s/python-config/python3.7m-config/g" Makefile
         cd -

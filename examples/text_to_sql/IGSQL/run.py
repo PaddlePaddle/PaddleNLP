@@ -15,6 +15,7 @@
 
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import random
@@ -55,8 +56,8 @@ def train(model, data, params):
     # Get the training batches.
     log = Logger(os.path.join(params.logdir, params.logfile), "w")
     num_train_original = atis_data.num_utterances(data.train_data)
-    log.put("Original number of training utterances:\t" + str(
-        num_train_original))
+    log.put("Original number of training utterances:\t" +
+            str(num_train_original))
 
     eval_fn = evaluate_utterance_sample
     trainbatch_fn = data.get_utterance_batches
@@ -71,32 +72,31 @@ def train(model, data, params):
         validsample_fn = data.get_all_interactions
 
     maximum_output_length = params.train_maximum_sql_length
-    train_batches = trainbatch_fn(
-        batch_size,
-        max_output_length=maximum_output_length,
-        randomize=not params.deterministic)
+    train_batches = trainbatch_fn(batch_size,
+                                  max_output_length=maximum_output_length,
+                                  randomize=not params.deterministic)
 
     if params.num_train >= 0:
         train_batches = train_batches[:params.num_train]
 
-    training_sample = trainsample_fn(
-        params.train_evaluation_size, max_output_length=maximum_output_length)
-    valid_examples = validsample_fn(
-        data.valid_data, max_output_length=maximum_output_length)
+    training_sample = trainsample_fn(params.train_evaluation_size,
+                                     max_output_length=maximum_output_length)
+    valid_examples = validsample_fn(data.valid_data,
+                                    max_output_length=maximum_output_length)
 
     num_train_examples = sum([len(batch) for batch in train_batches])
     num_steps_per_epoch = len(train_batches)
 
-    log.put("Actual number of used training examples:\t" + str(
-        num_train_examples))
+    log.put("Actual number of used training examples:\t" +
+            str(num_train_examples))
     log.put("(Shortened by output limit of " + str(maximum_output_length) + ")")
     log.put("Number of steps per epoch:\t" + str(num_steps_per_epoch))
     log.put("Batch size:\t" + str(batch_size))
 
     print("Kept " + str(num_train_examples) + "/" + str(num_train_original) +
           " examples")
-    print("Batch size of " + str(batch_size) + " gives " + str(
-        num_steps_per_epoch) + " steps per epoch")
+    print("Batch size of " + str(batch_size) + " gives " +
+          str(num_steps_per_epoch) + " steps per epoch")
 
     # Keeping track of things during training.
     epochs = 0
@@ -149,31 +149,31 @@ def train(model, data, params):
         with paddle.no_grad():
 
             # Run an evaluation step on a sample of the training data.
-            train_eval_results = eval_fn(
-                training_sample,
-                model,
-                params.train_maximum_sql_length,
-                name=os.path.join(params.logdir, "train-eval"),
-                write_results=True,
-                gold_forcing=True,
-                metrics=TRAIN_EVAL_METRICS)[0]
+            train_eval_results = eval_fn(training_sample,
+                                         model,
+                                         params.train_maximum_sql_length,
+                                         name=os.path.join(
+                                             params.logdir, "train-eval"),
+                                         write_results=True,
+                                         gold_forcing=True,
+                                         metrics=TRAIN_EVAL_METRICS)[0]
 
             for name, value in train_eval_results.items():
-                log.put("train final gold-passing " + name.name + ":\t" + "%.2f"
-                        % value)
+                log.put("train final gold-passing " + name.name + ":\t" +
+                        "%.2f" % value)
 
             # Run an evaluation step on the validation set.
-            valid_eval_results = eval_fn(
-                valid_examples,
-                model,
-                params.eval_maximum_sql_length,
-                name=os.path.join(params.logdir, "valid-eval"),
-                write_results=True,
-                gold_forcing=True,
-                metrics=VALID_EVAL_METRICS)[0]
+            valid_eval_results = eval_fn(valid_examples,
+                                         model,
+                                         params.eval_maximum_sql_length,
+                                         name=os.path.join(
+                                             params.logdir, "valid-eval"),
+                                         write_results=True,
+                                         gold_forcing=True,
+                                         metrics=VALID_EVAL_METRICS)[0]
             for name, value in valid_eval_results.items():
-                log.put("valid gold-passing " + name.name + ":\t" + "%.2f" %
-                        value)
+                log.put("valid gold-passing " + name.name + ":\t" +
+                        "%.2f" % value)
 
             valid_loss = valid_eval_results[Metrics.LOSS]
             valid_token_accuracy = valid_eval_results[Metrics.TOKEN_ACCURACY]
@@ -184,8 +184,8 @@ def train(model, data, params):
 
             if valid_loss > previous_epoch_loss and valid_token_accuracy < previous_valid_acc and step >= params.warmup_step:
                 learning_rate_coefficient *= params.learning_rate_ratio
-                log.put("learning rate coefficient:\t" + str(
-                    learning_rate_coefficient))
+                log.put("learning rate coefficient:\t" +
+                        str(learning_rate_coefficient))
 
             previous_epoch_loss = valid_loss
             previous_valid_acc = valid_token_accuracy
@@ -198,8 +198,8 @@ def train(model, data, params):
                 last_save_file = os.path.join(params.logdir, "best_model")
                 model.save(last_save_file)
 
-                log.put("maximum string accuracy:\t" + str(
-                    maximum_string_accuracy))
+                log.put("maximum string accuracy:\t" +
+                        str(maximum_string_accuracy))
                 log.put("patience:\t" + str(patience))
                 log.put("save file:\t" + str(last_save_file))
 
@@ -315,10 +315,10 @@ def main():
         print('not implemented')
         exit()
 
-    model = model_type(params, data.input_vocabulary, data.output_vocabulary,
-                       data.output_vocabulary_schema, data.anonymizer
-                       if params.anonymize and params.anonymization_scoring else
-                       None)
+    model = model_type(
+        params, data.input_vocabulary, data.output_vocabulary,
+        data.output_vocabulary_schema, data.anonymizer
+        if params.anonymize and params.anonymization_scoring else None)
 
     model.build_optim()
 

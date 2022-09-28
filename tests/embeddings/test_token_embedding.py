@@ -20,10 +20,12 @@ from paddlenlp.utils.log import logger
 from util import get_vocab_list, create_test_data
 
 from common_test import CommonTest
+
 logger.logger.setLevel('ERROR')
 
 
 class TestTokenEmbedding(CommonTest):
+
     def setUp(self):
         self.test_data_file = create_test_data(__file__)
         self.config[
@@ -32,6 +34,7 @@ class TestTokenEmbedding(CommonTest):
 
 
 class TestTokenEmbeddingTrainable(TestTokenEmbedding):
+
     def test_trainable(self):
         self.embedding = TokenEmbedding(**self.config)
         self.check_output_not_equal(self.config["trainable"],
@@ -39,6 +42,7 @@ class TestTokenEmbeddingTrainable(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingUNK(TestTokenEmbedding):
+
     def setUp(self):
         super().setUp()
         self.config["unknown_token"] = "[unk]"  # default [UNK], change it
@@ -55,6 +59,7 @@ class TestTokenEmbeddingUNK(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
+
     def setUp(self):
         super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
@@ -69,6 +74,7 @@ class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
+
     def setUp(self):
         super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
@@ -84,6 +90,7 @@ class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
+
     def setUp(self):
         super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file

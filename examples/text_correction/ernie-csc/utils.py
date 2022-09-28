@@ -48,8 +48,9 @@ def convert_example(example,
     token_type_ids = [0] * len(input_ids)
 
     # Use pad token in pinyin emb to map word emb [CLS], [SEP]
-    pinyins = lazy_pinyin(
-        source, style=Style.TONE3, neutral_tone_with_five=True)
+    pinyins = lazy_pinyin(source,
+                          style=Style.TONE3,
+                          neutral_tone_with_five=True)
     pinyin_ids = [0]
     # Align pinyin and chinese char
     pinyin_offset = 0
@@ -96,17 +97,18 @@ def create_dataloader(dataset,
 
     shuffle = True if mode == 'train' else False
     if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
+                                                          batch_size=batch_size,
+                                                          shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(
-            dataset, batch_size=batch_size, shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset,
+                                               batch_size=batch_size,
+                                               shuffle=shuffle)
 
-    return paddle.io.DataLoader(
-        dataset=dataset,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    return paddle.io.DataLoader(dataset=dataset,
+                                batch_sampler=batch_sampler,
+                                collate_fn=batchify_fn,
+                                return_list=True)
 
 
 def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
@@ -123,11 +125,11 @@ def parse_decode(words, corr_preds, det_preds, lengths, tokenizer,
         words = words[:max_seq_length - 2]
     pred_result = ""
     for j, word in enumerate(words):
-        candidates = tokenizer.convert_ids_to_tokens(corr_pred[j] if corr_pred[
-            j] < tokenizer.vocab_size else UNK_id)
+        candidates = tokenizer.convert_ids_to_tokens(
+            corr_pred[j] if corr_pred[j] < tokenizer.vocab_size else UNK_id)
         word_icc = is_chinese_char(ord(word))
-        cand_icc = is_chinese_char(ord(candidates)) if len(
-            candidates) == 1 else False
+        cand_icc = is_chinese_char(
+            ord(candidates)) if len(candidates) == 1 else False
         if not word_icc or det_pred[j] == 0\
             or candidates in [UNK, '[PAD]']\
             or (word_icc and not cand_icc):

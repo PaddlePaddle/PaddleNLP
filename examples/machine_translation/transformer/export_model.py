@@ -14,38 +14,41 @@ from paddlenlp.utils.log import logger
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default="./configs/transformer.big.yaml",
-        type=str,
-        help="Path of the config file. ")
+    parser.add_argument("--config",
+                        default="./configs/transformer.big.yaml",
+                        type=str,
+                        help="Path of the config file. ")
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help=
+        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
     )
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help=
+        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. "
-    )
+        help=
+        "The unknown token. It should be provided when use custom vocab_file. ")
     parser.add_argument(
         "--bos_token",
         default=None,
         type=str,
-        help="The bos token. It should be provided when use custom vocab_file. ")
+        help="The bos token. It should be provided when use custom vocab_file. "
+    )
     parser.add_argument(
         "--eos_token",
         default=None,
         type=str,
-        help="The eos token. It should be provided when use custom vocab_file. ")
+        help="The eos token. It should be provided when use custom vocab_file. "
+    )
     args = parser.parse_args()
     return args
 
@@ -90,13 +93,12 @@ def do_export(args):
     # Set evaluate mode
     transformer.eval()
 
-    # Convert dygraph model to static graph model 
+    # Convert dygraph model to static graph model
     transformer = paddle.jit.to_static(
         transformer,
         input_spec=[
             # src_word
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int64"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # trg_word
             # paddle.static.InputSpec(
             #     shape=[None, None], dtype="int64")

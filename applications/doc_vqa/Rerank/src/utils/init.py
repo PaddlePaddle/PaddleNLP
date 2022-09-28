@@ -44,11 +44,10 @@ def init_checkpoint(exe, init_checkpoint_path, main_program):
         #    print ("Var exists: [%s]" % (var.name))
         return os.path.exists(os.path.join(init_checkpoint_path, var.name))
 
-    fluid.io.load_vars(
-        exe,
-        init_checkpoint_path,
-        main_program=main_program,
-        predicate=existed_persitables)
+    fluid.io.load_vars(exe,
+                       init_checkpoint_path,
+                       main_program=main_program,
+                       predicate=existed_persitables)
     log.info("Load model from {}".format(init_checkpoint_path))
 
 
@@ -66,10 +65,9 @@ def init_pretraining_params(exe, pretraining_params_path, main_program):
         #    print ("Var exists: [%s]" % (var.name))
         return os.path.exists(os.path.join(pretraining_params_path, var.name))
 
-    fluid.io.load_vars(
-        exe,
-        pretraining_params_path,
-        main_program=main_program,
-        predicate=existed_params)
-    log.info("Load pretraining parameters from {}.".format(
-        pretraining_params_path))
+    fluid.io.load_vars(exe,
+                       pretraining_params_path,
+                       main_program=main_program,
+                       predicate=existed_params)
+    log.info(
+        "Load pretraining parameters from {}.".format(pretraining_params_path))

@@ -94,19 +94,17 @@ def load_link_prediction_train_data(config, str2id, term_file, terms,
     train_data = np.array(train_data, dtype="int64")
     np.save(os.path.join(config.graph_work_path, "train_data.npy"), train_data)
     if len(neg_samples) != 0:
-        np.save(
-            os.path.join(config.graph_work_path, "neg_samples.npy"),
-            np.array(neg_samples))
+        np.save(os.path.join(config.graph_work_path, "neg_samples.npy"),
+                np.array(neg_samples))
 
 
 def dump_graph(config):
     if not os.path.exists(config.graph_work_path):
         os.makedirs(config.graph_work_path)
     str2id = dict()
-    term_file = io.open(
-        os.path.join(config.graph_work_path, "terms.txt"),
-        "w",
-        encoding=config.encoding)
+    term_file = io.open(os.path.join(config.graph_work_path, "terms.txt"),
+                        "w",
+                        encoding=config.encoding)
     terms = []
     item_distribution = []
 
@@ -142,9 +140,8 @@ def dump_node_feat(config):
     log.info("Dump node feat starting...")
     id2str = [
         line.strip("\n").split("\t")[-1]
-        for line in io.open(
-            os.path.join(config.graph_work_path, "terms.txt"),
-            encoding=config.encoding)
+        for line in io.open(os.path.join(config.graph_work_path, "terms.txt"),
+                            encoding=config.encoding)
     ]
     # pool = multiprocessing.Pool()
 
@@ -153,9 +150,8 @@ def dump_node_feat(config):
     fn = partial(term2id, tokenizer=tokenizer, max_seqlen=config.max_seqlen)
     term_ids = [fn(x) for x in id2str]
 
-    np.save(
-        os.path.join(config.graph_work_path, "term_ids.npy"),
-        np.array(term_ids, np.uint16))
+    np.save(os.path.join(config.graph_work_path, "term_ids.npy"),
+            np.array(term_ids, np.uint16))
     log.info("Dump node feat done.")
 
 

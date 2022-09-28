@@ -51,10 +51,9 @@ def set_seed(args):
 def convert_example(example, tokenizer):
     """convert a Dureader-yesno example into necessary features"""
 
-    feature = tokenizer(
-        text=example['question'],
-        text_pair=example['answer'],
-        max_seq_len=args.max_seq_length)
+    feature = tokenizer(text=example['question'],
+                        text_pair=example['answer'],
+                        max_seq_len=args.max_seq_length)
     feature['labels'] = example['labels']
     feature['id'] = example['id']
 
@@ -101,52 +100,53 @@ def do_train(args):
 
     set_seed(args)
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        'dureader_yesno', splits=['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset('dureader_yesno',
+                                             splits=['train', 'dev', 'test'])
 
     trans_func = partial(convert_example, tokenizer=tokenizer)
 
-    train_batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        'labels': Stack(dtype="int64")
-    }): fn(samples)
+    train_batchify_fn = lambda samples, fn=Dict(
+        {
+            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            'labels': Stack(dtype="int64")
+        }): fn(samples)
 
-    test_batchify_fn = lambda samples, fn=Dict({
-        'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        'id': Stack()
-    }): fn(samples)
+    test_batchify_fn = lambda samples, fn=Dict(
+        {
+            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            'id': Stack()
+        }): fn(samples)
 
     train_ds = train_ds.map(trans_func, lazy=True)
     train_batch_sampler = paddle.io.DistributedBatchSampler(
         train_ds, batch_size=args.batch_size, shuffle=True)
-    train_data_loader = DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        collate_fn=train_batchify_fn,
-        return_list=True)
+    train_data_loader = DataLoader(dataset=train_ds,
+                                   batch_sampler=train_batch_sampler,
+                                   collate_fn=train_batchify_fn,
+                                   return_list=True)
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    dev_data_loader = DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=train_batchify_fn,
-        return_list=True)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    dev_data_loader = DataLoader(dataset=dev_ds,
+                                 batch_sampler=dev_batch_sampler,
+                                 collate_fn=train_batchify_fn,
+                                 return_list=True)
 
     test_ds = test_ds.map(trans_func, lazy=True)
-    test_batch_sampler = paddle.io.BatchSampler(
-        test_ds, batch_size=args.batch_size, shuffle=False)
-    test_data_loader = DataLoader(
-        dataset=test_ds,
-        batch_sampler=test_batch_sampler,
-        collate_fn=test_batchify_fn,
-        return_list=True)
+    test_batch_sampler = paddle.io.BatchSampler(test_ds,
+                                                batch_size=args.batch_size,
+                                                shuffle=False)
+    test_data_loader = DataLoader(dataset=test_ds,
+                                  batch_sampler=test_batch_sampler,
+                                  collate_fn=test_batchify_fn,
+                                  return_list=True)
 
-    model = model_class.from_pretrained(
-        args.model_name_or_path, num_classes=len(train_ds.label_list))
+    model = model_class.from_pretrained(args.model_name_or_path,
+                                        num_classes=len(train_ds.label_list))
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -213,8 +213,7 @@ def do_train(args):
         predictions = predict(model, test_data_loader)
         with open('prediction.json', "w") as writer:
             writer.write(
-                json.dumps(
-                    predictions, ensure_ascii=False, indent=4) + "\n")
+                json.dumps(predictions, ensure_ascii=False, indent=4) + "\n")
 
 
 if __name__ == "__main__":

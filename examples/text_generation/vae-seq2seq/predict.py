@@ -28,7 +28,8 @@ def infer(args):
     _, _, _, vocab, bos_id, eos_id, _ = create_data_loader(args)
 
     net = VAESeq2SeqInferModel(args.embed_dim, args.hidden_size,
-                               args.latent_size, len(vocab) + 2)
+                               args.latent_size,
+                               len(vocab) + 2)
 
     model = paddle.Model(net)
     model.prepare()

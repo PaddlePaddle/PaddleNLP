@@ -128,6 +128,7 @@ def prepare_embedding_retrieval(glove_file, vocab_size=100000):
 
 
 class DataAugmentor(object):
+
     def __init__(self, model, tokenizer, emb_norm, vocab, ids_to_tokens, M, N,
                  p):
         self.model = model
@@ -156,8 +157,8 @@ class DataAugmentor(object):
         tokenized_text = ['[CLS]'] + tokenized_text
         tokenized_len = len(tokenized_text)
 
-        tokenized_text = word_pieces + ['[SEP]'] + tokenized_text[
-            1:] + ['[SEP]']
+        tokenized_text = word_pieces + ['[SEP]'
+                                        ] + tokenized_text[1:] + ['[SEP]']
 
         if len(tokenized_text) > 512:
             tokenized_text = tokenized_text[:512]
@@ -196,8 +197,8 @@ class DataAugmentor(object):
 
         if len(word_piece_ids) == 1:
             word_pieces[word_piece_ids[0]] = '[MASK]'
-            candidate_words = self._masked_language_model(sentence, word_pieces,
-                                                          word_piece_ids[0])
+            candidate_words = self._masked_language_model(
+                sentence, word_pieces, word_piece_ids[0])
         elif len(word_piece_ids) > 1:
             candidate_words = self._word_distance(mask_token)
         else:
@@ -235,6 +236,7 @@ class DataAugmentor(object):
 
 
 class AugmentProcessor(object):
+
     def __init__(self, augmentor, glue_dir, task_name):
         self.augmentor = augmentor
         self.glue_dir = glue_dir
@@ -298,45 +300,44 @@ def main():
         default=None,
         type=str,
         required=True,
-        help="Downloaded pretrained model (bert-base-uncased) is under this folder"
-    )
-    parser.add_argument(
-        "--glove_embs",
-        default=None,
-        type=str,
-        required=True,
-        help="Glove word embeddings file")
-    parser.add_argument(
-        "--glue_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="GLUE data dir")
+        help=
+        "Downloaded pretrained model (bert-base-uncased) is under this folder")
+    parser.add_argument("--glove_embs",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="Glove word embeddings file")
+    parser.add_argument("--glue_dir",
+                        default=None,
+                        type=str,
+                        required=True,
+                        help="GLUE data dir")
     parser.add_argument(
         "--task_name",
         default=None,
         type=str,
         required=True,
-        help="Task(eg. CoLA, SST-2) that we want to do data augmentation for its train set"
+        help=
+        "Task(eg. CoLA, SST-2) that we want to do data augmentation for its train set"
     )
-    parser.add_argument(
-        "--N",
-        default=30,
-        type=int,
-        help="How many times is the corpus expanded?")
+    parser.add_argument("--N",
+                        default=30,
+                        type=int,
+                        help="How many times is the corpus expanded?")
     parser.add_argument(
         "--M",
         default=15,
         type=int,
         help="Choose from M most-likely words in the corresponding position")
-    parser.add_argument(
-        "--p",
-        default=0.4,
-        type=float,
-        help="Threshold probability p to replace current word")
+    parser.add_argument("--p",
+                        default=0.4,
+                        type=float,
+                        help="Threshold probability p to replace current word")
 
-    parser.add_argument(
-        "--device", default="gpu", type=str, help="device, gpu or cpu")
+    parser.add_argument("--device",
+                        default="gpu",
+                        type=str,
+                        help="device, gpu or cpu")
 
     args = parser.parse_args()
     logger.info(args)

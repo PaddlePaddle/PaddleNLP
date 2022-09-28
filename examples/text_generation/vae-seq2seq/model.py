@@ -40,8 +40,10 @@ class CrossEntropyWithKL(nn.Layer):
         self.update_kl_weight()
         self.kl_loss = kl_loss
 
-        rec_loss = F.cross_entropy(
-            input=dec_output, label=label, reduction='none', soft_label=False)
+        rec_loss = F.cross_entropy(input=dec_output,
+                                   label=label,
+                                   reduction='none',
+                                   soft_label=False)
 
         rec_loss = paddle.squeeze(rec_loss, axis=[2])
         rec_loss = rec_loss * trg_mask
@@ -54,6 +56,7 @@ class CrossEntropyWithKL(nn.Layer):
 
 
 class Perplexity(paddle.metric.Metric):
+
     def __init__(self, name='ppl', reset_freq=100, *args, **kwargs):
         self.cross_entropy = kwargs.pop('loss')
         super(Perplexity, self).__init__(*args, **kwargs)
@@ -82,6 +85,7 @@ class Perplexity(paddle.metric.Metric):
 
 
 class NegativeLogLoss(paddle.metric.Metric):
+
     def __init__(self, name='nll', reset_freq=100, *args, **kwargs):
         self.cross_entropy = kwargs.pop('loss')
         super(NegativeLogLoss, self).__init__(*args, **kwargs)
@@ -110,6 +114,7 @@ class NegativeLogLoss(paddle.metric.Metric):
 
 
 class TrainCallback(paddle.callbacks.ProgBarLogger):
+
     def __init__(self, ppl, nll, log_freq=200, verbose=2):
         super(TrainCallback, self).__init__(log_freq, verbose)
         self.ppl = ppl
@@ -142,6 +147,7 @@ class TrainCallback(paddle.callbacks.ProgBarLogger):
 
 
 class LSTMEncoder(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  embed_dim,
@@ -153,13 +159,12 @@ class LSTMEncoder(nn.Layer):
         self.src_embedder = nn.Embedding(
             vocab_size,
             embed_dim,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
-        self.lstm = nn.LSTM(
-            input_size=embed_dim,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            dropout=enc_dropout)
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
+        self.lstm = nn.LSTM(input_size=embed_dim,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            dropout=enc_dropout)
         if enc_dropout > 0.0:
             self.dropout = nn.Dropout(enc_dropout)
         else:
@@ -170,8 +175,8 @@ class LSTMEncoder(nn.Layer):
 
         if self.dropout:
             src_emb = self.dropout(src_emb)
-        enc_output, enc_final_state = self.lstm(
-            src_emb, sequence_length=src_length)
+        enc_output, enc_final_state = self.lstm(src_emb,
+                                                sequence_length=src_length)
         if self.dropout:
             enc_output = self.dropout(enc_output)
 
@@ -182,6 +187,7 @@ class LSTMEncoder(nn.Layer):
 
 
 class LSTMDecoderCell(nn.Layer):
+
     def __init__(self,
                  num_layers,
                  embed_dim,
@@ -191,9 +197,8 @@ class LSTMDecoderCell(nn.Layer):
         super(LSTMDecoderCell, self).__init__()
         self.dropout = dropout
         self.lstm_cells = nn.LayerList([
-            nn.LSTMCell(
-                input_size=embed_dim + latent_size, hidden_size=hidden_size)
-            for i in range(num_layers)
+            nn.LSTMCell(input_size=embed_dim + latent_size,
+                        hidden_size=hidden_size) for i in range(num_layers)
         ])
 
     def forward(self, step_input, lstm_states, latent_z):
@@ -213,6 +218,7 @@ class LSTMDecoderCell(nn.Layer):
 
 
 class LSTMDecoder(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  embed_dim,
@@ -229,14 +235,14 @@ class LSTMDecoder(nn.Layer):
         self.trg_embedder = nn.Embedding(
             vocab_size,
             embed_dim,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         self.output_fc = nn.Linear(
             hidden_size,
             vocab_size,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
         if dec_dropout > 0.0:
             self.dropout = nn.Dropout(dec_dropout)
@@ -251,15 +257,15 @@ class LSTMDecoder(nn.Layer):
         trg_emb = self.trg_embedder(trg)
         if self.dropout:
             trg_emb = self.dropout(trg_emb)
-        lstm_output, _ = self.lstm(
-            inputs=trg_emb,
-            initial_states=dec_initial_states,
-            latent_z=latent_z)
+        lstm_output, _ = self.lstm(inputs=trg_emb,
+                                   initial_states=dec_initial_states,
+                                   latent_z=latent_z)
         dec_output = self.output_fc(lstm_output)
         return dec_output
 
 
 class VAESeq2SeqModel(nn.Layer):
+
     def __init__(self,
                  embed_dim,
                  hidden_size,
@@ -284,13 +290,13 @@ class VAESeq2SeqModel(nn.Layer):
         self.distributed_fc = nn.Linear(
             hidden_size * 2,
             latent_size * 2,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
         self.fc = nn.Linear(
             latent_size,
             2 * hidden_size * num_layers,
-            weight_attr=paddle.ParamAttr(initializer=I.Uniform(
-                low=-init_scale, high=init_scale)))
+            weight_attr=paddle.ParamAttr(
+                initializer=I.Uniform(low=-init_scale, high=init_scale)))
 
     def sampling(self, z_mean, z_log_var):
         """
@@ -303,8 +309,7 @@ class VAESeq2SeqModel(nn.Layer):
 
     def build_distribution(self, enc_final_state=None):
         enc_hidden = [
-            paddle.concat(
-                state, axis=-1) for state in enc_final_state
+            paddle.concat(state, axis=-1) for state in enc_final_state
         ]
 
         enc_hidden = paddle.concat(enc_hidden, axis=-1)
@@ -316,8 +321,8 @@ class VAESeq2SeqModel(nn.Layer):
         """
         Compute the KL divergence between Gaussian distribution
         """
-        kl_cost = -0.5 * (
-            logvars - paddle.square(means) - paddle.exp(logvars) + 1.0)
+        kl_cost = -0.5 * (logvars - paddle.square(means) - paddle.exp(logvars) +
+                          1.0)
         kl_cost = paddle.mean(kl_cost, 0)
 
         return paddle.sum(kl_cost)
@@ -333,8 +338,9 @@ class VAESeq2SeqModel(nn.Layer):
         latent_z = self.sampling(z_mean, z_log_var)
 
         dec_first_hidden_cell = self.fc(latent_z)
-        dec_first_hidden, dec_first_cell = paddle.split(
-            dec_first_hidden_cell, 2, axis=-1)
+        dec_first_hidden, dec_first_cell = paddle.split(dec_first_hidden_cell,
+                                                        2,
+                                                        axis=-1)
         if self.num_layers > 1:
             dec_first_hidden = paddle.split(dec_first_hidden, self.num_layers)
             dec_first_cell = paddle.split(dec_first_cell, self.num_layers)
@@ -352,6 +358,7 @@ class VAESeq2SeqModel(nn.Layer):
 
 
 class VAESeq2SeqInferModel(VAESeq2SeqModel):
+
     def __init__(self,
                  embed_dim,
                  hidden_size,
@@ -372,8 +379,9 @@ class VAESeq2SeqInferModel(VAESeq2SeqModel):
         # Encoder
         latent_z = paddle.normal(shape=(trg.shape[0], self.latent_size))
         dec_first_hidden_cell = self.fc(latent_z)
-        dec_first_hidden, dec_first_cell = paddle.split(
-            dec_first_hidden_cell, 2, axis=-1)
+        dec_first_hidden, dec_first_cell = paddle.split(dec_first_hidden_cell,
+                                                        2,
+                                                        axis=-1)
         if self.num_layers > 1:
             dec_first_hidden = paddle.split(dec_first_hidden, self.num_layers)
             dec_first_cell = paddle.split(dec_first_cell, self.num_layers)
@@ -383,25 +391,22 @@ class VAESeq2SeqInferModel(VAESeq2SeqModel):
         dec_initial_states = [[h, c]
                               for h, c in zip(dec_first_hidden, dec_first_cell)]
 
-        output_fc = lambda x: F.one_hot(
-            paddle.multinomial(
-                F.softmax(paddle.squeeze(
-                    self.decoder.output_fc(x),[1]))),num_classes=self.vocab_size)
+        output_fc = lambda x: F.one_hot(paddle.multinomial(
+            F.softmax(paddle.squeeze(self.decoder.output_fc(x), [1]))),
+                                        num_classes=self.vocab_size)
 
         latent_z = nn.BeamSearchDecoder.tile_beam_merge_with_batch(
             latent_z, self.beam_size)
 
-        decoder = nn.BeamSearchDecoder(
-            cell=self.decoder.lstm.cell,
-            start_token=self.start_token,
-            end_token=self.end_token,
-            beam_size=self.beam_size,
-            embedding_fn=self.decoder.trg_embedder,
-            output_fn=output_fc)
+        decoder = nn.BeamSearchDecoder(cell=self.decoder.lstm.cell,
+                                       start_token=self.start_token,
+                                       end_token=self.end_token,
+                                       beam_size=self.beam_size,
+                                       embedding_fn=self.decoder.trg_embedder,
+                                       output_fn=output_fc)
 
-        outputs, _ = nn.dynamic_decode(
-            decoder,
-            inits=dec_initial_states,
-            max_step_num=self.max_out_len,
-            latent_z=latent_z)
+        outputs, _ = nn.dynamic_decode(decoder,
+                                       inits=dec_initial_states,
+                                       max_step_num=self.max_out_len,
+                                       latent_z=latent_z)
         return outputs

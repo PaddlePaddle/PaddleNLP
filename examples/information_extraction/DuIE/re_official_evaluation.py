@@ -247,8 +247,8 @@ def calc_pr(predict_filename, alias_filename, golden_filename):
     sys.stderr.write('correct spo num = {}\n'.format(correct_sum))
     sys.stderr.write('submitted spo num = {}\n'.format(predict_sum))
     sys.stderr.write('golden set spo num = {}\n'.format(recall_sum))
-    sys.stderr.write('submitted recall spo num = {}\n'.format(
-        recall_correct_sum))
+    sys.stderr.write(
+        'submitted recall spo num = {}\n'.format(recall_correct_sum))
     precision = correct_sum / predict_sum if predict_sum > 0 else 0.0
     recall = recall_correct_sum / recall_sum if recall_sum > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) \
@@ -267,12 +267,18 @@ def calc_pr(predict_filename, alias_filename, golden_filename):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--golden_file", type=str, help="true spo results", required=True)
-    parser.add_argument(
-        "--predict_file", type=str, help="spo results predicted", required=True)
-    parser.add_argument(
-        "--alias_file", type=str, default='', help="entities alias dictionary")
+    parser.add_argument("--golden_file",
+                        type=str,
+                        help="true spo results",
+                        required=True)
+    parser.add_argument("--predict_file",
+                        type=str,
+                        help="spo results predicted",
+                        required=True)
+    parser.add_argument("--alias_file",
+                        type=str,
+                        default='',
+                        help="entities alias dictionary")
     args = parser.parse_args()
     golden_filename = args.golden_file
     predict_filename = args.predict_file

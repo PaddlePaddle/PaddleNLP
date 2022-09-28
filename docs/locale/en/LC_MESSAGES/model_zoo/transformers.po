@@ -775,7 +775,7 @@ msgid "ERNIE_"
 msgstr ""
 
 #: ../model_zoo/transformers.rst:288
-msgid "``ernie-1.0``"
+msgid "``ernie-3.0-medium-zh``"
 msgstr ""
 
 #: ../model_zoo/transformers.rst:288 ../model_zoo/transformers.rst:308

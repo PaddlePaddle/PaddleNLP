@@ -25,8 +25,10 @@ from eval import test
 from config import Config
 
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--target", default=111.0, type=float, help="target perplexity")
+parser.add_argument("--target",
+                    default=111.0,
+                    type=float,
+                    help="target perplexity")
 target = parser.parse_args().target
 
 if __name__ == '__main__':

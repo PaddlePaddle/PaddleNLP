@@ -87,20 +87,20 @@ def r_data_generation(args, evids, text_dict_list, text_exclusive_dict_list,
         temp['id'] = ins['id']
         temp['pred_label'] = ins['pred_label']
         temp['rationale'] = text_dict_list2[ins['id']]['context_idx']
-        temp['no_rationale'] = text_exclusive_dict_list2[ins['id']][
-            'context_idx']
+        temp['no_rationale'] = text_exclusive_dict_list2[
+            ins['id']]['context_idx']
         if len(temp['rationale']) > 1 and \
             args.inter_mode != 'lime' and \
             not (args.base_model.startswith('roberta')):
             for i in range(len(temp['rationale'][1])):
-                temp['rationale'][1][i] -= len(temp['rationale'][0]) + len(temp[
-                    'no_rationale'][0])
+                temp['rationale'][1][i] -= len(temp['rationale'][0]) + len(
+                    temp['no_rationale'][0])
             for i in range(len(temp['no_rationale'][1])):
                 temp['no_rationale'][1][i] -= len(temp['rationale'][0]) + len(
                     temp['no_rationale'][0])
         temp['rationale_pred'] = text_dict_list[ins['id']]['pred_label']
-        temp['no_rationale_pred'] = text_exclusive_dict_list[ins['id']][
-            'pred_label']
+        temp['no_rationale_pred'] = text_exclusive_dict_list[
+            ins['id']]['pred_label']
         temp['rationale_token'] = text_dict_list2[ins['id']]['context_token']
 
         res_data.append(temp)

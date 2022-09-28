@@ -34,76 +34,74 @@ from paddlenlp.transformers.roberta.tokenizer import RobertaTokenizer, RobertaBP
 
 sys.path.append('../task/similarity')
 from LIME.lime_text import LimeTextExplainer
+
 sys.path.append('..')
 from roberta.modeling import RobertaForSequenceClassification
+
 sys.path.remove('..')
 from simnet.utils import CharTokenizer, preprocess_data
 from simnet.model import SimNet
+
 sys.path.remove('../task/similarity')
 sys.path.append('../..')
 from model_interpretation.utils import convert_tokenizer_res_to_old_version
+
 sys.path.remove('../..')
 
 
 def get_args():
     parser = argparse.ArgumentParser('textual similarity prediction')
 
-    parser.add_argument(
-        '--base_model',
-        required=True,
-        choices=['roberta_base', 'roberta_large', 'lstm'])
-    parser.add_argument(
-        '--from_pretrained',
-        type=str,
-        required=True,
-        help='pretrained model directory or tag')
-    parser.add_argument(
-        '--max_seq_len',
-        type=int,
-        default=128,
-        help='max sentence length, should not greater than 512')
+    parser.add_argument('--base_model',
+                        required=True,
+                        choices=['roberta_base', 'roberta_large', 'lstm'])
+    parser.add_argument('--from_pretrained',
+                        type=str,
+                        required=True,
+                        help='pretrained model directory or tag')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=128,
+                        help='max sentence length, should not greater than 512')
     parser.add_argument('--batch_size', type=int, default=1, help='batchsize')
-    parser.add_argument(
-        '--data_dir',
-        type=str,
-        required=True,
-        help='data directory includes train / develop data')
+    parser.add_argument('--data_dir',
+                        type=str,
+                        required=True,
+                        help='data directory includes train / develop data')
 
-    parser.add_argument(
-        '--init_checkpoint',
-        type=str,
-        default=None,
-        help='checkpoint to warm start from')
-    parser.add_argument(
-        '--wd',
-        type=float,
-        default=0.01,
-        help='weight decay, aka L2 regularizer')
+    parser.add_argument('--init_checkpoint',
+                        type=str,
+                        default=None,
+                        help='checkpoint to warm start from')
+    parser.add_argument('--wd',
+                        type=float,
+                        default=0.01,
+                        help='weight decay, aka L2 regularizer')
     parser.add_argument(
         '--use_amp',
         action='store_true',
-        help='only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
+        help=
+        'only activate AMP(auto mixed precision accelatoin) on TensorCore compatible devices'
     )
-    parser.add_argument(
-        '--inter_mode',
-        type=str,
-        default="attention",
-        choices=[
-            "attention", "simple_gradient", "smooth_gradient",
-            "integrated_gradient", "lime"
-        ],
-        help='appoint the mode of interpretable.')
-    parser.add_argument(
-        '--output_dir',
-        type=Path,
-        required=True,
-        help='interpretable output directory')
+    parser.add_argument('--inter_mode',
+                        type=str,
+                        default="attention",
+                        choices=[
+                            "attention", "simple_gradient", "smooth_gradient",
+                            "integrated_gradient", "lime"
+                        ],
+                        help='appoint the mode of interpretable.')
+    parser.add_argument('--output_dir',
+                        type=Path,
+                        required=True,
+                        help='interpretable output directory')
     parser.add_argument('--language', type=str, required=True)
     args = parser.parse_args()
     return args
 
 
 class SimilarityData(DatasetBuilder):
+
     def _read(self, filename):
         with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
@@ -132,8 +130,9 @@ def map_fn_senti(examples, tokenizer):
         title = 'sentence2'
     queries = [example[query] for example in examples]
     titles = [example[title] for example in examples]
-    tokenized_examples = tokenizer(
-        queries, titles, max_seq_len=args.max_seq_len)
+    tokenized_examples = tokenizer(queries,
+                                   titles,
+                                   max_seq_len=args.max_seq_len)
     tokenized_examples = convert_tokenizer_res_to_old_version(
         tokenized_examples)
 
@@ -158,40 +157,40 @@ def init_roberta_var(args):
 
     dev_ds = SimilarityData().read(os.path.join(args.data_dir, 'dev'))
     dev_ds.map(map_fn, batched=True)
-    dev_batch_sampler = paddle.io.BatchSampler(
-        dev_ds, batch_size=args.batch_size, shuffle=False)
-    batchify_fn = lambda samples, fn=Dict({
-        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id)
-    }): fn(samples)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
+                                               batch_size=args.batch_size,
+                                               shuffle=False)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id)
+        }): fn(samples)
 
-    dataloader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=dev_batch_sampler,
-        collate_fn=batchify_fn,
-        return_list=True)
+    dataloader = paddle.io.DataLoader(dataset=dev_ds,
+                                      batch_sampler=dev_batch_sampler,
+                                      collate_fn=batchify_fn,
+                                      return_list=True)
 
     return model, tokenizer, dataloader, dev_ds
 
 
 def init_lstm_var(args):
     if args.language == 'ch':
-        vocab = Vocab.load_vocabulary(
-            "../task/similarity/simnet/vocab.char",
-            unk_token='[UNK]',
-            pad_token='[PAD]')
+        vocab = Vocab.load_vocabulary("../task/similarity/simnet/vocab.char",
+                                      unk_token='[UNK]',
+                                      pad_token='[PAD]')
     else:
-        vocab = Vocab.load_vocabulary(
-            "../task/similarity/simnet/vocab_QQP",
-            unk_token='[UNK]',
-            pad_token='[PAD]')
+        vocab = Vocab.load_vocabulary("../task/similarity/simnet/vocab_QQP",
+                                      unk_token='[UNK]',
+                                      pad_token='[PAD]')
 
     tokenizer = CharTokenizer(vocab, args.language, '../punctuations')
     model = SimNet(network='lstm', vocab_size=len(vocab), num_classes=2)
 
     dev_ds = SimilarityData().read(os.path.join(args.data_dir, 'dev'))
-    dev_examples = preprocess_data(
-        dev_ds.data, tokenizer, language=args.language)
+    dev_examples = preprocess_data(dev_ds.data,
+                                   tokenizer,
+                                   language=args.language)
     batches = [
         dev_examples[idx:idx + args.batch_size]
         for idx in range(0, len(dev_examples), args.batch_size)
@@ -265,13 +264,14 @@ if __name__ == "__main__":
 
             result['id'] = dev_ds.data[step]['id']
 
-            probs, atts, embedded = model.forward_interpret(*fwd_args,
-                                                            **fwd_kwargs)
+            probs, atts, embedded = model.forward_interpret(
+                *fwd_args, **fwd_kwargs)
             pred_label = paddle.argmax(probs, axis=-1).tolist()[0]
 
             result['pred_label'] = pred_label
             result['probs'] = [
-                float(format(prob, '.5f')) for prob in probs.numpy()[0].tolist()
+                float(format(prob, '.5f'))
+                for prob in probs.numpy()[0].tolist()
             ]
             if args.language == 'ch':
                 result['query'] = ''.join(q_tokens)

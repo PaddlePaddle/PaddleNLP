@@ -22,6 +22,7 @@ INF = 1. * 1e12
 
 
 class LSTMModel(nn.Layer):
+
     def __init__(self,
                  vocab_size,
                  num_classes,
@@ -37,10 +38,9 @@ class LSTMModel(nn.Layer):
 
         self.direction = direction
 
-        self.embedder = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=padding_idx)
+        self.embedder = nn.Embedding(num_embeddings=vocab_size,
+                                     embedding_dim=emb_dim,
+                                     padding_idx=padding_idx)
 
         # self.lstm_encoder = nlp.seq2vec.LSTMEncoder(emb_dim,
         #                                             lstm_hidden_size,
@@ -49,15 +49,15 @@ class LSTMModel(nn.Layer):
         #                                             dropout=dropout_rate,
         #                                             pooling_type=pooling_type)
 
-        self.lstm_layer = nn.LSTM(
-            input_size=emb_dim,
-            hidden_size=lstm_hidden_size,
-            num_layers=lstm_layers,
-            direction=direction,
-            dropout=dropout_rate)
+        self.lstm_layer = nn.LSTM(input_size=emb_dim,
+                                  hidden_size=lstm_hidden_size,
+                                  num_layers=lstm_layers,
+                                  direction=direction,
+                                  dropout=dropout_rate)
 
-        self.fc = nn.Linear(lstm_hidden_size * (2 if direction == 'bidirect'
-                                                else 1), fc_hidden_size)
+        self.fc = nn.Linear(
+            lstm_hidden_size * (2 if direction == 'bidirect' else 1),
+            fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
         self.softmax = nn.Softmax(axis=1)
 
@@ -70,8 +70,9 @@ class LSTMModel(nn.Layer):
 
         # text_repr = self.lstm_encoder(embedded_text, sequence_length=seq_len)
 
-        encoded_text, (last_hidden, last_cell) = self.lstm_layer(
-            embedded_text, sequence_length=seq_len)
+        encoded_text, (last_hidden,
+                       last_cell) = self.lstm_layer(embedded_text,
+                                                    sequence_length=seq_len)
         if self.direction == 'bidirect':
             text_repr = paddle.concat(
                 (last_hidden[-2, :, :], last_hidden[-1, :, :]), axis=1)
@@ -91,8 +92,9 @@ class LSTMModel(nn.Layer):
 
         # encoded_text: tensor[batch, seq_len, num_directions * hidden]
         # last_hidden: tensor[2, batch, hiddens]
-        encoded_text, (last_hidden, last_cell) = self.lstm_layer(
-            embedded_text, sequence_length=seq_len)
+        encoded_text, (last_hidden,
+                       last_cell) = self.lstm_layer(embedded_text,
+                                                    sequence_length=seq_len)
         if self.direction == 'bidirect':
             text_repr = paddle.concat(
                 (last_hidden[-2, :, :], last_hidden[-1, :, :]),
@@ -110,6 +112,7 @@ class LSTMModel(nn.Layer):
 
 
 class BiLSTMAttentionModel(nn.Layer):
+
     def __init__(self,
                  attention_layer,
                  vocab_size,
@@ -123,16 +126,14 @@ class BiLSTMAttentionModel(nn.Layer):
         super().__init__()
         self.padding_idx = padding_idx
 
-        self.embedder = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=emb_dim,
-            padding_idx=padding_idx)
-        self.bilstm = nn.LSTM(
-            input_size=emb_dim,
-            hidden_size=lstm_hidden_size,
-            num_layers=lstm_layers,
-            dropout=dropout_rate,
-            direction='bidirect')
+        self.embedder = nn.Embedding(num_embeddings=vocab_size,
+                                     embedding_dim=emb_dim,
+                                     padding_idx=padding_idx)
+        self.bilstm = nn.LSTM(input_size=emb_dim,
+                              hidden_size=lstm_hidden_size,
+                              num_layers=lstm_layers,
+                              dropout=dropout_rate,
+                              direction='bidirect')
         self.attention = attention_layer
         if isinstance(attention_layer, SelfAttention):
             self.fc = nn.Linear(lstm_hidden_size, fc_hidden_size)
@@ -148,8 +149,9 @@ class BiLSTMAttentionModel(nn.Layer):
         mask = text != self.padding_idx
         embedded_text = self.embedder(text)
         # Encode text, shape: (batch, max_seq_len, num_directions * hidden_size)
-        encoded_text, (last_hidden, last_cell) = self.bilstm(
-            embedded_text, sequence_length=seq_len)
+        encoded_text, (last_hidden,
+                       last_cell) = self.bilstm(embedded_text,
+                                                sequence_length=seq_len)
         # Shape: (batch_size, lstm_hidden_size)
         hidden, att_weights = self.attention(
             encoded_text, mask)  # Shape: (batch_size, fc_hidden_size)
@@ -166,11 +168,10 @@ class BiLSTMAttentionModel(nn.Layer):
                          n_samples=None):
         mask = text != self.padding_idx
 
-        baseline_text = paddle.to_tensor(
-            [[0] * text.shape[1]],
-            dtype=text.dtype,
-            place=text.place,
-            stop_gradient=text.stop_gradient)
+        baseline_text = paddle.to_tensor([[0] * text.shape[1]],
+                                         dtype=text.dtype,
+                                         place=text.place,
+                                         stop_gradient=text.stop_gradient)
 
         embedded_text = self.embedder(text)
         baseline_embedded = self.embedder(baseline_text)
@@ -178,12 +179,11 @@ class BiLSTMAttentionModel(nn.Layer):
         if noise is not None:
             if noise.upper() == 'GAUSSIAN':
                 stdev_spread = 0.15
-                stdev = stdev_spread * (
-                    embedded_text.max() - embedded_text.min()).numpy()
-                noise = paddle.to_tensor(
-                    np.random.normal(0, stdev,
-                                     embedded_text.shape).astype(np.float32),
-                    stop_gradient=False)
+                stdev = stdev_spread * (embedded_text.max() -
+                                        embedded_text.min()).numpy()
+                noise = paddle.to_tensor(np.random.normal(
+                    0, stdev, embedded_text.shape).astype(np.float32),
+                                         stop_gradient=False)
                 embedded_text = embedded_text + noise
 
             elif noise.upper() == 'INTEGRATED':
@@ -194,8 +194,9 @@ class BiLSTMAttentionModel(nn.Layer):
                 raise ValueError('unsupported noise method: %s' % (noise))
 
         # Encode text, shape: (batch, max_seq_len, num_directions * hidden_size)
-        encoded_text, (last_hidden, last_cell) = self.bilstm(
-            embedded_text, sequence_length=seq_len)
+        encoded_text, (last_hidden,
+                       last_cell) = self.bilstm(embedded_text,
+                                                sequence_length=seq_len)
         # Shape: (batch_size, lstm_hidden_size)
         hidden, att_weights = self.attention(
             encoded_text, mask)  # Shape: (batch_size, fc_hidden_size)
@@ -218,8 +219,8 @@ class SelfAttention(nn.Layer):
     def __init__(self, hidden_size):
         super().__init__()
         self.hidden_size = hidden_size
-        self.att_weight = self.create_parameter(
-            shape=[1, hidden_size, 1], dtype='float32')
+        self.att_weight = self.create_parameter(shape=[1, hidden_size, 1],
+                                                dtype='float32')
 
     def forward(self, input, mask=None):
         """
@@ -234,16 +235,17 @@ class SelfAttention(nn.Layer):
         # Shape: (batch_size, max_seq_len, hidden_size)
         h = paddle.add_n([forward_input, backward_input])
         # Shape: (batch_size, hidden_size, 1)
-        att_weight = self.att_weight.tile(
-            repeat_times=(paddle.shape(h)[0], 1, 1))
+        att_weight = self.att_weight.tile(repeat_times=(paddle.shape(h)[0], 1,
+                                                        1))
         # Shape: (batch_size, max_seq_len, 1)
         att_score = paddle.bmm(paddle.tanh(h), att_weight)
         if mask is not None:
             # mask, remove the effect of 'PAD'
             mask = paddle.cast(mask, dtype='float32')
             mask = mask.unsqueeze(axis=-1)
-            inf_tensor = paddle.full(
-                shape=mask.shape, dtype='float32', fill_value=-INF)
+            inf_tensor = paddle.full(shape=mask.shape,
+                                     dtype='float32',
+                                     fill_value=-INF)
             att_score = paddle.multiply(att_score, mask) + paddle.multiply(
                 inf_tensor, (1 - mask))
         # Shape: (batch_size, max_seq_len, 1)
@@ -267,8 +269,8 @@ class SelfInteractiveAttention(nn.Layer):
         super().__init__()
         self.input_weight = self.create_parameter(
             shape=[1, hidden_size, hidden_size], dtype='float32')
-        self.bias = self.create_parameter(
-            shape=[1, 1, hidden_size], dtype='float32')
+        self.bias = self.create_parameter(shape=[1, 1, hidden_size],
+                                          dtype='float32')
         self.att_context_vector = self.create_parameter(
             shape=[1, hidden_size, 1], dtype='float32')
 
@@ -296,12 +298,13 @@ class SelfInteractiveAttention(nn.Layer):
             # mask, remove the effect of 'PAD'
             mask = paddle.cast(mask, dtype='float32')
             mask = mask.unsqueeze(axis=-1)
-            inf_tensor = paddle.full(
-                shape=paddle.shape(mask), dtype='float32', fill_value=-INF)
+            inf_tensor = paddle.full(shape=paddle.shape(mask),
+                                     dtype='float32',
+                                     fill_value=-INF)
             att_score = paddle.multiply(att_score, mask) + paddle.multiply(
                 inf_tensor, (1 - mask))
-        att_weight = F.softmax(
-            att_score, axis=1)  # tensor[batch_size, seq_len, 1]
+        att_weight = F.softmax(att_score,
+                               axis=1)  # tensor[batch_size, seq_len, 1]
 
         reps = paddle.bmm(input.transpose(perm=(0, 2, 1)), att_weight).squeeze(
             -1)  # Shape: (batch_size, hidden_size)

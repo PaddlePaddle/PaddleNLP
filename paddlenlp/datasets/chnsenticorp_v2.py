@@ -35,15 +35,15 @@ class ChnSentiCorpV2(DatasetBuilder):
     MD5 = "e336e76d7be4ecd5479083d5b8f771e4"
     META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
     SPLITS = {
-        'train': META_INFO(
-            os.path.join('chnsenticorp', 'train', 'part.0'),
-            '3fac2659547f1ddf90d223b8ed31f22f'),
-        'dev': META_INFO(
-            os.path.join('chnsenticorp', 'dev', 'part.0'),
-            'a3a853bfb3af4a592fc4df24b56c88a7'),
-        'test': META_INFO(
-            os.path.join('chnsenticorp', 'test', 'part.0'),
-            '6bfc8f35f523d2fdf12648d9d02778ff'),
+        'train':
+        META_INFO(os.path.join('chnsenticorp', 'train', 'part.0'),
+                  '3fac2659547f1ddf90d223b8ed31f22f'),
+        'dev':
+        META_INFO(os.path.join('chnsenticorp', 'dev', 'part.0'),
+                  'a3a853bfb3af4a592fc4df24b56c88a7'),
+        'test':
+        META_INFO(os.path.join('chnsenticorp', 'test', 'part.0'),
+                  '6bfc8f35f523d2fdf12648d9d02778ff'),
     }
 
     def _get_data(self, mode, **kwargs):

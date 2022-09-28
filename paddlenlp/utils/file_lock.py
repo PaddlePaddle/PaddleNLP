@@ -55,18 +55,19 @@ class FileLock(object):
         start_time = time.time()
         while True:
             try:
-                self.fd = os.open(self.lock_file_path, os.O_CREAT | os.O_EXCL |
-                                  os.O_RDWR)
+                self.fd = os.open(self.lock_file_path,
+                                  os.O_CREAT | os.O_EXCL | os.O_RDWR)
                 self.is_locked = True  # moved to ensure tag only when locked
                 break
             except OSError as e:
                 if e.errno != errno.EEXIST:
                     raise
                 if self.timeout is None:
-                    raise FileLockException("Could not acquire lock on {}".
-                                            format(self.lock_file_path))
-                if self.timeout > 0 and (time.time() - start_time
-                                         ) >= self.timeout:
+                    raise FileLockException(
+                        "Could not acquire lock on {}".format(
+                            self.lock_file_path))
+                if self.timeout > 0 and (time.time() -
+                                         start_time) >= self.timeout:
                     raise FileLockException("Timeout occured.")
                 time.sleep(self.delay)
 
@@ -103,7 +104,9 @@ class FileLock(object):
 
 
 def decorate(lock_file_path):
+
     def _wrapper(func):
+
         @functools.wraps(func)
         def _impl(*args, **kwargs):
             with FileLock(lock_file_path):

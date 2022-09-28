@@ -25,6 +25,7 @@ from contextlib import ExitStack
 
 
 class DeviceScope(object):
+
     def __init__(self, index, stage, name_scope=None):
         self.index = index
         self.stage = stage
@@ -33,8 +34,7 @@ class DeviceScope(object):
     def __enter__(self):
         self.stack = ExitStack()
         self.stack.enter_context(
-            paddle.static.ipu_shard_guard(
-                index=self.index, stage=self.stage))
+            paddle.static.ipu_shard_guard(index=self.index, stage=self.stage))
         if self.name_scope is not None:
             self.stack.enter_context(paddle.static.name_scope(self.name_scope))
         return self
@@ -124,8 +124,9 @@ class IpuBertEmbeddings(Layer):
         # word embeddings
         word_embeddings_weights = paddle.transpose(self.word_embeddings_weights,
                                                    [1, 0])
-        input_embeddings = paddle.gather(
-            word_embeddings_weights, indices, axis=0)
+        input_embeddings = paddle.gather(word_embeddings_weights,
+                                         indices,
+                                         axis=0)
 
         # position_embeddings
         position_embeddings = self.position_embeddings(positions)
@@ -160,8 +161,8 @@ class BertModel(Layer):
         self.config = config
         self.custom_ops = custom_ops
 
-        qk_scale = 1 / np.sqrt(self.config.hidden_size /
-                               self.config.num_hidden_layers)
+        qk_scale = 1 / np.sqrt(
+            self.config.hidden_size / self.config.num_hidden_layers)
         self.qk_scale_attrs = {
             'name': 'QK_scale',
             'shape': [1],
@@ -246,33 +247,30 @@ class BertModel(Layer):
             with attn_scope:
                 with paddle.static.name_scope(f"Layer{i}/Attention"):
                     layer_input = sequence_output
-                    q = self.create_parameter(
-                        shape=[
-                            self.config.hidden_size, self.config.hidden_size
-                        ],
-                        dtype="float32")
-                    k = self.create_parameter(
-                        shape=[
-                            self.config.hidden_size, self.config.hidden_size
-                        ],
-                        dtype="float32")
-                    v = self.create_parameter(
-                        shape=[
-                            self.config.hidden_size, self.config.hidden_size
-                        ],
-                        dtype="float32")
+                    q = self.create_parameter(shape=[
+                        self.config.hidden_size, self.config.hidden_size
+                    ],
+                                              dtype="float32")
+                    k = self.create_parameter(shape=[
+                        self.config.hidden_size, self.config.hidden_size
+                    ],
+                                              dtype="float32")
+                    v = self.create_parameter(shape=[
+                        self.config.hidden_size, self.config.hidden_size
+                    ],
+                                              dtype="float32")
                     qkv = paddle.concat([q, k, v], axis=1)
                     qkv = paddle.matmul(sequence_output, qkv)
                     qkv.block.ops[-1]._set_attr(
                         '__available_memory',
                         self.config.available_mem_proportion)
-                    q, k, v = paddle.split(
-                        qkv,
-                        num_or_sections=[
-                            self.config.hidden_size, self.config.hidden_size,
-                            self.config.hidden_size
-                        ],
-                        axis=1)
+                    q, k, v = paddle.split(qkv,
+                                           num_or_sections=[
+                                               self.config.hidden_size,
+                                               self.config.hidden_size,
+                                               self.config.hidden_size
+                                           ],
+                                           axis=1)
                     q = paddle.reshape(q, self.qkv_shape)
                     q = paddle.transpose(q, [0, 2, 1, 3])
                     k = paddle.reshape(k, self.qkv_shape)
@@ -291,20 +289,20 @@ class BertModel(Layer):
                                         self.config.seq_len).astype('int32')
                                     base = paddle.fluid.layers.assign(
                                         base_value)
-                                    mmask = paddle.less_than(base,
-                                                             input_mask[0])
+                                    mmask = paddle.less_than(
+                                        base, input_mask[0])
                                     mask_value = np.greater_equal(
                                         base_value,
                                         self.config.max_predictions_per_seq)
                                     mask = paddle.fluid.layers.assign(
                                         mask_value)
                                     mmask = paddle.logical_or(mmask, mask)
-                                    smask = paddle.less_than(base,
-                                                             input_mask[1])
-                                    final_mask = paddle.logical_and(mmask,
-                                                                    smask)
-                                    final_mask = paddle.cast(final_mask,
-                                                             "float16")
+                                    smask = paddle.less_than(
+                                        base, input_mask[1])
+                                    final_mask = paddle.logical_and(
+                                        mmask, smask)
+                                    final_mask = paddle.cast(
+                                        final_mask, "float16")
                                     sub_attrs = {
                                         'name': 'constant_sub',
                                         'shape': [1],
@@ -341,12 +339,12 @@ class BertModel(Layer):
                         qk = paddle.fluid.layers.elementwise_mul(qk, qk_scale)
 
                         if self.config.task == "PRETRAINING":
-                            qk = paddle.fluid.layers.elementwise_add(qk,
-                                                                     final_mask)
+                            qk = paddle.fluid.layers.elementwise_add(
+                                qk, final_mask)
                         else:
                             # for SQUAD task, input_mask is calculated in data preprocessing
-                            qk = paddle.fluid.layers.elementwise_add(qk,
-                                                                     input_mask)
+                            qk = paddle.fluid.layers.elementwise_add(
+                                qk, input_mask)
 
                         qk = paddle.fluid.layers.softmax(qk)
                         if self.config.task == "SQUAD":
@@ -361,10 +359,9 @@ class BertModel(Layer):
                         qkv = paddle.transpose(qkv, [0, 2, 1, 3])
                         qkv = paddle.reshape(qkv, [-1, self.config.hidden_size])
 
-                    qkv_linear = nn.Linear(
-                        self.config.hidden_size,
-                        self.config.hidden_size,
-                        bias_attr=False)
+                    qkv_linear = nn.Linear(self.config.hidden_size,
+                                           self.config.hidden_size,
+                                           bias_attr=False)
                     qkv = qkv_linear(qkv)
                     qkv.block.ops[-1]._set_attr(
                         '__available_memory',
@@ -374,8 +371,8 @@ class BertModel(Layer):
                         self.config.attention_probs_dropout_prob,
                         dropout_implementation='upscale_in_train')
                     attention = paddle.add(layer_input, qkv)
-                    layer_norm1 = nn.LayerNorm(
-                        self.config.hidden_size, epsilon=0.001)
+                    layer_norm1 = nn.LayerNorm(self.config.hidden_size,
+                                               epsilon=0.001)
                     attention = layer_norm1(attention)
 
             # FF
@@ -401,8 +398,8 @@ class BertModel(Layer):
                         self.config.attention_probs_dropout_prob,
                         dropout_implementation='upscale_in_train')
                     ff = paddle.add(attention, ff)
-                    layer_norm2 = nn.LayerNorm(
-                        self.config.hidden_size, epsilon=0.001)
+                    layer_norm2 = nn.LayerNorm(self.config.hidden_size,
+                                               epsilon=0.001)
                     sequence_output = layer_norm2(ff)
 
                 if self.should_checkpoint(i):
@@ -455,8 +452,10 @@ class IpuBertForQuestionAnswering(Layer):
         """
         logits = self.classifier(sequence_output)
 
-        start_logits = paddle.slice(
-            input=logits, axes=[1], starts=[0], ends=[1])
+        start_logits = paddle.slice(input=logits,
+                                    axes=[1],
+                                    starts=[0],
+                                    ends=[1])
         end_logits = paddle.slice(input=logits, axes=[1], starts=[1], ends=[2])
 
         start_logits = paddle.reshape(start_logits, [-1, self.seq_len])
@@ -657,12 +656,14 @@ class IpuBertPretrainingMLMAccAndLoss(Layer):
             total_tokens = paddle.fluid.layers.reduce_sum(mlm_mask)
             total_correct_tokens = paddle.cast(total_correct_tokens, "float32")
             total_tokens = paddle.cast(total_tokens, "float32")
-            mlm_acc = paddle.fluid.layers.elementwise_div(total_correct_tokens,
-                                                          total_tokens)
+            mlm_acc = paddle.fluid.layers.elementwise_div(
+                total_correct_tokens, total_tokens)
 
         masked_lm_softmax = paddle.fluid.layers.softmax(mlm)
-        mlm_loss = self.custom_ops.custom_nll_loss(
-            masked_lm_softmax, masked_lm_ids, 1, str(self.ignore_index), False)
+        mlm_loss = self.custom_ops.custom_nll_loss(masked_lm_softmax,
+                                                   masked_lm_ids, 1,
+                                                   str(self.ignore_index),
+                                                   False)
 
         return mlm_acc, mlm_loss
 
@@ -695,8 +696,8 @@ class IpuBertPretrainingNSPAccAndLoss(Layer):
             }
             nsp_total = paddle.fluid.layers.fill_constant(**attrs)
             nsp_total = paddle.cast(nsp_total, "float32")
-            nsp_acc = paddle.fluid.layers.elementwise_div(nsp_correct,
-                                                          nsp_total)
+            nsp_acc = paddle.fluid.layers.elementwise_div(
+                nsp_correct, nsp_total)
 
         next_sentence_softmax = paddle.fluid.layers.softmax(nsp)
         nsp_loss = self.custom_ops.custom_nll_loss(next_sentence_softmax,

@@ -14,7 +14,7 @@
 安装指令如下，更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 ```
 # 安装client和serving app，用于向服务发送请求
-pip install paddle_serving_app paddle_serving_clinet
+pip install paddle_serving_app paddle_serving_client
 
 # 安装serving，用于启动服务
 # CPU server
@@ -33,9 +33,10 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 
 
 ### 安装FasterTokenizer文本处理加速库（可选）
-如果部署环境是Linux，推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+推荐安装faster_tokenizer，可以得到更极致的文本处理效率，进一步提升服务性能。目前faster_tokenizer已支持Windows，Linux x64，Mac x86_64平台。
+
 ```
-pip install faster_tokenizers
+pip install faster_tokenizer
 ```
 
 

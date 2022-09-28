@@ -59,35 +59,34 @@ def define_args_parser():
         choices=['preproc', 'train', 'infer', 'test', 'debug'])
     general_args.add_argument('--batch-size', type=int)
     general_args.add_argument('--beam-size', default=1, type=int)
-    general_args.add_argument(
-        "--use-cuda", type=_arg_bool, default=True, help="is run in cuda mode")
-    general_args.add_argument(
-        "--is-eval-value",
-        type=_arg_bool,
-        default=True,
-        help="is evaluating value")
-    general_args.add_argument(
-        "--is-cloud",
-        type=_arg_bool,
-        default=False,
-        help="is run in paddle cloud")
-    general_args.add_argument(
-        "--is-debug",
-        type=_arg_bool,
-        default=False,
-        help="is run in debug mode")
+    general_args.add_argument("--use-cuda",
+                              type=_arg_bool,
+                              default=True,
+                              help="is run in cuda mode")
+    general_args.add_argument("--is-eval-value",
+                              type=_arg_bool,
+                              default=True,
+                              help="is evaluating value")
+    general_args.add_argument("--is-cloud",
+                              type=_arg_bool,
+                              default=False,
+                              help="is run in paddle cloud")
+    general_args.add_argument("--is-debug",
+                              type=_arg_bool,
+                              default=False,
+                              help="is run in debug mode")
 
     model_args = parser.add_argument_group(title='model')
-    model_args.add_argument(
-        '--pretrain-model', help='ernie model path for dygraph')
+    model_args.add_argument('--pretrain-model',
+                            help='ernie model path for dygraph')
     model_args.add_argument('--init-model-params', help='trained model params')
     model_args.add_argument('--init-model-optim', help='dumped model optimizer')
-    model_args.add_argument(
-        '--model-name',
-        choices=['seq2tree_v2'],
-        help='ernie model path for dygraph')
-    model_args.add_argument(
-        '--grammar-type', choices=['dusql_v2', 'nl2sql'], help='')
+    model_args.add_argument('--model-name',
+                            choices=['seq2tree_v2'],
+                            help='ernie model path for dygraph')
+    model_args.add_argument('--grammar-type',
+                            choices=['dusql_v2', 'nl2sql'],
+                            help='')
 
     data_args = parser.add_argument_group(title='data')
     data_args.add_argument('--data-root', help='root data path. low priority.')
@@ -97,18 +96,20 @@ def define_args_parser():
     data_args.add_argument('--db-schema', help='temp argument')
     data_args.add_argument(
         '--grammar',
-        help='path to grammar definition file, or cached label vocabs directory')
-    data_args.add_argument(
-        '--train-set', help='original dataset path or dumped file path')
-    data_args.add_argument(
-        '--dev-set', help='original dataset path or dumped file path')
-    data_args.add_argument(
-        '--test-set', help='original dataset path or dumped file path')
-    data_args.add_argument(
-        '--eval-file', help='file to be evaluated(inferenced result)')
+        help='path to grammar definition file, or cached label vocabs directory'
+    )
+    data_args.add_argument('--train-set',
+                           help='original dataset path or dumped file path')
+    data_args.add_argument('--dev-set',
+                           help='original dataset path or dumped file path')
+    data_args.add_argument('--test-set',
+                           help='original dataset path or dumped file path')
+    data_args.add_argument('--eval-file',
+                           help='file to be evaluated(inferenced result)')
     data_args.add_argument('--output', help='')
-    data_args.add_argument(
-        "--is-cached", type=_arg_bool, help="is dataset in cached format")
+    data_args.add_argument("--is-cached",
+                           type=_arg_bool,
+                           help="is dataset in cached format")
 
     train_args = parser.add_argument_group(title='train')
     train_args.add_argument('--epochs', type=int)
@@ -172,9 +173,8 @@ def gen_config(arg_list=None):
         }
 
     config_file = cli_args.config
-    config = json.loads(
-        jsonnet.evaluate_file(config_file),
-        object_hook=lambda o: SimpleNamespace(**o))
+    config = json.loads(jsonnet.evaluate_file(config_file),
+                        object_hook=lambda o: SimpleNamespace(**o))
 
     for group, args in arg_groups.items():
         if not hasattr(config, group):

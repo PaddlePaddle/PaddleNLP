@@ -41,18 +41,17 @@ def parse_args():
         "--model_name_or_path",
         default="gpt2-medium-en",
         type=str,
-        help="The model name to specify the gpt to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt-cpm-large-cn']. "
+        help=
+        "The model name to specify the gpt to use. Can be one of ['gpt2-en', 'gpt2-medium-en', 'gpt-cpm-large-cn']. "
     )
-    parser.add_argument(
-        "--decoding_lib",
-        default="../../build/lib/libdecoding_op.so",
-        type=str,
-        help="Path of libdecoding_op.so. ")
-    parser.add_argument(
-        "--inference_model_dir",
-        default="./infer_model/",
-        type=str,
-        help="Path to save inference model of gpt. ")
+    parser.add_argument("--decoding_lib",
+                        default="../../build/lib/libdecoding_op.so",
+                        type=str,
+                        help="Path of libdecoding_op.so. ")
+    parser.add_argument("--inference_model_dir",
+                        default="./infer_model/",
+                        type=str,
+                        help="Path to save inference model of gpt. ")
     parser.add_argument(
         "--topk",
         default=4,
@@ -63,17 +62,17 @@ def parse_args():
         default=0.0,
         type=float,
         help="The probability threshold to procedure topp sampling. ")
-    parser.add_argument(
-        "--max_out_len", default=32, type=int, help="Maximum output length. ")
-    parser.add_argument(
-        "--temperature",
-        default=1.0,
-        type=float,
-        help="The temperature to set. ")
-    parser.add_argument(
-        "--use_fp16_decoding",
-        action="store_true",
-        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--max_out_len",
+                        default=32,
+                        type=int,
+                        help="Maximum output length. ")
+    parser.add_argument("--temperature",
+                        default=1.0,
+                        type=float,
+                        help="The temperature to set. ")
+    parser.add_argument("--use_fp16_decoding",
+                        action="store_true",
+                        help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()
     return args
 
@@ -85,24 +84,22 @@ def do_predict(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     logger.info('Loading the model parameters, please wait...')
-    model = model_class.from_pretrained(
-        args.model_name_or_path, max_predict_len=args.max_out_len)
+    model = model_class.from_pretrained(args.model_name_or_path,
+                                        max_predict_len=args.max_out_len)
 
-    gpt = FasterGPT(
-        model=model,
-        decoding_lib=args.decoding_lib,
-        use_fp16_decoding=args.use_fp16_decoding)
+    gpt = FasterGPT(model=model,
+                    decoding_lib=args.decoding_lib,
+                    use_fp16_decoding=args.use_fp16_decoding)
 
     # Set evaluate mode
     gpt.eval()
 
-    # Convert dygraph model to static graph model 
+    # Convert dygraph model to static graph model
     gpt = paddle.jit.to_static(
         gpt,
         input_spec=[
             # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
             #
             # If it's necessarry to provide mem_seq_len and attention_mask,
             # the parameters should be:

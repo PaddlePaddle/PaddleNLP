@@ -87,8 +87,8 @@ class NERWordTagTask(WordTagTask):
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_state.pdparams",
-                "a93e4074c9440cc3f1d4d29e54cf766d"
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.3/model_state.pdparams",
+                "32b4ed27e99d6b2c76e50a24d1a9fd56"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",

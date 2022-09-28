@@ -77,23 +77,25 @@ _MNLI_BASE_KWARGS = dict(
         journal={arXiv preprint arXiv:1508.05326},
         year={2015}
       }"""),
-    url="http://www.nyu.edu/projects/bowman/multinli/", )
+    url="http://www.nyu.edu/projects/bowman/multinli/",
+)
 
 
 class GlueConfig(datasets.BuilderConfig):
     """BuilderConfig for GLUE."""
 
     def __init__(
-            self,
-            text_features,
-            label_column,
-            data_url,
-            data_dir,
-            citation,
-            url,
-            label_classes=None,
-            process_label=lambda x: x,
-            **kwargs, ):
+        self,
+        text_features,
+        label_column,
+        data_url,
+        data_dir,
+        citation,
+        url,
+        label_classes=None,
+        process_label=lambda x: x,
+        **kwargs,
+    ):
         """BuilderConfig for GLUE.
 
         Args:
@@ -113,8 +115,8 @@ class GlueConfig(datasets.BuilderConfig):
             of the label and processing it to the form required by the label feature
           **kwargs: keyword arguments forwarded to super.
         """
-        super(GlueConfig, self).__init__(
-            version=datasets.Version("1.0.0", ""), **kwargs)
+        super(GlueConfig, self).__init__(version=datasets.Version("1.0.0", ""),
+                                         **kwargs)
         self.text_features = text_features
         self.label_column = label_column
         self.label_classes = label_classes
@@ -148,7 +150,8 @@ class Glue(datasets.GeneratorBasedBuilder):
               journal={arXiv preprint arXiv:1805.12471},
               year={2018}
             }"""),
-            url="https://nyu-mll.github.io/CoLA/", ),
+            url="https://nyu-mll.github.io/CoLA/",
+        ),
         GlueConfig(
             name="sst2",
             description=textwrap.dedent("""\
@@ -169,7 +172,8 @@ class Glue(datasets.GeneratorBasedBuilder):
               pages={1631--1642},
               year={2013}
             }"""),
-            url="https://datasets.stanford.edu/sentiment/index.html", ),
+            url="https://datasets.stanford.edu/sentiment/index.html",
+        ),
         GlueConfig(
             name="mrpc",
             description=textwrap.dedent("""\
@@ -177,8 +181,10 @@ class Glue(datasets.GeneratorBasedBuilder):
             sentence pairs automatically extracted from online news sources, with human annotations
             for whether the sentences in the pair are semantically equivalent."""
                                         ),  # pylint: disable=line-too-long
-            text_features={"sentence1": "",
-                           "sentence2": ""},
+            text_features={
+                "sentence1": "",
+                "sentence2": ""
+            },
             label_classes=["not_equivalent", "equivalent"],
             label_column="Quality",
             data_url="",  # MRPC isn't hosted by GLUE.
@@ -214,7 +220,8 @@ class Glue(datasets.GeneratorBasedBuilder):
             url = {https://data.quora.com/First-Quora-Dataset-Release-Question-Pairs},
             urldate = {2019-04-03}
           }"""),
-            url="https://data.quora.com/First-Quora-Dataset-Release-Question-Pairs",
+            url=
+            "https://data.quora.com/First-Quora-Dataset-Release-Question-Pairs",
         ),
         GlueConfig(
             name="stsb",
@@ -238,7 +245,8 @@ class Glue(datasets.GeneratorBasedBuilder):
               year={2017}
             }"""),
             url="http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark",
-            process_label=np.float32, ),
+            process_label=np.float32,
+        ),
         GlueConfig(
             name="mnli",
             description=textwrap.dedent("""\
@@ -250,19 +258,22 @@ class Glue(datasets.GeneratorBasedBuilder):
             We use the standard test set, for which we obtained private labels from the authors, and evaluate
             on both the matched (in-domain) and mismatched (cross-domain) section. We also use and recommend
             the SNLI corpus as 550k examples of auxiliary training data."""),
-            **_MNLI_BASE_KWARGS, ),
+            **_MNLI_BASE_KWARGS,
+        ),
         GlueConfig(
             name="mnli_mismatched",
             description=textwrap.dedent("""\
           The mismatched validation and test splits from MNLI.
           See the "mnli" BuilderConfig for additional information."""),
-            **_MNLI_BASE_KWARGS, ),
+            **_MNLI_BASE_KWARGS,
+        ),
         GlueConfig(
             name="mnli_matched",
             description=textwrap.dedent("""\
           The matched validation and test splits from MNLI.
           See the "mnli" BuilderConfig for additional information."""),
-            **_MNLI_BASE_KWARGS, ),
+            **_MNLI_BASE_KWARGS,
+        ),
         GlueConfig(
             name="qnli",
             description=textwrap.dedent("""\
@@ -291,7 +302,8 @@ class Glue(datasets.GeneratorBasedBuilder):
               journal={arXiv preprint arXiv:1606.05250},
               year={2016}
             }"""),
-            url="https://rajpurkar.github.io/SQuAD-explorer/", ),
+            url="https://rajpurkar.github.io/SQuAD-explorer/",
+        ),
         GlueConfig(
             name="rte",
             description=textwrap.dedent("""\
@@ -342,7 +354,8 @@ class Glue(datasets.GeneratorBasedBuilder):
               booktitle={TAC},
               year={2009}
             }"""),
-            url="https://aclweb.org/aclwiki/Recognizing_Textual_Entailment", ),
+            url="https://aclweb.org/aclwiki/Recognizing_Textual_Entailment",
+        ),
         GlueConfig(
             name="wnli",
             description=textwrap.dedent("""\
@@ -376,7 +389,8 @@ class Glue(datasets.GeneratorBasedBuilder):
               booktitle={Thirteenth International Conference on the Principles of Knowledge Representation and Reasoning},
               year={2012}
             }"""),
-            url="https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html",
+            url=
+            "https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html",
         ),
         GlueConfig(
             name="ax",
@@ -397,7 +411,8 @@ class Glue(datasets.GeneratorBasedBuilder):
             data_url="https://dl.fbaipublicfiles.com/glue/data/AX.tsv",
             data_dir="",  # We are downloading a tsv.
             citation="",  # The GLUE citation is sufficient.
-            url="https://gluebenchmark.com/diagnostics", ),
+            url="https://gluebenchmark.com/diagnostics",
+        ),
     ]
 
     def _info(self):
@@ -415,7 +430,8 @@ class Glue(datasets.GeneratorBasedBuilder):
             description=_GLUE_DESCRIPTION,
             features=datasets.Features(features),
             homepage=self.config.url,
-            citation=self.config.citation + "\n" + _GLUE_CITATION, )
+            citation=self.config.citation + "\n" + _GLUE_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         if self.config.name == "ax":
@@ -426,7 +442,8 @@ class Glue(datasets.GeneratorBasedBuilder):
                     gen_kwargs={
                         "data_file": data_file,
                         "split": "test",
-                    }, )
+                    },
+                )
             ]
 
         if self.config.name == "mrpc":
@@ -446,32 +463,43 @@ class Glue(datasets.GeneratorBasedBuilder):
                 "data_file": os.path.join(data_dir or "", "train.tsv"),
                 "split": "train",
                 "mrpc_files": mrpc_files,
-            }, )
+            },
+        )
         if self.config.name == "mnli":
             return [
                 train_split,
-                _mnli_split_generator(
-                    "validation_matched", data_dir, "dev", matched=True),
-                _mnli_split_generator(
-                    "validation_mismatched", data_dir, "dev", matched=False),
-                _mnli_split_generator(
-                    "test_matched", data_dir, "test", matched=True),
-                _mnli_split_generator(
-                    "test_mismatched", data_dir, "test", matched=False),
+                _mnli_split_generator("validation_matched",
+                                      data_dir,
+                                      "dev",
+                                      matched=True),
+                _mnli_split_generator("validation_mismatched",
+                                      data_dir,
+                                      "dev",
+                                      matched=False),
+                _mnli_split_generator("test_matched",
+                                      data_dir,
+                                      "test",
+                                      matched=True),
+                _mnli_split_generator("test_mismatched",
+                                      data_dir,
+                                      "test",
+                                      matched=False),
             ]
         elif self.config.name == "mnli_matched":
             return [
-                _mnli_split_generator(
-                    "validation", data_dir, "dev", matched=True),
-                _mnli_split_generator(
-                    "test", data_dir, "test", matched=True),
+                _mnli_split_generator("validation",
+                                      data_dir,
+                                      "dev",
+                                      matched=True),
+                _mnli_split_generator("test", data_dir, "test", matched=True),
             ]
         elif self.config.name == "mnli_mismatched":
             return [
-                _mnli_split_generator(
-                    "validation", data_dir, "dev", matched=False),
-                _mnli_split_generator(
-                    "test", data_dir, "test", matched=False),
+                _mnli_split_generator("validation",
+                                      data_dir,
+                                      "dev",
+                                      matched=False),
+                _mnli_split_generator("test", data_dir, "test", matched=False),
             ]
         else:
             return [
@@ -482,21 +510,23 @@ class Glue(datasets.GeneratorBasedBuilder):
                         "data_file": os.path.join(data_dir or "", "dev.tsv"),
                         "split": "dev",
                         "mrpc_files": mrpc_files,
-                    }, ),
+                    },
+                ),
                 datasets.SplitGenerator(
                     name=datasets.Split.TEST,
                     gen_kwargs={
                         "data_file": os.path.join(data_dir or "", "test.tsv"),
                         "split": "test",
                         "mrpc_files": mrpc_files,
-                    }, ),
+                    },
+                ),
             ]
 
     def _generate_examples(self, data_file, split, mrpc_files=None):
         if self.config.name == "mrpc":
             # We have to prepare the MRPC dataset from the original sources ourselves.
-            examples = self._generate_example_mrpc_files(
-                mrpc_files=mrpc_files, split=split)
+            examples = self._generate_example_mrpc_files(mrpc_files=mrpc_files,
+                                                         split=split)
             for example in examples:
                 yield example["idx"], example
         else:
@@ -508,11 +538,13 @@ class Glue(datasets.GeneratorBasedBuilder):
             is_cola_non_test = self.config.name == "cola" and split != "test"
 
             with open(data_file, encoding="utf8") as f:
-                reader = csv.DictReader(
-                    f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                reader = csv.DictReader(f,
+                                        delimiter="\t",
+                                        quoting=csv.QUOTE_NONE)
                 if is_cola_non_test:
-                    reader = csv.reader(
-                        f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                    reader = csv.reader(f,
+                                        delimiter="\t",
+                                        quoting=csv.QUOTE_NONE)
 
                 for n, row in enumerate(reader):
                     if is_cola_non_test:
@@ -550,8 +582,9 @@ class Glue(datasets.GeneratorBasedBuilder):
                 # The first 3 bytes are the utf-8 BOM \xef\xbb\xbf, which messes with
                 # the Quality key.
                 f.seek(3)
-                reader = csv.DictReader(
-                    f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                reader = csv.DictReader(f,
+                                        delimiter="\t",
+                                        quoting=csv.QUOTE_NONE)
                 for n, row in enumerate(reader):
                     yield {
                         "sentence1": row["#1 String"],
@@ -567,8 +600,9 @@ class Glue(datasets.GeneratorBasedBuilder):
                 # The first 3 bytes are the utf-8 BOM \xef\xbb\xbf, which messes with
                 # the Quality key.
                 f.seek(3)
-                reader = csv.DictReader(
-                    f, delimiter="\t", quoting=csv.QUOTE_NONE)
+                reader = csv.DictReader(f,
+                                        delimiter="\t",
+                                        quoting=csv.QUOTE_NONE)
                 for n, row in enumerate(reader):
                     is_row_in_dev = [row["#1 ID"], row["#2 ID"]] in dev_ids
                     if is_row_in_dev == (split == "dev"):
@@ -584,9 +618,13 @@ def _mnli_split_generator(name, data_dir, split, matched):
     return datasets.SplitGenerator(
         name=name,
         gen_kwargs={
-            "data_file": os.path.join(data_dir, "%s_%s.tsv" % (split, "matched"
-                                                               if matched else
-                                                               "mismatched")),
-            "split": split,
-            "mrpc_files": None,
-        }, )
+            "data_file":
+            os.path.join(
+                data_dir,
+                "%s_%s.tsv" % (split, "matched" if matched else "mismatched")),
+            "split":
+            split,
+            "mrpc_files":
+            None,
+        },
+    )

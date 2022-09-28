@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -109,12 +109,12 @@ def do_train():
     dev_ds = load_dataset(
         read_text_pair, data_path=args.test_set_file, lazy=False)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-       'ernie-1.0',
+    pretrained_model = AutoModel.from_pretrained(
+       'ernie-3.0-medium-zh',
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(
         convert_example,

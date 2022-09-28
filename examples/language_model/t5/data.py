@@ -26,24 +26,28 @@ GLUE_PROCESSED = collections.OrderedDict([
     ("sst-2", (["sst2 sentence: "], ["negative", "positive"])),
     (
         "mrpc",
-        (["mrpc sentence1: ", " sentence2: "],
-         ["not_equivalent", "equivalent"]), ),
+        (["mrpc sentence1: ", " sentence2: "], ["not_equivalent",
+                                                "equivalent"]),
+    ),
     ("sts-b", (["stsb sentence1: ", " sentence2: "], None)),
-    ("qqp",
-     (["qqp question1: ", " question2: "], ["not_duplicate", "duplicate"])),
+    ("qqp", (["qqp question1: ",
+              " question2: "], ["not_duplicate", "duplicate"])),
     (
         "mnli",
         (
             ["mnli hypothesis: ", " premise: "],
-            ["contradiction", "entailment", "neutral"], ), ),
+            ["contradiction", "entailment", "neutral"],
+        ),
+    ),
     (
         "qnli",
-        (["qnli question: ", " sentence: "],
-         ["entailment", "not_entailment"]), ),
+        (["qnli question: ", " sentence: "], ["entailment", "not_entailment"]),
+    ),
     (
         "rte",
-        (["rte sentence1: ", " rte sentence2: "],
-         ["entailment", "not_entailment"]), ),
+        (["rte sentence1: ",
+          " rte sentence2: "], ["entailment", "not_entailment"]),
+    ),
 ])
 
 
@@ -60,8 +64,9 @@ def trans_func(example, tokenizer, args):
             label_text = id2label[example["labels"]]
         else:
             label_text = str(example["labels"])
-        target = tokenizer(
-            label_text, return_token_type_ids=False, return_attention_mask=True)
+        target = tokenizer(label_text,
+                           return_token_type_ids=False,
+                           return_attention_mask=True)
 
     if len(processed) == 1:
         text = processed[0] + example["sentence"]
@@ -73,14 +78,16 @@ def trans_func(example, tokenizer, args):
         text,
         max_seq_len=args.max_seq_length,
         return_token_type_ids=False,
-        return_attention_mask=True, )
+        return_attention_mask=True,
+    )
 
     if not args.is_test:
         return (
             source["input_ids"],
             source["attention_mask"],
             target["input_ids"],
-            target["attention_mask"], )
+            target["attention_mask"],
+        )
     else:
         return source["input_ids"], source["attention_mask"]
 
@@ -93,20 +100,23 @@ def get_train_dataloader(tokenizer, args):
     else:
         ds = load_dataset("glue", args.task_name, splits="train")
         ds.map(
-            partial(
-                trans_func, tokenizer=tokenizer, args=args),
+            partial(trans_func, tokenizer=tokenizer, args=args),
             batched=False,
-            lazy=False, )
+            lazy=False,
+        )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(
-        ds, batch_size=args.train_batch_size, shuffle=True)
+    batch_sampler = BatchSampler(ds,
+                                 batch_size=args.train_batch_size,
+                                 shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # attention_mask
         Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # decoder_attention_mask
     ): fn(samples)
 
     data_loader = DataLoader(
@@ -114,7 +124,8 @@ def get_train_dataloader(tokenizer, args):
         batch_sampler=batch_sampler,
         collate_fn=batchify_fn,
         num_workers=args.num_workers,
-        return_list=True, )
+        return_list=True,
+    )
 
     return data_loader
 
@@ -127,20 +138,23 @@ def get_dev_dataloader(tokenizer, args):
     else:
         ds = load_dataset("glue", args.task_name, splits="dev")
         ds.map(
-            partial(
-                trans_func, tokenizer=tokenizer, args=args),
+            partial(trans_func, tokenizer=tokenizer, args=args),
             batched=False,
-            lazy=False, )
+            lazy=False,
+        )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(
-        ds, batch_size=args.train_batch_size, shuffle=False)
+    batch_sampler = BatchSampler(ds,
+                                 batch_size=args.train_batch_size,
+                                 shuffle=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # attention_mask
         Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # decoder_attention_mask
     ): fn(samples)
 
     data_loader = DataLoader(
@@ -148,7 +162,8 @@ def get_dev_dataloader(tokenizer, args):
         batch_sampler=batch_sampler,
         collate_fn=batchify_fn,
         num_workers=args.num_workers,
-        return_list=True, )
+        return_list=True,
+    )
 
     return data_loader
 
@@ -164,20 +179,23 @@ def get_mnli_dev_dataloader(tokenizer, args, matched=True):
     else:
         ds = load_dataset("glue", args.task_name, splits=split)
         ds.map(
-            partial(
-                trans_func, tokenizer=tokenizer, args=args),
+            partial(trans_func, tokenizer=tokenizer, args=args),
             batched=False,
-            lazy=False, )
+            lazy=False,
+        )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(
-        ds, batch_size=args.train_batch_size, shuffle=False)
+    batch_sampler = BatchSampler(ds,
+                                 batch_size=args.train_batch_size,
+                                 shuffle=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # attention_mask
         Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+            ),  # decoder_attention_mask
     ): fn(samples)
 
     data_loader = DataLoader(
@@ -185,6 +203,7 @@ def get_mnli_dev_dataloader(tokenizer, args, matched=True):
         batch_sampler=batch_sampler,
         collate_fn=batchify_fn,
         num_workers=args.num_workers,
-        return_list=True, )
+        return_list=True,
+    )
 
     return data_loader
