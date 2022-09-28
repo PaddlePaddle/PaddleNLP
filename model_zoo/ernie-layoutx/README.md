@@ -129,7 +129,7 @@ python -u run_ner.py \
   --dataset_name xfund_zh \
   --do_train \
   --do_eval \
-  --lang "zh" \
+  --lang "ch" \
   --max_steps 20000 \
   --eval_steps 100 \
   --save_steps 100 \
@@ -210,8 +210,8 @@ python3 -u run_cls.py \
     --max_seq_length 512 \
     --warmup_ratio 0.05 \
     --weight_decay 0 \
-    --eval_steps 100 \
-    --save_steps 100 \
+    --eval_steps 2000 \
+    --save_steps 2000 \
     --save_total_limit 1 \
     --load_best_model_at_end \
     --pattern "cls" \

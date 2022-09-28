@@ -922,11 +922,7 @@ def _resize_image(
         raise ValueError("image is not 3-dimensional.")
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
-    if isinstance(target_size, list):
-        # Case for multi-scale training
-        selected_size = random.choice(target_size)
-    else:
-        selected_size = target_size
+    selected_size = target_size
     if float(im_size_min) == 0:
         raise ZeroDivisionError("min size of image is 0")
     resize_w = selected_size

@@ -139,9 +139,8 @@ class DataArguments:
         default=None,
         metadata={"help": "The way to convert the predict result"},
     )
-    lang: str = field(
+    lang: Optional[str] = field(
         default="en",
-        choices=["en", "ch"],
         metadata={"help": "Languge type of the dataset"},
     )
 

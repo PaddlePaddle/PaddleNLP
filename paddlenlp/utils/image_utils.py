@@ -691,7 +691,7 @@ def two_dimension_sort_layout(layout1, layout2, vratio=0.54):
     return two_dimension_sort_box(layout1["bbox"], layout2["bbox"])
 
 
-def ppocr2example(ocr_res, img_path, simplify=True, scale=False):
+def ppocr2example(ocr_res, img_path):
     """Transfer paddleocr result to example
     """
     segments = []
@@ -719,18 +719,9 @@ def ppocr2example(ocr_res, img_path, simplify=True, scale=False):
     im_w, im_h = img.size
     im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
 
-    if scale:
-        image_size = 1024
-        scale_x = image_size / im_w
-        scale_y = image_size / im_h
     for segment in segments:
         bbox = segment["bbox"]
         x1, y1, w, h = bbox.left, bbox.top, bbox.width, bbox.height
-        if scale:
-            w = int(min(w * scale_x, image_size - 1))
-            h = int(min(h * scale_y, image_size - 1))
-            y1 = int(max(0, min(y1 * scale_y, image_size - h - 1)))
-            x1 = int(max(0, min(x1 * scale_x, image_size - w - 1)))
         bbox = Bbox(*[x1, y1, w, h])
         text = segment["text"]
         char_num = 0
@@ -758,11 +749,10 @@ def ppocr2example(ocr_res, img_path, simplify=True, scale=False):
                 ])
             ])
     new_doc_boxes = []
-    if simplify:
-        for doc_box in doc_boxes:
-            bbox = doc_box[0]
-            new_doc_boxes.append([bbox.left, bbox.top, bbox.width, bbox.height])
-        doc_boxes = new_doc_boxes
+    for doc_box in doc_boxes:
+        bbox = doc_box[0]
+        new_doc_boxes.append([bbox.left, bbox.top, bbox.right, bbox.bottom])
+    doc_boxes = new_doc_boxes
     example = {
         "text": doc_tokens,
         "bbox": doc_boxes,

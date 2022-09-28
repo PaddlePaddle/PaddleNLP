@@ -35,7 +35,7 @@ wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip &
 python infer.py \
     --model_path_prefix ../../ner_export/inference \
     --task_type ner \
-    --lang en \
+    --lang "en" \
     --batch_size 8
 ```
 
@@ -81,7 +81,7 @@ python infer.py \
 python infer.py \
     --model_path_prefix ../../mrc_export/inference \
     --task_type mrc \
-    --lang ch \
+    --lang "ch" \
     --batch_size 8
 ```
 
@@ -107,6 +107,7 @@ python infer.py \
 ```shell
 python infer.py \
     --model_path_prefix ../../cls_export/inference \
+    --lang "en" \
     --task_type cls \
     --batch_size 8
 ```
