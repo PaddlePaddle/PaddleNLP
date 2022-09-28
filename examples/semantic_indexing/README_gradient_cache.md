@@ -54,6 +54,19 @@ python data/download_data.py --resource data.retriever.qas.nq
 [data.retriever.qas.nq-train](https://dl.fbaipublicfiles.com/dpr/data/retriever/nq-train.qa.csv)
 [psgs_w100.tsv](https://dl.fbaipublicfiles.com/dpr/wikipedia_split/psgs_w100.tsv.gz)
 
+
+## 代码结构及说明
+```
+|—— train_gradient_cache_DPR.py # gradient_cache实现dense passage retrieval训练脚本
+|—— train_gradient_cache.py # gradient_cache算法简单实现
+|—— NQdataset.py # NQ数据集封装
+|—— generate_dense_embeddings.py # 生成文本的稠密表示
+|—— faiss_indexer.py # faiss相关indexer封装
+|—— dense_retriever.py # 召回，指标检测
+|—— qa_validation.py # 相关计算匹配函数
+|—— tokenizers.py # tokenizer封装
+```
+
 ## 模型训练
 ### 基于 [Dense Passage Retriever](https://arxiv.org/abs/2004.04906) 策略训练
 ```
