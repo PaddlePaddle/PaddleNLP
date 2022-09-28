@@ -100,9 +100,9 @@ def parse_args():
                         type=str,
                         choices=['true', 'false', 'True', 'False'],
                         help="Whether to use amp to train Transformer. ")
-    parser.add_argument("--device", 
-                        default="gpu", 
-                        choices=["gpu", "cpu", "xpu", "npu"], 
+    parser.add_argument("--device",
+                        default="gpu",
+                        choices=["gpu", "cpu", "xpu", "npu"],
                         help="Device selected for inference.")
     parser.add_argument(
         "--amp_level",
