@@ -1996,6 +1996,68 @@ class ImageReader(object):
 
         return examples
 
+    def box2example(self, ocr_res, img_path, querys):
+        """
+        ocr_res = [[word_str, [x1, y1, x2, y2]], [word_str, [x1, y1, x2, y2]], ...]
+        """
+        examples = []
+        doc_boxes = []
+        boxes = [x[1] for x in ocr_res]
+        im_w_box = max([b[2] for b in boxes]) + 20
+        im_h_box = max([b[3] for b in boxes]) + 20
+        img = Image.open(img_path)
+        im_w, im_h = img.size
+        im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
+
+        scale_x = self.image_size / im_w
+        scale_y = self.image_size / im_h
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            if x2 <= x1 or y2 <= y1:
+                raise ValueError("Invalid bbox format")
+            w = max(x1, x2) - min(x1, x2)
+            h = max(y1, y2) - min(y1, y2)
+            w = int(min(w * scale_x, self.image_size - 1))
+            h = int(min(h * scale_y, self.image_size - 1))
+            x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
+            y1 = int(max(0, min(y1 * scale_y, self.image_size - h - 1)))
+            if w < 0:
+                raise ValueError("Invalid bbox format")
+            doc_boxes.append([Bbox(*[x1, y1, w, h])])
+
+        img_base64 = img2base64(img_path)
+
+        doc_tokens = [[x[0]] for x in ocr_res]
+        doc_segment_ids = [[0]] * len(doc_tokens)
+
+        qas_id = 0
+        for query in querys:
+            example = Example(
+                keys=[query],
+                key_labels=[0],
+                doc_tokens=doc_tokens,
+                seq_labels=[0 for one in doc_tokens],
+                text='',
+                qas_id=str(qas_id),
+                model_type=None,
+                boxes=doc_boxes,
+                segment_ids=doc_segment_ids,
+                symbol_ids=None,
+                image_rois=self.image_rois,
+                im_base64=img_base64,
+            )
+
+            if not (len(example.doc_tokens) == len(example.boxes) == len(
+                    example.segment_ids)):
+                raise ValueError(
+                    f"Incorrect word_boxes, the format should be `List[str, Tuple[float, float, float, float]]`"
+                )
+
+            examples.append(example)
+            qas_id += 1
+
+        return examples
+
     def example2feature(self, example, tokenizer, max_line_id=128):
         features = []
         all_doc_tokens = []
@@ -2211,8 +2273,12 @@ class ImageReader(object):
                        img_path,
                        querys,
                        batch_size,
+                       ocr_type="ppocr",
                        phase="infer"):
-        self.examples[phase] = self.ppocr2example(ocr_res, img_path, querys)
+        if ocr_type == "ppocr":
+            self.examples[phase] = self.ppocr2example(ocr_res, img_path, querys)
+        elif ocr_type == "word_boxes":
+            self.examples[phase] = self.box2example(ocr_res, img_path, querys)
         self.features[phase] = sum([self.example2feature(e, self.tokenizer) \
                                     for e in self.examples[phase]], [])
         for batch_data in self._prepare_batch_data(self.features[phase],
@@ -2341,8 +2407,8 @@ class ImageReader(object):
         return cur_span_index == best_span_index
 
 
-def get_dvqa_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
-                  all_key_probs, example_index):
+def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
+                 all_key_probs, example_index):
 
     def _compute_softmax(scores):
         """Compute softmax probability over raw logits."""
@@ -2399,8 +2465,8 @@ def get_dvqa_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
         preds.append({
             'value': final_text,
             'prob': round(avg_prob, 2),
-            'start': start_index,
-            'end': end_index
+            'start': orig_doc_start,
+            'end': orig_doc_end
         })
     return preds
 

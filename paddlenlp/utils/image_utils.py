@@ -67,8 +67,7 @@ class DecodeImage(BaseOperator):
 
         im = sample['image']
         data = np.frombuffer(bytearray(im), dtype='uint8')
-        im = np.array(Image.open(BytesIO(data), ))  # RGB format
-        im = im[:, :, :3]  # RGBA -> RGB
+        im = np.array(Image.open(BytesIO(data)).convert('RGB'))  # RGB format
         sample['image'] = im
 
         if 'h' not in sample:

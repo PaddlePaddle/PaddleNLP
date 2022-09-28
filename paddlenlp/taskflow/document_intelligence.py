@@ -16,7 +16,7 @@ import os
 import collections
 import paddle
 from ..transformers import AutoTokenizer
-from .utils import download_file, ImageReader, get_dvqa_pred, find_answer_pos
+from .utils import download_file, ImageReader, get_doc_pred, find_answer_pos
 from .task import Task
 
 usage = r"""
@@ -37,14 +37,14 @@ usage = r"""
             ]
             docprompt(batch_input)
             '''
-
+            [[{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}], [{'prompt': '五百丁本次想要担任的是什么职位?', 'result': [{'value': '客户经理', 'prob': 1.0, 'start': 180, 'end': 183}]}, {'prompt': '五百丁是在哪里上的大学?', 'result': [{'value': '广州五百丁学院', 'prob': 1.0, 'start': 32, 'end': 38}]}, {'prompt': '大学学的是什么专业?', 'result': [{'value': '金融学(本科）', 'prob': 0.74, 'start': 39, 'end': 45}]}]]
             '''
          """
 
 URLS = {
     "docprompt": [
         "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/docprompt/docprompt_params.tar",
-        "fe72df2168caa83815bd8939155105b7"
+        "8eae8148981731f230b328076c5a08bf"
     ],
 }
 
@@ -69,11 +69,13 @@ class DocPromptTask(Task):
         self._batch_size = kwargs.get("batch_size", 1)
         self._topn = kwargs.get("topn", 1)
         self._use_gpu = kwargs.get("use_gpu", True)
+        self._lang = kwargs.get("lang", "ch")
         if not self._use_gpu:
             paddle.set_device('cpu')
         self._ocr = PaddleOCR(use_angle_cls=True,
                               show_log=False,
-                              use_gpu=self._use_gpu)
+                              use_gpu=self._use_gpu,
+                              lang=self._lang)
         self._usage = usage
         download_file(self._task_path, "docprompt_params.tar",
                       URLS[self.model][0], URLS[self.model][1])
@@ -97,7 +99,12 @@ class DocPromptTask(Task):
         """
         preprocess_results = self._check_input_text(inputs)
         for example in preprocess_results:
-            ocr_result = self._ocr.ocr(example["doc"], cls=True)
+            if "word_boxes" in example.keys():
+                ocr_result = example["word_boxes"]
+                example["ocr_type"] = "word_boxes"
+            else:
+                ocr_result = self._ocr.ocr(example["doc"], cls=True)
+                example["ocr_type"] = "ppocr"
             example["ocr_result"] = ocr_result
         return preprocess_results
 
@@ -110,78 +117,92 @@ class DocPromptTask(Task):
             ocr_result = example["ocr_result"]
             doc_path = example["doc"]
             prompt = example["prompt"]
-            data_loader = self._reader.data_generator(ocr_result, doc_path,
-                                                      prompt, self._batch_size)
+            ocr_type = example["ocr_type"]
 
-            RawResult = collections.namedtuple("RawResult",
-                                               ["unique_id", "seq_logits"])
-
-            all_results = []
-            for data in data_loader:
-                for idx in range(len(self.input_names)):
-                    self.input_handles[idx].copy_from_cpu(data[idx])
-                self.predictor.run()
-                outputs = [
-                    output_handle.copy_to_cpu()
-                    for output_handle in self.output_handle
-                ]
-                unique_ids, seq_logits = outputs
-
-                for idx in range(len(unique_ids)):
-                    all_results.append(
-                        RawResult(
-                            unique_id=int(unique_ids[idx]),
-                            seq_logits=seq_logits[idx],
-                        ))
-
-            all_examples = self._reader.examples["infer"]
-            all_features = self._reader.features["infer"]
-            all_key_probs = [1 for _ in all_examples]
-
-            example_index_to_features = collections.defaultdict(list)
-
-            for feature in all_features:
-                example_index_to_features[feature.qas_id].append(feature)
-
-            unique_id_to_result = {}
-            for result in all_results:
-                unique_id_to_result[result.unique_id] = result
-
-            all_predictions = []
-
-            for (example_index, example) in enumerate(all_examples):
-                example_qas_id = example.qas_id
-                example_query = example.keys[0]
-                features = example_index_to_features[example_qas_id]
-
-                preds = []
-                # keep track of the minimum score of null start+end of position 0
-                for feature in features:
-                    if feature.unique_id not in unique_id_to_result:
-                        continue
-                    result = unique_id_to_result[feature.unique_id]
-
-                    # find preds
-                    ans_pos = find_answer_pos(result.seq_logits, feature)
-                    preds.extend(
-                        get_dvqa_pred(result, ans_pos, example, self._tokenizer,
-                                      feature, True, all_key_probs,
-                                      example_index))
-
-                if not preds:
-                    preds.append({
+            if not ocr_result:
+                all_predictions = [{
+                    "prompt":
+                    p,
+                    "result": [{
                         'value': '',
-                        'prob': 0.,
+                        'prob': 0.0,
                         'start': -1,
                         'end': -1
+                    }]
+                } for p in prompt]
+            else:
+                data_loader = self._reader.data_generator(
+                    ocr_result, doc_path, prompt, self._batch_size, ocr_type)
+
+                RawResult = collections.namedtuple("RawResult",
+                                                   ["unique_id", "seq_logits"])
+
+                all_results = []
+                for data in data_loader:
+                    for idx in range(len(self.input_names)):
+                        self.input_handles[idx].copy_from_cpu(data[idx])
+                    self.predictor.run()
+                    outputs = [
+                        output_handle.copy_to_cpu()
+                        for output_handle in self.output_handle
+                    ]
+                    unique_ids, seq_logits = outputs
+
+                    for idx in range(len(unique_ids)):
+                        all_results.append(
+                            RawResult(
+                                unique_id=int(unique_ids[idx]),
+                                seq_logits=seq_logits[idx],
+                            ))
+
+                all_examples = self._reader.examples["infer"]
+                all_features = self._reader.features["infer"]
+                all_key_probs = [1 for _ in all_examples]
+
+                example_index_to_features = collections.defaultdict(list)
+
+                for feature in all_features:
+                    example_index_to_features[feature.qas_id].append(feature)
+
+                unique_id_to_result = {}
+                for result in all_results:
+                    unique_id_to_result[result.unique_id] = result
+
+                all_predictions = []
+
+                for (example_index, example) in enumerate(all_examples):
+                    example_qas_id = example.qas_id
+                    example_query = example.keys[0]
+                    features = example_index_to_features[example_qas_id]
+
+                    preds = []
+                    # keep track of the minimum score of null start+end of position 0
+                    for feature in features:
+                        if feature.unique_id not in unique_id_to_result:
+                            continue
+                        result = unique_id_to_result[feature.unique_id]
+
+                        # find preds
+                        ans_pos = find_answer_pos(result.seq_logits, feature)
+                        preds.extend(
+                            get_doc_pred(result, ans_pos, example,
+                                         self._tokenizer, feature, True,
+                                         all_key_probs, example_index))
+
+                    if not preds:
+                        preds.append({
+                            'value': '',
+                            'prob': 0.,
+                            'start': -1,
+                            'end': -1
+                        })
+                    else:
+                        preds = sorted(
+                            preds, key=lambda x: x["prob"])[::-1][:self._topn]
+                    all_predictions.append({
+                        "prompt": example_query,
+                        "result": preds
                     })
-                else:
-                    preds = sorted(preds,
-                                   key=lambda x: x["prob"])[::-1][:self._topn]
-                all_predictions.append({
-                    "prompt": example_query,
-                    "result": preds
-                })
             all_predictions_list.append(all_predictions)
         return all_predictions_list
 
