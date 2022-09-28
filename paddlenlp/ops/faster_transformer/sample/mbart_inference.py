@@ -31,6 +31,10 @@ def setup_args():
                         default="./infer_model/",
                         type=str,
                         help="Path to save inference model of BART. ")
+    parser.add_argument("--batch_size",
+                        default=1,
+                        type=int,
+                        help="Batch size. ")
 
     args = parser.parse_args()
 
@@ -53,14 +57,21 @@ def postprocess_response(tokenizer, seq, bos_idx, eos_idx):
 
 def infer(args):
     model_name = "mbart-large-50-many-to-many-mmt"
-    tokenizer = MBartTokenizer.from_pretrained(model_name)
 
+    tokenizer = MBartTokenizer.from_pretrained(model_name, src_lang="en_XX")
     bos_id = tokenizer.lang_code_to_id["zh_CN"]
+    inputs = "PaddleNLP is a powerful NLP library with Awesome pre-trained models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications."
+
     eos_id = tokenizer.eos_token_id
 
-    inputs = "PaddleNLP is a powerful NLP library with Awesome pre-trained models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications."
+    # Input ids
     input_ids = tokenizer(inputs)["input_ids"]
-    input_ids = np.asarray(input_ids, dtype="int32").reshape(1, -1)
+    input_ids = np.asarray(input_ids,
+                           dtype="int32").reshape(1, -1).repeat(args.batch_size,
+                                                                axis=0)
+
+    # Forced bos token ids
+    forced_bos_token = np.ones([args.batch_size, 1], dtype="int32") * bos_id
 
     # Load FasterTransformer lib.
     load("FasterTransformer", verbose=True)
@@ -74,8 +85,14 @@ def infer(args):
     predictor = paddle_infer.create_predictor(config)
 
     input_names = predictor.get_input_names()
-    input_handle = predictor.get_input_handle(input_names[0])
-    input_handle.copy_from_cpu(input_ids.astype("int32"))
+
+    # Input ids
+    input_ids_handle = predictor.get_input_handle(input_names[0])
+    input_ids_handle.copy_from_cpu(input_ids.astype("int32"))
+
+    # Forced bos token ids
+    forced_bos_token_handle = predictor.get_input_handle(input_names[1])
+    forced_bos_token_handle.copy_from_cpu(forced_bos_token.astype("int32"))
 
     predictor.run()
 
@@ -83,11 +100,17 @@ def infer(args):
     output_handle = predictor.get_output_handle(output_names[0])
     output_data = output_handle.copy_to_cpu()
 
-    result = postprocess_response(
-        tokenizer,
-        output_data.transpose([1, 2, 0]).tolist()[0][0], bos_id, eos_id)
+    # [batch_size, num_beams * 2, sequence_length]
+    output_data = output_data.transpose([1, 2, 0])
+
+    # Only use the best sequence.
+    result = [
+        postprocess_response(tokenizer,
+                             sample.tolist()[0], bos_id, eos_id)
+        for sample in output_data
+    ]
     print("Model input:", inputs)
-    print("Result:", result)
+    print("Result:", "\n".join(result))
 
 
 if __name__ == "__main__":
