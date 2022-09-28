@@ -62,14 +62,15 @@ docker logs pip02
 
 ## 3. Docker编译一个定制化CUDA版本的Pipelines的镜像
 
-Docker编译一个定制化CUDA版本的Pipelines的镜像流程分2步，第一步是构建一个基础镜像，第二步是构建一键启动镜像。第一步构建的镜像是一个可用的状态，但是启动后，需要进入容器，然后手工启动服务，然后需要把运行命令打包到镜像中，使得Docker启动的时候能够自动启动Pipelines的服务。
+Docker编译一个定制化CUDA版本的Pipelines的镜像流程分2步，第一步是利用Paddle镜像构建Pipelines基础镜像，第二步是构建一键启动镜像。第一步构建的镜像是一个可用的状态，但是启动后，需要进入容器，手工启动服务，第二步是需要把运行命令打包到镜像中，使得Docker启动的时候能够自动启动Pipelines的服务。
 
 ### 3.1 基础镜像
 
-以CUDA 11.2镜像为例，编译一个镜像流程如下，首先构建一个包含Pipelines环境的镜像：
+以CUDA 11.2环境为例，编译一个Pipelines基础镜像流程如下：
 
 ```
 nvidia-docker run --name pipelines --net host --shm-size 4g -it registry.baidubce.com/paddlepaddle/paddle:2.3.2-gpu-cuda11.2-cudnn8 /bin/bash
+cd /root
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
@@ -78,7 +79,7 @@ apt-get install lsof
 ```
 镜像构建完成可以使用`Ctrl+P+Q`组合键跳出容器。
 
-在第一步构建镜像的过程中，如果是CUDA的其他版本，则需要在[官网](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/docker/linux-docker.html)上查找是否有对应的CUDA版本的Docker，如果没有，则需要自己手工构建一个该CUDA版本的Docker，然后安装对应CUDA版本的PaddlePaddle，然后继续执行上面的流程。
+在第一步构建镜像的过程中，如果是CUDA的其他版本，则需要在[Paddle官网](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/docker/linux-docker.html)上查找是否有对应的CUDA版本的Paddle镜像，如果没有，则需要自己手工构建一个该CUDA版本的Docker，然后安装对应CUDA版本的PaddlePaddle，然后继续执行上面的流程。
 
 ### 3.2 一键启动镜像
 

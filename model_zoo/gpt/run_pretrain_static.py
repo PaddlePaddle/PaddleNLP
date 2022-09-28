@@ -53,10 +53,9 @@ def create_data_holder(args):
     loss_mask = paddle.static.data(name="loss_mask",
                                    shape=[-1, args.max_seq_len],
                                    dtype="float32")
-    attention_mask = paddle.static.data(
-        name="attention_mask",
-        shape=[-1, 1, args.max_seq_len, args.max_seq_len],
-        dtype="float32")
+    attention_mask = paddle.static.data(name="attention_mask",
+                                        shape=[-1, args.max_seq_len],
+                                        dtype="int64")
     position_ids = paddle.static.data(name="position_ids",
                                       shape=[-1, args.max_seq_len],
                                       dtype="int64")

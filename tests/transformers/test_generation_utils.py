@@ -72,9 +72,13 @@ class GenerationTesterMixin:
 
         # generate max 3 tokens
         max_length = 3
-        if config["eos_token_id"] is not None and config["pad_token_id"] is None:
+
+        if config.get(
+                "eos_token_id",
+                None) is not None and config.get("pad_token_id", None) is None:
             # hack to allow generate for models such as GPT2 as is done in `generate()`
             config["pad_token_id"] = config["eos_token_id"]
+
         return config, input_ids, attention_mask, max_length
 
     @staticmethod
