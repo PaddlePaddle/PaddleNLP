@@ -15,7 +15,9 @@
 
 import functools
 import paddle
+from paddle import Tensor
 import numpy as np
+from typing import Optional, Tuple
 from collections import OrderedDict
 from dataclasses import fields, dataclass
 from typing import Any, List, Tuple, Optional
@@ -23,6 +25,20 @@ from paddle.nn.layer.transformer import _convert_attention_mask, MultiHeadAttent
 from paddle.distributed.fleet.utils import recompute
 
 from .utils import adapt_stale_fwd_patch
+
+
+def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
+    """re-construct the outputs with one method which contains the simple logic
+
+    Args:
+        outputs (Tuple[Tensor]): the source of the outputs
+        loss (Optional[Tensor], optional): the loss of the model. Defaults to None.
+    """
+    if loss is not None:
+        outputs = (loss, ) + outputs
+    if len(outputs) == 1:
+        return outputs[0]
+    return outputs
 
 
 def layer_init_wrapper(func):

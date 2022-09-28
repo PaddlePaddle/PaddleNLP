@@ -26,7 +26,8 @@ from .. import PretrainedModel, register_base_model
 from ..model_outputs import (BaseModelOutput, SequenceClassifierOutput,
                              TokenClassifierOutput,
                              QuestionAnsweringModelOutput,
-                             MultipleChoiceModelOutput, MaskedLMOutput)
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             tuple_output)
 
 __all__ = [
     'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
@@ -816,7 +817,7 @@ class ElectraGenerator(ElectraPretrainedModel):
 
         if not return_dict:
             output = (prediction_scores, ) + generator_sequence_output[1:]
-            return ((loss, ) + output) if loss is not None else output
+            return tuple_output(output, loss)
 
         return MaskedLMOutput(
             loss=loss,
@@ -1072,9 +1073,8 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, ) + sequence_output[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            output = (logits, ) + sequence_output[1:]
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -1186,7 +1186,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + sequence_output[1:]
-            return ((loss, ) + output) if loss is not None else output
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -1744,13 +1744,15 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
             (-1, self.num_choices))  # logits: (bs, num_choice)
 
         loss = None
+        output = (reshaped_logits, ) + sequence_output[1:]
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(reshaped_logits, labels)
+            output = (loss, ) + output
 
         if not return_dict:
             output = (reshaped_logits, ) + sequence_output[1:]
-            return ((loss, ) + output) if loss is not None else output
+            return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(
             loss=loss,
@@ -2117,8 +2119,7 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
             total_loss = (start_loss + end_loss) / 2
         if not return_dict:
             output = (start_logits, end_logits) + sequence_output[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,

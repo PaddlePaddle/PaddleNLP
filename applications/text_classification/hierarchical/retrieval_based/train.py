@@ -30,7 +30,7 @@ from base_model import SemanticIndexBase
 from model import SemanticIndexBatchNeg
 from data import read_text_pair, convert_example, create_dataloader, gen_id2corpus, gen_text_file, convert_corpus_example
 from data import convert_label_example
-from ann_util import build_index
+from data import build_index
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -62,19 +62,16 @@ parser.add_argument('--save_steps', type=int, default=10000,
 parser.add_argument('--log_steps', type=int, default=10,
                     help="Inteval steps to print log")
 parser.add_argument("--train_set_file", type=str,
-                    default='./recall/train.csv',
+                    default='./data/train.txt',
                     help="The full path of train_set_file.")
-parser.add_argument("--dev_set_file", type=str,
-                    default='./recall/dev.csv',
-                    help="The full path of dev_set_file.")
 parser.add_argument("--margin", default=0.2, type=float,
                     help="Margin beteween pos_sample and neg_samples")
 parser.add_argument("--scale", default=30, type=int,
                     help="Scale for pair-wise margin_rank_loss")
-parser.add_argument("--corpus_file", type=str, default='./recall/corpus.csv',
+parser.add_argument("--corpus_file", type=str, default='./data/label.txt',
                     help="The full path of input file")
 parser.add_argument("--similar_text_pair_file", type=str,
-                    default='./recall/dev.csv',
+                    default='./data/dev.txt',
                     help="The full path of similar text pair file")
 parser.add_argument("--recall_result_dir", type=str, default='./recall_result_dir',
                     help="The full path of recall result file to save")
@@ -113,7 +110,12 @@ def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
              text_list, id2corpus):
     # Load pretrained semantic model
     inner_model = model._layers
-    final_index = build_index(args, corpus_data_loader, inner_model)
+    final_index = build_index(corpus_data_loader,
+                              inner_model,
+                              output_emb_size=args.output_emb_size,
+                              hnsw_max_elements=args.hnsw_max_elements,
+                              hnsw_ef=args.hnsw_ef,
+                              hnsw_m=args.hnsw_m)
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
     with open(recall_result_file, 'w', encoding='utf-8') as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):

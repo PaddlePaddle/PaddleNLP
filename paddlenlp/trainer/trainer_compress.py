@@ -204,10 +204,14 @@ def _replace_auto_model_forward(self):
 def _recover_auto_model_forward(self):
 
     def init_func(layer):
-        if isinstance(layer, self.base_model_class):
+        if isinstance(
+                layer, self.base_model_class
+                if not isinstance(self, paddle.DataParallel) else
+                self._layers.base_model_class):
             layer.forward = layer._ori_forward
 
-    for layer in self.children():
+    for layer in self._layers.children() if isinstance(
+            self, paddle.DataParallel) else self.children():
         layer.apply(init_func)
     return self
 
@@ -268,6 +272,24 @@ def _dynabert_init(self, model, eval_dataloader):
     return ofa_model, teacher_model
 
 
+def check_dynabert_config(net_config, width_mult):
+    '''
+    Corrects net_config for OFA model if necessary.
+    '''
+    if 'electra.embeddings_project' in net_config:
+        net_config["electra.embeddings_project"]['expand_ratio'] = 1.0
+    for key in net_config:
+        # Makes sure to expands the size of the last dim to `width_mult` for
+        # these Linear weights.
+        if 'q_proj' in key or 'k_proj' in key or 'v_proj' in key or 'linear1' in key:
+            net_config[key]['expand_ratio'] = width_mult
+        # Keeps the size of the last dim of these Linear weights same as
+        # before.
+        elif 'out_proj' in key or 'linear2' in key:
+            net_config[key]['expand_ratio'] = 1.0
+    return net_config
+
+
 def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                        eval_dataloader, num_train_epochs):
 
@@ -275,7 +297,10 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
         if self.custom_dynabert_evaluate is not None:
             return self.custom_dynabert_evaluate(model, data_loader)
         if isinstance(model, OFA):
-            class_name = model.model.__class__.__name__
+            if isinstance(model.model, paddle.DataParallel):
+                class_name = model.model._layers.__class__.__name__
+            else:
+                class_name = model.model.__class__.__name__
         else:
             class_name = model.__class__.__name__
         if "SequenceClassification" in class_name:
@@ -388,6 +413,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                 # Step8: Broadcast supernet config from width_mult,
                 # and use this config in supernet training.
                 net_config = utils.dynabert_config(ofa_model, width_mult)
+                net_config = check_dynabert_config(net_config, width_mult)
                 ofa_model.set_net_config(net_config)
                 if "token_type_ids" in batch:
                     logits, teacher_logits = ofa_model(
@@ -424,6 +450,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
             if global_step % self.args.save_steps == 0:
                 for idx, width_mult in enumerate(self.args.width_mult_list):
                     net_config = utils.dynabert_config(ofa_model, width_mult)
+                    net_config = check_dynabert_config(net_config, width_mult)
                     ofa_model.set_net_config(net_config)
                     tic_eval = time.time()
                     logger.info("width_mult %s:" % round(width_mult, 2))
@@ -453,7 +480,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
                     model_to_save = model._layers if isinstance(
                         model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir_width)
-                logger.info("Best acc of width_mult %.2f: %.4f" %
+                logger.info("Best result of width_mult %.2f: %.4f" %
                             (width_mult, best_acc[idx]))
                 return ofa_model
 
@@ -468,9 +495,12 @@ def _dynabert_export(self, ofa_model):
     ofa_model._add_teacher = False
     ofa_model, ofa_model.model = _recover_transformer_func(
         ofa_model), _recover_transformer_func(ofa_model.model)
-
-    ori_num_heads = ofa_model.model.base_model.encoder.layers[
-        0].self_attn.num_heads
+    if isinstance(ofa_model.model, paddle.DataParallel):
+        ori_num_heads = ofa_model.model._layers.base_model.encoder.layers[
+            0].self_attn.num_heads
+    else:
+        ori_num_heads = ofa_model.model.base_model.encoder.layers[
+            0].self_attn.num_heads
     for width_mult in self.args.width_mult_list:
         model_dir = os.path.join(self.args.output_dir,
                                  "width_mult_" + str(round(width_mult, 2)))
@@ -479,6 +509,7 @@ def _dynabert_export(self, ofa_model):
         origin_model = self.model.__class__.from_pretrained(model_dir)
         ofa_model.model.set_state_dict(state_dict)
         best_config = utils.dynabert_config(ofa_model, width_mult)
+        best_config = check_dynabert_config(best_config, width_mult)
         origin_model_new = ofa_model.export(best_config,
                                             input_shapes=[[1, 1], [1, 1]],
                                             input_dtypes=['int64', 'int64'],
@@ -500,8 +531,12 @@ def _dynabert_export(self, ofa_model):
         net = paddle.jit.to_static(origin_model_new, input_spec=input_shape)
         paddle.jit.save(net, pruned_infer_model_dir)
         # Recover num_heads of ofa_model.model
-        for layer in ofa_model.model.base_model.encoder.layers:
-            layer.self_attn.num_heads = ori_num_heads
+        if isinstance(ofa_model.model, paddle.DataParallel):
+            for layer in ofa_model.model._layers.base_model.encoder.layers:
+                layer.self_attn.num_heads = ori_num_heads
+        else:
+            for layer in ofa_model.model.base_model.encoder.layers:
+                layer.self_attn.num_heads = ori_num_heads
     logger.info("Pruned models have been exported.")
 
 
@@ -561,7 +596,9 @@ def _post_training_quantization_grid_search(self, model_dir):
             optimize_model=False)
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
-            save_model_path=os.path.join(model_dir, algo + str(batch_size)),
+            save_model_path=os.path.join(
+                model_dir, algo +
+                "_".join([str(batch_size), str(batch_nums)])),
             model_filename=args.output_filename_prefix + ".pdmodel",
             params_filename=args.output_filename_prefix + ".pdiparams")
 
@@ -632,6 +669,8 @@ def auto_model_forward(self,
     embedding_kwargs["input_ids"] = input_ids
 
     embedding_output = self.embeddings(**embedding_kwargs)
+    if hasattr(self, "embeddings_project"):
+        embedding_output = self.embeddings_project(embedding_output)
 
     self.encoder._use_cache = use_cache  # To be consistent with HF
 
