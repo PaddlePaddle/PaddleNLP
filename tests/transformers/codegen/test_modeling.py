@@ -15,6 +15,8 @@
 
 import datetime
 import unittest
+import numpy as np
+import random
 
 import paddle
 from paddlenlp.transformers import (CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST,
@@ -77,6 +79,10 @@ class CodeGenModelTester:
         self.bos_token_id = vocab_size - 1
         self.eos_token_id = vocab_size - 1
         self.pad_token_id = vocab_size - 1
+
+        paddle.seed(128)
+        np.random.seed(128)
+        random.seed(128)
 
     def prepare_config_and_inputs(self):
         input_ids = ids_tensor([self.batch_size, self.seq_length],
@@ -382,6 +388,31 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
     test_model_parallel = False
     test_head_masking = False
 
+    # attention mask issue
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
+        )
+
+        input_ids = inputs_dict[self.input_name]
+        attention_mask = paddle.zeros_like(input_ids, dtype=paddle.float32)
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+        attention_mask = attention_mask[:max_batch_size, :
+                                        sequence_length].unsqueeze([1, 2])
+
+        # generate max 3 tokens
+        max_length = 3
+
+        if config.get(
+                "eos_token_id",
+                None) is not None and config.get("pad_token_id", None) is None:
+            # hack to allow generate for models such as GPT2 as is done in `generate()`
+            config["pad_token_id"] = config["eos_token_id"]
+
+        return config, input_ids, attention_mask, max_length
+
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class):
         inputs_dict = super()._prepare_for_class(inputs_dict, model_class)
@@ -415,8 +446,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
 
     @slow
     def test_batch_generation(self):
-        # tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
-        tokenizer = CodeGenTokenizer.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             "Salesforce/codegen-350M-mono")
         model = CodeGenForCausalLM.from_pretrained(
             "Salesforce/codegen-350M-mono")
@@ -477,13 +507,17 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
     def test_model_name_list(self):
         pass
 
+    @slow
+    def test_auto_tokenizer(self):
+        for model_name in CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST:
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+
 
 class CodeGenModelLanguageGenerationTest(unittest.TestCase):
 
     @slow
     def test_lm_generate_codegen(self):
-        # tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
-        tokenizer = CodeGenTokenizer.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             "Salesforce/codegen-350M-mono")
         model = CodeGenForCausalLM.from_pretrained(
             "Salesforce/codegen-350M-mono")
@@ -504,15 +538,12 @@ class CodeGenModelLanguageGenerationTest(unittest.TestCase):
 
     @slow
     def test_codegen_sample(self):
-        # NOTE: Only codegen-350M-mono supports AutoTokenizer.
         tokenizer = AutoTokenizer.from_pretrained(
             "Salesforce/codegen-350M-mono")
-        # tokenizer = CodeGenTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
         model = CodeGenForCausalLM.from_pretrained(
             "Salesforce/codegen-350M-mono")
         model.eval()
 
-        # NOTE: PaddleNLP do not support token_type_ids.
         tokenized = tokenizer("def hello_world():",
                               return_tensors="pd",
                               return_token_type_ids=True,
@@ -523,21 +554,26 @@ class CodeGenModelLanguageGenerationTest(unittest.TestCase):
                                        top_k=1)
         output_str = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
-        # token_type_ids = tokenized.token_type_ids
+        token_type_ids = tokenized.token_type_ids
         output_seq, _ = model.generate(input_ids=input_ids,
                                        decode_strategy="sampling",
                                        top_k=1,
                                        num_return_sequences=5)
-        # output_seq_tt, _ = model.generate(
-        #     input_ids=input_ids, token_type_ids=token_type_ids, decode_strategy="sampling", top_k=1, num_return_sequences=5
-        # )
+        output_seq_tt, _ = model.generate(input_ids=input_ids,
+                                          token_type_ids=token_type_ids,
+                                          decode_strategy="sampling",
+                                          top_k=1,
+                                          num_return_sequences=5)
         output_seq_strs = tokenizer.batch_decode(output_seq,
                                                  skip_special_tokens=True)
-        # output_seq_tt_strs = tokenizer.batch_decode(output_seq_tt, skip_special_tokens=True)
+        output_seq_tt_strs = tokenizer.batch_decode(output_seq_tt,
+                                                    skip_special_tokens=True)
 
         EXPECTED_OUTPUT_STR = '\n      print("Hello World")\n\nhello_world()\n\n#'
 
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
-        # self.assertTrue(
-        #     all([output_seq_strs[idx] != output_seq_tt_strs[idx] for idx in range(len(output_seq_tt_strs))])
-        # )  # token_type_ids should change output
+        self.assertTrue(
+            all([
+                output_seq_strs[idx] != output_seq_tt_strs[idx]
+                for idx in range(len(output_seq_tt_strs))
+            ]))  # token_type_ids should change output
