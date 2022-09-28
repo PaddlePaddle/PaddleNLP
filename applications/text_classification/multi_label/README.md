@@ -272,7 +272,7 @@ checkpoint/
 训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
 ```
 
 输出打印示例：

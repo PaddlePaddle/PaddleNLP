@@ -3,13 +3,16 @@
 **目录**
    * [analysis模块介绍](#analysis模块介绍)
    * [模型评估](#模型评估)
+   * [错误样例分析](#错误样例分析)
    * [稀疏数据筛选方案](#稀疏数据筛选方案)
    * [脏数据清洗方案](#脏数据清洗方案)
    * [数据增强策略方案](#数据增强策略方案)
 
 ## analysis模块介绍
 
-analysis模块提供了**模型评估**脚本对整体分类情况和每个类别分别进行评估，并打印预测错误样本，帮助开发者分析模型表现找到训练和预测数据中存在的问题问题。同时基于[可信AI工具集](https://github.com/PaddlePaddle/TrustAI)和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化方案从多角度帮助开发者提升模型效果。
+analysis模块提供了**模型评估**脚本对整体分类情况和每个类别分别进行评估，并打印预测错误样本，帮助开发者分析模型表现找到训练和预测数据中存在的问题。
+
+同时基于[可信AI工具集](https://github.com/PaddlePaddle/TrustAI)和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**词级别、句子级别的数据可解释性分析**帮助开发者理解模型进行数据分析，并提供**稀疏数据筛选、脏数据清洗、数据增强**三种优化方案从多角度帮助开发者提升模型效果。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/63761690/184790352-7f91da02-aadd-48fe-9130-8323a89c6a43.jpg" width="600">
@@ -20,6 +23,8 @@ analysis模块提供了**模型评估**脚本对整体分类情况和每个类�
 ```text
 analysis/
 ├── evaluate.py # 评估脚本
+├── sent_interpret.py # 句子级别可解释性分析脚本
+├── word_interpret.ipynb # 词级别可解释性分析notebook
 ├── sparse.py # 稀疏数据筛选脚本
 ├── dirty.py # 脏数据清洗脚本
 ├── aug.py # 数据增强脚本
@@ -37,7 +42,7 @@ python evaluate.py \
     --params_path "../checkpoint" \
     --max_seq_length 128 \
     --batch_size 32 \
-    --bad_case_path "./bad_case.txt"
+    --bad_case_path "bad_case.txt"
 ```
 
 默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
@@ -83,7 +88,70 @@ Prediction    Label    Text
 婚后分居    不履行家庭义务,婚后分居    2015年2月23日，被告将原告赶出家门，原告居住于娘家待产，双方分居至今。
 ...
 ```
+## 错误样例分析
+"模型为什么会预测出这个结果?"是文本分类任务开发者时常遇到的问题，如何分析错误样本(bad case)是文本分类任务落地中重要一环，本项目基于TrustAI开源了基于词级别和句子级别的模型可解释性分析方法，帮助开发者更好地理解文本分类模型与数据，有助于后续的模型优化与数据清洗标注。
 
+**安装TrustAI**
+```shell
+pip install trustai==0.1.7
+```
+
+**安装interpretdl**（可选）如果使用词级别可解释性分析GradShap方法，需要安转interpretdl
+```shell
+pip install interpretdl==0.7.0
+```
+### 词级别可解释性分析
+
+本项目开源模型的词级别可解释性分析Notebook，提供LIME、Integrated Gradient、GradShap 三种分析方法，支持分析微调后模型的预测结果，开发者可以通过更改**数据目录**和**模型目录**在自己的任务中使用Jupyter Notebook进行数据分析。
+
+运行 [word_interpreter.ipynb](./word_interpreter.ipynb) 代码，即可分析影响样本预测结果的关键词以及可视化所有词对预测结果的贡献情况，颜色越深代表这个词对预测结果影响越大：
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/63761690/192739675-63145d59-23c6-416f-bf71-998fd4995254.png" width="1000">
+</div>
+
+### 句子级别可解释性分析
+
+本项目基于特征相似度（[FeatureSimilarity](https://arxiv.org/abs/2104.04128)）算法，计算对样本预测结果正影响的训练数据，帮助理解模型的预测结果与训练集数据的关系。
+
+我们可以运行代码，得到支持样本模型预测结果的训练数据：
+```shell
+python sent_interpret.py \
+    --device "gpu" \
+    --dataset_dir "../data" \
+    --params_path "../checkpoint/" \
+    --max_seq_length 128 \
+    --batch_size 16 \
+    --top_k 3 \
+    --train_file "train.txt" \
+    --interpret_file "bad_case.txt" \
+    ----interpreted_file "sent_interpret.txt"
+```
+默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`
+
+可支持配置的参数：
+
+* `device`: 选用什么设备进行训练，选择cpu、gpu、xpu、npu；默认为"gpu"。
+* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含dev.txt和label.txt文件;默认为None。
+* `params_path`：保存训练模型的目录；默认为"../checkpoint/"。
+* `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
+* `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `seed`：随机种子，默认为3。
+* `top_k`：筛选支持训练证据数量；默认为3。
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `interpret_file`：本地数据集中待分析文件名；默认为"bad_case.txt"。
+* `interpreted_file`：保存句子级别可解释性结果文件名；默认为"sent_interpret.txt"。
+
+可解释性结果保存在 `interpreted_file` 文件中：
+```text
+text: 2015年2月23日，被告将原告赶出家门，原告居住于娘家待产，双方分居至今。
+predict label: 婚后分居
+label: 不履行家庭义务,婚后分居
+examples with positive influence
+support1 text: 2014年中秋节原告回了娘家，原、被告分居至今。	label: 婚后分居	score: 0.99942
+support2 text: 原告于2013年8月13日离开被告家，分居至今。	label: 婚后分居	score: 0.99916
+support3 text: 2014年4月，被告外出务工，双方分居至今。	label: 婚后分居	score: 0.99902
+...
+```
 ## 稀疏数据筛选方案
 
 稀疏数据指缺乏足够训练数据支持导致低置信度的待预测数据，简单来说，由于模型在训练过程中没有学习到足够与待预测样本相似的数据，模型难以正确预测样本所属类别。本项目中稀疏数据筛选基于TrustAI（可信AI）工具集，利用基于特征相似度的实例级证据分析方法，抽取开发集中样本的支持训练证据，并计算支持证据平均分（通常为得分前三的支持训练证据均分）。分数较低的样本表明其训练证据不足，在训练集中较为稀疏，实验表明模型在这些样本上表现也相对较差。更多细节详见[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[实例级证据分析](https://github.com/PaddlePaddle/TrustAI/blob/main/trustai/interpretation/example_level/README.md)。
@@ -92,7 +160,7 @@ Prediction    Label    Text
 
 **安装TrustAI**
 ```shell
-pip install trustai==0.1.4
+pip install trustai==0.1.7
 ```
 
 ### 稀疏数据识别--数据增强
@@ -220,7 +288,7 @@ cat ../data/train.txt ../data/support.txt > ../data/train_sparse_annotate.txt
 
 **安装TrustAI**
 ```shell
-pip install trustai==0.1.4
+pip install trustai==0.1.7
 ```
 
 现在我们进行脏数据识别，脏数据保存在`"train_dirty.txt"`,剩余训练数据保存在`"train_dirty_rest.txt"`：
