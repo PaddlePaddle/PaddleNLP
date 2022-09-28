@@ -82,18 +82,6 @@ python train_gradient_cache_DPR.py \
 
 ```
 python generate_dense_embeddings.py \
-   --model_file {path to biencoder} \
-   --ctx_file {path to psgs_w100.tsv file} \
-   --shard_id {shard_num, 0-based} --num_shards {total number of shards} \
-   --out_file ${out files location + name PREFX}  \
-   --que_model_path {que_model_path} \
-   --con_model_path {con_model_path}
-```
-
-## 如果只有一台机器，可以直接使用
-
-```
-python generate_dense_embeddings.py \
    --ctx_file ./dataset_dir/psgs_w100.tsv \
    --out_file test_generate \
    --que_model_path ./save_dir/question_model_40 \
