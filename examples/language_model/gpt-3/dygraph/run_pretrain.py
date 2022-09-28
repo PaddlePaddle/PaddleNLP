@@ -153,7 +153,7 @@ def do_train(args):
     dp_rank = hcg.get_data_parallel_rank()
     sharding_rank = hcg.get_sharding_parallel_rank()
 
-    # sharding stage2/3 not support hybrid parallel
+    # sharding stage2/3 not support hybrid parallel now
     if args.sharding_stage in [2, 3]:
         assert args.mp_degree == args.pp_degree == 1, "sharding stage2/3 will support tensor/pipeline parallel later"
         dp_group = hcg.get_data_parallel_group()
@@ -279,8 +279,9 @@ def do_train(args):
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
         if args.dp_degree > 1:
-            sync_params_buffers(
-                model, comm_group=dp_group, src_rank=dp_group.ranks[0])
+            sync_params_buffers(model,
+                                comm_group=dp_group,
+                                src_rank=dp_group.ranks[0])
 
         scaler = scaler if args.use_pure_fp16 else None
         model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler,
