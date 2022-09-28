@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 source test_tipc/common_func.sh
 
 function readlinkf() {
