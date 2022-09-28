@@ -229,8 +229,7 @@ def reader(data_path, max_seq_len=512):
                     cur_result_list = []
 
                     for result in result_list:
-                        if result['start'] + 1 <= max_content_len < result[
-                                'end']:
+                        if result['start'] + 1 <= max_content_len < result['end'] and result['end'] - result['start'] <= max_content_len :
                             max_content_len = result['start']
                             break
 
