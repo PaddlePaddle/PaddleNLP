@@ -126,5 +126,3 @@ python dense_retriever.py --hnsw_index \
 * `qa_file`： qa_file文件
 * `que_model_path`: question encoder model
 * `con_model_path`: context encoder model
-
-
