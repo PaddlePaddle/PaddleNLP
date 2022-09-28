@@ -71,12 +71,12 @@ python train_gradient_cache_DPR.py \
 参数含义说明
 * `batch_size`: 批次大小
 * `learning_rate`: 学习率
-* `save_dir`:模型保存位置
-* `warmupsteps`： 预热学习率参数
+* `save_dir`: 模型保存位置
+* `warmupsteps`: 预热学习率参数
 * `epoches`: 训练批次大小
 * `max_grad_norm`: 详见ClipGradByGlobalNorm
-* `train_data_path`:训练数据存放地址
-* `chunk_size`:chunk大小
+* `train_data_path`: 训练数据存放地址
+* `chunk_size`: chunk的大小
 
 ## 生成文章稠密向量表示
 
@@ -93,7 +93,7 @@ python generate_dense_embeddings.py \
 ## 如果只有一台机器，可以直接使用
 
 ```
-python generate_dense_embedding \
+python generate_dense_embeddings.py \
    --ctx_file {data/psgs_w100.tsv} \
    --out_file {test_generate} \
    --que_model_path {que_model_path} \
@@ -126,3 +126,40 @@ python dense_retriever.py --hnsw_index \
 * `qa_file`： qa_file文件
 * `que_model_path`: question encoder model
 * `con_model_path`: context encoder model
+
+
+# 运行示例
+```
+mkdir dataset_dir
+#新建存放数据集的文件夹
+cd dataset_dir
+#进入dataset_dir，将后续会使用到的数据集放在这个文件夹下面
+cd ..
+#回到上一级目录
+python train_gradient_cache_DPR.py \
+   --batch_size 128 \
+   --learning_rate 2e-05 \
+   --save_dir save_biencoder
+   --warmup_steps 1237 \
+   --epoches 40 \
+   --max_grad_norm 2 \
+   --train_data_path ./dataset_dir/biencoder-nq-train.json \
+   --chunk_size 16 \
+
+
+python generate_dense_embeddings.py \
+   --ctx_file ./dataset_dir/psgs_w100.tsv \
+   --out_file test_generate \
+   --que_model_path ./save_dir/question_model_40 \
+   --con_model_path ./save_dir/context_model_40
+
+
+python dense_retriever.py --hnsw_index \
+    --out_file out_file \
+    --encoded_ctx_file ./test_generate \
+    --ctx_file ./dataset_dir/psgs_w100.tsv \
+    --qa_file ./dataset_dir/nq.qa.csv \
+    --que_model_path ./save_dir/question_model_40 \
+    --con_model_path ./save_dir/context_model_40
+
+```
