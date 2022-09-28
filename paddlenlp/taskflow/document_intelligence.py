@@ -23,11 +23,21 @@ usage = r"""
             from paddlenlp import Taskflow
             docprompt = Taskflow("document_intelligence")
             # Types of doc: A string containing a local path to an image
-            docprompt([{"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+            docprompt({"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             # Types of doc: A string containing a http link pointing to an image
             docprompt({"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             '''
             [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
+            '''
+
+            # Batch input
+            batch_input = [
+                {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]},
+                {"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}
+            ]
+            docprompt(batch_input)
+            '''
+
             '''
          """
 
@@ -85,123 +95,156 @@ class DocPromptTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = self._check_input_text(inputs)
-
-        img_path = inputs["doc"]
-        if not os.path.exists(img_path):
-            download_file("./", img_path.rsplit("/", 1)[-1], img_path)
-            img_path = img_path.rsplit("/", 1)[-1]
-        question = inputs["prompt"]
-
-        ocr_result = self._ocr.ocr(img_path, cls=True)
-        data_loader = self._reader.data_generator(ocr_result, img_path,
-                                                  question, self._batch_size)
-
-        infer_cache = {}
-        infer_cache["data_loader"] = data_loader
-        return infer_cache
+        preprocess_results = self._check_input_text(inputs)
+        for example in preprocess_results:
+            ocr_result = self._ocr.ocr(example["doc"], cls=True)
+            example["ocr_result"] = ocr_result
+        return preprocess_results
 
     def _run_model(self, inputs):
         """
         Run the task model from the outputs of the `_tokenize` function. 
         """
-        infer_cache = inputs
-        RawResult = collections.namedtuple("RawResult",
-                                           ["unique_id", "seq_logits"])
+        all_predictions_list = []
+        for example in inputs:
+            ocr_result = example["ocr_result"]
+            doc_path = example["doc"]
+            prompt = example["prompt"]
+            data_loader = self._reader.data_generator(ocr_result, doc_path,
+                                                      prompt, self._batch_size)
 
-        all_results = []
-        for data in infer_cache['data_loader']:
-            for idx in range(len(self.input_names)):
-                self.input_handles[idx].copy_from_cpu(data[idx])
-            self.predictor.run()
-            outputs = [
-                output_handle.copy_to_cpu()
-                for output_handle in self.output_handle
-            ]
-            unique_ids, seq_logits = outputs
+            RawResult = collections.namedtuple("RawResult",
+                                               ["unique_id", "seq_logits"])
 
-            for idx in range(len(unique_ids)):
-                all_results.append(
-                    RawResult(
-                        unique_id=int(unique_ids[idx]),
-                        seq_logits=seq_logits[idx],
-                    ))
-        infer_cache['results'] = all_results
-        return infer_cache
+            all_results = []
+            for data in data_loader:
+                for idx in range(len(self.input_names)):
+                    self.input_handles[idx].copy_from_cpu(data[idx])
+                self.predictor.run()
+                outputs = [
+                    output_handle.copy_to_cpu()
+                    for output_handle in self.output_handle
+                ]
+                unique_ids, seq_logits = outputs
+
+                for idx in range(len(unique_ids)):
+                    all_results.append(
+                        RawResult(
+                            unique_id=int(unique_ids[idx]),
+                            seq_logits=seq_logits[idx],
+                        ))
+
+            all_examples = self._reader.examples["infer"]
+            all_features = self._reader.features["infer"]
+            all_key_probs = [1 for _ in all_examples]
+
+            example_index_to_features = collections.defaultdict(list)
+
+            for feature in all_features:
+                example_index_to_features[feature.qas_id].append(feature)
+
+            unique_id_to_result = {}
+            for result in all_results:
+                unique_id_to_result[result.unique_id] = result
+
+            all_predictions = []
+
+            for (example_index, example) in enumerate(all_examples):
+                example_qas_id = example.qas_id
+                example_query = example.keys[0]
+                features = example_index_to_features[example_qas_id]
+
+                preds = []
+                # keep track of the minimum score of null start+end of position 0
+                for feature in features:
+                    if feature.unique_id not in unique_id_to_result:
+                        continue
+                    result = unique_id_to_result[feature.unique_id]
+
+                    # find preds
+                    ans_pos = find_answer_pos(result.seq_logits, feature)
+                    preds.extend(
+                        get_dvqa_pred(result, ans_pos, example, self._tokenizer,
+                                      feature, True, all_key_probs,
+                                      example_index))
+
+                if not preds:
+                    preds.append({
+                        'value': '',
+                        'prob': 0.,
+                        'start': -1,
+                        'end': -1
+                    })
+                else:
+                    preds = sorted(preds,
+                                   key=lambda x: x["prob"])[::-1][:self._topn]
+                all_predictions.append({
+                    "prompt": example_query,
+                    "result": preds
+                })
+            all_predictions_list.append(all_predictions)
+        return all_predictions_list
 
     def _postprocess(self, inputs):
         """
         The model output is tag ids, this function will convert the model output to raw text.
         """
-        all_results = inputs['results']
-        all_examples = self._reader.examples["infer"]
-        all_features = self._reader.features["infer"]
-        all_key_probs = [1 for _ in all_examples]
-
-        example_index_to_features = collections.defaultdict(list)
-
-        for feature in all_features:
-            example_index_to_features[feature.qas_id].append(feature)
-
-        unique_id_to_result = {}
-        for result in all_results:
-            unique_id_to_result[result.unique_id] = result
-
-        all_predictions = []
-
-        for (example_index, example) in enumerate(all_examples):
-            example_qas_id = example.qas_id
-            example_query = example.keys[0]
-            features = example_index_to_features[example_qas_id]
-
-            preds = []
-            # keep track of the minimum score of null start+end of position 0
-            for feature in features:
-                if feature.unique_id not in unique_id_to_result:
-                    continue
-                result = unique_id_to_result[feature.unique_id]
-
-                # find preds
-                ans_pos = find_answer_pos(result.seq_logits, feature)
-                preds.extend(
-                    get_dvqa_pred(result, ans_pos, example, self._tokenizer,
-                                  feature, True, all_key_probs, example_index))
-
-            if not preds:
-                preds.append({'value': '', 'prob': 0., 'start': -1, 'end': -1})
-            else:
-                preds = sorted(preds,
-                               key=lambda x: x["prob"])[::-1][:self._topn]
-            all_predictions.append({"prompt": example_query, "result": preds})
-        return all_predictions
+        results = inputs
+        results = results[0] if len(results) == 1 else results
+        return results
 
     def _check_input_text(self, inputs):
         inputs = inputs[0]
         if isinstance(inputs, dict):
-            if "doc" not in inputs.keys():
-                raise TypeError(
-                    "Invalid inputs, the inputs should contain the image file path or image url."
-                )
-            if "prompt" not in inputs.keys():
-                raise TypeError(
-                    "Invalid inputs, the inputs should contain the prompt list."
-                )
-            # inputs = [inputs]
-        elif isinstance(inputs, list):
-            if isinstance(inputs[0], dict):
-                if "doc" not in inputs[0].keys():
+            inputs = [inputs]
+        if isinstance(inputs, list):
+            input_list = []
+            for example in inputs:
+                data = {}
+                if isinstance(example, dict):
+                    if "doc" not in example.keys():
+                        raise ValueError(
+                            "Invalid inputs, the inputs should contain an url to an image or a local path."
+                        )
+                    else:
+                        if isinstance(example["doc"], str):
+                            if example["doc"].startswith("http://") or example[
+                                    "doc"].startswith("https://"):
+                                download_file("./",
+                                              example["doc"].rsplit("/", 1)[-1],
+                                              example["doc"])
+                                doc_path = example["doc"].rsplit("/", 1)[-1]
+                            else:
+                                doc_path = example["doc"]
+                            data["doc"] = doc_path
+                        else:
+                            raise ValueError(
+                                f"Incorrect path or url, URLs must start with `http://` or `https://`"
+                            )
+                    if "prompt" not in example.keys():
+                        raise ValueError(
+                            "Invalid inputs, the inputs should contain the prompt."
+                        )
+                    else:
+                        if isinstance(example["prompt"], list) and all(
+                                isinstance(s, str) for s in example["prompt"]):
+                            data["prompt"] = example["prompt"]
+                        else:
+                            raise TypeError(
+                                "Incorrect prompt, prompt should be list of string."
+                            )
+                    if "word_boxes" in example.keys():
+                        data["word_boxes"] = example["word_boxes"]
+                    input_list.append(data)
+                else:
                     raise TypeError(
-                        "Invalid inputs, the inputs should contain the image file path or image url."
-                    )
-                if "prompt" not in inputs[0].keys():
-                    raise TypeError(
-                        "Invalid inputs, the inputs should contain the prompt list."
-                    )
+                        "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!"
+                        .format(type(example)))
         else:
             raise TypeError(
-                "Invalid inputs, input for document question answering should be dict or list of dict, but type of {} found!"
+                "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!"
                 .format(type(inputs)))
-        return inputs
+        return input_list
 
     def _construct_model(self, model):
         """

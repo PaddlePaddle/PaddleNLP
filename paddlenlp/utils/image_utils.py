@@ -66,8 +66,9 @@ class DecodeImage(BaseOperator):
                 sample["im_base64"].encode('utf-8'))
 
         im = sample['image']
-        data = np.frombuffer(im, dtype='uint8')
-        im = np.array(Image.open(BytesIO(data)))  # RGB format
+        data = np.frombuffer(bytearray(im), dtype='uint8')
+        im = np.array(Image.open(BytesIO(data), ))  # RGB format
+        im = im[:, :, :3]  # RGBA -> RGB
         sample['image'] = im
 
         if 'h' not in sample:
@@ -198,7 +199,6 @@ class NormalizeImage(BaseOperator):
             samples = [samples]
         for sample in samples:
             for k in sample.keys():
-                # hard code
                 if k.startswith('image'):
                     im = sample[k]
                     im = im.astype(np.float32, copy=False)
