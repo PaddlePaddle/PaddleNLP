@@ -3,8 +3,8 @@
  **目录**
 
 - [1. 模型介绍](#模型介绍)
-- [2. 模型效果](#模型效果)
-- [3. 开始运行](#开始运行)
+- [2. 开箱即用](#开箱即用)
+- [3. 模型效果](#模型效果)
 - [4. 一键复现模型效果](#一键复现模型效果)
   - [4.1 启动文档信息抽取任务](#启动文档信息抽取任务)
   - [4.2 启动文档视觉问答任务](#启动文档视觉问答任务)
@@ -23,9 +23,77 @@
     <img src=https://user-images.githubusercontent.com/40840292/190966162-b26f68b8-9a36-42c0-837b-98f9b91c2adb.png height=500 hspace='15'/>
 </div>
 
+<a name="开箱即用"></a>
+
+## 2. 开箱即用
+
+```paddlenlp.Taskflow```基于ERNIE-LayoutX强大的跨模态语义对齐能力和布局理解能力提供开箱即用的文档抽取问答能力。
+
+#### 输入格式
+
+```
+[
+  {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]},
+  {"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}
+]
+```
+
+默认使用PaddleOCR进行OCR识别，同时支持用户通过``word_boxes``传入自己的OCR结果，格式为``List[str, List[float, float, float, float]]``。
+
+```
+[
+  {"doc": doc_path, "prompt": prompt, "word_boxes": word_boxes}
+]
+```
+
+#### 支持单条、批量预测
+
+- 支持本地图片路径输入
+
+简历图片样例：
+
+<img src="https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png" align="middle" width="60%" height="60%">
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> docprompt = Taskflow("document_intelligence")
+>>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+[{'prompt': '五百丁本次想要担任的是什么职位?',
+  'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
+ {'prompt': '五百丁是在哪里上的大学?',
+  'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
+ {'prompt': '大学学的是什么专业?',
+  'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
+```
+
+- http图片链接输入
+
+发票图片样例：
+
+<img src="https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg" align="middle" width="60%" height="60%">
+
+```python
+>>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+[{'prompt': '发票号码是多少?',
+  'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
+ {'prompt': '校验码是多少?',
+  'result': [{'end': 271,
+              'prob': 1.0,
+              'start': 263,
+              'value': '01107 555427109891646'}]}]
+```
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
+* `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
+
+
 <a name="模型效果"></a>
 
-## 2. 模型效果
+## 3. 模型效果
 
 - 开源数据集介绍
 
@@ -71,19 +139,16 @@
   | LayoutXLM-Base     |  1e-5, 2, _  | 1e-5, 8, 0.1 |  1e-5, 2, _  | 2e-5. 8, 0.1 |
   | ERNIE-LayoutX-Base |  2e-5, 4, _  | 1e-5, 8, 0.  |  1e-5, 4, _  | 2e-5. 8, 0.05 |
 
-<a name="开始运行"></a>
 
-## 3. 开始运行
+<a name="一键复现模型效果"></a>
+
+## 4. 一键复现模型效果
 
 - 请执行以下命令进行安装项目依赖
 
 ```
 pip install -r requirements.txt
 ```
-
-<a name="一键复现模型效果"></a>
-
-## 4. 一键复现模型效果
 
 <a name="启动文档信息抽取任务"></a>
 
