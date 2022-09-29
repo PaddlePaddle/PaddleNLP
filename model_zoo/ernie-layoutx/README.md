@@ -50,9 +50,9 @@
 
 - 支持本地图片路径输入
 
-简历图片样例：
-
-<img src="https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png" align="middle" width="60%" height="60%">
+<div align="center">
+    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=400 hspace='10'/>
+</div>
 
 ```python
 >>> from pprint import pprint
@@ -70,9 +70,9 @@
 
 - http图片链接输入
 
-发票图片样例：
-
-<img src="https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg" align="middle" width="60%" height="60%">
+<div align="center">
+    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg height=400 hspace='10'/>
+</div>
 
 ```python
 >>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])

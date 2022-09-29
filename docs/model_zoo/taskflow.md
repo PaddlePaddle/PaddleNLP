@@ -1596,6 +1596,10 @@ from paddlenlp import Taskflow
 <img src="https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg" align="middle" width="60%" height="60%">
 
 ```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> docprompt = Taskflow("document_intelligence")
 >>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
 [{'prompt': '发票号码是多少?',
   'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
