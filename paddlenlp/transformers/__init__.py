@@ -53,6 +53,8 @@ from .ernie_doc.tokenizer import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
+from .ernie_layoutx.modeling import *
+from .ernie_layoutx.tokenizer import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .fnet.modeling import *
