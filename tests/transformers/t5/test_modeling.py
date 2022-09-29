@@ -1162,13 +1162,6 @@ class TestAsymmetricT5(unittest.TestCase):
         # outputs = model(*inputs)
         assert len(outputs) == (4 if self.use_labels else
                                 3), f"{type(outputs)}, {type(lm_labels)}"
-        # try:
-        #     outputs[1].shape == [
-        #         tester.batch_size, tester.decoder_seq_length, tester.vocab_size
-        #     ]
-        # except Exception as e:
-        #     assert 1==0, f"use_labels:{self.use_labels}, return_dict:{self.return_dict},"\
-        #         f"{len(outputs)} " + f"{type(outputs)}" if isinstance(outputs, tuple) else f"{outputs.keys()}"
 
         if self.use_labels:
             assert outputs[1].shape == [

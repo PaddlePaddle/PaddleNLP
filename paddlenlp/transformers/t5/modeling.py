@@ -1900,7 +1900,6 @@ def convert_encoder_output(encoder_output):
             The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
             The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
     """
-    # if isinstance(encoder_output, tuple)
     return BaseModelOutput(
         last_hidden_state=encoder_output[0],
         hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,
