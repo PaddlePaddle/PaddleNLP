@@ -39,6 +39,7 @@ from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
+from .document_intelligence import DocPromptTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -437,7 +438,18 @@ TASKS = {
         "default": {
             "model": "pai-painter-painting-base-zh",
         }
-    }
+    },
+    "document_intelligence": {
+        "models": {
+            "docprompt": {
+                "task_class": DocPromptTask,
+                "task_flag": "document_intelligence-docprompt",
+            },
+        },
+        "default": {
+            "model": "docprompt"
+        }
+    },
 }
 
 support_schema_list = [
