@@ -20,7 +20,7 @@ import numpy as np
 from typing import Optional, Tuple
 from collections import OrderedDict
 from dataclasses import fields, dataclass
-from typing import Any, List, Tuple, Optional
+from typing import Any, Tuple, Optional
 from paddle.nn.layer.transformer import _convert_attention_mask, MultiHeadAttention
 from paddle.distributed.fleet.utils import recompute
 
@@ -357,7 +357,16 @@ class ModelOutput(OrderedDict):
         """
         Convert self to a tuple containing all the attributes/keys that are not `None`.
         """
-        return tuple(self[k] for k in self.keys())
+        # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3355
+        # when trying to get the keys of `OrderedDict`, `keys` method return empty values.
+        # TODO(wj-Mcat): this bug should be fixed in Paddle framework
+        tuples = ()
+        for field in fields(self):
+            if getattr(self, field.name, None) is None:
+                continue
+            tuples = tuples + (getattr(self, field.name), )
+
+        return tuples
 
 
 @dataclass

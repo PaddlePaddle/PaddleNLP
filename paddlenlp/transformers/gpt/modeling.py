@@ -833,16 +833,16 @@ class GPTModel(GPTPretrainedModel):
             length = length + cache_length
         else:
             cache_length = 0
-        casual_mask = self.bias[:, :, cache_length:length, :length]
+        causal_mask = self.bias[:, :, cache_length:length, :length]
 
         if attention_mask is not None:
             if attention_mask.dtype != paddle.int64:
                 attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & casual_mask)) * -1e4
+            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
         else:
-            attention_mask = (1.0 - casual_mask) * -1e4
+            attention_mask = (1.0 - causal_mask) * -1e4
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
