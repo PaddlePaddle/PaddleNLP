@@ -1588,7 +1588,7 @@ from paddlenlp import Taskflow
 - http图片链接输入
 
 ```python
->>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+>>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
 [{'prompt': '发票号码是多少?',
   'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
  {'prompt': '校验码是多少?',

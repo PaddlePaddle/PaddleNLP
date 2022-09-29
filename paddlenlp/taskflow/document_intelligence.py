@@ -25,7 +25,7 @@ usage = r"""
             # Types of doc: A string containing a local path to an image
             docprompt({"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             # Types of doc: A string containing a http link pointing to an image
-            docprompt({"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
+            docprompt({"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             '''
             [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
             '''
@@ -68,10 +68,8 @@ class DocPromptTask(Task):
             )
         self._batch_size = kwargs.get("batch_size", 1)
         self._topn = kwargs.get("topn", 1)
-        self._use_gpu = kwargs.get("use_gpu", True)
         self._lang = kwargs.get("lang", "ch")
-        if not self._use_gpu:
-            paddle.set_device('cpu')
+        self._use_gpu = False if paddle.get_device() == 'cpu' else True
         self._ocr = PaddleOCR(use_angle_cls=True,
                               show_log=False,
                               use_gpu=self._use_gpu,
