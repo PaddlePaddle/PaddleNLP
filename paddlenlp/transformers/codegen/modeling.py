@@ -21,13 +21,28 @@ from paddle.nn import Layer, Embedding
 from ..nezha.modeling import ACT2FN
 from .. import PretrainedModel, register_base_model
 
+CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "Salesforce/codegen-350M-nl",
+    "Salesforce/codegen-350M-multi",
+    "Salesforce/codegen-350M-mono",
+    "Salesforce/codegen-2B-nl",
+    "Salesforce/codegen-2B-multi",
+    "Salesforce/codegen-2B-mono",
+    "Salesforce/codegen-6B-nl",
+    "Salesforce/codegen-6B-multi",
+    "Salesforce/codegen-6B-mono",
+    "Salesforce/codegen-16B-nl",
+    "Salesforce/codegen-16B-multi",
+    "Salesforce/codegen-16B-mono",
+]
+
 
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
     dim = x.shape[-1]
     if seq_len is None:
         seq_len = x.shape[seq_dim]
     inv_freq = 1.0 / (10000**(paddle.arange(0, dim, 2) / dim))
-    sinusoid_inp = (paddle.einsum("i , j -> i j",
+    sinusoid_inp = (paddle.einsum("i,j->ij",
                                   paddle.arange(seq_len, dtype="float32"),
                                   inv_freq))
     return paddle.sin(sinusoid_inp), paddle.cos(sinusoid_inp)
@@ -59,13 +74,10 @@ class CodeGenAttention(Layer):
                  max_positions, attn_pdrop, resid_pdrop):
         super().__init__()
 
-        self.register_buffer(
-            "causal_mask",
-            paddle.tril(
-                paddle.ones((max_positions, max_positions),
-                            dtype=paddle.get_default_dtype())).reshape(
-                                (1, 1, max_positions, max_positions)),
-        )
+        self.causal_mask = paddle.tril(
+            paddle.ones((max_positions, max_positions),
+                        dtype=paddle.get_default_dtype())).reshape(
+                            (1, 1, max_positions, max_positions))
 
         self.attn_dropout = nn.Dropout(attn_pdrop)
         self.resid_dropout = nn.Dropout(resid_pdrop)
@@ -475,7 +487,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
                                           "specified when generating attention_mask"
             if batch_size == 1 and past_length != 0:
                 batch_size, seq_len = input_shape
-                attention_mask = paddle.ones(
+                attention_mask = paddle.zeros(
                     [batch_size, 1, 1, seq_len + past_length],
                     dtype=paddle.get_default_dtype())
             else:
@@ -487,7 +499,13 @@ class CodeGenModel(CodeGenPreTrainedModel):
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
-            attention_mask.stop_gradient = True
+        attention_mask.stop_gradient = True
+        # TODO: CodeGen Attention Mask is TOO confusion.
+        # When it's 2D, it must be int and it's denoted by 1/0.
+        # When using model.generate() without providing attention mask
+        # or using 4D attention mask,
+        # the attention mask's dtype must be float and it's denoted by 0/-inf.
+        # Moreover, cannot support 3D attention mask.
 
         inputs_embeds = self.wte(input_ids)
         if token_type_ids is not None:
@@ -521,7 +539,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
     r"""
     CodeGen Model with a `language modeling` head on top.
     Args:
-        bart (:class:`CodeGenModel`):
+        transformer (:class:`CodeGenModel`):
             An instance of CodeGenModel.
     """
     _keys_to_ignore_on_load_missing = [
@@ -572,8 +590,12 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
 
     def prepare_inputs_for_generation(self, input_ids, cache=None, **kwargs):
         # only last token for inputs_ids if past is defined in kwargs
+        token_type_ids = kwargs.get("token_type_ids", None)
+
         if cache:
             input_ids = input_ids[:, -1].unsqueeze(-1)
+            if token_type_ids is not None:
+                token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
 
         attention_mask = kwargs.get("attention_mask", None)
         if attention_mask is not None:
@@ -585,6 +607,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
             "cache": cache,
             "use_cache": kwargs.get("use_cache"),
             "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
         }
 
     def forward(self,
