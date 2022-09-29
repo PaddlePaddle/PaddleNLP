@@ -487,9 +487,9 @@ class CodeGenModel(CodeGenPreTrainedModel):
                                           "specified when generating attention_mask"
             if batch_size == 1 and past_length != 0:
                 batch_size, seq_len = input_shape
-                attention_mask = (
-                    1.0 - paddle.ones([batch_size, 1, 1, seq_len + past_length],
-                                      dtype=paddle.get_default_dtype())) * -1e4
+                attention_mask = paddle.zeros(
+                    [batch_size, 1, 1, seq_len + past_length],
+                    dtype=paddle.get_default_dtype())
             else:
                 attention_mask = paddle.cast(
                     input_ids == self.pad_token_id,
@@ -499,7 +499,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
-            attention_mask.stop_gradient = True
+        attention_mask.stop_gradient = True
         # TODO: CodeGen Attention Mask is TOO confusion.
         # When it's 2D, it must be int and it's denoted by 1/0.
         # When using model.generate() without providing attention mask
