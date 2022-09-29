@@ -51,7 +51,7 @@
 - 支持本地图片路径输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=400 hspace='10'/>
+    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=800 hspace='20'/>
 </div>
 
 ```python
