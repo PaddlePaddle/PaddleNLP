@@ -166,7 +166,10 @@ class Predictor(object):
             config.set_cpu_math_library_num_threads(cpu_threads)
         elif device == "xpu":
             # set XPU configs accordingly
-            config.enable_xpu(100)
+            config.enable_xpu()
+        elif device == "npu":
+            # set NPU configs accordingly
+            config.enable_npu()
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
@@ -250,7 +253,7 @@ if __name__ == '__main__':
     parser.add_argument("--model_dir", type=str, default='./output', help="The path to parameters in static graph.")
     parser.add_argument("--data_dir", type=str, default="./waybill_ie/data", help="The folder where the dataset is located.")
     parser.add_argument("--batch_size", type=int, default=32, help="The number of sequences contained in a mini-batch.")
-    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "npu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
     parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
     parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
     parser.add_argument('--cpu_threads', default=10, type=int, help='Number of threads to predict when using cpu.')
