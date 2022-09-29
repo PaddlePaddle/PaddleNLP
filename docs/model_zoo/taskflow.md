@@ -43,6 +43,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
+| [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 基于跨模态通用文档预训练模型ERNIE-LayoutX |
 
 
 ## QuickStart
@@ -1545,6 +1546,80 @@ from paddlenlp import Taskflow
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 
 </div></details>
+
+### 文档智能
+<details><summary>&emsp; 基于跨模态通用文档预训练模型ERNIE-LayoutX </summary><div>
+
+#### 输入格式
+
+```
+[
+  {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]},
+  {"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}
+]
+```
+
+默认使用PaddleOCR进行OCR识别，同时支持用户通过``word_boxes``传入自己的OCR结果，格式为``List[str, List[float, float, float, float]]``。
+
+```
+[
+  {"doc": doc_path, "prompt": prompt, "word_boxes": word_boxes}
+]
+```
+
+#### 支持单条、批量预测
+
+- 支持本地图片路径输入
+
+<div align="center">
+    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=800 hspace='20'/>
+</div>
+
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> docprompt = Taskflow("document_intelligence")
+>>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+[{'prompt': '五百丁本次想要担任的是什么职位?',
+  'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
+ {'prompt': '五百丁是在哪里上的大学?',
+  'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
+ {'prompt': '大学学的是什么专业?',
+  'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
+```
+
+- http图片链接输入
+
+<div align="center">
+    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg height=400 hspace='10'/>
+</div>
+
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> docprompt = Taskflow("document_intelligence")
+>>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+[{'prompt': '发票号码是多少?',
+  'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
+ {'prompt': '校验码是多少?',
+  'result': [{'end': 271,
+              'prob': 1.0,
+              'start': 263,
+              'value': '01107 555427109891646'}]}]
+```
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
+* `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
+
+
+</div></details>
+
 
 ## PART Ⅱ &emsp; 定制化训练
 
