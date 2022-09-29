@@ -208,7 +208,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
     parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "npu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
     parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")
     parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
