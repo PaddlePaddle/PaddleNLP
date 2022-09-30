@@ -1198,8 +1198,8 @@ class GPTLMHeadModel(GPTPretrainedModel):
             labels (paddle.Tensor, optional):
                 A Tensor of shape `(batch_size, sequence_length)`. 
                 Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
-                `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
-                are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
+                `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100`
+                are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
                 Defaults to None.
             output_attentions (bool, optional):
                 See :class:`GPTModel`.
@@ -1243,15 +1243,8 @@ class GPTLMHeadModel(GPTPretrainedModel):
             if len(outputs) == 1 and loss is None:
                 return logits
 
-            temp_list = [
-                loss,
-                logits,
-                outputs.past_key_values,
-                outputs.hidden_states,
-                outputs.attentions,
-                outputs.cross_attentions,
-            ]
-            return tuple(v for v in temp_list if v is not None)
+            outputs = (logits, ) + outputs[1:]
+            return ((loss, ) + outputs) if loss is not None else outputs
 
         return CausalLMOutputWithCrossAttentions(
             loss=loss,
@@ -1363,7 +1356,14 @@ class GPTForTokenClassification(GPTPretrainedModel):
         self.classifier = nn.Linear(self.gpt.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(self,
+                input_ids,
+                position_ids=None,
+                attention_mask=None,
+                labels=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The GPTForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1374,9 +1374,25 @@ class GPTForTokenClassification(GPTPretrainedModel):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
                 See :class:`GPTModel`.
+            labels (Tensor, optional):
+                Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in 
+                `[0, ..., num_labels - 1]`. If `num_labels == 1` a regression loss is computed (Mean-Square loss), If
+                `num_labels > 1` a classification loss is computed (Cross-Entropy). Defaults to None.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
+            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            returns tensor `logits`, a tensor of the input token classification logits.
             Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
@@ -1393,13 +1409,37 @@ class GPTForTokenClassification(GPTPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.gpt(input_ids,
-                                   position_ids=position_ids,
-                                   attention_mask=attention_mask)
+        sequence_output = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=True,
+        )
+        hidden_states = sequence_output[0]
+        hidden_states = self.dropout(hidden_states)
+        logits = self.classifier(hidden_states)
 
-        sequence_output = self.dropout(sequence_output)
-        logits = self.classifier(sequence_output)
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.reshape(-1, self.num_classes),
+                            labels.reshape(-1))
+
+        if not return_dict:
+            if len(sequence_output) == 1 and loss is None:
+                return logits
+
+            outputs = (logits, ) + sequence_output[1:]
+            return ((loss, ) + outputs) if loss is not None else outputs
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 class GPTForSequenceClassification(GPTPretrainedModel):
@@ -1415,15 +1455,27 @@ class GPTForSequenceClassification(GPTPretrainedModel):
             
     """
 
-    def __init__(self, gpt, num_classes=2):
+    def __init__(self, gpt, num_classes=2, problem_type=None):
         super(GPTForSequenceClassification, self).__init__()
         self.gpt = gpt  # allow gpt to be config
+        self.num_classes = num_classes
+        self.problem_type = problem_type
         self.score = nn.Linear(self.gpt.config["hidden_size"],
                                num_classes,
                                bias_attr=False)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        labels=None,
+        use_cache=False,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The GPTForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -1434,9 +1486,27 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
                 See :class:`GPTModel`.
+            labels (Tensor, optional):
+                Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in 
+                `[0, ..., num_labels - 1]`. If `num_labels == 1` a regression loss is computed (Mean-Square loss), If
+                `num_labels > 1` a classification loss is computed (Cross-Entropy). Defaults to None.
+            use_cache (bool, optional):
+                See :classL `GPTModel`.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast`.
+
+            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_classes]` and dtype as float32.
 
         Example:
@@ -1457,25 +1527,44 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         # sequence_output shape [bs, seq_len, hidden_size]
         sequence_output = self.gpt(input_ids,
                                    position_ids=position_ids,
-                                   attention_mask=attention_mask)
+                                   attention_mask=attention_mask,
+                                   use_cache=use_cache,
+                                   output_attentions=output_attentions,
+                                   output_hidden_states=output_hidden_states,
+                                   return_dict=True)
         # logits shape [bs, seq_len, num_class]
-        logits = self.score(sequence_output)
+        logits = self.score(sequence_output[0])
         # padding index maybe 0
         eos_token_id = self.gpt.config.get("eos_token_id", 0)
         # sequence_lengths shape [bs,]
         sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(
             axis=-1) - 1
 
-        try:
-            sequence_output.shape[0]
-        except Exception as e:
-            assert False, f"{e}\n{len(sequence_output)} {[type(x) for x in sequence_output]}"
         pooled_logits = logits.gather_nd(
-            paddle.stack(
-                [paddle.arange(sequence_output.shape[0]), sequence_lengths],
-                axis=-1))
+            paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths],
+                         axis=-1))
 
-        return pooled_logits
+        loss = None
+        if labels is not None:
+            # 多分类？
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(pooled_logits.reshape(-1, self.num_classes),
+                            labels.reshape(-1))
+
+        if not return_dict:
+            if len(sequence_output) == 1 and loss is None:
+                return pooled_logits
+
+            outputs = (pooled_logits, ) + sequence_output[1:]
+            return ((loss, ) + outputs) if loss is not None else outputs
+
+        return SequenceClassifierOutputWithPast(
+            loss=loss,
+            logits=pooled_logits,
+            past_key_values=sequence_output.past_key_values,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 GPTForCausalLM = GPTLMHeadModel
