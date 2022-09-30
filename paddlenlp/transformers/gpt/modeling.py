@@ -1546,10 +1546,16 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
         loss = None
         if labels is not None:
-            # 多分类？
-            loss_fct = CrossEntropyLoss()
-            loss = loss_fct(pooled_logits.reshape(-1, self.num_classes),
-                            labels.reshape(-1))
+            if self.num_classes == 1:
+                loss_fct = MSELoss()
+                loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
+            elif labels.dtype == paddle.int32 or labels.dtype == paddle.int32:
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(pooled_logits.reshape(-1, self.num_classes),
+                                labels.reshape(-1))
+            else:
+                loss_fct = BCEWithLogitsLoss()
+                loss = loss_fct(pooled_logits, labels)
 
         if not return_dict:
             if len(sequence_output) == 1 and loss is None:
