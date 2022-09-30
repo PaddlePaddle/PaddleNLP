@@ -223,7 +223,9 @@ def reader(data_path, max_seq_len=512):
                 yield json_line
             else:
                 if result['end'] - result['start'] > max_content_len:
-                    logger.warn("result['end '] - result ['start'] exceeds max_content_len, which will result in no valid instance being returned")
+                    logger.warn(
+                        "result['end '] - result ['start'] exceeds max_content_len, which will result in no valid instance being returned"
+                    )
                 result_list = json_line['result_list']
                 json_lines = []
                 accumulate = 0
@@ -231,10 +233,11 @@ def reader(data_path, max_seq_len=512):
                     cur_result_list = []
 
                     for result in result_list:
-                        if result['start'] + 1 <= max_content_len < result['end'] and result['end'] - result['start'] <= max_content_len :
+                        if result['start'] + 1 <= max_content_len < result[
+                                'end'] and result['end'] - result[
+                                    'start'] <= max_content_len:
                             max_content_len = result['start']
                             break
-                        
 
                     cur_content = content[:max_content_len]
                     res_content = content[max_content_len:]
