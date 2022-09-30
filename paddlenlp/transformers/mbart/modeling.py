@@ -203,7 +203,7 @@ class MBartLearnedPositionalEmbedding(Embedding):
         positions = paddle.arange(past_key_values_length,
                                   past_key_values_length + seq_len,
                                   dtype="int64")
-        return super().forward(positions + self.offset)
+        return Embedding.forward(self, positions + self.offset)
 
 
 class MBartEncoder(MBartPretrainedModel):
@@ -270,7 +270,7 @@ class MBartEncoder(MBartPretrainedModel):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.d_model**0.5 * self.embed_tokens(input_ids)
-        inputs_embed_pos = self.encoder_embed_positions(input_ids.shape)
+        inputs_embed_pos = self.encoder_embed_positions(paddle.shape(input_ids))
         hidden_states = inputs_embeds + inputs_embed_pos
         hidden_states = self.encoder_layernorm_embedding(hidden_states)
         encoder_input = self.encoder_dropout(hidden_states)

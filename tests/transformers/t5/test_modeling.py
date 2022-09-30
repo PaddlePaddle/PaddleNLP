@@ -18,6 +18,7 @@ import random
 import copy
 import tempfile
 import unittest
+from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
@@ -25,7 +26,7 @@ from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
 
 import paddle
-from paddlenlp.transformers import T5ForConditionalGeneration, T5Model, T5Tokenizer
+from paddlenlp.transformers import T5ForConditionalGeneration, T5Model, T5Tokenizer, T5EncoderModel
 from paddlenlp.transformers.t5.modeling import T5_PRETRAINED_MODEL_ARCHIVE_LIST
 
 
@@ -53,7 +54,6 @@ class T5ModelTester:
         # For common tests
         is_training=True,
         use_attention_mask=True,
-        use_labels=True,
         hidden_size=32,
         num_hidden_layers=5,
         num_attention_heads=4,
@@ -75,7 +75,6 @@ class T5ModelTester:
         self.seq_length = self.decoder_seq_length
         self.is_training = is_training
         self.use_attention_mask = use_attention_mask
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -105,7 +104,7 @@ class T5ModelTester:
                 [self.batch_size, self.decoder_seq_length], vocab_size=2)
 
         lm_labels = None
-        if self.use_labels:
+        if self.parent.use_labels:
             lm_labels = ids_tensor([self.batch_size, self.decoder_seq_length],
                                    self.vocab_size)
 
@@ -165,6 +164,8 @@ class T5ModelTester:
         decoder_attention_mask,
         lm_labels,
     ):
+        if not self.parent.use_labels:
+            return
         model = T5Model(**config)
         model.eval()
 
@@ -213,13 +214,14 @@ class T5ModelTester:
     ):
         model = T5Model(**config)
         model.eval()
-        result = model(
-            input_ids=input_ids,
-            decoder_input_ids=decoder_input_ids,
-            attention_mask=attention_mask,
-            decoder_attention_mask=decoder_attention_mask,
-        )
-        result = model(input_ids=input_ids, decoder_input_ids=decoder_input_ids)
+        result = model(input_ids=input_ids,
+                       decoder_input_ids=decoder_input_ids,
+                       attention_mask=attention_mask,
+                       decoder_attention_mask=decoder_attention_mask,
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids=input_ids,
+                       decoder_input_ids=decoder_input_ids,
+                       return_dict=self.parent.return_dict)
         decoder_output = result[0]
         decoder_past = result[1]
         encoder_output = result[2]
@@ -247,17 +249,22 @@ class T5ModelTester:
         pretrained_model = T5Model(**config)
         model = T5ForConditionalGeneration(pretrained_model)
         model.eval()
-        outputs = model(
-            input_ids=input_ids,
-            decoder_input_ids=decoder_input_ids,
-            decoder_attention_mask=decoder_attention_mask,
-            labels=lm_labels,
-        )
-        self.parent.assertEqual(len(outputs), 4)
-        self.parent.assertEqual(
-            outputs[1].shape,
-            [self.batch_size, self.decoder_seq_length, self.vocab_size])
-        self.parent.assertEqual(outputs[0].shape, [1])
+        outputs = model(input_ids=input_ids,
+                        decoder_input_ids=decoder_input_ids,
+                        decoder_attention_mask=decoder_attention_mask,
+                        labels=lm_labels,
+                        return_dict=self.parent.return_dict)
+        self.parent.assertEqual(len(outputs),
+                                4 if self.parent.use_labels else 3)
+        if self.parent.use_labels:
+            self.parent.assertEqual(
+                outputs[1].shape,
+                [self.batch_size, self.decoder_seq_length, self.vocab_size])
+            self.parent.assertEqual(outputs[0].shape, [1])
+        else:
+            self.parent.assertEqual(
+                outputs[0].shape,
+                [self.batch_size, self.decoder_seq_length, self.vocab_size])
 
     def create_and_check_decoder_model_past(
         self,
@@ -271,14 +278,19 @@ class T5ModelTester:
         model = T5Model(**config).get_decoder()
         model.eval()
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids)
-        outputs_no_past = model(input_ids, use_cache=False)
+        outputs = model(input_ids,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids,
+                                       return_dict=self.parent.return_dict)
+        outputs_no_past = model(input_ids,
+                                use_cache=False,
+                                return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf) + 1)
         self.parent.assertTrue(len(outputs) == len(outputs_no_past) + 1)
 
-        output, past_key_values = outputs
+        output, past_key_values = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor([self.batch_size, 1], config["vocab_size"])
@@ -286,8 +298,11 @@ class T5ModelTester:
         # append to next input_ids and
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)[0]
-        output_from_past = model(next_tokens, cache=past_key_values)[0]
+        output_from_no_past = model(next_input_ids,
+                                    return_dict=self.parent.return_dict)[0]
+        output_from_past = model(next_tokens,
+                                 cache=past_key_values,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor([
@@ -326,7 +341,8 @@ class T5ModelTester:
         # first forward pass
         output, past_key_values = model(input_ids,
                                         attention_mask=attn_mask,
-                                        use_cache=True)
+                                        use_cache=True,
+                                        return_dict=self.parent.return_dict)[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor([self.batch_size, 1], config["vocab_size"])
@@ -348,11 +364,14 @@ class T5ModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)[0]
+        output_from_no_past = model(next_input_ids,
+                                    attention_mask=attn_mask,
+                                    return_dict=self.parent.return_dict)[0]
         output_from_past = model(next_tokens,
                                  cache=past_key_values,
                                  attention_mask=paddle.ones(
-                                     (attn_mask.shape[0], 1), dtype="int64"))[0]
+                                     (attn_mask.shape[0], 1), dtype="int64"),
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor([
@@ -384,9 +403,10 @@ class T5ModelTester:
         # first forward pass
         outputs = model(input_ids,
                         attention_mask=attention_mask,
-                        use_cache=True)
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
 
-        output, past_key_values = outputs
+        output, past_key_values = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor([self.batch_size, 3], config["vocab_size"])
@@ -398,10 +418,12 @@ class T5ModelTester:
                                             axis=-1)
 
         output_from_no_past = model(next_input_ids,
-                                    attention_mask=next_attention_mask)[0]
+                                    attention_mask=next_attention_mask,
+                                    return_dict=self.parent.return_dict)[0]
         output_from_past = model(next_tokens,
                                  attention_mask=next_attention_mask,
-                                 cache=past_key_values)[0]
+                                 cache=past_key_values,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor([
@@ -497,8 +519,16 @@ class T5ModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = T5Model
+    return_dict: bool = False
+    use_labels: bool = False
 
     all_model_classes = (T5Model, T5ForConditionalGeneration)
     all_generative_model_classes = {T5ForConditionalGeneration: (T5Model, "t5")}
@@ -605,6 +635,139 @@ class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         for model_name in T5_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = T5Model.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class T5EncoderOnlyModelTester:
+
+    def __init__(
+        self,
+        parent,
+        vocab_size=99,
+        batch_size=13,
+        encoder_seq_length=7,
+        # For common tests
+        use_attention_mask=True,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        d_ff=37,
+        relative_attention_num_buckets=8,
+        is_training=False,
+        dropout_rate=0.1,
+        initializer_factor=0.002,
+        is_encoder_decoder=False,
+        eos_token_id=1,
+        pad_token_id=0,
+        scope=None,
+    ):
+
+        self.parent = parent
+        self.batch_size = batch_size
+        self.encoder_seq_length = encoder_seq_length
+        # For common tests
+        self.seq_length = self.encoder_seq_length
+        self.use_attention_mask = use_attention_mask
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.d_ff = d_ff
+        self.relative_attention_num_buckets = relative_attention_num_buckets
+        self.dropout_rate = dropout_rate
+        self.initializer_factor = initializer_factor
+        self.eos_token_id = eos_token_id
+        self.pad_token_id = pad_token_id
+        self.is_encoder_decoder = is_encoder_decoder
+        self.scope = None
+        self.is_training = is_training
+
+    def get_config(self):
+        config = dict(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            d_ff=self.d_ff,
+            d_kv=self.hidden_size // self.num_attention_heads,
+            num_layers=self.num_hidden_layers,
+            num_heads=self.num_attention_heads,
+            relative_attention_num_buckets=self.relative_attention_num_buckets,
+            dropout_rate=self.dropout_rate,
+            initializer_factor=self.initializer_factor,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.pad_token_id,
+            pad_token_id=self.pad_token_id,
+            is_encoder_decoder=self.is_encoder_decoder,
+        )
+        return config
+
+    def prepare_config_and_inputs(self):
+        input_ids = ids_tensor([self.batch_size, self.encoder_seq_length],
+                               self.vocab_size)
+
+        attention_mask = None
+        if self.use_attention_mask:
+            attention_mask = ids_tensor(
+                [self.batch_size, self.encoder_seq_length], vocab_size=2)
+
+        config = self.get_config()
+        return (
+            config,
+            input_ids,
+            attention_mask,
+        )
+
+    def create_and_check_model(
+        self,
+        config,
+        input_ids,
+        attention_mask,
+    ):
+        model = T5EncoderModel(**config)
+        model.eval()
+        result = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
+        result = model(input_ids=input_ids)
+        encoder_output = result[0]
+
+        self.parent.assertEqual(
+            encoder_output.shape,
+            [self.batch_size, self.encoder_seq_length, self.hidden_size])
+
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        (
+            config,
+            input_ids,
+            attention_mask,
+        ) = config_and_inputs
+
+        inputs_dict = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+        }
+        return config, inputs_dict
+
+
+class T5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
+    all_model_classes = (T5EncoderModel, )
+    test_pruning = False
+    test_resize_embeddings = False
+    test_model_parallel = True
+    all_parallelizable_model_classes = (T5EncoderModel, )
+
+    def _make_model_instance(self, config, model_class):
+        return model_class(**config)
+
+    def setUp(self):
+        self.model_tester = T5EncoderOnlyModelTester(self)
+
+    def test_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model(*config_and_inputs)
+
+    def test_model_name_list(self):
+        pass
 
 
 class T5ModelIntegrationTests(unittest.TestCase):
@@ -968,7 +1131,15 @@ class T5ModelIntegrationTests(unittest.TestCase):
         self.assertEqual(translation, expected_translation)
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class TestAsymmetricT5(unittest.TestCase):
+    return_dict = False
+    use_labels = False
 
     def build_model_and_check_forward_pass(self, **kwargs):
         tester = T5ModelTester(self, **kwargs)
@@ -983,18 +1154,24 @@ class TestAsymmetricT5(unittest.TestCase):
         pretrained_model = T5Model(**config)
         model = T5ForConditionalGeneration(pretrained_model)
         model.eval()
-        outputs = model(
-            input_ids=input_ids,
-            decoder_input_ids=decoder_input_ids,
-            decoder_attention_mask=decoder_attention_mask,
-            labels=lm_labels,
-        )
+        outputs = model(input_ids=input_ids,
+                        decoder_input_ids=decoder_input_ids,
+                        decoder_attention_mask=decoder_attention_mask,
+                        labels=lm_labels,
+                        return_dict=self.return_dict)
         # outputs = model(*inputs)
-        assert len(outputs) == 4
-        assert outputs[1].shape == [
-            tester.batch_size, tester.decoder_seq_length, tester.vocab_size
-        ]
-        assert outputs[0].shape == [1]
+        assert len(outputs) == (4 if self.use_labels else
+                                3), f"{type(outputs)}, {type(lm_labels)}"
+
+        if self.use_labels:
+            assert outputs[1].shape == [
+                tester.batch_size, tester.decoder_seq_length, tester.vocab_size
+            ]
+            assert outputs[0].shape == [1]
+        else:
+            assert outputs[0].shape == [
+                tester.batch_size, tester.decoder_seq_length, tester.vocab_size
+            ]
         return model
 
     def test_small_decoder(self):
