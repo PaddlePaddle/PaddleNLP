@@ -206,10 +206,8 @@ class ElectraEmbeddings(nn.Layer):
         inputs_embeds=None):
 
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
             input_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
             input_embeddings = inputs_embeds
     
         if position_ids is None:
@@ -599,9 +597,9 @@ class ElectraModel(ElectraPretrainedModel):
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             inputs_embeds (Tensor, optional):
-                Optionally, instead of passing input_ids you can choose to directly pass an embedded representation.
+                Instead of passing input_ids you can choose to directly pass an embedded representation.
                 This is useful for use cases such as P-Tuning, where you want more control over how to convert input_ids indices
-                into associated vectors than the model's internal embedding lookup matrix.
+                into the embedding space.
                 Its data type should be `float32` and it has a shape of [batch_size, sequence_length, embedding_size].
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
