@@ -45,6 +45,7 @@ class ElectraModelTester:
         self.is_training = True
         self.use_input_mask = True
         self.use_token_type_ids = True
+        self.use_inputs_embeds = False
         self.vocab_size = 99
         self.embedding_size = 32
         self.hidden_size = 32
@@ -76,6 +77,12 @@ class ElectraModelTester:
         if self.use_token_type_ids:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length],
                                         self.type_vocab_size)
+        
+        inputs_embeds = None
+        if self.use_inputs_embeds:
+            inputs_embeds = floats_tensor([self.batch_size, self.seq_length, self.embedding_size])
+            # In order to use inputs_embeds, input_ids needs to set to None
+            input_ids = None
 
         sequence_labels = None
         token_labels = None
@@ -88,7 +95,7 @@ class ElectraModelTester:
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        return config, input_ids, token_type_ids, input_mask, inputs_embeds, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
         return {
@@ -113,6 +120,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -122,6 +130,7 @@ class ElectraModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
                        return_dict=self.parent.return_dict)
         result = model(input_ids, token_type_ids=token_type_ids)
         result = model(input_ids, return_dict=self.parent.return_dict)
@@ -139,6 +148,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -148,6 +158,7 @@ class ElectraModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
         if not self.parent.return_dict and token_labels is None:
@@ -168,6 +179,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -178,6 +190,7 @@ class ElectraModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
 
@@ -199,6 +212,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -209,6 +223,7 @@ class ElectraModelTester:
             input_ids,
             attention_mask=input_mask,
             token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
         )
         self.parent.assertEqual(result.logits.shape,
                                 (self.batch_size, self.seq_length))
@@ -219,6 +234,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -229,6 +245,7 @@ class ElectraModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
         if not self.parent.return_dict and token_labels is None:
@@ -248,6 +265,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -257,6 +275,7 @@ class ElectraModelTester:
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
                        start_positions=sequence_labels,
                        end_positions=sequence_labels,
                        return_dict=self.parent.return_dict)
@@ -275,6 +294,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -291,6 +311,7 @@ class ElectraModelTester:
         result = model(multiple_choice_inputs_ids,
                        attention_mask=multiple_choice_input_mask,
                        token_type_ids=multiple_choice_token_type_ids,
+                       inputs_embeds=inputs_embeds,
                        labels=choice_labels,
                        return_dict=self.parent.return_dict)
 
@@ -311,6 +332,7 @@ class ElectraModelTester:
             config,
             input_ids,
             token_type_ids,
+            inputs_embeds,
             input_mask,
             sequence_labels,
             token_labels,
@@ -319,16 +341,18 @@ class ElectraModelTester:
         inputs_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
-            "attention_mask": input_mask
+            "attention_mask": input_mask,
+            "inputs_embeds": inputs_embeds
         }
         return config, inputs_dict
 
 
-@parameterized_class(("return_dict", "use_labels"), [
-    [False, False],
-    [False, True],
-    [True, False],
-    [True, True],
+@parameterized_class(("return_dict", "use_labels", "use_inputs_embeds"), [
+    [False, False, True],
+    [False, False, False],
+    [False, True, False],
+    [True, False, False],
+    [True, True, False],
 ])
 class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
     test_resize_embeddings = False

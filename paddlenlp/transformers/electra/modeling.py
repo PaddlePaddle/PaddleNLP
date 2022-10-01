@@ -199,11 +199,26 @@ class ElectraEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        past_key_values_length=None):
+
+        if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_embeddings = inputs_embeds
+    
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
+            if past_key_values_length is not None:
+                position_ids += past_key_values_length
             position_ids.stop_gradient = True
         position_ids = position_ids.astype("int64")
 
@@ -550,6 +565,7 @@ class ElectraModel(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -585,6 +601,11 @@ class ElectraModel(ElectraPretrainedModel):
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing input_ids you can choose to directly pass an embedded representation.
+                This is useful for use cases such as P-Tuning, where you want more control over how to convert input_ids indices
+                into associated vectors than the model's internal embedding lookup matrix.
+                Its data type should be `float32` and it has a shape of [batch_size, sequence_length, embedding_size].
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -625,7 +646,8 @@ class ElectraModel(ElectraPretrainedModel):
 
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+                                           token_type_ids=token_type_ids,
+                                           inputs_embeds=inputs_embeds)
 
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
@@ -743,6 +765,7 @@ class ElectraGenerator(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 labels=None,
                 output_attentions=False,
                 output_hidden_states=False,
@@ -790,6 +813,7 @@ class ElectraGenerator(ElectraPretrainedModel):
             token_type_ids,
             position_ids,
             attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
@@ -999,6 +1023,7 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
         token_type_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         labels=None,
         output_attentions: bool = None,
         output_hidden_states: bool = None,
@@ -1050,6 +1075,7 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
             token_type_ids,
             position_ids,
             attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
@@ -1115,6 +1141,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 labels: Optional[Tensor] = None,
                 output_attentions: Optional[bool] = None,
                 output_hidden_states: Optional[bool] = None,
@@ -1169,6 +1196,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
             token_type_ids,
             position_ids,
             attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
@@ -1625,6 +1653,7 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
         token_type_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         labels: Optional[Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -1729,6 +1758,7 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
             token_type_ids,
             position_ids,
             attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -2019,6 +2049,7 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
         token_type_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         start_positions: Optional[Tensor] = None,
         end_positions: Optional[Tensor] = None,
         output_attentions: Optional[bool] = None,
@@ -2089,6 +2120,7 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
             token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
