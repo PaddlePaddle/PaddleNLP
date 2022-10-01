@@ -200,16 +200,16 @@ class ElectraEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        inputs_embeds=None):
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                inputs_embeds=None):
 
         if input_ids is not None:
             input_embeddings = self.word_embeddings(input_ids)
         else:
             input_embeddings = inputs_embeds
-    
+
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)

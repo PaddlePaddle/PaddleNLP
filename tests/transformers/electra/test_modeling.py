@@ -77,10 +77,11 @@ class ElectraModelTester:
         if self.use_token_type_ids:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length],
                                         self.type_vocab_size)
-        
+
         inputs_embeds = None
         if self.use_inputs_embeds:
-            inputs_embeds = floats_tensor([self.batch_size, self.seq_length, self.embedding_size])
+            inputs_embeds = floats_tensor(
+                [self.batch_size, self.seq_length, self.embedding_size])
             # In order to use inputs_embeds, input_ids needs to set to None
             input_ids = None
 
