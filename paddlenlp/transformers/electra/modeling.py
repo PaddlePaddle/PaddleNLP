@@ -203,8 +203,7 @@ class ElectraEmbeddings(nn.Layer):
         input_ids,
         token_type_ids=None,
         position_ids=None,
-        inputs_embeds=None,
-        past_key_values_length=None):
+        inputs_embeds=None):
 
         if input_ids is not None:
             input_shape = paddle.shape(input_ids)
@@ -217,8 +216,6 @@ class ElectraEmbeddings(nn.Layer):
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
-            if past_key_values_length is not None:
-                position_ids += past_key_values_length
             position_ids.stop_gradient = True
         position_ids = position_ids.astype("int64")
 
