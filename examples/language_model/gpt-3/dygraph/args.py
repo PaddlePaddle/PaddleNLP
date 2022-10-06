@@ -128,11 +128,11 @@ def parse_args(MODEL_CLASSES):
                         type=float,
                         help="Grad clip for the parameter.")
     parser.add_argument("--max_lr",
-                        default=1e-5,
+                        default=1e-4,
                         type=float,
                         help="The initial max learning rate for Adam.")
     parser.add_argument("--min_lr",
-                        default=5e-5,
+                        default=1e-5,
                         type=float,
                         help="The initial min learning rate for Adam.")
     parser.add_argument(
@@ -198,6 +198,11 @@ def parse_args(MODEL_CLASSES):
                         type=int,
                         default=10,
                         help="Evaluate the model use X steps data.")
+    parser.add_argument(
+        "--fuse_transformer",
+        type=str2bool,
+        default=False,
+        help="Whether to use fuse attention and fuse feedforward or not.")
 
     # Config for 4D Parallelism
 
@@ -281,7 +286,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--device",
                         type=str,
                         default="gpu",
-                        choices=["cpu", "gpu", "xpu"],
+                        choices=["cpu", "gpu", "xpu", "npu"],
                         help="select cpu, gpu, xpu devices.")
     parser.add_argument("--lr_decay_style",
                         type=str,

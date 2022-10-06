@@ -21,7 +21,8 @@ limitations under the License. */
 #include "normalizers/unicode.h"
 #include "re2/re2.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tests {
 
 TEST(normalizers, split) {
@@ -50,4 +51,5 @@ TEST(normalizers, split) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

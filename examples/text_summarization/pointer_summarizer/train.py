@@ -62,7 +62,7 @@ class Trainer(object):
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
                  list(self.model.reduce_state.parameters())
-        assert len(params) == 31
+
         self.optimizer = Adagrad(
             parameters=params,
             learning_rate=initial_lr,
@@ -145,11 +145,12 @@ class Trainer(object):
                 % (iter, n_iters, loss, running_avg_loss, 1.0 /
                    (time.time() - start)))
             start = time.time()
-            if iter % 5000 == 0 or iter == 1000:
-                model_save_dir = self.save_model(running_avg_loss, iter)
-                print(
-                    'Saved model for iter %d with running avg loss %.8f to directory: %s'
-                    % (iter, running_avg_loss, model_save_dir))
+            if iter % 5000 == 0 or iter == 1:
+                if paddle.distributed.get_rank() == 0:
+                    model_save_dir = self.save_model(running_avg_loss, iter)
+                    print(
+                        'Saved model for iter %d with running avg loss %.8f to directory: %s'
+                        % (iter, running_avg_loss, model_save_dir))
 
 
 if __name__ == '__main__':
@@ -166,7 +167,17 @@ if __name__ == '__main__':
         help=
         "If > 0: set total number of training steps to perform. Override config.max_iterations.",
     )
+    parser.add_argument(
+        "--device",
+        default="gpu",
+        type=str,
+        choices=["cpu", "gpu", "xpu"],
+        help="The device to select to train the model, is must be cpu/gpu/xpu.")
+
     args = parser.parse_args()
+    paddle.set_device(args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
 
     train_processor = Trainer()
     if args.max_steps > 0:

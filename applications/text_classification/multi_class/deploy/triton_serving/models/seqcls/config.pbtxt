@@ -50,7 +50,7 @@ ensemble_scheduling {
         value: "tokenizer_token_type_ids"
       }
       output_map {
-        key: "linear_147.tmp_1"
+        key: "linear_75.tmp_1"
         value: "OUTPUT_2"
       }
     },

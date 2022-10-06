@@ -21,7 +21,6 @@ import random
 import time
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 

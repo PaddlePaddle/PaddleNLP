@@ -105,7 +105,7 @@ function _train(){
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP_MoE_C8) echo "run run_mode: DP_MoE_C8"
+    DP_MoE_C8|DP_MoE_C16) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
@@ -115,7 +115,7 @@ function _train(){
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    Sharding_MoE_C8) echo "run run_mode: Sharding_MoE_C8"
+    Sharding_MoE_C8|Sharding_MoE_C16) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
@@ -130,7 +130,11 @@ function _train(){
     cd ../examples/language_model/moe/dygraph/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
-    timeout 15m ${train_cmd} > ${log_file} 2>&1
+    if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
+        ${train_cmd} > ${log_file} 2>&1
+    else
+        timeout 15m ${train_cmd} > ${log_file} 2>&1
+    fi
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else

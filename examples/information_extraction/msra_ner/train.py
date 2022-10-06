@@ -23,7 +23,6 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 
-import paddlenlp as ppnlp
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from datasets import load_dataset
@@ -106,7 +105,7 @@ def do_train(args):
             examples['tokens'],
             max_seq_len=args.max_seq_length,
             # We use this argument because the texts in our dataset are lists of words (with a label for each word).
-            is_split_into_words=True,
+            is_split_into_words='token',
             return_length=True)
         labels = []
 

@@ -46,4 +46,12 @@ __global__ void transpose(T* src,
                           const int seq_len,
                           const int head_num,
                           const int size_per_head);
+
+template <typename T>
+void fusedQKV_masked_attention_dispatch_v2(
+  const T* qkv_buf, const T* qkv_bias,
+  T* key_cache, T* value_cache,
+  T* context_buf, const bool* finished, int max_batch_size, int inference_batch_size, 
+  int head_num, int size_per_head, const int step, const int max_seq_len, 
+  const int max_input_len, const int* input_lengths, const int rotary_embedding_dim, cudaStream_t stream);
 }

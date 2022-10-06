@@ -509,7 +509,7 @@ class SPOChunkEvaluator(paddle.metric.Metric):
         spo_f1 = 2 * self.num_correct_spo / (self.num_infer_spo +
                                              self.num_label_spo)
         ent_precision = self.num_correct_ent / self.num_infer_ent if self.num_infer_ent > 0 else 0.
-        ent_recall = self.num_correct_ent / self.num_correct_ent if self.num_correct_ent > 0 else 0.
+        ent_recall = self.num_correct_ent / self.num_label_ent if self.num_label_ent > 0 else 0.
         ent_f1 = 2 * ent_precision * ent_recall / (
             ent_precision + ent_recall) if (ent_precision +
                                             ent_recall) != 0 else 0.

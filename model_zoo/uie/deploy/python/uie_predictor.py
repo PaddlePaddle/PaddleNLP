@@ -28,7 +28,8 @@ class InferBackend(object):
                  model_path_prefix,
                  device='cpu',
                  use_quantize=False,
-                 use_fp16=False):
+                 use_fp16=False,
+                 device_id=0):
         print(">>> [InferBackend] Creating Engine ...")
         onnx_model = paddle2onnx.command.c_paddle_to_onnx(
             model_file=model_path_prefix + ".pdmodel",
@@ -41,7 +42,7 @@ class InferBackend(object):
             f.write(onnx_model)
 
         if device == "gpu":
-            providers = ['CUDAExecutionProvider']
+            providers = [('CUDAExecutionProvider', {'device_id': device_id})]
             print(">>> [InferBackend] Use GPU to inference ...")
             if use_fp16:
                 print(">>> [InferBackend] Use FP16 to inference ...")
@@ -80,7 +81,7 @@ class UIEPredictor(object):
         if not isinstance(args.device, six.string_types):
             print(
                 ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                type(args.device))
             exit(0)
         if args.device not in ['cpu', 'gpu']:
             print(
@@ -88,8 +89,7 @@ class UIEPredictor(object):
                 type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh",
-                                                        use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._batch_size = args.batch_size
@@ -99,7 +99,8 @@ class UIEPredictor(object):
             args.use_fp16 = False
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               device=args.device,
-                                              use_fp16=args.use_fp16)
+                                              use_fp16=args.use_fp16,
+                                              device_id=args.device_id)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -172,10 +173,14 @@ class UIEPredictor(object):
         for idx in range(0, len(texts), self._batch_size):
             l, r = idx, idx + self._batch_size
             input_dict = {
-                "input_ids": encoded_inputs['input_ids'][l:r],
-                "token_type_ids": encoded_inputs['token_type_ids'][l:r],
-                "pos_ids": encoded_inputs['position_ids'][l:r],
-                "att_mask": encoded_inputs["attention_mask"][l:r]
+                "input_ids":
+                encoded_inputs['input_ids'][l:r].astype('int64'),
+                "token_type_ids":
+                encoded_inputs['token_type_ids'][l:r].astype('int64'),
+                "pos_ids":
+                encoded_inputs['position_ids'][l:r].astype('int64'),
+                "att_mask":
+                encoded_inputs["attention_mask"][l:r].astype('int64')
             }
             start_prob, end_prob = self._infer(input_dict)
             start_prob = start_prob.tolist()
@@ -189,17 +194,10 @@ class UIEPredictor(object):
                                                  limit=self._position_prob,
                                                  return_prob=True)
 
-        input_ids = input_dict['input_ids']
         sentence_ids = []
         probs = []
-        for start_ids, end_ids, ids, offset_map in zip(start_ids_list,
-                                                       end_ids_list,
-                                                       input_ids.tolist(),
-                                                       offset_maps.tolist()):
-            for i in reversed(range(len(ids))):
-                if ids[i] != 0:
-                    ids = ids[:i]
-                    break
+        for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list,
+                                                  offset_maps.tolist()):
             span_list = get_span(start_ids, end_ids, with_prob=True)
             sentence_id, prob = get_id_and_prob(span_list, offset_map)
             sentence_ids.append(sentence_id)

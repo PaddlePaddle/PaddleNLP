@@ -122,8 +122,9 @@ def do_train():
                                              splits=["train", "dev", "test"])
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        'ernie-1.0', num_classes=len(train_ds.label_list))
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+        'ernie-3.0-medium-zh', num_classes=len(train_ds.label_list))
+
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
@@ -168,6 +169,7 @@ def do_train():
         apply_decay_param_fun=lambda x: x in decay_params)
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
+
     metric = paddle.metric.Accuracy()
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)

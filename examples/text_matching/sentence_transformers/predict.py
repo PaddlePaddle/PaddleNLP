@@ -21,7 +21,7 @@ import time
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 
 from model import SentenceTransformer
@@ -144,8 +144,7 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     data = [
         ['世界上什么东西最小', '世界上什么东西最小？'],
@@ -154,8 +153,7 @@ if __name__ == "__main__":
     ]
     label_map = {0: 'dissimilar', 1: 'similar'}
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        "ernie-tiny")
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
     model = SentenceTransformer(pretrained_model)
 
     if args.params_path and os.path.isfile(args.params_path):

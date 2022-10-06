@@ -75,7 +75,7 @@ def whitespace_tokenize(text):
     """
     Runs basic whitespace cleaning and splitting on a peice of text.
     Args:
-        text (str): Text to be tokened.
+        text (str): Text to be tokenized.
     Returns:
         list(str): Token list.
     """
@@ -546,7 +546,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         `__init__` whose name ends with `_token`) as attributes of the tokenizer
         instance.
         """
-
         init_dict = fn_args_to_dict(original_init, *((self, ) + args), **kwargs)
         init_dict.pop('self', None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
@@ -987,8 +986,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                #TODO aligns with HuggingFace here in breaking change
-                return self.convert_tokens_to_ids(text)
+                if is_split_into_words == True:
+                    tokens = list(
+                        itertools.chain(*(
+                            self.tokenize(t, is_split_into_words=True, **kwargs)
+                            for t in text)))
+                    return self.convert_tokens_to_ids(tokens)
+                else:
+                    return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1066,8 +1071,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                #TODO aligns with HuggingFace here in breaking change
-                return self.convert_tokens_to_ids(text)
+                if is_split_into_words == True:
+                    tokens = list(
+                        itertools.chain(*(
+                            self.tokenize(t, is_split_into_words=True, **kwargs)
+                            for t in text)))
+                    return self.convert_tokens_to_ids(tokens)
+                else:
+                    return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1321,18 +1332,33 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         if text is None:
             return None
         split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            for sub_token in self.wordpiece_tokenizer.tokenize(token):
+        if hasattr(self, "basic_tokenizer"):
+            for token in self.basic_tokenizer.tokenize(
+                    text, never_split=self.all_special_tokens):
+                # If the token is part of the never_split set
+                if token in self.basic_tokenizer.never_split:
+                    split_tokens.append(token)
+                else:
+                    for sub_token in self.wordpiece_tokenizer.tokenize(token):
+                        split_tokens.append(
+                            sub_token if sub_token != self.unk_token else token)
+        else:
+            for sub_token in self.wordpiece_tokenizer.tokenize(text):
                 split_tokens.append(
-                    sub_token if sub_token != self.unk_token else token)
+                    sub_token if sub_token != self.unk_token else text)
 
         normalized_text, char_mapping = '', []
 
         for i, ch in enumerate(text):
             if hasattr(self, "do_lower_case") and self.do_lower_case:
                 ch = ch.lower()
-            ch = unicodedata.normalize('NFD', ch)
-            ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
+                if self.basic_tokenizer.strip_accents is not False:
+                    ch = unicodedata.normalize('NFD', ch)
+                    ch = ''.join(
+                        [c for c in ch if unicodedata.category(c) != 'Mn'])
+            elif self.basic_tokenizer.strip_accents:
+                ch = unicodedata.normalize('NFD', ch)
+                ch = ''.join([c for c in ch if unicodedata.category(c) != 'Mn'])
 
             ch = ''.join([
                 c for c in ch
@@ -1344,11 +1370,19 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         text, token_mapping, offset = normalized_text, [], 0
 
         for token in split_tokens:
-
             if token[:2] == '##':
                 token = token[2:]
-
-            start = text[offset:].index(token) + offset
+            if token in self.all_special_tokens:
+                token = token.lower() if hasattr(
+                    self, "do_lower_case") and self.do_lower_case else token
+            # The greek letter "sigma" has 2 forms of lowercase, σ and ς respectively.
+            # When used as a final letter of a word, the final form (ς) is used. Otherwise, the form (σ) is used.
+            # https://latin.stackexchange.com/questions/6168/how-and-when-did-we-get-two-forms-of-sigma
+            if "σ" in token or "ς" in token:
+                start = text[offset:].replace("ς", "σ").index(
+                    token.replace("ς", "σ")) + offset
+            else:
+                start = text[offset:].index(token) + offset
 
             end = start + len(token)
 

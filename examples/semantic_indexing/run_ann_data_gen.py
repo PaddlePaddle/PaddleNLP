@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
 import os
 import numpy as np
@@ -9,7 +23,7 @@ from functools import partial
 
 import hnswlib
 import paddle
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.datasets import load_dataset, MapDataset, load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
@@ -49,8 +63,7 @@ args = parser.parse_args()
 
 def generate_new_ann(args, data_loader_dict, checkpoint_path, latest_step_num):
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        'ernie-1.0')
+    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
 
     model = SemanticIndexANCE(pretrained_model,
                               output_emb_size=args.output_emb_size)
@@ -164,7 +177,7 @@ def ann_data_gen(args):
         if not os.path.exists(args.ann_data_dir):
             os.makedirs(args.ann_data_dir)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     data_load_dict = build_data_loader(args, tokenizer)
 

@@ -4,6 +4,7 @@ from .modules.seq2seq import Seq2SeqBenchmark
 from .modules.bigru_crf import BiGruCrfBenchmark
 from .modules.xlnet import XLNetBenchmark
 from .modules.rnnlm import RNNLMBenchmark
+from .modules.ernie_tiny import ErnieTinyBenchmark
 from .modules.optimizer import *
 from .modules.lr_scheduler import *
 
@@ -17,6 +18,7 @@ MODEL_REGISTRY = {
     "xlnet": XLNetBenchmark,
     "lac": BiGruCrfBenchmark,
     "ptb": RNNLMBenchmark,
+    "ernie_tiny": ErnieTinyBenchmark,
 }
 
 OPTIMIZER_REGISTRY = {

@@ -1,115 +1,258 @@
-# 多标签分类任务
+# 多标签分类指南
 
 **目录**
-   * [多标签任务介绍](#多标签任务介绍)
-   * [代码结构说明](#代码结构说明)
-   * [模型微调](#模型微调)
-       * [从本地文件创建数据集](#从本地文件创建数据集)
-   * [模型预测](#模型预测)
-   * [模型静态图导出](#模型预测)
-   * [模型裁剪](#模型裁剪)
-       * [环境准备](#环境准备)
-       * [裁剪API使用](#裁剪API使用)
-   * [模型部署](#模型部署)
+**目录**
+- [1. 多标签分类简介](#多标签分类简介)
+- [2. 快速开始](#快速开始)
+    - [2.1 运行环境](#运行环境)
+    - [2.2 代码结构](#代码结构)
+    - [2.3 数据准备](#数据准备)
+    - [2.4 模型训练](#模型训练)
+    - [2.5 模型部署](#模型部署)
+    - [2.6 模型效果](#模型效果)
 
-## 多标签任务介绍
+<a name="多标签分类简介"></a>
 
-文本多标签分类是自然语言处理（NLP）中常见的文本分类任务，文本多标签分类在各种现实场景中具有广泛的适用性，例如商品分类、网页标签、新闻标注、蛋白质功能分类、电影分类、语义场景分类等。多标签数据集中样本用来自 `n_classes` 个可能类别的 `m` 个标签类别标记，其中 `m` 的取值在 0 到 `n_classes` 之间，这些类别具有不相互排斥的属性。通常，我们将每个样本的标签用One-hot的形式表示，正类用 1 表示，负类用 0 表示。例如，数据集中样本可能标签是A、B和C的多标签分类问题，标签为 \[1,0,1\] 代表存在标签 A 和 C 而标签 B 不存在的样本。
+## 1. 多标签分类简介
 
-在现实中的案情错综复杂，同一案件可能适用多项法律条文，涉及数罪并罚，需要多标签模型充分学习标签之间的关联性，对文本进行分类预测。CAIL2018—SMALL数据集中罪名预测任务数据来自“中国裁判文书网”公开的刑事法律文书，包括19.6万份文书样例，其中每份数据由法律文书中的案情描述和事实部分组成，包括每个案件被告人被判的罪名，数据集共包含202项罪名，被告人罪名通常涉及一项至多项。以数据集中某一法律文书为例：
-```text
-"公诉机关指控，2009年12月18日22时许，被告人李某（已判刑）伙同被告人丁某、李某乙、李某甲、杨某某在永吉县岔路河镇夜宴歌厅唱完歌后离开，因之前对该歌厅服务生刘某某心怀不满，遂手持事先准备好的镐把、扎枪再次返回夜宴歌厅，在追赶殴打刘某某过程中，任意损毁歌厅内的笔记本电脑、调音台、麦克接收机等物品。被告人丁某用镐把随意将服务员齐某某头部打伤。经物价部门鉴定，笔记本电脑、调音台、麦克接收机总价值人民币7120.00元；经法医鉴定，齐某某左额部硬膜外血肿，构成重伤。被告人丁某、李某乙、李某甲、杨某某案发后外逃，后主动到公安机关投案。并认为，被告人丁某随意殴打他人，致人重伤，其行为已构成××罪。被告人李某乙、李某甲、杨某某在公共场所持械随意殴打他人，情节恶劣，任意毁损他人财物，情节严重，其行为均已构成××罪，应予惩处。"
+本项目提供通用场景下**基于预训练模型微调的多标签分类端到端应用方案**，打通数据标注-模型训练-模型调优-模型压缩-预测部署全流程，有效缩短开发周期，降低AI开发落地门槛。
+
+多标签数据集的标签集含有两个或两个以上的类别，输入句子/文本具有一个或多个标签，多标签任务的目标是预测**样本属于哪些标签类别，这些类别具有不相互排斥的属性**。文本多标签分类在各种现实场景中具有广泛的适用性，例如商品分类、网页标签、新闻标注、蛋白质功能分类、电影分类、语义场景分类等。以下图为例，该新闻文本具有 `相机` 和 `芯片` 两个标签。
+
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/63761690/187823132-3590bfff-8248-4e92-900d-bac350328743.png width="550"/>
+</div>
+<br>
+
+**方案亮点：**
+
+- **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
+
+**更多选择：**
+
+对于大多数多标签分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，多标签分类项目中还提供 提示学习(小样本)和语义索引的两种全流程文本分类方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
+
+- 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习多标签分类方案](./few-shot#readme)
+
+- 【标签类别不固定场景】 👉 [语义索引多标签分类方案](./retrieval_based#readme)
+
+
+<a name="快速开始"></a>
+
+## 2. 快速开始
+
+我们以公开数据集CAIL2019—婚姻家庭要素提取任务为示例，演示多标签分类全流程方案使用。下载数据集：
+```shell
+wget https://paddlenlp.bj.bcebos.com/datasets/divorce.tar.gz
+tar -zxvf divorce.tar.gz
+mv divorce data
+rm divorce.tar.gz
 ```
-该案件中被告人涉及故意伤害，寻衅滋事两项罪名。接下来我们将讲解如何利用多标签模型，根据输入文本预测案件所涉及的一个或多个罪名。
 
-## 代码结构说明
+<div align="center">
+    <img width="900" alt="image" src="https://user-images.githubusercontent.com/63761690/187828356-e2f4f627-f5fe-4c83-8879-ed6951f7511e.png">
+</div>
+<div align="center">
+    <font size ="2">
+    多标签分类数据标注-模型训练-模型分析-模型压缩-预测部署流程图
+     </font>
+</div>
 
-以下是本项目主要代码结构及说明：
+<a name="运行环境"></a>
+
+### 2.1 运行环境
+
+- python >= 3.6
+- paddlepaddle >= 2.3
+- paddlenlp >= 2.4
+- scikit-learn >= 1.0.2
+
+**安装PaddlePaddle：**
+
+ 环境中paddlepaddle-gpu或paddlepaddle版本应大于或等于2.3, 请参见[飞桨快速安装](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)根据自己需求选择合适的PaddlePaddle下载命令。
+
+
+**安装PaddleNLP：**
+
+安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+```shell
+python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
+```
+
+
+**安装sklearn：**
+```shell
+python3 -m  pip install scikit-learn==1.0.2
+```
+
+<a name="代码结构"></a>
+
+### 2.2 代码结构
 
 ```text
 multi_label/
 ├── deploy # 部署
-│   └── predictor # 导出ONNX模型并基于ONNXRuntime部署
-│   │   ├── infer.py # ONNXRuntime推理部署示例
-│   │   ├── predictor.py
-│   │   └── README.md # 使用说明
-│   ├── paddle_serving # 基于Paddle Serving 部署
-│   │   ├──config.yml # 分类任务启动服务端的配置文件
-│   │   ├──rpc_client.py # 分类任务发送pipeline预测请求的脚本
-│   │   ├──service.py # 分类任务启动服务端的脚本
-│   │   └── README.md # 使用说明
-│   └── triton_serving # 基于Triton server部署
-│       ├── README.md # 使用说明
-│       ├── seqcls_grpc_client.py # 客户端测试代码
-│       └── models # 部署模型
-│           ├── seqcls
-│           │   └── config.pbtxt
-│           ├── seqcls_model
-│           │   └──config.pbtxt
-│           ├── seqcls_postprocess
-│           │   ├── 1
-│           │   │   └── model.py
-│           │   └── config.pbtxt
-│           └── tokenizer
-│               ├── 1
-│               │   └── model.py
-│               └── config.pbtxt
+│   └── predictor # 离线部署
+│   │   ├── infer.py # 测试脚本
+│   │   ├── predictor.py 离线部署脚本
+│   │   └── README.md # 离线部署使用说明
+│   ├── paddle_serving # PaddleServing在线服务化部署
+│   │   ├──config.yml # 服务端的配置文件
+│   │   ├──rpc_client.py # 客户端预测脚本
+│   │   ├──service.py # 服务端的脚本
+│   │   └── README.md # 在线服务化部署使用说明
+│   └── triton_serving # Triton在线服务化部署
+│       ├── README.md # Triton部署使用说明
+│       ├── seqcls_grpc_client.py # 客户端预测脚本
+│       └── models
 ├── train.py # 训练评估脚本
 ├── predict.py # 预测脚本
-├── export_model.py # 动态图参数导出静态图参数脚本
+├── export_model.py # 静态图模型导出脚本
 ├── utils.py # 工具函数脚本
 ├── metric.py # metric脚本
 ├── prune.py # 裁剪脚本
-├── prune_trainer.py # 裁剪trainer脚本
-├── prune_config.py # 裁剪训练参数配置
-├── requirements.txt # 环境依赖
 └── README.md # 使用说明
 ```
+<a name="数据准备"></a>
 
-## 模型微调
+### 2.3 数据准备
 
-请使用以下命令安装所需依赖
+训练需要准备指定格式的标注数据集,如果没有已标注的数据集，可以参考 [数据标注指南](../doccano.md) 进行文本分类数据标注。指定格式本地数据集目录结构：
 
-```shell
-pip install -r requirements.txt
+```text
+data/
+├── train.txt # 训练数据集文件
+├── dev.txt # 开发数据集文件
+├── test.txt # 测试数据集文件（可选）
+├── label.txt # 分类标签文件
+└── data.txt # 待预测数据文件（可选）
+```
+**训练、开发、测试数据集**文件中文本与标签类别名用tab符`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
+
+- train.txt/dev.txt/test.txt 文件格式：
+```text
+<文本>'\t'<标签>','<标签>','<标签>
+<文本>'\t'<标签>','<标签>
+...
 ```
 
-我们以公开数据集CAIL2018—SMALL中罪名预测任务为示例，在训练集上进行模型微调，并在开发集上验证。
+- train.txt/dev.txt/test.txt 文件样例：
 
-单卡训练
-```shell
-python train.py --early_stop
+```text
+现在原告已是第二次申请与被告离婚了。    二次起诉离婚
+双方均认可价值6万元。    不动产分割,有夫妻共同财产
+2004年4月，原、被告发生纠纷后，被告离家外出未归，直到现在，双方长期分居生活，十几年间互无联系，夫妻感情已经完全破裂。    婚后分居
+婚生子杨某甲由原告抚养，高中阶段之前的相关费用由原告承担，高中阶段之后的相关费用由双方协商，被告可以随时探望孩子；    婚后有子女,支付抚养费,限制行为能力子女抚养
+...
 ```
 
-指定GPU卡号/多卡训练
+**分类标签**包含数据集中所有标签集合，每一行为一个标签名。
+
+- label.txt 文件格式：
+
+```text
+<标签>
+<标签>
+...
+```
+
+- label.txt 文件样例：
+```text
+婚后有子女
+限制行为能力子女抚养
+有夫妻共同财产
+支付抚养费
+...
+```
+
+**待预测数据文件：** 包含需要预测标签的文本数据，每条数据一行。
+
+- data.txt 文件格式：
+
+```text
+<文本>
+<文本>
+...
+```
+
+- data.txt 文件样例：
+```text
+原、被告另购置橱柜、碗架、电磁炉、电饭锅各一个归原告王某某所有。
+于是原告到儿子就读的幼儿园进行探望，被告碰见后对原告破口大骂，还不让儿子叫原告妈妈，而叫被告现在的妻子做妈妈。
+6、被告父亲给的房屋装修款2.3万元在原告处，要求依法分割；
+由我全额出资购买的联想台式电脑，我均依次放弃。
+...
+```
+<a name="模型训练"></a>
+
+### 2.4 模型训练
+
+#### 2.4.1 预训练模型微调
+
+使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
+```shell
+python train.py \
+    --dataset_dir "data" \
+    --device "gpu" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --epochs 100
+```
+
+
+如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
+```shell
+python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
+    --dataset_dir "data" \
+    --device "cpu" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --epochs 100
+```
+
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
+
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop
+python -m paddle.distributed.launch --gpus "0" train.py \
+    --dataset_dir "data" \
+    --device "gpu" \
+    --max_seq_length 128 \
+    --model_name "ernie-3.0-medium-zh" \
+    --batch_size 32 \
+    --early_stop \
+    --epochs 100
 ```
-使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
-
 可支持配置的参数：
 
+* `device`: 选用什么设备进行训练，选择cpu、gpu、xpu、npu。如使用gpu训练，可使用参数--gpus指定GPU卡号；默认为"gpu"。
+* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
-* `dataset`：训练数据集;默认为"cail2018_small"。
-* `dataset_dir`：本地数据集路径，数据集路径中应包含train.tsv，dev.tsv和label.tsv文件;默认为None。
-* `task_name`：训练数据集;默认为"charges"。
-* `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
-* `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu。如使用gpu训练，择使用参数gpus指定GPU卡号。
+* `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
+* `model_name`：选择预训练模型,可选"ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"；默认为"ernie-3.0-medium-zh"。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `learning_rate`：Fine-tune的最大学习率；默认为3e-5。
-* `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.00。
-* `early_stop`：选择是否使用早停法(EarlyStopping)；默认为False。
-* `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为6。
-* `epochs`: 训练轮次，默认为1000。
-* `warmup`：是否使用学习率warmup策略；默认为False。
-* `warmup_steps`：学习率warmup策略的steps数，如果设为2000，则学习率会在前2000 steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为2000。
-* `logging_steps`: 日志打印的间隔steps数，默认5。
+* `learning_rate`：训练最大学习率；默认为3e-5。
+* `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
+* `early_stop`：选择是否使用早停法(EarlyStopping)，模型在开发集经过一定epoch后精度表现不再上升，训练终止；默认为False。
+* `early_stop_nums`：在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
+* `logging_steps`: 训练过程中日志打印的间隔steps数，默认5。
+* `weight_decay`：控制正则项力度的参数，用于防止过拟合，默认为0.0。
+* `warmup`：是否使用学习率warmup策略，使用时应设置适当的训练轮次（epochs）；默认为False。
+* `warmup_steps`：学习率warmup策略的比例数，如果设为1000，则学习率会在1000steps数从0慢慢增长到learning_rate, 而后再缓慢衰减；默认为0。
+* `init_from_ckpt`: 模型初始checkpoint参数地址，默认None。
 * `seed`：随机种子，默认为3。
+* `train_file`：本地数据集中训练集文件名；默认为"train.txt"。
+* `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
-
-程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
+程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
 
 ```text
 checkpoint/
@@ -117,131 +260,90 @@ checkpoint/
 ├── model_state.pdparams
 ├── tokenizer_config.json
 └── vocab.txt
-
 ```
 
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
-* 如需训练中文文本分类任务，只需更换预训练模型参数 `model_name` 。中文训练任务推荐使用"ernie-3.0-base-zh"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
+* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
+* 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 
-### 从本地文件创建数据集
+#### 2.4.2 训练评估与模型优化
 
-在许多情况，我们需要使用本地数据集来训练我们的文本分类模型，这里我们将介绍如何加载本地固定格式数据集进行训练,本项目将以CAIL2018-SMALL数据集罪名预测任务为例进行介绍：
+训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/cail2018_small_charges.tar.gz
-
-tar -zxvf cail2018_small_charges.tar.gz
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
 ```
 
-本地数据集目录结构如下：
+输出打印示例：
 
 ```text
-cail2018_small_charges/
-├── train.tsv # 训练数据集文件
-├── dev.tsv # 开发数据集文件
-├── test.tsv # 可选，测试训练集文件
-├── label.tsv # 分类标签文件
-└── data.tsv # 可选，待预测数据文件
-
-```
-
-train.tsv(训练数据集文件), dev.tsv(开发数据集文件), test.tsv(可选，测试训练集文件)中输入文本序列与标签数据用`'\t'`分隔开，标签中多个标签之间用`','`逗号分隔开。
-- train.tsv/dev.tsv/test.tsv 文件格式：
-```text
-<输入序列1>'\t'<标签1>','<标签2>'\n'
-<输入序列2>'\t'<标签1>'\n'
-...
-```
-- train.tsv/dev.tsv/test.tsv 文件样例：
-```text
-灵璧县人民检察院指控：××事实2014年11月29日1时许，被告人彭某甲驾驶辽A×××××小型轿车行驶至辽宁省沈阳市于洪区太湖街红色根据地酒店门口路段时，与前方被害人闻某驾驶的辽A×××××号轿车发生追尾的交通事故。事故发生后，被告人彭某甲与乘坐人韩某下车与闻某发生口角争执，并在一起互相厮打。在厮打过程中，彭某甲与韩某用拳头将闻某面部打伤。经鉴定，闻某的损伤程度为轻伤二级。××事实2015年6月至2015年9月，被告人彭某甲通过其建立的“比特战斗”微信群，将47部淫秽视频文件上传至该微信群供群成员观看。公诉机关针对指控提供了相关书证，证人证言，被害人陈述，被告人供述，鉴定意见，现场勘验检查笔录等证据，公诉机关认为，被告人彭某甲伙同他人故意非法损害公民身体健康，致人轻伤；利用移动通讯终端传播淫秽电子信息，情节严重，其行为已触犯《中华人民共和国刑法》××××、××××、××××之规定，构成××罪、××罪，提请法院依法判处。    故意伤害,[制造、贩卖、传播]淫秽物品,传播淫秽物品
-酉阳县人民检察院指控，2014年1月17日1时许，被告人周某某在酉阳县桃花源美食街万州烤鱼店外与田某甲发生口角，随后周某某持刀将在店内的被害人田某某砍伤。经重庆市酉阳县公安局物证鉴定室鉴定，田某某所受伤为轻伤二级。指控的证据有被告人立案决定书，户籍信息，鉴定意见，辨认笔录，被害人田某某的陈述，证人冉某、陈某某等人的证言，周某某的供述与辩解等。公诉机关认为，被告人周某某××他人身体，致人轻伤，其行为触犯了《中华人民共和国刑法》第二百三十四××的规定，犯罪事实清楚，证据确实、充分，应当以××罪追究其刑事责任。周某某在××考验期内发现有其他罪没有判决的，适用《中华人民共和国刑法》××、六十九条。提请依法判决。    故意伤害,[组织、强迫、引诱、容留、介绍]卖淫,[引诱、容留、介绍]卖淫
-...
-```
-label.tsv(分类标签文件)记录数据集中所有标签集合，每一行为一个标签名。
-- label.tsv 文件格式：
-
-```text
-<标签名1>'\n'
-<标签名2>'\n'
-...
-```
-- label.tsv 文件样例：
-```text
-故意伤害
-盗窃
-危险驾驶
-非法[持有、私藏][枪支、弹药]
+[2022-08-12 02:24:48,193] [    INFO] - -----Evaluate model-------
+[2022-08-12 02:24:48,194] [    INFO] - Train dataset size: 14377
+[2022-08-12 02:24:48,194] [    INFO] - Dev dataset size: 1611
+[2022-08-12 02:24:48,194] [    INFO] - Accuracy in dev dataset: 74.24%
+[2022-08-12 02:24:48,194] [    INFO] - Macro avg in dev dataset: precision: 82.96 | recall: 77.59 | F1 score 79.36
+[2022-08-12 02:24:48,194] [    INFO] - Micro avg in dev dataset: precision: 91.50 | recall: 89.66 | F1 score 90.57
+[2022-08-12 02:24:48,195] [    INFO] - Class name: 婚后有子女
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 6759(47.0%) | precision: 99.78 | recall: 99.59 | F1 score 99.68
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 784(48.7%) | precision: 97.07 | recall: 97.32 | F1 score 97.20
+[2022-08-12 02:24:48,195] [    INFO] - ----------------------------
+[2022-08-12 02:24:48,195] [    INFO] - Class name: 限制行为能力子女抚养
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 4358(30.3%) | precision: 99.36 | recall: 99.56 | F1 score 99.46
+[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 492(30.5%) | precision: 88.57 | recall: 88.21 | F1 score 88.39
 ...
 ```
 
-data.tsv(可选，待预测数据文件)
-
-- data.tsv 文件格式：
+预测错误的样本保存在bad_case.txt文件中：
 
 ```text
-<输入序列1>'\n'
-<输入序列2>'\n'
+Prediction    Label    Text
+不动产分割    不动产分割,有夫妻共同财产    2014年，王X以其与肖X协议离婚时未分割该套楼房的首付款为由，起诉至法院，要求分得楼房的首付款15万元。
+婚后分居,准予离婚    二次起诉离婚,准予离婚,婚后分居,法定离婚    但原、被告对已建立起的夫妻感情不够珍惜，因琐事即发生吵闹并最终分居，对夫妻感情造成了严重的影响，现原、被告已分居六年有余，且经人民法院判决不准离婚后仍未和好，夫妻感情确已破裂，依法应准予原、被告离婚。
+婚后有子女,限制行为能力子女抚养    婚后有子女    婚后生有一女，取名彭某乙，已11岁，现已由被告从铁炉白族乡中心小学转入走马镇李桥小学读书。
+婚后分居    不履行家庭义务,婚后分居    2015年2月23日，被告将原告赶出家门，原告居住于娘家待产，双方分居至今。
 ...
 ```
-- data.tsv 文件样例：
-```text
-经审理查明，2012年4月5日19时许，被告人王某在杭州市下城区朝晖路农贸市场门口贩卖盗版光碟、淫秽光碟时被民警当场抓获，并当场查获其贩卖的各类光碟5515张，其中5280张某属非法出版物、235张某属淫秽物品。上述事实，被告人王某在庭审中亦无异议，且有经庭审举证、质证的扣押物品清单、赃物照片、公安行政处罚决定书、抓获经过及户籍证明等书证；证人胡某、徐某的证言；出版物鉴定书、淫秽物品审查鉴定书及检查笔录等证据证实，足以认定。
-榆林市榆阳区人民检察院指控：2015年11月22日2时许，被告人王某某在自己经营的榆阳区长城福源招待所内，介绍并容留杨某向刘某某、白某向乔某某提供性服务各一次
-...
-```
-在训练过程中通过指定数据集路径参数 `dataset_dir` 进行：
-单卡训练
+
+模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
+
+#### 2.4.3 模型预测
+训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
+
 ```shell
-python train.py --early_stop --dataset_dir 'cail2018_small_charges'
-```
-
-指定GPU卡号/多卡训练
-```shell
-unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py --early_stop --dataset_dir 'cail2018_small_charges'
-```
-使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"
-
-更多数据集读取格式详见[数据集加载](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#)和[自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
-
-
-## 模型预测
-
-输入待预测数据和数据标签对照列表，模型预测数据对应的标签
-
-启动预测：
-```shell
-# 预测默认数据
-python predict.py --params_path ./checkpoint/model_state.pdparams
-
-# 预测本地数据文件cail2018_small_charges/data.tsv
-python predict.py --params_path ./checkpoint/model_state.pdparams --dataset_dir=cail2018_small_charges
+python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_dir "data"
 ```
 
 可支持配置的参数：
 
-* `params_path`：必须，待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-* `dataset_dir`：本地数据集路径，数据集路径中应包含data.tsv和label.tsv文件;默认为None。
-* `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
+* `device`: 选用什么设备进行预测，可选cpu、gpu、xpu、npu；默认为gpu。
+* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含data.txt和label.txt文件;默认为None。
+* `params_path`：待预测模型的目录；默认为"./checkpoint/"。
+* `max_seq_length`：模型使用的最大序列长度,建议与训练时最大序列长度一致, 若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `device`: 选用什么设备进行训练，可选cpu、gpu、xpu、npu；默认为gpu。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
+* `data_file`：本地数据集中未标注待预测数据文件名；默认为"data.txt"。
+* `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 
-## 模型静态图导出
+<a name="模型部署"></a>
 
-使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，具体代码见[静态图导出脚本](export_model.py)。静态图参数保存在`output_path`指定路径中。运行方式：
+### 2.5 模型部署
+
+#### 2.5.1 静态图导出
+
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
-python export_model.py --params_path ./checkpoint/model_state.pdparams --output_path ./export --num_classes 202
+python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
-可支持配置的参数：
+如果使用ERNIE M作为预训练模型，运行方式：
+```shell
+python export_model.py --params_path ./checkpoint/ --output_path ./export --multilingual
+```
 
-* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/model_state.pdparams"。
-* `num_classes`：必须，任务标签类别数。
+可支持配置的参数：
+* `multilingual`：是否为多语言任务（是否使用ERNIE M作为预训练模型）；默认为False。
+* `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
-* `model_name`：选择预训练模型；默认为"ernie-3.0-base-zh"。
 
 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
@@ -251,100 +353,57 @@ export/
 ├── float32.pdiparams.info
 └── float32.pdmodel
 ```
+ 导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
+#### 2.5.2 模型裁剪
 
-导出模型之后，可以用于部署，项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py),用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 [压缩API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md), 一行命令即可启动模型裁剪。
 
-```shell
-# 使用内置数据集
-python deploy/predictor/infer.py --model_path_prefix ./export/float32
-
-# 使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./export/float32 --dataset_dir cail2018_small_charges
-```
-
-此外，本项目还提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
-
-## 模型裁剪
-### 环境准备
-
-使用裁剪功能需要安装 paddleslim 包
+使用裁剪功能需要安装 paddleslim：
 
 ```shell
-pip install paddleslim
+pip install paddleslim==2.2.2
 ```
 
-### 裁剪 API 使用
-本项目基于 PaddleNLP 的 Trainer API 发布提供了模型裁剪 API。裁剪 API 支持用户对 ERNIE 等Transformers 类下游任务微调模型进行裁剪，用户只需要简单地调用 `prune()` 即可一键启动裁剪和并自动保存裁剪后的模型。
-
-可以这样使用裁剪 API (示例代码只提供了核心调用，如需跑通完整的例子可参考[完整样例脚本](prune.py)):
-
-```python
-trainer = Trainer(
-        model=model,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
-        tokenizer=tokenizer,
-        criterion=criterion)
-
-output_dir = os.path.join(training_args.output_dir, data_args.dataset)
-
-trainer.prune(output_dir, prune_config=DynabertConfig(width_mult=2/3))
-```
-由于裁剪 API 基于 Trainer，所以首先需要初始化一个 Trainer 实例，对于模型裁剪来说必要传入的参数如下：
-
-* `model`：ERNIE等模型在下游任务中微调后的模型，通过`AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path)` 来获取
-* `data_collator`：使用 PaddleNLP 预定义好的[DataCollator 类](../../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作,使用方法参考本项目中代码即可
-* `train_dataset`：裁剪训练需要使用的训练集
-* `eval_dataset`：裁剪训练使用的评估集
-* `tokenizer`：模型`model`对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_args.model_name_or_path)` 来获取
-* `criterion`： 定义criterion计算损失，分类中使用损失函数 paddle.nn.BCEWithLogitsLoss()
-
-然后可以直接调用 `prune` 启动裁剪，其中 `prune` 的参数释义如下：
-* `output_dir`：裁剪后模型保存目录
-* `prune_config`：裁剪配置，目前裁剪配置仅支持`DynabertConfig`类。
-
-当默认参数不满足需求时，可通过传入参数对裁剪过程进行特殊配置，`DynabertConfig`中可以传的参数有：
-* `width_mult_list`：裁剪宽度保留的比例，表示对 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，默认是 `2/3`
-* `output_filename_prefix`：裁剪导出模型的文件名前缀，默认是`"float32"`
-
-
-启动裁剪：
+开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
 ```shell
-# 使用内置数据集
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams
-
-# 使用本地数据集
-python prune.py --output_dir ./prune --params_dir ./checkpoint/model_state.pdparams --dataset_dir cail2018_small_charges
+python prune.py \
+    --device "gpu" \
+    --dataset_dir "data" \
+    --output_dir "prune" \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --num_train_epochs 10 \
+    --max_seq_length 128 \
+    --logging_steps 5 \
+    --save_steps 100 \
+    --width_mult_list '3/4' '2/3' '1/2'
 ```
+
 
 可支持配置的参数：
-* `TrainingArguments`
-  * `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
-  * `TrainingArguments` 包含了用户需要的大部分训练参数，所有可配置的参数详见[TrainingArguments 参数介绍](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)，示例通过`prune_config.json`对TrainingArguments 参数进行配置
-
-* `DataArguments`
-  * `dataset`：训练数据集;默认为cail2018_small数据集。
-  * `task_name`：训练数据集任务名;默认为罪名预测任务"charges"。
-  * `dataset_dir`：本地数据集路径，需包含train.tsv,dev.tsv,label.tsv;默认为None。
-  * `max_seq_length`：ERNIE模型使用的最大序列长度，最大不能超过512, 若出现显存不足，请适当调低这一参数；默认为512。
-
-* `ModelArguments`
-  * `params_dir`：待预测模型参数文件；默认为"./checkpoint/model_state.pdparams"。
-  * `model_name_or_path`：选择预训练模型；默认为"ernie-3.0-base-zh"。
-
-以上参数都可通过 `python prune.py --dataset xx --params_dir xx` 的方式传入）
+* `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
+* `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
+* `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `learning_rate`：训练最大学习率；默认为3e-5。
+* `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
+* `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
+* `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
+* `seed`：随机种子，默认为3。
+* `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
+* `dataset_dir`：本地数据集路径，需包含train.txt,dev.txt,label.txt;默认为None。
+* `max_seq_length`：模型使用的最大序列长度，建议与训练过程保持一致, 若出现显存不足，请适当调低这一参数；默认为128。
+* `params_dir`：待预测模型参数文件；默认为"./checkpoint/"。
 
 程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中，保存模型文件结构如下所示：
 
 ```text
 prune/
-├── 0.6666666666666666
-│   ├── float32.pdiparams
-│   ├── float32.pdiparams.info
-│   ├── float32.pdmodel
+├── width_mult_0.75
+│   ├── pruned_model.pdiparams
+│   ├── pruned_model.pdiparams.info
+│   ├── pruned_model.pdmodel
 │   ├── model_state.pdparams
 │   └── model_config.json
 └── ...
@@ -352,28 +411,60 @@ prune/
 
 **NOTE:**
 
-1. 目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级；
+1. 目前支持的裁剪策略需要训练，训练时间视下游任务数据量而定，且和微调的训练时间是一个量级。 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `per_device_train_batch_size`、`learning_rate`、`num_train_epochs`、`max_seq_length` 等超参进行网格搜索（grid search）。
 
-2. 裁剪类似蒸馏过程，方便起见，可以直接使用微调时的超参。为了进一步提升精度，可以对 `per_device_train_batch_size`、`learning_rate`、`num_train_epochs`、`max_seq_length` 等超参进行 grid search；
+2. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
-3. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。
+3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
-4. 本项目提供了[onnxruntime部署预测示例](./deploy/predictor/infer.py)，用法详见[ONNX Runtime推理部署](./deploy/predictor/README.md)。运行方式：
+4. **压缩API暂不支持多语言预训练模型ERNIE-M**，相关功能正在加紧开发中。
 
-```shell
-# 使用内置数据集
-python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32
+#### 2.5.3 部署方案
 
-# 使用本地数据集
-python deploy/predictor/infer.py --model_path_prefix ./prune/0.6666666666666666/float32 --dataset_dir cail2018_small_charges
-```
-5. 本项目提供了基于[Paddle Serving](./deploy/paddle_serving)的服务化部署，用法详见[基于Paddle Serving的服务化部署](./deploy/predictor/README.md)。
+- 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
 
-## 模型部署
+- 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
 
+<a name="模型效果"></a>
 
-- 服务化部署请参考：[基于Paddle Serving的服务化部署指南](deploy/paddle_serving/README.md)，Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件的服务化部署
+### 2.6 模型效果
 
-- ONNXRuntime 部署请参考：[ONNX导出及ONNXRuntime部署指南](deploy/predictor/README.md)
+我们在CAIL2019—婚姻家庭要素提取任务数据集评测模型表现，测试配置如下：
 
-- 基于ONNXRuntime的服务化部署请参考：[基于Triton Inference Server的服务化部署指南](deploy/triton_serving/README.md)
+1. 数据集：CAIL2019—婚姻家庭要素提取任务数据集
+
+2. 物理机环境
+
+    系统: CentOS Linux release 7.7.1908 (Core)
+
+    GPU: Tesla V100-SXM2-32GB
+
+    CPU: Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz
+
+    CUDA: 11.2
+
+    cuDNN: 8.1.0
+
+    Driver Version: 460.27.04
+
+    内存: 630 GB
+
+3. PaddlePaddle 版本：2.3.0
+
+4. PaddleNLP 版本：2.3.1
+
+5. 性能数据指标：latency。latency 测试方法：固定 batch size 为 32，GPU部署运行时间 total_time，计算 latency = total_time / total_samples
+
+6. 精度评价指标：Micro F1分数、Macro F1分数
+
+|  model_name  | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
+| -------------------------- | ------------ | ------------ | ------------ |------------ |
+|ERNIE 1.0 Large Cw |24-layer, 1024-hidden, 20-heads|91.14|81.68 |5.66 |
+|ERNIE 3.0 Base  |12-layer, 768-hidden, 12-heads|90.38|80.14| 2.70 |
+|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|90.57|79.36| 1.46|
+|ERNIE 3.0 Mini |6-layer, 384-hidden, 12-heads|89.27|76.78| 0.56|
+|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|89.43|77.20| 0.34|
+|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|85.39|75.07|0.32|
+| ERNIE 3.0 Medium + 裁剪(保留比例3/4)|6-layer, 768-hidden, 9-heads| 89.94|79.35| 0.81   |
+| ERNIE 3.0 Medium + 裁剪(保留比例2/3)|6-layer, 768-hidden, 8-heads| 89.99|79.37 | 0.75  |
+| ERNIE 3.0 Medium + 裁剪(保留比例1/2)|6-layer, 768-hidden, 6-heads| 89.19 | 76.35| 0.61 |

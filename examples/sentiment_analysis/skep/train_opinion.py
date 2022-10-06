@@ -88,22 +88,37 @@ def convert_example_to_feature(example,
     """
     tokens = example['tokens']
     labels = example['labels']
-    tokenized_input = tokenizer(tokens,
-                                return_length=True,
-                                is_split_into_words=True,
-                                max_seq_len=max_seq_len)
+    assert len(tokens) == len(labels)
 
-    input_ids = np.array(tokenized_input['input_ids'], dtype="int64")
-    token_type_ids = np.array(tokenized_input['token_type_ids'], dtype="int64")
-    seq_len = np.array(tokenized_input['seq_len'], dtype="int64")
+    # 1. tokenize the tokens into sub-tokens, and align the length of tokens and labels
+    new_labels, new_tokens = [no_entity_label], [tokenizer.cls_token]
+    for index, token in enumerate(tokens):
+        sub_tokens = tokenizer.tokenize(token)
+        if not sub_tokens:
+            sub_tokens = [tokenizer.unk_token]
+
+        # repeate the labels n-times
+        new_labels.extend([labels[index]] * len(sub_tokens))
+        new_tokens.extend(sub_tokens)
+
+    # 2. check the max-length of tokens and labels
+    new_tokens = new_tokens[:max_seq_len - 1]
+    new_labels = new_labels[:max_seq_len - 1]
+
+    # 3. construct the input data
+    new_labels.append(no_entity_label)
+    new_tokens.append(tokenizer.sep_token)
+    input_ids = np.array(
+        [tokenizer.convert_tokens_to_ids(token) for token in new_tokens],
+        dtype="int64")
+    token_type_ids = np.zeros([len(input_ids)], dtype='int64')
+    seq_len = np.array(len(input_ids), dtype="int64")
 
     if is_test:
         return input_ids, token_type_ids, seq_len
     else:
         labels = labels[:(max_seq_len - 2)]
-        encoded_label = np.array([no_entity_label] + labels + [no_entity_label],
-                                 dtype="int64")
-
+        encoded_label = np.array(new_labels, dtype="int64")
         return input_ids, token_type_ids, seq_len, encoded_label
 
 

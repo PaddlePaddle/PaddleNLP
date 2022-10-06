@@ -17,11 +17,10 @@ import os
 import sys
 from tqdm import tqdm
 import numpy as np
-from scipy.special import softmax
 
 import paddle
 from paddle import inference
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
@@ -34,10 +33,8 @@ from data import convert_example
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True,
     help="The directory to static model.")
-
 parser.add_argument("--corpus_file", type=str, required=True,
     help="The corpus_file path.")
-
 parser.add_argument("--max_seq_length", default=64, type=int,
     help="The maximum total input sequence length after tokenization. Sequences "
     "longer than this will be truncated, sequences shorter will be padded.")
@@ -45,16 +42,15 @@ parser.add_argument("--batch_size", default=32, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
-
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
     help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
     help='The tensorrt precision.')
-
 parser.add_argument('--cpu_threads', default=10, type=int,
     help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
     help='Enable to use mkldnn to speed up when using cpu.')
+parser.add_argument("--model_name_or_path",default='rocketqa-zh-base-query-encoder',type=str,help='The pretrained model used for training')
 
 args = parser.parse_args()
 # yapf: enable
@@ -131,10 +127,10 @@ class Predictor(object):
         Returns:
             results(obj:`dict`): All the predictions labels.
         """
-
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         all_embeddings = []
@@ -146,7 +142,7 @@ class Predictor(object):
                 max_seq_length=self.max_seq_length,
                 pad_to_max_seq_len=True)
             examples.append((input_ids, segment_ids))
-            if (len(examples) > 100):
+            if (len(examples) > self.batch_size):
                 input_ids, segment_ids = batchify_fn(examples)
                 self.input_handles[0].copy_from_cpu(input_ids)
                 self.input_handles[1].copy_from_cpu(segment_ids)
@@ -178,7 +174,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]

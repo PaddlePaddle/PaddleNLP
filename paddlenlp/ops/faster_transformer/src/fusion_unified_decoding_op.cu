@@ -110,8 +110,6 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const std::string& hidden_act,
     const bool early_stopping,
     const int min_length,
-    cublasHandle_t cublas_handle_,
-    cublasLtHandle_t cublaslt_handle_,
     cudaStream_t stream,
     const int tensor_para_size = 1,
     const int layer_para_size = 1,
@@ -147,8 +145,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
   typedef typename traits_::data_t data_t_;
 
   DecodingInitParam<DataType_> decoding_params;
-  decoding_params.cublas_handle = cublas_handle_;
-  decoding_params.cublaslt_handle = cublaslt_handle_;
+  decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+  decoding_params.cublaslt_handle =
+      CublasHandle::GetInstance()->cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input_ids.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input_ids.place());
@@ -228,8 +227,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
                               i
                         : i;
     params[layer_idx].stream = stream;
-    params[layer_idx].cublas_handle = cublas_handle_;
-    params[layer_idx].cublaslt_handle = cublaslt_handle_;
+    params[layer_idx].cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
+    params[layer_idx].cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
 
     if (decoding_strategy == "beam_search" ||
         decoding_strategy == "beam_search_v2" ||
@@ -545,11 +544,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const int layer_para_size = 1,
     const int layer_para_batch_size = 1) {
   auto stream = input_ids.stream();
-  cublasHandle_t cublas_handle_;
-  cublasCreate(&cublas_handle_);
-  cublasSetStream(cublas_handle_, stream);
-  cublasLtHandle_t cublaslt_handle_;
-  cublasLtCreate(&cublaslt_handle_);
+
+  cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
 
   std::vector<paddle::Tensor> ret;
 
@@ -618,8 +614,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           hidden_act,
           early_stopping,
           min_length,
-          cublas_handle_,
-          cublaslt_handle_,
           stream,
           tensor_para_size,
           layer_para_size,
@@ -690,8 +684,6 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           hidden_act,
           early_stopping,
           min_length,
-          cublas_handle_,
-          cublaslt_handle_,
           stream,
           tensor_para_size,
           layer_para_size,
@@ -706,7 +698,5 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     }
   }
 
-  cublasDestroy(cublas_handle_);
-  cublasLtDestroy(cublaslt_handle_);
   return ret;
 }

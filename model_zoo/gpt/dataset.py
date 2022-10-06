@@ -87,7 +87,10 @@ def construct_samples_and_shuffle_data(name, data_prefix, documents, sizes,
             assert doc_idx.dtype == np.int32
             assert sizes.dtype == np.int32
 
-            import data_tools.helpers as helpers
+            try:
+                from tool_helpers import helpers
+            except Exception as e:
+                import data_tools.helpers as helpers
 
             sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length,
                                                   num_epochs, tokens_per_epoch)
@@ -274,13 +277,18 @@ def create_pretrained_dataset(
 ):
 
     if local_rank == 0:
-        start_time = time.time()
-        print('> compiling dataset index builder ...')
-        from data_tools.dataset_utils import compile_helper
-        compile_helper()
-        print('>>> done with dataset index builder. Compilation time: {:.3f} '
-              'seconds'.format(time.time() - start_time),
-              flush=True)
+        try:
+            from tool_helpers import helpers
+        except Exception as e:
+            start_time = time.time()
+            print('> compiling dataset index builder ...')
+            from data_tools.dataset_utils import compile_helper
+            compile_helper()
+            print(
+                '>>> done with dataset index builder. Compilation time: {:.3f} '
+                'seconds'.format(time.time() - start_time),
+                flush=True)
+            import data_tools.helpers as helpers
 
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -288,7 +296,10 @@ def create_pretrained_dataset(
     if device_world_size > 1 and local_rank != 0:
         while True:
             try:
-                import data_tools.helpers as helpers
+                try:
+                    from tool_helpers import helpers
+                except Exception as ine:
+                    import data_tools.helpers as helpers
                 break
             except Exception as e:
                 print("> wait for helpers to be compiled!")
@@ -431,17 +442,13 @@ class GPTDataset(paddle.io.Dataset):
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
-        # Attention mask for the attention calulate
-        attention_mask = np.tri(seq_length, seq_length).reshape(
-            (1, seq_length, seq_length))
 
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[np.where(np.array(tokens) == self.eos_id)] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
-        attention_mask = (attention_mask - 1.0) * 1e9
-        attention_mask = attention_mask.astype("float32")
+        attention_mask = np.ones(seq_length, dtype="int64")
         labels = np.array(labels, dtype="int64")
         return [tokens, loss_mask, attention_mask, position_ids, labels]
 

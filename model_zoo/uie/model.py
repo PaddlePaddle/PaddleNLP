@@ -28,11 +28,10 @@ class UIE(ErniePretrainedModel):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input_ids, token_type_ids, pos_ids, att_mask):
-        sequence_output, pooled_output = self.encoder(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=pos_ids,
-            attention_mask=att_mask)
+        sequence_output, _ = self.encoder(input_ids=input_ids,
+                                          token_type_ids=token_type_ids,
+                                          position_ids=pos_ids,
+                                          attention_mask=att_mask)
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
         start_prob = self.sigmoid(start_logits)

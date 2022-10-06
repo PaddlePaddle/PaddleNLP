@@ -20,7 +20,8 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
+
+import paddlenlp
 
 
 class SimCSE(nn.Layer):
@@ -52,7 +53,7 @@ class SimCSE(nn.Layer):
         # Used scaling cosine similarity to ease converge
         self.sacle = scale
         self.classifier = nn.Linear(output_emb_size, 2)
-        self.rdrop_loss = ppnlp.losses.RDropLoss()
+        self.rdrop_loss = paddlenlp.losses.RDropLoss()
 
     @paddle.jit.to_static(input_spec=[
         paddle.static.InputSpec(shape=[None, None], dtype='int64'),

@@ -20,6 +20,12 @@ from ..tokenizer_utils import PretrainedTokenizer
 
 __all__ = ["RoFormerv2Tokenizer"]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "roformer_v2_chinese_char_small": 512,
+    "roformer_v2_chinese_char_base": 512,
+    "roformer_v2_chinese_char_large": 512
+}
+
 
 class RoFormerv2Tokenizer(PretrainedTokenizer):
     """
@@ -94,7 +100,15 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+
+    # TODO(wj-Mcat): to be confirmed
+    max_model_input_sizes = {
+        "roformer_v2_chinese_char_small": 1024,
+        "roformer_v2_chinese_char_base": 1024,
+        "roformer_v2_chinese_char_large": 1024,
+    }
     padding_side = "right"
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

@@ -33,6 +33,13 @@ from ...data.vocab import Vocab
 
 __all__ = ['UnifiedTransformerTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "unified_transformer-12L-cn": 512,
+    "unified_transformer-12L-cn-luge": 512,
+    "plato-mini": 512,
+    "plato-xl": 1024
+}
+
 
 class UnifiedTransformerTokenizer(PretrainedTokenizer):
     """
@@ -111,6 +118,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     TASK_TO_SPECIAL_TOKEN = {
         'chitchat': "[CHAT]",
@@ -179,6 +187,13 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
                 # 30001
         """
         return len(self.vocab)
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
+        return vocab
 
     def preprocess_text(self,
                         inputs,

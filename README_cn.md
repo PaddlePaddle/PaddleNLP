@@ -30,14 +30,41 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
-* 🍭 2022.6.29 **PaddleNLP v2.3.4**发布！[**ERNIE Tiny**](./model_zoo/ernie-3.0) 全系列中文预训练小模型发布，快速提升预训练模型部署效率，通用信息抽取技术[**UIE Tiny**](./model_zoo/uie) 系列模型全新升级，支持速度更快效果更好的UIE小模型。
-* 🔥 2022.5.16 [**PaddleNLP v2.3**](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)全新发布！🎉
-  * 💎 发布通用信息抽取技术[**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**一键抽取**与全流程**小样本**高效定制开发。
-  * 😊 发布文心大模型[**ERNIE 3.0**](./model_zoo/ernie-3.0)轻量级模型，在[CLUE](https://www.cluebenchmarks.com/)上实现同规模结构效果最佳，并提供**🗜️无损压缩**和**⚙️全场景部署**方案。
-  * 🏥 发布中文医疗领域预训练模型[**ERNIE-Health**](./model_zoo/ernie-health)，[CBLUE](https://github.com/CBLUEbenchmark/CBLUE)中文医疗信息处理评测冠军模型。
-  * 💬 发布大规模百亿开放域对话预训练模型[**PLATO-XL**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/plato-xl) ，配合⚡**FasterGeneration**⚡快速实现高性能GPU并行推理加速。
 
-* 📬 2021.12.12 **PaddleNLP v2.2**发布！新增开箱即用的NLP能力[Taskflow](./docs/model_zoo/taskflow.md)！配套语义检索、智能问答、评论观点抽取[产业案例](./applications)，快速搭建端到端NLP系统！配套视频课程[直通车](https://aistudio.baidu.com/aistudio/course/introduce/24902)！
+* 🔥 **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
+  * 💎 NLP工具：**[NLP 流水线系统 Pipelines](./pipelines)** 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
+  * 💢 产业应用：新增 **[文本分类全流程应用方案](./applications/text_classification)** ，覆盖多分类、多标签、层次分类各类场景，支持 **小样本学习** 和 **TrustAI** 可信计算模型训练与调优；[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，发布 **UIE-M**，支持中英文混合抽取，新增**UIE 数据蒸馏**方案，打破 UIE 推理瓶颈，推理速度提升 100 倍以上；
+  * 🍭 AIGC 内容生成：新增代码生成 SOTA 模型[**CodeGen**](./examples/code_generation/codegen)，支持多种编程语言代码生成；集成[**文图生成潮流模型**](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) DALL·E Mini、Disco Diffusion、Stable Diffusion，更多趣玩模型等你来玩；新增[**中文文本摘要应用**](./applications/text_summarization)，基于大规模语料的中文摘要模型首次发布，可支持 Taskflow 一键调用和定制训练；
+  * 💪 框架升级：[**模型自动压缩 API**](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[**小样本 Prompt**](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
+
+
+* 👀 **2022.9.6 飞桨智慧金融行业系列直播课**
+
+  * 围绕深度学习技术在金融行业的产业实践与发展趋势，邀请行业内专家分享产业实践。探讨科技金融的未来发展；
+
+  * PaddleNLP配套课程发布产业实践范例：基于UIE的金融文件信息抽取；基于Pipelines的FAQ问答系统；
+
+  * **9月6日起每周二、周四19点直播**，扫码免费加入微信群获取直播链接，与行业专家深度交流：
+
+    <div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/188596360-264415d4-5462-43ad-8517-5b7e690061ce.jpg" width="150" height="150" />
+    </div>
+
+* 🔥 **2022.5.16  发布 [PaddleNLP v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)**
+  * 💎 发布通用信息抽取技术 [**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**零样本抽取**与全流程**小样本**高效定制开发；
+  * 😊 发布文心大模型 [**ERNIE 3.0**](./model_zoo/ernie-3.0) 轻量级模型，在 [CLUE ](https://www.cluebenchmarks.com/)上实现同规模结构效果最佳，并提供**🗜️无损压缩**和**⚙️全场景部署**方案；
+  * 🏥 发布中文医疗领域预训练模型 [**ERNIE-Health**](./model_zoo/ernie-health)，[CBLUE](https://github.com/CBLUEbenchmark/CBLUE) 中文医疗信息处理评测冠军模型；
+  * 💬 发布大规模百亿开放域对话预训练模型 [**PLATO-XL**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/plato-xl) ，配合⚡**FasterGeneration**⚡快速实现高性能GPU并行推理加速。
+
+## 社区交流
+
+- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+  - 与众多社区开发者以及官方团队深度交流。
+  - 10G重磅NLP学习大礼包！
+
+  <div align="center">
+  <img src="https://user-images.githubusercontent.com/11793384/184784832-bb97930f-a738-4480-99be-517aeb65afac.png" width="150" height="150" />
+  </div>
 
 ## 特性
 
@@ -311,16 +338,6 @@ PaddleNLP提供全流程的文本领域API，可大幅提升NLP任务建模的�
 - 提供30+多语言词向量的[Embedding API](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/embeddings.html)
 
 更多使用方法请参考[API文档](https://paddlenlp.readthedocs.io/zh/latest/)。
-
-## 社区交流
-
-- 微信扫描二维码并填写问卷之后，加入交流群领取福利
-  - 获取5月18-19日每晚20:30《产业级通用信息抽取技术UIE+ERNIE轻量级模型》直播课链接。
-  - 10G重磅NLP学习大礼包！
-
-  <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/168411900-d9f3d777-99ab-4b5c-8cdc-ef747a48b864.jpg" width="150" height="150" />
-  </div>
 
 
 ## Citation

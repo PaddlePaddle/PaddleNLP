@@ -17,11 +17,11 @@ import random
 import time
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
 from functools import partial
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 from base_model import SemanticIndexBase
 from batch_negative.model import SemanticIndexBatchNeg
@@ -37,6 +37,7 @@ parser.add_argument("--max_seq_length", default=512, type=int,
                     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int,
                     help="Batch size per GPU/CPU for training.")
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="The pretrained model used for training")
 parser.add_argument("--output_emb_size", default=256,
                     type=int, help="output_embedding_size")
 parser.add_argument("--learning_rate", default=5E-5, type=float,
@@ -86,7 +87,7 @@ parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
 parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt',
                     help="evaluate_result")
-parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False],
+parser.add_argument('--evaluate', action='store_true',
                     help='whether evaluate while training')
 args = parser.parse_args()
 # yapf: enable
@@ -172,10 +173,9 @@ def do_train():
                             data_path=args.train_set_file,
                             lazy=False)
 
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-        'ernie-1.0')
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
@@ -295,7 +295,7 @@ def do_train():
                                                    'model_state.pdparams')
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
-        if args.evaluate:
+        if args.evaluate and rank == 0:
             print("evaluating")
             recall_5 = evaluate(model, corpus_data_loader, query_data_loader,
                                 recall_result_file, text_list, id2corpus)

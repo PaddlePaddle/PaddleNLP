@@ -24,10 +24,10 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from model import SimCSE
 from data import read_simcse_text, read_text_pair, convert_example, create_dataloader
@@ -104,12 +104,12 @@ def do_train():
     train_ds = load_dataset(
         read_simcse_text, data_path=args.train_set_file, lazy=False)
     model_name_or_path='rocketqa-zh-dureader-query-encoder'
-    pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
+    pretrained_model = AutoModel.from_pretrained(
        model_name_or_path,
        hidden_dropout_prob=args.dropout,
        attention_probs_dropout_prob=args.dropout)
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained(model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     trans_func = partial(
         convert_example,

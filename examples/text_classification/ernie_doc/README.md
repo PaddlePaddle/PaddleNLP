@@ -20,7 +20,7 @@
 
 ### 通用参数释义
 
-除[ERNIE_DOC](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/ernie-doc/run_classifier.py)
+除[ERNIE_DOC](../../../model_zoo/ernie-doc/README.md)
 展示的通用参数之外，本例还有如下参数：
 
 - `static_mode` 在 `predict.py` 表示是否使用静态图进行预测。

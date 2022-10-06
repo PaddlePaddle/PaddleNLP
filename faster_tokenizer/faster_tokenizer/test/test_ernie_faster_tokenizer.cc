@@ -26,7 +26,8 @@ limitations under the License. */
 #include "pretokenizers/bert.h"
 #include "tokenizers/ernie_faster_tokenizer.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tests {
 
 template <typename T>
@@ -62,7 +63,7 @@ TEST(tokenizer, ernie_faster_tokenizer) {
        "##ations",
        ".",
        "[SEP]"}};
-  std::vector<std::vector<uint>> expected_ids = {
+  std::vector<std::vector<uint32_t>> expected_ids = {
       {1, 508, 125, 125, 266, 384, 170, 2},
       {1,
        3362,
@@ -79,7 +80,7 @@ TEST(tokenizer, ernie_faster_tokenizer) {
        11005,
        42,
        2}};
-  std::vector<std::vector<uint>> expected_type_ids = {
+  std::vector<std::vector<uint32_t>> expected_type_ids = {
       {0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   for (int i = 0; i < encodings.size(); ++i) {
     CheckVectorEqual(expected_tokens[i], encodings[i].GetTokens());
@@ -89,4 +90,5 @@ TEST(tokenizer, ernie_faster_tokenizer) {
 }
 
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

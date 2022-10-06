@@ -15,7 +15,6 @@ import argparse
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import JiebaTokenizer, Pad, Vocab
 
 from model import TextCNNModel

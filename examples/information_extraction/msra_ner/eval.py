@@ -24,7 +24,6 @@ import numpy as np
 import paddle
 from paddle.io import DataLoader
 
-import paddlenlp as ppnlp
 from datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 from paddlenlp.transformers import BertForTokenClassification, BertTokenizer
@@ -57,7 +56,7 @@ def do_eval(args):
             examples['tokens'],
             max_seq_len=args.max_seq_length,
             # We use this argument because the texts in our dataset are lists of words (with a label for each word).
-            is_split_into_words=True,
+            is_split_into_words='token',
             return_length=True)
         labels = []
 

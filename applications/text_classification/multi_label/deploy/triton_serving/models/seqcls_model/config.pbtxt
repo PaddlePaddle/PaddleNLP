@@ -14,9 +14,9 @@ input [
 ]
 output [
     {
-      name: "linear_147.tmp_1"
+      name: "linear_75.tmp_1"
       data_type: TYPE_FP32
-      dims: [ 202 ]
+      dims: [ 20 ]
     }
 ]
 

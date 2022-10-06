@@ -319,7 +319,7 @@ msgstr ""
 #: ../FAQ.md:183
 msgid ""
 "A: "
-"预训练模型通常会有配套的tokenzier和词典，对于大多数中文预训练模型，如ERNIE-1.0，使用的都是字粒度的输入，tokenzier会将句子转换为字粒度的形式，模型无法收到词粒度的输入。如果希望引入额外的词典，需要修改预训练模型的tokenizer和词典，可以参考这里blog，另外注意embedding矩阵也要加上这些新增词的embedding表示。"
+"预训练模型通常会有配套的tokenzier和词典，对于大多数中文预训练模型，如ERNIE-3.0-Medium-zh，使用的都是字粒度的输入，tokenzier会将句子转换为字粒度的形式，模型无法收到词粒度的输入。如果希望引入额外的词典，需要修改预训练模型的tokenizer和词典，可以参考这里blog，另外注意embedding矩阵也要加上这些新增词的embedding表示。"
 msgstr ""
 
 #: ../FAQ.md:185

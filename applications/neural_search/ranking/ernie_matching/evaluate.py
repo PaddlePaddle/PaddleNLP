@@ -22,10 +22,9 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import LinearDecayWithWarmup, AutoModel, AutoTokenizer
 
 from data import create_dataloader, gen_pair
 from data import convert_pairwise_example as convert_example
@@ -41,12 +40,7 @@ parser.add_argument("--test_file", type=str, required=True, help="The full path 
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--eval_step", default=200, type=int, help="Step interval for evaluation.")
-parser.add_argument('--save_step', default=10000, type=int, help="Step interval for saving checkpoint.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="The pretrained model used for training")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -109,7 +103,7 @@ def read_test(src_path, is_predict=False):
         yield {'query': query, 'title': title, 'label': label}
 
 
-def do_train():
+def main():
     paddle.set_device(args.device)
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
@@ -120,10 +114,8 @@ def do_train():
     dev_ds = load_dataset(read_test, src_path=args.test_file, lazy=False)
     print(dev_ds[0])
 
-    pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-        'ernie-gram-zh')
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func_eval = partial(convert_example,
                               tokenizer=tokenizer,
@@ -155,4 +147,4 @@ def do_train():
 
 
 if __name__ == "__main__":
-    do_train()
+    main()

@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -92,11 +93,24 @@ def do_convert():
     else:
         if args.is_shuffle:
             indexes = np.random.permutation(len(raw_examples))
+            index_list = indexes.tolist()
             raw_examples = [raw_examples[i] for i in indexes]
 
         i1, i2, _ = args.splits
         p1 = int(len(raw_examples) * i1)
         p2 = int(len(raw_examples) * (i1 + i2))
+
+        train_ids = index_list[:p1]
+        dev_ids = index_list[p1:p2]
+        test_ids = index_list[p2:]
+
+        with open(os.path.join(args.save_dir, "sample_index.json"), "w") as fp:
+            maps = {
+                "train_ids": train_ids,
+                "dev_ids": dev_ids,
+                "test_ids": test_ids
+            }
+            fp.write(json.dumps(maps))
 
         if args.task_type == "ext":
             train_examples = _create_ext_examples(raw_examples[:p1],

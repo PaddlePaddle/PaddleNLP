@@ -11,14 +11,13 @@
 ## 服务端环境准备
 
 ### 安装Triton Server
-下载Triton Server镜像，并启动
-```
-# 拉取镜像
+拉取Triton Server镜像：
+```shell
 docker pull nvcr.io/nvidia/tritonserver:21.10-py3
-
-# 启动容器
+```
+启动容器：
+```shell
 docker run  -it --gpus all --net=host --name triton_server -v /path/triton/models:/models nvcr.io/nvidia/tritonserver:21.10-py3 bash
-
 ```
 
 **NOTE:**
@@ -31,15 +30,13 @@ docker run  -it --gpus all --net=host --name triton_server -v /path/triton/model
 ### 进入容器并准备PaddleNLP环境
 整个服务的前后处理依赖PaddleNLP，需要在容器内安装相关python包
 
-```
-# 进入容器
+进入容器：
+```shell
 docker exec -it triton_server bash
-
-# 安装PaddlePaddle
-python3 -m pip install paddlepaddle-gpu -i https://mirror.baidu.com/pypi/simple
-
-# 安装PaddleNLP
-python3 -m pip install paddlenlp -i https://mirror.baidu.com/pypi/simple
+```
+安装PaddlePaddle、PaddleNLP
+```shell
+python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/pypi/simple
 ```
 
 **NOTE:**
@@ -53,10 +50,10 @@ python3 -m pip install paddlenlp -i https://mirror.baidu.com/pypi/simple
 
 ### 安装FasterTokenizers文本处理加速库（可选）
 
-如果部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。
 
-```
-# 注意：在容器内安装
+在容器内安装 faster_tokenizers
+```shell
 python3 -m pip install faster_tokenizers
 ```
 
@@ -73,18 +70,19 @@ python ../../export_model.py --params_path=../../checkpoint/model_state.pdparams
 ```
 
 使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成model.onnx模型文件。
-```bash
-# 模型地址根据实际填写即可
-# 转换层次分类模型
-paddle2onnx --model_dir wos_infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file model.onnx --opset_version 13 --enable_onnx_checker True --enable_dev_version True
 
-# 将转换好的ONNX模型移动到模型仓库目录
+```shell
+paddle2onnx --model_dir infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file model.onnx --opset_version 13 --enable_onnx_checker True --enable_dev_version True
+```
+
+创建空白目录/seqcls/1和seqcls_model/1，并将将转换好的ONNX模型移动到模型仓库目录
+
+```shell
+mkdir /models/seqcls/1
 mkdir /models/seqcls_model/1
 mv model.onnx /models/seqcls_model/1
-
-# 创建空白目录/seqcls/1
-mkdir /models/seqcls/1
 ```
+
 Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX#%E5%8F%82%E6%95%B0%E9%80%89%E9%A1%B9)
 
 模型下载转换好之后，models目录结构如下:
@@ -120,14 +118,13 @@ seqcls_grpc_client.py     # 层次分类任务发送pipeline预测请求的脚�
 
 ### 启动服务端
 
-在容器内执行下面命令启动服务:
-
-```
-# 默认启动models下所有模型
+在容器内执行下面命令启动服务，默认启动models下所有模型:
+```shell
 tritonserver --model-repository=/models
-
-# 可通过参数只启动单一任务
-tritonserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_seqcls
+```
+也可以通过设定参数只启动单一任务服务：
+```shell
+tritonserver --model-repository=/models --model-control-mode=explicit --load-model=seqcls
 ```
 输出打印如下:
 
@@ -177,10 +174,7 @@ pip install tritonclient==2.10.0
 
 方式二：拉取官网镜像并启动容器:
 ```
-# 拉取镜像
 docker pull nvcr.io/nvidia/tritonserver:21.10-py3-sdk
-
-#启动容器
 docker run  -it --net=host --name triton_client -v /path/to/triton:/triton_code nvcr.io/nvidia/tritonserver:21.10-py3-sdk bash
 ```
 
@@ -189,16 +183,4 @@ docker run  -it --net=host --name triton_client -v /path/to/triton:/triton_code 
 
 ```
 python seqcls_grpc_client.py
-```
-
-输出打印如下:
-
-```
-text:
-a high degree of uncertainty associated with the emission inventory for china tends to degrade the performance of chemical transport models in predicting pm2.5 concentrations especially on a daily basis. in this study a novel machine learning algorithm, geographically -weighted gradient boosting machine (gw-gbm), was developed by improving gbm through building spatial smoothing kernels to weigh the loss function. this modification addressed the spatial nonstationarity of the relationships between pm2.5 concentrations and predictor variables such as aerosol optical depth (aod) and meteorological conditions. gw-gbm also overcame the estimation bias of pm2.5 concentrations due to missing aod retrievals, and thus potentially improved subsequent exposure analyses. gw-gbm showed good performance in predicting daily pm2.5 concentrations (r-2 = 0.76, rmse = 23.0 g/m(3)) even with partially missing aod data, which was better than the original gbm model (r-2 = 0.71, rmse = 25.3 g/m(3)). on the basis of the continuous spatiotemporal prediction of pm2.5 concentrations, it was predicted that 95% of the population lived in areas where the estimated annual mean pm2.5 concentration was higher than 35 g/m(3), and 45% of the population was exposed to pm2.5 >75 g/m(3) for over 100 days in 2014. gw-gbm accurately predicted continuous daily pm2.5 concentrations in china for assessing acute human health effects. (c) 2017 elsevier ltd. all rights reserved.
-- level 1
-label: 0  confidence: 0.997
-- level 2
-label: 8  confidence: 0.991
-...
 ```

@@ -19,7 +19,7 @@ import json
 from functools import partial
 import numpy as np
 import paddle
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoTokenizer
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                            is_test=True,
                            pattern_id=args.pattern_id)
     test_ds = test_ds.map(transform_fn, lazy=False)
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     batchify_test_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # src_ids

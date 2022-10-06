@@ -1,8 +1,8 @@
 #rpc端口, rpc_port和http_port不允许同时为空。当rpc_port为空且http_port不为空时，会自动将rpc_port设置为http_port+1
-rpc_port: 18090
+rpc_port: 7688
 
 #http端口, rpc_port和http_port不允许同时为空。当rpc_port可用且http_port为空时，不自动生成http_port
-http_port: 9999
+http_port: 9998
 
 #worker_num, 最大并发数。
 #当build_dag_each_worker=True时, 框架会创建worker_num个进程，每个进程内构建grpcSever和DAG
@@ -38,7 +38,7 @@ op:
             model_config: serving_server
 
             #Fetch结果列表，以client_config中fetch_var的alias_name为准
-            fetch_list: ["linear_147.tmp_1"]
+            fetch_list: ["linear_75.tmp_1"]
             
             # device_type, 0=cpu, 1=gpu, 2=tensorRT, 3=arm cpu, 4=kunlun xpu
             device_type: 1
@@ -46,7 +46,7 @@ op:
             #计算硬件ID，当devices为""或不写时为CPU预测；当devices为"0", "0,1,2"时为GPU预测，表示使用的GPU卡
             devices: "0"
 
-            #use_mkldnn
+            #开启MKLDNN加速
             use_mkldnn: True
 
             #thread_num

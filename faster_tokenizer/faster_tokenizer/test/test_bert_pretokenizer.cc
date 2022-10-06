@@ -18,7 +18,8 @@ limitations under the License. */
 #include "gtest/gtest.h"
 #include "pretokenizers/bert.h"
 
-namespace tokenizers {
+namespace paddlenlp {
+namespace faster_tokenizer {
 namespace tests {
 TEST(pretokenizers, whitespace) {
   std::string input =
@@ -44,4 +45,5 @@ TEST(pretokenizers, whitespace) {
   }
 }
 }  // namespace tests
-}  // namespace tokenizers
+}  // namespace faster_tokenizer
+}  // namespace paddlenlp

@@ -67,8 +67,8 @@ doccano还支持PostgreSQL、Docker、Docker Compose等安装方式，详情请�
     <img src=https://user-images.githubusercontent.com/63761690/176858888-79b781f9-2ce0-4348-ba14-faac19031867.png height=300 hspace='15'/>
 </div>
 
-doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，文本分类本地数据集定制训练中**统一使用TextLine**这一文件格式，即上传的文件需要为txt或tsv等格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
-上传的文件为txt或tsv等格式，每一行为一条待标注文本，示例:
+doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，文本分类本地数据集定制训练中**统一使用TextLine**这一文件格式，即上传的文件需要为txt等格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
+上传的文件为txt等格式，每一行为一条待标注文本，示例:
 
 ```text
 黑苦荞茶的功效与作用及食用方法
@@ -109,7 +109,8 @@ doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/175248039-ce1673f1-9b03-4804-b1cb-29e4b4193f86.png height=300 hspace='15'/>
 </div>
-对于层次分类任务的分类标签我们建议使用标签层次结构中叶结点标签路径作为标签，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
+
+对于层次分类任务的分类标签我们建议使用标签层次结构中**叶结点标签路径作为标签**，以上图的标签结构为例，我们建议使用`##`作为分隔符，分隔不同层之间的标签：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/63761690/177095794-0acb9665-3862-4de9-8771-8f424fd4f7b0.png height=300 hspace='15'/>
@@ -162,8 +163,10 @@ doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式
 
 
 ### 7.1 多分类任务
-通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多分类文本任务指南](multi_class/README.md)进行相应模型训练。
-运行
+通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多分类文本任务指南](multi_class/README.md)中固定格式进行相应模型训练。
+
+数据标注转化运行：
+
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
@@ -172,9 +175,13 @@ python doccano.py \
     --task_type "multi_class"
 ```
 
-### 7.1 多标签任务
-通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)进行相应模型训练。
-运行
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[多分类训练评估与模型优化指南](multi_class/analysis/README.md)
+
+### 7.2 多标签任务
+通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)中固定格式进行相应模型训练。
+
+数据标注转化运行：
+
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
@@ -183,30 +190,49 @@ python doccano.py \
     --task_type "multi_label"
 ```
 
-### 7.1 多分类任务
-通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[层次文本分类任务指南](hierarchical/README.md)进行相应模型训练。
-运行
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[多标签训练评估与模型优化指南](multi_label/analysis/README.md)
+
+### 7.3 层次分类任务
+
+通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[层次文本分类任务指南](hierarchical/README.md)中固定格式进行相应模型训练。
+
+数据标注转化运行：
+
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
     --save_dir ./data \
-    --splits 0.8 0.1 0.1 \
-    --task_type "hierarchical" \
-    --separator "##"
+    --splits 0.8 0.2 \
+    --task_type "hierarchical"
 ```
 
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[层次分类训练评估与模型优化指南](hierarchical/analysis/README.md)
 可配置参数说明：
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.2]表示按照``8:2``的比例将数据划分为训练集、验证集。
 - ``task_type``: 可选，选择任务类型,有多分类，多标签，层次分类三种类型的任务。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 不同层标签之间的分隔符，该参数只对层次文本分类任务有效。默认为"##"。
+- ``valid``: 是否为稀疏数据筛选的有效标注数据，默认为False.
+- ``dirty``: 是否为脏数据清洗策略标注数据，默认为False.
+
+转化后的doccano标注数据目录结构如下：
+
+```text
+data/
+├── train.txt # 训练数据集文件
+├── dev.txt # 开发数据集文件
+├── test.txt # 测试训练集文件（可选，数据划分为 train/dev/test 数据集）
+├── label.txt # 分类标签文件
+└── data.txt # 待预测数据文件
+```
 
 备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集，也可以划分成train/dev 数据集，或全部导出为 train 数据集。
+- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分成train/dev 数据集，也可以划分为 train/dev/test 数据集。
+- 脚本会自动生成data.txt，如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt为无标签数据。**如果有未标注数据，则用未标注数据文件替换data.txt**
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 

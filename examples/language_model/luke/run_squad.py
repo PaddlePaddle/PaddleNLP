@@ -18,15 +18,12 @@ import random
 import time
 import json
 import math
-
+from args import parse_args
 from functools import partial
 import numpy as np
+
 import paddle
-
 from paddle.io import DataLoader
-from args import parse_args
-
-import paddlenlp as ppnlp
 
 from paddlenlp.data import Pad, Stack, Tuple, Dict
 from paddlenlp.transformers import LukeTokenizer, LukeForQuestionAnswering

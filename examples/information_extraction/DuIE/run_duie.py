@@ -31,7 +31,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import DataLoader
 
-from paddlenlp.transformers import ErnieTokenizer, ErnieForTokenClassification, LinearDecayWithWarmup
+from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification, LinearDecayWithWarmup
 
 from data_loader import DuIEDataset, DataCollator
 from utils import decoding, find_entity, get_precision_recall_f1, write_prediction_results
@@ -155,10 +155,10 @@ def do_train():
     num_classes = (len(label_map.keys()) - 2) * 2 + 2
 
     # Loads pretrained model ERNIE
-    model = ErnieForTokenClassification.from_pretrained("ernie-1.0",
-                                                        num_classes=num_classes)
+    model = AutoModelForTokenClassification.from_pretrained(
+        "ernie-3.0-medium-zh", num_classes=num_classes)
     model = paddle.DataParallel(model)
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     criterion = BCELossForDuIE()
 
     # Loads dataset.
@@ -276,9 +276,9 @@ def do_predict():
     num_classes = (len(label_map.keys()) - 2) * 2 + 2
 
     # Loads pretrained model ERNIE
-    model = ErnieForTokenClassification.from_pretrained("ernie-1.0",
-                                                        num_classes=num_classes)
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
+    model = AutoModelForTokenClassification.from_pretrained(
+        "ernie-3.0-medium-zh", num_classes=num_classes)
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     criterion = BCELossForDuIE()
 
     # Loads dataset.

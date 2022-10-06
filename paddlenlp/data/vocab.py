@@ -264,9 +264,14 @@ class Vocab(object):
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self._token_to_idx[tokens]
+            return self._token_to_idx[
+                tokens] if tokens in self._token_to_idx else self._token_to_idx[
+                    self.unk_token]
         else:
-            return [self._token_to_idx[token] for token in tokens]
+            return [
+                self._token_to_idx[token] if token in self._token_to_idx else
+                self._token_to_idx[self.unk_token] for token in tokens
+            ]
 
     def __len__(self):
         return len(self._idx_to_token)

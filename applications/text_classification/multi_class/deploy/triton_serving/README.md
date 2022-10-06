@@ -50,7 +50,7 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 
 ### 安装FasterTokenizers文本处理加速库（可选）
 
-如果部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。
 
 在容器内安装 faster_tokenizers
 ```shell
@@ -121,7 +121,7 @@ tritonserver --model-repository=/models
 ```
 也可以通过设定参数只启动单一任务服务：
 ```shell
-tritonserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_seqcls
+tritonserver --model-repository=/models --model-control-mode=explicit --load-model=seqcls
 ```
 
 **NOTE:**
@@ -165,13 +165,13 @@ I0619 13:43:33.409775 5127 http_server.cc:167] Started Metrics Service at 0.0.0.
 客户端请求有两种方式，可以选择在在本地执行脚本请求，或下载官方客户端镜像在容器中执行。
 
 方式一：本地执行脚本，需要先安装依赖:
-```
+```shell
 pip install grpcio
 pip install tritonclient==2.10.0
 ```
 
 方式二：拉取官网镜像并启动容器:
-```
+```shell
 docker pull nvcr.io/nvidia/tritonserver:21.10-py3-sdk
 docker run  -it --net=host --name triton_client -v /path/to/triton:/triton_code nvcr.io/nvidia/tritonserver:21.10-py3-sdk bash
 ```

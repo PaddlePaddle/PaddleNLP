@@ -14,120 +14,88 @@
 
 import os
 import argparse
-
+import functools
 import numpy as np
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Tuple, Pad
+from paddlenlp.utils.log import logger
+from paddle.io import DataLoader, BatchSampler
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from utils import preprocess_function, read_local_dataset
+
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--params_path",
-                    default="./checkpoint/model_state.pdparams",
-                    type=str,
-                    help="The path to model parameters to be loaded.")
-parser.add_argument("--dataset_dir",
-                    default=None,
-                    type=str,
-                    help="Local dataset directory should"
-                    "include data.tsv and label.tsv")
-parser.add_argument("--max_seq_length",
-                    default=128,
-                    type=int,
-                    help="The maximum total input sequence length "
-                    "after tokenization. Sequences longer than this"
-                    "will be truncated, sequences shorter will be padded.")
-parser.add_argument("--batch_size",
-                    default=32,
-                    type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument('--device',
-                    choices=['cpu', 'gpu', 'xpu', 'npu'],
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument('--model_name',
-                    default='ernie-3.0-base-zh',
-                    help="Define which model to train, "
-                    "defaults to ernie-3.0-base-zh.")
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--dataset_dir", required=True, default=None, type=str, help="Local dataset directory should include data.txt and label.txt")
+parser.add_argument("--output_file", default="output.txt", type=str, help="Save prediction result")
+parser.add_argument("--params_path", default="./checkpoint/", type=str, help="The path to model parameters to be loaded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--data_file", type=str, default="data.txt", help="Unlabeled data file name")
+parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
 args = parser.parse_args()
+# yapf: enable
 
 
 @paddle.no_grad()
-def predict(data, label_list):
+def predict():
     """
     Predicts the data labels.
-    Args:
-
-        data (obj:`List`): The processed data whose each element is one sequence.
-        label_map(obj:`List`): The label id (key) to label str (value) map.
- 
     """
     paddle.set_device(args.device)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(label_list))
-    if args.params_path and os.path.isfile(args.params_path):
-        model.set_dict(paddle.load(os.path.join(args.params_path)))
-        print("Loaded parameters from %s" % args.params_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.params_path)
 
-    examples = []
-    for text in data:
-        result = tokenizer(text=text, max_seq_len=args.max_seq_length)
-        examples.append((result['input_ids'], result['token_type_ids']))
+    label_list = []
+    label_path = os.path.join(args.dataset_dir, args.label_file)
+    with open(label_path, 'r', encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            label_list.append(line.strip())
 
-    # Seperates data into some batches.
-    batches = [
-        examples[i:i + args.batch_size]
-        for i in range(0, len(examples), args.batch_size)
-    ]
+    data_ds = load_dataset(read_local_dataset,
+                           path=os.path.join(args.dataset_dir, args.data_file),
+                           is_test=True,
+                           lazy=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-    ): fn(samples)
+    trans_func = functools.partial(preprocess_function,
+                                   tokenizer=tokenizer,
+                                   max_seq_length=args.max_seq_length,
+                                   is_test=True)
+
+    data_ds = data_ds.map(trans_func)
+
+    # batchify dataset
+    collate_fn = DataCollatorWithPadding(tokenizer)
+    data_batch_sampler = BatchSampler(data_ds,
+                                      batch_size=args.batch_size,
+                                      shuffle=False)
+
+    data_data_loader = DataLoader(dataset=data_ds,
+                                  batch_sampler=data_batch_sampler,
+                                  collate_fn=collate_fn)
 
     results = []
     model.eval()
-    for batch in batches:
-        input_ids, token_type_ids = batchify_fn(batch)
-        input_ids = paddle.to_tensor(input_ids)
-        token_type_ids = paddle.to_tensor(token_type_ids)
-        logits = model(input_ids, token_type_ids)
+    for batch in data_data_loader:
+        logits = model(**batch)
         probs = F.softmax(logits, axis=1)
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
         labels = [label_list[i] for i in idx]
         results.extend(labels)
 
-    for text, r in zip(data, results):
-        print("input data:", text)
-        print('label: {}'.format(r))
-        print('---------------------------------')
+    with open(args.output_file, 'w', encoding='utf-8') as f:
+        f.write('text' + '\t' + 'label' + '\n')
+        for t, r in zip(data_ds.data, results):
+            f.write(t["text"] + '\t' + r + '\n')
+    logger.info("Prediction results save in {}.".format(args.output_file))
     return
 
 
 if __name__ == "__main__":
-    if args.dataset_dir is not None:
-        data_dir = os.path.join(args.dataset_dir, "data.tsv")
-        label_dir = os.path.join(args.dataset_dir, "label.tsv")
-        label_list = []
-        data = []
-        with open(label_dir, 'r', encoding='utf-8') as f:
-            for line in f:
-                label_list.append(line.strip())
-        f.close()
-        with open(data_dir, 'r', encoding='utf-8') as f:
-            for line in f:
-                data.append(line.strip())
-        f.close()
-    else:
-        data = [
-            "黑苦荞茶的功效与作用及食用方法", "交界痣会凸起吗", "检查是否能怀孕挂什么科", "鱼油怎么吃咬破吃还是直接咽下去",
-            "幼儿挑食的生理原因是"
-        ]
-        label_list = [
-            '病情诊断', '治疗方案', '病因分析', '指标解读', '就医建议', '疾病表述', '后果表述', '注意事项',
-            '功效作用', '医疗费用', '其他'
-        ]
-    predict(data, label_list)
+
+    predict()

@@ -16,7 +16,6 @@ import argparse
 import os
 
 import paddle
-import paddlenlp as ppnlp
 from paddlenlp.data import Vocab
 from model import TextCNNModel
 

@@ -52,8 +52,8 @@ parser = PdArgumentParser(TrainingArguments, DataArguments)
     - 这里的，`labels`如果模型没有使用到，我们还需要额外定义`criterion`，计算最后的loss损失。
 ```python
 train_dataset = load_dataset("chnsenticorp", splits=["train"])
-model = AutoModelForSequenceClassification.from_pretrained("ernie-1.0-base-zh", num_classes=len(train_dataset.label_list))
-tokenizer = AutoTokenizer.from_pretrained("ernie-1.0-base-zh")
+model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(train_dataset.label_list))
+tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
 def convert_example(example, tokenizer):
     encoded_inputs = tokenizer(text=example["text"], max_seq_len=128, pad_to_max_seq_len=True)
@@ -394,6 +394,13 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         （`float`，可选，默认为 32768）
 
                         The value of initial scale_loss for fp16. (default: 32768)
+
+  --recompute
+                        是否使用重计算训练。可以节省显存。
+                        重新计算前向过程以获取梯度，减少中间变量显存
+                        (`bool`, 可选, 默认为 `False`)
+
+                        Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
 
   --minimum_eval_times
                         最少评估次数，如果当前设置的eval_steps，评估次数少于minimum_eval_times，

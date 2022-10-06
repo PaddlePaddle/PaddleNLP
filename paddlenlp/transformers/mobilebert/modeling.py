@@ -784,7 +784,6 @@ class MobileBertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "mobilebert-uncased": {
             "attention_probs_dropout_prob": 0.1,
@@ -812,7 +811,6 @@ class MobileBertPretrainedModel(PretrainedModel):
             "vocab_size": 30522
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
 
     pretrained_resource_files_map = {
         "model_state": {
