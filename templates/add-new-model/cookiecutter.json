@@ -1,0 +1,11 @@
+{
+    "modelname": "ERNIE_DOC",
+    "uppercase_modelname": "ERNIE_DOC",
+    "lowercase_modelname": "ernie_doc",
+    "camelcase_modelname": "ErnieDoc",
+    "authors": "PaddlePaddle Authors",
+    "checkpoint_identifier": "ernie-doc-base-en",
+    "tokenizer_type": ["Based On Bert", "BPE", "SentencePiece"],
+    "is_encoder_model": ["y", "n"],
+    "is_decoder_model": ["n", "y"]
+}
