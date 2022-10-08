@@ -18,6 +18,11 @@ from .. import GPTTokenizer
 
 __all__ = ['CodeGenTokenizer']
 
+VOCAB_FILES_NAMES = {
+    "vocab_file": "vocab.json",
+    "merges_file": "merges.txt",
+}
+
 
 class CodeGenTokenizer(GPTTokenizer):
 

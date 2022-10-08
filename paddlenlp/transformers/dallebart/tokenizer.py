@@ -101,7 +101,7 @@ class HashtagProcessor:
 
 def replace_person_token(t):
     "Used for CC12M"
-    t = re.sub("<person>([,\s]*(and)*[,\s]*<person>)+", " people ", t)
+    t = re.sub(r"<person>([,\s]*(and)*[,\s]*<person>)+", " people ", t)
     while "<person>" in t:
         t = t.replace("<person>",
                       f" {random.choices(*tuple(zip(*person_token)))[0]} ", 1)
@@ -114,7 +114,7 @@ def fix_html(t):
 
 
 def replace_punctuation_with_commas(t):
-    return re.sub("[()[\].,|:;?!=+~\-\/{}]", ",", t)
+    return re.sub(r"[()[\].,|:;?!=+~\-\/{}]", ",", t)
 
 
 def simplify_quotes(t):
@@ -122,19 +122,19 @@ def simplify_quotes(t):
 
 
 def merge_quotes(t):
-    return re.sub('(\s*"+\s*)+', ' " ', t)
+    return re.sub(r'(\s*"+\s*)+', ' " ', t)
 
 
 def remove_comma_numbers(t):
 
     def _f(t):
-        return re.sub("(\d),(\d{3})", r"\1\2", t)
+        return re.sub(r"(\d),(\d{3})", r"\1\2", t)
 
     return _f(_f(t))
 
 
 def pre_process_dot_numbers(t):
-    return re.sub("(\w)\.(\w)", rf"\1{temp_token}dot{temp_token}\2", t)
+    return re.sub(r"(\w)\.(\w)", rf"\1{temp_token}dot{temp_token}\2", t)
 
 
 def post_process_dot_numbers(t):
@@ -152,7 +152,7 @@ def post_process_quotes(t):
 
 
 def pre_process_dates(t):
-    return re.sub("(\d)/(\d)", rf"\1{temp_token}slash{temp_token}\2", t)
+    return re.sub(r"(\d)/(\d)", rf"\1{temp_token}slash{temp_token}\2", t)
 
 
 def post_process_dates(t):
@@ -160,7 +160,7 @@ def post_process_dates(t):
 
 
 def merge_commas(t):
-    return re.sub("(\s*,+\s*)+", ", ", t)
+    return re.sub(r"(\s*,+\s*)+", ", ", t)
 
 
 def add_space_after_commas(t):
@@ -170,14 +170,14 @@ def add_space_after_commas(t):
 def handle_special_chars(t):
     "Handle special characters"
     # replace "-" with a space when between words without space
-    t = re.sub("(\w)-(\w)", r"\1 \2", t)
+    t = re.sub(r"(\w)-(\w)", r"\1 \2", t)
     # always add space around some characters
-    return re.sub("([%&\/$*])", r" \1 ", t)
+    return re.sub(r"([%&\/$*])", r" \1 ", t)
 
 
 def expand_hashtags(t, hashtag_processor):
     "Remove # and try to split words"
-    return re.sub("#(\w+)", lambda m: hashtag_processor(m.group(1)), t)
+    return re.sub(r"#(\w+)", lambda m: hashtag_processor(m.group(1)), t)
 
 
 _re_ignore_chars = r"[_#\\]"
@@ -190,7 +190,7 @@ def ignore_chars(t):
 
 def remove_extra_spaces(t):
     "Remove extra spaces (including \t and \n)"
-    return re.sub("\s+", " ", t)
+    return re.sub(r"\s+", " ", t)
 
 
 def remove_repeating_chars(t):
