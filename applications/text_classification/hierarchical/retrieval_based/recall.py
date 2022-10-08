@@ -63,6 +63,8 @@ parser.add_argument("--hnsw_max_elements", default=1000000,
                     type=int, help="Recall number for each query from Ann index.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu",
                     help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--model_name_or_path", default='rocketqa-zh-dureader-query-encoder',
+                    type=str, help='The pretrained model used for training')
 args = parser.parse_args()
 # yapf: enable
 
@@ -71,8 +73,7 @@ if __name__ == "__main__":
     rank = paddle.distributed.get_rank()
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-    tokenizer = AutoTokenizer.from_pretrained(
-        'rocketqa-zh-dureader-query-encoder')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     trans_func = partial(convert_corpus_example,
                          tokenizer=tokenizer,
                          max_seq_length=args.max_seq_length)
@@ -82,8 +83,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
             ),  # text_segment
     ): [data for data in fn(samples)]
-    pretrained_model = AutoModel.from_pretrained(
-        "rocketqa-zh-dureader-query-encoder")
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     model = SemanticIndexBase(pretrained_model,
                               output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
@@ -106,7 +106,12 @@ if __name__ == "__main__":
                                            trans_fn=trans_func)
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
-    final_index = build_index(args, corpus_data_loader, inner_model)
+    final_index = build_index(corpus_data_loader,
+                              inner_model,
+                              output_emb_size=args.output_emb_size,
+                              hnsw_max_elements=args.hnsw_max_elements,
+                              hnsw_ef=args.hnsw_ef,
+                              hnsw_m=args.hnsw_m)
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
     query_ds = MapDataset(text_list)
     query_data_loader = create_dataloader(query_ds,

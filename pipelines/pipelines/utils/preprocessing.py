@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Callable, Dict, List, Optional
 
 import re
@@ -12,6 +26,7 @@ logger = logging.getLogger(__name__)
 def convert_files_to_dicts(dir_path: str,
                            clean_func: Optional[Callable] = None,
                            split_paragraphs: bool = False,
+                           split_answers: bool = False,
                            encoding: Optional[str] = None) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
@@ -20,6 +35,7 @@ def convert_files_to_dicts(dir_path: str,
     :param dir_path: path for the documents to be written to the DocumentStore
     :param clean_func: a custom cleaning function that gets applied to each doc (input: str, output:str)
     :param split_paragraphs: split text in paragraphs.
+    :param split_answers: split text into two columns, including question column, answer column.
     :param encoding: character encoding to use when converting pdf documents.
     """
     file_paths = [p for p in Path(dir_path).glob("**/*")]
@@ -68,12 +84,22 @@ def convert_files_to_dicts(dir_path: str,
                 for para in text.split("\n"):
                     if not para.strip():  # skip empty paragraphs
                         continue
-                    documents.append({
-                        "content": para,
-                        "meta": {
-                            "name": path.name
-                        }
-                    })
+                    if (split_answers):
+                        query, answer = para.split('\t')
+                        documents.append({
+                            "content": query,
+                            "meta": {
+                                "name": path.name,
+                                "answer": answer,
+                            }
+                        })
+                    else:
+                        documents.append({
+                            "content": para,
+                            "meta": {
+                                "name": path.name
+                            }
+                        })
             else:
                 documents.append({"content": text, "meta": {"name": path.name}})
 

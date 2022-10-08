@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from functools import partial
 import argparse
 import os
@@ -26,9 +40,10 @@ if __name__ == "__main__":
     batch_size = 1
     params_path = 'checkpoints/inbatch/model_40/model_state.pdparams'
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+    model_name_or_path = "rocketqa-zh-base-query-encoder"
     paddle.set_device(device)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=max_seq_length)
@@ -38,7 +53,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
 
-    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    pretrained_model = AutoModel.from_pretrained(model_name_or_path)
 
     model = SemanticIndexBaseStatic(pretrained_model,
                                     output_emb_size=output_emb_size)

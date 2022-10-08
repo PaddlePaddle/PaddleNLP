@@ -1,4 +1,5 @@
 /***************************************************************************************************
+ * Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
  * Copyright (c) 2011-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are not permit-
@@ -80,9 +81,11 @@ struct Qk_vec_ {};
 template<> struct Qk_vec_<float,     32> { using Type = float;    };
 template<> struct Qk_vec_<float,     64> { using Type = float2;   };
 template<> struct Qk_vec_<float,    128> { using Type = float4;   };
+template<> struct Qk_vec_<float,    256> { using Type = float4;   };
 template<> struct Qk_vec_<uint16_t,  32> { using Type = uint32_t; };
 template<> struct Qk_vec_<uint16_t,  64> { using Type = uint32_t; };
 template<> struct Qk_vec_<uint16_t, 128> { using Type = uint2;    };
+template<> struct Qk_vec_<uint16_t, 256> { using Type = uint4;    };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -430,13 +433,14 @@ inline size_t smem_size_in_bytes(
   // The number of partial rows to reduce in the final reduction.
   // int rows_per_red = threads_per_block / threads_per_value;
   // to solve `threads_per_block / threads_per_value` is not 2^n
-  int rows_per_red = pad_active_groups;
+  int rows_per_red = params.rotary_embedding_dim>0 ? threads_per_block / threads_per_value: pad_active_groups;
   // The amount of storage needed to finalize the outputs.
   size_t red_sz = rows_per_red * params.hidden_size_per_head * sizeof(T) / 2;
 
   // The max.
   return max(softmax_sz, red_sz);
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -500,7 +504,7 @@ __global__ void masked_multihead_attention_kernel(Masked_multihead_attention_par
   // The number of elements per vector.
   constexpr int QK_VEC_SIZE = sizeof(Qk_vec) / sizeof(T);
   // Make sure the hidden size per head is a multiple of the vector size.
-  static_assert(Dh % QK_VEC_SIZE == 0 && Dh / QK_VEC_SIZE <= WARP_SIZE, "");
+  static_assert(Dh % QK_VEC_SIZE == 0, "");
   // The number of vectors per warp.
   constexpr int QK_VECS_PER_WARP = Dh / QK_VEC_SIZE;
 
@@ -837,6 +841,568 @@ __global__ void masked_multihead_attention_kernel(Masked_multihead_attention_par
   }
 }
 
+template<
+    // The type of the inputs. Supported types: float and half.
+    typename T,
+    // The hidden dimension per head.
+    int Dh,
+    int Dh_MAX,
+    // The number of threads per key.
+    int THREADS_PER_KEY,
+    // The number of threads per value.
+    int THREADS_PER_VALUE,
+    // The number of threads in a threadblock.
+    int THREADS_PER_BLOCK
+    >
+__global__ void gptj_masked_multihead_attention_kernel(Masked_multihead_attention_params<T> params, int pad_active_groups)
+{
+
+    // Make sure the hidden dimension per head is a multiple of the number of threads per key.
+    static_assert(Dh_MAX % THREADS_PER_KEY == 0, "");
+    // Make sure the hidden dimension per head is a multiple of the number of threads per value.
+    static_assert(Dh_MAX % THREADS_PER_VALUE == 0, "");
+
+    // The size of a warp.
+    constexpr int WARP_SIZE = 32;
+    // The number of warps in a threadblock.
+    constexpr int WARPS_PER_BLOCK = THREADS_PER_BLOCK / WARP_SIZE;
+
+    // Use smem_size_in_bytes (above) to determine the amount of shared memory.
+    extern __shared__ char smem_[];
+
+    // The shared memory for the Q*K^T values and partial logits in softmax.
+    float* qk_smem = reinterpret_cast<float*>(smem_);
+
+    // The shared memory for the logits. For FP32, that's the same buffer as qk_smem.
+    char* logits_smem_ = smem_;
+
+    // DO_CROSS_ATTENTION = false
+    constexpr bool DO_CROSS_ATTENTION = false;
+
+#ifndef MMHA_USE_FP32_ACUM_FOR_LOGITS
+    if (sizeof(T) != 4) {
+        // TODO - cahnge to tlength
+        logits_smem_ +=
+            (DO_CROSS_ATTENTION) ? div_up(params.seq_length + 1, 4) * 16 : div_up(params.timestep + 1, 4) * 16;
+    }
+    T* logits_smem = reinterpret_cast<T*>(logits_smem_);
+#else
+    float* logits_smem = reinterpret_cast<float*>(logits_smem_);
+#endif
+
+    // The shared memory to do the final reduction for the output values. Reuse qk_smem.
+    T* out_smem = reinterpret_cast<T*>(smem_);
+
+    // The shared memory buffers for the block-wide reductions. One for max, one for sum.
+    __shared__ float red_smem[WARPS_PER_BLOCK * 2];
+
+    // A vector of Q or K elements for the current timestep.
+    using Qk_vec = typename Qk_vec_<T, Dh_MAX>::Type;
+
+    // Use alignment for safely casting the shared buffers as Qk_vec.
+    // Shared memory to store Q inputs.
+    __shared__ __align__(sizeof(Qk_vec)) T q_smem[Dh_MAX];
+
+    // This is one of the reasons we should have a separate kernel for cross attention
+    __shared__ __align__(sizeof(Qk_vec)) T bias_smem[DO_CROSS_ATTENTION ? Dh_MAX : 1];
+
+    // A vector of Q or K elements for the current timestep.
+    using Qk_vec = typename Qk_vec_<T, Dh_MAX>::Type;
+    // The number of elements per vector.
+    constexpr int QK_VEC_SIZE = sizeof(Qk_vec) / sizeof(T);
+    // Make sure the hidden size per head is a multiple of the vector size.
+    static_assert(Dh_MAX % QK_VEC_SIZE == 0, "");
+    // We will use block wide reduction if needed
+    // static_assert(Dh_MAX / QK_VEC_SIZE <= WARP_SIZE, "");
+    // The number of vectors per warp.
+    constexpr int QK_VECS_PER_WARP = Dh_MAX / QK_VEC_SIZE;
+
+    // The layout of the cache is [B, H, Dh/x, L, x] with x == 4/8 for FP32/FP16. Since each thread
+    // owns x elements, we have to decompose the linear index into chunks of x values and the posi-
+    // tion of the thread in that chunk.
+
+    // The number of elements in a chunk of 16B (that's the x in the above formula).
+    constexpr int QK_ELTS_IN_16B = 16 / sizeof(T);
+    // The number of K vectors in 16B.
+    constexpr int QK_VECS_IN_16B = 16 / sizeof(Qk_vec);
+
+    // The batch/beam idx
+    const int bi = blockIdx.y;
+    if (params.finished != nullptr && params.finished[bi] == true) {
+        return;
+    }
+    // The beam idx
+    const int beami = bi % params.beam_width;
+    // The "beam-aware" batch idx
+    const int bbi = bi / params.beam_width;
+    // The head.
+    const int hi = blockIdx.x;
+    // Combine the batch and the head indices.
+    const int bhi = bi * params.num_heads + hi;
+    // Combine the "beam-aware" batch idx and the head indices.
+    const int bbhi = bbi * params.beam_width * params.num_heads + hi;
+    // The thread in the block.
+    const int tidx = threadIdx.x;
+
+    // While doing the product Q*K^T for the different keys we track the max.
+    float qk_max = -FLT_MAX;
+
+    float qk = 0.0F;
+
+    int qkv_base_offset = (params.stride == 0) ? bhi * Dh : bi * params.stride + hi * Dh;
+
+    // int tlength = (DO_CROSS_ATTENTION)? params.memory_length_per_sample[bi] - 1 : params.timestep;
+    int tlength = (DO_CROSS_ATTENTION)                  ? params.memory_length_per_sample[bi] - 1 :
+                  (params.length_per_sample == nullptr) ? params.timestep :
+                                                          params.length_per_sample[bi];
+    // First QK_VECS_PER_WARP load Q and K + the bias values for the current timestep.
+    if (tidx < QK_VECS_PER_WARP) {
+
+        // The offset in the Q and K buffer also accounts for the batch.
+        int qk_offset = qkv_base_offset + tidx * QK_VEC_SIZE;
+        // The offset in the bias buffer.
+        int qk_bias_offset = hi * Dh + tidx * QK_VEC_SIZE;
+
+        // Trigger the loads from the Q and K buffers.
+        Qk_vec q;
+        zero(q);
+        q = (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ? *reinterpret_cast<const Qk_vec*>(&params.q[qk_offset]) : q;
+        Qk_vec k;
+        zero(k);
+        if (DO_CROSS_ATTENTION) {
+            // The 16B chunk written by the thread.
+            int co = tidx / QK_VECS_IN_16B;
+            // The position of the thread in that 16B chunk.
+            int ci = tidx % QK_VECS_IN_16B * QK_VEC_SIZE;
+
+            // Two chunks are separated by L * x elements. A thread write QK_VEC_SIZE elements.
+            int offset = bhi * params.seq_length * Dh + co * params.seq_length * QK_ELTS_IN_16B +
+                         // params.timestep*QK_ELTS_IN_16B +
+                         tlength * QK_ELTS_IN_16B + ci;
+            k = (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ? *reinterpret_cast<const Qk_vec*>(&params.k_cache[offset]) :
+                                                            k;
+        }
+        else {
+            k = (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) ? *reinterpret_cast<const Qk_vec*>(&params.k[qk_offset]) : k;
+        }
+
+        // Trigger the loads from the Q and K bias buffers.
+        Qk_vec q_bias;
+        zero(q_bias);
+        q_bias = (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.q_bias != nullptr ?
+                     *reinterpret_cast<const Qk_vec*>(&params.q_bias[qk_bias_offset]) :
+                     q_bias;
+        Qk_vec k_bias;
+        zero(k_bias);
+
+        if (!DO_CROSS_ATTENTION || (DO_CROSS_ATTENTION && params.timestep == 0)) {
+            k_bias = (Dh == Dh_MAX || tidx * QK_VEC_SIZE < Dh) && params.k_bias != nullptr ?
+                         *reinterpret_cast<const Qk_vec*>(&params.k_bias[qk_bias_offset]) :
+                         k_bias;
+        }
+
+        // Computes the Q/K values with bias.
+        q = add(q, q_bias);
+        if (!DO_CROSS_ATTENTION || (DO_CROSS_ATTENTION && params.timestep == 0)) {
+            k = add(k, k_bias);
+            if (params.rotary_embedding_dim > 0) {
+                apply_rotary_embedding(q, k, tidx, params.rotary_embedding_dim, params.timestep);
+            }
+        }
+        else {
+            if (params.rotary_embedding_dim > 0) {
+                apply_rotary_embedding(q, tidx, params.rotary_embedding_dim, params.timestep);
+            }
+        }
+
+        // Store the Q values to shared memory.
+        *reinterpret_cast<Qk_vec*>(&q_smem[tidx * QK_VEC_SIZE]) = q;
+
+        // Store Dh values of k_bias into smem, since will need to add later
+        // if params.timestep == 0
+        if (DO_CROSS_ATTENTION && params.timestep == 0) {
+            *reinterpret_cast<Qk_vec*>(&bias_smem[tidx * QK_VEC_SIZE]) = k_bias;
+        }
+
+        // Write the K values to the global memory cache.
+        //
+        // NOTE: The stores are uncoalesced as we have multiple chunks of 16B spread across the memory
+        // system. We designed it this way as it allows much better memory loads (and there are many
+        // more loads) + the stores are really "write and forget" since we won't need the ack before
+        // the end of the kernel. There's plenty of time for the transactions to complete.
+
+        // The 16B chunk written by the thread.
+        int co = tidx / QK_VECS_IN_16B;
+        // The position of the thread in that 16B chunk.
+        int ci = tidx % QK_VECS_IN_16B * QK_VEC_SIZE;
+
+        // Two chunks are separated by L * x elements. A thread write QK_VEC_SIZE elements.
+        int offset = bhi * params.seq_length * Dh + co * params.seq_length * QK_ELTS_IN_16B +
+                     // params.timestep*QK_ELTS_IN_16B +
+                     tlength * QK_ELTS_IN_16B + ci;
+
+        if (!DO_CROSS_ATTENTION || (DO_CROSS_ATTENTION && params.timestep == 0)) {
+            // Trigger the stores to global memory.
+            if (Dh == Dh_MAX || co < Dh / QK_ELTS_IN_16B) {
+                *reinterpret_cast<Qk_vec*>(&params.k_cache[offset]) = k;
+            }
+        }
+
+        // Compute \sum_i Q[i] * K^T[i] for the current timestep.
+#ifdef MMHA_USE_FP32_ACUM_FOR_FMA
+        using Qk_vec_acum = typename Qk_vec_acum_fp32_<Qk_vec>::Type;
+#else
+        using Qk_vec_acum = Qk_vec;
+#endif
+        qk = dot<Qk_vec_acum, Qk_vec>(q, k);
+        if (QK_VECS_PER_WARP <= WARP_SIZE) {
+#pragma unroll
+            for (int mask = QK_VECS_PER_WARP / 2; mask >= 1; mask /= 2) {
+                qk += __shfl_xor_sync(shfl_mask(QK_VECS_PER_WARP), qk, mask);
+            }
+        }
+    }
+
+    if (QK_VECS_PER_WARP > WARP_SIZE) {
+        constexpr int WARPS_PER_RED = (QK_VECS_PER_WARP + WARP_SIZE - 1) / WARP_SIZE;
+        qk = block_sum<WARPS_PER_RED>(&red_smem[WARPS_PER_RED], qk);
+    }
+
+    // Store that value in shared memory. Keep the Q*K^T value in register for softmax.
+    if (tidx == 0) {
+        // Normalize qk.
+        qk *= params.inv_sqrt_dh;
+
+        if (params.relative_attention_bias_float != nullptr) {
+            qk = qk
+                 + params.relative_attention_bias_float[hi * params.relative_attention_bias_stride
+                                                            * params.relative_attention_bias_stride
+                                                        + tlength * params.relative_attention_bias_stride + tlength];
+        }
+        else if (params.relative_attention_bias_half != nullptr) {
+            qk = qk
+                 + (float)
+                       params.relative_attention_bias_half[hi * params.relative_attention_bias_stride
+                                                               * params.relative_attention_bias_stride
+                                                           + tlength * params.relative_attention_bias_stride + tlength];
+        }
+        qk_max = qk;
+        qk_smem[tlength] = qk;
+        // qk_smem[params.timestep] = qk;
+    }
+
+    // Make sure the data is in shared memory.
+    __syncthreads();
+
+    // The type of queries and keys for the math in the Q*K^T product.
+    using K_vec = typename K_vec_<T, THREADS_PER_KEY>::Type;
+    // The number of elements per vector.
+    constexpr int K_VEC_SIZE = sizeof(K_vec) / sizeof(T);
+    // Make sure the hidden size per head is a multiple of the vector size.
+    static_assert(Dh_MAX % K_VEC_SIZE == 0, "");
+    // The number of elements per thread.
+    constexpr int K_ELTS_PER_THREAD = Dh_MAX / THREADS_PER_KEY;
+    // The number of vectors per thread.
+    constexpr int K_VECS_PER_THREAD = K_ELTS_PER_THREAD / K_VEC_SIZE;
+
+    // The position the first key loaded by each thread from the cache buffer (for this B * H).
+    int ko = tidx / THREADS_PER_KEY;
+    // The position of the thread in the chunk of keys.
+    int ki = tidx % THREADS_PER_KEY * K_VEC_SIZE;
+
+    static_assert(Dh_MAX == THREADS_PER_KEY * K_VEC_SIZE * K_VECS_PER_THREAD);
+
+    // Load the Q values from shared memory. The values are reused during the loop on K.
+    K_vec q[K_VECS_PER_THREAD];
+#pragma unroll
+    for (int ii = 0; ii < K_VECS_PER_THREAD; ++ii) {
+        q[ii] = *reinterpret_cast<const K_vec*>(&q_smem[ki + ii * THREADS_PER_KEY * K_VEC_SIZE]);
+    }
+
+    K_vec k_bias[DO_CROSS_ATTENTION ? K_VECS_PER_THREAD : 1];
+    if (DO_CROSS_ATTENTION && params.timestep == 0) {
+#pragma unroll
+        for (int ii = 0; ii < K_VECS_PER_THREAD; ++ii) {
+            k_bias[ii] = *reinterpret_cast<const K_vec*>(&bias_smem[ki + ii * THREADS_PER_KEY * K_VEC_SIZE]);
+        }
+    }
+
+    // The number of timesteps loaded per iteration.
+    constexpr int K_PER_ITER = THREADS_PER_BLOCK / THREADS_PER_KEY;
+    // The number of keys per warp.
+    constexpr int K_PER_WARP = WARP_SIZE / THREADS_PER_KEY;
+
+    // The base pointer for the key in the cache buffer.
+    T* k_cache = &params.k_cache[bhi * params.seq_length * Dh + ki];
+    // Base pointer for the beam's batch, before offsetting with indirection buffer
+    T* k_cache_batch = &params.k_cache[bbhi * params.seq_length * Dh + ki];
+
+    // Pick a number of keys to make sure all the threads of a warp enter (due to shfl_sync).
+    // int ti_end = div_up(params.timestep, K_PER_WARP) * K_PER_WARP;
+    int ti_end = div_up(tlength, K_PER_WARP) * K_PER_WARP;
+
+    // Iterate over the keys/timesteps to compute the various (Q*K^T)_{ti} values.
+    for (int ti = ko; ti < ti_end; ti += K_PER_ITER) {
+
+        // The keys loaded from the key cache.
+        K_vec k[K_VECS_PER_THREAD];
+        K_vec k_vec_zero;
+        zero(k_vec_zero);
+#pragma unroll
+        for (int ii = 0; ii < K_VECS_PER_THREAD; ++ii) {
+            int jj = ii * params.seq_length + ti;
+            // if( ti < params.timestep ) {
+            if (ti < tlength) {
+                const int beam_src =
+                    (params.cache_indir != nullptr) ?
+                        params.cache_indir[(bbi * params.beam_width + beami) * params.seq_length + ti] :
+                        0;
+                const int beam_offset = beam_src * params.num_heads * params.seq_length * Dh;
+                k[ii] = (Dh == Dh_MAX || jj * QK_ELTS_IN_16B < Dh * params.seq_length) ?
+                            *reinterpret_cast<const K_vec*>(&k_cache_batch[beam_offset + jj * QK_ELTS_IN_16B]) :
+                            k_vec_zero;
+                // add bias and update k_cache
+                if (DO_CROSS_ATTENTION && params.timestep == 0) {
+                    k[ii] = add(k[ii], k_bias[ii]);
+                    if (Dh == Dh_MAX || jj * QK_ELTS_IN_16B < Dh * params.seq_length) {
+                        *reinterpret_cast<K_vec*>(&k_cache[jj * QK_ELTS_IN_16B]) = k[ii];
+                    }
+                }
+            }
+        }
+
+        // Perform the dot product and normalize qk.
+        //
+        // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
+        float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q, k) * params.inv_sqrt_dh;
+        bool is_mask = (params.input_lengths != nullptr && ti >= params.input_lengths[bi] && ti < params.max_input_len);
+
+        // Store the product to shared memory. There's one qk value per timestep. Update the max.
+        // if( ti < params.timestep && tidx % THREADS_PER_KEY == 0 ) {
+        if (ti < tlength && tidx % THREADS_PER_KEY == 0) {
+            if (params.relative_attention_bias_float != nullptr) {
+                qk = qk
+                     + params.relative_attention_bias_float[hi * params.relative_attention_bias_stride
+                                                                * params.relative_attention_bias_stride
+                                                            + tlength * params.relative_attention_bias_stride + ti];
+            }
+            else if (params.relative_attention_bias_half != nullptr) {
+                qk = qk
+                     + (float)
+                           params.relative_attention_bias_half[hi * params.relative_attention_bias_stride
+                                                                   * params.relative_attention_bias_stride
+                                                               + tlength * params.relative_attention_bias_stride + ti];
+            }
+            qk_max = is_mask ? qk_max : fmaxf(qk_max, qk);
+            qk_smem[ti] = qk;
+        }
+    }
+
+// Perform the final reduction to compute the max inside each warp.
+//
+// NOTE: In a group of THREADS_PER_KEY threads, the leader already has the max value for the
+// group so it's not needed to run the reduction inside the group (again).
+#pragma unroll
+    for (int mask = WARP_SIZE / 2; mask >= THREADS_PER_KEY; mask /= 2) {
+        qk_max = fmaxf(qk_max, __shfl_xor_sync(uint32_t(-1), qk_max, mask));
+    }
+
+    // Decompose the thread index into warp and lane.
+    const int warp = tidx / WARP_SIZE;
+    const int lane = tidx % WARP_SIZE;
+
+    // The warp leader writes the max to shared memory.
+    if (lane == 0) {
+        red_smem[warp] = qk_max;
+    }
+
+    // Make sure the products are in shared memory.
+    __syncthreads();
+
+    // The warps finalize the reduction.
+    qk_max = lane < WARPS_PER_BLOCK ? red_smem[lane] : -FLT_MAX;
+#pragma unroll
+    for (int mask = WARPS_PER_BLOCK / 2; mask >= 1; mask /= 2) {
+        qk_max = fmaxf(qk_max, __shfl_xor_sync(uint32_t(-1), qk_max, mask));
+    }
+
+    // Broadcast to all the threads in the warp.
+    qk_max = __shfl_sync(uint32_t(-1), qk_max, 0);
+
+    // Compute the logits and start the sum.
+    float sum = 0.f;
+    // for( int ti = tidx; ti <= params.timestep; ti += THREADS_PER_BLOCK ) {
+    for (int ti = tidx; ti <= tlength; ti += THREADS_PER_BLOCK) {
+        bool is_mask = (params.input_lengths != nullptr && ti >= params.input_lengths[bi] && ti < params.max_input_len);
+        float logit = is_mask ? 0.f : __expf(qk_smem[ti] - qk_max);
+        sum += logit;
+        qk_smem[ti] = logit;
+    }
+
+    // Compute the sum.
+    sum = block_sum<WARPS_PER_BLOCK>(&red_smem[WARPS_PER_BLOCK], sum);
+
+    // Normalize the logits.
+    float inv_sum = __fdividef(1.f, sum + 1.e-6f);
+    // for( int ti = tidx; ti <= params.timestep; ti += THREADS_PER_BLOCK ) {
+    for (int ti = tidx; ti <= tlength; ti += THREADS_PER_BLOCK) {
+        convert_from_float(logits_smem[ti], qk_smem[ti] * inv_sum);
+    }
+
+    // Put Values part below so we leverage __syncthreads
+    // from the previous step
+
+    // The number of elements per vector.
+    constexpr int V_VEC_SIZE = Dh_MAX / THREADS_PER_VALUE;
+    // A vector of V elements for the current timestep.
+    using V_vec = typename V_vec_<T, V_VEC_SIZE>::Type;
+
+    // The value computed by this thread.
+    int vo = tidx / THREADS_PER_VALUE;
+    // The hidden dimensions computed by this particular thread.
+    int vi = tidx % THREADS_PER_VALUE * V_VEC_SIZE;
+
+    // The base pointer for the value in the cache buffer.
+    T* v_cache = &params.v_cache[bhi * params.seq_length * Dh + vi];
+    // Base pointer for the beam's batch, before offsetting with indirection buffer
+    T* v_cache_batch = &params.v_cache[bbhi * params.seq_length * Dh + vi];
+
+    // The number of values processed per iteration of the loop.
+    constexpr int V_PER_ITER = THREADS_PER_BLOCK / THREADS_PER_VALUE;
+
+    // One group of threads computes the product(s) for the current timestep.
+    V_vec v_bias;
+    zero(v_bias);
+    // if( vo == params.timestep % V_PER_ITER ) {
+    if (Dh == Dh_MAX || vi < Dh) {
+        if (!DO_CROSS_ATTENTION || (DO_CROSS_ATTENTION && params.timestep == 0)) {
+            if (vo == tlength % V_PER_ITER) {
+                // Trigger the loads from the V bias buffer.
+                if (params.v_bias != nullptr) {
+                    v_bias = *reinterpret_cast<const V_vec*>(&params.v_bias[hi * Dh + vi]);
+                }
+                if (DO_CROSS_ATTENTION) {
+                    *reinterpret_cast<V_vec*>(&bias_smem[vi]) = v_bias;
+                }
+            }
+        }
+    }
+
+    // From previous, before values, step
+    // Also make sure the logits are in shared memory.
+    __syncthreads();
+
+    // Values continued
+#ifdef MMHA_USE_FP32_ACUM_FOR_OUT
+    using V_vec_acum = typename V_vec_acum_fp32_<V_vec>::Type;
+#else
+    using V_vec_acum = V_vec;
+#endif
+    // The partial outputs computed by each thread.
+    V_vec_acum out;
+    zero(out);
+
+    // Loop over the timesteps to compute the partial outputs.
+    // for( int ti = vo; ti < params.timestep; ti += V_PER_ITER ) {
+    if (Dh == Dh_MAX || vi < Dh) {
+        for (int ti = vo; ti < tlength; ti += V_PER_ITER) {
+
+            // Fetch offset based on cache_indir when beam sampling
+            const int beam_src = (params.cache_indir != nullptr) ?
+                                     params.cache_indir[(bbi * params.beam_width + beami) * params.seq_length + ti] :
+                                     0;
+            const int beam_offset = beam_src * params.num_heads * params.seq_length * Dh;
+            // Load the values from the cache.
+            V_vec v = *reinterpret_cast<const V_vec*>(&v_cache_batch[beam_offset + ti * Dh]);
+            if (DO_CROSS_ATTENTION && params.timestep == 0) {
+                v = add(v, *reinterpret_cast<V_vec*>(&bias_smem[vi]));
+                *reinterpret_cast<V_vec*>(&v_cache[ti * Dh]) = v;
+            }
+            // Load the logits from shared memory.
+#if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
+            float logit = logits_smem[ti];
+            out = fma(logit, cast_to_float(v), out);
+#else
+            T logit = logits_smem[ti];
+
+            // Update the partial sums.
+            out = fma(logit, v, out);
+#endif
+        }
+    }
+
+    // One group of threads computes the product(s) for the current timestep.
+    // if( vo == params.timestep % V_PER_ITER ) {
+    if (vo == tlength % V_PER_ITER && (Dh == Dh_MAX || vi < Dh)) {
+
+        V_vec v;
+        if (DO_CROSS_ATTENTION) {
+            v = *reinterpret_cast<const V_vec*>(&v_cache[tlength * Dh]);
+        }
+        else {
+            // Trigger the loads from the V buffer.
+            v = *reinterpret_cast<const V_vec*>(&params.v[qkv_base_offset + vi]);
+            // Trigger the loads from the V bias buffer.
+            // V_vec v_bias = *reinterpret_cast<const V_vec*>(&params.v_bias[hi*Dh + vi]);
+        }
+
+        // Compute the V values with bias.
+        if (!DO_CROSS_ATTENTION || (DO_CROSS_ATTENTION && params.timestep == 0)) {
+            v = add(v, v_bias);
+
+            // Store the values with bias back to global memory in the cache for V.
+            //*reinterpret_cast<V_vec*>(&v_cache[params.timestep*Dh]) = v;
+            *reinterpret_cast<V_vec*>(&v_cache[tlength * Dh]) = v;
+        }
+
+        // Initialize the output value with the current timestep.
+#if defined(MMHA_USE_FP32_ACUM_FOR_LOGITS)
+        // out = fma(logits_smem[params.timestep], cast_to_float(v), out);
+        out = fma(logits_smem[tlength], cast_to_float(v), out);
+#else
+        // out = fma(logits_smem[params.timestep], v, out);
+        out = fma(logits_smem[tlength], v, out);
+#endif
+    }
+
+    // Make sure we can start writing to shared memory.
+    __syncthreads();
+
+    // Run the final reduction amongst the different groups computing different partial outputs.
+    if (Dh == Dh_MAX || vi < Dh)
+#pragma unroll
+        for (int active_groups = V_PER_ITER; active_groups >= 2; active_groups /= 2) {
+
+            // The midpoint in the number of active groups.
+            int midpoint = active_groups / 2;
+
+            // The upper part of active threads store to shared memory.
+            if (vo >= midpoint && vo < active_groups && (Dh == Dh_MAX || vi < Dh)) {
+#ifdef MMHA_USE_FP32_ACUM_FOR_OUT
+                convert_from_float(*reinterpret_cast<V_vec*>(&out_smem[(vo - midpoint) * Dh + vi]), out);
+#else
+                *reinterpret_cast<V_vec*>(&out_smem[(vo - midpoint) * Dh + vi]) = out;
+#endif
+            }
+            __syncthreads();
+
+            // The bottom warps update their values.
+            if (vo < midpoint && (Dh == Dh_MAX || vi < Dh)) {
+                out = add(*reinterpret_cast<const V_vec*>(&out_smem[vo * Dh + vi]), out);
+            }
+            __syncthreads();
+        }
+
+    // Output the final values.
+    if (vo == 0 && (Dh == Dh_MAX || vi < Dh)) {
+#ifdef MMHA_USE_FP32_ACUM_FOR_OUT
+        convert_from_float(*reinterpret_cast<V_vec*>(&params.out[bhi * Dh + vi]), out);
+#else
+        *reinterpret_cast<V_vec*>(&params.out[bhi * Dh + vi]) = out;
+#endif
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace mmha  
@@ -846,21 +1412,40 @@ __global__ void masked_multihead_attention_kernel(Masked_multihead_attention_par
 #define MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK, stream) \
   int pad_active_groups = 1 << static_cast<int>(ceil(std::log2(THDS_PER_BLOCK / THDS_PER_VALUE))); \
   size_t smem_sz = mmha::smem_size_in_bytes<T>(params, THDS_PER_VALUE, THDS_PER_BLOCK, pad_active_groups); \
-  dim3 grid(params.num_heads, params.batch_size); \
+  dim3 grid(params.num_heads, params.batch_size);  \
   mmha::masked_multihead_attention_kernel<T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK> \
     <<<grid, THDS_PER_BLOCK, smem_sz, stream>>>(params, pad_active_groups)
+
+
+#define GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK, stream) \
+  int pad_active_groups = 1 << static_cast<int>(ceil(std::log2(THDS_PER_BLOCK / THDS_PER_VALUE))); \
+  size_t smem_sz = mmha::smem_size_in_bytes<T>(params, THDS_PER_VALUE, THDS_PER_BLOCK, pad_active_groups); \
+  dim3 grid(params.num_heads, params.batch_size);  \
+    mmha::gptj_masked_multihead_attention_kernel<T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK> \
+  <<<grid, THDS_PER_BLOCK, smem_sz, stream>>>(params, pad_active_groups)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template < typename T, int Dh, int Dh_MAX>
 void  mmha_launch_kernel(const Masked_multihead_attention_params<T> &params, const cudaStream_t &stream) {
-  constexpr int THREADS_PER_VALUE = Dh * sizeof(T) / 16;
-  if( params.timestep < 32 ) {
-    MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 4, THREADS_PER_VALUE, 64, stream);
-  } else if( params.timestep < 2048 ) {
-    MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 2, THREADS_PER_VALUE, 128, stream);
-  } else {
-    MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 1, THREADS_PER_VALUE, 256, stream);
+  if(params.rotary_embedding_dim>0){
+    constexpr int THREADS_PER_VALUE = Dh_MAX * sizeof(T) / 16;
+    if( params.timestep < 32 ) {
+      GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 4, THREADS_PER_VALUE, 64, stream);
+    } else if( params.timestep < 2048 ) {
+      GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 2, THREADS_PER_VALUE, 128, stream);
+    } else {
+      GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 1, THREADS_PER_VALUE, 256, stream);
+    }
+  }else{
+    constexpr int THREADS_PER_VALUE = Dh * sizeof(T) / 16;
+    if( params.timestep < 32 ) {
+      MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 4, THREADS_PER_VALUE, 64, stream);
+    } else if( params.timestep < 2048 ) {
+      MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 2, THREADS_PER_VALUE, 128, stream);
+    } else {
+      MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 1, THREADS_PER_VALUE, 256, stream);
+    }
   }
 }
 
@@ -883,6 +1468,18 @@ void masked_multihead_attention_(const Masked_multihead_attention_params<T> &par
       break;
     case 128:
       mmha_launch_kernel<T, 128, 128>(params, stream);
+      break;
+    case 160:
+      mmha_launch_kernel<T, 160, 256>(params, stream);
+      break;
+    case 192:
+      mmha_launch_kernel<T, 192, 256>(params, stream);
+      break;
+    case 224:
+      mmha_launch_kernel<T, 224, 256>(params, stream);
+      break;
+    case 256: // GPTJ/CodeGen
+      mmha_launch_kernel<T, 256, 256>(params, stream);
       break;
     default:
       // assert(false);

@@ -25,6 +25,8 @@ __all__ = ['FNetTokenizer']
 
 SPIECE_UNDERLINE = "▁"
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"fnet-base": 512, "fnet-large": 512}
+
 
 @dataclass(frozen=True, eq=True)
 class AddedToken:
@@ -111,6 +113,7 @@ class FNetTokenizer(AlbertEnglishTokenizer):
         }
     }
     model_input_names = ["input_ids", "token_type_ids"]
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  sentencepiece_model_file,

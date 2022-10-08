@@ -24,7 +24,8 @@ from paddlenlp.transformers import (TransformerModel, WordEmbedding,
                                     InferTransformerModel, GPTModel)
 from paddlenlp.ops import (InferTransformerDecoding, InferGptDecoding,
                            InferUnifiedDecoding, InferBartDecoding,
-                           InferMBartDecoding, InferOptDecoding)
+                           InferMBartDecoding, InferOptDecoding,
+                           InferGptJDecoding)
 
 from .encoder import enable_faster_encoder, disable_faster_encoder
 from paddlenlp.ops.ext_utils import load
@@ -33,7 +34,8 @@ from paddlenlp.transformers import (GPTChineseTokenizer, GPTTokenizer,
                                     UnifiedTransformerPretrainedModel,
                                     UNIMOPretrainedModel, BartPretrainedModel,
                                     GPTPretrainedModel, MBartPretrainedModel,
-                                    OPTPretrainedModel)
+                                    OPTPretrainedModel, GPTJPretrainedModel,
+                                    CodeGenPreTrainedModel)
 
 
 class FasterTransformer(TransformerModel):
@@ -1102,7 +1104,11 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
 class FasterUNIMOText(UNIMOPretrainedModel):
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 **kwargs):
         super(FasterUNIMOText, self).__init__()
         self._model = model
         self._use_fp16_decoding = use_fp16_decoding
@@ -1119,6 +1125,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         self._size_per_head = self._hidden_dims // self._n_head
         self._n_layer = self._model.num_hidden_layers
         self._hidden_act = self._model.hidden_act
+        self.trans_out = kwargs.get("trans_out", False)
 
         self.decoding = InferUnifiedDecoding(
             model=self._model,
@@ -1242,26 +1249,33 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         seq_len = model_inputs.pop('seq_len')
         decoder_type_ids = model_inputs.pop('decoder_type_ids')
 
-        return self.decoding(input_ids=model_inputs["input_ids"],
-                             attn_mask=model_inputs["attention_mask"],
-                             memory_seq_lens=seq_len,
-                             type_id=model_inputs["token_type_ids"],
-                             decoder_type_id=decoder_type_ids,
-                             beam_size=num_beams,
-                             diversity_rate=diversity_rate,
-                             topk=top_k,
-                             topp=top_p,
-                             decoding_strategy=decode_strategy,
-                             max_out_len=max_length,
-                             bos_token_id=bos_token_id,
-                             eos_token_id=eos_token_id,
-                             pad_token_id=pad_token_id,
-                             temperature=temperature,
-                             length_penalty=length_penalty,
-                             forced_eos_token_id=forced_eos_token_id,
-                             pos_bias=False,
-                             early_stopping=early_stopping,
-                             min_length=min_length)
+        ids, output_scores = self.decoding(
+            input_ids=model_inputs["input_ids"],
+            attn_mask=model_inputs["attention_mask"],
+            memory_seq_lens=seq_len,
+            type_id=model_inputs["token_type_ids"],
+            decoder_type_id=decoder_type_ids,
+            beam_size=num_beams,
+            diversity_rate=diversity_rate,
+            topk=top_k,
+            topp=top_p,
+            decoding_strategy=decode_strategy,
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            temperature=temperature,
+            length_penalty=length_penalty,
+            forced_eos_token_id=forced_eos_token_id,
+            pos_bias=False,
+            early_stopping=early_stopping,
+            min_length=min_length)
+        if self.trans_out:
+            if decode_strategy.startswith("beam_search"):
+                ids = ids.transpose([1, 2, 0])
+            else:
+                ids = ids.transpose([1, 0])
+        return ids, output_scores
 
     generate = forward
 
@@ -1365,8 +1379,13 @@ class FasterBART(BartPretrainedModel):
 
 
 class FasterMBART(MBartPretrainedModel):
+    enable_faster_encoder_func = enable_faster_encoder
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 enable_faster_encoder=False):
         super(FasterMBART, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1379,12 +1398,17 @@ class FasterMBART(MBartPretrainedModel):
         self.encoder = model.mbart.get_encoder()
         self.decoder = model.mbart.get_decoder()
         self.pad_token_id = model.mbart.config['pad_token_id']
+        self.enable_faster_encoder = enable_faster_encoder
 
         self.decoding = InferMBartDecoding(
             model=self._model,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             hidden_act=model.mbart.config['activation_function'])
+
+        if self.enable_faster_encoder:
+            # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
+            self.encoder = FasterMBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):
         return self.encoder
@@ -1425,11 +1449,9 @@ class FasterMBART(MBartPretrainedModel):
 
         #(gongenlei) Not enable_faster_encoder temporarily
         if encoder_output is None:
-            self.encoder = enable_faster_encoder(self.encoder)
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
                 input_ids, model_kwargs)["encoder_output"]
-            self.encoder = disable_faster_encoder(self.encoder)
         batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
@@ -1452,22 +1474,28 @@ class FasterMBART(MBartPretrainedModel):
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
 
-        if forced_bos_token_id is not None:
-            if decode_strategy == "sampling":
-                trg_word = paddle.full([batch_size * num_return_sequences, 1],
-                                       forced_bos_token_id,
-                                       dtype="int32")
+        if not isinstance(forced_bos_token_id, type(input_ids)):
+            if forced_bos_token_id is not None:
+                if decode_strategy == "sampling":
+                    forced_bos_token_id = paddle.full(
+                        [batch_size * num_return_sequences, 1],
+                        forced_bos_token_id,
+                        dtype="int32")
+                else:
+                    forced_bos_token_id = paddle.full([batch_size, 1],
+                                                      forced_bos_token_id,
+                                                      dtype="int32")
             else:
-                trg_word = paddle.full([batch_size, 1],
-                                       forced_bos_token_id,
-                                       dtype="int32")
-        else:
-            trg_word = paddle.zeros([0])
+                forced_bos_token_id = paddle.zeros([0])
+        elif decode_strategy == "sampling":
+            num_samples = paddle.shape(encoder_output)[0]
+            forced_bos_token_id = paddle.expand(forced_bos_token_id,
+                                                shape=[num_samples, 1])
 
         return self.decoding(enc_output=encoder_output,
                              memory_seq_lens=seq_len,
                              beam_size=num_beams,
-                             trg_word=trg_word,
+                             trg_word=forced_bos_token_id,
                              top_k=top_k,
                              top_p=top_p,
                              decoding_strategy=decode_strategy,
@@ -1479,5 +1507,142 @@ class FasterMBART(MBartPretrainedModel):
                              alpha=length_penalty,
                              temperature=temperature,
                              early_stopping=early_stopping)
+
+    generate = forward
+
+
+class FasterGPTJ(GPTJPretrainedModel):
+
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterGPTJ, self).__init__()
+        self._model = model
+        self.use_fp16_decoding = use_fp16_decoding
+        self.decoding = InferGptJDecoding(model=model,
+                                          decoding_lib=decoding_lib,
+                                          use_fp16_decoding=use_fp16_decoding)
+
+    def forward(self,
+                input_ids,
+                seq_len=None,
+                attention_mask=None,
+                top_k=4,
+                top_p=0.0,
+                min_length=0,
+                max_length=256,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                temperature=0,
+                repetition_penalty=1.0,
+                decode_strategy="sampling",
+                num_return_sequences=1,
+                **model_kwargs):
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, "int32")
+
+        # change top_p to zero if not using top_p sampling for FT
+        if decode_strategy == "greedy_search":
+            top_p = 0.0
+            top_k = 1
+        if top_p == 1.0:
+            top_p = 0.0
+        if seq_len is None:
+            seq_len = paddle.sum(paddle.cast(input_ids != pad_token_id,
+                                             dtype="int32"),
+                                 axis=-1,
+                                 dtype="int32")
+
+        if num_return_sequences > 1:
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
+            seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
+
+        return self.decoding(input_ids,
+                             mem_seq_len=seq_len,
+                             attention_mask=attention_mask,
+                             topk=top_k,
+                             topp=top_p,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             forced_eos_token_id=forced_eos_token_id,
+                             temperature=temperature,
+                             repetition_penalty=repetition_penalty,
+                             min_length=min_length)
+
+    generate = forward
+
+
+class FasterCodeGen(CodeGenPreTrainedModel):
+
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterCodeGen, self).__init__()
+        self._model = model
+        self.use_fp16_decoding = use_fp16_decoding
+        self.decoding = InferGptJDecoding(model=model,
+                                          decoding_lib=decoding_lib,
+                                          use_fp16_decoding=use_fp16_decoding,
+                                          transpose_qkv=True)
+
+    def forward(self,
+                input_ids,
+                seq_len=None,
+                attention_mask=None,
+                top_k=4,
+                top_p=0.0,
+                min_length=0,
+                max_length=256,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                forced_eos_token_id=None,
+                temperature=0,
+                repetition_penalty=1.0,
+                decode_strategy="sampling",
+                num_return_sequences=1,
+                **model_kwargs):
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, "int32")
+
+        # change top_p to zero if not using top_p sampling for FT
+        if decode_strategy == "greedy_search":
+            top_p = 0.0
+            top_k = 1
+        if top_p == 1.0:
+            top_p = 0.0
+        if seq_len is None:
+            seq_len = paddle.sum(paddle.cast(input_ids != pad_token_id,
+                                             dtype="int32"),
+                                 axis=-1,
+                                 dtype="int32")
+
+        if num_return_sequences > 1:
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                seq_len=seq_len,
+                attention_mask=attention_mask)
+            seq_len = model_kwargs["seq_len"]
+            attention_mask = model_kwargs.get("attention_mask", None)
+
+        return self.decoding(input_ids,
+                             mem_seq_len=seq_len,
+                             attention_mask=attention_mask,
+                             topk=top_k,
+                             topp=top_p,
+                             max_out_len=max_length,
+                             bos_token_id=bos_token_id,
+                             eos_token_id=eos_token_id,
+                             pad_token_id=pad_token_id,
+                             forced_eos_token_id=forced_eos_token_id,
+                             temperature=temperature,
+                             repetition_penalty=repetition_penalty,
+                             min_length=min_length)
 
     generate = forward

@@ -23,11 +23,12 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from pipelines.pipelines.base import Pipeline
 from pipelines.pipelines.config import get_component_definitions, get_pipeline_definition, read_pipeline_config_from_yaml
-from rest_api.config import PIPELINE_YAML_PATH, FILE_UPLOAD_PATH, INDEXING_PIPELINE_NAME
+from rest_api.config import PIPELINE_YAML_PATH, FILE_UPLOAD_PATH, INDEXING_PIPELINE_NAME, FILE_PARSE_PATH
 from rest_api.controller.utils import as_form
 
 logger = logging.getLogger(__name__)
@@ -137,3 +138,12 @@ def upload_file(
         },
     )
     return {'message': "OK"}
+
+
+@router.get("/files")
+def download_file(
+        file_name: str = '1fc0aeac9900487a8c6cec8dda6499bd_demo_1.png'):
+    file_path = os.path.join(FILE_PARSE_PATH, file_name)
+    if (os.path.exists(file_path)):
+        return FileResponse(file_path)
+    return {'message': "File not Found"}

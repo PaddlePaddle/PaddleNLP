@@ -138,6 +138,9 @@ class ErnieMTokenizer(PretrainedTokenizer):
 
         text, token_mapping, offset = normalized_text, [], 0
 
+        if self.do_lower_case:
+            text = text.lower()
+
         for token in split_tokens:
             if token[:1] == '▁':
                 token = token[1:]

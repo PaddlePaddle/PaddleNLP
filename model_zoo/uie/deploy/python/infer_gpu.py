@@ -51,6 +51,10 @@ def parse_args():
                         default=4,
                         type=int,
                         help="Batch size per GPU for inference.")
+    parser.add_argument("--device_id",
+                        default=0,
+                        type=int,
+                        help="The GPU device ID.")
     args = parser.parse_args()
     return args
 

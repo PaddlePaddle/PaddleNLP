@@ -25,6 +25,8 @@ from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ['PPMiniLMTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"ppminilm-6l-768h": 512}
+
 
 class PPMiniLMTokenizer(PretrainedTokenizer):
     r"""
@@ -86,6 +88,7 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

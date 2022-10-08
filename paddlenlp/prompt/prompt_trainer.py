@@ -186,17 +186,21 @@ class PromptTrainer(Trainer):
 
             ppt_parameters = []
             if self.template is not None:
-                ppt_parameters.extend(self.template.parameters())
+                ppt_parameters.extend([
+                    x for x in self.template.parameters() if not x.stop_gradient
+                ])
             if self.verbalizer is not None:
                 if isinstance(self.verbalizer, SoftVerbalizer):
                     if not self.model.freeze_plm:
                         plm_parameters.extend([
-                            p for p in self.verbalizer.non_head_parameters()
+                            p for n, p in self.verbalizer.non_head_parameters()
                             if not p.stop_gradient
                         ])
-                    ppt_parameters.extend(self.verbalizer.head_parameters())
+                    ppt_parameters.extend(
+                        [p for n, p in self.verbalizer.head_parameters()])
                 else:
-                    ppt_parameters.extend(self.verbalizer.parameters())
+                    ppt_parameters.extend(
+                        [p for n, p in self.verbalizer.parameters()])
 
             decay_parameters = [
                 p.name for n, p in self.model.named_parameters()

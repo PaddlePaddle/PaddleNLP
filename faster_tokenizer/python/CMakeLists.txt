@@ -11,7 +11,7 @@ add_custom_target(copy_setup ALL
 # 3. Copy the core_tokenizers.so to python tokenizers directory
 set(TOKENIZER_CORE_NAME "core_tokenizers")
 set(TOKENIZER_DST_DIR ${CMAKE_BINARY_DIR}/python/faster_tokenizer)
-set(TOKENIZER_SRC_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer/src)
+set(TOKENIZER_SRC_DIR ${CMAKE_BINARY_DIR}/faster_tokenizer)
 set(TOKENIZER_THIRD_PARTY_DIR ${CMAKE_BINARY_DIR}/third_party)
 
 IF(WIN32)

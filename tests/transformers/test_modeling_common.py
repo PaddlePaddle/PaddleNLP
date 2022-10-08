@@ -29,8 +29,8 @@ def ids_tensor(shape, vocab_size, dtype="int32"):
     return paddle.randint(low=0, high=vocab_size, dtype=dtype, shape=shape)
 
 
-def random_attention_mask(shape):
-    attn_mask = ids_tensor(shape, vocab_size=2)
+def random_attention_mask(shape, dtype="int32"):
+    attn_mask = ids_tensor(shape, vocab_size=2, dtype=dtype)
     # make sure that at least one token is attended to for each batch
     attn_mask[:, -1] = 1
     return attn_mask

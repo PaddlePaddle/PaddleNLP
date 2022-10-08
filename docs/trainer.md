@@ -395,6 +395,13 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
                         The value of initial scale_loss for fp16. (default: 32768)
 
+  --recompute
+                        是否使用重计算训练。可以节省显存。
+                        重新计算前向过程以获取梯度，减少中间变量显存
+                        (`bool`, 可选, 默认为 `False`)
+
+                        Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
+
   --minimum_eval_times
                         最少评估次数，如果当前设置的eval_steps，评估次数少于minimum_eval_times，
                         此选项会覆盖eval_steps参数。

@@ -14,21 +14,20 @@
 
 import os
 import sys
-import yaml
 import functools
-from typing import Optional
-import paddle
-import json
 
+import paddle
+import paddle.nn.functional as F
+from paddleslim.nas.ofa import OFA
+from paddlenlp.utils.log import logger
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
+from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
 from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
-from paddlenlp.utils.log import logger
 from dataclasses import dataclass, field
 
 from utils import preprocess_function, read_local_dataset
-from prune_trainer import DynabertConfig
+from metric import MetricReport
 
 
 # yapf: disable
@@ -41,8 +40,8 @@ class DataArguments:
     the command line.
     """
 
-    dataset_dir: str = field(default=None, metadata={"help": "The dataset directory should include train.txt, dev.txt and label.txt files."})
-    max_seq_length: int = field(default=512, metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
+    dataset_dir: str = field(default=None, metadata={"help": "Local dataset directory should include train.txt, dev.txt and label.txt."})
+    max_seq_length: int = field(default=128,metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
 @dataclass
@@ -50,37 +49,58 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-    params_dir: str = field(default='./checkpoint/', metadata={"help": "The output directory where the model checkpoints are written."})
-    width_mult: str = field(default='2/3', metadata={"help": "The reserved ratio for q, k, v, and ffn weight widths."})
-
+    params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
 # yapf: enable
+
+
+@paddle.no_grad()
+def dynabert_evaluate(model, data_loader):
+    metric = MetricReport()
+    model.eval()
+    metric.reset()
+    for batch in data_loader:
+        logits = model(batch['input_ids'],
+                       batch['token_type_ids'],
+                       attention_mask=[None, None])
+        # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
+        if isinstance(model, OFA):
+            logits = logits[0]
+        probs = F.sigmoid(logits)
+        metric.update(probs, batch['labels'])
+
+    micro_f1_score, macro_f1_score = metric.accumulate()
+    logger.info("micro f1 score: %.5f, macro f1 score: %.5f" %
+                (micro_f1_score, macro_f1_score))
+    model.train()
+    return macro_f1_score
 
 
 def main():
     parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    paddle.set_device(training_args.device)
-
+        (ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
+    )
+    paddle.set_device(compression_args.device)
+    compression_args.strategy = 'dynabert'
     # Log model and data config
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
+    compression_args.print_config(model_args, "Model")
+    compression_args.print_config(data_args, "Data")
 
-    # load and preprocess dataset
     label_list = {}
-    with open(os.path.join(data_args.dataset_dir, 'label.txt'),
-              'r',
-              encoding='utf-8') as f:
+    label_path = os.path.join(data_args.dataset_dir, 'label.txt')
+    train_path = os.path.join(data_args.dataset_dir, 'train.txt')
+    dev_path = os.path.join(data_args.dataset_dir, 'dev.txt')
+    with open(label_path, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
+
     train_ds = load_dataset(read_local_dataset,
-                            path=os.path.join(data_args.dataset_dir,
-                                              'train.txt'),
+                            path=train_path,
                             label_list=label_list,
                             lazy=False)
     dev_ds = load_dataset(read_local_dataset,
-                          path=os.path.join(data_args.dataset_dir, 'dev.txt'),
+                          path=dev_path,
                           label_list=label_list,
                           lazy=False)
 
@@ -94,25 +114,22 @@ def main():
                                    label_nums=len(label_list))
     train_dataset = train_ds.map(trans_func)
     dev_dataset = dev_ds.map(trans_func)
+
     # Define data collector， criterion
     data_collator = DataCollatorWithPadding(tokenizer)
     criterion = paddle.nn.BCEWithLogitsLoss()
 
-    trainer = Trainer(model=model,
-                      args=training_args,
-                      data_collator=data_collator,
-                      train_dataset=train_dataset,
-                      eval_dataset=dev_dataset,
-                      tokenizer=tokenizer,
-                      criterion=criterion)
+    trainer = Trainer(
+        model=model,
+        args=compression_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset,
+        eval_dataset=dev_dataset,
+        criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
 
-    output_dir = training_args.output_dir
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    compression_args.print_config()
 
-    trainer.prune(
-        output_dir,
-        prune_config=DynabertConfig(width_mult=eval(model_args.width_mult)))
+    trainer.compress(custom_dynabert_evaluate=dynabert_evaluate)
 
 
 if __name__ == "__main__":

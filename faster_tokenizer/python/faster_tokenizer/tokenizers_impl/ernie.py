@@ -39,16 +39,20 @@ class ErnieFasterTokenizer(BaseFasterTokenizer):
                  lowercase=True,
                  wordpieces_prefix="##",
                  max_sequence_len=None,
+                 max_input_chars_per_word=100,
                  use_faster_wordpiece=False,
                  use_faster_wordpiece_with_pretokenization=False):
         tokenizer_model = WordPiece if not use_faster_wordpiece else FasterWordPiece
         model_kwargs = {
             "unk_token": str(unk_token),
-            "continuing_subword_prefix": wordpieces_prefix
+            "continuing_subword_prefix": wordpieces_prefix,
+            "max_input_chars_per_word": max_input_chars_per_word,
         }
         if use_faster_wordpiece:
             model_kwargs[
                 "with_pretokenization"] = use_faster_wordpiece_with_pretokenization
+        else:
+            model_kwargs["handle_chinese_chars"] = handle_chinese_chars
         if vocab is not None:
             tokenizer = Tokenizer(tokenizer_model(vocab, **model_kwargs))
         else:

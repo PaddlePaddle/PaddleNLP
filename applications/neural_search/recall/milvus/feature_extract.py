@@ -50,6 +50,7 @@ parser.add_argument('--cpu_threads', default=10, type=int,
     help='Number of threads to predict when using cpu.')
 parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False],
     help='Enable to use mkldnn to speed up when using cpu.')
+parser.add_argument("--model_name_or_path",default='rocketqa-zh-base-query-encoder',type=str,help='The pretrained model used for training')
 
 args = parser.parse_args()
 # yapf: enable
@@ -173,7 +174,7 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     id2corpus = read_text(args.corpus_file)
 
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]

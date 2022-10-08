@@ -263,8 +263,9 @@ class ManualVerbalizer(Verbalizer):
         return word_logits
 
     def process_outputs(self, logits, inputs, **kwargs):
-        # TODO: support multiple mask ids per sentence.
         mask_ids = inputs["mask_ids"].unsqueeze(2)
+        real_len = logits.shape[1]
+        mask_ids = mask_ids[:, -real_len:]
         logits = paddle.where(mask_ids == 1, logits, paddle.zeros_like(logits))
         logits = logits.sum(axis=1) / mask_ids.sum(axis=1)
 
@@ -380,28 +381,26 @@ class SoftVerbalizer(Verbalizer):
 
     def head_parameters(self):
         if isinstance(self.head, nn.Linear):
-            return [p for n, p in self.head.named_parameters()]
+            return [(n, p) for n, p in self.head.named_parameters()]
         else:
-            head_name = '.'.join(self.head_name[1:])
-            return [
-                p for n, p in self.head.named_parameters() if head_name in n
-            ]
+            return [(n, p) for n, p in self.head.named_parameters()
+                    if self.head_name[1] in n]
 
     def non_head_parameters(self):
         if isinstance(self.head, nn.Linear):
             return []
         else:
-            head_name = '.'.join(self.head_name[1:])
-            return [
-                p for n, p in self.head.named_parameters() if head_name not in n
-            ]
+            return [(n, p) for n, p in self.head.named_parameters()
+                    if self.head_name[1] not in n]
 
     def process_model(self, model):
-        setattr(model, self.head_name, Identity())
+        setattr(model, self.head_name[0], Identity())
         return model
 
     def process_outputs(self, logits, inputs=None, **kwargs):
         mask_ids = inputs["mask_ids"].unsqueeze(2)
+        real_len = logits.shape[1]
+        mask_ids = mask_ids[:, -real_len:]
         logits = (logits * mask_ids).sum(axis=1) / mask_ids.sum(axis=1)
         return self.head(logits)
 
@@ -425,7 +424,7 @@ class SoftVerbalizer(Verbalizer):
             # LMHead
             last_name = [n for n, p in model.named_children()][-1]
             self.head = copy.deepcopy(getattr(model, last_name))
-            self.head_name = last_name
+            self.head_name = [last_name]
             head_names = [n for n, p in self.head.named_children()][::-1]
             for name in head_names:
                 module = getattr(self.head, name)
@@ -437,15 +436,17 @@ class SoftVerbalizer(Verbalizer):
                                   bias_attr=False))
                     getattr(self.head, name).weight.set_value(
                         self._create_init_weight(module.weight))
+                    self.head_name.append(name)
                     break
         elif model_type in self.LAST_WEIGHT:
             # OnlyMLMHead
             last_name = [n for n, p in model.named_children()][-1]
             head = getattr(model, last_name)
-            self.head_name = last_name
+            self.head_name = [last_name]
             # LMPredictionHead
             last_name = [n for n, p in head.named_children()][-1]
             self.head = copy.deepcopy(getattr(head, last_name))
+            self.head_name.append("decoder")
 
             module = paddle.to_tensor(getattr(self.head, "decoder_weight"))
             bias = paddle.to_tensor(getattr(self.head, "decoder_bias"))

@@ -28,7 +28,8 @@ class InferBackend(object):
                  model_path_prefix,
                  device='cpu',
                  use_quantize=False,
-                 use_fp16=False):
+                 use_fp16=False,
+                 device_id=0):
         print(">>> [InferBackend] Creating Engine ...")
         onnx_model = paddle2onnx.command.c_paddle_to_onnx(
             model_file=model_path_prefix + ".pdmodel",
@@ -41,7 +42,7 @@ class InferBackend(object):
             f.write(onnx_model)
 
         if device == "gpu":
-            providers = ['CUDAExecutionProvider']
+            providers = [('CUDAExecutionProvider', {'device_id': device_id})]
             print(">>> [InferBackend] Use GPU to inference ...")
             if use_fp16:
                 print(">>> [InferBackend] Use FP16 to inference ...")
@@ -98,7 +99,8 @@ class UIEPredictor(object):
             args.use_fp16 = False
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               device=args.device,
-                                              use_fp16=args.use_fp16)
+                                              use_fp16=args.use_fp16,
+                                              device_id=args.device_id)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -165,7 +167,6 @@ class UIEPredictor(object):
                                          return_tensors='np',
                                          return_offsets_mapping=True)
         offset_maps = encoded_inputs["offset_mapping"]
-        input_ids = encoded_inputs["input_ids"]
 
         start_probs = []
         end_probs = []
@@ -195,14 +196,8 @@ class UIEPredictor(object):
 
         sentence_ids = []
         probs = []
-        for start_ids, end_ids, ids, offset_map in zip(start_ids_list,
-                                                       end_ids_list,
-                                                       input_ids.tolist(),
-                                                       offset_maps.tolist()):
-            for i in reversed(range(len(ids))):
-                if ids[i] != 0:
-                    ids = ids[:i]
-                    break
+        for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list,
+                                                  offset_maps.tolist()):
             span_list = get_span(start_ids, end_ids, with_prob=True)
             sentence_id, prob = get_id_and_prob(span_list, offset_map)
             sentence_ids.append(sentence_id)

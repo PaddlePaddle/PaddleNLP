@@ -200,8 +200,9 @@ class Predictor(object):
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         input_ids, segment_ids = batchify_fn(examples)
@@ -233,10 +234,12 @@ class Predictor(object):
                 (input_ids, segment_ids, title_ids, title_segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+                ),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         query_ids, query_segment_ids, title_ids, title_segment_ids = batchify_fn(

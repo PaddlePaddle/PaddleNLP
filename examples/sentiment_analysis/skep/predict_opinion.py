@@ -67,7 +67,7 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     tokens = example["tokens"]
     encoded_inputs = tokenizer(tokens,
                                return_length=True,
-                               is_split_into_words=True,
+                               is_split_into_words='token',
                                max_seq_len=max_seq_length)
     input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
     token_type_ids = np.array(encoded_inputs["token_type_ids"], dtype="int64")

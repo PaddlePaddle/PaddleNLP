@@ -211,7 +211,7 @@ class TrainerCallback:
         def on_log(self, args, state, control, logs=None, **kwargs):
             _ = logs.pop("total_flos", None)
             if state.is_local_process_zero:
-                print(logs)
+                logger.info(logs)
     ```"""
 
     def on_init_end(self, args: TrainingArguments, state: TrainerState,
@@ -551,9 +551,9 @@ class PrinterCallback(TrainerCallback):
         _ = logs.pop("total_flos", None)
         if state.is_local_process_zero:
             if type(logs) is dict:
-                print(", ".join(f"{k}: {v}" for k, v in logs.items()))
+                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
             else:
-                print(logs)
+                logger.info(logs)
 
 
 class EarlyStoppingCallback(TrainerCallback):

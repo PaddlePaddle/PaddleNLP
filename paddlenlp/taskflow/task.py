@@ -169,7 +169,10 @@ class Task(metaclass=abc.ABCMeta):
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
+        if self.task in ["document_question_answering", "knowledge_mining"]:
+            self._config.switch_ir_optim(False)
         self.predictor = paddle.inference.create_predictor(self._config)
+        self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [
             self.predictor.get_input_handle(name)
             for name in self.predictor.get_input_names()
@@ -202,7 +205,9 @@ class Task(metaclass=abc.ABCMeta):
             trans_model = float16.convert_float_to_float16(onnx_model,
                                                            keep_io_types=True)
             onnx.save_model(trans_model, fp16_model_file)
-        providers = ['CUDAExecutionProvider']
+        providers = [('CUDAExecutionProvider', {
+            'device_id': self.kwargs['device_id']
+        })]
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = self._num_threads
         sess_options.inter_op_num_threads = self._num_threads

@@ -1356,7 +1356,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     def __init__(self, **kwargs):
         # inputs and kwargs for saving and re-loading (see ``from_pretrained`` and ``save_pretrained``)
         self.init_inputs = ()
-        self.init_kwargs = copy.deepcopy(kwargs)
+
+        self.init_kwargs = getattr(self, "init_kwargs",
+                                   None) or copy.deepcopy(kwargs)
         self.name_or_path = kwargs.pop("name_or_path", "")
         self._processor_class = kwargs.pop("processor_class", None)
 
@@ -2013,7 +2015,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                            List[List[str]]]] = None,
                  max_length: Optional[int] = None,
                  stride: int = 0,
-                 is_split_into_words: bool = False,
+                 is_split_into_words: Union[bool, str] = False,
                  padding: Union[bool, str, PaddingStrategy] = False,
                  truncation: Union[bool, str, TruncationStrategy] = False,
                  return_position_ids: bool = False,
@@ -2061,6 +2063,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 a bigger batch than inputs to include all spans. Moreover, 'overflow_to_sample'
                 and 'offset_mapping' preserving the original example and position
                 information will be added to the returned dictionary. Defaults to 0.
+            is_split_into_words (Union[bool, str], optional):
+                when the text is words or tokens, `is_split_into_words` should be True or `token`.
+                `True`: means that the text should be words which should be tokenized.
+                `token`: means that the text should be tokens which already be tokenized, so it should not be tokenized again.
             padding (bool, str or [PaddingStrategy], optional):
                 Activates and controls padding. Accepts the following values:
 
@@ -2200,6 +2206,13 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             raise ValueError(
                 "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
                 "or `List[List[str]]` (batch of pretokenized examples).")
+
+        # check `split_into_words` value
+        if isinstance(is_split_into_words,
+                      str) and is_split_into_words != 'token':
+            raise ValueError(
+                "the value of `is_split_into_words` should be one of: {True, False, 'token'} but receive: <%s>",
+                is_split_into_words)
 
         if is_split_into_words:
             is_batched = isinstance(text,
