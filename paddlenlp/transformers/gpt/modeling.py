@@ -1231,12 +1231,12 @@ class GPTLMHeadModel(GPTPretrainedModel):
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
+            shift_logits = logits[:, :-1, :]
+            shift_labels = labels[:, 1:]
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(shift_logits.reshape(-1, shift_logits.size(-1)),
-                            shift_labels.reshape(-1))
+            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])),
+                            shift_labels.reshape((-1, )))
 
         # outputs = [output, all_hidden_states, new_caches, all_self_attentions]
         if not return_dict:
@@ -1424,8 +1424,8 @@ class GPTForTokenClassification(GPTPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits.reshape(-1, self.num_classes),
-                            labels.reshape(-1))
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
 
         if not return_dict:
             if len(sequence_output) == 1 and loss is None:
@@ -1548,11 +1548,11 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         if labels is not None:
             if self.num_classes == 1:
                 loss_fct = MSELoss()
-                loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
-            elif labels.dtype == paddle.int32 or labels.dtype == paddle.int32:
+                loss = loss_fct(pooled_logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = CrossEntropyLoss()
-                loss = loss_fct(pooled_logits.reshape(-1, self.num_classes),
-                                labels.reshape(-1))
+                loss = loss_fct(pooled_logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
             else:
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(pooled_logits, labels)

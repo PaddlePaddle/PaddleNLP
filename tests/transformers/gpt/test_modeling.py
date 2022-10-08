@@ -23,6 +23,7 @@ from tests.testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
+from parameterized import parameterized_class
 
 import paddle
 from paddlenlp.transformers import (
@@ -55,7 +56,6 @@ class GPTModelTester:
         seq_length=7,
         is_training=True,
         use_input_mask=True,
-        use_labels=True,
         vocab_size=99,
         hidden_size=32,
         num_hidden_layers=5,
@@ -77,7 +77,6 @@ class GPTModelTester:
         self.seq_length = seq_length
         self.is_training = is_training
         self.use_input_mask = use_input_mask
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -110,7 +109,7 @@ class GPTModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
-        if self.use_labels:
+        if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size],
                                          self.type_sequence_label_size,
                                          dtype="int64")
@@ -181,9 +180,15 @@ class GPTModelTester:
         model = GPTModel(**config)
         model.eval()
 
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
+        result = model(input_ids,
+                       use_cache=True,
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids,
+                       use_cache=True,
+                       return_dict=self.parent.return_dict)
+        result = model(input_ids,
+                       use_cache=True,
+                       return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(
             result[0].shape,
@@ -196,13 +201,19 @@ class GPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, use_cache=True)
-        outputs_no_past = model(input_ids, use_cache=False)
+        outputs = model(input_ids,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids,
+                                       use_cache=True,
+                                       return_dict=self.parent.return_dict)
+        outputs_no_past = model(input_ids,
+                                use_cache=False,
+                                return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -215,16 +226,19 @@ class GPTModelTester:
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)
-        output_from_past = model(next_tokens, use_cache=True, cache=past)[0]
+        output_from_no_past = model(next_input_ids,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(next_tokens,
+                                 use_cache=True,
+                                 cache=past,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
-        output_from_no_past_slice = output_from_no_past[:, -1,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, 0,
-                                                  random_slice_idx].detach()
+        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx]
+        output_from_past_slice = output_from_past[:, 0, random_slice_idx]
 
         # test that outputs are equal for slice
         self.parent.assertTrue(
@@ -245,7 +259,8 @@ class GPTModelTester:
         # first forward pass
         output, past = model(input_ids,
                              attention_mask=attn_mask,
-                             use_cache=True)
+                             use_cache=True,
+                             return_dict=self.parent.return_dict)[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -269,21 +284,23 @@ class GPTModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
+        output_from_no_past = model(next_input_ids,
+                                    attention_mask=attn_mask,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(next_tokens,
                                  cache=past,
                                  use_cache=True,
-                                 attention_mask=attn_mask)[0]
+                                 attention_mask=attn_mask,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
                                       output_from_past.shape[-1],
                                       dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -1,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, 0,
-                                                  random_slice_idx].detach()
+        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx]
+        output_from_past_slice = output_from_past[:, 0, random_slice_idx]
 
         # test that outputs are equal for slice
         self.parent.assertTrue(
@@ -297,9 +314,12 @@ class GPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, attention_mask=input_mask, use_cache=True)
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -317,11 +337,15 @@ class GPTModelTester:
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
         output_from_no_past = model(next_input_ids,
-                                    attention_mask=next_attention_mask)
+                                    attention_mask=next_attention_mask,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(next_tokens,
                                  attention_mask=next_attention_mask,
                                  cache=past,
-                                 use_cache=True)[0]
+                                 use_cache=True,
+                                 return_dict=self.parent.return_dict)[0]
         self.parent.assertTrue(
             output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -347,43 +371,82 @@ class GPTModelTester:
         model = GPTLMHeadModel(base_model)
         model.eval()
 
-        result = model(input_ids, use_cache=True)[0]
-        self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+        result = model(input_ids,
+                       use_cache=True,
+                       labels=input_ids if self.parent.use_labels else None,
+                       return_dict=self.parent.return_dict)
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(
+                result[1].shape,
+                [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(
+                result[0].shape,
+                [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids,
                                                input_mask, *args):
         base_model = GPTModel(**config)
         model = GPTLMHeadModel(base_model)
 
-        loss_fct = paddle.nn.loss.CrossEntropyLoss()
+        if self.parent.use_labels:
+            loss, logits = model(input_ids,
+                                 labels=input_ids,
+                                 return_dict=self.parent.return_dict)
 
-        logits = model(input_ids)
-        loss = loss_fct(logits, input_ids)
-        self.parent.assertEqual(loss.shape, [1])
-        self.parent.assertEqual(
-            logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
-        loss.backward()
+            self.parent.assertEqual(loss.shape, [1])
+            self.parent.assertEqual(
+                logits.shape,
+                [self.batch_size, self.seq_length, self.vocab_size])
+            loss.backward()
 
     def create_and_check_gpt_for_sequence_classification(
             self, config, input_ids, input_mask, sequence_labels, *args):
         base_model = GPTModel(**config)
         model = GPTForSequenceClassification(base_model, self.num_labels)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(result.shape,
-                                [self.batch_size, self.num_labels])
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            labels=sequence_labels if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict)
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape,
+                                    [self.batch_size, self.num_labels])
+        elif self.parent.return_dict:
+            self.parent.assertEqual(result[0].shape,
+                                    [self.batch_size, self.num_labels])
+        else:
+            self.parent.assertEqual(result.shape,
+                                    [self.batch_size, self.num_labels])
 
     def create_and_check_gpt_for_token_classification(self, config, input_ids,
                                                       input_mask,
-                                                      sequence_labels, *args):
+                                                      sequence_labels,
+                                                      token_labels, *args):
         # config.num_labels = self.num_labels
         base_model = GPTModel(**config)
         model = GPTForTokenClassification(base_model, self.num_labels)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.num_labels])
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       labels=token_labels if self.parent.use_labels else None,
+                       return_dict=self.parent.return_dict)
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(
+                result[1].shape,
+                [self.batch_size, self.seq_length, self.num_labels])
+        elif self.parent.return_dict:
+            self.parent.assertEqual(
+                result[0].shape,
+                [self.batch_size, self.seq_length, self.num_labels])
+        else:
+            self.parent.assertEqual(
+                result.shape,
+                [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_gpt_weight_initialization(self, config, *args):
         model = GPTModel(**config)
@@ -416,11 +479,20 @@ class GPTModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = GPTModel
+    use_labels = False
+    return_dict = False
 
-    all_model_classes = (GPTModel, GPTLMHeadModel, GPTForSequenceClassification,
-                         GPTForTokenClassification)
+    # all_model_classes = (GPTModel, GPTLMHeadModel, GPTForSequenceClassification,
+    #                      GPTForTokenClassification)
+    all_model_classes = (GPTModel, )
     all_generative_model_classes = {GPTLMHeadModel: (GPTModel, "gpt")}
     all_parallelizable_model_classes = (GPTLMHeadModel)
     test_missing_keys = False
@@ -540,11 +612,11 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     @slow
     def test_model_from_pretrained(self):
         for model_name in GPT2_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = GPT2Model.from_pretrained(model_name)
+            model = GPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
 
-class GPT2ModelLanguageGenerationTest(unittest.TestCase):
+class GPTModelLanguageGenerationTest(unittest.TestCase):
 
     def _test_lm_generate_gpt_helper(
         self,
