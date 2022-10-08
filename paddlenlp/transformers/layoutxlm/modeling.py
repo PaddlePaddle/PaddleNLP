@@ -26,12 +26,14 @@ from paddle.nn import CrossEntropyLoss
 from paddlenlp.utils.log import logger
 from .. import PretrainedModel, register_base_model
 from .visual_backbone import build_resnet_fpn_backbone
+from .visual_backbone import build_resnet_backbone
 from .visual_backbone import read_config
 
 __all__ = [
     'LayoutXLMModel', "LayoutXLMPretrainedModel",
     "LayoutXLMForTokenClassification", "LayoutXLMForSequenceClassification",
-    "LayoutXLMForPretraining", "LayoutXLMForRelationExtraction"
+    "LayoutXLMForPretraining", "LayoutXLMForRelationExtraction",
+    "LayoutXLMForQuestionAnswering"
 ]
 
 
@@ -46,7 +48,7 @@ def relative_position_bucket(relative_position,
         n = paddle.abs(relative_position)
     else:
         n = paddle.max(-relative_position, paddle.zeros_like(relative_position))
-    # now n is in the range [0, inf)
+    # Now n is in the range [0, inf)
     # half of the buckets are for exact increments in positions
     max_exact = num_buckets // 2
     is_small = n < max_exact
@@ -823,6 +825,36 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         embeddings = self.embeddings.dropout(embeddings)
         return embeddings
 
+    def _calc_visual_bbox(self, image_feature_pool_shape, bbox, visual_shape):
+        visual_bbox_x = (paddle.arange(
+            0,
+            1000 * (image_feature_pool_shape[1] + 1),
+            1000,
+            dtype=bbox.dtype,
+        ) // image_feature_pool_shape[1])
+        visual_bbox_y = (paddle.arange(
+            0,
+            1000 * (image_feature_pool_shape[0] + 1),
+            1000,
+            dtype=bbox.dtype,
+        ) // image_feature_pool_shape[0])
+
+        expand_shape = image_feature_pool_shape[0:2]
+        visual_bbox = paddle.stack(
+            [
+                visual_bbox_x[:-1].expand(expand_shape),
+                visual_bbox_y[:-1].expand(expand_shape[::-1]).transpose([1, 0]),
+                visual_bbox_x[1:].expand(expand_shape),
+                visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
+            ],
+            axis=-1,
+        ).reshape([expand_shape[0] * expand_shape[1],
+                   paddle.shape(bbox)[-1]])
+
+        visual_bbox = visual_bbox.expand(
+            [visual_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
+        return visual_bbox
+
     def _calc_img_embeddings(self, image, bbox, position_ids):
         use_image_info = self.use_visual_backbone and image is not None
         position_embeddings = self.embeddings.position_embeddings(position_ids)
@@ -887,38 +919,11 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 output_hidden_states=False,
                 output_attentions=False):
         input_shape = paddle.shape(input_ids)
-
         visual_shape = list(input_shape)
         visual_shape[1] = self.config["image_feature_pool_shape"][
             0] * self.config["image_feature_pool_shape"][1]
-
-        visual_bbox_x = (paddle.arange(
-            0,
-            1000 * (self.config["image_feature_pool_shape"][1] + 1),
-            1000,
-            dtype=bbox.dtype,
-        ) // self.config["image_feature_pool_shape"][1])
-        visual_bbox_y = (paddle.arange(
-            0,
-            1000 * (self.config["image_feature_pool_shape"][0] + 1),
-            1000,
-            dtype=bbox.dtype,
-        ) // self.config["image_feature_pool_shape"][0])
-
-        expand_shape = self.config["image_feature_pool_shape"][0:2]
-        visual_bbox = paddle.stack(
-            [
-                visual_bbox_x[:-1].expand(expand_shape),
-                visual_bbox_y[:-1].expand(expand_shape[::-1]).transpose([1, 0]),
-                visual_bbox_x[1:].expand(expand_shape),
-                visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
-            ],
-            axis=-1,
-        ).reshape([expand_shape[0] * expand_shape[1],
-                   paddle.shape(bbox)[-1]])
-
-        visual_bbox = visual_bbox.expand(
-            [input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
+        visual_bbox = self._calc_visual_bbox(
+            self.config["image_feature_pool_shape"], bbox, visual_shape)
 
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
         if attention_mask is None:
@@ -976,7 +981,6 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                                              -1, -1, -1, -1)
             elif head_mask.dim() == 2:
                 head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
-            head_mask = head_mask.to(dtype=next(self.parameters()).dtype)
         else:
             head_mask = [None] * self.config["num_hidden_layers"]
 
@@ -1095,7 +1099,7 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
             self.layoutxlm = layoutxlm
         self.dropout = nn.Dropout(dropout if dropout is not None else self.
                                   layoutxlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"],
+        self.classifier = nn.Linear(self.layoutxlm.config["hidden_size"] * 3,
                                     num_classes)
         self.classifier.apply(self.init_weights)
 
@@ -1125,6 +1129,23 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
         head_mask=None,
         labels=None,
     ):
+        input_shape = paddle.shape(input_ids)
+        visual_shape = list(input_shape)
+        visual_shape[1] = self.layoutxlm.config["image_feature_pool_shape"][
+            0] * self.layoutxlm.config["image_feature_pool_shape"][1]
+        visual_bbox = self.layoutxlm._calc_visual_bbox(
+            self.layoutxlm.config["image_feature_pool_shape"], bbox,
+            visual_shape)
+
+        visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
+            [input_shape[0], visual_shape[1]])
+
+        initial_image_embeddings = self.layoutxlm._calc_img_embeddings(
+            image=image,
+            bbox=visual_bbox,
+            position_ids=visual_position_ids,
+        )
+
         outputs = self.layoutxlm(
             input_ids=input_ids,
             bbox=bbox,
@@ -1136,11 +1157,20 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
         )
         seq_length = input_ids.shape[1]
         # sequence out and image out
-        sequence_output, image_output = outputs[0][:, :seq_length], outputs[
-            0][:, seq_length:]
+        sequence_output, final_image_embeddings = outputs[
+            0][:, :seq_length], outputs[0][:, seq_length:]
 
-        # token feature to sequence feature
-        token_featue_to_sequence_feature(input_ids, seq_length, sequence_output)
+        cls_final_output = sequence_output[:, 0, :]
+
+        # average-pool the visual embeddings
+        pooled_initial_image_embeddings = initial_image_embeddings.mean(axis=1)
+        pooled_final_image_embeddings = final_image_embeddings.mean(axis=1)
+        # concatenate with cls_final_output
+        sequence_output = paddle.concat([
+            cls_final_output, pooled_initial_image_embeddings,
+            pooled_final_image_embeddings
+        ],
+                                        axis=1)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -1150,21 +1180,10 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
 
-            if attention_mask is not None:
-                active_loss = attention_mask.reshape([
-                    -1,
-                ]) == 1
-                active_logits = logits.reshape([-1,
-                                                self.num_classes])[active_loss]
-                active_labels = labels.reshape([
-                    -1,
-                ])[active_loss]
-                loss = loss_fct(active_logits, active_labels)
-            else:
-                loss = loss_fct(logits.reshape([-1, self.num_classes]),
-                                labels.reshape([
-                                    -1,
-                                ]))
+            loss = loss_fct(logits.reshape([-1, self.num_classes]),
+                            labels.reshape([
+                                -1,
+                            ]))
 
             outputs = (loss, ) + outputs
 
@@ -1548,3 +1567,88 @@ class LayoutXLMForRelationExtraction(LayoutXLMPretrainedModel):
                    pred_relations=pred_relations,
                    hidden_states=hidden_states)
         return res
+
+
+class LayoutXLMForQuestionAnswering(LayoutXLMPretrainedModel):
+
+    def __init__(self,
+                 layoutxlm,
+                 num_classes=2,
+                 dropout=None,
+                 has_visual_segment_embedding=False):
+        super(LayoutXLMForQuestionAnswering, self).__init__()
+        self.num_classes = num_classes
+        self.layoutxlm = layoutxlm
+        self.has_visual_segment_embedding = has_visual_segment_embedding
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.
+                                  layoutxlm.config["hidden_dropout_prob"])
+        self.qa_outputs = nn.Linear(self.layoutxlm.config["hidden_size"],
+                                    num_classes)
+        self.qa_outputs.apply(self.init_weights)
+
+    def get_input_embeddings(self):
+        return self.layoutxlm.embeddings.word_embeddings
+
+    def forward(self,
+                input_ids=None,
+                bbox=None,
+                image=None,
+                attention_mask=None,
+                token_type_ids=None,
+                position_ids=None,
+                head_mask=None,
+                start_positions=None,
+                end_positions=None):
+        # In LayoutXLM the type vocab size is 1
+        token_type_ids = paddle.zeros_like(input_ids)
+
+        outputs = self.layoutxlm(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            bbox=bbox,
+            image=image,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            head_mask=head_mask,
+        )
+        seq_length = input_ids.shape[1]
+        # sequence out and image out
+        sequence_output = outputs[0][:, :seq_length]
+        sequence_output = self.dropout(sequence_output)
+
+        if token_type_ids is not None:
+            span_mask = -token_type_ids * 1e8
+        else:
+            span_mask = 0
+
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = paddle.split(logits,
+                                                num_or_sections=2,
+                                                axis=-1)
+        start_logits = start_logits.squeeze(-1) + span_mask
+        end_logits = end_logits.squeeze(-1) + span_mask
+
+        outputs = (start_logits, end_logits) + outputs[2:]
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.shape) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.shape) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # Sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.shape[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        if not total_loss:
+            return outputs
+        else:
+            outputs = (total_loss, ) + outputs
+            return outputs
