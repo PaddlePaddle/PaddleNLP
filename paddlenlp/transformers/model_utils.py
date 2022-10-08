@@ -100,6 +100,11 @@ def _find_weight_file_path(cache_dir: str,
         file for file in os.listdir(cache_dir) if file.endswith('.pdparams')
     ]
     if len(weight_file_names) == 1:
+        logger.warning(
+            f"there is no <{resource_weight_file_name}> which is the expected weight file name "
+            f"under dir<{cache_dir}>, but the file<{weight_file_names[0]}> is found, and it will "
+            f"be used to init model weights. We suggest that you rename it to <{resource_weight_file_name}>"
+        )
         return os.path.join(cache_dir, weight_file_names[0])
 
     raise ValueError(
