@@ -16,13 +16,10 @@ import paddle
 import paddle.nn as nn
 
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPooling,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-)
+from ..model_outputs import (BaseModelOutputWithPooling,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, tuple_output)
 
 __all__ = [
     'ErnieMModel', 'ErnieMPretrainedModel', 'ErnieMForSequenceClassification',
@@ -437,11 +434,7 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            if loss is not None:
-                return (loss, ) + output
-            if len(output) == 1:
-                return output[0]
-            return output
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -560,8 +553,7 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
 
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,
@@ -660,8 +652,7 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
                             labels.reshape((-1, )))
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -760,10 +751,10 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
             loss = loss_fct(reshaped_logits, labels)
+
         if not return_dict:
             output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(
             loss=loss,

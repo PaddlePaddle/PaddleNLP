@@ -153,7 +153,7 @@ pip install paddlenlp --upgrade
 pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-#### Elastic search 日志显示错误
+#### Elastic search 日志显示错误 `exception during geoip databases update`
 
 需要编辑config/elasticsearch.yml，在末尾添加：
 

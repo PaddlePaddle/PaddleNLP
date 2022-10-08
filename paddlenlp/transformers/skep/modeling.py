@@ -25,15 +25,11 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
 
-from ..model_outputs import (
-    BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
-)
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             CausalLMOutputWithCrossAttentions, tuple_output)
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -528,11 +524,7 @@ class SkepForSequenceClassification(SkepPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            if loss is not None:
-                return (loss, ) + output
-            if len(output) == 1:
-                return output[0]
-            return output
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -642,11 +634,7 @@ class SkepForTokenClassification(SkepPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            if loss is not None:
-                return (loss, ) + output
-            if len(output) == 1:
-                return output[0]
-            return output
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,

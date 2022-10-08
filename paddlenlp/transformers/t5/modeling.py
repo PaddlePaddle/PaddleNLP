@@ -12,22 +12,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import math
+from typing import Optional, Tuple, Union, List
 
 import numpy as np
 import paddle
+from paddle import Tensor
 
 import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    Seq2SeqModelOutput,
+    Seq2SeqLMOutput,
+    BaseModelOutput,
+    ModelOutput,
+)
 
 __all__ = [
-    'T5Model',
-    "T5PretrainedModel",
-    'T5ForConditionalGeneration',
+    'T5Model', "T5PretrainedModel", 'T5ForConditionalGeneration',
+    'T5EncoderModel'
 ]
 
 T5_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -942,7 +951,8 @@ class T5Stack(nn.Layer):
                 cache=None,
                 use_cache=False,
                 output_attentions=False,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                return_dict=False):
         assert input_ids is not None, "input_ids can not be None"
         input_shape = input_ids.shape
         input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
@@ -1049,13 +1059,22 @@ class T5Stack(nn.Layer):
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states, )
 
-        return tuple(v for v in [
-            hidden_states,
-            present_key_value_states,
-            all_hidden_states,
-            all_attentions,
-            all_cross_attentions,
-        ] if v is not None)
+        if not return_dict:
+            return tuple(v for v in [
+                hidden_states,
+                present_key_value_states,
+                all_hidden_states,
+                all_attentions,
+                all_cross_attentions,
+            ] if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=present_key_value_states,
+            hidden_states=all_hidden_states,
+            attentions=all_attentions,
+            cross_attentions=all_cross_attentions,
+        )
 
     def get_extended_attention_mask(self, attention_mask, input_shape):
         if attention_mask.ndim == 3:
@@ -1291,7 +1310,8 @@ class T5Model(T5PretrainedModel):
                 cache=None,
                 use_cache=True,
                 output_attentions=False,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The T5Model forward method, overrides the `__call__()` special method.
 
@@ -1341,8 +1361,16 @@ class T5Model(T5PretrainedModel):
             output_hidden_states (bool, optional):
                 Whether or not to return the output of all hidden layers.
                 Defaults to `False`.
+            return_dict (bool, optional):
+                Whether or not to return a class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
+
 
         Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput` if `return_dict=True`. 
+            Otherwise it returns a tuple of tensors corresponding to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`.
+
             tuple: Returns tuple (`last_hidden_state`, `cache`, `decoder_hidden_states`, `decoder_attentions`,
             `cross_attentions`, `encoder_last_hidden_state`, `encoder_hidden_states`, `encoder_attentions`)
 
@@ -1417,8 +1445,10 @@ class T5Model(T5PretrainedModel):
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states)
-
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict)
+        elif return_dict and not isinstance(encoder_output, BaseModelOutput):
+            encoder_output = convert_encoder_output(encoder_output)
         hidden_states = encoder_output[0]
 
         # Decode
@@ -1430,9 +1460,22 @@ class T5Model(T5PretrainedModel):
             encoder_attention_mask=attention_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
-        return decoder_outputs + encoder_output
+        if not return_dict:
+            return decoder_outputs + encoder_output
+
+        return Seq2SeqModelOutput(
+            last_hidden_state=decoder_outputs.last_hidden_state,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_output.last_hidden_state,
+            encoder_hidden_states=encoder_output.hidden_states,
+            encoder_attentions=encoder_output.attentions,
+        )
 
 
 class T5ForConditionalGeneration(T5PretrainedModel):
@@ -1488,7 +1531,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 labels=None,
                 use_cache=True,
                 output_attentions=False,
-                output_hidden_states=False):
+                output_hidden_states=False,
+                return_dict=False):
         r"""
 
         Args:
@@ -1516,8 +1560,15 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 See :class:`T5Model`.
             output_hidden_states (bool, optional):
                 See :class:`T5Model`.
+            return_dict (bool, optional):
+                Whether or not to return a class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput`. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput` if `return_dict=True`. 
+            Otherwise it returns a tuple of tensors corresponding to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput`. 
+
             tuple: Returns tuple (`loss`, `logits`, `cache`, `decoder_hidden_states`, `decoder_attentions`,
             `cross_attentions`, `encoder_last_hidden_state`, `encoder_hidden_states`, `encoder_attentions`)
 
@@ -1579,12 +1630,15 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states)
-
-        if isinstance(encoder_output, (tuple, list)):
-            hidden_states = encoder_output[0]
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict)
         else:
-            hidden_states = encoder_output
+            if isinstance(encoder_output, paddle.Tensor):
+                encoder_output = (encoder_output, )
+            if return_dict and not isinstance(encoder_output, BaseModelOutput):
+                encoder_output = convert_encoder_output(encoder_output)
+
+        hidden_states = encoder_output[0]
 
         if labels is not None and decoder_input_ids is None:
             # get decoder inputs from shifting lm labels to the right
@@ -1608,7 +1662,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_attention_mask=attention_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states)
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
         sequence_output = decoder_outputs[0]
 
@@ -1629,11 +1684,21 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             loss = loss_fct(lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
                             labels.flatten())
 
-        if not isinstance(encoder_output, (list, tuple)):
-            encoder_output = (encoder_output, )
+        if not return_dict:
+            output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
+            return ((loss, ) + output) if loss is not None else output
 
-        output = (lm_logits, ) + decoder_outputs[1:] + encoder_output
-        return ((loss, ) + output) if loss is not None else output
+        return Seq2SeqLMOutput(
+            loss=loss,
+            logits=lm_logits,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_output.last_hidden_state,
+            encoder_hidden_states=encoder_output.hidden_states,
+            encoder_attentions=encoder_output.attentions,
+        )
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -1730,3 +1795,113 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+class T5EncoderModel(T5PretrainedModel):
+    base_model_class = None
+
+    def __init__(self,
+                 vocab_size=32128,
+                 d_model=768,
+                 d_kv=64,
+                 d_ff=3072,
+                 num_layers=12,
+                 num_heads=12,
+                 relative_attention_num_buckets=32,
+                 dropout_rate=0.1,
+                 layer_norm_epsilon=1e-06,
+                 feed_forward_proj="relu",
+                 is_decoder: bool = False,
+                 **kwargs):
+        super().__init__()
+        self.config = {
+            "vocab_size": vocab_size,
+            "d_model": d_model,
+            "d_kv": d_kv,
+            "d_ff": d_ff,
+            "num_layers": num_layers,
+            "num_heads": num_heads,
+            "relative_attention_num_buckets": relative_attention_num_buckets,
+            "dropout_rate": dropout_rate,
+            "layer_norm_epsilon": layer_norm_epsilon,
+            "feed_forward_proj": feed_forward_proj,
+            "is_decoder": is_decoder,
+            "initializer_factor": kwargs.pop("initializer_factor", 1.0)
+        }
+        self.config.update(kwargs)
+        self.shared = nn.Embedding(vocab_size, d_model)
+
+        self.use_cache = False
+        self.is_encoder_decoder = False
+        self.encoder = T5Stack(d_model,
+                               num_layers,
+                               layer_norm_epsilon,
+                               dropout_rate,
+                               relative_attention_num_buckets,
+                               d_kv,
+                               num_heads,
+                               feed_forward_proj,
+                               d_ff,
+                               embed_tokens=self.shared,
+                               is_decoder=is_decoder)
+
+        # Initialize weights and apply final processing
+        self.init_weights()
+
+    @property
+    def t5(self):
+        return self
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.shared
+
+    def set_input_embeddings(self, new_embeddings: nn.Embedding) -> None:
+        self.shared = new_embeddings
+        self.encoder.set_input_embeddings(new_embeddings)
+
+    def get_encoder(self) -> T5Stack:
+        return self.encoder
+
+    def forward(
+        self,
+        input_ids: Tensor = None,
+        attention_mask: Optional[Tensor] = None,
+        encoder_hidden_states: Optional[Tuple[Tensor]] = None,
+        encoder_attention_mask: Optional[Tensor] = None,
+        cache=None,
+        use_cache: Optional[bool] = False,
+        output_attentions: Optional[bool] = False,
+        output_hidden_states: Optional[bool] = False,
+        return_dict: Optional[bool] = False,
+    ):
+        encoder_outputs = self.encoder(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            cache=cache,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+
+        return encoder_outputs
+
+
+T5EncoderModel.base_model_class = T5EncoderModel
+
+
+def convert_encoder_output(encoder_output):
+    """
+    Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`.
+    
+    Args: 
+        encoder_output (tuple or ModleOutput):
+            The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
+            The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
+    """
+    return BaseModelOutput(
+        last_hidden_state=encoder_output[0],
+        hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,
+        attentions=encoder_output[2] if len(encoder_output) > 2 else None,
+    )
