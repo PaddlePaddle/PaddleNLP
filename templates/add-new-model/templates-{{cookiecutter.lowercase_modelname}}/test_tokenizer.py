@@ -492,7 +492,7 @@ class {{cookiecutter.camelcase_modelname}}TokenizationTest(TokenizerTesterMixin,
                 ]
                 self.assertEqual(encoded_sequence, filtered_sequence)
 
-{%- if cookiecutter.tokenizer_type == "Based on SentencePiece" %}
+{%- elif cookiecutter.tokenizer_type == "Based on SentencePiece" %}
 
 # TODO(cookiecutter): to be tested under the actual case
 class {{cookiecutter.camelcase_modelname}}TokenizerTest(TokenizerTesterMixin, unittest.TestCase):

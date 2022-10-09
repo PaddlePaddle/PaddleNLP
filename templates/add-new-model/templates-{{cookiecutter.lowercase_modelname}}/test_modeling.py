@@ -22,7 +22,7 @@ import paddle
 
 from paddlenlp.transformers import {{cookiecutter.camelcase_modelname}}Model, {{cookiecutter.camelcase_modelname}}ForQuestionAnswering, {{cookiecutter.camelcase_modelname}}ForSequenceClassification, {{cookiecutter.camelcase_modelname}}ForTokenClassification, {{cookiecutter.camelcase_modelname}}ForPretraining, {{cookiecutter.camelcase_modelname}}ForMultipleChoice, {{cookiecutter.camelcase_modelname}}ForMaskedLM, {{cookiecutter.camelcase_modelname}}PretrainedModel
 
-from paddlenlp.transformers.{{lowercase_modelname}}.configuration import {{cookiecutter.camelcase_modelname}}Config
+from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.configuration import {{cookiecutter.camelcase_modelname}}Config
 from paddlenlp.transformers.model_utils import PretrainedModel
 
 from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin

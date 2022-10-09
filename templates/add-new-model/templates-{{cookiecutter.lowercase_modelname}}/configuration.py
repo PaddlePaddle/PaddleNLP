@@ -11,21 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" {{cookiecutter.model_name}} model configuration"""
+""" {{cookiecutter.modelname}} model configuration"""
 from __future__ import annotations
 
 from typing import Dict
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
 __all__ = [
-    "{{uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION", "{{cookiecutter.camelcase_modelname}}Config",
-    "{{uppercase_modelname}}_PRETRAINED_RESOURCE_FILES_MAP"
+    "{{cookiecutter.uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION", "{{cookiecutter.camelcase_modelname}}Config",
+    "{{cookiecutter.uppercase_modelname}}_PRETRAINED_RESOURCE_FILES_MAP"
 ]
 
-{{uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION = {
+{{cookiecutter.uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION = {
 }
 
-{{uppercase_modelname}}_PRETRAINED_RESOURCE_FILES_MAP = {
+{{cookiecutter.uppercase_modelname}}_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
     }
 }
@@ -34,8 +34,8 @@ __all__ = [
 class {{cookiecutter.camelcase_modelname}}Config(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`{{cookiecutter.camelcase_modelname}}Model`]. It is used to
-    instantiate a {{uppercase_modelname}} model according to the specified arguments, defining the model architecture. Instantiating a
-    configuration with the defaults will yield a similar configuration to that of the {{uppercase_modelname}}
+    instantiate a {{cookiecutter.uppercase_modelname}} model according to the specified arguments, defining the model architecture. Instantiating a
+    configuration with the defaults will yield a similar configuration to that of the {{cookiecutter.uppercase_modelname}}
     {{cookiecutter.checkpoint_identifier}} architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
@@ -55,7 +55,7 @@ class {{cookiecutter.camelcase_modelname}}Config(PretrainedConfig):
     ```python
     >>> from paddlenlp.transformers import {{cookiecutter.camelcase_modelname}}Model, {{cookiecutter.camelcase_modelname}}Config
 
-    >>> # Initializing a {{uppercase_modelname}} {{cookiecutter.checkpoint_identifier}} style configuration
+    >>> # Initializing a {{cookiecutter.uppercase_modelname}} {{cookiecutter.checkpoint_identifier}} style configuration
     >>> configuration = {{cookiecutter.camelcase_modelname}}Config()
 
     >>> # Initializing a model from the {{cookiecutter.checkpoint_identifier}} style configuration
@@ -66,7 +66,7 @@ class {{cookiecutter.camelcase_modelname}}Config(PretrainedConfig):
     ```"""
     model_type = "{{cookiecutter.lowercase_modelname}}"
     attribute_map: Dict[str, str] = {}
-    pretrained_init_configuration = {{uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION
+    pretrained_init_configuration = {{cookiecutter.uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(self,
                  vocab_size: int = 30522,

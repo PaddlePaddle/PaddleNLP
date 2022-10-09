@@ -25,7 +25,7 @@ __all__ = [
 
 class {{cookiecutter.camelcase_modelname}}Tokenizer(PretrainedTokenizer):
     """
-    Constructs a {{lowercase_modelname}} tokenizer Based on BertTokenizer
+    Constructs a {{cookiecutter. lowercase_modelname}} tokenizer Based on BertTokenizer
 
     Args:
         vocab_file (str):
@@ -165,7 +165,7 @@ class {{cookiecutter.camelcase_modelname}}Tokenizer(BPETokenizer):
             **kwargs
         )
 
-{%- if cookiecutter.tokenizer_type == "Based on SentencePiece" %}
+{%- elif cookiecutter.tokenizer_type == "Based on SentencePiece" %}
 
 class {{cookiecutter.camelcase_modelname}}Tokenizer(PretrainedTokenizer):
     resource_files_names = {
