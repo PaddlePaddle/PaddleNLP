@@ -68,6 +68,7 @@ class {{cookiecutter.camelcase_modelname}}Config(PretrainedConfig):
     attribute_map: Dict[str, str] = {}
     pretrained_init_configuration = {{cookiecutter.uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION
 
+    # TODO(templates): 调整构造函数参数
     def __init__(self,
                  vocab_size: int = 30522,
                  hidden_size: int = 768,

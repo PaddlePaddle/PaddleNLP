@@ -2,7 +2,7 @@
 
 .PHONY: add-new-model
 add-new-model:
-	cookiecutter ./add-new-model --no-input --overwrite-if-exists
+	cookiecutter ./add-new-model --no-input --overwrite-if-exists -o template-results
 
 install:
 	pip install -r requirements.txt

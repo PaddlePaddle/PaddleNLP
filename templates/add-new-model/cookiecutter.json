@@ -1,11 +1,11 @@
 {
-    "modelname": "ERNIE_DOC",
-    "uppercase_modelname": "ERNIE_DOC",
-    "lowercase_modelname": "ernie_doc",
-    "camelcase_modelname": "ErnieDoc",
+    "modelname": "Bert",
+    "uppercase_modelname": "BERT",
+    "lowercase_modelname": "bert",
+    "camelcase_modelname": "Bert",
     "authors": "PaddlePaddle Authors",
-    "checkpoint_identifier": "ernie-doc-base-en",
-    "tokenizer_type": ["Based On Bert", "BPE", "SentencePiece"],
-    "is encoder model": ["y", "n"],
-    "is decoder model": ["n", "y"]
+    "checkpoint_identifier": "bert-base-uncased",
+    "tokenizer_type": ["Based on Bert", "Based on BPETokenizer", "Based on SentencePiece"],
+    "is_encoder_model": ["y", "n"],
+    "is_decoder_model": ["n", "y"]
 }

@@ -28,6 +28,7 @@ except ImportError:
 from dataclasses import dataclass, fields
 from typing import List, Optional, Tuple, Union
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
 from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -40,19 +41,55 @@ from ..model_outputs import (
 )
 from .configuration import {{cookiecutter.uppercase_modelname}}_PRETRAINED_RESOURCE_FILES_MAP, {{cookiecutter.camelcase_modelname}}Config, {{cookiecutter.uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION
 
+# TODO(templates): 调整导出模型参数列表
 __all__ = [
     '{{cookiecutter.camelcase_modelname}}Model',
     "{{cookiecutter.camelcase_modelname}}PretrainedModel",
-    '{{cookiecutter.camelcase_modelname}}ForPretraining',
-    '{{cookiecutter.camelcase_modelname}}PretrainingCriterion',
-    '{{cookiecutter.camelcase_modelname}}PretrainingHeads',
     '{{cookiecutter.camelcase_modelname}}ForSequenceClassification',
     '{{cookiecutter.camelcase_modelname}}ForTokenClassification',
     '{{cookiecutter.camelcase_modelname}}ForQuestionAnswering',
     '{{cookiecutter.camelcase_modelname}}ForMultipleChoice',
-    "{{cookiecutter.camelcase_modelname}}ForMaskedLM",
 ]
 
+class {{cookiecutter.camelcase_modelname}}Embeddings(Layer):
+    """
+    Include embeddings from word, position and token_type embeddings
+    """
+
+    def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
+        super({{cookiecutter.camelcase_modelname}}Embeddings, self).__init__()
+
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
+                                                config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+    def forward(self,
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor]=None,
+                position_ids: Optional[Tensor]=None,
+                past_key_values_length: Optional[Tuple[Tensor]]=None):
+        if position_ids is None:
+            ones = paddle.ones_like(input_ids, dtype="int64")
+            seq_length = paddle.cumsum(ones, axis=-1)
+
+            position_ids = seq_length - ones
+            if past_key_values_length is not None:
+                position_ids += past_key_values_length
+            position_ids.stop_gradient = True
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+
+        input_embedings = self.word_embeddings(input_ids)
+        position_embeddings = self.position_embeddings(position_ids)
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        embeddings = self.layer_norm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
 
 class {{cookiecutter.camelcase_modelname}}Pooler(Layer):
     """
@@ -60,7 +97,7 @@ class {{cookiecutter.camelcase_modelname}}Pooler(Layer):
     """
 
     def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
-        """init the {{cookiecutter. lowercase_modelname}} pooler with config & args/kwargs
+        """init the {{cookiecutter.lowercase_modelname}} pooler with config & args/kwargs
 
         Args:
             config ({{cookiecutter.camelcase_modelname}}Config): {{cookiecutter.camelcase_modelname}}Config instance. Defaults to None.
@@ -68,16 +105,12 @@ class {{cookiecutter.camelcase_modelname}}Pooler(Layer):
         super({{cookiecutter.camelcase_modelname}}Pooler, self).__init__()
 
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.activation = nn.Tanh()
-        self.pool_act = config.pool_act
+        self.activation = getattr(F, config.pool_act)
 
-    def forward(self, hidden_states):
-        # We "pool" the model by simply taking the hidden state corresponding
-        # to the first token.
+    def forward(self, hidden_states: Tensor):
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
-        if self.pool_act == "tanh":
-            pooled_output = self.activation(pooled_output)
+        pooled_output = self.activation(pooled_output)
         return pooled_output
 
 
@@ -92,7 +125,7 @@ class {{cookiecutter.camelcase_modelname}}PretrainedModel(PretrainedModel):
     model_config_file = "model_config.json"
     config_class = {{cookiecutter.camelcase_modelname}}Config
     resource_files_names = {"model_state": "model_state.pdparams"}
-    base_model_prefix = "{{cookiecutter. lowercase_modelname}}"
+    base_model_prefix = "{{cookiecutter.lowercase_modelname}}"
     _keys_to_ignore_on_load_missing = [r'position_ids']
 
     pretrained_init_configuration = {{cookiecutter.uppercase_modelname}}_PRETRAINED_INIT_CONFIGURATION
@@ -178,8 +211,8 @@ class {{cookiecutter.camelcase_modelname}}Model({{cookiecutter.camelcase_modelna
                 token_type_ids: Optional[Tensor] = None,
                 position_ids: Optional[Tensor] = None,
                 attention_mask: Optional[Tensor] = None,
-                past_key_values: Optional[Tensor] = None,
-                use_cache: bool = False,
+                past_key_values: Optional[Tuple[Tensor]] = None,
+                use_cache: Optional[bool] = None,
                 output_hidden_states: Optional[bool] = None,
                 output_attentions: Optional[bool] = None,
                 return_dict=None: Optional[bool] = None):
@@ -247,13 +280,14 @@ class {{cookiecutter.camelcase_modelname}}Model({{cookiecutter.camelcase_modelna
                 import paddle
                 from paddlenlp.transformers import {{cookiecutter.camelcase_modelname}}Model, {{cookiecutter.camelcase_modelname}}Tokenizer
 
-                tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter. lowercase_modelname}}-wwm-chinese')
-                model = {{cookiecutter.camelcase_modelname}}Model.from_pretrained('{{cookiecutter. lowercase_modelname}}-wwm-chinese')
+                tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter.lowercase_modelname}}-wwm-chinese')
+                model = {{cookiecutter.camelcase_modelname}}Model.from_pretrained('{{cookiecutter.lowercase_modelname}}-wwm-chinese')
 
                 inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         output_hidden_states = output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -295,11 +329,11 @@ class {{cookiecutter.camelcase_modelname}}Model({{cookiecutter.camelcase_modelna
                 hidden_states = layer(hidden_states, attention_mask)
                 if output_hidden_states:
                     all_hidden_states.append(hidden_states)
-            pooled_output = self.pooler(hidden_states)
+            pooled_output = self.pooler(`(pooler)
 
-            if return_dict:
+            if pooler:
                 return BaseModelOutputWithPoolingAndCrossAttentions(
-                    last_hidden_state=hidden_states,
+                    last_hidden_state=hidden_statespooler
                     pooler_output=pooled_output,
                     hidden_states=all_hidden_states)
             else:
@@ -340,17 +374,17 @@ class {{cookiecutter.camelcase_modelname}}ForQuestionAnswering({{cookiecutter.ca
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        {{cookiecutter. lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
+        {{cookiecutter.lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
             An instance of {{cookiecutter.camelcase_modelname}}Model.
         dropout (float, optional):
             The dropout probability for output of {{cookiecutter.uppercase_modelname}}.
             If None, use the same value as `hidden_dropout_prob` of `{{cookiecutter.camelcase_modelname}}Model`
-            instance `{{cookiecutter. lowercase_modelname}}`. Defaults to `None`.
+            instance `{{cookiecutter.lowercase_modelname}}`. Defaults to `None`.
         """
 
     def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
         super({{cookiecutter.camelcase_modelname}}ForQuestionAnswering, self).__init__(config)
-        self.{{cookiecutter. lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
+        self.{{cookiecutter.lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
             classifier_dropout is not None else config.hidden_dropout_prob)
@@ -406,8 +440,8 @@ class {{cookiecutter.camelcase_modelname}}ForQuestionAnswering({{cookiecutter.ca
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.modeling import {{cookiecutter.camelcase_modelname}}ForQuestionAnswering
-                from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.tokenizer import {{cookiecutter.camelcase_modelname}}Tokenizer
+                from paddlenlp.transformers.{{cookiecutter.lowercase_modelname}}.modeling import {{cookiecutter.camelcase_modelname}}ForQuestionAnswering
+                from paddlenlp.transformers.{{cookiecutter.lowercase_modelname}}.tokenizer import {{cookiecutter.camelcase_modelname}}Tokenizer
 
                 tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter.checkpoint_identifier}}')
                 model = {{cookiecutter.camelcase_modelname}}ForQuestionAnswering.from_pretrained('{{cookiecutter.checkpoint_identifier}}')
@@ -421,7 +455,7 @@ class {{cookiecutter.camelcase_modelname}}ForQuestionAnswering({{cookiecutter.ca
         """
 
 
-        outputs = self.{{cookiecutter. lowercase_modelname}}(input_ids,
+        outputs = self.{{cookiecutter.lowercase_modelname}}(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
                             attention_mask=attention_mask,
@@ -471,20 +505,20 @@ class {{cookiecutter.camelcase_modelname}}ForSequenceClassification({{cookiecutt
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        {{cookiecutter. lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
+        {{cookiecutter.lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
             An instance of {{cookiecutter.camelcase_modelname}}Model.
         num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of {{cookiecutter.uppercase_modelname}}.
             If None, use the same value as `hidden_dropout_prob` of `{{cookiecutter.camelcase_modelname}}Model`
-            instance `{{cookiecutter. lowercase_modelname}}`. Defaults to None.
+            instance `{{cookiecutter.lowercase_modelname}}`. Defaults to None.
     """
 
     def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
         super({{cookiecutter.camelcase_modelname}}ForSequenceClassification, self).__init__(config)
 
-        self.{{cookiecutter. lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
+        self.{{cookiecutter.lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
@@ -537,8 +571,8 @@ class {{cookiecutter.camelcase_modelname}}ForSequenceClassification({{cookiecutt
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.modeling import {{cookiecutter.camelcase_modelname}}ForSequenceClassification
-                from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.tokenizer import {{cookiecutter.camelcase_modelname}}Tokenizer
+                from paddlenlp.transformers.{{cookiecutter.lowercase_modelname}}.modeling import {{cookiecutter.camelcase_modelname}}ForSequenceClassification
+                from paddlenlp.transformers.{{cookiecutter.lowercase_modelname}}.tokenizer import {{cookiecutter.camelcase_modelname}}Tokenizer
 
                 tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter.checkpoint_identifier}}')
                 model = {{cookiecutter.camelcase_modelname}}ForSequenceClassification.from_pretrained('{{cookiecutter.checkpoint_identifier}}', num_labels=2)
@@ -551,7 +585,7 @@ class {{cookiecutter.camelcase_modelname}}ForSequenceClassification({{cookiecutt
                 # [1, 2]
 
         """
-        outputs = self.{{cookiecutter. lowercase_modelname}}(input_ids,
+        outputs = self.{{cookiecutter.lowercase_modelname}}(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
                             attention_mask=attention_mask,
@@ -595,20 +629,20 @@ class {{cookiecutter.camelcase_modelname}}ForTokenClassification({{cookiecutter.
     designed for token classification tasks like NER tasks.
 
     Args:
-        {{cookiecutter. lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
+        {{cookiecutter.lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
             An instance of {{cookiecutter.camelcase_modelname}}Model.
         num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of {{cookiecutter.uppercase_modelname}}.
             If None, use the same value as `hidden_dropout_prob` of `{{cookiecutter.camelcase_modelname}}Model`
-            instance `{{cookiecutter. lowercase_modelname}}`. Defaults to None.
+            instance `{{cookiecutter.lowercase_modelname}}`. Defaults to None.
     """
 
     def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
         super().__init__(config)
 
-        self.{{cookiecutter. lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
+        self.{{cookiecutter.lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
@@ -658,8 +692,8 @@ class {{cookiecutter.camelcase_modelname}}ForTokenClassification({{cookiecutter.
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.modeling import {{cookiecutter.camelcase_modelname}}ForTokenClassification
-                from paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.tokenizer import {{cookiecutter.camelcase_modelname}}Tokenizer
+                from paddlenlp.transformers.{{cookiecutter.lowercase_modelname}}.modeling import {{cookiecutter.camelcase_modelname}}ForTokenClassification
+                from paddlenlp.transformers.{{cookiecutter.lowercase_modelname}}.tokenizer import {{cookiecutter.camelcase_modelname}}Tokenizer
 
                 tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter.checkpoint_identifier}}')
                 model = {{cookiecutter.camelcase_modelname}}ForTokenClassification.from_pretrained('{{cookiecutter.checkpoint_identifier}}', num_labels=2)
@@ -672,7 +706,7 @@ class {{cookiecutter.camelcase_modelname}}ForTokenClassification({{cookiecutter.
                 # [1, 13, 2]
 
         """
-        outputs = self.{{cookiecutter. lowercase_modelname}}(input_ids,
+        outputs = self.{{cookiecutter.lowercase_modelname}}(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
                             attention_mask=attention_mask,
@@ -703,221 +737,20 @@ class {{cookiecutter.camelcase_modelname}}ForTokenClassification({{cookiecutter.
         )
 
 
-class {{cookiecutter.camelcase_modelname}}LMPredictionHead(Layer):
-    """
-    {{cookiecutter.camelcase_modelname}} Model with a `language modeling` head on top for CLM fine-tuning.
-    """
-
-    def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config, embedding_weights=None):
-        super({{cookiecutter.camelcase_modelname}}LMPredictionHead, self).__init__()
-
-        self.transform = nn.Linear(config.hidden_size, config.hidden_size)
-        self.activation = getattr(nn.functional, config.hidden_act)
-        self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder_weight = self.create_parameter(
-            shape=[config.vocab_size, config.hidden_size],
-            dtype=self.transform.weight.dtype,
-            is_bias=False) if embedding_weights is None else embedding_weights
-
-        self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size],
-            dtype=self.decoder_weight.dtype,
-            is_bias=True)
-
-    def forward(self, hidden_states: Tensor, masked_positions: Optional[Tensor]=None):
-        if masked_positions is not None:
-            hidden_states = paddle.reshape(hidden_states,
-                                           [-1, hidden_states.shape[-1]])
-            hidden_states = paddle.tensor.gather(hidden_states,
-                                                 masked_positions)
-        # gather masked tokens might be more quick
-        hidden_states = self.transform(hidden_states)
-        hidden_states = self.activation(hidden_states)
-        hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
-        return hidden_states
-
-
-class {{cookiecutter.camelcase_modelname}}ForPretraining({{cookiecutter.camelcase_modelname}}PretrainedModel):
-    """
-    {{cookiecutter.camelcase_modelname}} Model with pretraining tasks on top.
-
-    Args:
-        {{cookiecutter. lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
-            An instance of :class:`{{cookiecutter.camelcase_modelname}}Model`.
-
-    """
-
-    def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
-        super({{cookiecutter.camelcase_modelname}}ForPretraining, self).__init__(config)
-        self.{{cookiecutter. lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
-        self.cls = {{cookiecutter.camelcase_modelname}}PretrainingHeads(
-            config,
-            embedding_weights=self.{{cookiecutter. lowercase_modelname}}.embeddings.word_embeddings.weight)
-
-        self.apply(self.init_weights)
-
-    def forward(self,
-                input_ids,
-                token_type_ids: Optional[Tensor]=None,
-                position_ids: Optional[Tensor]=None,
-                attention_mask: Optional[Tensor]=None,
-                masked_positions: Optional[Tensor]=None,
-                labels: Optional[Tensor]=None,
-                next_sentence_label: Optional[Tensor]=None,
-                output_hidden_states: Optional[bool]=None,
-                output_attentions: Optional[bool]=None,
-                return_dict: Optional[bool]=None):
-        r"""
-
-        Args:
-            input_ids (Tensor):
-                See :class:`{{cookiecutter.camelcase_modelname}}Model`.
-            token_type_ids (Tensor, optional):
-                See :class:`{{cookiecutter.camelcase_modelname}}Model`.
-            position_ids (Tensor, optional):
-                See :class:`{{cookiecutter.camelcase_modelname}}Model`.
-            attention_mask (Tensor, optional):
-                See :class:`{{cookiecutter.camelcase_modelname}}Model`.
-            masked_positions(Tensor, optional):
-                See :class:`{{cookiecutter.camelcase_modelname}}PretrainingHeads`.
-            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
-                vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked),
-                the loss is only computed for the tokens with labels in `[0, ..., vocab_size]`.
-            next_sentence_label (Tensor of shape `(batch_size,)`, optional):
-                Labels for computing the next sequence prediction (classification) loss. Input should be a sequence
-                pair (see `input_ids` docstring) Indices should be in `[0, 1]`:
-
-                - 0 indicates sequence B is a continuation of sequence A,
-                - 1 indicates sequence B is a random sequence.
-            output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `False`.
-            output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
-            return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.{{cookiecutter.camelcase_modelname}}ForPreTrainingOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
-
-        Returns:
-            An instance of :class:`~paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.{{cookiecutter.camelcase_modelname}}ForPreTrainingOutput` if `return_dict=True`.
-            Otherwise it returns a tuple of tensors corresponding to ordered and
-            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.{{cookiecutter. lowercase_modelname}}.{{cookiecutter.camelcase_modelname}}ForPreTrainingOutput`.
-
-        """
-        with paddle.static.amp.fp16_guard():
-            outputs = self.{{cookiecutter. lowercase_modelname}}(input_ids,
-                                token_type_ids=token_type_ids,
-                                position_ids=position_ids,
-                                attention_mask=attention_mask,
-                                output_attentions=output_attentions,
-                                output_hidden_states=output_hidden_states,
-                                return_dict=return_dict)
-            sequence_output, pooled_output = outputs[:2]
-            prediction_scores, seq_relationship_score = self.cls(
-                sequence_output, pooled_output, masked_positions)
-
-            total_loss = None
-            if labels is not None and next_sentence_label is not None:
-                loss_fct = paddle.nn.CrossEntropyLoss()
-                masked_lm_loss = loss_fct(
-                    prediction_scores.reshape(
-                        (-1, prediction_scores.shape[-1])),
-                    labels.reshape((-1, )))
-                next_sentence_loss = loss_fct(
-                    seq_relationship_score.reshape((-1, 2)),
-                    next_sentence_label.reshape((-1, )))
-                total_loss = masked_lm_loss + next_sentence_loss
-            if not return_dict:
-                output = (prediction_scores,
-                          seq_relationship_score) + outputs[2:]
-                return ((total_loss, ) +
-                        output) if total_loss is not None else output
-
-            return {{cookiecutter.camelcase_modelname}}ForPreTrainingOutput(
-                loss=total_loss,
-                prediction_logits=prediction_scores,
-                seq_relationship_logits=seq_relationship_score,
-                hidden_states=outputs.hidden_states,
-                attentions=outputs.attentions,
-            )
-
-
-class {{cookiecutter.camelcase_modelname}}PretrainingCriterion(paddle.nn.Layer):
-    """
-
-    Args:
-        vocab_size(int):
-            Vocabulary size of `inputs_ids` in `{{cookiecutter.camelcase_modelname}}Model`. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling `{{cookiecutter.camelcase_modelname}}Model`.
-
-    """
-
-    def __init__(self, vocab_size):
-        super({{cookiecutter.camelcase_modelname}}PretrainingCriterion, self).__init__()
-        # CrossEntropyLoss is expensive since the inner reshape (copy)
-        self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
-        self.vocab_size = vocab_size
-
-    def forward(self, prediction_scores: Tensor, seq_relationship_score: Tensor,
-                masked_lm_labels: Tensor, next_sentence_labels: Tensor, masked_lm_scale: Tensor):
-        """
-        Args:
-            prediction_scores(Tensor):
-                The scores of masked token prediction. Its data type should be float32.
-                If `masked_positions` is None, its shape is [batch_size, sequence_length, vocab_size].
-                Otherwise, its shape is [batch_size, mask_token_num, vocab_size]
-            seq_relationship_score(Tensor):
-                The scores of next sentence prediction. Its data type should be float32 and
-                its shape is [batch_size, 2]
-            masked_lm_labels(Tensor):
-                The labels of the masked language modeling, its dimensionality is equal to `prediction_scores`.
-                Its data type should be int64. If `masked_positions` is None, its shape is [batch_size, sequence_length, 1].
-                Otherwise, its shape is [batch_size, mask_token_num, 1]
-            next_sentence_labels(Tensor):
-                The labels of the next sentence prediction task, the dimensionality of `next_sentence_labels`
-                is equal to `seq_relation_labels`. Its data type should be int64 and
-                its shape is [batch_size, 1]
-            masked_lm_scale(Tensor or int):
-                The scale of masked tokens. Used for the normalization of masked language modeling loss.
-                If it is a `Tensor`, its data type should be int64 and its shape is equal to `prediction_scores`.
-
-        Returns:
-            Tensor: The pretraining loss, equals to the sum of `masked_lm_loss` plus the mean of `next_sentence_loss`.
-            Its data type should be float32 and its shape is [1].
-
-
-        """
-        with paddle.static.amp.fp16_guard():
-            masked_lm_loss = F.cross_entropy(prediction_scores,
-                                             masked_lm_labels,
-                                             reduction='none',
-                                             ignore_index=-1)
-            masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = F.cross_entropy(seq_relationship_score,
-                                                 next_sentence_labels,
-                                                 reduction='none')
-        return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
-
-
 class {{cookiecutter.camelcase_modelname}}ForMultipleChoice({{cookiecutter.camelcase_modelname}}PretrainedModel):
     """
     {{cookiecutter.camelcase_modelname}} Model with a linear layer on top of the hidden-states output layer,
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        {{cookiecutter. lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
+        {{cookiecutter.lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
             An instance of {{cookiecutter.camelcase_modelname}}Model.
         num_choices (int, optional):
             The number of choices. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of {{cookiecutter.camelcase_modelname}}.
             If None, use the same value as `hidden_dropout_prob` of `{{cookiecutter.camelcase_modelname}}Model`
-            instance `{{cookiecutter. lowercase_modelname}}`. Defaults to None.
+            instance `{{cookiecutter.lowercase_modelname}}`. Defaults to None.
 
     Examples:
         >>> model = {{cookiecutter.camelcase_modelname}}ForMultipleChoice(config, dropout=0.1)
@@ -929,7 +762,7 @@ class {{cookiecutter.camelcase_modelname}}ForMultipleChoice({{cookiecutter.camel
     def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
         super({{cookiecutter.camelcase_modelname}}ForMultipleChoice, self).__init__(config)
 
-        self.{{cookiecutter. lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
+        self.{{cookiecutter.lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config)
         self.num_choices = config.num_choices
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.
@@ -984,8 +817,8 @@ class {{cookiecutter.camelcase_modelname}}ForMultipleChoice({{cookiecutter.camel
                 from paddlenlp.transformers import {{cookiecutter.camelcase_modelname}}ForMultipleChoice, {{cookiecutter.camelcase_modelname}}Tokenizer
                 from paddlenlp.data import Pad, Dict
 
-                tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter. lowercase_modelname}}-base-uncased')
-                model = {{cookiecutter.camelcase_modelname}}ForMultipleChoice.from_pretrained('{{cookiecutter. lowercase_modelname}}-base-uncased', num_choices=2)
+                tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter.lowercase_modelname}}-base-uncased')
+                model = {{cookiecutter.camelcase_modelname}}ForMultipleChoice.from_pretrained('{{cookiecutter.lowercase_modelname}}-base-uncased', num_choices=2)
 
                 data = [
                     {
@@ -1045,7 +878,7 @@ class {{cookiecutter.camelcase_modelname}}ForMultipleChoice({{cookiecutter.camel
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
-        outputs = self.{{cookiecutter. lowercase_modelname}}(input_ids,
+        outputs = self.{{cookiecutter.lowercase_modelname}}(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
                             attention_mask=attention_mask,
@@ -1093,18 +926,18 @@ class {{cookiecutter.camelcase_modelname}}ForMaskedLM({{cookiecutter.camelcase_m
     {{cookiecutter.camelcase_modelname}} Model with a `masked language modeling` head on top.
 
     Args:
-        {{cookiecutter. lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
+        {{cookiecutter.lowercase_modelname}} (:class:`{{cookiecutter.camelcase_modelname}}Model`):
             An instance of :class:`{{cookiecutter.camelcase_modelname}}Model`.
 
     """
 
     def __init__(self, config: {{cookiecutter.camelcase_modelname}}Config):
         super({{cookiecutter.camelcase_modelname}}ForMaskedLM, self).__init__(config)
-        self.{{cookiecutter. lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config=config)
+        self.{{cookiecutter.lowercase_modelname}} = {{cookiecutter.camelcase_modelname}}Model(config=config)
 
         self.cls = {{cookiecutter.camelcase_modelname}}OnlyMLMHead(
             config=config,
-            embedding_weights=self.{{cookiecutter. lowercase_modelname}}.embeddings.word_embeddings.weight)
+            embedding_weights=self.{{cookiecutter.lowercase_modelname}}.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
 
@@ -1153,8 +986,8 @@ class {{cookiecutter.camelcase_modelname}}ForMaskedLM({{cookiecutter.camelcase_m
                 import paddle
                 from paddlenlp.transformers import {{cookiecutter.camelcase_modelname}}ForMaskedLM, {{cookiecutter.camelcase_modelname}}Tokenizer
 
-                tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter. lowercase_modelname}}-base-uncased')
-                model = {{cookiecutter.camelcase_modelname}}ForMaskedLM.from_pretrained('{{cookiecutter. lowercase_modelname}}-base-uncased')
+                tokenizer = {{cookiecutter.camelcase_modelname}}Tokenizer.from_pretrained('{{cookiecutter.lowercase_modelname}}-base-uncased')
+                model = {{cookiecutter.camelcase_modelname}}ForMaskedLM.from_pretrained('{{cookiecutter.lowercase_modelname}}-base-uncased')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -1165,7 +998,7 @@ class {{cookiecutter.camelcase_modelname}}ForMaskedLM({{cookiecutter.camelcase_m
 
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        outputs = self.{{cookiecutter. lowercase_modelname}}(input_ids,
+        outputs = self.{{cookiecutter.lowercase_modelname}}(input_ids,
                             token_type_ids=token_type_ids,
                             position_ids=position_ids,
                             attention_mask=attention_mask,
