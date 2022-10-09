@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 # limitations under the License.
 import numpy as np
 import nltk
-from paddlenlp.metrics import BLEU
 import evaluate
+from paddlenlp.metrics import BLEU
 
 
 def convert_example(example,
@@ -25,7 +25,7 @@ def convert_example(example,
                     ignore_pad_token_for_loss=True,
                     is_train=True):
     """
-    Convert a example into necessary features.
+    Convert an example into necessary features.
     """
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
@@ -46,37 +46,38 @@ def convert_example(example,
     input_seq = f'answer: {answer} context: {context} </s>'
     output_seq = f'question: {question} </s>'
 
-    labels = tokenizer(
+    outputs = tokenizer(
         output_seq,
         max_seq_len=max_target_length,
         pad_to_max_seq_len=True,
         truncation_strategy="longest_first",
     )
 
-    output_ids = [decoder_start_token_id] + labels["input_ids"][:-1]
+    output_ids = [decoder_start_token_id] + outputs["input_ids"][:-1]
 
     if ignore_pad_token_for_loss:
-        labels["input_ids"] = [(l if l != tokenizer.pad_token_id else -100)
-                               for l in labels["input_ids"]]
+        # Replace all tokenizer.pad_token_id in the outputs by -100 when we want to ignore padding in the loss.
+        outputs["input_ids"] = [(l if l != tokenizer.pad_token_id else -100)
+                                for l in outputs["input_ids"]]
 
     if is_train:
-        input_ids = tokenizer(input_seq,
-                              max_seq_len=max_source_length,
-                              pad_to_max_seq_len=True,
-                              truncation_strategy="longest_first",
-                              return_attention_mask=True,
-                              return_length=False)
-        return input_ids["input_ids"], input_ids[
-            "attention_mask"], output_ids, labels["input_ids"]
+        inputs = tokenizer(input_seq,
+                           max_seq_len=max_source_length,
+                           pad_to_max_seq_len=True,
+                           truncation_strategy="longest_first",
+                           return_attention_mask=True,
+                           return_length=False)
+        return inputs["input_ids"], inputs[
+            "attention_mask"], output_ids, outputs["input_ids"]
     else:
-        input_ids = tokenizer(input_seq,
-                              max_seq_len=max_source_length,
-                              pad_to_max_seq_len=True,
-                              truncation_strategy="longest_first",
-                              return_attention_mask=True,
-                              return_length=True)
-        return input_ids["input_ids"], input_ids["attention_mask"], \
-        input_ids["length"], output_ids, labels["input_ids"]
+        inputs = tokenizer(input_seq,
+                           max_seq_len=max_source_length,
+                           pad_to_max_seq_len=True,
+                           truncation_strategy="longest_first",
+                           return_attention_mask=True,
+                           return_length=True)
+        return inputs["input_ids"], inputs["attention_mask"], \
+        inputs["length"], output_ids, outputs["input_ids"]
 
 
 def compute_metrics(preds, labels, tokenizer, ignore_pad_token_for_loss=True):

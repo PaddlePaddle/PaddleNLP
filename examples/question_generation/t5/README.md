@@ -122,7 +122,7 @@ python -m paddle.distributed.launch --gpus 1,2 train.py \
 
 ```text
 ./output/
-├── t5_model_1000.pdparams
+├── t5_model_1000
 │   ├── model_config.json
 │   ├── model_state.pdparams
 │   ├── special_tokens_map.json
@@ -141,7 +141,7 @@ python -m paddle.distributed.launch --gpus 1,2 train.py \
 # GPU启动，预测仅支持单卡
 export CUDA_VISIBLE_DEVICES=0
 python predict.py \
-    --model_name_or_path=t5-base-finetuned-question-generation-ap \
+    --model_name_or_path=./checkpoints/model_xx/ \
     --dataset_name=squad \
     --output_path=generate.txt \
     --max_source_length=1024 \
