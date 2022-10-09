@@ -310,7 +310,7 @@ class BertModelTester:
                        start_positions=sequence_labels,
                        end_positions=sequence_labels,
                        return_dict=self.return_dict)
-        if token_labels is not None:
+        if sequence_labels is not None:
             result = result[1:]
 
         self.parent.assertEqual(result[0].shape,
