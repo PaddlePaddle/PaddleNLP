@@ -1572,7 +1572,7 @@ from paddlenlp import Taskflow
 - 支持本地图片路径输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=800 hspace='20'/>
+    <img src=https://user-images.githubusercontent.com/40840292/190966162-b26f68b8-9a36-42c0-837b-98f9b91c2adb.png height=800 hspace='20'/>
 </div>
 
 
@@ -1593,7 +1593,7 @@ from paddlenlp import Taskflow
 - http图片链接输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=400 hspace='10'/>
 </div>
 
 

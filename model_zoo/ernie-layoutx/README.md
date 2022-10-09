@@ -51,7 +51,7 @@
 - 支持本地图片路径输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=800 hspace='20'/>
+    <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
 </div>
 
 ```python
@@ -71,7 +71,7 @@
 - http图片链接输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
 </div>
 
 ```python
