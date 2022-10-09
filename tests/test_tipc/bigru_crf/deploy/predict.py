@@ -97,11 +97,17 @@ def load_vocab(dict_path):
     return vocab
 
 
-def parse_result(words, preds, lengths, word_vocab, label_vocab):
+def parse_result(words,
+                 preds,
+                 lengths,
+                 word_vocab,
+                 label_vocab,
+                 with_start_stop_tag=True):
     """ Parse padding result """
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))
     id2label_dict = dict(zip(label_vocab.values(), label_vocab.keys()))
+    offset = 1 if with_start_stop_tag else 0
     for sent_index in range(len(lengths)):
         sent = [
             id2word_dict[index]
@@ -109,7 +115,7 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
         ]
         tags = [
             id2label_dict[index]
-            for index in preds[sent_index][:lengths[sent_index]]
+            for index in preds[sent_index][offset:offset + lengths[sent_index]]
         ]
 
         sent_out = []
