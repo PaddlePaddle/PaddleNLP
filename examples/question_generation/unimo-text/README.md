@@ -69,7 +69,8 @@ tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 │       ├── pipeline_service.py # 服务器程序
 │       └── README.md # 说明文档
 ├── export_model.py # 动态图参数导出静态图参数脚本
-├── train.py # 训练评估脚本
+├── train.py # 训练脚本
+├── predict.py # 预测评估脚本
 ├── utils.py # 工具函数脚本
 └── README.md # 说明文档
 ```
@@ -132,18 +133,18 @@ data/
 - train.json/dev.json/test.json 文件格式：
 ```text
 {
-  "source": <context_text>,
-  "title": <answer_text>,
-  "target": <question_text>,
+  "context": <context_text>,
+  "answer": <answer_text>,
+  "question": <question_text>,
 }
 ...
 ```
-- train.txt/dev.txt/test.txt 文件样例：
+- train.json/dev.json/test.json 文件样例：
 ```text
 {
-  "source": "欠条是永久有效的,未约定还款期限的借款合同纠纷,诉讼时效自债权人主张债权之日起计算,时效为2年。 根据《中华人民共和国民法通则》第一百三十五条:向人民法院请求保护民事权利的诉讼时效期间为二年,法律另有规定的除外。 第一百三十七条:诉讼时效期间从知道或者应当知道权利被侵害时起计算。但是,从权利被侵害之日起超过二十年的,人民法院不予保护。有特殊情况的,人民法院可以延长诉讼时效期间。 第六十二条第(四)项:履行期限不明确的,债务人可以随时履行,债权人也可以随时要求履行,但应当给对方必要的准备时间。",
-  "title": "永久有效",
-  "target": "欠条的有效期是多久"
+  "context": "欠条是永久有效的,未约定还款期限的借款合同纠纷,诉讼时效自债权人主张债权之日起计算,时效为2年。 根据《中华人民共和国民法通则》第一百三十五条:向人民法院请求保护民事权利的诉讼时效期间为二年,法律另有规定的除外。 第一百三十七条:诉讼时效期间从知道或者应当知道权利被侵害时起计算。但是,从权利被侵害之日起超过二十年的,人民法院不予保护。有特殊情况的,人民法院可以延长诉讼时效期间。 第六十二条第(四)项:履行期限不明确的,债务人可以随时履行,债权人也可以随时要求履行,但应当给对方必要的准备时间。",
+  "answer": "永久有效",
+  "question": "欠条的有效期是多久"
 }
 ...
 ```
@@ -156,7 +157,7 @@ data/
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log run_gen.py \
+python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log train.py \
     --dataset_name=dureader_qg \
     --model_name_or_path="unimo-text-1.0" \
     --save_dir=./unimo/finetune/checkpoints \
@@ -239,7 +240,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log 
 
 ```shell
 export CUDA_VISIBLE_DEVICES=0
-python -u run_gen.py \
+python -u predict.py \
     --dataset_name=dureader_qg \
     --model_name_or_path=your_model_path \
     --output_path=./predict.txt \
@@ -255,13 +256,14 @@ python -u run_gen.py \
 ```
 关键参数释义如下：
 - `output_path` 表示预测输出结果保存的文件路径，默认为./predict.txt。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的微调好的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。
 
 
-Finetuned baseline的模型在xxx任务验证集上有如下结果(指标为BLEU-4)：
+Finetuned baseline的模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
 
 |       model_name        | DuReaderQG |
 | :-----------------------------: | :-----------: |
-|   finetuned unimo-text-1.0    | 41.08 |
+|    unimo-text-1.0-dureader_qg-template1    | 41.08 |
 
 ### 模型转换部署
 
