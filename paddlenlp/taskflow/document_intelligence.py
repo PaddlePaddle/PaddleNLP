@@ -16,7 +16,7 @@ import os
 import collections
 import paddle
 from ..transformers import AutoTokenizer
-from .utils import download_file, ImageReader, get_doc_pred, find_answer_pos
+from .utils import download_file, ImageReader, get_doc_pred, find_answer_pos, sort_res
 from .task import Task
 
 usage = r"""
@@ -128,6 +128,7 @@ class DocPromptTask(Task):
                         'end': -1
                     }]
                 } for p in prompt]
+                all_boxes = {}
             else:
                 data_loader = self._reader.data_generator(
                     ocr_result, doc_path, prompt, self._batch_size, ocr_type)
@@ -167,9 +168,13 @@ class DocPromptTask(Task):
                     unique_id_to_result[result.unique_id] = result
 
                 all_predictions = []
-
+                all_boxes = {}
                 for (example_index, example) in enumerate(all_examples):
+                    example_doc_tokens = example.doc_tokens
                     example_qas_id = example.qas_id
+                    page_id = example_qas_id.split("_")[0]
+                    if page_id not in all_boxes:
+                        all_boxes[page_id] = example.ori_boxes
                     example_query = example.keys[0]
                     features = example_index_to_features[example_qas_id]
 
@@ -195,8 +200,9 @@ class DocPromptTask(Task):
                             'end': -1
                         })
                     else:
-                        preds = sorted(
-                            preds, key=lambda x: x["prob"])[::-1][:self._topn]
+                        preds = sort_res(example_query, preds,
+                                         example_doc_tokens, all_boxes[page_id],
+                                         self._lang)[:self._topn]
                     all_predictions.append({
                         "prompt": example_query,
                         "result": preds
