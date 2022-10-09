@@ -31,7 +31,6 @@ from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokeni
 from paddlenlp.metrics import BLEU
 
 from gen_utils import print_args, set_seed, create_data_loader, select_sum
-from adversarial_utils import FGM, PGD
 
 
 # yapf: disable
@@ -39,7 +38,6 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--dataset_name', type=str, default='dureader_qg', help='The name of the dataset to load.')
     parser.add_argument('--model_name_or_path', type=str, default='unimo-text-1.0', help='The path or shortcut name of the pre-trained model.')
-    parser.add_argument("--train_file", type=str, required=False, default=None, help="Train data path.")
     parser.add_argument("--predict_file", type=str, required=False, default=None, help="Predict data path.")
     parser.add_argument('--save_dir', type=str, default='./checkpoints', help='The directory where the checkpoints will be saved.')
     parser.add_argument('--logging_steps', type=int, default=100, help='Log every X updates steps.')
@@ -140,12 +138,6 @@ def run(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    if args.train_file:
-        train_ds = load_dataset(read_file, file=args.train_file, lazy=False)
-    else:
-        train_ds = load_dataset(args.dataset_name,
-                                splits='train',
-                                data_files=args.train_file)
     if args.predict_file:
         dev_ds = load_dataset(read_file, file=args.predict_file, lazy=False)
     else:
@@ -153,85 +145,10 @@ def run(args):
                               splits='dev',
                               data_files=args.predict_file)
 
-    train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
-                                                     'train')
     dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
                                                  'test')
 
-    if args.do_train:
-        num_training_steps = args.epochs * len(train_data_loader)
-
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps,
-                                             args.warmup_propotion)
-        # Generate parameter names needed to perform weight decay.
-        # All bias and LayerNorm parameters are excluded.
-
-        decay_params = [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
-
-        optimizer = AdamW(learning_rate=lr_scheduler,
-                          parameters=model.parameters(),
-                          weight_decay=args.weight_decay,
-                          beta1=args.beta1,
-                          beta2=args.beta2,
-                          epsilon=args.epsilon,
-                          apply_decay_param_fun=lambda x: x in decay_params,
-                          grad_clip=paddle.nn.ClipGradByGlobalNorm(
-                              args.max_grad_norm))
-
-        step = 0
-        total_time = 0.0
-        best_bleu4 = 0
-        for epoch in range(args.epochs):
-            print('\nEpoch %d/%d' % (epoch + 1, args.epochs))
-            batch_start_time = time.time()
-            for inputs in train_data_loader:
-                step += 1
-                labels = inputs[-1]
-                logits = model(*inputs[:-1])
-                labels = paddle.nn.functional.one_hot(
-                    labels, num_classes=logits.shape[-1])
-                labels = paddle.nn.functional.label_smooth(labels)
-                loss = F.cross_entropy(logits, labels, soft_label=True)
-                loss.backward()
-
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.clear_grad()
-
-                total_time += (time.time() - batch_start_time)
-                if step % args.logging_steps == 0:
-                    ppl = paddle.exp(loss)
-                    print(
-                        'step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step'
-                        % (step, loss, ppl, optimizer.get_lr(),
-                           total_time / args.logging_steps))
-                    total_time = 0.0
-
-                if step % args.save_steps == 0 or step >= num_training_steps:
-                    if dist.get_rank() == 0:
-                        save_ckpt(model, tokenizer, args.save_dir, step)
-                        print('Saved step {} model.\n'.format(step))
-                        if args.do_predict:
-                            model_eval = model._layers if isinstance(
-                                model, paddle.DataParallel) else model
-                            bleu4 = evaluation(model_eval, dev_data_loader,
-                                               args, tokenizer)
-                            if bleu4 > best_bleu4:
-                                print(
-                                    "best BLEU-4 performence has been updated: %.5f  --> %.5f"
-                                    % (best_bleu4, bleu4))
-                                best_bleu4 = bleu4
-                                save_ckpt(model, tokenizer, args.save_dir,
-                                          'best')
-
-                batch_start_time = time.time()
-
-        print('\nTraining completed.')
-    elif args.do_predict:
+    if args.do_predict:
         model_eval = model._layers if isinstance(model,
                                                  paddle.DataParallel) else model
         evaluation(model_eval, dev_data_loader, args, tokenizer)
