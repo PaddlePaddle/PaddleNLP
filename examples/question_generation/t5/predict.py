@@ -26,114 +26,36 @@ from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 from utils import convert_example, compute_metrics
 
 
+# yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
-    parser.add_argument("--model_name_or_path",
-                        default="t5-base",
-                        type=str,
-                        required=True,
-                        help="Path to pre-trained model. ")
-    parser.add_argument(
-        "--dataset_name",
-        default="squad",
-        type=str,
-        required=True,
-        help="The name of the dataset to use. Selected in the list: " + "squad")
-    parser.add_argument(
-        '--output_path',
-        type=str,
-        default='generate.txt',
-        help='The file path where the infer result will be saved.')
-    parser.add_argument(
-        "--max_source_length",
-        default=1024,
-        type=int,
-        help=
-        "The maximum total input sequence length after tokenization.Sequences longer "
-        "than this will be truncated, sequences shorter will be padded.",
-    )
-    parser.add_argument(
-        "--min_target_length",
-        default=0,
-        type=int,
-        help=
-        "The minimum total sequence length for target text when generating. ")
-    parser.add_argument(
-        "--max_target_length",
-        default=142,
-        type=int,
-        help="The maximum total sequence length for target text after "
-        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded during ``evaluate`` and ``predict``.",
-    )
-    parser.add_argument('--decode_strategy',
-                        default='greedy_search',
-                        type=str,
-                        help='The decode strategy in generation.')
-    parser.add_argument(
-        '--top_k',
-        default=2,
-        type=int,
-        help=
-        'The number of highest probability vocabulary tokens to keep for top-k sampling.'
-    )
-    parser.add_argument('--top_p',
-                        default=1.0,
-                        type=float,
-                        help='The cumulative probability for top-p sampling.')
-    parser.add_argument('--num_beams',
-                        default=1,
-                        type=int,
-                        help='The number of beams for beam search.')
-    parser.add_argument(
-        '--length_penalty',
-        default=0.6,
-        type=float,
-        help='The exponential penalty to the sequence length for beam search.')
-    parser.add_argument(
-        '--early_stopping',
-        default=False,
-        type=eval,
-        help=
-        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.'
-    )
-    parser.add_argument("--diversity_rate",
-                        default=0.0,
-                        type=float,
-                        help="The diversity of beam search. ")
-    parser.add_argument(
-        '--faster',
-        action='store_true',
-        help='Whether to process inference using faster transformer. ')
-    parser.add_argument(
-        '--use_fp16_decoding',
-        action='store_true',
-        help=
-        'Whether to use fp16 when using faster transformer. Only works when using faster transformer. '
-    )
-    parser.add_argument(
-        "--batch_size",
-        default=64,
-        type=int,
-        help="Batch size per GPU/CPU for testing or evaluation.")
-    parser.add_argument("--seed",
-                        default=42,
-                        type=int,
-                        help="random seed for initialization")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument("--logging_steps",
-                        type=int,
-                        default=100,
-                        help="Log every X updates steps.")
-    parser.add_argument("--is_debug",
-                        default=False,
-                        type=bool,
-                        help="Whether to debug.")
+    parser.add_argument("--model_name_or_path", default="t5-base", type=str, required=True, help="Path to pre-trained model. ")
+    parser.add_argument("--dataset_name", default="squad", type=str, required=True, help="The name of the dataset to use. Selected in the list: " + "squad")
+    parser.add_argument('--output_path', type=str, default='generate.txt', help='The file path where the infer result will be saved.')
+    parser.add_argument("--max_source_length", default=1024, type=int, help=
+        "The maximum total input sequence length after tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",)
+    parser.add_argument("--min_target_length", default=0, type=int, help="The minimum total sequence length for target text when generating. ")
+    parser.add_argument("--max_target_length", default=142, type=int,help=
+        "The maximum total sequence length for target text after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded during ``evaluate`` and ``predict``.",)
+    parser.add_argument('--decode_strategy', default='greedy_search', type=str, help='The decode strategy in generation.')
+    parser.add_argument('--top_k', default=2, type=int,help=
+        'The number of highest probability vocabulary tokens to keep for top-k sampling.')
+    parser.add_argument('--top_p', default=1.0, type=float,help=
+        'The cumulative probability for top-p sampling.')
+    parser.add_argument('--num_beams', default=1, type=int, help='The number of beams for beam search.')
+    parser.add_argument('--length_penalty', default=0.6, type=float, help='The exponential penalty to the sequence length for beam search.')
+    parser.add_argument('--early_stopping', default=False, type=eval, help=
+        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
+    parser.add_argument("--diversity_rate", default=0.0, type=float, help="The diversity of beam search. ")
+    parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
+    parser.add_argument('--use_fp16_decoding', action='store_true',help=
+        'Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
+    parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for testing or evaluation.")
+    parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
+    parser.add_argument( "--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--is_debug", default=False, type=bool, help="Whether to debug.")
     args = parser.parse_args()
     return args
 
