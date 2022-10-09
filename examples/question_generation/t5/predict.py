@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,8 +49,9 @@ def parse_args():
         "--max_source_length",
         default=1024,
         type=int,
-        help="The maximum total input sequence length after "
-        "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
+        help=
+        "The maximum total input sequence length after tokenization.Sequences longer "
+        "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
         "--min_target_length",
@@ -63,8 +64,7 @@ def parse_args():
         default=142,
         type=int,
         help="The maximum total sequence length for target text after "
-        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
-        "during ``evaluate`` and ``predict``.",
+        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded during ``evaluate`` and ``predict``.",
     )
     parser.add_argument('--decode_strategy',
                         default='greedy_search',

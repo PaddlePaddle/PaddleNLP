@@ -4,7 +4,7 @@
 **目录**
 - [问题生成](#问题生成)
   - [简介](#简介)
-    - [基于预训练语言模型的问题生成](#基于预训练语言模型的问题生成)
+    <!-- - [基于预训练语言模型的问题生成](#基于预训练语言模型的问题生成) -->
   <!-- - [效果展示](#效果展示)
   - [开箱即用](#开箱即用) -->
   - [训练定制](#训练定制)
@@ -27,7 +27,7 @@ Question Generation（QG），即问题生成，指的是给定一段上下文�
 
 问题生成技术在教育、咨询、搜索、推荐等多个领域均有着巨大的应用价值。具体来说，问题生成可广泛应用于问答系统语料库构建，事实性问题生成，教育行业题库生成，对话提问，聊天机器人意图理解，对话式搜索意图提问，闲聊机器人主动提问等等场景。
 
-### 基于预训练语言模型的问题生成
+<!-- ### 基于预训练语言模型的问题生成
 
 基于预训练语言模型（Pretrained Language Models, PLMs）范式的问题生成是目前最常用、效果最好(SOTA)的方式。
 预训练模型是在超大规模的语料采用无监督或者弱监督的方式进行预训练，能够学习如何准确地理解自然语言并以自然语言的形式流畅表达，这两项都是完成文本生成任务的重要能力。
@@ -39,7 +39,7 @@ from paddlenlp.transformers import  ErnieForGeneration, ErnieTokenizer
 model_name = "ernie-1.0"
 model = UNIMOLMHeadModel.from_pretrained(model_name)
 tokenizer = UNIMOTokenizer.from_pretrained(model_name)
-```
+``` -->
 <!--
 ## 效果展示
 
@@ -78,8 +78,8 @@ tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 ### 问题生成定制训练全流程介绍
 接下来，我们将按数据准备、训练、预测、推理部署等四个阶段对问题生成应用的全流程进行介绍。
 1. **数据准备**
-- 如果没有已标注的数据集，我们推荐doccano数据标注工具([doccano](https://github.com/doccano/doccano))。
-- 如果已有标注好的本地数据集，我们需要根据将数据集整理为文档要求的格式，请参考[从本地文件创建数据集](###从本地文件创建数据集)。
+- 默认使用中文问题生成数据集DuReader_QG进行实验，该数据集已集成到PaddleNLP。
+- 如果已有标注好的本地数据集，我们需要根据将数据集整理为文档要求的格式，请参考[从本地文件创建数据集（可选）](#从本地文件创建数据集（可选）)。
 
 2. **模型训练**
 
@@ -101,7 +101,7 @@ tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 
 ### 数据准备
 #### 数据加载
-[**DuReader_QG**数据集](https://www.luge.ai/#/luge/dataDetail?id=8)是一个中文问答数据集，我们使用该数据集作为应用案例进行实验。**DuReader_QG**中的数据主要由由上下文、问题、答案3个主要部分组成，其任务描述为给定上下文p和答案a，生成自然语言表述的问题q，且该问题符合段落和上下文的限制。
+[**DuReader_QG**数据集](https://www.luge.ai/#/luge/dataDetail?id=8)是一个中文问题生成数据集，我们使用该数据集作为应用案例进行实验。**DuReader_QG**中的数据主要由由上下文、问题、答案3个主要部分组成，其任务描述为给定上下文p和答案a，生成自然语言表述的问题q，且该问题符合段落和上下文的限制。
 
 为了方便用户快速测试，PaddleNLP Dataset API内置了DuReader_QG数据集，一键即可完成数据集加载，示例代码如下：
 
@@ -216,8 +216,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log 
 - `do_train` 是否进行训练。
 - `do_predict` 是否进行预测，在验证集上会自动评估。
 - `device` 表示使用的设备，从gpu和cpu中选择。
-- `adversarial_training` 表示使用何种对抗训练策略，从['None', 'fgm', 'pgd']中选择。
-- `template` 表示使用的设备，从[0, 1, 2, 3]中选择，0表示不选择模版，1表示使用默认模版。
+- `template` 表示使用的模版，从[0, 1, 2, 3, 4]中选择，0表示不选择模版，1表示使用默认模版。
 
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。如：
 
