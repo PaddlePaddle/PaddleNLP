@@ -20,6 +20,7 @@ import paddle
 
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 
 from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
@@ -904,7 +905,8 @@ class T5Stack(nn.Layer):
                  feed_forward_proj,
                  d_ff,
                  embed_tokens=None,
-                 is_decoder=False):
+                 is_decoder=False,
+                 enable_recompute=False):
         super().__init__()
         self.is_decoder = is_decoder
         self.embed_tokens = embed_tokens
@@ -923,6 +925,7 @@ class T5Stack(nn.Layer):
         ])
         self.final_layer_norm = T5LayerNorm(d_model, eps=layer_norm_epsilon)
         self.dropout = nn.Dropout(dropout_rate)
+        self.enable_recompute = enable_recompute
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1005,17 +1008,26 @@ class T5Stack(nn.Layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states, )
 
-            layer_outputs = layer_module(
-                hidden_states,
-                attention_mask=extended_attention_mask,
-                position_bias=position_bias,
-                encoder_hidden_states=encoder_hidden_states,
-                encoder_attention_mask=encoder_extended_attention_mask,
-                encoder_decoder_position_bias=encoder_decoder_position_bias,
-                cache=past_key_value,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-            )
+            if self.enable_recompute:
+                layer_outputs = recompute(layer_module, hidden_states,
+                                          extended_attention_mask,
+                                          position_bias, encoder_hidden_states,
+                                          encoder_extended_attention_mask,
+                                          encoder_decoder_position_bias,
+                                          past_key_value, use_cache,
+                                          output_attentions)
+            else:
+                layer_outputs = layer_module(
+                    hidden_states,
+                    attention_mask=extended_attention_mask,
+                    position_bias=position_bias,
+                    encoder_hidden_states=encoder_hidden_states,
+                    encoder_attention_mask=encoder_extended_attention_mask,
+                    encoder_decoder_position_bias=encoder_decoder_position_bias,
+                    cache=past_key_value,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                )
 
             # layer_outputs is a tuple with:
             # hidden-states, key-value-states, (self-attention position bias), (self-attention weights), (cross-attention position bias), (cross-attention weights)
@@ -1207,23 +1219,26 @@ class T5Model(T5PretrainedModel):
 
     """
 
-    def __init__(self,
-                 tie_word_embeddings=True,
-                 pad_token_id=0,
-                 bos_token_id=0,
-                 eos_token_id=1,
-                 initializer_factor=1.0,
-                 vocab_size=32128,
-                 d_model=768,
-                 d_kv=64,
-                 d_ff=3072,
-                 num_layers=12,
-                 num_decoder_layers=12,
-                 num_heads=12,
-                 relative_attention_num_buckets=32,
-                 dropout_rate=0.1,
-                 layer_norm_epsilon=1e-06,
-                 feed_forward_proj="relu"):
+    def __init__(
+        self,
+        tie_word_embeddings=True,
+        pad_token_id=0,
+        bos_token_id=0,
+        eos_token_id=1,
+        initializer_factor=1.0,
+        vocab_size=32128,
+        d_model=768,
+        d_kv=64,
+        d_ff=3072,
+        num_layers=12,
+        num_decoder_layers=12,
+        num_heads=12,
+        relative_attention_num_buckets=32,
+        dropout_rate=0.1,
+        layer_norm_epsilon=1e-06,
+        feed_forward_proj="relu",
+        enable_recompute=False,
+    ):
         super().__init__()
         self.tie_word_embeddings = tie_word_embeddings
         self.pad_token_id = pad_token_id
@@ -1253,7 +1268,8 @@ class T5Model(T5PretrainedModel):
                                feed_forward_proj,
                                d_ff,
                                self.shared,
-                               is_decoder=False)
+                               is_decoder=False,
+                               enable_recompute=enable_recompute)
         self.decoder = T5Stack(d_model,
                                num_decoder_layers,
                                layer_norm_epsilon,
@@ -1264,7 +1280,8 @@ class T5Model(T5PretrainedModel):
                                feed_forward_proj,
                                d_ff,
                                self.shared,
-                               is_decoder=True)
+                               is_decoder=True,
+                               enable_recompute=enable_recompute)
 
         self.init_weights()
 

@@ -46,6 +46,35 @@ python run_glue.py \
 - `scheduler_type` scheduler类型，可选linear和cosine，默认linear。
 - `output_dir` 表示模型保存路径。
 
+使用trainer进行Fine-tuning:
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
+    --model_name_or_path t5-base \
+    --task_name rte \
+    --max_seq_length 256 \
+    --do_train \
+    --do_eval \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 64 \
+    --learning_rate 1e-4 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.1 \
+    --num_train_epochs 10 \
+    --eval_steps 200 \
+    --logging_steps 20 \
+    --save_steps 200 \
+    --save_total_limit 3 \
+    --metric_for_best_model `eval_accuarcy` \
+    --fp16 \
+    --fp16_opt_level "O1" \
+    --recompute true \
+    --sharding "stage1" \
+    --overwrite_output_dir \
+    --disable_tqdm true \
+    --output_dir outputs/rte/
+```
+具体参数含义请参见: https://paddlenlp.readthedocs.io/zh/latest/trainer.html
+
 ###### t5-base模型在GLUE开发集上的结果：
 | Model                          | cola  | sst-2  | mrpc        | sts-b             | qqp         | mnli       | qnli | rte   | mean |
 |--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|-------|

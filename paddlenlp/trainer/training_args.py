@@ -176,17 +176,19 @@ class TrainingArguments:
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
             For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at 
             https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
-        sharding (`bool`, *optional*, defaults to `False`):
-            Whether to use sharding to share parameters on different cards, to save memory.
+        sharding (`str`, *optional*, defaults to ``):
+            Whether or not to use Paddle Sharding Data Parallel training (in distributed training
+            only). The base option should be `stage1`, `stage2` or `stage3` and you can add
+            CPU-offload to `stage2` or `stage3` like this: `stage2 offload` or `stage3 offload`. 
+            Each stage means:
+                stage1 : optimizer state segmentation
+                stage2 : optimizer state + gradient segmentation
+                stage3 : parameter + gradient + optimizer state segmentation
+                offload : offload parameters to cpu
         sharding_degree (`int`, *optional*, defaults to `-1`)
             Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards, 
             then set sharding_degree=8, sharding will only communication inside machine. 
             default -1 means sharding parameters between all workers.
-        sharding_stage (`int`, *optional*, defaults to `1`)
-            Sharding stage means different types of sharding acorss different cards. It means:
-                stage 1 : optimizer state segmentation
-                stage 2 : optimizer state + gradient segmentation
-                stage 3 : parameter + gradient + optimizer state segmentation
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
