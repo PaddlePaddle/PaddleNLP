@@ -112,6 +112,7 @@ def convert_example(example,
             tokenized_example['input_ids'])
         index_list = []
         count = tokenized_example['input_ids'].count(tokenizer.cls_token_id)
+        # If template==4, count must be equal to 7, otherwise count must be equal to 2
         assert count == 7 or count == 2, str(
             count) + ' is not in [2, 7], temp_tokens: ' + ' '.join(
                 temp_tokens) + 'source: ' + source

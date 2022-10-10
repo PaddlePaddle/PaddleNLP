@@ -25,63 +25,22 @@ from paddlenlp.ops import FasterUNIMOText
 from paddlenlp.utils.log import logger
 
 
+# yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path",
-                        default="checkpoint",
-                        type=str,
-                        help="The model name to specify the UNIMOText to use. ")
-    parser.add_argument("--inference_model_dir",
-                        default="./export_checkpoint",
-                        type=str,
-                        help="Path to save inference model of UNIMOText. ")
-    parser.add_argument(
-        "--topk",
-        default=4,
-        type=int,
-        help="The number of candidate to procedure top_k sampling. ")
-    parser.add_argument(
-        "--topp",
-        default=1.0,
-        type=float,
-        help="The probability threshold to procedure top_p sampling. ")
-    parser.add_argument("--max_dec_len",
-                        default=20,
-                        type=int,
-                        help="Maximum output length. ")
-    parser.add_argument("--min_dec_len",
-                        default=3,
-                        type=int,
-                        help="Minimum output length. ")
-    parser.add_argument("--temperature",
-                        default=1.0,
-                        type=float,
-                        help="The temperature to set. ")
-    parser.add_argument("--num_return_sequences",
-                        default=1,
-                        type=int,
-                        help="The number of returned sequences. ")
-    parser.add_argument("--use_fp16_decoding",
-                        action="store_true",
-                        help="Whether to use fp16 decoding to predict. ")
-    parser.add_argument("--decoding_strategy",
-                        default="beam_search",
-                        choices=["sampling", "beam_search"],
-                        type=str,
-                        help="The main strategy to decode. ")
-    parser.add_argument(
-        "--num_beams",
-        default=6,
-        type=int,
-        help="The number of candidate to procedure beam search. ")
-    parser.add_argument("--diversity_rate",
-                        default=0.0,
-                        type=float,
-                        help="The diversity rate to procedure beam search. ")
-    parser.add_argument("--length_penalty",
-                        default=1.2,
-                        type=float,
-                        help="The diversity rate to procedure beam search. ")
+    parser.add_argument("--model_name_or_path", default="checkpoint", type=str, help="The model name to specify the UNIMOText to use. ")
+    parser.add_argument("--inference_model_dir", default="./export_checkpoint", type=str, help="Path to save inference model of UNIMOText. ")
+    parser.add_argument("--topk", default=4, type=int, help="The number of candidate to procedure top_k sampling. ")
+    parser.add_argument("--topp", default=1.0, type=float, help="The probability threshold to procedure top_p sampling. ")
+    parser.add_argument("--max_dec_len", default=20, type=int, help="Maximum output length. ")
+    parser.add_argument("--min_dec_len", default=3, type=int, help="Minimum output length. ")
+    parser.add_argument("--temperature", default=1.0, type=float, help="The temperature to set. ")
+    parser.add_argument("--num_return_sequences", default=1, type=int, help="The number of returned sequences. ")
+    parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--decoding_strategy", default="beam_search", choices=["sampling", "beam_search"], type=str, help="The main strategy to decode. ")
+    parser.add_argument("--num_beams", default=6, type=int, help="The number of candidate to procedure beam search. ")
+    parser.add_argument("--diversity_rate", default=0.0, type=float, help="The diversity rate to procedure beam search. ")
+    parser.add_argument("--length_penalty", default=1.2, type=float, help="The diversity rate to procedure beam search. ")
     args = parser.parse_args()
     return args
 
@@ -106,14 +65,14 @@ def do_predict(args):
         unimo_text,
         input_spec=[
             # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # token_type_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # attention_mask
             paddle.static.InputSpec(shape=[None, 1, None, None],
-                                    dtype="float32"),
+                                    dtype="float64"),
             # seq_len
-            paddle.static.InputSpec(shape=[None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None], dtype="int64"),
             args.max_dec_len,
             args.min_dec_len,
             args.topk,
