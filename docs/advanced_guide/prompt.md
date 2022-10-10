@@ -432,8 +432,8 @@ class DataArguments:
     data_path : str = field(default="./data", metadata={"help": "The path to dataset."})
 
 parser = PdArgumentParser((DataArguments, PromptTuningArguments))
-data_args, training_args = parser.parse_args_into_dataclasses(args=["--output_dir", "./"],
-															  look_for_args_file=False)
+data_args, training_args = parser.parse_args_into_dataclasses(
+    args=["--output_dir", "./", "--do_train", "True"], look_for_args_file=False)
 ```
 
 **初始化和训练**
@@ -444,6 +444,7 @@ data_args, training_args = parser.parse_args_into_dataclasses(args=["--output_di
 
 import paddle
 from paddle.metric import Accuracy
+from paddlenlp.prompt import PromptTrainer
 
 # 损失函数
 criterion = paddle.nn.CrossEntropyLoss()
