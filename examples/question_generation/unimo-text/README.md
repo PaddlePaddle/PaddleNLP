@@ -274,14 +274,14 @@ python -u predict.py \
 python export_model.py \
     --model_name_or_path ./checkpoint \
     --inference_model_dir ./export_checkpoint \
-    --max_out_len 64 \
+    --max_dec_len 50 \
     --use_fp16_decoding
 ```
 关键参数释义如下：
 
 * `model_name_or_path`：动态图训练保存的参数路径；默认为"./checkpoint"。
 * `inference_model_dir`：静态图图保存的参数路径；默认为"./export_checkpoint"。
-* `max_out_len`：最大输出长度。
+* `max_dec_len`：最大输出长度。
 * `use_fp16_decoding`:是否使用fp16解码进行预测。
 
 执行命令后将会自动导出模型到指定的 `inference_model_dir` 中，保存模型文件结构如下所示：
