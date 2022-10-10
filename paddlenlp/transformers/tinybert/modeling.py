@@ -16,7 +16,6 @@
 import paddle
 import paddle.nn as nn
 
-
 from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 from ..configuration_utils import PretrainedConfig
@@ -247,7 +246,7 @@ class TinyBertModel(TinyBertPretrainedModel):
         super(TinyBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        
+
         # TODO(wj-Mcat): construct config temporary
         # to be removed when TinyBertConfig is completed
         config = PretrainedConfig(
