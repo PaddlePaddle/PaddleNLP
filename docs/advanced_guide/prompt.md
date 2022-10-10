@@ -341,9 +341,9 @@ Prompt 框架定义了统一的样本结构 ``InputExample`` 以便进行数据�
 
 ```python
 data = [
-    {'id': 3, 'sentence1': '你晚上吃了什么', 'sentence2': '你晚上吃啥了', 'label': '1'},
-    {'id': 4, 'sentence1': '我想打开滴滴叫的士', 'sentence2': '你叫小欧吗', 'label': '0'},
-    {'id': 5, 'sentence1': '女孩子到底是不是你', 'sentence2': '你不是女孩子吗', 'label': '1'}
+    {'id': 3, 'sentence1': '你晚上吃了什么', 'sentence2': '你晚上吃啥了', 'label': 1},
+    {'id': 4, 'sentence1': '我想打开滴滴叫的士', 'sentence2': '你叫小欧吗', 'label': 0},
+    {'id': 5, 'sentence1': '女孩子到底是不是你', 'sentence2': '你不是女孩子吗', 'label': 1}
 ]
 ```
 
@@ -389,7 +389,7 @@ template = AutoTemplate.create_from(template="{'text': 'text_a'}和{'text': 'tex
 
 # 定义标签词映射
 verbalizer = ManualVerbalizer(tokenizer=tokenizer,
-                              label_words={'0': '不', '1': '相'})
+                              label_words={0: '不', 1: '相'})
 
 # 定义文本分类提示模型
 prompt_model = PromptModelForSequenceClassification(model,
@@ -464,7 +464,7 @@ trainer = PromptTrainer(model=prompt_model,
                         args=training_args,
                         criterion=criterion,
                         train_dataset=data_ds,
-                        eval_dataset=data_ds,
+                        eval_dataset=None,
                         callbacks=None,
                         compute_metrics=compute_metrics)
 
