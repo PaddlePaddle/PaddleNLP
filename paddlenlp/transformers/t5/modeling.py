@@ -32,6 +32,7 @@ from ..model_outputs import (
     Seq2SeqLMOutput,
     BaseModelOutput,
     ModelOutput,
+    convert_encoder_output,
 )
 
 __all__ = [
@@ -1889,19 +1890,3 @@ class T5EncoderModel(T5PretrainedModel):
 
 
 T5EncoderModel.base_model_class = T5EncoderModel
-
-
-def convert_encoder_output(encoder_output):
-    """
-    Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.Seq2SeqModelOutput`.
-    
-    Args: 
-        encoder_output (tuple or ModleOutput):
-            The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
-            The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
-    """
-    return BaseModelOutput(
-        last_hidden_state=encoder_output[0],
-        hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,
-        attentions=encoder_output[2] if len(encoder_output) > 2 else None,
-    )
