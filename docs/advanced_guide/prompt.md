@@ -69,6 +69,7 @@ Prompt API 提供了这类算法实现的基本模块，支持[PET](https://arxi
 例如，对于自然语言推理任务，给定样本
 
 ```python
+from paddlenlp.prompt import InputExample
 sample = InputExample(uid=0,
                       text_a="心里有些生畏,又不知畏惧什么",
                       text_b="心里特别开心",
@@ -92,6 +93,7 @@ tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
 template = ManualTemplate(tokenizer=tokenizer,
                           max_seq_length=512,
                           template="“{'text': 'text_a'}”和“{'text': 'text_b'}”之间的逻辑关系是{'mask'}")
+input_dict = template.wrap_one_example(sample)
 ```
 
 其中初始化参数定义如下
@@ -311,7 +313,7 @@ verbalizer = MultiMaskVerbalizer(tokenizer=tokenizer,
 **调用 API**
 
 ```python
-from paddlenlp.prompt import MultiMaskVerbalizer
+from paddlenlp.prompt import SoftVerbalizer
 from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
 
 model = AutoModelForMaskedLM.from_pretrained("ernie-3.0-base-zh")
@@ -376,6 +378,10 @@ tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
 
 
 ```python
+from paddlenlp.prompt import AutoTemplate
+from paddlenlp.prompt import ManualVerbalizer
+from paddlenlp.prompt import PromptModelForSequenceClassification
+
 # 定义模板
 template = AutoTemplate.create_from(template="{'text': 'text_a'}和{'text': 'text_b'}说的是{'mask'}同的事情。",
                                     tokenizer=tokenizer,
@@ -417,7 +423,7 @@ python xxx.py --output_dir xxx --learning_rate xxx
 除了训练参数，还需要自定义数据和模型相关的参数。最后用 ``PdArgumentParser`` 输出参数。
 
 ```python
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.prompt import PromptTuningArguments
 
@@ -426,7 +432,8 @@ class DataArguments:
     data_path : str = field(default="./data", metadata={"help": "The path to dataset."})
 
 parser = PdArgumentParser((DataArguments, PromptTuningArguments))
-data_args, training_args = parser.parse_args_into_dataclasses()
+data_args, training_args = parser.parse_args_into_dataclasses(args=["--output_dir", "./"],
+															  look_for_args_file=False)
 ```
 
 **初始化和训练**
