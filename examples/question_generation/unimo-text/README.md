@@ -258,7 +258,7 @@ python -u predict.py \
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的微调好的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。
 
 
-Finetuned baseline的模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
+微调的baseline模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
 
 |       model_name        | DuReaderQG |
 | :-----------------------------: | :-----------: |
