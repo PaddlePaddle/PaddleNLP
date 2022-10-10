@@ -302,19 +302,20 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model = BertForQuestionAnswering(config)
-
+        model = BertForQuestionAnswering(BertModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-            start_positions=sequence_labels,
-            end_positions=sequence_labels,
-        )
-        self.parent.assertEqual(result[1].shape,
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.return_dict)
+        if sequence_labels is not None:
+            result = result[1:]
+
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.seq_length])
-        self.parent.assertEqual(result[2].shape,
+        self.parent.assertEqual(result[1].shape,
                                 [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
