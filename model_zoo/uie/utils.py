@@ -334,7 +334,8 @@ def get_relation_type_dict(relation_data):
                 added_list.append(relation_data[i][0])
                 suffix = relation_data[i][0].rsplit("的", 1)[1]
                 suffix = unify_prompt_name(suffix)
-                relation_type_dict[suffix] = relation_data[i][1]
+                relation_type_dict.setdefault(suffix,
+                                              []).append(relation_data[i][1])
     return relation_type_dict
 
 
