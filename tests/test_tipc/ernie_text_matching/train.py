@@ -181,7 +181,7 @@ if __name__ == "__main__":
     parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
     parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")
-    parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
+    parser.add_argument('--device', choices=['cpu', 'gpu', 'npu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     args = parser.parse_args()
     # yapf: enable
     do_train(args)
