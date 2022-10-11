@@ -233,6 +233,12 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log 
 
 **NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
 
+微调的baseline模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
+
+|       model_name        | DuReaderQG |
+| :-----------------------------: | :-----------: |
+|    unimo-text-1.0-dureader_qg-template1    | 41.08 |
+
 ### 模型预测
 
 运行下方脚本可以使用训练好的模型进行预测。
@@ -256,13 +262,6 @@ python -u predict.py \
 关键参数释义如下：
 - `output_path` 表示预测输出结果保存的文件路径，默认为./predict.txt。
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的微调好的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。
-
-
-微调的baseline模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
-
-|       model_name        | DuReaderQG |
-| :-----------------------------: | :-----------: |
-|    unimo-text-1.0-dureader_qg-template1    | 41.08 |
 
 ### 模型转换部署
 
