@@ -1,8 +1,8 @@
 #rpc端口, rpc_port和http_port不允许同时为空。当rpc_port为空且http_port不为空时，会自动将rpc_port设置为http_port+1
-rpc_port: 7688
+rpc_port: 18090
 
 #http端口, rpc_port和http_port不允许同时为空。当rpc_port可用且http_port为空时，不自动生成http_port
-http_port: 9998
+http_port: 9878
 
 #worker_num, 最大并发数。
 #当build_dag_each_worker=True时, 框架会创建worker_num个进程，每个进程内构建grpcSever和DAG
