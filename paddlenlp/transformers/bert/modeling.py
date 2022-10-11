@@ -1283,7 +1283,7 @@ class BertForMaskedLM(BertPretrainedModel):
 
     def __init__(self, config: BertConfig):
         super(BertForMaskedLM, self).__init__(config)
-        self.bert = BertModel(config=config)
+        self.bert = BertModel(config)
 
         self.cls = BertOnlyMLMHead(
             config=config,

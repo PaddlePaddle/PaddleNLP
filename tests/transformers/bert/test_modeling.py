@@ -302,7 +302,7 @@ class BertModelTester:
         token_labels,
         choice_labels,
     ):
-        model = BertForQuestionAnswering(BertModel(**config))
+        model = BertForQuestionAnswering(config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,

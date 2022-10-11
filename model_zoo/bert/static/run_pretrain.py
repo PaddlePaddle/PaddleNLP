@@ -28,6 +28,7 @@ import distutils.util
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.io import DataLoader, Dataset
+from paddlenlp.transformers.bert.configuration import BertConfig
 
 from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
@@ -306,11 +307,11 @@ def do_train(args):
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-    config = model_class.pretrained_init_configuration[args.model_name_or_path]
+    config = model_class.config_class.from_pretrained(args.model_name_or_path)
     if config["vocab_size"] % 8 != 0:
         config["vocab_size"] += 8 - (config["vocab_size"] % 8)
     config['fuse'] = args.fuse_transformer
-    model = BertForPretraining(BertModel(**config))
+    model = model_class(config)
     criterion = BertPretrainingCriterion(model.bert.config["vocab_size"])
     prediction_scores, seq_relationship_score = model(
         input_ids=input_ids,
