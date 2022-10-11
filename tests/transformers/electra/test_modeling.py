@@ -145,15 +145,17 @@ class ElectraModelTester:
         input_token_types = ids_tensor([self.batch_size, self.seq_length],
                                        self.type_vocab_size)
 
-        # create MultiHeadAttention.Cache objects for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
+        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
         embed_size_per_head = self.hidden_size // self.num_attention_heads
         key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
                                     self.seq_length, embed_size_per_head))
         values_tensor = floats_tensor(
             (self.batch_size, self.num_attention_heads, self.seq_length,
              embed_size_per_head))
-        past_key_values = (paddle.nn.MultiHeadAttention.Cache(
-            k=key_tensor, v=values_tensor), ) * self.num_hidden_layers
+        past_key_values = ((
+            key_tensor,
+            values_tensor,
+        ), ) * self.num_hidden_layers
 
         # create fully-visible attention mask for input_ids only and input_ids + past
         attention_mask = paddle.ones([self.batch_size, self.seq_length])

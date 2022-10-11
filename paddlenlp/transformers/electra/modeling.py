@@ -153,9 +153,12 @@ class TransformerEncoderPro(TransformerEncoder):
                              src_mask=src_mask,
                              output_attentions=output_attentions)
             else:
+                cache_wrapper = cache[i] if isinstance(
+                    cache[i], nn.MultiHeadAttention.Cache
+                ) else nn.MultiHeadAttention.Cache(*cache[i])
                 output, new_cache = mod(output,
                                         src_mask=src_mask,
-                                        cache=cache[i],
+                                        cache=cache_wrapper,
                                         output_attentions=output_attentions)
                 new_caches.append(new_cache)
             if output_attentions:
@@ -592,12 +595,11 @@ class ElectraModel(ElectraPretrainedModel):
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
-            past_key_values (tuple(paddle.nn.MultiHeadAttention.Cache), optional):
+            past_key_values (tuple(tuple(Tensor)), optional):
                 Precomputed key and value hidden states of the attention blocks of each layer. This can be used to speedup
                 auto-regressive decoding for generation tasks or to support use cases such as Prefix-Tuning where vectors are prepended
-                to each attention layer.
-                The length of tuple equals to the number of layers, and each MultiHeadAttention.Cache objects contains key and value tensor
-                of shape `(batch_size, num_heads, past_key_values_length, embed_size_per_head)`)
+                to each attention layer. The length of tuple equals to the number of layers, and each tuple having 2 tensors of shape
+                `(batch_size, num_heads, past_key_values_length, embed_size_per_head)`)
                 If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
                 don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
                 `input_ids` of shape `(batch_size, sequence_length)`.
