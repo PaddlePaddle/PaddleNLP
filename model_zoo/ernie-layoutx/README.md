@@ -6,9 +6,9 @@
 - [2. 开箱即用](#开箱即用)
 - [3. Benchmark模型效果](#Benchmark模型效果)
 - [4. Benchmark模型复现](#Benchmark模型复现)
-  - [4.1 启动文档信息抽取任务](#启动文档信息抽取任务)
-  - [4.2 启动文档视觉问答任务](#启动文档视觉问答任务)
-  - [4.3 启动文档图像分类任务](#启动文档图像分类任务)
+  - [4.1 文档信息抽取任务](#文档信息抽取任务)
+  - [4.2 文档视觉问答任务](#文档视觉问答任务)
+  - [4.3 文档图像分类任务](#文档图像分类任务)
 - [5. 部署](#部署)
   - [5.1 静态图导出](#静态图导出)
   - [5.2 Python部署](#Python部署)
@@ -17,19 +17,87 @@
 
 ## 1. 模型介绍
 
-2021年9月，百度NLP以文心大模型ERNIE为底座，将布局知识增强技术融入文档预训练中，提出了融合文本、图像、布局等信息进行联合建模的跨模态布局增强文档预训练模型ERNIE-Layout，并创新性地提出阅读顺序预测和细粒度图文匹配两个自监督预训练任务，在4项文档理解任务上达到SOTA，登顶DocVQA榜首，对外发布。在此之后百度的研究者对模型结构进一步改进，提出空间解偶注意力机制交互方式，在各数据集上取得大幅度提升，[相关论文](https://openreview.net/forum?id=NHECrvMz1LL)已被EMNLP2022会议收录。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-LayoutX。
+ERNIE-Layout 以文心文本大模型ERNIE为底座，融合文本、图像、布局等信息进行跨模态联合建模，创新性引入布局知识增强，提出阅读顺序预测、细粒度图文匹配等自监督预训练任务，升级空间解偶注意力机制，在各数据集上效果取得大幅度提升，相关工作[ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)已被 EMNLP 2022 Findings 会议收录[2]。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-LayoutX。
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=500 hspace='15'/>
-</div>
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">ERNIE-Layout模型结构</div>
+</center>
 
 <a name="开箱即用"></a>
 
 ## 2. 开箱即用
 
-通过```paddlenlp.Taskflow```三行代码集成DocPrompt功能，即可获得以下惊艳的问答效果：
+- 通过Huggingface网页体验DocPrompt功能：
 
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">DocPrompt Huggingface Demo</div>
+</center>
 
+- 通过```paddlenlp.Taskflow```三行代码调用DocPrompt功能，具备跨语言能力，适配各类场景：
+
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195115285-7b89f55c-5fda-42c6-a13c-4599e72d3cc5.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">发票文档抽取问答</div>
+</center>
+
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195115530-2dc6cb76-dd19-4c25-8e30-9962077eda61.png height=750 hspace='25'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">海报文档抽取问答</div>
+</center>
+
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195115680-22180d62-2266-4c39-8ce9-999a3298909c.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">网页文档抽取问答</div>
+</center>
+
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195115802-d352f977-7650-47d5-9bdf-846c2f8c77b4.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">表格文档抽取问答</div>
+</center>
+
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195116530-9f606f0b-fd11-49af-b767-71d95084b218.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">英文票据多语种（中、英、日、泰语）抽取问答</div>
+</center>
+
+<center>
+    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=500 hspace='15'>
+    <br>
+    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
+    display: inline-block;
+    color: #999;
+    padding: 2px;">中文票据多语种（中、英、日、法语）抽取问答</div>
+</center>
 
 #### 输入格式
 
@@ -97,9 +165,9 @@
 * `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
 
 
-<a name="模型效果"></a>
+<a name="Benchmark模型效果"></a>
 
-## 3. 模型效果
+## 3. Benchmark模型效果
 
 - 开源数据集介绍
 
@@ -146,9 +214,9 @@
   | ERNIE-LayoutX-Base |  2e-5, 4, _  | 1e-5, 8, 0.  |  1e-5, 4, _  | 2e-5. 8, 0.05 |
 
 
-<a name="一键复现模型效果"></a>
+<a name="Benchmark模型复现"></a>
 
-## 4. 一键复现模型效果
+## 4. Benchmark模型复现
 
 - 请执行以下命令进行安装项目依赖
 
@@ -156,9 +224,9 @@
 pip install -r requirements.txt
 ```
 
-<a name="启动文档信息抽取任务"></a>
+<a name="文档信息抽取任务"></a>
 
-#### 4.1 启动文档信息抽取任务
+#### 4.1 文档信息抽取任务
 
 启动FUNSD任务：
 
@@ -223,9 +291,9 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-<a name="启动文档视觉问答任务"></a>
+<a name="文档视觉问答任务"></a>
 
-#### 4.2 启动文档视觉问答任务
+#### 4.2 文档视觉问答任务
 
 启动DocVQA-ZH任务：
 
@@ -263,9 +331,9 @@ python3 -u run_mrc.py \
   --overwrite_output_dir
 ```
 
-<a name="启动文档图像分类任务"></a>
+<a name="文档图像分类任务"></a>
 
-#### 4.3 启动文档图像分类任务
+#### 4.3 文档图像分类任务
 
 启动RVL-CDIP任务
 
