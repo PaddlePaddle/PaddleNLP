@@ -65,8 +65,14 @@ class ElectraModelTester:
         self.num_choices = 2
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length],
-                               self.vocab_size)
+        input_ids = None
+        inputs_embeds = None
+        if self.use_inputs_embeds:
+            inputs_embeds = floats_tensor(
+                [self.batch_size, self.seq_length, self.embedding_size])
+        else:
+            input_ids = ids_tensor([self.batch_size, self.seq_length],
+                                   self.vocab_size)
 
         input_mask = None
         if self.use_input_mask:
@@ -77,13 +83,6 @@ class ElectraModelTester:
         if self.use_token_type_ids:
             token_type_ids = ids_tensor([self.batch_size, self.seq_length],
                                         self.type_vocab_size)
-
-        inputs_embeds = None
-        if self.use_inputs_embeds:
-            inputs_embeds = floats_tensor(
-                [self.batch_size, self.seq_length, self.embedding_size])
-            # In order to use inputs_embeds, input_ids needs to set to None
-            input_ids = None
 
         sequence_labels = None
         token_labels = None

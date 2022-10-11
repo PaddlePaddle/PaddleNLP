@@ -205,11 +205,6 @@ class ElectraEmbeddings(nn.Layer):
                 position_ids=None,
                 inputs_embeds=None):
 
-        if input_ids is not None:
-            input_embeddings = self.word_embeddings(input_ids)
-        else:
-            input_embeddings = inputs_embeds
-
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
@@ -220,7 +215,10 @@ class ElectraEmbeddings(nn.Layer):
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
-        input_embeddings = self.word_embeddings(input_ids)
+        if input_ids is not None:
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_embeddings = inputs_embeds
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
