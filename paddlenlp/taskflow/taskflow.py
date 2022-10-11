@@ -458,7 +458,8 @@ TASKS = {
                 "task_flag": "question-generation-unimo-text-1.0",
             },
             "unimo-text-1.0-dureader_qg-template1": {
-                "task_class": QuestionGenerationTask,
+                "task_class":
+                QuestionGenerationTask,
                 "task_flag":
                 "question-generation-unimo-text-1.0-dureader_qg-template1",
             },
