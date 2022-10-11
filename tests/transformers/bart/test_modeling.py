@@ -18,6 +18,7 @@ import tempfile
 import unittest
 import numpy as np
 import random
+from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
@@ -90,7 +91,6 @@ class BartModelTester:
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -168,7 +168,10 @@ class BartModelTester:
         decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1],
                                               dtype=paddle.get_default_dtype())
 
-        encoder_output = encoder(input_ids, attention_mask)
+        encoder_output = encoder(
+            input_ids,
+            attention_mask,
+        )  #TODO: 加return_dict
         origin_cache = decoder.decoder.gen_cache(encoder_output)
         outputs = decoder(decoder_input_ids,
                           decoder_attention_mask,
@@ -222,8 +225,16 @@ class BartModelTester:
                             atol=1e-3))
 
 
+# @parameterized_class(("return_dict", "use_labels"), [
+#     [False, False],
+#     [False, True],
+#     [True, False],
+#     [True, True],
+# ])
 class BartHeadTests(unittest.TestCase):
     vocab_size = 99
+    use_labels = False
+    return_dict = False
 
     def _get_config_and_data(self):
         input_ids = paddle.to_tensor(
@@ -286,6 +297,7 @@ class BartHeadTests(unittest.TestCase):
         lm_model = BartForConditionalGeneration(bart_model)
         outputs = lm_model(input_ids=input_ids)
         expected_shape = [batch_size, input_ids.shape[1], config["vocab_size"]]
+        assert isinstance(outputs, paddle.Tensor), f"{outputs.keys()}"
         self.assertEqual(outputs.shape, expected_shape)
 
     def test_lm_uneven_forward(self):
@@ -367,12 +379,19 @@ class BartHeadTests(unittest.TestCase):
             assert_tensors_close(desired_result.long(), bart_toks, prefix=ex)
 
 
+# @parameterized_class(("return_dict", "use_labels"), [
+#     [False, False],
+#     [False, True],
+#     [True, False],
+#     [True, True],
+# ])
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = BartModel
 
     all_model_classes = (BartModel, BartForConditionalGeneration,
                          BartForSequenceClassification,
                          BartForQuestionAnswering)
+
     all_generative_model_classes = {
         BartForConditionalGeneration: (BartModel, "bart")
     }
@@ -380,6 +399,8 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     fx_compatible = True
     test_pruning = False
     test_missing_keys = False
+    use_labels = False
+    return_dict = False
 
     def setUp(self):
         self.model_tester = BartModelTester(self)

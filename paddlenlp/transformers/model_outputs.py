@@ -128,7 +128,7 @@ def _transformer_decoder_layer_fwd(
     self_attn_outputs = self.self_attn(tgt, tgt, tgt, tgt_mask,
                                        cache[0] if cache else None)
     # self_attn_outputs = (tgt, attn_weights, incremental_cache) or only tgt
-    if isinstance(self_attn_outputs, tgt):
+    if isinstance(self_attn_outputs, type(tgt)):
         tgt = self_attn_outputs
     else:
         tgt = self_attn_outputs[0]
@@ -147,7 +147,7 @@ def _transformer_decoder_layer_fwd(
 
     cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask,
                                          cache[1] if cache else None)
-    if isinstance(cross_attn_outputs, tgt):
+    if isinstance(cross_attn_outputs, type(tgt)):
         tgt = cross_attn_outputs
     else:
         tgt = cross_attn_outputs[0]
@@ -191,7 +191,7 @@ def _transformer_decoder_fwd(self,
     tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
     memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
 
-    new_caches = []
+    new_caches = [] if cache else None
     all_hidden_states = [tgt] if output_hidden_states else None
     all_self_attns = [] if output_attentions else None
     all_cross_attns = [] if output_attentions else None
@@ -212,17 +212,17 @@ def _transformer_decoder_fwd(self,
                           memory_mask=memory_mask,
                           cache=cache[i] if cache else None,
                           output_attentions=output_attentions)
-        if isinstance(outputs, tgt):
+        if isinstance(outputs, type(tgt)):
             tgt = outputs
         else:
             tgt = outputs[0]
-            if cache:
-                new_caches.append(outputs[-1])
-            if output_attentions:
-                all_self_attns.append(outputs[1])
-                all_cross_attns.append(outputs[2])
-            if output_hidden_states:
-                all_hidden_states.append(tgt)
+        if cache:
+            new_caches.append(outputs[-1])
+        if output_attentions:
+            all_self_attns.append(outputs[1])
+            all_cross_attns.append(outputs[2])
+        if output_hidden_states:
+            all_hidden_states.append(tgt)
 
     if self.norm is not None:
         tgt = self.norm(tgt)
@@ -230,12 +230,12 @@ def _transformer_decoder_fwd(self,
             all_hidden_states[-1] = tgt
 
     if not return_dict:
-        if isinstance(outputs, tgt):
+        if isinstance(outputs, type(tgt)):
             return tgt
 
         temp_list = [
             tgt,
-            new_caches,
+            new_caches if cache else None,
             all_hidden_states,
             all_self_attns,
             all_cross_attns,
@@ -243,7 +243,7 @@ def _transformer_decoder_fwd(self,
         return tuple(v for v in temp_list if v is not None)
 
     return BaseModelOutputWithPastAndCrossAttentions(
-        last_hidden_state=hidden_states,
+        last_hidden_state=tgt,
         past_key_values=new_caches,
         hidden_states=all_hidden_states,
         attentions=all_self_attns,
