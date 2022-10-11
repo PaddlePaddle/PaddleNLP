@@ -24,9 +24,12 @@ from pipelines.utils import launch_es
 data_dict = {
     'data/dureader_dev':
     "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
-    "data/baike": "https://paddlenlp.bj.bcebos.com/applications/baike.zip",
+    "data/baike":
+    "https://paddlenlp.bj.bcebos.com/applications/baike.zip",
     "data/insurance":
-    "https://paddlenlp.bj.bcebos.com/applications/insurance.zip"
+    "https://paddlenlp.bj.bcebos.com/applications/insurance.zip",
+    "data/file_example":
+    "https://paddlenlp.bj.bcebos.com/pipelines/file_examples.zip"
 }
 
 parser = argparse.ArgumentParser()
