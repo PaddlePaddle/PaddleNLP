@@ -19,87 +19,60 @@
 
 ERNIE-Layout 以文心文本大模型ERNIE为底座，融合文本、图像、布局等信息进行跨模态联合建模，创新性引入布局知识增强，提出阅读顺序预测、细粒度图文匹配等自监督预训练任务，升级空间解偶注意力机制，在各数据集上效果取得大幅度提升，相关工作[ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)已被 EMNLP 2022 Findings 会议收录[2]。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-LayoutX。
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=500 hspace='15'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">ERNIE-Layout模型结构</div>
-</center>
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=400 hspace='10'/>
+</div>
 
 <a name="开箱即用"></a>
 
 ## 2. 开箱即用
 
-- 通过Huggingface网页体验DocPrompt功能：
+#### 通过Huggingface网页体验DocPrompt功能：
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=500 hspace='15'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">DocPrompt Huggingface Demo</div>
-</center>
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=400 hspace='10'/>
+</div>
 
-- 通过```paddlenlp.Taskflow```三行代码调用DocPrompt功能，具备跨语言能力，适配各类场景：
+#### 通过```paddlenlp.Taskflow```三行代码调用DocPrompt功能，具备跨语言能力，适配各类场景：
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195115285-7b89f55c-5fda-42c6-a13c-4599e72d3cc5.png height=500 hspace='15'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">发票文档抽取问答</div>
-</center>
+- 发票文档抽取问答
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195115530-2dc6cb76-dd19-4c25-8e30-9962077eda61.png height=750 hspace='25'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">海报文档抽取问答</div>
-</center>
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195115285-7b89f55c-5fda-42c6-a13c-4599e72d3cc5.png height=400 hspace='10'/>
+</div>
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195115680-22180d62-2266-4c39-8ce9-999a3298909c.png height=500 hspace='15'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">网页文档抽取问答</div>
-</center>
+- 海报文档抽取问答
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195115802-d352f977-7650-47d5-9bdf-846c2f8c77b4.png height=500 hspace='15'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">表格文档抽取问答</div>
-</center>
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195115530-2dc6cb76-dd19-4c25-8e30-9962077eda61.png height=750 hspace='25'/>
+</div>
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195116530-9f606f0b-fd11-49af-b767-71d95084b218.png height=500 hspace='15'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">英文票据多语种（中、英、日、泰语）抽取问答</div>
-</center>
+- 网页文档抽取问答
 
-<center>
-    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=250 hspace='8'>
-    <br>
-    <div style="color:orange; border-bottom: 1px solid #d9d9d9;
-    display: inline-block;
-    color: #999;
-    padding: 2px;">中文票据多语种（中、英、日、法语）抽取问答</div>
-</center>
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195115680-22180d62-2266-4c39-8ce9-999a3298909c.png height=500 hspace='15'/>
+</div>
 
-#### 输入格式
+
+- 表格文档抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195115802-d352f977-7650-47d5-9bdf-846c2f8c77b4.png height=500 hspace='15'/>
+</div>
+
+- 英文票据多语种（中、英、日、泰语）抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195116530-9f606f0b-fd11-49af-b767-71d95084b218.png height=500 hspace='15'/>
+</div>
+
+- 中文票据多语种（中、英、日、法语）抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=300 hspace='10'/>
+</div>
+
+- 输入格式
 
 ```
 [
@@ -116,53 +89,53 @@ ERNIE-Layout 以文心文本大模型ERNIE为底座，融合文本、图像、�
 ]
 ```
 
-#### 支持单条、批量预测
+- 支持单条、批量预测
 
-- 支持本地图片路径输入
+  - 支持本地图片路径输入
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
-</div>
+  <div align="center">
+      <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
+  </div>
 
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
 
->>> docprompt = Taskflow("document_intelligence")
->>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
-[{'prompt': '五百丁本次想要担任的是什么职位?',
-  'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
- {'prompt': '五百丁是在哪里上的大学?',
-  'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
- {'prompt': '大学学的是什么专业?',
-  'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
-```
+  >>> docprompt = Taskflow("document_intelligence")
+  >>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+  [{'prompt': '五百丁本次想要担任的是什么职位?',
+    'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
+  {'prompt': '五百丁是在哪里上的大学?',
+    'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
+  {'prompt': '大学学的是什么专业?',
+    'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
+  ```
 
-- http图片链接输入
+  - http图片链接输入
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
-</div>
+  <div align="center">
+      <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
+  </div>
 
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
 
->>> docprompt = Taskflow("document_intelligence")
->>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
-[{'prompt': '发票号码是多少?',
-  'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
- {'prompt': '校验码是多少?',
-  'result': [{'end': 271,
-              'prob': 1.0,
-              'start': 263,
-              'value': '01107 555427109891646'}]}]
-```
+  >>> docprompt = Taskflow("document_intelligence")
+  >>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+  [{'prompt': '发票号码是多少?',
+    'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
+  {'prompt': '校验码是多少?',
+    'result': [{'end': 271,
+                'prob': 1.0,
+                'start': 263,
+                'value': '01107 555427109891646'}]}]
+  ```
 
-#### 可配置参数说明
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
-* `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
+- 可配置参数说明
+  * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+  * `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
+  * `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
 
 
 <a name="Benchmark模型效果"></a>
