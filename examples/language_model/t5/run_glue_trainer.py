@@ -325,12 +325,11 @@ def main():
         model_args.model_name_or_path)
     tokenizer = T5Tokenizer.from_pretrained(model_args.model_name_or_path)
 
+    print(model.state_dict()["t5.encoder.embed_tokens.weight"])
     # get dataloader
     train_dataset = get_train_dataset(tokenizer, data_args)
     if data_args.task_name == "mnli":
-        eval_dataset_match = get_mnli_dev_dataset(tokenizer,
-                                                  data_args,
-                                                  matched=True)
+        eval_dataset = get_mnli_dev_dataset(tokenizer, data_args, matched=True)
         eval_dataset_mismatch = get_mnli_dev_dataset(tokenizer,
                                                      data_args,
                                                      matched=False)

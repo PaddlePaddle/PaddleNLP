@@ -64,8 +64,8 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
     --logging_steps 20 \
     --save_steps 200 \
     --save_total_limit 3 \
-    --metric_for_best_model `eval_accuarcy` \
-    --fp16 \
+    --metric_for_best_model "eval_accuarcy" \
+    --fp16 false \
     --fp16_opt_level "O1" \
     --recompute true \
     --sharding "stage1" \
@@ -80,6 +80,8 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
 |--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|-------|
 |                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |         |
 | T5-base-Paddle | 61.74 | 95.18 | 90.44 | 90.09   | 91.60 | 87.18 | 93.56 | 81.95 | 86.4675 |
+
+和 torch 论文得分对比。
 
 
 ### GLUE Demo测试

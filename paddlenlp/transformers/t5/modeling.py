@@ -24,6 +24,7 @@ from paddle.distributed.fleet.utils import recompute
 
 from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
+from ...utils.log import logger
 
 __all__ = [
     'T5Model',
@@ -35,6 +36,8 @@ T5_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "t5-small",
     "t5-base",
     "t5-large",
+    "t5-3b",
+    "t5-11b",
 ]
 
 
@@ -560,6 +563,7 @@ class T5Block(nn.Layer):
         if hidden_states.dtype == paddle.float16 and paddle.isinf(
                 hidden_states).any():
             # TODO finfo
+            logger.warning("clip value")
             clamp_value = finfo(hidden_states.dtype).max - 1000
             hidden_states = paddle.clip(hidden_states,
                                         min=-clamp_value,
@@ -724,6 +728,42 @@ class T5PretrainedModel(PretrainedModel):
             "initializer_factor": 1.0,
             "feed_forward_proj": "gated-gelu",
         },
+        "t5-3b": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 1024,
+            "d_kv": 128,
+            "d_ff": 16384,
+            "num_layers": 24,
+            "num_decoder_layers": 24,
+            "num_heads": 32,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu"
+        },
+        "t5-11b": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 1024,
+            "d_kv": 128,
+            "d_ff": 65536,
+            "num_layers": 24,
+            "num_decoder_layers": 24,
+            "num_heads": 128,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu"
+        },
     }
     pretrained_resource_files_map = {
         "model_state": {
@@ -733,6 +773,10 @@ class T5PretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/model_state.pdparams",
             "t5-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/model_state.pdparams",
+            "t5-3b":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/model_state.pdparams",
+            "t5-11b":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/model_state.pdparams",
             "t5-v1_1-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/model_state.pdparams",
             "t5-v1_1-large":
@@ -1157,7 +1201,7 @@ class T5Stack(nn.Layer):
                 1.0 - encoder_extended_attention_mask) * -1e4
         elif self.dtype == paddle.float32:
             encoder_extended_attention_mask = (
-                1.0 - encoder_extended_attention_mask) * -1e9
+                1.0 - encoder_extended_attention_mask) * -1e4
         else:
             raise ValueError(
                 f"{self.dtype} not recognized. `dtype` should be set to either `paddle.float32` or `paddle.float16`"

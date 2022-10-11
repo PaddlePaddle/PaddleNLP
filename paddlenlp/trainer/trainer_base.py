@@ -671,18 +671,20 @@ class Trainer:
                     elif (args.recompute and args.local_rank != -1):
                         fused_allreduce_gradients(list(model.parameters()),
                                                   None)
-
+                    # Optimizer step
+                    optimizer_was_run = True
                     if self.do_grad_scaling:
-                        # TODO: fix sharding stage2 stage3 with original scaler useage.
-                        if self.sharding is not None and ShardingOption.SHARD_OP not in self.args.sharding:
-                            self.scaler.step(self.optimizer)
-                            self.scaler.update()
-                        else:
-                            self.scaler.minimize(self.optimizer, tr_loss)
+                        scale_before = self.scaler._scale.numpy()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        scale_after = self.scaler._scale.numpy()
+                        optimizer_was_run = scale_before <= scale_after
                     else:
                         self.optimizer.step()
 
-                    self.lr_scheduler.step()
+                    if optimizer_was_run:
+                        self.lr_scheduler.step()
+
                     self.optimizer.clear_grad()
 
                     self.state.global_step += 1
@@ -1080,10 +1082,22 @@ class Trainer:
         if not training:
             return model
 
+        # Mixed precision training with apex (torch < 1.6)
+        if training and self.do_grad_scaling:  # self.args.fp16_opt_level=="O2":
+            # model, self.optimizer
+            decorated = paddle.amp.decorate(models=model,
+                                            optimizers=self.optimizer,
+                                            level=self.args.fp16_opt_level)
+            if self.optimizer is None:
+                model = decorated
+            else:
+                model, self.optimizer = decorated
+
+        print(model.state_dict()["t5.encoder.embed_tokens.weight"])
         # Multi-gpu training
         if self.args.world_size > 1 and self.sharding is None:
             model = paddle.DataParallel(model)
-            # Distributed training (should be after apex fp16 initialization)
+            # Distributed training (should be after fp16 initialization)
         if self.sharding is not None:
             # Sharded DDP!
             if ShardingOption.SHARD_OP in self.args.sharding:
