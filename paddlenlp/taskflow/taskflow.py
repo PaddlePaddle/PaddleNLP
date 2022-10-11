@@ -40,6 +40,7 @@ from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
 from .document_intelligence import DocPromptTask
+from .question_generation import QuestionGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -448,6 +449,22 @@ TASKS = {
         },
         "default": {
             "model": "docprompt"
+        }
+    },
+    "question_generation": {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question-generation-unimo-text-1.0",
+            },
+            "unimo-text-1.0-dureader_qg-template1": {
+                "task_class": QuestionGenerationTask,
+                "task_flag":
+                "question-generation-unimo-text-1.0-dureader_qg-template1",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-dureader_qg-template1"
         }
     },
 }
