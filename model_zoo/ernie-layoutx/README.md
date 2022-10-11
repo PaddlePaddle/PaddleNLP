@@ -27,7 +27,9 @@
 
 ## 2. 开箱即用
 
-```paddlenlp.Taskflow```基于ERNIE-LayoutX强大的跨模态语义对齐能力和布局理解能力提供开箱即用的文档抽取问答能力。
+通过```paddlenlp.Taskflow```三行代码集成DocPrompt功能，即可获得以下惊艳的问答效果：
+
+
 
 #### 输入格式
 
