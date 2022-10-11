@@ -1,23 +1,23 @@
-简体中文 | [English](README_en.md)
+[简体中文](README.md) | English
 
 # ERNIE-LayoutX
 
- **目录**
+ **content**
 
-- [1. 模型介绍](#1)
-- [2. 开箱即用](#2)
-- [3. Benchmark模型效果](#3)
-- [4. Benchmark模型复现](#4)
-  - [4.1 文档信息抽取任务](#41)
-  - [4.2 文档视觉问答任务](#42)
-  - [4.3 文档图像分类任务](#43)
-- [5. 部署](#5)
-  - [5.1 静态图导出](#51)
-  - [5.2 Python部署](#52)
+- [1. Model Instruction](#1)
+- [2. Out-of-Box](#2)
+- [3. Benchmark Model Performance](#3)
+- [4. Benchmark Fine-tuning Examples](#4)
+  - [4.1 Document Information Extraction](#41)
+  - [4.2 Document Visual Question Answering](#42)
+  - [4.3 Document Visual Classification](#43)
+- [5. Deploy](#5)
+  - [5.1 Model Export](#51)
+  - [5.2 Python Deploy](#52)
 
 <a name="1"></a>
 
-## 1. 模型介绍
+## 1. Model Instruction
 
 ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布局等信息进行跨模态联合建模，创新性引入布局知识增强，提出阅读顺序预测、细粒度图文匹配等自监督预训练任务，升级空间解偶注意力机制，在各数据集上效果取得大幅度提升，相关工作[ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)已被EMNLP 2022 Findings会议收录[2]。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-LayoutX。
 
@@ -27,15 +27,15 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="2"></a>
 
-## 2. 开箱即用
+## 2. Out-of-Box
 
-#### 通过Huggingface网页体验DocPrompt功能：
+#### Gradio web demo is available
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195133774-a8f9f04f-e0a3-4711-b90f-a9d138ab2466.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=400 hspace='10'/>
 </div>
 
-#### 通过``paddlenlp.Taskflow``三行代码调用DocPrompt功能，具备多语言文档抽取问答能力，部分应用场景展示如下：
+#### ```paddlenlp.Taskflow``` with three-line codes
 
 - 发票文档抽取问答
 
@@ -74,7 +74,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
     <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=300 hspace='10'/>
 </div>
 
-- 输入格式
+- Input Format
 
 ```
 [
@@ -142,7 +142,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="3"></a>
 
-## 3. Benchmark模型效果
+## 3. Benchmark Model Performance
 
 - 开源数据集介绍
 
@@ -191,7 +191,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="4"></a>
 
-## 4. Benchmark模型复现
+## 4. Benchmark Fine-tuning Examples
 
 - 请执行以下命令进行安装项目依赖
 
@@ -201,9 +201,9 @@ pip install -r requirements.txt
 
 <a name="41"></a>
 
-#### 4.1 文档信息抽取任务
+#### 4.1 Document Information Extraction
 
-FUNSD任务：
+启动FUNSD任务：
 
 ```shell
 python -u run_ner.py \
@@ -234,7 +234,7 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-XFUND-ZH任务：
+启动XFUND-ZH任务：
 
 ```shell
 python -u run_ner.py \
@@ -268,9 +268,9 @@ python -u run_ner.py \
 
 <a name="42"></a>
 
-#### 4.2 文档视觉问答任务
+#### 4.2 Document Visual Question Answering
 
-DocVQA-ZH任务：
+启动DocVQA-ZH任务：
 
 ```shell
 python3 -u run_mrc.py \
@@ -308,9 +308,9 @@ python3 -u run_mrc.py \
 
 <a name="43"></a>
 
-#### 4.3 文档图像分类任务
+#### 4.3 Document Visual Classification
 
-RVL-CDIP任务
+启动RVL-CDIP任务
 
 ```shell
 python3 -u run_cls.py \
@@ -347,11 +347,11 @@ python3 -u run_cls.py \
 
 <a name="5"></a>
 
-## 5. 部署
+## 5. Deploy
 
 <a name="51"></a>
 
-#### 5.1 静态图导出
+#### 5.1 Model Export
 
 使用动态图训练结束之后，还可以将动态图参数导出为静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
 
@@ -389,7 +389,7 @@ export/
 
 <a name="52"></a>
 
-#### 5.2 Python部署
+#### 5.2 Python Deploy
 
 导出静态图模型之后可用于部署，项目提供了文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例，详见[ERNIE-LayoutX Python部署指南](./deploy/python/README.md)。
 
