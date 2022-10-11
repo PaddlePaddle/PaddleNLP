@@ -1962,8 +1962,8 @@ class ImageReader(object):
                 doc_tokens.append([eng_word])
                 doc_segment_ids.append([segment_id])
                 char_num.append(len(eng_word))
-            ori_char_width = round(ori_bbox.width / sum(char_num))
-            sc_char_width = round(sc_bbox.width / sum(char_num))
+            ori_char_width = round(ori_bbox.width / sum(char_num), 1)
+            sc_char_width = round(sc_bbox.width / sum(char_num), 1)
             for chr_idx in range(len(char_num)):
                 if chr_idx == 0:
                     doc_boxes.append([
@@ -2645,54 +2645,61 @@ def longestCommonSequence(question_tokens, context_tokens):
 
 
 def sort_res(prompt, ans_list, context, boxes, lang="en"):
-    """
-    Sort the result
-    """
     if len(ans_list) == 1:
         return ans_list
     else:
-        if lang == "en":
-            clean_prompt = [word for word in prompt.split(" ")]
-        else:
-            clean_prompt = [word for word in prompt]
-
-        max_index, max_len = longestCommonSequence(clean_prompt, context)
-        if max_index == -1:
+        ans_val = []
+        for ans in ans_list:
+            ans_val.append(ans["value"])
+        if len(set(ans_val)) == len(ans_val):
             sorted_ans_list = sorted(ans_list,
                                      key=lambda x: x["prob"],
                                      reverse=True)
             return sorted_ans_list
         else:
-            prompt_center = []
-            for idx in range(max_index - max_len + 1, max_index + 1):
-                box = boxes[idx][0]
-                x = box.left + box.width / 2
-                y = box.top + box.height / 2
-                prompt_center.append([x, y])
+            if lang == "en":
+                clean_prompt = [word for word in prompt.split(" ")]
+            else:
+                clean_prompt = [word for word in prompt]
 
-            ans_center = []
-            ans_prob = []
-            for ans in ans_list:
-                ans_prob.append(ans["prob"])
-                cent_list = []
-                for idx in range(ans["start"], ans["end"] + 1):
+            max_index, max_len = longestCommonSequence(clean_prompt, context)
+            if max_index == -1:
+                sorted_ans_list = sorted(ans_list,
+                                         key=lambda x: x["prob"],
+                                         reverse=True)
+                return sorted_ans_list
+            else:
+                prompt_center = []
+                for idx in range(max_index - max_len + 1, max_index + 1):
                     box = boxes[idx][0]
                     x = box.left + box.width / 2
                     y = box.top + box.height / 2
-                    cent_list.append([x, y])
-                ans_center.append(cent_list)
+                    prompt_center.append([x, y])
 
-            ans_odist = []
-            for ans_c in ans_center:
-                odist = 0
-                for a_c in ans_c:
-                    for p_c in prompt_center:
-                        odist += calEuclidean(a_c, p_c)
-                odist /= len(ans_c)
-                ans_odist.append(odist * (-1))
+                ans_center = []
+                ans_prob = []
+                for ans in ans_list:
+                    ans_prob.append(ans["prob"])
+                    cent_list = []
+                    for idx in range(ans["start"], ans["end"] + 1):
+                        box = boxes[idx][0]
+                        x = box.left + box.width / 2
+                        y = box.top + box.height / 2
+                        cent_list.append([x, y])
+                    ans_center.append(cent_list)
 
-            ans_score = ans_prob + ans_odist
-            sorted_ans_list = sorted(ans_list,
-                                     key=lambda x: ans_score[ans_list.index(x)],
-                                     reverse=True)
-            return sorted_ans_list
+                ans_odist = []
+                for ans_c in ans_center:
+                    odist = 0
+                    for a_c in ans_c:
+                        for p_c in prompt_center:
+                            odist += calEuclidean(a_c, p_c)
+                    odist /= len(ans_c)
+                    ans_odist.append(odist * (-1))
+
+                ans_score = np.sum([ans_prob, ans_odist], axis=0).tolist()
+                sorted_ans_list = sorted(
+                    ans_list,
+                    key=lambda x: ans_score[ans_list.index(x)],
+                    reverse=True)
+                return sorted_ans_list

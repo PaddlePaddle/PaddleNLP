@@ -4,8 +4,8 @@
 
 - [1. 模型介绍](#模型介绍)
 - [2. 开箱即用](#开箱即用)
-- [3. 模型效果](#模型效果)
-- [4. 一键复现模型效果](#一键复现模型效果)
+- [3. Benchmark模型效果](#Benchmark模型效果)
+- [4. Benchmark模型复现](#Benchmark模型复现)
   - [4.1 启动文档信息抽取任务](#启动文档信息抽取任务)
   - [4.2 启动文档视觉问答任务](#启动文档视觉问答任务)
   - [4.3 启动文档图像分类任务](#启动文档图像分类任务)
@@ -17,10 +17,10 @@
 
 ## 1. 模型介绍
 
-基于布局知识增强技术，同时依托文心ERNIE，百度研究者提出了融合文本、图像、布局等信息进行联合建模的跨模态通用文档预训练模型ERNIE-Layout。如下图所示，ERNIE-Layout创新性地提出了阅读顺序预测和细粒度图文匹配两个自监督预训练任务，有效提升模型在文档任务上跨模态语义对齐能力和布局理解能力。
+2021年9月，百度NLP以文心大模型ERNIE为底座，将布局知识增强技术融入文档预训练中，提出了融合文本、图像、布局等信息进行联合建模的跨模态布局增强文档预训练模型ERNIE-Layout，并创新性地提出阅读顺序预测和细粒度图文匹配两个自监督预训练任务，在4项文档理解任务上达到SOTA，登顶DocVQA榜首，对外发布。在此之后百度的研究者对模型结构进一步改进，提出空间解偶注意力机制交互方式，在各数据集上取得大幅度提升，[相关论文](https://openreview.net/forum?id=NHECrvMz1LL)已被EMNLP2022会议收录。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-LayoutX。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/190966162-b26f68b8-9a36-42c0-837b-98f9b91c2adb.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=500 hspace='15'/>
 </div>
 
 <a name="开箱即用"></a>
@@ -354,8 +354,6 @@ export/
 ## References
 
 - [ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)
-
-- [ERNIE-mmLayout: Multi-grained MultiModal Transformer for Document Understanding](https://arxiv.org/abs/2209.08569)
 
 - [ICDAR 2019 Competition on Scene Text Visual Question Answering](https://arxiv.org/pdf/1907.00490.pdf)
 
