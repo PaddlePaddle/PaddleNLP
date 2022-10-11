@@ -45,6 +45,7 @@ class ErnieRanker(BaseRanker):
         model_name_or_path: Union[str, Path],
         top_k: int = 10,
         use_gpu: bool = True,
+        max_seq_len: int = 256,
         progress_bar: bool = True,
         batch_size: int = 1000,
     ):
@@ -71,6 +72,7 @@ class ErnieRanker(BaseRanker):
         self.transformer_model.eval()
         self.progress_bar = progress_bar
         self.batch_size = batch_size
+        self.max_seq_len = max_seq_len
 
         if len(self.devices) > 1:
             self.model = paddle.DataParallel(self.transformer_model)
@@ -94,7 +96,7 @@ class ErnieRanker(BaseRanker):
 
         features = self.tokenizer([query for doc in documents],
                                   [doc.content for doc in documents],
-                                  max_seq_len=256,
+                                  max_seq_len=self.max_seq_len,
                                   pad_to_max_seq_len=True,
                                   truncation_strategy="longest_first")
 
@@ -114,7 +116,7 @@ class ErnieRanker(BaseRanker):
             reverse=True,
         )
 
-        # rank documents according to scores
+        # Rank documents according to scores
         sorted_documents = [doc for _, doc in sorted_scores_and_documents]
         return sorted_documents[:top_k]
 
@@ -126,14 +128,14 @@ class ErnieRanker(BaseRanker):
         batch_size: Optional[int] = None,
     ) -> Union[List[Document], List[List[Document]]]:
         """
-        Use loaded Ranker model to, for a list of queries, rank each query's supplied list of Document.
+        Use loaded ranker model to re-rank the supplied lists of Documents
 
-        Returns list of dictionary of query and list of document sorted by (desc.) similarity with query
+        Returns lists of Documents sorted by (desc.) similarity with the corresponding queries.
 
-        :param query_doc_list: List of dictionaries containing queries with their retrieved documents
-        :param top_k: The maximum number of answers to return for each query
-        :param batch_size: Number of samples the model receives in one batch for inference
-        :return: List of dictionaries containing query and ranked list of Document
+        :param queries: Single query string or list of queries
+        :param documents: Single list of Documents or list of lists of Documents to be reranked.
+        :param top_k: The maximum number of documents to return per Document list.
+        :param batch_size: Number of Documents to process at a time.
         """
         if top_k is None:
             top_k = self.top_k
@@ -191,7 +193,7 @@ class ErnieRanker(BaseRanker):
             result = []
             for pred_group, doc_group in zip(grouped_predictions, documents):
                 sorted_scores_and_documents = sorted(
-                    zip(pred_group, doc_group),  # type: ignore
+                    zip(pred_group, doc_group),
                     key=lambda similarity_document_tuple:
                     similarity_document_tuple[0],
                     reverse=True,
