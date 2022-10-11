@@ -92,7 +92,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization.")
     parser.add_argument("--num_workers", type=int, default=2, help="Num of workers for DataLoader.")
     parser.add_argument("--check_accuracy", type=str2bool, nargs='?', const=False, help="Check accuracy for training process.")
-    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="select cpu, gpu, xpu devices.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "mlu"], help="select cpu, gpu, xpu devices.")
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
