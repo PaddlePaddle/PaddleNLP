@@ -834,7 +834,7 @@ class GPTModel(GPTPretrainedModel):
                 It is only used for inference and should be None for training.
                 Default to `None`.
             output_attentions (bool, optional):
-                hether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
                 tensors for more detail. Defaults to `False`.
             output_hidden_states (bool, optional):
                 Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
