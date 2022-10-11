@@ -91,7 +91,7 @@ ERNIE-Layout 以文心文本大模型ERNIE为底座，融合文本、图像、�
 </center>
 
 <center>
-    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=500 hspace='15'>
+    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=250 hspace='8'>
     <br>
     <div style="color:orange; border-bottom: 1px solid #d9d9d9;
     display: inline-block;
