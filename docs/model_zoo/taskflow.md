@@ -1667,7 +1667,7 @@ from paddlenlp import Taskflow
 * `num_return_sequences`：解码返回序列数，默认为1。
 * `repetition_penalty`：解码重复惩罚值，默认为1。
 * `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
-* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为True。
+* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为False。
 
 </div></details>
 
