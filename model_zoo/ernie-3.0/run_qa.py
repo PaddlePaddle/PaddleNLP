@@ -132,7 +132,7 @@ def parse_args():
                         help="random seed for initialization")
     parser.add_argument(
         '--device',
-        choices=['cpu', 'gpu', 'xpu'],
+        choices=['cpu', 'gpu', 'xpu', 'mlu'],
         default="gpu",
         help="Select which device to train model, defaults to gpu.")
     parser.add_argument(
