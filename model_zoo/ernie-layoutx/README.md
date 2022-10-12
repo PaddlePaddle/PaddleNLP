@@ -7,7 +7,7 @@
 - [1. 模型介绍](#1)
 - [2. 开箱即用](#2)
 - [3. Benchmark模型效果](#3)
-- [4. Benchmark模型复现](#4)
+- [4. 模型微调](#4)
   - [4.1 文档信息抽取任务](#41)
   - [4.2 文档视觉问答任务](#42)
   - [4.3 文档图像分类任务](#43)
@@ -191,7 +191,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="4"></a>
 
-## 4. Benchmark模型复现
+## 4. 模型微调
 
 - 请执行以下命令进行安装项目依赖
 
@@ -203,7 +203,7 @@ pip install -r requirements.txt
 
 #### 4.1 文档信息抽取任务
 
-FUNSD任务：
+- FUNSD训练
 
 ```shell
 python -u run_ner.py \
@@ -234,7 +234,7 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-XFUND-ZH任务：
+- XFUND-ZH训练
 
 ```shell
 python -u run_ner.py \
@@ -270,7 +270,7 @@ python -u run_ner.py \
 
 #### 4.2 文档视觉问答任务
 
-DocVQA-ZH任务：
+- DocVQA-ZH训练
 
 ```shell
 python3 -u run_mrc.py \
@@ -310,7 +310,7 @@ python3 -u run_mrc.py \
 
 #### 4.3 文档图像分类任务
 
-RVL-CDIP任务
+- RVL-CDIP训练
 
 ```shell
 python3 -u run_cls.py \

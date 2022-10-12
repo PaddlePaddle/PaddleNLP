@@ -2005,7 +2005,6 @@ class ImageReader(object):
 
             examples.append(example)
             qas_id += 1
-
         return examples
 
     def box2example(self, ocr_res, img_path, querys):

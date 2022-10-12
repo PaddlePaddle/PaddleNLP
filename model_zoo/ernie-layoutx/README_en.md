@@ -12,7 +12,7 @@
   - [4.2 Document Visual Question Answering](#42)
   - [4.3 Document Visual Classification](#43)
 - [5. Deploy](#5)
-  - [5.1 Model Export](#51)
+  - [5.1 Inference Model Export](#51)
   - [5.2 Python Deploy](#52)
 
 <a name="1"></a>
@@ -201,7 +201,7 @@ pip install -r requirements.txt
 
 #### 4.1 Document Information Extraction
 
-FUNSD Train
+- FUNSD Train
 
 ```shell
 python -u run_ner.py \
@@ -232,7 +232,7 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-XFUND-ZH Train
+- XFUND-ZH Train
 
 ```shell
 python -u run_ner.py \
@@ -268,7 +268,7 @@ python -u run_ner.py \
 
 #### 4.2 Document Visual Question Answering
 
-DocVQA-ZH Train
+- DocVQA-ZH Train
 
 ```shell
 python3 -u run_mrc.py \
@@ -308,7 +308,7 @@ python3 -u run_mrc.py \
 
 #### 4.3 Document Visual Classification
 
-RVL-CDIP Train
+- RVL-CDIP Train
 
 ```shell
 python3 -u run_cls.py \
@@ -349,7 +349,7 @@ python3 -u run_cls.py \
 
 <a name="51"></a>
 
-#### 5.1 Model Export
+#### 5.1 Inference Model Export
 
 使用动态图训练结束之后，还可以将动态图参数导出为静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
 
