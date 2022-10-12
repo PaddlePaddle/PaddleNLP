@@ -115,7 +115,7 @@ class EMAModel:
                 ) if param.ndim == 1 else copy.deepcopy(param)
                 ema_params[key] = ema_param
 
-            if not param.requires_grad:
+            if not param.stop_gradient:
                 ema_params[key].copy_(param.astype(ema_param.dtype), True)
                 ema_param = ema_params[key]
             else:
