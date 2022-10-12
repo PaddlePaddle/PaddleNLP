@@ -1634,7 +1634,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict)
         else:
-            if isinstance(encoder_output, paddle.Tensor):
+            if isinstance(encoder_output, type(decoder_input_ids)):
                 encoder_output = (encoder_output, )
             if return_dict and not isinstance(encoder_output, BaseModelOutput):
                 encoder_output = convert_encoder_output(encoder_output)
