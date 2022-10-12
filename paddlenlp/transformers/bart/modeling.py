@@ -598,10 +598,10 @@ class BartModel(BartPretrainedModel):
             )
         # If the user passed a tuple for encoder_outputs, we wrap it in a BaseModelOutput when return_dict=True
         elif return_dict and not isinstance(encoder_output, ModelOutput):
-            if isinstance(encoder_output, paddle.Tensor):
+            if isinstance(encoder_output, type(decoder_input_ids)):
                 encoder_output = (encoder_output, )
             encoder_output = convert_encoder_output(encoder_output)
-        if isinstance(encoder_output, paddle.Tensor):
+        if isinstance(encoder_output, type(decoder_input_ids)):
             encoder_last_hidden_state = encoder_output
         else:
             encoder_last_hidden_state = encoder_output[0]
@@ -620,9 +620,9 @@ class BartModel(BartPretrainedModel):
                                       output_hidden_states=output_hidden_states,
                                       return_dict=return_dict)
         if not return_dict:
-            if isinstance(decoder_output, paddle.Tensor):
+            if isinstance(decoder_output, type(decoder_input_ids)):
                 decoder_output = (decoder_output, )
-            if isinstance(encoder_output, paddle.Tensor):
+            if isinstance(encoder_output, type(decoder_input_ids)):
                 encoder_output = (encoder_output, )
             return decoder_output + encoder_output
 
