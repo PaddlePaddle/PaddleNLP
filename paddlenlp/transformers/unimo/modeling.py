@@ -568,9 +568,9 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         logits = self.lm_head(sequence_output, masked_positions)
 
         lm_loss = None
-        if labels:
+        if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
+            lm_loss = loss_fct(
                 logits.reshape((-1, self.unimo.config["vocab_size"])),
                 labels.reshape((-1, )))
 
