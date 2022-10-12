@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import logging
 from abc import abstractmethod
@@ -48,7 +48,7 @@ class BaseRanker(BaseComponent):
     def run(self,
             query: str,
             documents: List[Document],
-            top_k: Optional[int] = None):  # type: ignore
+            top_k: Optional[int] = None):
         self.query_count += 1
         if documents:
             predict = self.timing(self.predict, "query_time")
@@ -58,6 +58,28 @@ class BaseRanker(BaseComponent):
 
         document_ids = [doc.id for doc in results]
         logger.debug(f"Retrieved documents with IDs: {document_ids}")
+        output = {"documents": results}
+
+        return output, "output_1"
+
+    def run_batch(
+        self,
+        queries: List[str],
+        documents: Union[List[Document], List[List[Document]]],
+        top_k: Optional[int] = None,
+        batch_size: Optional[int] = None,
+    ):
+        self.query_count += len(queries)
+        predict_batch = self.timing(self.predict_batch, "query_time")
+        results = predict_batch(queries=queries,
+                                documents=documents,
+                                top_k=top_k,
+                                batch_size=batch_size)
+
+        for doc_list in results:
+            document_ids = [doc.id for doc in doc_list]
+            logger.debug("Ranked documents with IDs: %s", document_ids)
+
         output = {"documents": results}
 
         return output, "output_1"
