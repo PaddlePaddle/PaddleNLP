@@ -7,7 +7,7 @@ English | [简体中文](README_ch.md)
 - [ERNIE-Layout](#ERNIE-Layout)
   - [1. Model Instruction](#1)
   - [2. Out-of-Box](#2)
-      - [Gradio web demo](#21)
+      - [HuggingFace web demo](#21)
       - [Demo show](#22)
       - [Taskflow](#23)
   - [3. Model Performance](#3)
@@ -26,7 +26,7 @@ English | [简体中文](README_ch.md)
 Recent years have witnessed the rise and success of pre-training techniques in visually-rich document understanding. However, most existing methods lack the systematic mining and utilization of layout-centered knowledge, leading to sub-optimal performances. In this paper, we propose ERNIE-Layout, a novel document pre-training solution with layout knowledge enhancement in the whole workflow, to learn better representations that combine the features from text, layout, and image. Specifically, we first rearrange input sequences in the serialization stage, and then present a correlative pre-training task, reading order prediction, to learn the proper reading order of documents. To improve the layout awareness of the model, we integrate a spatial-aware disentangled attention into the multi-modal transformer and a replaced regions prediction task into the pre-training phase. Experimental results show that ERNIE-Layout achieves superior performance on various downstream tasks, setting new state-of-the-art on key information extraction, document image classification, and document question answering datasets. [Related work](http://arxiv.org/abs/2210.06155) accpeted by EMNLP 2022(Findings). To expand the scope of commercial applications for document intelligence, we propose a multilingual multi-modal document model ERNIE-Layout through PaddleNLP.
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=450 width=1000 hspace='10'/>
 </div>
 
 <a name="2"></a>
@@ -35,12 +35,12 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 
 <a name="21"></a>
 
-#### Gradio web demo
+#### HuggingFace web demo
 
-Gradio web demo is available [here](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)
+HuggingFace web demo is available [here](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195604457-32c16d23-d971-4183-b62f-a6970225ebad.png height=500 width=1000 hspace='10'/>
 </div>
 
 <a name="22"></a>
@@ -50,38 +50,39 @@ Gradio web demo is available [here](https://huggingface.co/spaces/PaddlePaddle/E
 - 发票抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603240-a3cb664e-2548-441f-a75c-9e0b9eebb023.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610223-f8e22405-1a5e-4a19-a7db-49bd13f2248d.png height=350 width=1000 hspace='10'/>
 </div>
 
 - 海报抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610368-04230855-62de-439e-b708-2c195b70461f.png height=600 width=1000 hspace='15'/>
 </div>
 
 - 网页抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195608975-25e65082-1af4-4781-9753-cf2ef17afea9.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195611613-bdbe692e-d7f2-4a2b-b548-1a933463b0b9.png height=350 width=1000 hspace='10'/>
 </div>
 
 
 - 表格抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610692-8367f1c8-32c2-4b5d-9514-a149795cf609.png height=350 width=1000 hspace='10'/>
 </div>
+
 
 - 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603876-151894d4-a570-4a63-97cc-528b722c2b01.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195615523-05d05aba-3bc3-415d-a836-ad1a5d3db56e.png height=400 width=1000 hspace='15'/>
 </div>
 
 - 中文票据多语种（中简、中繁、英、日、法语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603730-49fe0da0-b6c5-43e7-bbe5-9b7d2dd03f9a.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195615648-de053dcc-312b-4c7a-a8c9-299bba3dcfd5.png height=350 width=1000 hspace='15'/>
 </div>
 
 <a name="23"></a>
@@ -107,26 +108,6 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
 
 - Support single and batch input
 
-  - Image from local path
-
-  <div align="center">
-      <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
-  </div>
-
-  ```python
-  >>> from pprint import pprint
-  >>> from paddlenlp import Taskflow
-
-  >>> docprompt = Taskflow("document_intelligence")
-  >>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
-  [{'prompt': '五百丁本次想要担任的是什么职位?',
-    'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
-  {'prompt': '五百丁是在哪里上的大学?',
-    'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
-  {'prompt': '大学学的是什么专业?',
-    'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
-  ```
-
   - Image from http link
 
   <div align="center">
@@ -151,6 +132,26 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
     'result': [{'end': 51, 'prob': 1.0, 'start': 51, 'value': 'Paperback'}]},
   {'prompt': 'For Rage, who is the author listed as?',
     'result': [{'end': 93, 'prob': 1.0, 'start': 91, 'value': 'Bob Woodward'}]}]
+  ```
+
+  - Image from local path
+
+  <div align="center">
+      <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
+  </div>
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+
+  >>> docprompt = Taskflow("document_intelligence")
+  >>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+  [{'prompt': '五百丁本次想要担任的是什么职位?',
+    'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
+  {'prompt': '五百丁是在哪里上的大学?',
+    'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
+  {'prompt': '大学学的是什么专业?',
+    'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
   ```
 
 - Parameter Description
