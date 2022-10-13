@@ -375,17 +375,17 @@ python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased
 ```
 
 - Parameter Description
-* `model_path`：the save directory of dygraph model parameters, default to "./checkpoint/"。
-* `output_path`：the save directory of static graph model parameters, default to "./export"。
+  * `model_path`：the save directory of dygraph model parameters, default to "./checkpoint/"。
+  * `output_path`：the save directory of static graph model parameters, default to "./export"。
 
 - Directory
 
-```text
-export/
-├── inference.pdiparams
-├── inference.pdiparams.info
-└── inference.pdmodel
-```
+  ```text
+  export/
+  ├── inference.pdiparams
+  ├── inference.pdiparams.info
+  └── inference.pdmodel
+  ```
 
 <a name="52"></a>
 
