@@ -12,9 +12,9 @@ English | [简体中文](README_ch.md)
       - [Taskflow](#23)
   - [3. Model Performance](#3)
   - [4. Fine-tuning Examples](#4)
-      - [4.1 Document Information Extraction](#41)
-      - [4.2 Document Visual Question Answering](#42)
-      - [4.3 Document Visual Classification](#43)
+      - [4.1 Key Information Extraction](#41)
+      - [4.2 Document Question Answering](#42)
+      - [4.3 Document Image Classification](#43)
   - [5. Deploy](#5)
       - [5.1 Inference Model Export](#51)
       - [5.2 Python Deploy](#52)
@@ -215,7 +215,7 @@ pip install -r requirements.txt
 
 <a name="41"></a>
 
-#### 4.1 Document Information Extraction
+#### 4.1 Key Information Extraction
 
 - FUNSD Train
 
@@ -282,7 +282,7 @@ python -u run_ner.py \
 
 <a name="42"></a>
 
-#### 4.2 Document Visual Question Answering
+#### 4.2 Document Question Answering
 
 - DocVQA-ZH Train
 
@@ -322,7 +322,7 @@ python3 -u run_mrc.py \
 
 <a name="43"></a>
 
-#### 4.3 Document Visual Classification
+#### 4.3 Document Image Classification
 
 - RVL-CDIP Train
 
