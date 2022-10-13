@@ -62,10 +62,6 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 网页抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603536-b5e0107d-c39f-4bee-9d78-072a53072d68.png height=400 hspace='10'/>
-</div>
-
-<div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195608975-25e65082-1af4-4781-9753-cf2ef17afea9.png height=400 hspace='10'/>
 </div>
 
