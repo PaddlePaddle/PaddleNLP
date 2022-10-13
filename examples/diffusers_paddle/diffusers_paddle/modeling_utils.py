@@ -21,11 +21,10 @@ from typing import Callable, List, Optional, Tuple, Union
 import paddle
 import paddle.nn as nn
 
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import EntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
+from .download_utils import diffusers_paddle_bos_download
 from requests import HTTPError
 
-from .utils import CONFIG_NAME, DIFFUSERS_PADDLE_CACHE, HUGGINGFACE_CO_RESOLVE_ENDPOINT, WEIGHTS_NAME, logging
+from .utils import CONFIG_NAME, DIFFUSERS_PADDLE_CACHE, DOWNLOAD_SERVER, WEIGHTS_NAME, logging
 
 logger = logging.get_logger(__name__)
 
@@ -209,32 +208,11 @@ class ModelMixin(nn.Layer):
                     - A path to a *directory* containing model weights saved using [`~ModelMixin.save_config`], e.g.,
                       `./my_model_directory/`.
 
-            cache_dir (`Union[str, os.PathLike]`, *optional*):
-                Path to a directory in which a downloaded pretrained model configuration should be cached if the
-                standard cache should not be used.
             paddle_dtype (`str` or `paddle.dtype`, *optional*):
                 Override the default `paddle.dtype` and load the model under this dtype. If `"auto"` is passed the dtype
                 will be automatically derived from the model's weights.
-            force_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to force the (re-)download of the model weights and configuration files, overriding the
-                cached versions if they exist.
-            resume_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
-                file exists.
-            proxies (`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
             output_loading_info(`bool`, *optional*, defaults to `False`):
                 Whether or not to also return a dictionary containing missing keys, unexpected keys and error messages.
-            local_files_only(`bool`, *optional*, defaults to `False`):
-                Whether or not to only look at local files (i.e., do not try to download the model).
-            use_auth_token (`str` or *bool*, *optional*):
-                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
-                when running `diffusers-cli login` (stored in `~/.huggingface`).
-            revision (`str`, *optional*, defaults to `"main"`):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
-                identifier allowed by git.
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
@@ -244,41 +222,11 @@ class ModelMixin(nn.Layer):
                 problem, you can set this option to resolve it. Note that we do not guarantee the timeliness or safety.
                 Please refer to the mirror site for more information.
 
-        <Tip>
-
-         It is required to be logged in (`huggingface-cli login`) when you want to use private or [gated
-         models](https://huggingface.co/docs/hub/models-gated#gated-models).
-
-        </Tip>
-
-        <Tip>
-
-        Activate the special ["offline-mode"](https://huggingface.co/diffusers/installation.html#offline-mode) to use
-        this method in a firewalled environment.
-
-        </Tip>
-
         """
-        cache_dir = kwargs.pop("cache_dir", DIFFUSERS_PADDLE_CACHE)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
-        force_download = kwargs.pop("force_download", False)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
         output_loading_info = kwargs.pop("output_loading_info", False)
-        local_files_only = kwargs.pop("local_files_only", False)
-        use_auth_token = kwargs.pop("use_auth_token", None)
-        revision = kwargs.pop("revision", None)
-        from_auto_class = kwargs.pop("_from_auto", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         subfolder = kwargs.pop("subfolder", None)
-        # do not use
-        device_map = kwargs.pop("device_map", None)
-
-        user_agent = {
-            "file_type": "model",
-            "framework": "paddle",
-            "from_auto_class": from_auto_class
-        }
 
         # Load config if we don't provide a configuration
         config_path = pretrained_model_name_or_path
@@ -304,35 +252,10 @@ class ModelMixin(nn.Layer):
         else:
             try:
                 # Load from URL or cache if already cached
-                model_file = hf_hub_download(
+                model_file = diffusers_paddle_bos_download(
                     pretrained_model_name_or_path,
                     filename=WEIGHTS_NAME,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    proxies=proxies,
-                    resume_download=resume_download,
-                    local_files_only=local_files_only,
-                    use_auth_token=use_auth_token,
-                    user_agent=user_agent,
                     subfolder=subfolder,
-                    revision=revision,
-                )
-
-            except RepositoryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} is not a local folder and is not a valid model identifier "
-                    "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to pass a "
-                    "token having permission to this repo with `use_auth_token` or log in with `huggingface-cli "
-                    "login`.")
-            except RevisionNotFoundError:
-                raise EnvironmentError(
-                    f"{revision} is not a valid git identifier (branch name, tag name or commit id) that exists for "
-                    "this model name. Check the model page at "
-                    f"'https://huggingface.co/{pretrained_model_name_or_path}' for available revisions."
-                )
-            except EntryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} does not appear to have a file named {WEIGHTS_NAME}."
                 )
             except HTTPError as err:
                 raise EnvironmentError(
@@ -340,7 +263,7 @@ class ModelMixin(nn.Layer):
                     f" {pretrained_model_name_or_path}:\n{err}")
             except ValueError:
                 raise EnvironmentError(
-                    f"We couldn't connect to '{HUGGINGFACE_CO_RESOLVE_ENDPOINT}' to load this model, couldn't find it"
+                    f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
                     f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
                     f" directory containing a file named {WEIGHTS_NAME} or"
                     " \nCheckout your internet connection or see how to run the library in"
@@ -355,16 +278,8 @@ class ModelMixin(nn.Layer):
 
         model, unused_kwargs = cls.from_config(
             config_path,
-            cache_dir=cache_dir,
             return_unused_kwargs=True,
-            force_download=force_download,
-            resume_download=resume_download,
-            proxies=proxies,
-            local_files_only=local_files_only,
-            use_auth_token=use_auth_token,
-            revision=revision,
             subfolder=subfolder,
-            device_map=device_map,
             **kwargs,
         )
         state_dict = load_dict(model_file, return_numpy=True)

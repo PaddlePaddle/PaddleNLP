@@ -37,13 +37,16 @@ if is_paddle_available():
 
 logger = get_logger(__name__)
 
-from paddlenlp.utils.env import _get_sub_home
+from paddlenlp.utils.env import _get_sub_home, _get_ppnlp_home
+
+ppnlp_cache_home = _get_ppnlp_home()
+default_cache_path = _get_sub_home('models')
 
 CONFIG_NAME = "config.json"
 # WEIGHTS_NAME = "diffusion_paddle_model.pdparams"
 WEIGHTS_NAME = "model_state.pdparams"
 ONNX_WEIGHTS_NAME = "model.onnx"
-HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
-DIFFUSERS_PADDLE_CACHE = _get_sub_home('diffusers_paddle')
-DIFFUSERS_DYNAMIC_MODULE_NAME = "diffusers_modules"
-PPNLP_MODULES_CACHE = _get_sub_home('modules')
+DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
+DIFFUSERS_PADDLE_CACHE = default_cache_path
+DIFFUSERS_PADDLE_DYNAMIC_MODULE_NAME = "diffusers_paddle_modules"
+PPNLP_MODULES_CACHE = os.getenv("PPNLP_MODULES_CACHE", _get_sub_home("modules"))

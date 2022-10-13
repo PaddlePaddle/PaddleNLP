@@ -23,12 +23,11 @@ import re
 from collections import OrderedDict
 from typing import Any, Dict, Tuple, Union
 
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import EntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
+from .download_utils import diffusers_paddle_bos_download
 from requests import HTTPError
 
 from . import __version__
-from .utils import DIFFUSERS_PADDLE_CACHE, HUGGINGFACE_CO_RESOLVE_ENDPOINT, logging
+from .utils import DIFFUSERS_PADDLE_CACHE, DOWNLOAD_SERVER, logging
 
 logger = logging.get_logger(__name__)
 
@@ -129,26 +128,8 @@ class ConfigMixin:
                 Whether or not to raise an error if some of the weights from the checkpoint do not have the same size
                 as the weights of the model (if for instance, you are instantiating a model with 10 labels from a
                 checkpoint with 3 labels).
-            force_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to force the (re-)download of the model weights and configuration files, overriding the
-                cached versions if they exist.
-            resume_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
-                file exists.
-            proxies (`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
             output_loading_info(`bool`, *optional*, defaults to `False`):
                 Whether or not to also return a dictionary containing missing keys, unexpected keys and error messages.
-            local_files_only(`bool`, *optional*, defaults to `False`):
-                Whether or not to only look at local files (i.e., do not try to download the model).
-            use_auth_token (`str` or *bool*, *optional*):
-                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
-                when running `transformers-cli login` (stored in `~/.huggingface`).
-            revision (`str`, *optional*, defaults to `"main"`):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
-                identifier allowed by git.
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
@@ -190,17 +171,7 @@ class ConfigMixin:
     def get_config_dict(cls, pretrained_model_name_or_path: Union[str,
                                                                   os.PathLike],
                         **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        cache_dir = kwargs.pop("cache_dir", DIFFUSERS_PADDLE_CACHE)
-        force_download = kwargs.pop("force_download", False)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
-        use_auth_token = kwargs.pop("use_auth_token", None)
-        local_files_only = kwargs.pop("local_files_only", False)
-        revision = kwargs.pop("revision", None)
-        _ = kwargs.pop("mirror", None)
         subfolder = kwargs.pop("subfolder", None)
-
-        user_agent = {"file_type": "config"}
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -231,35 +202,10 @@ class ConfigMixin:
         else:
             try:
                 # Load from URL or cache if already cached
-                config_file = hf_hub_download(
+                config_file = diffusers_paddle_bos_download(
                     pretrained_model_name_or_path,
                     filename=cls.config_name,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    proxies=proxies,
-                    resume_download=resume_download,
-                    local_files_only=local_files_only,
-                    use_auth_token=use_auth_token,
-                    user_agent=user_agent,
                     subfolder=subfolder,
-                    revision=revision,
-                )
-
-            except RepositoryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} is not a local folder and is not a valid model identifier"
-                    " listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to pass a"
-                    " token having permission to this repo with `use_auth_token` or log in with `huggingface-cli"
-                    " login`.")
-            except RevisionNotFoundError:
-                raise EnvironmentError(
-                    f"{revision} is not a valid git identifier (branch name, tag name or commit id) that exists for"
-                    " this model name. Check the model page at"
-                    f" 'https://huggingface.co/{pretrained_model_name_or_path}' for available revisions."
-                )
-            except EntryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} does not appear to have a file named {cls.config_name}."
                 )
             except HTTPError as err:
                 raise EnvironmentError(
@@ -267,7 +213,7 @@ class ConfigMixin:
                     f" {pretrained_model_name_or_path}:\n{err}")
             except ValueError:
                 raise EnvironmentError(
-                    f"We couldn't connect to '{HUGGINGFACE_CO_RESOLVE_ENDPOINT}' to load this model, couldn't find it"
+                    f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
                     f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
                     f" directory containing a {cls.config_name} file.\nCheckout your internet connection or see how to"
                     " run the library in offline mode at"

@@ -25,21 +25,12 @@ import paddle
 import paddle.nn as nn
 
 import PIL
-from huggingface_hub import snapshot_download
 from PIL import Image
 from tqdm.auto import tqdm
 
 from .configuration_utils import ConfigMixin
-from .dynamic_modules_utils import get_class_from_dynamic_module
-from .schedulers.scheduling_utils import SCHEDULER_CONFIG_NAME
-from .utils import (
-    CONFIG_NAME,
-    DIFFUSERS_PADDLE_CACHE,
-    ONNX_WEIGHTS_NAME,
-    WEIGHTS_NAME,
-    BaseOutput,
-    logging,
-)
+from .utils import (DIFFUSERS_PADDLE_CACHE, BaseOutput, logging,
+                    DOWNLOAD_SERVER)
 
 from . import OnnxRuntimeModel
 
@@ -59,7 +50,7 @@ LOADABLE_CLASSES = {
     "paddlenlp.transformers": {
         "PretrainedTokenizer": ["save_pretrained", "from_pretrained"],
         "PretrainedModel": ["save_pretrained", "from_pretrained"],
-        "CLIPFeatureExtractor": ["save_pretrained", "from_pretrained"],
+        "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
     },
 }
 
@@ -335,68 +326,16 @@ class DiffusionPipeline(ConfigMixin):
         ... )
         ```
         """
-        cache_dir = kwargs.pop("cache_dir", DIFFUSERS_PADDLE_CACHE)
-        resume_download = kwargs.pop("resume_download", False)
-        proxies = kwargs.pop("proxies", None)
-        local_files_only = kwargs.pop("local_files_only", False)
-        use_auth_token = kwargs.pop("use_auth_token", None)
-        revision = kwargs.pop("revision", None)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
-        custom_pipeline = kwargs.pop("custom_pipeline", None)
         provider = kwargs.pop("provider", None)
         sess_options = kwargs.pop("sess_options", None)
         # do not use
-        device_map = kwargs.pop("device_map", None)
 
-        # 1. Download the checkpoints and configs
-        # use snapshot download here to get it working from from_pretrained
-        if not os.path.isdir(pretrained_model_name_or_path):
-            config_dict = cls.get_config_dict(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                resume_download=resume_download,
-                proxies=proxies,
-                local_files_only=local_files_only,
-                use_auth_token=use_auth_token,
-                revision=revision,
-            )
-            # make sure we only download sub-folders and `diffusers` filenames
-            folder_names = [
-                k for k in config_dict.keys() if not k.startswith("_")
-            ]
-            allow_patterns = [os.path.join(k, "*") for k in folder_names]
-            allow_patterns += [
-                WEIGHTS_NAME, SCHEDULER_CONFIG_NAME, CONFIG_NAME,
-                ONNX_WEIGHTS_NAME, cls.config_name
-            ]
-
-            if custom_pipeline is not None:
-                allow_patterns += [CUSTOM_PIPELINE_FILE_NAME]
-
-            # download all allow_patterns
-            cached_folder = snapshot_download(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                resume_download=resume_download,
-                proxies=proxies,
-                local_files_only=local_files_only,
-                use_auth_token=use_auth_token,
-                revision=revision,
-                allow_patterns=allow_patterns,
-            )
-        else:
-            cached_folder = pretrained_model_name_or_path
-
-        config_dict = cls.get_config_dict(cached_folder)
+        # 1. Download the configs
+        config_dict = cls.get_config_dict(pretrained_model_name_or_path)
 
         # 2. Load the pipeline class, if using custom module then load it from the hub
-        # if we load from explicit class, let's use it
-        if custom_pipeline is not None:
-            pipeline_class = get_class_from_dynamic_module(
-                custom_pipeline,
-                module_file=CUSTOM_PIPELINE_FILE_NAME,
-                cache_dir=custom_pipeline)
-        elif cls != DiffusionPipeline:
+        if cls != DiffusionPipeline:
             pipeline_class = cls
         else:
             diffusers_module = importlib.import_module(
@@ -490,13 +429,15 @@ class DiffusionPipeline(ConfigMixin):
                     loading_kwargs["sess_options"] = sess_options
 
                 # check if the module is in a subdirectory
-                if os.path.isdir(os.path.join(cached_folder, name)):
+                if not os.path.isfile(
+                        os.path.join(pretrained_model_name_or_path, name)):
                     loaded_sub_model = load_method(
-                        os.path.join(cached_folder, name), **loading_kwargs)
+                        os.path.join(pretrained_model_name_or_path, name),
+                        **loading_kwargs)
                 else:
                     # else load from the root directory
-                    loaded_sub_model = load_method(cached_folder,
-                                                   **loading_kwargs)
+                    loaded_sub_model = load_method(
+                        pretrained_model_name_or_path, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):

@@ -16,18 +16,16 @@
 import platform
 from argparse import ArgumentParser
 
-import huggingface_hub
-
 from .. import __version__ as version
 from ..utils import is_paddle_available, is_paddlenlp_available
-from . import BaseDiffusersCLICommand
+from . import BaseDiffusersPaddleCLICommand
 
 
 def info_command_factory(_):
     return EnvironmentCommand()
 
 
-class EnvironmentCommand(BaseDiffusersCLICommand):
+class EnvironmentCommand(BaseDiffusersPaddleCLICommand):
 
     @staticmethod
     def register_subcommand(parser: ArgumentParser):
@@ -35,7 +33,6 @@ class EnvironmentCommand(BaseDiffusersCLICommand):
         download_parser.set_defaults(func=info_command_factory)
 
     def run(self):
-        hub_version = huggingface_hub.__version__
 
         pd_version = "not installed"
         pd_cuda_available = "NA"
@@ -56,7 +53,6 @@ class EnvironmentCommand(BaseDiffusersCLICommand):
             "Platform": platform.platform(),
             "Python version": platform.python_version(),
             "Paddle version (GPU?)": f"{pd_version} ({pd_cuda_available})",
-            "Huggingface_hub version": hub_version,
             "PaddleNLP version": paddlenlp_version,
             "Using GPU in script?": "<fill in>",
             "Using distributed or parallel set-up in script?": "<fill in>",
