@@ -6,7 +6,7 @@
 
 - [1. 模型介绍](#1)
 - [2. 开箱即用](#2)
-  - [Gradio web demo](#21)
+  - [HuggingFace web demo](#21)
   - [应用场景展示](#22)
   - [Taskflow](#23)
 - [3. Benchmark模型效果](#3)
@@ -35,7 +35,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="21"></a>
 
-#### Gradio web demo
+#### HuggingFace web demo
 
 通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
 

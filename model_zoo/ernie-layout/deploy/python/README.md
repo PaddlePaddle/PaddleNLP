@@ -1,37 +1,38 @@
 English | [简体中文](README_ch.md)
 
-# ERNIE-LayoutX Python部署指南
+# ERNIE-Layout Python Deploy Guide
 
-本文介绍ERNIE-LayoutX Python部署指南，包括部署环境的准备，文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例。
+- [1. Quick Start](#1)
+- [2. Key Information Extraction Deploy](#2)
+- [3. Document Question Answering Deploy](#3)
+- [4. Document Image Classification Deploy](#4)
+- [5. Parameter Description](#5)
 
-- [ERNIE-LayoutX Python 部署指南](#ERNIE-LayoutXPython部署指南)
-  - [1. 开始运行](#1-开始运行)
-  - [2. 文档信息抽取模型推理](#2-文档信息抽取模型推理)
-  - [3. 文档视觉问答模型推理](#3-文档视觉问答模型推理)
-  - [4. 文档图像分类模型推理](#4-文档图像分类模型推理)
-  - [5. 更多配置](#5-更多配置)
+<a name="1"></a>
 
-## 1. 开始运行
+## 1. Quick Start
 
-#### 环境要求
+#### Environment
 
-- 请执行以下命令进行安装项目依赖
+- Dependency Installation
 
 ```
 pip install -r requirements.txt
 ```
 
-#### 数据准备
+#### Data Preparation
 
-- 提供了少量图片数据，可用于后续章节的部署测试，下载后放在``./images``目录。
+- Dowload the sample images and put in ``./images``
 
 ```shell
 wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip
 ```
 
-## 2. 文档信息抽取模型推理
+<a name="2"></a>
 
-- 使用如下命令进行英文文档信息抽取部署
+## 2. Key Information Extraction Deploy
+
+- Run
 
 ```shell
 python infer.py \
@@ -41,7 +42,7 @@ python infer.py \
     --batch_size 8
 ```
 
-- 输出样例
+- Output sample
 
 ```
 [{'doc': './images/ner_sample.jpg',
@@ -75,9 +76,11 @@ python infer.py \
               'probability': 0.9810855421041412}]}]
 ```
 
-## 3. 文档视觉问答模型推理
+<a name="3"></a>
 
-- 使用如下命令进行中文文档视觉问答部署
+## 3. Document Question Answering Deploy
+
+- Run
 
 ```shell
 python infer.py \
@@ -87,7 +90,7 @@ python infer.py \
     --batch_size 8
 ```
 
-- 输出样例
+- Output sample
 
 ```
 [{'doc': './images/mrc_sample.jpg',
@@ -102,9 +105,11 @@ python infer.py \
               'answer': ['2003年7月22日营业期限2003年7月22日']}]}]
 ```
 
-## 4. 文档图像分类模型推理
+<a name="4"></a>
 
-- 使用如下命令进行英文文档图像分类部署
+## 4. Document Image Classification Deploy
+
+- Run
 
 ```shell
 python infer.py \
@@ -114,17 +119,19 @@ python infer.py \
     --batch_size 8
 ```
 
-- 输出样例
+- Output sample
 
 ```
 [{'doc': './images/cls_sample.jpg', 'result': 'email'}]
 ```
 
+<a name="5"></a>
+
 ## 5. Parameter Description
 
-- `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
-- `max_seq_length`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `task_type`: 选择任务类型，可选有`ner`, `cls`和`mrc`。
-- `lang`: 选择任务的语言类型，可选有`en`, `ch`。
-- `device`: 选用什么设备进行训练，可选cpu或gpu。
+- `model_path_prefix`: The file path of the Paddle model for inference, with the file prefix name。For example, the inference model file path is `./export/inference.pdiparams`, then pass `./export/inference`。
+- `batch_size`: number of input of each batch, default to 1.
+- `max_seq_length`: If the OCR result exceeds the set maximum length, the OCR result will be sliced. The default is 512.
+- `task_type`: choose the task type，the options are `ner`, `cls` and `mrc`。
+- `lang`: select the task language，the options are `en` and `ch`。
+- `device`: choose the device，the options are `cpu` and `gpu`。

@@ -18,7 +18,6 @@ English | [简体中文](README_ch.md)
   - [5. Deploy](#5)
       - [5.1 Inference Model Export](#51)
       - [5.2 Python Deploy](#52)
-  - [References](#references)
 
 <a name="1"></a>
 
@@ -47,39 +46,39 @@ HuggingFace web demo is available [here](https://huggingface.co/spaces/PaddlePad
 
 #### Demo show
 
-- 发票抽取问答
+- Invoice VQA
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195610223-f8e22405-1a5e-4a19-a7db-49bd13f2248d.png height=350 width=1000 hspace='10'/>
 </div>
 
-- 海报抽取问答
+- Poster VQA
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195610368-04230855-62de-439e-b708-2c195b70461f.png height=600 width=1000 hspace='15'/>
 </div>
 
-- 网页抽取问答
+- WebPage VQA
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195611613-bdbe692e-d7f2-4a2b-b548-1a933463b0b9.png height=350 width=1000 hspace='10'/>
 </div>
 
 
-- 表格抽取问答
+- Table VQA
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195610692-8367f1c8-32c2-4b5d-9514-a149795cf609.png height=350 width=1000 hspace='10'/>
 </div>
 
 
-- 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
+- English invoice VQA by multilingual(CH, EN, JP, Th, ES, RUS) prompt
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195615523-05d05aba-3bc3-415d-a836-ad1a5d3db56e.png height=400 width=1000 hspace='15'/>
 </div>
 
-- 中文票据多语种（中简、中繁、英、日、法语）抽取问答
+- Chinese invoice VQA by multilingual(CHS, CHT, EN, JP, FR) prompt
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195615648-de053dcc-312b-4c7a-a8c9-299bba3dcfd5.png height=350 width=1000 hspace='15'/>
@@ -93,7 +92,7 @@ HuggingFace web demo is available [here](https://huggingface.co/spaces/PaddlePad
 
 ```
 [
-  {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]},
+  {"doc": "./book.png", "prompt": ["What is the name of the author of 'The Adventure Zone: The Crystal Kingdom’?", "What type of book cover does The Adventure Zone: The Crystal Kingdom have?", "For Rage, who is the author listed as?"]},
   {"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}
 ]
 ```
@@ -155,7 +154,7 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
   ```
 
 - Parameter Description
-  * `batch_size`: number of input in each batch, default to 1.
+  * `batch_size`: number of input of each batch, default to 1.
   * `lang`: PaddleOCR language, `en` is better to English images, default to `ch`.
   * `topn`: return the top n results with highest probability, default to 1.
 
@@ -168,10 +167,10 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
 
   |   Dataset   |  Task   | Language | Note |
   | --------- | ---------- | --- | ---- |
-  | FUNSD     | 文档信息抽取 | English | - |
-  | XFUND-ZH  | 文档信息抽取 | Chinese | - |
-  | DocVQA-ZH | 文档视觉问答 | Chinese | [DocVQA-ZH](http://ailab.aiwin.org.cn/competitions/49)已停止榜单提交，因此我们将原始训练集进行重新划分以评估模型效果，划分后训练集包含4,187张图片，验证集包含500张图片，测试集包含500张图片。 |
-  | RVL-CDIP (sampled)  | 文档图像分类 | English | RVL-CDIP原始数据集共包含400,000张图片，由于数据集较大训练较慢，为验证文档图像分类的模型效果故进行降采样，采样后的训练集包含6,400张图片，验证集包含800张图片，测试集包含800张图片。 |
+  | FUNSD     | Key Information Extraction | English | - |
+  | XFUND-ZH  | Key Information Extraction | Chinese | - |
+  | DocVQA-ZH | Document Question Answering | Chinese | The submission of the competition of [DocVQA-ZH](http://ailab.aiwin.org.cn/competitions/49) is now closed so we split original dataset into three parts for model evluation. There are 4,187 training images, 500 validation images, and 500 test images.|
+  | RVL-CDIP (sampled)  | Document Image Classification | English | The RVL-CDIP dataset consists of 400,000 grayscale images in 16 classes, with 25,000 images per class. Because of the original dataset is large and slow for training, so we downsampling from it. The sampled dataset consist of 6,400 training images, 800 validation images, and 800 test images. |
 
 - Results
 
@@ -182,10 +181,9 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
 
 - Evaluation Methods
 
-  - 以上所有任务均基于Grid Search方式进行超参寻优。FUNSD和XFUND-ZH每间隔 100 steps 评估验证集效果，评价指标为Accuracy。
-    RVL-CDIP每间隔2000 steps评估验证集效果，评价指标为F1-Score。DocVQA-ZH每间隔10000 steps评估验证集效果，取验证集最优效果作为表格中的汇报指标，评价指标为ANLS（计算方法参考https://arxiv.org/pdf/1907.00490.pdf）。
+  - All the above tasks do the Hyper Parameter searching based on Grid Search method. The evaluation step interval of FUNSD and XFUND-ZH are both 100, metric is Accuracy. The evaluation step interval of RVL-CDIP is 2000, metric is F1-Score. The evaluation step interval of DocVQA-ZH is 10000, metric is [ANLS](https://arxiv.org/pdf/1907.00490.pdf),
 
-  - 以上每个下游任务的超参范围如下表所示：
+  - Hyper Parameters search ranges
 
     | Hyper Parameters  |  FUNSD  | RVL-CDIP (sampled)  | XFUND-ZH | DocVQA-ZH |
     | ----------------- | ------- | -------- | -------- | --------- |
@@ -193,13 +191,11 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
     | batch_size        | 1, 2, 4 |  8, 16, 24   | 1, 2, 4 |   8, 16, 24  |
     | warmup_ratio      |     -   | 0, 0.05, 0.1 |    -    | 0, 0.05, 0.1 |
 
-    FUNSD和XFUND-ZH使用的lr_scheduler_type策略是constant，因此不对warmup_ratio进行搜索。
+    The strategy of ``lr_scheduler_type`` for FUNSD and XFUND is constant, so warmup_ratio is excluded.
 
-  - 文档信息抽取任务FUNSD和XFUND-ZH采用最大步数（max_steps）的微调方式，分别为10000 steps和20000 steps；文档视觉问答DocVQA-ZH的num_train_epochs为6；文档图像分类RVL-CDIP的num_train_epochs为20。
+  - ``max_steps`` is applied for the fine-tuning on both FUNSD and XFUND-ZH, 10000 steps and 20000 steps respectively; ``num_train_epochs`` is set to 6 and 20 for DocVQA-ZH and RVL-CDIP respectively.
 
 - Best Hyper Parameter
-
-  不同预训练模型在下游任务上做Grid Search之后的最优超参（learning_rate、batch_size、warmup_ratio）如下：
 
   |         Model      |     FUNSD    |   RVL-CDIP (sampled)   |   XFUND-ZH   |   DocVQA-ZH |
   | ------------------ | ------------ | ------------ | ------------ | ----------- |
@@ -408,7 +404,7 @@ python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased
 
 #### 5.2 Python Deploy
 
-We provide the deploy example on Document information extraction, DocVQA and Document image classification, please follow the [ERNIE-Layout Python Deploy Guide](./deploy/python/README.md)
+We provide the deploy example on Key Information Extraction, Document Question Answering and Document Image Classification, please follow the [ERNIE-Layout Python Deploy Guide](./deploy/python/README.md)
 
 
 <a name="References"></a>
