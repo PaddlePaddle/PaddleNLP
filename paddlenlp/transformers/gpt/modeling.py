@@ -1182,7 +1182,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None and len(attention_mask.shape) == 4:
+        if attention_mask is not None and attention_mask.ndim == 4:
             attention_mask = attention_mask[:, -1:, -1:, :]
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
