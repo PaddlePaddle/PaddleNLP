@@ -75,7 +75,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=350 width=1000 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=375 width=1000 hspace='15'/>
 </div>
 
 - 中文票据多语种（中简、中繁、英、日、法语）抽取问答
