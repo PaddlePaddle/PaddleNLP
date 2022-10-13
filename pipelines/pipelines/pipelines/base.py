@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 
 import copy
 import json
@@ -70,6 +70,9 @@ class RootNode(BaseComponent):
     outgoing_edges = 1
 
     def run(self, root_node: str):  # type: ignore
+        return {}, "output_1"
+
+    def run_batch(self):  # type: ignore
         return {}, "output_1"
 
 
@@ -512,6 +515,179 @@ class Pipeline(BasePipeline):
             else:
                 i += 1  # attempt executing next node in the queue as current `node_id` has unprocessed predecessors
         return node_output
+
+    def run_batch(  # type: ignore
+        self,
+        queries: List[str] = None,
+        file_paths: Optional[List[str]] = None,
+        labels: Optional[Union[MultiLabel, List[MultiLabel]]] = None,
+        documents: Optional[Union[List[Document], List[List[Document]]]] = None,
+        meta: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+        params: Optional[dict] = None,
+        debug: Optional[bool] = None,
+    ):
+        if file_paths is not None or meta is not None:
+            logger.info(
+                "It seems that an indexing Pipeline is run, so using the nodes' run method instead of run_batch."
+            )
+            if isinstance(queries, list):
+                raise Exception(
+                    "For indexing, only a single query can be provided.")
+            if isinstance(labels, list):
+                raise Exception(
+                    "For indexing, only one MultiLabel object can be provided as labels."
+                )
+            flattened_documents: List[Document] = []
+            if documents and isinstance(documents[0], list):
+                for doc_list in documents:
+                    assert isinstance(doc_list, list)
+                    flattened_documents.extend(doc_list)
+            return self.run(
+                query=queries,
+                file_paths=file_paths,
+                labels=labels,
+                documents=flattened_documents,
+                meta=meta,
+                params=params,
+                debug=debug,
+            )
+            # Validate node names
+        self._validate_node_names_in_params(params=params)
+
+        root_node = self.root_node
+        if not root_node:
+            raise Exception("Cannot run a pipeline with no nodes.")
+
+        node_output = None
+        queue: Dict[str, Any] = {
+            root_node: {
+                "root_node": root_node,
+                "params": params
+            }
+        }  # ordered dict with "node_id" -> "input" mapping that acts as a FIFO queue
+        if queries:
+            queue[root_node]["queries"] = queries
+        if file_paths:
+            queue[root_node]["file_paths"] = file_paths
+        if labels:
+            queue[root_node]["labels"] = labels
+        if documents:
+            queue[root_node]["documents"] = documents
+        if meta:
+            queue[root_node]["meta"] = meta
+
+        i = 0  # the first item is popped off the queue unless it is a "join" node with unprocessed predecessors
+        while queue:
+            node_id = list(queue.keys())[i]
+            node_input = queue[node_id]
+            node_input["node_id"] = node_id
+
+            # Apply debug attributes to the node input params
+            # NOTE: global debug attributes will override the value specified in each node's params dictionary.
+            if debug is None and node_input:
+                if node_input.get("params", {}):
+                    debug = params.get("debug", None)  # type: ignore
+            if debug is not None:
+                if not node_input.get("params", None):
+                    node_input["params"] = {}
+                if node_id not in node_input["params"].keys():
+                    node_input["params"][node_id] = {}
+                node_input["params"][node_id]["debug"] = debug
+
+            predecessors = set(nx.ancestors(self.graph, node_id))
+            if predecessors.isdisjoint(set(queue.keys(
+            ))):  # only execute if predecessor nodes are executed
+                try:
+                    logger.debug("Running node '%s` with input: %s", node_id,
+                                 node_input)
+                    node_output, stream_id = self.graph.nodes[node_id][
+                        "component"]._dispatch_run_batch(**node_input)
+                except Exception as e:
+                    # The input might be a really large object with thousands of embeddings.
+                    # If you really want to see it, raise the log level.
+                    logger.debug(
+                        "Exception while running node '%s' with input %s",
+                        node_id, node_input)
+                    raise Exception(
+                        f"Exception while running node '{node_id}': {e}\nEnable debug logging to see the data that was passed when the pipeline failed."
+                    ) from e
+                queue.pop(node_id)
+
+                if stream_id == "split":
+                    for stream_id in [
+                            key for key in node_output.keys()
+                            if key.startswith("output_")
+                    ]:
+                        current_node_output = {
+                            k: v
+                            for k, v in node_output.items()
+                            if not k.startswith("output_")
+                        }
+                        current_docs = node_output.pop(stream_id)
+                        current_node_output["documents"] = current_docs
+                        next_nodes = self.get_next_nodes(node_id, stream_id)
+                        for n in next_nodes:
+                            queue[n] = current_node_output
+                else:
+                    next_nodes = self.get_next_nodes(node_id, stream_id)
+                    for n in next_nodes:
+                        if queue.get(
+                                n):  # concatenate inputs if it's a join node
+                            existing_input = queue[n]
+                            if "inputs" not in existing_input.keys():
+                                updated_input: Dict = {
+                                    "inputs": [existing_input, node_output],
+                                    "params": params
+                                }
+                                if queries:
+                                    updated_input["queries"] = queries
+                                if file_paths:
+                                    updated_input["file_paths"] = file_paths
+                                if labels:
+                                    updated_input["labels"] = labels
+                                if documents:
+                                    updated_input["documents"] = documents
+                                if meta:
+                                    updated_input["meta"] = meta
+                            else:
+                                existing_input["inputs"].append(node_output)
+                                updated_input = existing_input
+                            queue[n] = updated_input
+                        else:
+                            queue[n] = node_output
+                i = 0
+            else:
+                i += 1  # attempt executing next node in the queue as current `node_id` has unprocessed predecessors
+        return node_output
+
+    def _validate_node_names_in_params(self, params: Optional[Dict]):
+        """
+        Validates the node names provided in the 'params' arg of run/run_batch method.
+        """
+        if params:
+            if not all(node_id in self.graph.nodes
+                       for node_id in params.keys()):
+
+                # Might be a non-targeted param. Verify that too
+                not_a_node = set(params.keys()) - set(self.graph.nodes)
+                valid_global_params = set([
+                    "debug"
+                ])  # Debug will be picked up by _dispatch_run, see its code
+                for node_id in self.graph.nodes:
+                    run_signature_args = self._get_run_node_signature(node_id)
+                    valid_global_params |= set(run_signature_args)
+                invalid_keys = [
+                    key for key in not_a_node if key not in valid_global_params
+                ]
+
+                if invalid_keys:
+                    raise ValueError(
+                        f"No node(s) or global parameter(s) named {', '.join(invalid_keys)} found in pipeline."
+                    )
+
+    def _get_run_node_signature(self, node_id: str):
+        return inspect.signature(
+            self.graph.nodes[node_id]["component"].run).parameters.keys()
 
     def _reorder_columns(self, df: DataFrame,
                          desired_order: List[str]) -> DataFrame:

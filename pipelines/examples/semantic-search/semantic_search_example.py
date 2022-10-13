@@ -209,6 +209,22 @@ def semantic_search_tutorial():
                           })
 
     print_documents(prediction)
+    # Batch prediction
+    predictions = pipe.run_batch(queries=["亚马逊河流的介绍", '期货交易手续费指的是什么?'],
+                                 params={
+                                     "Retriever": {
+                                         "top_k": 50
+                                     },
+                                     "Ranker": {
+                                         "top_k": 5
+                                     }
+                                 })
+    for i in range(len(predictions['queries'])):
+        result = {
+            'documents': predictions['documents'][i],
+            'query': predictions['queries'][i]
+        }
+        print_documents(result)
 
 
 if __name__ == "__main__":
