@@ -26,7 +26,7 @@
 ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布局等信息进行跨模态联合建模，创新性引入布局知识增强，提出阅读顺序预测、细粒度图文匹配等自监督预训练任务，升级空间解偶注意力机制，在各数据集上效果取得大幅度提升，相关工作[ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](http://arxiv.org/abs/2210.06155)已被EMNLP 2022 Findings会议收录[1]。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-Layout。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=400 width=1000 hspace='10'/>
 </div>
 
 <a name="2"></a>
@@ -40,7 +40,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195604457-32c16d23-d971-4183-b62f-a6970225ebad.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195604457-32c16d23-d971-4183-b62f-a6970225ebad.png height=400 width=1000 hspace='10'/>
 </div>
 
 <a name="22"></a>
