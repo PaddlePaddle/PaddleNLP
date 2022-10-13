@@ -50,38 +50,38 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 发票抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603240-a3cb664e-2548-441f-a75c-9e0b9eebb023.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610223-f8e22405-1a5e-4a19-a7db-49bd13f2248d.png height=400 hspace='10'/>
 </div>
 
 - 海报抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610368-04230855-62de-439e-b708-2c195b70461f.png height=400 hspace='10'/>
 </div>
 
 - 网页抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195608975-25e65082-1af4-4781-9753-cf2ef17afea9.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610535-7ed75945-7138-44d9-adac-7e9260fa0f0d.png height=400 hspace='10'/>
 </div>
 
 
 - 表格抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610692-8367f1c8-32c2-4b5d-9514-a149795cf609.png height=400 hspace='10'/>
 </div>
 
 - 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603876-151894d4-a570-4a63-97cc-528b722c2b01.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=500 hspace='15'/>
 </div>
 
 - 中文票据多语种（中简、中繁、英、日、法语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603730-49fe0da0-b6c5-43e7-bbe5-9b7d2dd03f9a.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=500 hspace='15'/>
 </div>
 
 <a name="23"></a>
