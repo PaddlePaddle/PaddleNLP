@@ -62,26 +62,26 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 网页抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195611613-bdbe692e-d7f2-4a2b-b548-1a933463b0b9.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195611613-bdbe692e-d7f2-4a2b-b548-1a933463b0b9.png height=500 width=1000 hspace='10'/>
 </div>
 
 
 - 表格抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195610692-8367f1c8-32c2-4b5d-9514-a149795cf609.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610692-8367f1c8-32c2-4b5d-9514-a149795cf609.png height=400 width=1000 hspace='10'/>
 </div>
 
 - 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=400 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=400 width=1000 hspace='15'/>
 </div>
 
 - 中文票据多语种（中简、中繁、英、日、法语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=400 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=400 width=1000 hspace='15'/>
 </div>
 
 <a name="23"></a>
