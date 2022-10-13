@@ -11,3 +11,4 @@ sentencepiece
 paddle2onnx
 protobuf>=3.1.0, <=3.20.0
 visualdl
+Pillow>=9.1.0
