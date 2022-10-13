@@ -56,7 +56,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 海报文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.pngg height=750 hspace='25'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.png height=750 hspace='25'/>
 </div>
 
 - 网页文档抽取问答
@@ -69,7 +69,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 表格文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.pn height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.png height=500 hspace='15'/>
 </div>
 
 - 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
