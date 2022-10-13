@@ -4,19 +4,20 @@ English | [简体中文](README_ch.md)
 
  **content**
 
-- [ERNIE-Layout](#ernie-layoutx)
-  - [1. Model Instruction](#1-model-instruction)
-  - [2. Out-of-Box](#2-out-of-box)
-      - [Gradio web demo is available](#gradio-web-demo-is-available)
-      - [```paddlenlp.Taskflow``` with three-line codes](#paddlenlptaskflow-with-three-line-codes)
-  - [3. Model Performance](#3-model-performance)
-  - [4. Fine-tuning Examples](#4-fine-tuning-examples)
-      - [4.1 Document Information Extraction](#41-document-information-extraction)
-      - [4.2 Document Visual Question Answering](#42-document-visual-question-answering)
-      - [4.3 Document Visual Classification](#43-document-visual-classification)
-  - [5. Deploy](#5-deploy)
-      - [5.1 Inference Model Export](#51-inference-model-export)
-      - [5.2 Python Deploy](#52-python-deploy)
+- [ERNIE-Layout](#ERNIE-Layout)
+  - [1. Model Instruction](#1)
+  - [2. Out-of-Box](#2)
+      - [Gradio web demo](#21)
+      - [Demo show](#22)
+      - [Taskflow](#23)
+  - [3. Model Performance](#3)
+  - [4. Fine-tuning Examples](#4)
+      - [4.1 Document Information Extraction](#41)
+      - [4.2 Document Visual Question Answering](#42)
+      - [4.3 Document Visual Classification](#43)
+  - [5. Deploy](#5)
+      - [5.1 Inference Model Export](#51)
+      - [5.2 Python Deploy](#52)
   - [References](#references)
 
 <a name="1"></a>
@@ -32,50 +33,60 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 
 ## 2. Out-of-Box
 
-#### Gradio web demo is available
+<a name="21"></a>
+
+#### Gradio web demo
+
+Gradio web demo is available [here](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=400 hspace='10'/>
 </div>
 
-#### ```paddlenlp.Taskflow``` with three-line codes
+<a name="22"></a>
+
+#### Demo show
 
 - 发票文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115285-7b89f55c-5fda-42c6-a13c-4599e72d3cc5.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603240-a3cb664e-2548-441f-a75c-9e0b9eebb023.png height=400 hspace='10'/>
 </div>
 
 - 海报文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115530-2dc6cb76-dd19-4c25-8e30-9962077eda61.png height=750 hspace='25'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.pngg height=750 hspace='25'/>
 </div>
 
 - 网页文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115680-22180d62-2266-4c39-8ce9-999a3298909c.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603536-b5e0107d-c39f-4bee-9d78-072a53072d68.png height=500 hspace='15'/>
 </div>
 
 
 - 表格文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115802-d352f977-7650-47d5-9bdf-846c2f8c77b4.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.pn height=500 hspace='15'/>
 </div>
 
-- 英文票据多语种（中、英、日、泰语）抽取问答
+- 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195116530-9f606f0b-fd11-49af-b767-71d95084b218.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603876-151894d4-a570-4a63-97cc-528b722c2b01.png height=500 hspace='15'/>
 </div>
 
-- 中文票据多语种（中、英、日、法语）抽取问答
+- 中文票据多语种（中简、中繁、英、日、法语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603730-49fe0da0-b6c5-43e7-bbe5-9b7d2dd03f9a.png height=300 hspace='10'/>
 </div>
+
+<a name="23"></a>
+
+#### Taskflow
 
 - Input Format
 
@@ -119,27 +130,32 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
   - Image from http link
 
   <div align="center">
-      <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
+      <img src=https://user-images.githubusercontent.com/40840292/195605071-02d4f3ab-ef2d-43c1-9bf0-ffdc017d4f92.png height=400 hspace='10'/>
   </div>
 
   ```python
   >>> from pprint import pprint
   >>> from paddlenlp import Taskflow
 
-  >>> docprompt = Taskflow("document_intelligence")
-  >>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
-  [{'prompt': '发票号码是多少?',
-    'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
-  {'prompt': '校验码是多少?',
-    'result': [{'end': 271,
-                'prob': 1.0,
-                'start': 263,
-                'value': '01107 555427109891646'}]}]
+  >>> docprompt = Taskflow("document_intelligence", lang="en")
+  >>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/book.png", "prompt": ["What is the name of the author of 'The Adventure Zone: The Crystal Kingdom’?", "What type of book cover does The Adventure Zone: The Crystal Kingdom have?", "For Rage, who is the author listed as?"]}])
+  [{'prompt': "What is the name of the author of 'The Adventure Zone: The "
+              'Crystal Kingdom’?',
+    'result': [{'end': 39,
+                'prob': 0.99,
+                'start': 22,
+                'value': 'Clint McElroy. Carey Pietsch, Griffn McElroy, Travis '
+                        'McElroy'}]},
+  {'prompt': 'What type of book cover does The Adventure Zone: The Crystal '
+              'Kingdom have?',
+    'result': [{'end': 51, 'prob': 1.0, 'start': 51, 'value': 'Paperback'}]},
+  {'prompt': 'For Rage, who is the author listed as?',
+    'result': [{'end': 93, 'prob': 1.0, 'start': 91, 'value': 'Bob Woodward'}]}]
   ```
 
 - Parameter Description
   * `batch_size`: number of input in each batch, default to 1.
-  * `lang`: PaddleOCR language, `en` is better on English images, default to `ch`.
+  * `lang`: PaddleOCR language, `en` is better to English images, default to `ch`.
   * `topn`: return the top n results with highest probability, default to 1.
 
 

@@ -6,6 +6,9 @@
 
 - [1. 模型介绍](#1)
 - [2. 开箱即用](#2)
+  - [Gradio web demo](#21)
+  - [应用场景展示](#22)
+  - [Taskflow](#23)
 - [3. Benchmark模型效果](#3)
 - [4. 模型微调](#4)
   - [4.1 文档信息抽取任务](#41)
@@ -30,50 +33,62 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 ## 2. 开箱即用
 
-#### 通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
+<a name="21"></a>
+
+#### Gradio web demo
+
+通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195133774-a8f9f04f-e0a3-4711-b90f-a9d138ab2466.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195604457-32c16d23-d971-4183-b62f-a6970225ebad.png height=400 hspace='10'/>
 </div>
 
-#### 通过``paddlenlp.Taskflow``三行代码调用DocPrompt功能，具备多语言文档抽取问答能力，部分应用场景展示如下：
+<a name="22"></a>
+
+#### 应用场景展示
 
 - 发票文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115285-7b89f55c-5fda-42c6-a13c-4599e72d3cc5.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603240-a3cb664e-2548-441f-a75c-9e0b9eebb023.png height=400 hspace='10'/>
 </div>
 
 - 海报文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115530-2dc6cb76-dd19-4c25-8e30-9962077eda61.png height=750 hspace='25'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.pngg height=750 hspace='25'/>
 </div>
 
 - 网页文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115680-22180d62-2266-4c39-8ce9-999a3298909c.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603536-b5e0107d-c39f-4bee-9d78-072a53072d68.png height=500 hspace='15'/>
 </div>
 
 
 - 表格文档抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195115802-d352f977-7650-47d5-9bdf-846c2f8c77b4.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.pn height=500 hspace='15'/>
 </div>
 
-- 英文票据多语种（中、英、日、泰语）抽取问答
+- 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195116530-9f606f0b-fd11-49af-b767-71d95084b218.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603876-151894d4-a570-4a63-97cc-528b722c2b01.png height=500 hspace='15'/>
 </div>
 
-- 中文票据多语种（中、英、日、法语）抽取问答
+- 中文票据多语种（中简、中繁、英、日、法语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603730-49fe0da0-b6c5-43e7-bbe5-9b7d2dd03f9a.png height=300 hspace='10'/>
 </div>
+
+<a name="23"></a>
+
+#### Taskflow
+
+通过``paddlenlp.Taskflow``三行代码调用DocPrompt功能，具备多语言文档抽取问答能力，部分应用场景展示如下：
 
 - 输入格式
 
