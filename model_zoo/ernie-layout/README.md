@@ -1,25 +1,28 @@
-简体中文 | [English](README_en.md)
+English | [简体中文](README_ch.md)
 
-# ERNIE-LayoutX
+# ERNIE-Layout
 
- **目录**
+ **content**
 
-- [1. 模型介绍](#1)
-- [2. 开箱即用](#2)
-- [3. Benchmark模型效果](#3)
-- [4. 模型微调](#4)
-  - [4.1 文档信息抽取任务](#41)
-  - [4.2 文档视觉问答任务](#42)
-  - [4.3 文档图像分类任务](#43)
-- [5. 部署](#5)
-  - [5.1 静态图导出](#51)
-  - [5.2 Python部署](#52)
+- [ERNIE-Layout](#ernie-layoutx)
+  - [1. Model Instruction](#1-model-instruction)
+  - [2. Out-of-Box](#2-out-of-box)
+      - [Gradio web demo is available](#gradio-web-demo-is-available)
+      - [```paddlenlp.Taskflow``` with three-line codes](#paddlenlptaskflow-with-three-line-codes)
+  - [3. Model Performance](#3-model-performance)
+  - [4. Fine-tuning Examples](#4-fine-tuning-examples)
+      - [4.1 Document Information Extraction](#41-document-information-extraction)
+      - [4.2 Document Visual Question Answering](#42-document-visual-question-answering)
+      - [4.3 Document Visual Classification](#43-document-visual-classification)
+  - [5. Deploy](#5-deploy)
+      - [5.1 Inference Model Export](#51-inference-model-export)
+      - [5.2 Python Deploy](#52-python-deploy)
+  - [References](#references)
 
 <a name="1"></a>
 
-## 1. 模型介绍
-
-ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布局等信息进行跨模态联合建模，创新性引入布局知识增强，提出阅读顺序预测、细粒度图文匹配等自监督预训练任务，升级空间解偶注意力机制，在各数据集上效果取得大幅度提升，相关工作[ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)已被EMNLP 2022 Findings会议收录[2]。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-LayoutX。
+## 1. Model Instruction
+Recent years have witnessed the rise and success of pre-training techniques in visually-rich document understanding. However, most existing methods lack the systematic mining and utilization of layout-centered knowledge, leading to sub-optimal performances. In this paper, we propose ERNIE-Layout, a novel document pre-training solution with layout knowledge enhancement in the whole workflow, to learn better representations that combine the features from text, layout, and image. Specifically, we first rearrange input sequences in the serialization stage, and then present a correlative pre-training task, reading order prediction, to learn the proper reading order of documents. To improve the layout awareness of the model, we integrate a spatial-aware disentangled attention into the multi-modal transformer and a replaced regions prediction task into the pre-training phase. Experimental results show that ERNIE-Layout achieves superior performance on various downstream tasks, setting new state-of-the-art on key information extraction, document image classification, and document question answering datasets. [Related work](http://arxiv.org/abs/2210.06155) accpeted by EMNLP 2022(Findings). To expand the scope of commercial applications for document intelligence, we propose a multilingual multi-modal document model ERNIE-Layout through PaddleNLP.
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=400 hspace='10'/>
@@ -27,15 +30,15 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="2"></a>
 
-## 2. 开箱即用
+## 2. Out-of-Box
 
-#### 通过Huggingface网页体验DocPrompt功能：
+#### Gradio web demo is available
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195133774-a8f9f04f-e0a3-4711-b90f-a9d138ab2466.png height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195117247-01a9caf5-3394-42b9-bfec-4a1c316a6990.png height=400 hspace='10'/>
 </div>
 
-#### 通过``paddlenlp.Taskflow``三行代码调用DocPrompt功能，具备多语言文档抽取问答能力，部分应用场景展示如下：
+#### ```paddlenlp.Taskflow``` with three-line codes
 
 - 发票文档抽取问答
 
@@ -74,7 +77,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
     <img src=https://user-images.githubusercontent.com/40840292/195116725-e3cb7d32-4b9e-4a36-8378-27ada0fbc434.png height=300 hspace='10'/>
 </div>
 
-- 输入格式
+- Input Format
 
 ```
 [
@@ -83,7 +86,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 ]
 ```
 
-默认使用PaddleOCR进行OCR识别，同时支持用户通过``word_boxes``传入自己的OCR结果，格式为``List[str, List[float, float, float, float]]``。
+Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes``, the data format is ``List[str, List[float, float, float, float]]``。
 
 ```
 [
@@ -91,9 +94,9 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 ]
 ```
 
-- 支持单条、批量预测
+- Support single and batch input
 
-  - 支持本地图片路径输入
+  - Image from local path
 
   <div align="center">
       <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
@@ -113,7 +116,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
     'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
   ```
 
-  - http图片链接输入
+  - Image from http link
 
   <div align="center">
       <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
@@ -134,35 +137,33 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
                 'value': '01107 555427109891646'}]}]
   ```
 
-- 可配置参数说明
-  * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-  * `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
-  * `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
+- Parameter Description
+  * `batch_size`: number of input in each batch, default to 1.
+  * `lang`: PaddleOCR language, `en` is better on English images, default to `ch`.
+  * `topn`: return the top n results with highest probability, default to 1.
 
 
 <a name="3"></a>
 
-## 3. Benchmark模型效果
+## 3. Model Performance
 
-- 开源数据集介绍
+- Dataset
 
-  |   数据集   |  任务类型   | 语言 | 说明 |
+  |   Dataset   |  Task   | Language | Note |
   | --------- | ---------- | --- | ---- |
-  | FUNSD     | 文档信息抽取 | 英文 | - |
-  | XFUND-ZH  | 文档信息抽取 | 中文 | - |
-  | DocVQA-ZH | 文档视觉问答 | 中文 | [DocVQA-ZH](http://ailab.aiwin.org.cn/competitions/49)已停止榜单提交，因此我们将原始训练集进行重新划分以评估模型效果，划分后训练集包含4,187张图片，验证集包含500张图片，测试集包含500张图片。 |
-  | RVL-CDIP (sampled)  | 文档图像分类 | 英文 | RVL-CDIP原始数据集共包含400,000张图片，由于数据集较大训练较慢，为验证文档图像分类的模型效果故进行降采样，采样后的训练集包含6,400张图片，验证集包含800张图片，测试集包含800张图片。 |
+  | FUNSD     | 文档信息抽取 | English | - |
+  | XFUND-ZH  | 文档信息抽取 | Chinese | - |
+  | DocVQA-ZH | 文档视觉问答 | Chinese | [DocVQA-ZH](http://ailab.aiwin.org.cn/competitions/49)已停止榜单提交，因此我们将原始训练集进行重新划分以评估模型效果，划分后训练集包含4,187张图片，验证集包含500张图片，测试集包含500张图片。 |
+  | RVL-CDIP (sampled)  | 文档图像分类 | English | RVL-CDIP原始数据集共包含400,000张图片，由于数据集较大训练较慢，为验证文档图像分类的模型效果故进行降采样，采样后的训练集包含6,400张图片，验证集包含800张图片，测试集包含800张图片。 |
 
-- 评测结果
-
-  在文档智能领域主流开源数据集的**验证集**上评测指标如下表所示：
+- Results
 
   |         Model      |    FUNSD  | RVL-CDIP (sampled)  | XFUND-ZH  | DocVQA-ZH |
   | ------------------ | --------- | --------- | --------- | --------- |
   | LayoutXLM-Base     |   86.72   |   **90.88**   |   86.24   |   66.01   |
   | ERNIE-LayoutX-Base | **89.31** | 90.29 | **88.58** | **69.57** |
 
-- 具体评测方式
+- Evaluation Methods
 
   - 以上所有任务均基于Grid Search方式进行超参寻优。FUNSD和XFUND-ZH每间隔 100 steps 评估验证集效果，评价指标为Accuracy。
     RVL-CDIP每间隔2000 steps评估验证集效果，评价指标为F1-Score。DocVQA-ZH每间隔10000 steps评估验证集效果，取验证集最优效果作为表格中的汇报指标，评价指标为ANLS（计算方法参考https://arxiv.org/pdf/1907.00490.pdf）。
@@ -179,7 +180,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
   - 文档信息抽取任务FUNSD和XFUND-ZH采用最大步数（max_steps）的微调方式，分别为10000 steps和20000 steps；文档视觉问答DocVQA-ZH的num_train_epochs为6；文档图像分类RVL-CDIP的num_train_epochs为20。
 
-- 最优超参
+- Best Hyper Parameter
 
   不同预训练模型在下游任务上做Grid Search之后的最优超参（learning_rate、batch_size、warmup_ratio）如下：
 
@@ -191,9 +192,9 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 <a name="4"></a>
 
-## 4. 模型微调
+## 4. Fine-tuning Examples
 
-- 请执行以下命令进行安装项目依赖
+- Installation
 
 ```
 pip install -r requirements.txt
@@ -201,9 +202,9 @@ pip install -r requirements.txt
 
 <a name="41"></a>
 
-#### 4.1 文档信息抽取任务
+#### 4.1 Document Information Extraction
 
-- FUNSD训练
+- FUNSD Train
 
 ```shell
 python -u run_ner.py \
@@ -234,7 +235,7 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-- XFUND-ZH训练
+- XFUND-ZH Train
 
 ```shell
 python -u run_ner.py \
@@ -268,9 +269,9 @@ python -u run_ner.py \
 
 <a name="42"></a>
 
-#### 4.2 文档视觉问答任务
+#### 4.2 Document Visual Question Answering
 
-- DocVQA-ZH训练
+- DocVQA-ZH Train
 
 ```shell
 python3 -u run_mrc.py \
@@ -308,9 +309,9 @@ python3 -u run_mrc.py \
 
 <a name="43"></a>
 
-#### 4.3 文档图像分类任务
+#### 4.3 Document Visual Classification
 
-- RVL-CDIP训练
+- RVL-CDIP Train
 
 ```shell
 python3 -u run_cls.py \
@@ -347,38 +348,37 @@ python3 -u run_cls.py \
 
 <a name="5"></a>
 
-## 5. 部署
+## 5. Deploy
 
 <a name="51"></a>
 
-#### 5.1 静态图导出
+#### 5.1 Inference Model Export
 
-使用动态图训练结束之后，还可以将动态图参数导出为静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
+After fine-tuning, you can also export the inference model via [Model Export Script](export_model.py), the inference model will be saved in the `output_path` you specified.
 
-
-导出在FUNSD上微调后的模型：
+- Export the model fine-tuned on FUNSD
 
 ```shell
 python export_model.py --task_type ner --model_path ./ernie-layoutx-base-uncased/models/funsd/ --output_path ./ner_export
 ```
 
-导出在DocVQA-ZH上微调后的模型：
+-Export the model fine-tuned on DocVQA-ZH
 
 ```shell
 python export_model.py --task_type mrc --model_path ./ernie-layoutx-base-uncased/models/docvqa_zh/ --output_path ./mrc_export
 ```
 
-导出在RVL-CDIP(sampled)上微调后的模型：
+- Export the model fine-tuned on RVL-CDIP(sampled)
 
 ```shell
 python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased/models/rvl_cdip_sampled/ --output_path ./cls_export
 ```
 
-可支持配置的参数：
-* `model_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
-* `output_path`：静态图图保存的参数路径；默认为"./export"。
+- Parameter Description
+* `model_path`：the save directory of dygraph model parameters, default to "./checkpoint/"。
+* `output_path`：the save directory of static graph model parameters, default to "./export"。
 
-程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
+- Directory
 
 ```text
 export/
@@ -389,16 +389,16 @@ export/
 
 <a name="52"></a>
 
-#### 5.2 Python部署
+#### 5.2 Python Deploy
 
-导出静态图模型之后可用于部署，项目提供了文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例，详见[ERNIE-LayoutX Python部署指南](./deploy/python/README.md)。
+We provide the deploy example on Document information extraction, DocVQA and Document image classification, please follow the [ERNIE-Layout Python Deploy Guide](./deploy/python/README.md)
 
 
 <a name="References"></a>
 
 ## References
 
-- [ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)
+- [ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](http://arxiv.org/abs/2210.06155)
 
 - [ICDAR 2019 Competition on Scene Text Visual Question Answering](https://arxiv.org/pdf/1907.00490.pdf)
 
@@ -408,4 +408,4 @@ export/
 
 - [RVL-CDIP dataset](https://adamharley.com/rvl-cdip/)
 
-- [保险文本视觉认知问答竞赛](http://ailab.aiwin.org.cn/competitions/49)
+- [Competition of Insurance Document Visual Cognition Question Answering](http://ailab.aiwin.org.cn/competitions/49)

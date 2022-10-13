@@ -1,3 +1,5 @@
+English | [简体中文](README_ch.md)
+
 # ERNIE-LayoutX Python部署指南
 
 本文介绍ERNIE-LayoutX Python部署指南，包括部署环境的准备，文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例。
@@ -118,7 +120,7 @@ python infer.py \
 [{'doc': './images/cls_sample.jpg', 'result': 'email'}]
 ```
 
-## 5. 更多配置
+## 5. Parameter Description
 
 - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。

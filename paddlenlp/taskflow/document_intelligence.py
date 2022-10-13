@@ -95,6 +95,13 @@ class DocPromptTask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
+
+        def _depth(lst):
+            if not isinstance(lst, list):
+                return 0
+            else:
+                return 1 + max(_depth(sublist) for sublist in lst)
+
         preprocess_results = self._check_input_text(inputs)
         for example in preprocess_results:
             if "word_boxes" in example.keys():
@@ -103,6 +110,9 @@ class DocPromptTask(Task):
             else:
                 ocr_result = self._ocr.ocr(example["doc"], cls=True)
                 example["ocr_type"] = "ppocr"
+                # Compatible with paddleocr>=2.6.0.2
+                ocr_result = ocr_result[0] if _depth(
+                    ocr_result) == 5 else ocr_result
             example["ocr_result"] = ocr_result
         return preprocess_results
 
