@@ -169,10 +169,22 @@ python train.py --vocab_path='./vocab.json' \
     --save_dir='./checkpoints'
 ```
 
+MLU 启动：
+
+```shell
+python train.py --vocab_path='./vocab.json' \
+    --device=mlu \
+    --network=lstm \
+    --lr=5e-4 \
+    --batch_size=64 \
+    --epochs=10 \
+    --save_dir='./checkpoints'
+```
+
 以上参数表示：
 
 * `vocab_path`: 用于保存根据语料库构建的词汇表的文件路径。
-* `device`: 选用什么设备进行训练，可选cpu、gpu或者xpu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
+* `device`: 选用什么设备进行训练，可选cpu、gpu、xpu或者mlu。如使用gpu训练则参数gpus指定GPU卡号。目前xpu只支持模型网络设置为lstm。
 * `network`: 模型网络名称，默认为`bilstm`， 可更换为bilstm，bigru，birnn，bow，lstm，rnn，gru，bilstm_attn，cnn等。
 * `lr`: 学习率， 默认为5e-5。
 * `batch_size`: 运行一个batch大小，默认为64。
@@ -241,6 +253,15 @@ XPU启动：
 ```shell
 python predict.py --vocab_path='./vocab.json' \
     --device=xpu \
+    --network=lstm \
+    --params_path=checkpoints/final.pdparams
+```
+
+MLU启动：
+
+```shell
+python predict.py --vocab_path='./vocab.json' \
+    --device=mlu \
     --network=lstm \
     --params_path=checkpoints/final.pdparams
 ```
