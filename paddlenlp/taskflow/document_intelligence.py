@@ -27,7 +27,7 @@ usage = r"""
             # Types of doc: A string containing a http link pointing to an image
             docprompt({"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             '''
-            [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
+            [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.74, 'start': 2, 'end': 2}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 231, 'end': 233}]}]
             '''
 
             # Batch input
@@ -37,7 +37,7 @@ usage = r"""
             ]
             docprompt(batch_input)
             '''
-            [[{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}], [{'prompt': '五百丁本次想要担任的是什么职位?', 'result': [{'value': '客户经理', 'prob': 1.0, 'start': 180, 'end': 183}]}, {'prompt': '五百丁是在哪里上的大学?', 'result': [{'value': '广州五百丁学院', 'prob': 1.0, 'start': 32, 'end': 38}]}, {'prompt': '大学学的是什么专业?', 'result': [{'value': '金融学(本科）', 'prob': 0.74, 'start': 39, 'end': 45}]}]]
+            [[{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.74, 'start': 2, 'end': 2}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 231, 'end': 233}]}], [{'prompt': '五百丁本次想要担任的是什么职位?', 'result': [{'value': '客户经理', 'prob': 1.0, 'start': 4, 'end': 7}]}, {'prompt': '五百丁是在哪里上的大学?', 'result': [{'value': '广州五百丁学院', 'prob': 1.0, 'start': 31, 'end': 37}]}, {'prompt': '大学学的是什么专业?', 'result': [{'value': '金融学(本科）', 'prob': 0.82, 'start': 38, 'end': 44}]}]]
             '''
          """
 
@@ -254,12 +254,14 @@ class DocPromptTask(Task):
                             "Invalid inputs, the inputs should contain the prompt."
                         )
                     else:
-                        if isinstance(example["prompt"], list) and all(
+                        if isinstance(example["prompt"], str):
+                            data["prompt"] = [example["prompt"]]
+                        elif isinstance(example["prompt"], list) and all(
                                 isinstance(s, str) for s in example["prompt"]):
                             data["prompt"] = example["prompt"]
                         else:
                             raise TypeError(
-                                "Incorrect prompt, prompt should be list of string."
+                                "Incorrect prompt, prompt should be string or list of string."
                             )
                     if "word_boxes" in example.keys():
                         data["word_boxes"] = example["word_boxes"]

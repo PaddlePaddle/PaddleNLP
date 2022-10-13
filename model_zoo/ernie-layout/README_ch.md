@@ -120,13 +120,13 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
   >>> from paddlenlp import Taskflow
 
   >>> docprompt = Taskflow("document_intelligence")
-  >>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+  >>> pprint(docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}]))
   [{'prompt': '五百丁本次想要担任的是什么职位?',
-    'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
+    'result': [{'end': 7, 'prob': 1.0, 'start': 4, 'value': '客户经理'}]},
   {'prompt': '五百丁是在哪里上的大学?',
-    'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
+    'result': [{'end': 37, 'prob': 1.0, 'start': 31, 'value': '广州五百丁学院'}]},
   {'prompt': '大学学的是什么专业?',
-    'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
+    'result': [{'end': 44, 'prob': 0.82, 'start': 38, 'value': '金融学(本科）'}]}]
   ```
 
   - http图片链接输入
@@ -140,13 +140,13 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
   >>> from paddlenlp import Taskflow
 
   >>> docprompt = Taskflow("document_intelligence")
-  >>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+  >>> pprint(docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}]))
   [{'prompt': '发票号码是多少?',
-    'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
+    'result': [{'end': 2, 'prob': 0.74, 'start': 2, 'value': 'No44527206'}]},
   {'prompt': '校验码是多少?',
-    'result': [{'end': 271,
+    'result': [{'end': 233,
                 'prob': 1.0,
-                'start': 263,
+                'start': 231,
                 'value': '01107 555427109891646'}]}]
   ```
 

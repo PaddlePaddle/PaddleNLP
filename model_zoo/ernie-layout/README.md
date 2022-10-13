@@ -144,13 +144,13 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
   >>> from paddlenlp import Taskflow
 
   >>> docprompt = Taskflow("document_intelligence")
-  >>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+  >>> pprint(docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}]))
   [{'prompt': '五百丁本次想要担任的是什么职位?',
-    'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
+    'result': [{'end': 7, 'prob': 1.0, 'start': 4, 'value': '客户经理'}]},
   {'prompt': '五百丁是在哪里上的大学?',
-    'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
+    'result': [{'end': 37, 'prob': 1.0, 'start': 31, 'value': '广州五百丁学院'}]},
   {'prompt': '大学学的是什么专业?',
-    'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
+    'result': [{'end': 44, 'prob': 0.82, 'start': 38, 'value': '金融学(本科）'}]}]
   ```
 
 - Parameter Description
@@ -375,7 +375,7 @@ After fine-tuning, you can also export the inference model via [Model Export Scr
 python export_model.py --task_type ner --model_path ./ernie-layoutx-base-uncased/models/funsd/ --output_path ./ner_export
 ```
 
--Export the model fine-tuned on DocVQA-ZH
+- Export the model fine-tuned on DocVQA-ZH
 
 ```shell
 python export_model.py --task_type mrc --model_path ./ernie-layoutx-base-uncased/models/docvqa_zh/ --output_path ./mrc_export
