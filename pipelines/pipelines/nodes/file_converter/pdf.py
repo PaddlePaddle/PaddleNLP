@@ -469,36 +469,32 @@ class PDFluxToTextConverter(BaseConverter):
         url = self.revise_url(url, extra_params=extra_params)
         return url
 
-    def get_target_varlue(self, key, dic, tmp_list):
+    def get_target_varlue(self, key, json, tmp_list):
         """
+        Parse the JSON files and extract text form the key recursively
         :param key: the key that you want to get
-        :param dic: JSON data
+        :param json: JSON data
         :param tmp_list: Use to Store the value of the target key
         :return: list
         """
-        if not isinstance(dic, dict) or not isinstance(tmp_list,
-                                                       list):  # 对传入数据进行格式校验
+        if not isinstance(json, dict) or not isinstance(tmp_list, list):
             return 'argv[1] not an dict or argv[-1] not an list '
-        if key in dic.keys():
-            tmp_list.append(dic[key])  # 传入数据存在则存入tmp_list
+        if key in json.keys():
+            tmp_list.append(json[key])
 
-        for value in dic.values():  # 传入数据不符合则对其value值进行遍历
+        for value in json.values():
             if isinstance(value, dict):
-                self.get_target_varlue(key, value,
-                                       tmp_list)  # 传入数据的value值是字典，则直接调用自身
+                self.get_target_varlue(key, value, tmp_list)
             elif isinstance(value, (list, tuple)):
-                self.__get_value(key, value,
-                                 tmp_list)  # 传入数据的value值是列表或者元组，则调用_get_value
+                self.get_value(key, value, tmp_list)
         return tmp_list
 
-    def __get_value(self, key, val, tmp_list):
+    def get_value(self, key, val, tmp_list):
         for val_ in val:
             if isinstance(val_, dict):
-                self.get_target_varlue(
-                    key, val_, tmp_list)  # 传入数据的value值是字典，则调用get_target_value
+                self.get_target_varlue(key, val_, tmp_list)
             elif isinstance(val_, (list, tuple)):
-                self.__get_value(key, val_,
-                                 tmp_list)  # 传入数据的value值是列表或者元组，则调用自身
+                self.get_value(key, val_, tmp_list)
 
 
 class PDFToTextOCRConverter(BaseConverter):
