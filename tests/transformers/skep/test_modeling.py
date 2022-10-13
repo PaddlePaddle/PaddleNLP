@@ -27,9 +27,13 @@ from paddlenlp.transformers import (
     SkepForTokenClassification,
     SkepCrfForTokenClassification,
 )
-from ..test_modeling_common import (ids_tensor, floats_tensor,
-                                    random_attention_mask, ModelTesterMixin)
-from ...testing_utils import slow
+# from ..test_modeling_common import (ids_tensor, floats_tensor,
+#                                     random_attention_mask, ModelTesterMixin)
+# from ...testing_utils import slow
+from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
+                                                     random_attention_mask,
+                                                     ModelTesterMixin)
+from tests.testing_utils import slow
 
 
 @dataclass
@@ -213,6 +217,59 @@ class SkepModelTester:
                 result[0].shape,
                 [self.config.batch_size, self.config.seq_length])
 
+    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
+                                     input_mask, sequence_labels, token_labels,
+                                     choice_labels):
+        model = SkepModel(**config)
+        model.eval()
+
+        input_ids = ids_tensor((self.batch_size, self.seq_length),
+                               self.vocab_size)
+        input_token_types = ids_tensor([self.batch_size, self.seq_length],
+                                       self.type_vocab_size)
+
+        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
+        embed_size_per_head = self.hidden_size // self.num_attention_heads
+        key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
+                                    self.seq_length, embed_size_per_head))
+        values_tensor = floats_tensor(
+            (self.batch_size, self.num_attention_heads, self.seq_length,
+             embed_size_per_head))
+        past_key_values = ((
+            key_tensor,
+            values_tensor,
+        ), ) * self.num_hidden_layers
+
+        # create fully-visible attention mask for input_ids only and input_ids + past
+        attention_mask = paddle.ones([self.batch_size, self.seq_length])
+        attention_mask_with_past = paddle.ones(
+            [self.batch_size, self.seq_length * 2])
+
+        outputs_with_cache = model(input_ids,
+                                   token_type_ids=input_token_types,
+                                   attention_mask=attention_mask_with_past,
+                                   past_key_values=past_key_values,
+                                   return_dict=self.parent.return_dict)
+        outputs_without_cache = model(input_ids,
+                                      token_type_ids=input_token_types,
+                                      attention_mask=attention_mask,
+                                      return_dict=self.parent.return_dict)
+
+        # last_hidden_state should have the same shape but different values when given past_key_values
+        if self.parent.return_dict:
+            self.parent.assertEqual(
+                outputs_with_cache.last_hidden_state.shape,
+                outputs_without_cache.last_hidden_state.shape)
+            self.parent.assertFalse(
+                paddle.allclose(outputs_with_cache.last_hidden_state,
+                                outputs_without_cache.last_hidden_state))
+        else:
+            outputs_with_cache, _ = outputs_with_cache
+            self.parent.assertEqual(outputs_with_cache.shape,
+                                    outputs_without_cache.shape)
+            self.parent.assertFalse(
+                paddle.allclose(outputs_with_cache, outputs_without_cache))
+
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
         (
@@ -280,6 +337,10 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_crf_token_classification(
             *config_and_inputs)
 
+    def test_for_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_cache(*config_and_inputs)
+
     @slow
     def test_model_from_pretrained(self):
         for model_name in list(
@@ -326,6 +387,44 @@ class SkepModelIntegrationTest(unittest.TestCase):
               [0.49883127, -0.15263288, 0.46780178]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_past_key_value(self):
+        model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+        # TODO(wj-Mcat): 这里需要使用真实数据
+        expected_shape = [1, 11, 1024]
+        self.assertEqual(output[0].shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [[[0.31737363, 0.58842909, 0.43969074],
+              [0.20047806, 0.04142847, -0.26555336],
+              [0.49882850, -0.15263671, 0.46780348]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        expected_slice = paddle.to_tensor(
+            [[[0.29901379, 0.68195367, 0.62448436],
+              [0.18537062, 0.33085057, -0.04292759],
+              [0.38783669, -0.19946010, 0.24944240]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

@@ -77,28 +77,32 @@ class ErnieEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
+        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
+        self.register_buffer(
+            "position_ids",
+            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"),
+                          shape=[1, -1]),
+        )
+
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 task_type_ids=None,
                 inputs_embeds=None,
-                past_key_values_length=None):
+                past_key_values_length=0):
+
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
             input_embeddings = self.word_embeddings(input_ids)
-        else:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
-            input_embeddings = inputs_embeds
+
+        input_shape = paddle.shape(inputs_embeds)[:-1]
 
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
-            #seq_length = input_ids.shape[1]
-            ones = paddle.ones(input_shape, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=1)
-            position_ids = seq_length - ones
-            if past_key_values_length is not None:
-                position_ids += past_key_values_length
+            seq_length = inputs_embeds.shape[1]
+            position_ids = self.position_ids[:,
+                                             past_key_values_length:seq_length +
+                                             past_key_values_length]
             position_ids.stop_gradient = True
 
         position_embeddings = self.position_embeddings(position_ids)
@@ -882,7 +886,7 @@ class ErnieModel(ErniePretrainedModel):
         self.embeddings.word_embeddings = value
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -982,7 +986,7 @@ class ErnieModel(ErniePretrainedModel):
             raise ValueError(
                 "You have to specify either input_ids or inputs_embeds")
 
-        past_key_values_length = None
+        past_key_values_length = 0
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
 
@@ -998,11 +1002,12 @@ class ErnieModel(ErniePretrainedModel):
                     dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask],
                                                axis=-1)
+
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
             attention_mask = (1.0 - attention_mask) * -1e4
+
         attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(
@@ -1065,7 +1070,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -1177,7 +1182,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -1308,7 +1313,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -1514,7 +1519,7 @@ class ErnieForPretraining(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -1695,7 +1700,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -1817,7 +1822,7 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,

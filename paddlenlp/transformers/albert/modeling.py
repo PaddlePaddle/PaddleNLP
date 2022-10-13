@@ -18,6 +18,7 @@ import math
 from typing import Optional, Tuple, List
 from dataclasses import dataclass
 import paddle
+from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
@@ -152,29 +153,25 @@ class AlbertEmbeddings(Layer):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         token_type_ids=None,
         position_ids=None,
         inputs_embeds=None,
         past_key_values_length=0,
     ):
-        if input_ids is not None:
-            input_shape = input_ids.shape
-        else:
-            input_shape = inputs_embeds.shape[:-1]
-
-        seq_length = input_shape[1]
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
 
         if position_ids is None:
+            seq_length = inputs_embeds.shape[1]
             position_ids = self.position_ids[:,
                                              past_key_values_length:seq_length +
                                              past_key_values_length]
+            position_ids.stop_gradient = True
 
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype="int64")
-
-        if inputs_embeds is None:
-            inputs_embeds = self.word_embeddings(input_ids)
+            input_shape = paddle.shape(inputs_embeds)
+            token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
 
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         embeddings = inputs_embeds + token_type_embeddings
@@ -229,15 +226,22 @@ class AlbertAttention(Layer):
         hidden_states,
         attention_mask=None,
         head_mask=None,
+        past_key_value=None,
         output_attentions=False,
     ):
-        mixed_query_layer = self.query(hidden_states)
-        mixed_key_layer = self.key(hidden_states)
-        mixed_value_layer = self.value(hidden_states)
+        key_layer, value_layer = hidden_states, hidden_states
+        if past_key_value is not None:
+            key_layer = paddle.concat([past_key_value[0], key_layer], axis=2)
+            value_layer = paddle.concat([past_key_value[1], value_layer],
+                                        axis=2)
 
-        query_layer = self.transpose_for_scores(mixed_query_layer)
-        key_layer = self.transpose_for_scores(mixed_key_layer)
-        value_layer = self.transpose_for_scores(mixed_value_layer)
+        query_layer = self.query(hidden_states)
+        key_layer = self.key(key_layer)
+        value_layer = self.value(value_layer)
+
+        query_layer = self.transpose_for_scores(query_layer)
+        key_layer = self.transpose_for_scores(key_layer)
+        value_layer = self.transpose_for_scores(value_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = paddle.matmul(query_layer,
@@ -310,12 +314,14 @@ class AlbertLayer(Layer):
         hidden_states,
         attention_mask=None,
         head_mask=None,
+        past_key_value: Optional[Tuple[Tuple[Tensor]]] = None,
         output_attentions=False,
     ):
         attention_output = self.attention(
             hidden_states,
             attention_mask=attention_mask,
             head_mask=head_mask,
+            past_key_value=past_key_value,
             output_attentions=output_attentions,
         )
 
@@ -361,12 +367,15 @@ class AlbertLayerGroup(Layer):
                 hidden_states,
                 attention_mask=None,
                 head_mask=None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = None,
                 output_attentions=False,
                 output_hidden_states=False):
 
         layer_attentions = () if output_attentions else None
         all_hidden_states = (hidden_states, ) if output_hidden_states else None
 
+        next_decoder_cache = () if use_cache else None
         for layer_index, albert_layer in enumerate(self.albert_layers):
 
             layer_output = albert_layer(
@@ -376,6 +385,9 @@ class AlbertLayerGroup(Layer):
                 output_attentions=output_attentions,
             )
             hidden_states = layer_output[0]
+
+            if use_cache:
+                next_decoder_cache += (layer_output[-1], )
 
             if output_attentions:
                 layer_attentions = layer_attentions + (layer_output[1], )
@@ -432,11 +444,12 @@ class AlbertTransformer(Layer):
 
     def forward(self,
                 hidden_states,
-                attention_mask=None,
-                head_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                attention_mask: Optional[Tensor] = None,
+                head_mask: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                output_hidden_states: Optional[bool] = False,
+                output_attentions: Optional[bool] = False,
+                return_dict: Optional[bool] = False):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
 
         all_hidden_states = (hidden_states, ) if output_hidden_states else None
@@ -994,15 +1007,17 @@ class AlbertModel(AlbertPretrainedModel):
         return head_mask
 
     def forward(self,
-                input_ids,
-                attention_mask=None,
-                token_type_ids=None,
-                position_ids=None,
-                head_mask=None,
-                inputs_embeds=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids=None,
+                attention_mask: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                head_mask: Optional[Tensor] = None,
+                use_cache: Optional[bool] = None,
+                past_key_values: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = False,
+                output_attentions: Optional[bool] = False,
+                return_dict: Optional[bool] = False):
         r'''
          The AlbertModel forward method, overrides the `__call__()` special method.
 
@@ -1040,9 +1055,19 @@ class AlbertModel(AlbertPretrainedModel):
 
                  - 1 indicates the head is **not masked**,
                  - 0 indicated the head is **masked**.
-             inputs_embeds (Tensor, optional):
+            inputs_embeds (Tensor, optional):
                 If you want to control how to convert `inputs_ids` indices into associated vectors, you can
                 pass an embedded representation directly instead of passing `inputs_ids`.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -1108,8 +1133,25 @@ class AlbertModel(AlbertPretrainedModel):
             raise ValueError(
                 "You have to specify either input_ids or inputs_embeds")
 
+        past_key_values_length = 0
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
+
         if attention_mask is None:
             attention_mask = paddle.ones(shape=input_shape)
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
+        # For 2D attention_mask from tokenizer
+        elif attention_mask.ndim == 2:
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
+            attention_mask = (1.0 - attention_mask) * -1e4
+        attention_mask.stop_gradient = True
+
         if token_type_ids is None:
             token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
 
@@ -1124,7 +1166,7 @@ class AlbertModel(AlbertPretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             inputs_embeds=inputs_embeds,
-        )
+            past_key_values_length=past_key_values_length)
 
         encoder_outputs = self.encoder(
             embedding_output,
@@ -1186,7 +1228,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
         return self.transformer.embeddings.word_embeddings
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
@@ -1382,7 +1424,7 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         return self.transformer.embeddings.word_embeddings
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
@@ -1507,7 +1549,7 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
         self.init_weights()
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
@@ -1647,7 +1689,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         self.init_weights()
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
@@ -1773,7 +1815,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         self.init_weights()
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
@@ -1926,7 +1968,7 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
         self.init_weights()
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,

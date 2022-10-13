@@ -16,7 +16,7 @@ import paddle
 import paddle.nn as nn
 
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (BaseModelOutputWithPooling,
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
                              SequenceClassifierOutput, TokenClassifierOutput,
                              QuestionAnsweringModelOutput,
                              MultipleChoiceModelOutput, tuple_output)
@@ -46,16 +46,26 @@ class ErnieMEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, position_ids=None):
+    def forward(self,
+                input_ids,
+                position_ids=None,
+                inputs_embeds=None,
+                past_key_values_length=0):
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=1)
-            position_ids = seq_length - ones
+            seq_length = inputs_embeds.shape[1]
+            position_ids = self.position_ids[:,
+                                             past_key_values_length:seq_length +
+                                             past_key_values_length]
+
         position_ids += 2
         position_ids.stop_gradient = True
-        input_embeddings = self.word_embeddings(input_ids)
+
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embeddings + position_embeddings
+        embeddings = inputs_embeds + position_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -230,6 +240,9 @@ class ErnieMModel(ErnieMPretrainedModel):
                 input_ids,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
+                past_key_values=None,
+                use_cache=None,
                 output_hidden_states=False,
                 output_attentions=False,
                 return_dict=False):
@@ -254,6 +267,19 @@ class ErnieMModel(ErnieMPretrainedModel):
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -296,22 +322,44 @@ class ErnieMModel(ErnieMPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time."
+            )
+
+        past_key_values_length = 0
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == 0).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
+
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            past_key_values_length=past_key_values_length)
 
+        self.encoder._use_cache = use_cache  # To be consistent with HF
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask,
+            cache=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
@@ -326,9 +374,10 @@ class ErnieMModel(ErnieMPretrainedModel):
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
 
-        return BaseModelOutputWithPooling(
+        return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
+            past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions)
 
