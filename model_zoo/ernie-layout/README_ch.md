@@ -47,29 +47,33 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 #### 应用场景展示
 
-- 发票文档抽取问答
+- 发票抽取问答
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195603240-a3cb664e-2548-441f-a75c-9e0b9eebb023.png height=400 hspace='10'/>
 </div>
 
-- 海报文档抽取问答
+- 海报抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.png height=750 hspace='25'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603422-a0a1905c-057f-4cac-9b45-52651eb7452a.png height=400 hspace='10'/>
 </div>
 
-- 网页文档抽取问答
+- 网页抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603536-b5e0107d-c39f-4bee-9d78-072a53072d68.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603536-b5e0107d-c39f-4bee-9d78-072a53072d68.png height=400 hspace='10'/>
+</div>
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195608975-25e65082-1af4-4781-9753-cf2ef17afea9.png height=400 hspace='10'/>
 </div>
 
 
-- 表格文档抽取问答
+- 表格抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603626-5f1bed89-1467-491f-811d-296f2623e179.png height=400 hspace='10'/>
 </div>
 
 - 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
@@ -81,7 +85,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 中文票据多语种（中简、中繁、英、日、法语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195603730-49fe0da0-b6c5-43e7-bbe5-9b7d2dd03f9a.png height=300 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195603730-49fe0da0-b6c5-43e7-bbe5-9b7d2dd03f9a.png height=500 hspace='15'/>
 </div>
 
 <a name="23"></a>
