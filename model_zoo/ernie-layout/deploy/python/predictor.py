@@ -854,19 +854,11 @@ class Predictor(object):
         return self.inference_backend.infer(data)
 
     def predict(self, docs):
-
-        def _depth(lst):
-            if not isinstance(lst, list):
-                return 0
-            else:
-                return 1 + max(_depth(sublist) for sublist in lst)
-
         input_data = []
         for doc in docs:
             ocr_result = self.ocr.ocr(doc, cls=True)
             # Compatible with paddleocr>=2.6.0.2
-            ocr_result = ocr_result[0] if _depth(
-                ocr_result) == 5 else ocr_result
+            ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result
             example = ppocr2example(ocr_result, doc)
             input_data.append(example)
 
