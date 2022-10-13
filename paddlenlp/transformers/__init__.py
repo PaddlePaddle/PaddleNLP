@@ -14,6 +14,8 @@
 
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char, AddedToken, normalize_chars, tokenize_special_chars, convert_to_unicode
+from .processing_utils import ProcessorMixin
+from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
