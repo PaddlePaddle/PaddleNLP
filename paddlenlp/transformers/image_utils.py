@@ -20,9 +20,14 @@ import paddle
 import numpy as np
 import PIL.Image
 import PIL.ImageOps
-from PIL.Image import Resampling
 
 import requests
+from ..utils.tools import compare_version
+
+if compare_version(PIL.__version__, "9.1.0") >= 0:
+    Resampling = PIL.Image.Resampling
+else:
+    Resampling = PIL.Image
 
 IMAGENET_DEFAULT_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
@@ -224,7 +229,7 @@ class ImageFeatureExtractionMixin:
                 If `size` is an int and `default_to_square` is `True`, then image will be resized to (size, size). If
                 `size` is an int and `default_to_square` is `False`, then smaller edge of the image will be matched to
                 this number. i.e, if height > width, then image will be rescaled to (size * height / width, size).
-            resample (`int`, *optional*, defaults to `PIL.Image.Resampling.BILINEAR`):
+            resample (`int`, *optional*, defaults to `PIL.Image.[Resampling.]BILINEAR`):
                 The filter to user for resampling.
             default_to_square (`bool`, *optional*, defaults to `True`):
                 How to convert `size` when it is a single int. If set to `True`, the `size` will be converted to a
