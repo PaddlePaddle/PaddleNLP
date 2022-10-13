@@ -151,13 +151,13 @@ class UNIMOModelTester:
 
         config = self.get_config()
 
-        return (
-            config,
-            input_ids,
-            input_mask,
-            token_type_ids,
-            position_ids,
-        )
+        lm_labels = None
+        if self.parent.use_labels:
+            lm_labels = ids_tensor([self.batch_size, self.seq_length],
+                                   self.vocab_size)
+
+        return (config, input_ids, input_mask, token_type_ids, position_ids,
+                lm_labels)
 
     def get_config(self):
         return {
@@ -181,9 +181,10 @@ class UNIMOModelTester:
         }
 
     def prepare_config_and_inputs_for_decoder(self):
-        (config, input_ids, input_mask, token_type_ids,
-         position_ids) = self.prepare_config_and_inputs()
-        return (config, input_ids, input_mask, token_type_ids, position_ids)
+        (config, input_ids, input_mask, token_type_ids, position_ids,
+         lm_labels) = self.prepare_config_and_inputs()
+        return (config, input_ids, input_mask, token_type_ids, position_ids,
+                lm_labels)
 
     def create_and_check_unimo_model(self, config, input_ids, input_mask,
                                      token_type_ids, position_ids, *args):
@@ -371,15 +372,11 @@ class UNIMOModelTester:
                             atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask,
-                                       token_type_ids, position_ids, *args):
+                                       token_type_ids, position_ids, lm_labels,
+                                       *args):
         base_model = UNIMOModel(**config)
         model = UNIMOLMHeadModel(base_model)
         model.eval()
-
-        lm_labels = None
-        if self.parent.use_labels:
-            lm_labels = ids_tensor([self.batch_size, self.seq_length],
-                                   self.vocab_size)
 
         outputs = model(input_ids,
                         token_type_ids=token_type_ids,
@@ -418,8 +415,8 @@ class UNIMOModelTester:
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
 
-        (config, input_ids, input_mask, token_type_ids,
-         position_ids) = config_and_inputs
+        (config, input_ids, input_mask, token_type_ids, position_ids,
+         lm_labels) = config_and_inputs
 
         inputs_dict = {
             "input_ids": input_ids,
