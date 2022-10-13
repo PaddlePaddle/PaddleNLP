@@ -593,6 +593,7 @@ class GPTModelLanguageGenerationTest(unittest.TestCase):
     def test_gpt_sample(self):
         tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
         model = GPTLMHeadModel.from_pretrained("gpt2-en")
+        model.eval()
 
         paddle.seed(128)
         np.random.seed(128)
@@ -631,6 +632,7 @@ class GPTModelLanguageGenerationTest(unittest.TestCase):
         # NOTE: duration changed sharply and can not be limit in a range for now.
         tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
         model = GPTLMHeadModel.from_pretrained("gpt2-en")
+        model.eval()
 
         paddle.seed(0)
         np.random.seed(0)
