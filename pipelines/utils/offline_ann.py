@@ -79,6 +79,16 @@ parser.add_argument("--params_path",
                     type=str,
                     help="The checkpoint path")
 
+parser.add_argument("--pdflux_username",
+                    default=None,
+                    type=str,
+                    help="The pdflux username for parsing pdf files")
+
+parser.add_argument("--pdflux_secret_key",
+                    default=None,
+                    type=str,
+                    help="The pdflux secret key for parsing pdf files")
+
 parser.add_argument(
     '--delete_index',
     action='store_true',
@@ -112,6 +122,8 @@ def offline_ann(index_name, doc_dir):
     dicts = convert_files_to_dicts(dir_path=doc_dir,
                                    split_paragraphs=True,
                                    split_answers=args.split_answers,
+                                   username=args.pdflux_username,
+                                   secret_key=args.pdflux_secret_key,
                                    encoding='utf-8')
 
     print(dicts[:3])

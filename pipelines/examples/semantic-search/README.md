@@ -142,7 +142,7 @@ sh examples/semantic-search/run_search_server.sh
 启动后可以使用curl命令验证是否成功运行：
 
 ```
-curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5,"index":"dureader_robust_query_encoder"}, "Ranker":{"top_k": 5}}}'
 ```
 #### 3.4.4 启动 WebUI
 ```bash

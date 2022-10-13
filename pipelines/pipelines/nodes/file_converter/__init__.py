@@ -29,8 +29,11 @@ PDFToTextConverter = safe_import("pipelines.nodes.file_converter.pdf",
 PDFToTextOCRConverter = safe_import("pipelines.nodes.file_converter.pdf",
                                     "PDFToTextOCRConverter",
                                     "ocr")  # Has optional dependencies
+PDFluxToTextConverter = safe_import("pipelines.nodes.file_converter.pdf",
+                                    "PDFluxToTextConverter",
+                                    "ocr")  # Has optional dependencies
 
 from pipelines.nodes.file_converter.docx import DocxToTextConverter
 from pipelines.nodes.file_converter.txt import TextConverter
-from pipelines.nodes.file_converter.pdf import PDFToTextConverter
+from pipelines.nodes.file_converter.pdf import PDFToTextConverter, PDFluxToTextConverter
 from pipelines.nodes.file_converter.image import ImageToTextConverter

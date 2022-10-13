@@ -18,7 +18,7 @@ import re
 import logging
 from pathlib import Path
 
-from pipelines.nodes.file_converter import BaseConverter, DocxToTextConverter, PDFToTextConverter, TextConverter, ImageToTextConverter
+from pipelines.nodes.file_converter import BaseConverter, DocxToTextConverter, PDFToTextConverter, TextConverter, ImageToTextConverter, PDFluxToTextConverter
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ def convert_files_to_dicts(dir_path: str,
                            clean_func: Optional[Callable] = None,
                            split_paragraphs: bool = False,
                            split_answers: bool = False,
+                           username: Optional[str] = None,
+                           secret_key: Optional[str] = None,
                            encoding: Optional[str] = None) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
@@ -58,7 +60,9 @@ def convert_files_to_dicts(dir_path: str,
     # No need to initialize converter if file type not present
     for file_suffix in suffix2paths.keys():
         if file_suffix == ".pdf":
-            suffix2converter[file_suffix] = PDFToTextConverter()
+            suffix2converter[file_suffix] = PDFToTextConverter(
+            ) if username is None else PDFluxToTextConverter(
+                username=username, secret_key=secret_key)
         if file_suffix == ".txt":
             suffix2converter[file_suffix] = TextConverter()
         if file_suffix == ".docx":
@@ -69,8 +73,6 @@ def convert_files_to_dicts(dir_path: str,
     documents = []
     for suffix, paths in suffix2paths.items():
         for path in paths:
-            if encoding is None and suffix == ".pdf":
-                encoding = "Latin1"
             logger.info("Converting {}".format(path))
             list_documents = suffix2converter[suffix].convert(
                 file_path=path,
