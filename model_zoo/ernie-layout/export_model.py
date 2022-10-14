@@ -31,9 +31,11 @@ if __name__ == "__main__":
         model = AutoModelForTokenClassification.from_pretrained(args.model_path)
     elif args.task_type == "mrc":
         model = AutoModelForQuestionAnswering.from_pretrained(args.model_path)
-    else:
+    elif args.task_type == "cls":
         model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path)
+    else:
+        raise ValueError("Unsppoorted task type!")
     model.eval()
 
     # Convert to static graph with specific input description
