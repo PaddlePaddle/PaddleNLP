@@ -107,6 +107,7 @@ PARAMS=$3
 REST_ARGS=$4
 # bash test_tipc/benchmark_train.sh test_tipc/configs/transformer/base/train_infer_python.txt benchmark_train dynamicTostatic_bs64_fp32_DP_N1C1
 
+
 to_static=""
 # parse "to_static" options and modify trainer into "to_static_trainer"
 if [[ $PARAMS =~ "dynamicTostatic" ]] ;then
