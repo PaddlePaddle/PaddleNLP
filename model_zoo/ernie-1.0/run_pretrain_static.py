@@ -376,7 +376,7 @@ def do_train(args):
                                 args.seed + fleet.worker_index() + 2021)
 
     assert args.device in [
-        "cpu", "gpu", "xpu"
+        "cpu", "gpu", "xpu", "mlu"
     ], "Invalid device! Available device should be cpu, gpu, or xpu."
     place = paddle.set_device(args.device)
 
