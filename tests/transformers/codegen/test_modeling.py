@@ -177,7 +177,9 @@ class CodeGenModelTester:
         model = CodeGenModel(**config)
         model.eval()
 
-        result = model(input_ids, use_cache=True)
+        result = model(input_ids,
+                       use_cache=True,
+                       return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(
             result[0].shape,
@@ -190,14 +192,16 @@ class CodeGenModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, )
-        outputs_no_past = model(input_ids, use_cache=False)
+        outputs = model(input_ids,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        outputs_no_past = model(input_ids,
+                                use_cache=False,
+                                return_dict=self.parent.return_dict)
 
-        self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
-        self.parent.assertTrue(len(outputs) == len(outputs_no_past))
+        self.parent.assertTrue(len(outputs) == len(outputs_no_past) + 1)
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -207,8 +211,11 @@ class CodeGenModelTester:
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)[0]
-        output_from_past = model(next_tokens, cache=past)[0]
+        output_from_no_past = model(next_input_ids,
+                                    return_dict=self.parent.return_dict)[0]
+        output_from_past = model(next_tokens,
+                                 cache=past,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -239,7 +246,8 @@ class CodeGenModelTester:
         # first forward pass
         output, past = model(input_ids,
                              attention_mask=attn_mask,
-                             use_cache=True)
+                             use_cache=True,
+                             return_dict=self.parent.return_dict)[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -263,10 +271,13 @@ class CodeGenModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)[0]
+        output_from_no_past = model(next_input_ids,
+                                    attention_mask=attn_mask,
+                                    return_dict=self.parent.return_dict)[0]
         output_from_past = model(next_tokens,
                                  cache=past,
-                                 attention_mask=attn_mask)[0]
+                                 attention_mask=attn_mask,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -290,9 +301,12 @@ class CodeGenModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, attention_mask=input_mask, use_cache=True)
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -307,10 +321,12 @@ class CodeGenModelTester:
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
         output_from_no_past = model(next_input_ids,
-                                    attention_mask=next_attention_mask)[0]
+                                    attention_mask=next_attention_mask,
+                                    return_dict=self.parent.return_dict)[0]
         output_from_past = model(next_tokens,
                                  attention_mask=next_attention_mask,
-                                 cache=past)[0]
+                                 cache=past,
+                                 return_dict=self.parent.return_dict)[0]
         self.parent.assertTrue(
             output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -335,10 +351,9 @@ class CodeGenModelTester:
         base_model = CodeGenModel(**config)
         model = CodeGenForCausalLM(base_model)
 
-        loss_fct = paddle.nn.CrossEntropyLoss()
-
-        logits, cache = model(input_ids)
-        loss = loss_fct(logits[:, :-1, :], input_ids[:, 1:])
+        loss, logits = model(input_ids,
+                             labels=input_ids,
+                             return_dict=self.parent.return_dict)[:2]
         self.parent.assertEqual(loss.shape, [1])
         self.parent.assertEqual(
             logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
@@ -348,9 +363,9 @@ class CodeGenModelTester:
         base_model = CodeGenModel(**config)
         model = CodeGenForCausalLM(base_model)
 
-        loss_fct = paddle.nn.CrossEntropyLoss()
-        logits, cache = model(input_ids)
-        loss = loss_fct(logits[:, :-1, :], input_ids[:, 1:])
+        loss, logits = model(input_ids,
+                             return_dict=self.parent.return_dict,
+                             labels=input_ids)[:2]
         self.parent.assertEqual(loss.shape, [1])
         self.parent.assertEqual(
             logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
@@ -387,6 +402,8 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
     test_missing_keys = False
     test_model_parallel = False
     test_head_masking = False
+    use_labels = False,
+    return_dict = False
 
     # attention mask issue
     def _get_input_ids_and_config(self):
