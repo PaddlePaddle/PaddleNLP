@@ -77,7 +77,7 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 - Exam Paper VQA
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195822039-302bfc0a-40ff-4560-add3-69012184c49a.png height=350 width=1000 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195822039-302bfc0a-40ff-4560-add3-69012184c49a.png height=700 width=1000 hspace='10'/>
 </div>
 
 
