@@ -33,7 +33,7 @@ If you want to download the model weights using a single Python line, you need t
 ```python
 from diffusers_paddle import DiffusionPipeline
 
-pipeline = DiffusionPipeline.from_pretrained("junnyu/stable-diffusion-v1-4-paddle")
+pipeline = DiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
 ```
 
 This however can make it difficult to build applications on top of `diffusers_paddle` as you will always have to pass the token around. A potential way to solve this issue is by downloading the weights to a local path `"./stable-diffusion-v1-4-paddle"`:
@@ -57,7 +57,7 @@ pipe = StableDiffusionPipeline.from_pretrained("./stable-diffusion-v1-4-paddle")
 # make sure you're logged in with `huggingface-cli login`
 from diffusers_paddle import StableDiffusionPipeline
 
-pipe = StableDiffusionPipeline.from_pretrained("junnyu/stable-diffusion-v1-4-paddle")
+pipe = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
 
 prompt = "a photo of an astronaut riding a horse on mars"
 image = pipe(prompt).sample[0]
@@ -74,7 +74,7 @@ from diffusers_paddle import StableDiffusionPipeline, DDIMScheduler
 scheduler = DDIMScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", clip_sample=False, set_alpha_to_one=False)
 
 pipe = StableDiffusionPipeline.from_pretrained(
-    "junnyu/stable-diffusion-v1-4-paddle",
+    "CompVis/stable-diffusion-v1-4",
     scheduler=scheduler,
 )
 
@@ -97,7 +97,7 @@ lms = LMSDiscreteScheduler(
 )
 
 pipe = StableDiffusionPipeline.from_pretrained(
-    "junnyu/stable-diffusion-v1-4-paddle",
+    "CompVis/stable-diffusion-v1-4",
     scheduler=lms,
 )
 

@@ -24,7 +24,7 @@ from .utils import (
     is_unidecode_available,
 )
 
-__version__ = "0.5.0.dev0"
+__version__ = "0.5.0"
 
 from .configuration_utils import ConfigMixin
 from .onnx_utils import OnnxRuntimeModel
@@ -63,6 +63,7 @@ else:
 
 if is_paddle_available() and is_paddlenlp_available():
     from .pipelines import (
+        LDMBertModel,
         LDMTextToImagePipeline,
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,

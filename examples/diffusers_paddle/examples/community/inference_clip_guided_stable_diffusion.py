@@ -30,7 +30,7 @@ def image_grid(imgs, rows, cols):
     return grid
 
 
-def create_clip_guided_pipeline(model_id="junnyu/stable-diffusion-v1-4-paddle",
+def create_clip_guided_pipeline(model_id="CompVis/stable-diffusion-v1-4",
                                 clip_model_id="openai/clip-vit-large-patch14",
                                 scheduler="plms"):
     pipeline = StableDiffusionPipeline.from_pretrained(model_id)
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     unfreeze_vae = True  #@param ["False", "True"]
     seed = 3788086447  #@param {type: "number"}
 
-    model_id = "junnyu/stable-diffusion-v1-4-paddle"
+    model_id = "CompVis/stable-diffusion-v1-4"
     clip_model_id = "openai/clip-vit-large-patch14"  #@param ["openai/clip-vit-base-patch32", "openai/clip-vit-base-patch14", "openai/clip-rn101", "openai/clip-rn50"] {allow-input: true}
     scheduler = "plms"  #@param ['plms', 'lms']
     guided_pipeline = create_clip_guided_pipeline(model_id, clip_model_id)

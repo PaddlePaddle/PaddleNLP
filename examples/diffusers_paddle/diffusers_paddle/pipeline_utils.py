@@ -34,9 +34,8 @@ from .utils import (DIFFUSERS_PADDLE_CACHE, BaseOutput, logging,
 
 from . import OnnxRuntimeModel
 
-# INDEX_FILE = "diffusion_paddle_model.pdparams"
 INDEX_FILE = "model_state.pdparams"
-CUSTOM_PIPELINE_FILE_NAME = "pipeline.py"
+DUMMY_MODULES_FOLDER = "diffusers_paddle.utils"
 
 logger = logging.get_logger(__name__)
 
@@ -96,28 +95,30 @@ class DiffusionPipeline(ConfigMixin):
 
         for name, module in kwargs.items():
             # retrive library
-            # TODO 如果paddlenlp在里面library就要
-            if "paddlenlp" in module.__module__.split("."):
-                library = "paddlenlp.transformers"
+            if module is None:
+                register_dict = {name: (None, None)}
             else:
-                library = module.__module__.split(".")[0]
+                if "paddlenlp" in module.__module__.split("."):
+                    library = "paddlenlp.transformers"
+                else:
+                    library = module.__module__.split(".")[0]
 
-            # check if the module is a pipeline module
-            pipeline_dir = module.__module__.split(".")[-2]
-            path = module.__module__.split(".")
-            is_pipeline_module = pipeline_dir in path and hasattr(
-                pipelines, pipeline_dir)
+                # check if the module is a pipeline module
+                pipeline_dir = module.__module__.split(".")[-2]
+                path = module.__module__.split(".")
+                is_pipeline_module = pipeline_dir in path and hasattr(
+                    pipelines, pipeline_dir)
 
-            # if library is not in LOADABLE_CLASSES, then it is a custom module.
-            # Or if it's a pipeline module, then the module is inside the pipeline
-            # folder so we set the library to module name.
-            if library not in LOADABLE_CLASSES or is_pipeline_module:
-                library = pipeline_dir
+                # if library is not in LOADABLE_CLASSES, then it is a custom module.
+                # Or if it's a pipeline module, then the module is inside the pipeline
+                # folder so we set the library to module name.
+                if library not in LOADABLE_CLASSES or is_pipeline_module:
+                    library = pipeline_dir
 
-            # retrieve class_name
-            class_name = module.__class__.__name__
+                # retrieve class_name
+                class_name = module.__class__.__name__
 
-            register_dict = {name: (library, class_name)}
+                register_dict = {name: (library, class_name)}
 
             # save model index config
             self.register_to_config(**register_dict)
@@ -207,123 +208,31 @@ class DiffusionPipeline(ConfigMixin):
             pretrained_model_name_or_path (`str` or `os.PathLike`, *optional*):
                 Can be either:
 
-                    - A string, the *repo id* of a pretrained pipeline hosted inside a model repo on
-                      https://huggingface.co/ Valid repo ids have to be located under a user or organization name, like
-                      `CompVis/ldm-text2im-large-256`.
+                    - A string, the *model id* of a pretrained pipeline hosted inside in `https://bj.bcebos.com/paddlenlp/models/community`.
+                      like `CompVis/stable-diffusion-v1-4`, `CompVis/ldm-text2im-large-256`.
                     - A path to a *directory* containing pipeline weights saved using
                       [`~DiffusionPipeline.save_pretrained`], e.g., `./my_pipeline_directory/`.
             paddle_dtype (`str` or `paddle.dtype`, *optional*):
                 Override the default `paddle.dtype` and load the model under this dtype. If `"auto"` is passed the dtype
                 will be automatically derived from the model's weights.
-            custom_pipeline (`str`, *optional*):
-
-                <Tip warning={true}>
-
-                    This is an experimental feature and is likely to change in the future.
-
-                </Tip>
-
-                Can be either:
-
-                    - A string, the *repo id* of a custom pipeline hosted inside a model repo on
-                      https://huggingface.co/. Valid repo ids have to be located under a user or organization name,
-                      like `hf-internal-testing/diffusers-dummy-pipeline`.
-
-                        <Tip>
-
-                         It is required that the model repo has a file, called `pipeline.py` that defines the custom
-                         pipeline.
-
-                        </Tip>
-
-                    - A string, the *file name* of a community pipeline hosted on GitHub under
-                      https://github.com/huggingface/diffusers/tree/main/examples/community. Valid file names have to
-                      match exactly the file name without `.py` located under the above link, *e.g.*
-                      `clip_guided_stable_diffusion`.
-
-                        <Tip>
-
-                         Community pipelines are always loaded from the current `main` branch of GitHub.
-
-                        </Tip>
-
-                    - A path to a *directory* containing a custom pipeline, e.g., `./my_pipeline_directory/`.
-
-                        <Tip>
-
-                         It is required that the directory has a file, called `pipeline.py` that defines the custom
-                         pipeline.
-
-                        </Tip>
-
-                For more information on how to load and create custom pipelines, please have a look at [Loading and
-                Creating Custom
-                Pipelines](https://huggingface.co/docs/diffusers/main/en/using-diffusers/custom_pipelines)
-
-            paddle_dtype (`str` or `paddle.dtype`, *optional*):
-            force_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to force the (re-)download of the model weights and configuration files, overriding the
-                cached versions if they exist.
-            resume_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
-                file exists.
-            proxies (`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
             output_loading_info(`bool`, *optional*, defaults to `False`):
                 Whether or not to also return a dictionary containing missing keys, unexpected keys and error messages.
-            local_files_only(`bool`, *optional*, defaults to `False`):
-                Whether or not to only look at local files (i.e., do not try to download the model).
-            use_auth_token (`str` or *bool*, *optional*):
-                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
-                when running `huggingface-cli login` (stored in `~/.huggingface`).
-            revision (`str`, *optional*, defaults to `"main"`):
-                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
-                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
-                identifier allowed by git.
-            mirror (`str`, *optional*):
-                Mirror source to accelerate downloads in China. If you are from China and have an accessibility
-                problem, you can set this option to resolve it. Note that we do not guarantee the timeliness or safety.
-                Please refer to the mirror site for more information. specify the folder name here.
-
             kwargs (remaining dictionary of keyword arguments, *optional*):
                 Can be used to overwrite load - and saveable variables - *i.e.* the pipeline components - of the
                 specific pipeline class. The overwritten components are then directly passed to the pipelines
                 `__init__` method. See example below for more information.
 
-        <Tip>
-
-        Passing `use_auth_token=True`` is required when you want to use a private model, *e.g.*
-        `"junnyu/stable-diffusion-v1-4-paddle"`
-        </Tip>
-
-        <Tip>
-
-        Activate the special ["offline-mode"](https://huggingface.co/diffusers/installation.html#offline-mode) to use
-        this method in a firewalled environment.
-
-        </Tip>
-
         Examples:
 
-        ```py
-        >>> from diffusers_paddle import DiffusionPipeline
+        ```python
+            >>> from diffusers_paddle import StableDiffusionPipeline
+            >>> # Download pipeline from https://bj.bcebos.com/paddlenlp/models/community/CompVis/stable-diffusion-v1-4 and cache.
+            >>> pipeline = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
 
-        >>> # Download pipeline from huggingface.co and cache.
-        >>> pipeline = DiffusionPipeline.from_pretrained("junnyu/ldm-text2im-large-256-paddle")
-
-        >>> # Download pipeline that requires an authorization token
-        >>> # For more information on access tokens, please refer to this section
-        >>> # of the documentation](https://huggingface.co/docs/hub/security-tokens)
-        >>> pipeline = DiffusionPipeline.from_pretrained("junnyu/stable-diffusion-v1-4-paddle")
-
-        >>> # Download pipeline, but overwrite scheduler
-        >>> from diffusers_paddle import LMSDiscreteScheduler
-
-        >>> scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
-        >>> pipeline = DiffusionPipeline.from_pretrained(
-        ...     "junnyu/stable-diffusion-v1-4-paddle", scheduler=scheduler
-        ... )
+            >>> # Download pipeline, but overwrite scheduler
+            >>> from diffusers_paddle import LMSDiscreteScheduler, StableDiffusionPipeline
+            >>> scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+            >>> pipeline = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", scheduler=scheduler)
         ```
         """
         paddle_dtype = kwargs.pop("paddle_dtype", None)
@@ -365,6 +274,7 @@ class DiffusionPipeline(ConfigMixin):
         for name, (library_name, class_name) in init_dict.items():
             is_pipeline_module = hasattr(pipelines, library_name)
             loaded_sub_model = None
+            sub_model_should_be_defined = True
 
             # if the model is in a pipeline module, then we load it from the pipeline
             if name in passed_class_obj:
@@ -388,6 +298,12 @@ class DiffusionPipeline(ConfigMixin):
                         raise ValueError(
                             f"{passed_class_obj[name]} is of type: {type(passed_class_obj[name])}, but should be"
                             f" {expected_class_obj}")
+                elif passed_class_obj[name] is None:
+                    logger.warn(
+                        f"You have passed `None` for {name} to disable its functionality in {pipeline_class}. Note"
+                        f" that this might lead to problems when using {pipeline_class} and is not recommended."
+                    )
+                    sub_model_should_be_defined = False
                 else:
                     logger.warn(
                         f"You have passed a non-standard module {passed_class_obj[name]}. We cannot verify whether it"
@@ -413,15 +329,26 @@ class DiffusionPipeline(ConfigMixin):
                     for c in importable_classes.keys()
                 }
 
-            if loaded_sub_model is None:
+            if loaded_sub_model is None and sub_model_should_be_defined:
                 load_method_name = None
                 for class_name, class_candidate in class_candidates.items():
                     if issubclass(class_obj, class_candidate):
                         load_method_name = importable_classes[class_name][1]
 
-                load_method = getattr(class_obj, load_method_name)
+                if load_method_name is None:
+                    none_module = class_obj.__module__
+                    if none_module.startswith(
+                            DUMMY_MODULES_FOLDER) and "dummy" in none_module:
+                        # call class_obj for nice error message of missing requirements
+                        class_obj()
 
+                    raise ValueError(
+                        f"The component {class_obj} of {pipeline_class} cannot be loaded as it does not seem to have"
+                        f" any of the loading methods defined in {ALL_IMPORTABLE_CLASSES}."
+                    )
+                load_method = getattr(class_obj, load_method_name)
                 loading_kwargs = {}
+
                 if issubclass(class_obj, nn.Layer):
                     loading_kwargs["paddle_dtype"] = paddle_dtype
                 if issubclass(class_obj, OnnxRuntimeModel):
@@ -441,7 +368,6 @@ class DiffusionPipeline(ConfigMixin):
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):
-                # TODO
                 if next(loaded_sub_model.named_parameters()
                         )[1].dtype != paddle_dtype:
                     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)

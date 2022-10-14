@@ -1,4 +1,4 @@
-# 🧨 Diffusers Pipelines
+# 🧨 Diffusers Paddle Pipelines
 
 Pipelines provide a simple way to run state-of-the-art diffusion models in inference.
 Most diffusion systems consist of multiple independently-trained models and highly adaptable scheduler
@@ -85,10 +85,10 @@ logic including pre-processing, an unrolled diffusion loop, and post-processing 
 ### Text-to-Image generation with Stable Diffusion
 
 ```python
-# make sure you're logged in with `huggingface-cli login`
-from diffusers_paddle import StableDiffusionPipeline, LMSDiscreteScheduler
+import paddle
+from diffusers_paddle import StableDiffusionPipeline
 
-pipe = StableDiffusionPipeline.from_pretrained("junnyu/stable-diffusion-v1-4-paddle")
+pipe = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
 
 prompt = "a photo of an astronaut riding a horse on mars"
 image = pipe(prompt).images[0]
@@ -102,6 +102,7 @@ The `StableDiffusionImg2ImgPipeline` lets you pass a text prompt and an initial 
 
 ```python
 import requests
+import paddle
 from PIL import Image
 from io import BytesIO
 
@@ -109,13 +110,12 @@ from diffusers_paddle import StableDiffusionImg2ImgPipeline
 
 # load the pipeline
 pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-    "junnyu/stable-diffusion-v1-4-paddle",
-    revision="fp16",
+    "CompVis/stable-diffusion-v1-4",
     paddle_dtype=paddle.float16,
 )
 
 # let's download an initial image
-url = "https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/img2img/sketch-mountains-input.jpg"
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
 response = requests.get(url)
 init_image = Image.open(BytesIO(response.content)).convert("RGB")
@@ -123,9 +123,9 @@ init_image = init_image.resize((768, 512))
 
 prompt = "A fantasy landscape, trending on artstation"
 with paddle.amp.auto_cast(True):
-    images = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images
+    image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
 
-images[0].save("fantasy_landscape.png")
+image.save("fantasy_landscape.png")
 ```
 You can also run this example on colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/image_2_image_using_diffusers.ipynb)
 
@@ -139,6 +139,7 @@ You can generate your own latents to reproduce results, or tweak your prompt on 
 The `StableDiffusionInpaintPipeline` lets you edit specific parts of an image by providing a mask and text prompt.
 
 ```python
+import paddle
 from io import BytesIO
 
 import requests
@@ -150,22 +151,22 @@ def download_image(url):
     response = requests.get(url)
     return PIL.Image.open(BytesIO(response.content)).convert("RGB")
 
-img_url = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo.png"
-mask_url = "https://raw.githubusercontent.com/CompVis/latent-diffusion/main/data/inpainting_examples/overture-creations-5sI6fQgYIuo_mask.png"
+img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
 
 init_image = download_image(img_url).resize((512, 512))
 mask_image = download_image(mask_url).resize((512, 512))
 
 pipe = StableDiffusionInpaintPipeline.from_pretrained(
-    "junnyu/stable-diffusion-v1-4-paddle",
-    revision="fp16",
+    "CompVis/stable-diffusion-v1-4",
     paddle_dtype=paddle.float16,
 )
-with paddle.amp.auto_cast(True):
-    prompt = "a cat sitting on a bench"
-    images = pipe(prompt=prompt, init_image=init_image, mask_image=mask_image, strength=0.75).images
 
-images[0].save("cat_on_bench.png")
+prompt = "a cat sitting on a bench"
+with paddle.amp.auto_cast(True):
+    image = pipe(prompt=prompt, init_image=init_image, mask_image=mask_image, strength=0.75).images[0]
+
+image.save("cat_on_bench.png")
 ```
 
 You can also run this example on colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/in_painting_with_stable_diffusion_using_diffusers.ipynb)

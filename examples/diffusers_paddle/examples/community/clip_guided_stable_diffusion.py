@@ -226,6 +226,7 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
     ):
         if isinstance(prompt, str):
             batch_size = 1
+            prompt = [prompt]
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
@@ -298,8 +299,8 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
                 uncond_tokens = [""]
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
-                    "`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    " {type(prompt)}.")
+                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
+                    f" {type(prompt)}.")
             elif isinstance(negative_prompt, str):
                 uncond_tokens = [negative_prompt]
             elif batch_size != len(negative_prompt):

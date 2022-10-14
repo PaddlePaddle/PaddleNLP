@@ -19,11 +19,30 @@
 from . import DummyObject, requires_backends
 
 
+class LDMBertModel(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+
 class LDMTextToImagePipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
 
 
 class StableDiffusionImg2ImgPipeline(metaclass=DummyObject):
@@ -32,6 +51,14 @@ class StableDiffusionImg2ImgPipeline(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle", "paddlenlp"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
 
 class StableDiffusionInpaintPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp"]
@@ -39,9 +66,25 @@ class StableDiffusionInpaintPipeline(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle", "paddlenlp"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
 
 class StableDiffusionPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])

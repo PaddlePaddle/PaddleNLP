@@ -193,9 +193,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
                 "`self.timesteps` is not set, you need to run 'set_timesteps' after creating the scheduler"
             )
 
-        timestep = timestep * paddle.ones(
-            (sample.shape[0],
-             ))  # torch.repeat_interleave(timestep, sample.shape[0])
+        timestep = timestep * paddle.ones((sample.shape[0], ))
         timesteps = (timestep * (len(self.timesteps) - 1)).astype("int64")
 
         sigma = self.discrete_sigmas[timesteps]

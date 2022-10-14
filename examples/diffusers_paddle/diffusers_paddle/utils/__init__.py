@@ -43,7 +43,6 @@ ppnlp_cache_home = _get_ppnlp_home()
 default_cache_path = _get_sub_home('models')
 
 CONFIG_NAME = "config.json"
-# WEIGHTS_NAME = "diffusion_paddle_model.pdparams"
 WEIGHTS_NAME = "model_state.pdparams"
 ONNX_WEIGHTS_NAME = "model.onnx"
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"

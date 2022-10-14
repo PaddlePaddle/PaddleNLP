@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import argparse
-import copy
 import math
 import os
 import random
@@ -271,10 +270,9 @@ class EMAModel:
     Exponential Moving Average of models weights
     """
 
-    def __init__(self, model, decay=0.9999):
-        self.averaged_model = copy.deepcopy(model).eval()
-        for params in self.averaged_model.paramaters():
-            params.stop_gradient = True
+    def __init__(self, parameters, decay=0.9999):
+        parameters = list(parameters)
+        self.shadow_params = [p.clone().detach() for p in parameters]
 
         self.decay = decay
 
@@ -288,37 +286,34 @@ class EMAModel:
         return 1 - min(self.decay, value)
 
     @paddle.no_grad()
-    def step(self, new_model):
-        ema_state_dict = self.averaged_model.state_dict()
+    def step(self, parameters):
+        parameters = list(parameters)
 
         self.optimization_step += 1
         self.decay = self.get_decay(self.optimization_step)
 
-        for key, param in new_model.named_parameters():
-            if isinstance(param, dict):
-                continue
-            try:
-                ema_param = ema_state_dict[key]
-            except KeyError:
-                ema_param = param.astype("float32").clone(
-                ) if param.ndim == 1 else copy.deepcopy(param)
-                ema_state_dict[key] = ema_param
-
-            param = param.clone().detach().astype(ema_param.dtype)
-
+        for s_param, param in zip(self.shadow_params, parameters):
             if not param.stop_gradient:
-                ema_state_dict[key].copy_(
-                    ema_state_dict[key] - self.decay * (ema_param - param),
-                    True)
+                tmp = self.decay * (s_param - param)
+                s_param.sub_(tmp)
             else:
-                ema_state_dict[key].copy_(param, True)
+                s_param.copy_(param, True)
 
-        for key, param in new_model.named_buffers():
-            ema_state_dict[key] = param
-
-        self.averaged_model.load_dict(ema_state_dict)
         if paddle.is_compiled_with_cuda():
             paddle.device.cuda.empty_cache()
+
+    def copy_to(self, parameters) -> None:
+        """
+        Copy current averaged parameters into given collection of parameters.
+        Args:
+            parameters: Iterable of `torch.nn.Parameter`; the parameters to be
+                updated with the stored moving averages. If `None`, the
+                parameters with which this `ExponentialMovingAverage` was
+                initialized will be used.
+        """
+        parameters = list(parameters)
+        for s_param, param in zip(self.shadow_params, parameters):
+            param.copy_(s_param)
 
 
 def freeze_params(params):
@@ -350,9 +345,6 @@ def main():
                                         subfolder="vae")
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="unet")
-
-    if args.use_ema:
-        ema_unet = EMAModel(unet)
 
     # Freeze vae and text_encoder
     freeze_params(vae.parameters())
@@ -513,6 +505,9 @@ def main():
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
 
+    if args.use_ema:
+        ema_unet = EMAModel(unet.parameters())
+
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / args.gradient_accumulation_steps)
@@ -596,7 +591,7 @@ def main():
                 global_step += 1
 
                 if args.use_ema:
-                    ema_unet.step(unet)
+                    ema_unet.step(unet.parameters())
                 progress_bar.update(1)
                 logs = {
                     "epoch": epoch,
@@ -618,11 +613,13 @@ def main():
 
     if rank == 0:
         writer.close()
+        unet = unwrap_model(unet)
+        if args.use_ema:
+            ema_unet.copy_to(unet.parameters())
         # Create the pipeline using using the trained modules and save it.
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
-            unet=unwrap_model(
-                ema_unet.averaged_model if args.use_ema else unet),
+            unet=unet,
         )
         pipeline.save_pretrained(args.output_dir)
 

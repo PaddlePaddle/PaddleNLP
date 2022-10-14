@@ -25,12 +25,28 @@ class ModelMixin(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class AutoencoderKL(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class UNet2DConditionModel(metaclass=DummyObject):
@@ -39,6 +55,14 @@ class UNet2DConditionModel(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class UNet2DModel(metaclass=DummyObject):
     _backends = ["paddle"]
@@ -46,12 +70,28 @@ class UNet2DModel(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class VQModel(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 def get_constant_schedule(*args, **kwargs):
@@ -89,12 +129,28 @@ class DiffusionPipeline(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class DDIMPipeline(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class DDPMPipeline(metaclass=DummyObject):
@@ -103,12 +159,28 @@ class DDPMPipeline(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class KarrasVePipeline(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class LDMPipeline(metaclass=DummyObject):
@@ -117,12 +189,28 @@ class LDMPipeline(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class PNDMPipeline(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class ScoreSdeVePipeline(metaclass=DummyObject):
@@ -131,12 +219,28 @@ class ScoreSdeVePipeline(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class DDIMScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class DDPMScheduler(metaclass=DummyObject):
@@ -145,12 +249,28 @@ class DDPMScheduler(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class KarrasVeScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class PNDMScheduler(metaclass=DummyObject):
@@ -159,12 +279,28 @@ class PNDMScheduler(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class SchedulerMixin(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
 
 
 class ScoreSdeVeScheduler(metaclass=DummyObject):
@@ -173,9 +309,25 @@ class ScoreSdeVeScheduler(metaclass=DummyObject):
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
 
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
 
 class EMAModel(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])

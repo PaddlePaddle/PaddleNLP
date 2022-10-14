@@ -24,3 +24,11 @@ class StableDiffusionOnnxPipeline(metaclass=DummyObject):
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle", "paddlenlp", "onnx"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "onnx"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "onnx"])
