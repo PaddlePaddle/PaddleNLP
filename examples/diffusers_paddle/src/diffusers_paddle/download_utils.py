@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url, download_check
 from .utils import DIFFUSERS_PADDLE_CACHE, DOWNLOAD_SERVER
 
 

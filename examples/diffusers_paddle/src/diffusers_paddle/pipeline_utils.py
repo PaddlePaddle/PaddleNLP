@@ -160,6 +160,9 @@ class DiffusionPipeline(ConfigMixin):
                 if save_method_name is not None:
                     break
 
+            # TODO 1014 junnyu for save null safety checker
+            if pipeline_component_name == "safety_checker" and save_method_name is None:
+                continue
             save_method = getattr(sub_model, save_method_name)
             save_method(os.path.join(save_directory, pipeline_component_name))
 
@@ -272,6 +275,13 @@ class DiffusionPipeline(ConfigMixin):
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
+            # TODO 1014 junnyu for load null safety checker
+            if name == "safety_checker" and (library_name is None
+                                             or class_name is None):
+                logger.warn("You have disabled the safety checker!")
+                init_kwargs[name] = None
+                continue
+
             is_pipeline_module = hasattr(pipelines, library_name)
             loaded_sub_model = None
             sub_model_should_be_defined = True
@@ -346,6 +356,7 @@ class DiffusionPipeline(ConfigMixin):
                         f"The component {class_obj} of {pipeline_class} cannot be loaded as it does not seem to have"
                         f" any of the loading methods defined in {ALL_IMPORTABLE_CLASSES}."
                     )
+
                 load_method = getattr(class_obj, load_method_name)
                 loading_kwargs = {}
 
@@ -355,16 +366,9 @@ class DiffusionPipeline(ConfigMixin):
                     loading_kwargs["provider"] = provider
                     loading_kwargs["sess_options"] = sess_options
 
-                # check if the module is in a subdirectory
-                if not os.path.isfile(
-                        os.path.join(pretrained_model_name_or_path, name)):
-                    loaded_sub_model = load_method(
-                        os.path.join(pretrained_model_name_or_path, name),
-                        **loading_kwargs)
-                else:
-                    # else load from the root directory
-                    loaded_sub_model = load_method(
-                        pretrained_model_name_or_path, **loading_kwargs)
+                loaded_sub_model = load_method(
+                    os.path.join(pretrained_model_name_or_path, name),
+                    **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):

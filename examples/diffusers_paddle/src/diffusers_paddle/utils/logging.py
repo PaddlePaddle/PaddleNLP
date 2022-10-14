@@ -108,7 +108,7 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
     """
     Return a logger with the specified name.
 
-    This function is not supposed to be directly accessed unless you are writing a custom diffusers module.
+    This function is not supposed to be directly accessed unless you are writing a custom diffusers_paddle module.
     """
 
     if name is None:
@@ -120,20 +120,20 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
 
 def get_verbosity() -> int:
     """
-    Return the current level for the 🤗 Diffusers' root logger as an int.
+    Return the current level for the paddlenlp Diffusers Paddle' root logger as an int.
 
     Returns:
         `int`: The logging level.
 
     <Tip>
 
-    🤗 Diffusers has following logging levels:
+    paddlenlp Diffusers Paddle has following logging levels:
 
-    - 50: `diffusers.logging.CRITICAL` or `diffusers.logging.FATAL`
-    - 40: `diffusers.logging.ERROR`
-    - 30: `diffusers.logging.WARNING` or `diffusers.logging.WARN`
-    - 20: `diffusers.logging.INFO`
-    - 10: `diffusers.logging.DEBUG`
+    - 50: `diffusers_paddle.logging.CRITICAL` or `diffusers_paddle.logging.FATAL`
+    - 40: `diffusers_paddle.logging.ERROR`
+    - 30: `diffusers_paddle.logging.WARNING` or `diffusers_paddle.logging.WARN`
+    - 20: `diffusers_paddle.logging.INFO`
+    - 10: `diffusers_paddle.logging.DEBUG`
 
     </Tip>"""
 
@@ -143,17 +143,17 @@ def get_verbosity() -> int:
 
 def set_verbosity(verbosity: int) -> None:
     """
-    Set the verbosity level for the 🤗 Diffusers' root logger.
+    Set the verbosity level for the paddlenlp Diffusers Paddle' root logger.
 
     Args:
         verbosity (`int`):
             Logging level, e.g., one of:
 
-            - `diffusers.logging.CRITICAL` or `diffusers.logging.FATAL`
-            - `diffusers.logging.ERROR`
-            - `diffusers.logging.WARNING` or `diffusers.logging.WARN`
-            - `diffusers.logging.INFO`
-            - `diffusers.logging.DEBUG`
+            - `diffusers_paddle.logging.CRITICAL` or `diffusers_paddle.logging.FATAL`
+            - `diffusers_paddle.logging.ERROR`
+            - `diffusers_paddle.logging.WARNING` or `diffusers_paddle.logging.WARN`
+            - `diffusers_paddle.logging.INFO`
+            - `diffusers_paddle.logging.DEBUG`
     """
 
     _configure_library_root_logger()
@@ -181,7 +181,7 @@ def set_verbosity_error():
 
 
 def disable_default_handler() -> None:
-    """Disable the default handler of the HuggingFace Diffusers' root logger."""
+    """Disable the default handler of the paddlenlp Diffusers Paddle' root logger."""
 
     _configure_library_root_logger()
 
@@ -190,7 +190,7 @@ def disable_default_handler() -> None:
 
 
 def enable_default_handler() -> None:
-    """Enable the default handler of the HuggingFace Diffusers' root logger."""
+    """Enable the default handler of the paddlenlp Diffusers Paddle' root logger."""
 
     _configure_library_root_logger()
 
@@ -199,7 +199,7 @@ def enable_default_handler() -> None:
 
 
 def add_handler(handler: logging.Handler) -> None:
-    """adds a handler to the HuggingFace Diffusers' root logger."""
+    """adds a handler to the paddlenlp Diffusers Paddle' root logger."""
 
     _configure_library_root_logger()
 
@@ -208,7 +208,7 @@ def add_handler(handler: logging.Handler) -> None:
 
 
 def remove_handler(handler: logging.Handler) -> None:
-    """removes given handler from the HuggingFace Diffusers' root logger."""
+    """removes given handler from the paddlenlp Diffusers Paddle' root logger."""
 
     _configure_library_root_logger()
 
@@ -228,7 +228,7 @@ def disable_propagation() -> None:
 
 def enable_propagation() -> None:
     """
-    Enable propagation of the library log outputs. Please disable the HuggingFace Diffusers' default handler to prevent
+    Enable propagation of the library log outputs. Please disable the paddlenlp Diffusers Paddle' default handler to prevent
     double logging if the root logger has been configured.
     """
 
@@ -238,7 +238,7 @@ def enable_propagation() -> None:
 
 def enable_explicit_format() -> None:
     """
-    Enable explicit formatting for every HuggingFace Diffusers' logger. The explicit formatter is as follows:
+    Enable explicit formatting for every paddlenlp Diffusers Paddle' logger. The explicit formatter is as follows:
     ```
         [LEVELNAME|FILENAME|LINE NUMBER] TIME >> MESSAGE
     ```
@@ -255,7 +255,7 @@ def enable_explicit_format() -> None:
 
 def reset_format() -> None:
     """
-    Resets the formatting for HuggingFace Diffusers' loggers.
+    Resets the formatting for paddlenlp Diffusers Paddle' loggers.
 
     All handlers currently bound to the root logger are affected by this method.
     """

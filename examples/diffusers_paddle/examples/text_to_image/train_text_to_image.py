@@ -29,6 +29,9 @@ from paddlenlp.utils.log import logger
 from paddlenlp.trainer import set_seed
 from diffusers_paddle import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers_paddle.optimization import get_scheduler
+from diffusers_paddle.modeling_utils import unwrap_model
+from diffusers_paddle.training_utils import main_process_first
+
 from datasets import load_dataset
 
 from paddle.vision import transforms, BaseTransform
@@ -45,12 +48,6 @@ class Lambda(BaseTransform):
 
     def _apply_image(self, img):
         return self.fn(img)
-
-
-def unwrap_model(model):
-    if isinstance(model, paddle.DataParallel):
-        return model._layers
-    return model
 
 
 def get_writer(args):
@@ -72,7 +69,7 @@ def parse_args():
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default=None,
+        default="CompVis/stable-diffusion-v1-4",
         required=True,
         help=
         "Path to pretrained model or model identifier from huggingface.co/models.",
@@ -473,11 +470,12 @@ def main():
 
         return examples
 
-    if args.max_train_samples is not None:
-        dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(
-            range(args.max_train_samples))
-    # Set the training transforms
-    train_dataset = dataset["train"].with_transform(preprocess_train)
+    with main_process_first():
+        if args.max_train_samples is not None:
+            dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(
+                range(args.max_train_samples))
+        # Set the training transforms
+        train_dataset = dataset["train"].with_transform(preprocess_train)
 
     def collate_fn(examples):
         pixel_values = paddle.stack(
@@ -553,9 +551,6 @@ def main():
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             with paddle.no_grad():
-                # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
-
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
                 latents = latents * 0.18215
@@ -572,6 +567,9 @@ def main():
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(
                     latents, noise, timesteps)
+
+                # Get the text embedding for conditioning
+                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
 
             # Predict the noise residual and compute loss
             noise_pred = unet(noisy_latents, timesteps,
@@ -594,10 +592,15 @@ def main():
                     ema_unet.step(unet.parameters())
                 progress_bar.update(1)
                 logs = {
-                    "epoch": epoch,
-                    "train_loss": train_loss,
-                    "step_loss": loss.item() * args.gradient_accumulation_steps,
-                    "lr": lr_scheduler.get_lr()
+                    "epoch":
+                    str(epoch).zfill(4),
+                    "train_loss":
+                    "{0:.10f}".format(train_loss),
+                    "step_loss":
+                    "{0:.10f}".format(loss.item() *
+                                      args.gradient_accumulation_steps),
+                    "lr":
+                    lr_scheduler.get_lr()
                 }
                 progress_bar.set_postfix(**logs)
                 train_loss = 0.0
@@ -620,6 +623,7 @@ def main():
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unet,
+            safety_checker=None,
         )
         pipeline.save_pretrained(args.output_dir)
 

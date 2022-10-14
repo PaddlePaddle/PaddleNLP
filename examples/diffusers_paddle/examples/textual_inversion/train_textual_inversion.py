@@ -29,6 +29,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.trainer import set_seed
 from diffusers_paddle import AutoencoderKL, DDPMScheduler, PNDMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers_paddle.optimization import get_scheduler
+from diffusers_paddle.modeling_utils import unwrap_model
 
 from PIL import Image
 from PIL.Image import Resampling
@@ -48,12 +49,6 @@ def get_writer(args):
     else:
         raise ValueError("writer_type must be in ['visualdl', 'tensorboard']")
     return writer
-
-
-def unwrap_model(model):
-    if isinstance(model, paddle.DataParallel):
-        return model._layers
-    return model
 
 
 def save_progress(text_encoder, placeholder_token_id, args):
@@ -79,7 +74,7 @@ def parse_args():
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="./CompVis-stable-diffusion-v1-4",
+        default="CompVis/stable-diffusion-v1-4",
         required=True,
         help="Path to pretrained model or model identifier from local models.",
     )
@@ -338,11 +333,10 @@ class TextualInversionDataset(Dataset):
 
         example["input_ids"] = self.tokenizer(
             text,
-            padding="max_length",
+            padding="do_not_pad",
             truncation=True,
             max_length=self.tokenizer.model_max_length,
-            return_tensors="pd",
-        ).input_ids[0]
+        ).input_ids
 
         # default to score-sde preprocessing
         img = np.array(image).astype(np.uint8)
@@ -362,9 +356,9 @@ class TextualInversionDataset(Dataset):
 
         image = self.flip_transform(image)
         image = np.array(image).astype(np.uint8)
-        image = (image / 127.5 - 1.0).astype(np.float32)
+        image = (image / 127.5 - 1.0).astype(np.float32).transpose([2, 0, 1])
 
-        example["pixel_values"] = paddle.to_tensor(image).transpose([2, 0, 1])
+        example["pixel_values"] = image
         return example
 
 
@@ -484,11 +478,29 @@ def main():
         center_crop=args.center_crop,
         set="train",
     )
+
+    def collate_fn(examples):
+        input_ids = [example["input_ids"] for example in examples]
+        pixel_values = paddle.to_tensor(
+            [example["pixel_values"] for example in examples], dtype="float32")
+        input_ids = tokenizer.pad({
+            "input_ids": input_ids
+        },
+                                  padding=True,
+                                  return_tensors="pd").input_ids
+        batch = {
+            "input_ids": input_ids,
+            "pixel_values": pixel_values,
+        }
+        return batch
+
     train_sampler = DistributedBatchSampler(
         train_dataset, batch_size=args.train_batch_size,
         shuffle=True) if num_processes > 1 else BatchSampler(
             train_dataset, batch_size=args.train_batch_size, shuffle=True)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler)
+    train_dataloader = DataLoader(train_dataset,
+                                  batch_sampler=train_sampler,
+                                  collate_fn=collate_fn)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
@@ -543,9 +555,6 @@ def main():
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
-            # Get the text embedding for conditioning
-            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
-
             with paddle.no_grad():
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
@@ -564,9 +573,11 @@ def main():
                 noisy_latents = noise_scheduler.add_noise(
                     latents, noise, timesteps)
 
-                # Predict the noise residual
-                noise_pred = unet(noisy_latents, timesteps,
-                                  encoder_hidden_states).sample
+            # Get the text embedding for conditioning
+            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+            # Predict the noise residual
+            noise_pred = unet(noisy_latents, timesteps,
+                              encoder_hidden_states).sample
 
             loss = F.mse_loss(noise_pred, noise,
                               reduction="none").mean([1, 2, 3]).mean()
@@ -594,9 +605,12 @@ def main():
                 progress_bar.update(1)
                 global_step += 1
                 logs = {
-                    "epoch": epoch,
-                    "loss": loss.item() * args.gradient_accumulation_steps,
-                    "lr": lr_scheduler.get_lr()
+                    "epoch":
+                    str(epoch).zfill(4),
+                    "step_loss":
+                    round(loss.item() * args.gradient_accumulation_steps, 10),
+                    "lr":
+                    lr_scheduler.get_lr()
                 }
                 progress_bar.set_postfix(**logs)
                 if rank == 0:
@@ -618,6 +632,8 @@ def main():
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             text_encoder=unwrap_model(text_encoder),
+            safety_checker=None,
+            tokenizer=tokenizer,
         )
         pipeline.save_pretrained(args.output_dir)
         # Also save the newly trained embeddings

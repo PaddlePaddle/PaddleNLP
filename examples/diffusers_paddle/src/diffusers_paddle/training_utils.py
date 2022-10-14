@@ -13,12 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import copy
 import os
 import random
 
 import numpy as np
 import paddle
+
+from .utils import logging
+
+logger = logging.get_logger(__name__)
 
 
 def enable_full_determinism(seed: int):
@@ -129,3 +134,29 @@ class EMAModel:
 
         self.averaged_model.load_dict(ema_state_dict)
         self.optimization_step += 1
+
+
+@contextlib.contextmanager
+def main_process_first(desc="work"):
+    if paddle.distributed.get_world_size() > 1:
+        rank = paddle.distributed.get_rank()
+        is_main_process = rank == 0
+        main_process_desc = "main local process"
+
+        try:
+            if not is_main_process:
+                # tell all replicas to wait
+                logger.debug(
+                    f"{rank}: waiting for the {main_process_desc} to perform {desc}"
+                )
+                paddle.distributed.barrier()
+            yield
+        finally:
+            if is_main_process:
+                # the wait is over
+                logger.debug(
+                    f"{rank}: {main_process_desc} completed {desc}, releasing all replicas"
+                )
+                paddle.distributed.barrier()
+    else:
+        yield

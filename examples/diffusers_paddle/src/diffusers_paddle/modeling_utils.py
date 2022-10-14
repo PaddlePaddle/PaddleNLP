@@ -392,7 +392,7 @@ class ModelMixin(nn.Layer):
                 " BertForSequenceClassification model).")
         else:
             logger.info(
-                f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n"
+                f"All model checkpoint weights were used when initializing {model.__class__.__name__}."
             )
         if len(missing_keys) > 0:
             logger.warning(
