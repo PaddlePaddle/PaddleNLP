@@ -553,15 +553,14 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 See :class: `UnifiedTransformerModel`
 
         Returns:
-            Tensor|tuple: If `use_cache` is False, it is a tensor 
-            representing the output of :class:`UnifiedTransformerLMHeadModel`, 
+            An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=labels=None`, 
+            returns a tensor representing the output of :class:`UnifiedTransformerLMHeadModel`, 
             with shape [batch_size, sequence_length, vocab_size]. The data type 
-            is float32 or float64. Otherwise, it is a tuple, besides the output 
-            of :class:`UnifiedTransformerLMHeadModel`, the tuple also includes 
-            the new cache which is same as input `cache` but `incremental_cache` 
-            in it has an incremental length. 
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
-            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+            is float32 or float64. 
 
         Example:
             .. code-block::
