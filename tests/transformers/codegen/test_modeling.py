@@ -531,7 +531,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
     @slow
     def test_model_from_pretrained(self):
         for model_name in CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = CodeGenModel.from_pretrained(model_name)
+            model = CodeGenModel.from_pretranviined(model_name)
             self.assertIsNotNone(model)
 
     @unittest.skip("Not implemented")
