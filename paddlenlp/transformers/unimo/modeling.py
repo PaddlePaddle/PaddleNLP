@@ -531,7 +531,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions`.
             Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=labels=None`, 
-            returns tensor `Sequence_output` of shape [batch_size, sequence_length, hidden_size],
+            returns tensor `logits` of shape [batch_size, sequence_length, hidden_size],
             which is the output at the last layer of the model.
 
         Example:
