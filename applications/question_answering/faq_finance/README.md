@@ -443,17 +443,10 @@ sh scripts/export_to_serving.sh
 ```
 
 启动 Pipeline Server:
-修改Tokenizer：
-
-```
-self.tokenizer = AutoTokenizer.from_pretrained('rocketqa-zh-base-query-encoder')
-
-```
-然后运行：
 
 ```
 cd deploy/python/
-python web_service.py
+python web_service.py --model_name_or_path rocketqa-zh-base-query-encoder
 ```
 
 启动客户端调用 Server, 使用 POST的方式：
