@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '2.3.0.dev'  # Maybe dev is better
+__version__ = '2.4.0.dev'  # Maybe dev is better
 import sys
 if 'datasets' in sys.modules.keys():
     from paddlenlp.utils.log import logger
     logger.warning(
         "Detected that datasets module was imported before paddlenlp. "
-        "This may cause PaddleNLP datasets to be unavalible in intranet"
+        "This may cause PaddleNLP datasets to be unavalible in intranet. "
         "Please import paddlenlp before datasets module to avoid download issues"
     )
 from . import data
@@ -34,6 +34,8 @@ from . import losses
 from . import experimental
 from .taskflow import Taskflow
 from . import trainer
+from . import prompt
+from . import dataaug
 import paddle
 
 paddle.disable_signal_handler()

@@ -35,7 +35,12 @@ from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .dialogue import DialogueTask
-from .information_extraction import UIETask
+from .information_extraction import UIETask, GPTask
+from .code_generation import CodeGenerationTask
+from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
+from .text_summarization import TextSummarizationTask
+from .document_intelligence import DocPromptTask
+from .question_generation import QuestionGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -190,9 +195,46 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-simbert-base-chinese"
             },
+            "rocketqa-zh-dureader-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag":
+                'text_similarity-rocketqa-zh-dureader-cross-encoder',
+            },
+            "rocketqa-base-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-base-cross-encoder',
+            },
+            "rocketqa-medium-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-medium-cross-encoder',
+            },
+            "rocketqa-mini-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-mini-cross-encoder',
+            },
+            "rocketqa-micro-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-micro-cross-encoder',
+            },
+            "rocketqa-nano-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-nano-cross-encoder',
+            },
         },
         "default": {
-            "model": "simbert-base-chinese"
+            "model": "rocketqa-zh-dureader-cross-encoder"
+        }
+    },
+    'text_summarization': {
+        "models": {
+            "unimo-text-1.0-summary": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-unimo-text-1.0-summary",
+                "task_priority_path": "unimo-text-1.0-summary",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-summary"
         }
     },
     "word_segmentation": {
@@ -256,22 +298,196 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-medical-base"
             },
+            "uie-base-en": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-base-en"
+            },
+            "uie-m-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-m-base"
+            },
+            "uie-m-large": {
+                "task_class": UIETask,
+                "hidden_size": 1024,
+                "task_flag": "information_extraction-uie-m-large"
+            },
+            "uie-data-distill-gp": {
+                "task_class": GPTask,
+                "task_flag": "information_extraction-uie-data-distill-gp"
+            },
         },
         "default": {
             "model": "uie-base"
         }
-    }
+    },
+    "code_generation": {
+        "models": {
+            "Salesforce/codegen-350M-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-mono',
+                "task_priority_path": "Salesforce/codegen-350M-mono",
+            },
+            "Salesforce/codegen-2B-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-mono',
+                "task_priority_path": "Salesforce/codegen-2B-mono",
+            },
+            "Salesforce/codegen-6B-mono": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-mono',
+                "task_priority_path": "Salesforce/codegen-6B-mono",
+            },
+            "Salesforce/codegen-350M-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-nl',
+                "task_priority_path": "Salesforce/codegen-350M-nl",
+            },
+            "Salesforce/codegen-2B-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-nl',
+                "task_priority_path": "Salesforce/codegen-2B-nl",
+            },
+            "Salesforce/codegen-6B-nl": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-nl',
+                "task_priority_path": "Salesforce/codegen-6B-nl",
+            },
+            "Salesforce/codegen-350M-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-350M-multi',
+                "task_priority_path": "Salesforce/codegen-350M-multi",
+            },
+            "Salesforce/codegen-2B-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-2B-multi',
+                "task_priority_path": "Salesforce/codegen-2B-multi",
+            },
+            "Salesforce/codegen-6B-multi": {
+                "task_class": CodeGenerationTask,
+                "task_flag": 'code_generation-Salesforce/codegen-6B-multi',
+                "task_priority_path": "Salesforce/codegen-6B-multi",
+            },
+        },
+        "default": {
+            "model": "Salesforce/codegen-350M-mono",
+        },
+    },
+    "text_to_image": {
+        "models": {
+            "dalle-mini": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mini",
+                "task_priority_path": "dalle-mini",
+            },
+            "dalle-mega-v16": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega-v16",
+                "task_priority_path": "dalle-mega-v16",
+            },
+            "dalle-mega": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega",
+                "task_priority_path": "dalle-mega",
+            },
+            "pai-painter-painting-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-painting-base-zh",
+                "task_priority_path": "pai-painter-painting-base-zh",
+            },
+            "pai-painter-scenery-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-scenery-base-zh",
+                "task_priority_path": "pai-painter-scenery-base-zh",
+            },
+            "pai-painter-commercial-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-commercial-base-zh",
+                "task_priority_path": "pai-painter-commercial-base-zh",
+            },
+            "openai/disco-diffusion-clip-vit-base-patch32": {
+                "task_class":
+                TextToImageDiscoDiffusionTask,
+                "task_flag":
+                "text_to_image-openai/disco-diffusion-clip-vit-base-patch32",
+                "task_priority_path":
+                "openai/disco-diffusion-clip-vit-base-patch32",
+            },
+            "openai/disco-diffusion-clip-rn50": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn50",
+                "task_priority_path": "openai/disco-diffusion-clip-rn50",
+            },
+            "openai/disco-diffusion-clip-rn101": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
+                "task_priority_path": "openai/disco-diffusion-clip-rn101",
+            },
+            "disco_diffusion_ernie_vil-2.0-base-zh": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag":
+                "text_to_image-disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_priority_path": "disco_diffusion_ernie_vil-2.0-base-zh",
+            },
+            "CompVis/stable-diffusion-v1-4": {
+                "task_class": TextToImageStableDiffusionTask,
+                "task_flag": "text_to_image-CompVis/stable-diffusion-v1-4",
+                "task_priority_path": "CompVis/stable-diffusion-v1-4",
+            },
+        },
+        "default": {
+            "model": "pai-painter-painting-base-zh",
+        }
+    },
+    "document_intelligence": {
+        "models": {
+            "docprompt": {
+                "task_class": DocPromptTask,
+                "task_flag": "document_intelligence-docprompt",
+            },
+        },
+        "default": {
+            "model": "docprompt"
+        }
+    },
+    "question_generation": {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0",
+            },
+            "unimo-text-1.0-dureader_qg-template1": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-dureader_qg-template1",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-dureader_qg-template1"
+        }
+    },
 }
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "wordtag"
+    "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base"
+]
+
+support_argument_list = [
+    "dalle-mini", "dalle-mega", "dalle-mega-v16",
+    "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh",
+    "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4",
+    "openai/disco-diffusion-clip-vit-base-patch32",
+    "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101",
+    "disco_diffusion_ernie_vil-2.0-base-zh"
 ]
 
 
 class Taskflow(object):
     """
-    The Taskflow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
+    The Taskflow is the end2end interface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
         3) Offer the usage and help message.
@@ -374,3 +590,7 @@ class Taskflow(object):
     def set_schema(self, schema):
         assert self.task_instance.model in support_schema_list, 'This method can only be used by the task with the model of uie or wordtag.'
         self.task_instance.set_schema(schema)
+
+    def set_argument(self, argument):
+        assert self.task_instance.model in support_argument_list, 'This method can only be used by the task with the model of text_to_image generation.'
+        self.task_instance.set_argument(argument)

@@ -20,11 +20,17 @@ SET(RE2_REPOSITORY    ${GIT_URL}/google/re2.git)
 SET(RE2_TAG           2022-04-01)
 
 IF(WIN32)
-  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/re2_static.lib")
+  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib/re2.lib")
   add_definitions(-DRE2_STATIC)
-ELSE(WIN32)
-  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/libre2.a")
-ENDIF(WIN32)
+ELSEIF(APPLE)
+  SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib/libre2.a")
+ELSE()
+  IF(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib/libre2.a")
+  ELSE()
+    SET(RE2_LIBRARIES     "${RE2_INSTALL_DIR}/lib64/libre2.a")
+  ENDIF()
+ENDIF()
 
 SET(RE2_INCLUDE_DIR ${RE2_INSTALL_DIR}/include)
 INCLUDE_DIRECTORIES(${RE2_INCLUDE_DIR})
@@ -37,12 +43,14 @@ ExternalProject_Add(
   GIT_TAG               ${RE2_TAG}
   PREFIX                ${RE2_PREFIX_DIR}
   UPDATE_COMMAND        ""
-  CMAKE_ARGS            -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                        -DBUILD_SHARED=ON
-                        -DBUILD_STATIC=ON
-                        -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+  CMAKE_ARGS            -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                        -DCMAKE_CXX_FLAGS_RELEASE=${CMAKE_CXX_FLAGS_RELEASE}
+                        -DCMAKE_CXX_FLAGS_DEBUG=${CMAKE_CXX_FLAGS_DEBUG}
+                        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+                        -DCMAKE_C_FLAGS_DEBUG=${CMAKE_C_FLAGS_DEBUG}
+                        -DCMAKE_C_FLAGS_RELEASE=${CMAKE_C_FLAGS_RELEASE}
                         -DCMAKE_INSTALL_PREFIX:PATH=${RE2_INSTALL_DIR}
-                        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+                        -DCMAKE_BUILD_TYPE:STRING=${THIRD_PARTY_BUILD_TYPE}
   BUILD_BYPRODUCTS     ${RE2_LIBRARIES}
 )
 

@@ -24,7 +24,8 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-import paddlenlp as ppnlp
+import paddlenlp
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -99,9 +100,9 @@ def do_train():
     dev_ds = dev_ds.map(transform_fn, lazy=False)
     public_test_ds = public_test_ds.map(transform_fn, lazy=False)
 
-    model = ErnieForPretraining.from_pretrained('ernie-1.0')
+    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
 
-    tokenizer = ppnlp.transformers.ErnieTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     if args.task_name != "chid":
         # [src_ids, token_type_ids, masked_positions, masked_lm_labels]
@@ -151,7 +152,7 @@ def do_train():
         print("warmup from:{}".format(args.init_from_ckpt))
 
     mlm_loss_fn = ErnieMLMCriterion()
-    rdrop_loss = ppnlp.losses.RDropLoss()
+    rdrop_loss = paddlenlp.losses.RDropLoss()
 
     num_training_steps = len(train_data_loader) * args.epochs
 

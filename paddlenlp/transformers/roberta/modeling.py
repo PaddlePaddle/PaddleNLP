@@ -18,7 +18,20 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    QuestionAnsweringModelOutput,
+    MultipleChoiceModelOutput,
+    MaskedLMOutput,
+    CausalLMOutputWithCrossAttentions,
+    ModelOutput,
+)
 
 __all__ = [
     'RobertaModel',
@@ -57,7 +70,11 @@ class RobertaEmbeddings(nn.Layer):
         self.padding_idx = pad_token_id
         self.cls_token_id = cls_token_id
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                past_key_values_length=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones_like(input_ids, dtype="int64")
@@ -67,6 +84,8 @@ class RobertaEmbeddings(nn.Layer):
                 position_ids = seq_length + self.padding_idx + 1 - ones
             else:  # postion_ids for RobertaTokenizer
                 position_ids = seq_length - ones
+            if past_key_values_length is not None:
+                position_ids += past_key_values_length
             position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
@@ -107,7 +126,6 @@ class RobertaPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "hfl/roberta-wwm-ext": {
             "attention_probs_dropout_prob": 0.1,
@@ -194,7 +212,6 @@ class RobertaPretrainedModel(PretrainedModel):
             "pad_token_id": 0
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "hfl/roberta-wwm-ext":
@@ -325,12 +342,22 @@ class RobertaModel(RobertaPretrainedModel):
         self.pooler = RobertaPooler(hidden_size)
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False):
+                past_key_values=None,
+                use_cache=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -362,29 +389,31 @@ class RobertaModel(RobertaPretrainedModel):
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
             output_hidden_states (bool, optional):
-                Whether or not to output hidden states for all hidden layers.
+                Whether to return the hidden states of all layers.
                 Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`sequence_output`, `pooled_output`) by default.
-            Returns (`encoder_outputs`, `pooled_output`) if output_hidden_states is `True`.
-
-            With the fields:
-
-            - `sequence_output` (Tensor):
-                Sequence of hidden-states at the last layer of the model.
-                It's data type should be float32 and its shape is [batch_size, sequence_length, hidden_size].
-
-            - `pooled_output` (Tensor):
-                The output of first token (`[CLS]`) in sequence.
-                We "pool" the model by simply taking the hidden state corresponding to the first token.
-                Its data type should be float32 and its shape is [batch_size, hidden_size].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and its shape is [batch_size, sequence_length, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -400,34 +429,55 @@ class RobertaModel(RobertaPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        past_key_values_length = None
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(
                     self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            past_key_values_length=past_key_values_length)
 
-        if output_hidden_states:
-            output = embedding_output
-            encoder_outputs = [embedding_output]
-            for mod in self.encoder.layers:
-                output = mod(output, src_mask=attention_mask)
-                encoder_outputs.append(output)
-            if self.encoder.norm is not None:
-                encoder_outputs[-1] = self.encoder.norm(encoder_outputs[-1])
-            pooled_output = self.pooler(encoder_outputs[-1])
-            return encoder_outputs, pooled_output
-        else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
+        self.encoder._use_cache = use_cache  # To be consistent with HF
+        encoder_outputs = self.encoder(
+            embedding_output,
+            src_mask=attention_mask,
+            cache=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+        if isinstance(encoder_outputs, type(embedding_output)):
+            sequence_output = encoder_outputs
             pooled_output = self.pooler(sequence_output)
-            return sequence_output, pooled_output
+            return (sequence_output, pooled_output)
+        else:
+            sequence_output = encoder_outputs[0]
+            pooled_output = self.pooler(sequence_output)
+            if not return_dict:
+                return (sequence_output, pooled_output) + encoder_outputs[1:]
+            return BaseModelOutputWithPoolingAndCrossAttentions(
+                last_hidden_state=sequence_output,
+                pooler_output=pooled_output,
+                past_key_values=encoder_outputs.past_key_values,
+                hidden_states=encoder_outputs.hidden_states,
+                attentions=encoder_outputs.attentions)
 
 
 class RobertaForQuestionAnswering(RobertaPretrainedModel):
@@ -446,14 +496,16 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
         self.classifier = nn.Linear(self.roberta.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(
-        self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        output_hidden_states=False,
-    ):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                start_positions=None,
+                end_positions=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -464,27 +516,28 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
             output_hidden_states (bool, optional):
-                See :class:`RobertaModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            tuple: Returns tuple (`start_logits`, `end_logits`) by default if output_hidden_states is `False`.
-            Returns tuple (`start_logits`, `end_logits`, `encoder_outputs`) if output_hidden_states is set to `True`.
-
-            With the fields:
-
-            - `start_logits` (Tensor):
-                A tensor of the input token classification logits, indicates the start position of the labelled span.
-                Its data type should be float32 and its shape is [batch_size, sequence_length].
-
-            - `end_logits` (Tensor):
-                A tensor of the input token classification logits, indicates the end position of the labelled span.
-                Its data type should be float32 and its shape is [batch_size, sequence_length].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and a shape of [batch_size, sequence_length, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput`.
 
         Example:
             .. code-block::
@@ -500,23 +553,48 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        encoder_outputs, _ = self.roberta(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=output_hidden_states,
-        )
-        sequence_output = encoder_outputs[
-            -1] if output_hidden_states else encoder_outputs
+        outputs = self.roberta(input_ids,
+                               token_type_ids=token_type_ids,
+                               position_ids=position_ids,
+                               attention_mask=attention_mask,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
+
+        sequence_output = outputs[0]
+
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        if output_hidden_states:
-            return start_logits, end_logits, encoder_outputs
-        else:
-            return start_logits, end_logits
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss, ) +
+                    output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class RobertaForSequenceClassification(RobertaPretrainedModel):
@@ -550,7 +628,10 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False):
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -561,23 +642,25 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
+                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
-                See :class:`RobertaModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` by default.
-            Returns tuple (`logits`, `encoder_outputs`) if output_hidden_states is set to `True`.
-
-            With the fields:
-
-            - `logits` (Tensor):
-                a tensor of the input text classification logits.
-                Its data type should be float32 and it has a shape of [batch_size, num_classes].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and a shape of [batch_size, sequence_length, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput`.
 
         Example:
             .. code-block::
@@ -593,18 +676,41 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        encoder_outputs, pooled_output = self.roberta(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=output_hidden_states)
+        outputs = self.roberta(input_ids,
+                               token_type_ids=token_type_ids,
+                               position_ids=position_ids,
+                               attention_mask=attention_mask,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
+        pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        if output_hidden_states:
-            return logits, encoder_outputs
-        return logits
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                                labels.reshape((-1, )))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+        if not return_dict:
+            output = (logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class RobertaForTokenClassification(RobertaPretrainedModel):
@@ -638,7 +744,10 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
-                output_hidden_states=False):
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -649,23 +758,22 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
             output_hidden_states (bool, optional):
-                See :class:`RobertaModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` by default.
-            Returns tuple (`logits`, `encoder_outputs`) if output_hidden_states is set to `True`.
-
-            With the fields:
-
-            - `logits` (Tensor):
-                a tensor of the input token classification logits.
-                Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and a shape of [batch_size, sequence_length, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
 
         Example:
             .. code-block::
@@ -681,23 +789,56 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        encoder_outputs, _ = self.roberta(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            output_hidden_states=output_hidden_states)
-        sequence_output = encoder_outputs[
-            -1] if output_hidden_states else encoder_outputs
+        outputs = self.roberta(input_ids,
+                               token_type_ids=token_type_ids,
+                               position_ids=position_ids,
+                               attention_mask=attention_mask,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
+
+        sequence_output = outputs[0]
+
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        if output_hidden_states:
-            return logits, encoder_outputs
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                            labels.reshape((-1, )))
+        if not return_dict:
+
+            output = (logits, ) + outputs[2:]
+            if loss is not None:
+                return (loss, ) + output
+            if len(output) == 1:
+                return output[0]
+            return output
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class RobertaForMultipleChoice(RobertaPretrainedModel):
+    """
+    RoBerta Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+    
+    Args:
+        bert (:class:`RobertaModel`):
+            An instance of RobertaModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Bert.
+            If None, use the same value as `hidden_dropout_prob` of `RobertaModel`
+            instance `bert`. Defaults to None.
+    """
 
     def __init__(self, roberta):
         super().__init__()
@@ -713,35 +854,135 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 token_type_ids=None,
                 attention_mask=None,
                 position_ids=None,
-                output_hidden_states=False):
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
+        r"""
+        The RobertaForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
+        Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BertForMultipleChoice, BertTokenizer
+                from paddlenlp.data import Pad, Dict
+
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForMultipleChoice.from_pretrained('bert-base-uncased', num_choices=2)
+
+                data = [
+                    {
+                        "question": "how do you turn on an ipad screen?",
+                        "answer1": "press the volume button.",
+                        "answer2": "press the lock button.",
+                        "label": 1,
+                    },
+                    {
+                        "question": "how do you indent something?",
+                        "answer1": "leave a space before starting the writing",
+                        "answer2": "press the spacebar",
+                        "label": 0,
+                    },
+                ]
+
+                text = []
+                text_pair = []
+                for d in data:
+                    text.append(d["question"])
+                    text_pair.append(d["answer1"])
+                    text.append(d["question"])
+                    text_pair.append(d["answer2"])
+
+                inputs = tokenizer(text, text_pair)
+                batchify_fn = lambda samples, fn=Dict(
+                    {
+                        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+                        "token_type_ids": Pad(
+                            axis=0, pad_val=tokenizer.pad_token_type_id
+                        ),  # token_type_ids
+                    }
+                ): fn(samples)
+                inputs = batchify_fn(inputs)
+
+                reshaped_logits = model(
+                    input_ids=paddle.to_tensor(inputs[0], dtype="int64"),
+                    token_type_ids=paddle.to_tensor(inputs[1], dtype="int64"),
+                )
+                print(reshaped_logits.shape)
+                # [2, 2]
+
+        """
 
         num_choices = input_ids.shape[1]
 
-        flat_input_ids = input_ids.reshape(
+        input_ids = input_ids.reshape(
             (-1, input_ids.shape[-1])) if input_ids is not None else None
-        flat_position_ids = position_ids.reshape(
+        position_ids = position_ids.reshape(
             (-1, position_ids.shape[-1])) if position_ids is not None else None
-        flat_token_type_ids = token_type_ids.reshape(
+        token_type_ids = token_type_ids.reshape(
             (-1,
              token_type_ids.shape[-1])) if token_type_ids is not None else None
-        flat_attention_mask = attention_mask.reshape(
+        attention_mask = attention_mask.reshape(
             (-1,
              attention_mask.shape[-1])) if attention_mask is not None else None
 
-        encoder_outputs, pooled_output = self.roberta(
-            flat_input_ids,
-            position_ids=flat_position_ids,
-            token_type_ids=flat_token_type_ids,
-            attention_mask=flat_attention_mask,
-            output_hidden_states=output_hidden_states)
+        outputs = self.roberta(input_ids,
+                               token_type_ids=token_type_ids,
+                               position_ids=position_ids,
+                               attention_mask=attention_mask,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
+        pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        output = logits.reshape((-1, num_choices))
+        reshaped_logits = logits.reshape((-1, num_choices))
 
-        if output_hidden_states:
-            return output, encoder_outputs
-        return output
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+        if not return_dict:
+            output = (reshaped_logits, ) + outputs[2:]
+            return ((loss, ) + output) if loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=reshaped_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class RobertaForMaskedLM(RobertaPretrainedModel):
@@ -777,7 +1018,10 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                output_hidden_states=False):
+                labels=None,
+                output_hidden_states=False,
+                output_attentions=False,
+                return_dict=False):
         r"""
 
         Args:
@@ -789,23 +1033,24 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
+                vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
+                loss is only computed for the tokens with labels in `[0, ..., vocab_size]`
             output_hidden_states (bool, optional):
-                See :class:`RobertaModel`.
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: Returns tensor `prediction_scores` by default.
-            Returns tuple (`prediction_scores`, `encoder_outputs`) if output_hidden_states is set to `True`.
-
-            With the fields:
-
-            - `prediction_scores` (Tensor):
-                The scores of masked token prediction.
-                Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and a shape of [batch_size, sequence_length, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput`.
 
         Example:
             .. code-block::
@@ -824,20 +1069,36 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 # [1, 13, 30522]
         """
 
-        encoder_outputs, pooled_output = self.roberta(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            output_hidden_states=output_hidden_states)
+        outputs = self.roberta(input_ids,
+                               token_type_ids=token_type_ids,
+                               position_ids=position_ids,
+                               attention_mask=attention_mask,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
 
-        sequence_output = encoder_outputs[
-            -1] if output_hidden_states else encoder_outputs
+        sequence_output = outputs[0]
         prediction_scores = self.lm_head(sequence_output)
 
-        if output_hidden_states:
-            return prediction_scores, encoder_outputs
-        return prediction_scores
+        masked_lm_loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss(
+            )  # -100 index = padding token
+            masked_lm_loss = loss_fct(
+                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
+                labels.reshape((-1, )))
+        if not return_dict:
+            output = (prediction_scores, ) + outputs[2:]
+            return ((masked_lm_loss, ) +
+                    output) if masked_lm_loss is not None else (
+                        output[0] if len(output) == 1 else output)
+
+        return MaskedLMOutput(
+            loss=masked_lm_loss,
+            logits=prediction_scores,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class RobertaLMHead(nn.Layer):
@@ -894,7 +1155,12 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 position_ids=None,
-                output_hidden_states=False):
+                labels=None,
+                past_key_values=None,
+                use_cache=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         Args:
             input_ids (Tensor):
@@ -905,24 +1171,30 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
-            output_hidden_states (bool, optional):
+            past_key_values (Tensor, optional):
                 See :class:`RobertaModel`.
-
+            use_cache (Tensor, optional):
+                See :class:`RobertaModel`.
+            attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the left-to-right language modeling loss (next word prediction). Indices should be in
+                `[-100, 0, ..., vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
+                ignored (masked), the loss is only computed for the tokens with labels in `[0, ..., vocab_size]`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: Returns tensor `prediction_scores` by default.
-            Returns tuple (`prediction_scores`, `encoder_outputs`) if output_hidden_states is set to `True`.
-
-            With the fields:
-
-            - `prediction_scores` (Tensor):
-                The scores of masked token prediction.
-                Its data type should be float32 and shape is [batch_size, sequence_length, vocab_size].
-
-            - `encoder_outputs` (List(Tensor)):
-                A list of Tensor containing hidden-states of the model at each hidden layer in the Transformer encoder.
-                The length of the list is `num_hidden_layers`.
-                Each Tensor has a data type of float32 and a shape of [batch_size, sequence_length, hidden_size].
+            An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions`.
 
         Example:
             .. code-block::
@@ -941,20 +1213,42 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 # [1, 13, 30522]
         """
 
-        encoder_outputs, pooled_output = self.roberta(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            output_hidden_states=output_hidden_states)
+        if labels is not None:
+            use_cache = False
+        outputs = self.roberta(input_ids,
+                               attention_mask=attention_mask,
+                               token_type_ids=token_type_ids,
+                               position_ids=position_ids,
+                               past_key_values=past_key_values,
+                               use_cache=use_cache,
+                               output_attentions=output_attentions,
+                               output_hidden_states=output_hidden_states,
+                               return_dict=return_dict)
 
-        sequence_output = encoder_outputs[
-            -1] if output_hidden_states else encoder_outputs
+        sequence_output = outputs[0]
         prediction_scores = self.lm_head(sequence_output)
 
-        if output_hidden_states:
-            return prediction_scores, encoder_outputs
-        return prediction_scores
+        lm_loss = None
+        if labels is not None:
+            # we are doing next-token prediction; shift prediction scores and input ids by one
+            shifted_prediction_scores = prediction_scores[:, :-1, :]
+            labels = labels[:, 1:]
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            lm_loss = loss_fct(
+                shifted_prediction_scores.reshape(
+                    (-1, prediction_scores.shape[-1])), labels.reshape((-1, )))
+        if not return_dict:
+            output = (prediction_scores, ) + outputs[2:]
+            return ((lm_loss, ) + output) if lm_loss is not None else (
+                output[0] if len(output) == 1 else output)
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=lm_loss,
+            logits=prediction_scores,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
     def prepare_inputs_for_generation(self,
                                       input_ids,

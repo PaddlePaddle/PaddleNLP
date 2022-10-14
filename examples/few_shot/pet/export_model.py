@@ -27,7 +27,7 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    model = ErnieForPretraining.from_pretrained('ernie-1.0')
+    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)

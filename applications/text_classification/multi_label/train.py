@@ -33,83 +33,30 @@ from paddlenlp.utils.log import logger
 from metric import MetricReport
 from utils import evaluate, preprocess_function, read_local_dataset
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--save_dir",
-                    default="./checkpoint",
-                    type=str,
-                    help="The output directory where the model "
-                    "checkpoints will be written.")
-parser.add_argument("--dataset",
-                    default="cail2018_small",
-                    type=str,
-                    help="Dataset for multi label classfication.")
-parser.add_argument("--dataset_dir",
-                    default=None,
-                    type=str,
-                    help="Local dataset directory should "
-                    "include train.tsv, dev.tsv and label.tsv")
-parser.add_argument("--task_name",
-                    default="charges",
-                    type=str,
-                    help="Task name for multi label classfication dataset.")
-parser.add_argument("--max_seq_length",
-                    default=512,
-                    type=int,
-                    help="The maximum total input sequence length"
-                    "after tokenization. Sequences longer than this "
-                    "will be truncated, sequences shorter will be padded.")
-parser.add_argument('--model_name',
-                    default="ernie-3.0-base-zh",
-                    help="Select model to train, defaults "
-                    "to ernie-3.0-base-zh.")
-parser.add_argument('--device',
-                    choices=['cpu', 'gpu', 'xpu', 'npu'],
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--batch_size",
-                    default=32,
-                    type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate",
-                    default=3e-5,
-                    type=float,
-                    help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay",
-                    default=0.0,
-                    type=float,
-                    help="Weight decay if we apply some.")
-parser.add_argument('--early_stop',
-                    action='store_true',
-                    help='Epoch before early stop.')
-parser.add_argument('--early_stop_nums',
-                    type=int,
-                    default=6,
-                    help='Number of epoch before early stop.')
-parser.add_argument("--epochs",
-                    default=1000,
-                    type=int,
-                    help="Total number of training epochs to perform.")
-parser.add_argument('--warmup',
-                    action='store_true',
-                    help="whether use warmup strategy")
-parser.add_argument("--warmup_steps",
-                    default=0,
-                    type=int,
-                    help="Linear warmup steps over the training process.")
-parser.add_argument("--logging_steps",
-                    default=5,
-                    type=int,
-                    help="The interval steps to logging.")
-parser.add_argument("--init_from_ckpt",
-                    type=str,
-                    default=None,
-                    help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed",
-                    type=int,
-                    default=3,
-                    help="random seed for initialization")
-
+parser.add_argument('--device', default="gpu", help="Select which device to train model, defaults to gpu.")
+parser.add_argument("--dataset_dir", required=True, default=None, type=str, help="Local dataset directory should include train.txt, dev.txt and label.txt")
+parser.add_argument("--save_dir", default="./checkpoint", type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument('--model_name', default="ernie-3.0-medium-zh", help="Select model to train, defaults to ernie-3.0-medium-zh.",
+                    choices=["ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"])
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument('--early_stop', action='store_true', help='Epoch before early stop.')
+parser.add_argument('--early_stop_nums', type=int, default=3, help='Number of epoch before early stop.')
+parser.add_argument("--logging_steps", default=5, type=int, help="The interval steps to logging.")
+parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
+parser.add_argument('--warmup', action='store_true', help="whether use warmup strategy")
+parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup steps over the training process.")
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--seed", type=int, default=3, help="random seed for initialization")
+parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
+parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
+parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
 args = parser.parse_args()
+# yapf: enable
 
 
 def set_seed(seed):
@@ -147,28 +94,22 @@ def train():
         paddle.distributed.init_parallel_env()
 
     # load and preprocess dataset
-    if args.dataset_dir is not None:
-        label_list = {}
-        with open(os.path.join(args.dataset_dir, 'label.tsv'),
-                  'r',
-                  encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                l = line.strip()
-                label_list[l] = i
-        train_ds = load_dataset(read_local_dataset,
-                                path=os.path.join(args.dataset_dir,
-                                                  'train.tsv'),
-                                label_list=label_list,
-                                lazy=False)
-        dev_ds = load_dataset(read_local_dataset,
-                              path=os.path.join(args.dataset_dir, 'dev.tsv'),
-                              label_list=label_list,
-                              lazy=False)
-    else:
-        train_ds, dev_ds = load_dataset(args.dataset,
-                                        name=args.task_name,
-                                        splits=["train", "dev"])
-        label_list = train_ds.label_list
+    label_list = {}
+    with open(os.path.join(args.dataset_dir, args.label_file),
+              'r',
+              encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            l = line.strip()
+            label_list[l] = i
+    train_ds = load_dataset(read_local_dataset,
+                            path=os.path.join(args.dataset_dir,
+                                              args.train_file),
+                            label_list=label_list,
+                            lazy=False)
+    dev_ds = load_dataset(read_local_dataset,
+                          path=os.path.join(args.dataset_dir, args.dev_file),
+                          label_list=label_list,
+                          lazy=False)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     trans_func = functools.partial(preprocess_function,
@@ -236,15 +177,9 @@ def train():
 
         for step, batch in enumerate(train_data_loader, start=1):
 
-            input_ids, token_type_ids, labels = batch['input_ids'], batch[
-                'token_type_ids'], batch['labels']
-
-            logits = model(input_ids, token_type_ids)
+            labels = batch.pop("labels")
+            logits = model(**batch)
             loss = criterion(logits, labels)
-
-            probs = F.sigmoid(logits)
-            metric.update(probs, labels)
-            micro_f1_score, macro_f1_score = metric.accumulate()
 
             loss.backward()
             optimizer.step()
@@ -255,9 +190,9 @@ def train():
             global_step += 1
             if global_step % args.logging_steps == 0 and rank == 0:
                 logger.info(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, micro_f1_score,
-                       macro_f1_score, 10 / (time.time() - tic_train)))
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, args.logging_steps /
+                       (time.time() - tic_train)))
                 tic_train = time.time()
 
         early_stop_count += 1
@@ -274,6 +209,10 @@ def train():
             best_f1_score = macro_f1_score
             model._layers.save_pretrained(save_best_path)
             tokenizer.save_pretrained(save_best_path)
+        logger.info("Current best macro f1 score: %.5f" % (best_f1_score))
+    logger.info("Final best macro f1 score: %.5f" % (best_f1_score))
+    logger.info("Save best macro f1 text classification model in %s" %
+                (args.save_dir))
 
 
 if __name__ == "__main__":

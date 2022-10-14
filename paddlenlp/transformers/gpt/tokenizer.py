@@ -29,6 +29,18 @@ __all__ = [
     'GPTChineseTokenizer',
 ]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "gpt-cpm-large-cn": 1024,
+    "gpt-cpm-small-cn-distill": 1024,
+    "gpt3-13B-en": 1024,
+    "gpt3-1.3B-en": 1024,
+    "gpt2-xl-en": 1024,
+    "gpt2-large-en": 1024,
+    "gpt2-medium-en": 1024,
+    "gpt2-en": 1024,
+    "gpt2-small-en": 1024
+}
+
 
 @lru_cache()
 def bytes_to_unicode():
@@ -129,6 +141,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             eol_token='\u2583',
             **kwargs  # The token of newline.
     ):
+
         self._model_file = model_file
         self.eol_token = eol_token
         if not os.path.isfile(model_file):
@@ -367,8 +380,11 @@ class GPTTokenizer(PretrainedTokenizer):
             eos_token='<|endoftext|>',
             unk_token='<|endoftext|>',
             eol_token='\u010a',
+            add_prefix_space=False,
+            add_bos_token=False,
             **kwargs  # The token of newline.
     ):
+
         pad_token = AddedToken(pad_token,
                                lstrip=False, rstrip=False) if isinstance(
                                    pad_token, str) else pad_token
@@ -379,9 +395,11 @@ class GPTTokenizer(PretrainedTokenizer):
                                lstrip=False, rstrip=False) if isinstance(
                                    unk_token, str) else unk_token
         self.eol_token = eol_token
-        self._build_special_tokens_map_extended(bos_token=pad_token,
-                                                eos_token=eos_token,
-                                                unk_token=unk_token)
+        self._build_special_tokens_map_extended(
+            bos_token=pad_token
+            if getattr(self, "bos_token", None) is None else self.bos_token,
+            eos_token=eos_token,
+            unk_token=unk_token)
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
@@ -406,6 +424,9 @@ class GPTTokenizer(PretrainedTokenizer):
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
+        self.add_prefix_space = add_prefix_space
+        self.add_bos_token = add_bos_token
+
         re = try_import("regex")
         self.pat = re.compile(
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
@@ -538,3 +559,28 @@ class GPTTokenizer(PretrainedTokenizer):
         text = bytearray([self.byte_decoder[c]
                           for c in text]).decode('utf-8', errors=self.errors)
         return text
+
+    def get_vocab(self):
+        return dict(self.encoder, **self.added_tokens_encoder)
+
+    def prepare_for_tokenization(self,
+                                 text,
+                                 is_split_into_words=False,
+                                 **kwargs):
+        add_prefix_space = kwargs.pop("add_prefix_space", self.add_prefix_space)
+        if is_split_into_words or add_prefix_space:
+            text = " " + text
+        return (text, kwargs)
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        if self.add_bos_token:
+            bos_token_ids = [self.bos_token_id]
+        else:
+            bos_token_ids = []
+
+        output = bos_token_ids + token_ids_0
+
+        if token_ids_1 is None:
+            return output
+
+        return output + bos_token_ids + token_ids_1

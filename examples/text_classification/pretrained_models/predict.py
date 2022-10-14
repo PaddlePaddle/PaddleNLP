@@ -17,8 +17,8 @@ import os
 
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Tuple, Pad
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from utils import convert_example
 
@@ -94,10 +94,9 @@ if __name__ == "__main__":
     ]
     label_map = {0: 'negative', 1: 'positive'}
 
-    model = ppnlp.transformers.ErnieForSequenceClassification.from_pretrained(
-        'ernie-tiny', num_classes=len(label_map))
-    tokenizer = ppnlp.transformers.ErnieTinyTokenizer.from_pretrained(
-        'ernie-tiny')
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'ernie-3.0-medium-zh', num_classes=len(label_map))
+    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)

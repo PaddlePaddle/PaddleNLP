@@ -135,7 +135,6 @@ class ProphetNetPretrainedModel(PretrainedModel):
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
     loading pretrained models.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "prophetnet-large-uncased": {
             "activation_dropout": 0.1,
@@ -171,7 +170,6 @@ class ProphetNetPretrainedModel(PretrainedModel):
             "vocab_size": 30522
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "prophetnet-large-uncased":
@@ -584,8 +582,9 @@ class ProphetNetNgramSelfAttention(Layer):
                                              axis=0)
 
         # [ngram, B*head, T, 2*T]
-        predict_attn_weights = paddlenlp.ops.einsum(
-            "nbtc,nbsc->nbts", (predict_query_states, predict_key_states))
+        predict_attn_weights = paddle.einsum("nbtc,nbsc->nbts",
+                                             predict_query_states,
+                                             predict_key_states)
 
         # [ngram, B*head, T, S]
         # retrieve relative position embeddings for each layer -> see paper for more details
@@ -609,8 +608,9 @@ class ProphetNetNgramSelfAttention(Layer):
                                        training=self.training)
         # project to attention output
         # [ngram, B*head, T, c]
-        predict_attn_output = paddlenlp.ops.einsum(
-            "nbts,nbsc->nbtc", (predict_attn_probs, predict_value_states))
+        predict_attn_output = paddle.einsum("nbts,nbsc->nbtc",
+                                            predict_attn_probs,
+                                            predict_value_states)
 
         # reshape so that num_heads dim is merged into last `head_dim` axis
         # [ngram, B, T, C]

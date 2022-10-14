@@ -17,7 +17,7 @@ import importlib
 import paddle
 import paddle.fluid.core as core
 import paddle.nn as nn
-from paddle.fluid.layer_helper import LayerHelper
+from paddle.common_ops_import import LayerHelper
 from paddlenlp.utils.downloader import get_path_from_url
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer, RobertaTokenizer
 from paddlenlp.transformers.ppminilm.tokenizer import PPMiniLMTokenizer

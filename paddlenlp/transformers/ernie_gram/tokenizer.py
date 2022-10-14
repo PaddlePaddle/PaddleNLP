@@ -89,6 +89,10 @@ class ErnieGramTokenizer(ErnieTokenizer):
             "do_lower_case": True
         },
     }
+    max_model_input_sizes = {
+        "ernie-gram-zh": 512,
+        "ernie-gram-zh-finetuned-dureader-robust": 512,
+    }
 
     def __init__(self,
                  vocab_file,
@@ -105,4 +109,5 @@ class ErnieGramTokenizer(ErnieTokenizer):
                                                  sep_token=sep_token,
                                                  pad_token=pad_token,
                                                  cls_token=cls_token,
-                                                 mask_token=mask_token)
+                                                 mask_token=mask_token,
+                                                 **kwargs)

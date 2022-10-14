@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import time
 import math
@@ -10,8 +24,8 @@ import paddle.nn.functional as F
 from paddle.optimizer.lr import NoamDecay
 from paddle.optimizer import AdamW
 
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+from datasets import load_dataset
 
 from utils import print_args, set_seed, create_data_loader
 
@@ -67,7 +81,7 @@ def train(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_ds, dev_ds = load_dataset('duconv', splits=('train', 'dev'))
+    train_ds, dev_ds = load_dataset('duconv', split=('train', 'dev'))
     train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
                                                      'train')
     dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args, 'dev')

@@ -20,6 +20,10 @@ from ..tokenizer_utils import PretrainedTokenizer
 
 __all__ = ["GAUAlphaTokenizer"]
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "chinese_GAU-alpha-char_L-24_H-768": 512
+}
+
 
 class GAUAlphaTokenizer(PretrainedTokenizer):
     """

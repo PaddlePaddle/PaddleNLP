@@ -81,6 +81,13 @@ class TestNormalizerJson(TestTokenizerJson):
         )
         self.check_normalizer_json(lowercase_normalizer)
 
+    def test_sequence(self):
+        lowercase_normalizer = faster_tokenizer.normalizers.LowercaseNormalizer(
+        )
+        sequence_normalizer = faster_tokenizer.normalizers.SequenceNormalizer(
+            normalizers=[lowercase_normalizer])
+        self.check_normalizer_json(sequence_normalizer)
+
 
 if __name__ == "__main__":
     unittest.main()

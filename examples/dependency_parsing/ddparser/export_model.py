@@ -16,14 +16,14 @@ import argparse
 import os
 
 import paddle
-import paddlenlp as ppnlp
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 from model.dep import BiAffineParser
 from data import load_vocab
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--encoding_model", choices=["lstm-pe", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-1.0", help="Select the encoding model.")
+parser.add_argument("--encoding_model", choices=["lstm-pe", "ernie-1.0", "ernie-3.0-medium-zh", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-3.0-medium-zh", help="Select the encoding model.")
 parser.add_argument("--params_path", type=str, required=True, default='./model_file/best.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
@@ -31,13 +31,11 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    # Load pretrained model if encoding model is ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in ["ernie-1.0", "ernie-tiny"]:
-        pretrained_model = ppnlp.transformers.ErnieModel.from_pretrained(
-            args.encoding_model)
-    elif args.encoding_model == "ernie-gram-zh":
-        pretrained_model = ppnlp.transformers.ErnieGramModel.from_pretrained(
-            args.encoding_model)
+    # Load pretrained model if encoding model is ernie-3.0-medium-zh, ernie-1.0, ernie-tiny or ernie-gram-zh
+    if args.encoding_model in [
+            "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"
+    ]:
+        pretrained_model = AutoModel.from_pretrained(args.encoding_model)
     else:
         pretrained_model = None
 

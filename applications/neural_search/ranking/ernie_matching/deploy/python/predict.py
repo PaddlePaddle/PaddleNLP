@@ -14,19 +14,21 @@
 
 import argparse
 import os
+import sys
 
-import numpy as np
-import pandas as pd
-import paddle
-import paddlenlp as ppnlp
 from scipy.special import softmax
 from scipy.special import expit
+import numpy as np
+import pandas as pd
+
+import paddle
 from paddle import inference
+import paddle.nn.functional as F
+
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
-import paddle.nn.functional as F
-import sys
+from paddlenlp.transformers import AutoTokenizer, AutoModel
 
 sys.path.append('.')
 
@@ -42,7 +44,8 @@ parser.add_argument("--batch_size", default=32, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
-
+parser.add_argument("--input_file", type=str, required=True,
+    help="The test set file.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
     help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
@@ -57,6 +60,7 @@ parser.add_argument("--benchmark", type=eval, default=False,
     help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/",
     help="The file path to save log.")
+parser.add_argument('--model_name_or_path', default="ernie-3.0-medium-zh", help="The pretrained model used for training")
 args = parser.parse_args()
 # yapf: enable
 
@@ -103,8 +107,8 @@ class Predictor(object):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = model_dir + "/inference.get_pooled_embedding.pdmodel"
-        params_file = model_dir + "/inference.get_pooled_embedding.pdiparams"
+        model_file = model_dir + "/inference.predict.pdmodel"
+        params_file = model_dir + "/inference.predict.pdiparams"
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -194,8 +198,9 @@ class Predictor(object):
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+                ),  # segment
         ): fn(samples)
 
         if args.benchmark:
@@ -222,13 +227,11 @@ if __name__ == "__main__":
                           args.batch_size, args.use_tensorrt, args.precision,
                           args.cpu_threads, args.enable_mkldnn)
 
-    tokenizer = ppnlp.transformers.ErnieGramTokenizer.from_pretrained(
-        'ernie-gram-zh')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    # test_ds = load_dataset("lcqmc", splits=["test"])
-    input_file = 'sort/test_pairwise.csv'
-
-    test_ds = load_dataset(read_text_pair, data_path=input_file, lazy=False)
+    test_ds = load_dataset(read_text_pair,
+                           data_path=args.input_file,
+                           lazy=False)
 
     data = [{'query': d['query'], 'title': d['title']} for d in test_ds]
 

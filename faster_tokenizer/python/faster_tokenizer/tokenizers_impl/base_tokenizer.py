@@ -82,7 +82,7 @@ class BaseFasterTokenizer:
         return self._tokenizer.add_tokens(tokens)
 
     def add_special_tokens(self, special_tokens):
-        return self._tokenizer.add_special_tokens(tokens)
+        return self._tokenizer.add_special_tokens(special_tokens)
 
     def encode(
         self,

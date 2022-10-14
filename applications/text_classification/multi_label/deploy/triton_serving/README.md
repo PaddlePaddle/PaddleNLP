@@ -11,14 +11,13 @@
 ## 服务端环境准备
 
 ### 安装Triton Server
-下载Triton Server镜像，并启动
-```
-# 拉取镜像
+拉取Triton Server镜像：
+```shell
 docker pull nvcr.io/nvidia/tritonserver:21.10-py3
-
-# 启动容器
+```
+启动容器：
+```shell
 docker run  -it --gpus all --net=host --name triton_server -v /path/triton/models:/models nvcr.io/nvidia/tritonserver:21.10-py3 bash
-
 ```
 
 **NOTE:**
@@ -31,15 +30,13 @@ docker run  -it --gpus all --net=host --name triton_server -v /path/triton/model
 ### 进入容器并准备PaddleNLP环境
 整个服务的前后处理依赖PaddleNLP，需要在容器内安装相关python包
 
-```
-# 进入容器
+进入容器：
+```shell
 docker exec -it triton_server bash
-
-# 安装PaddlePaddle
-python3 -m pip install paddlepaddle-gpu -i https://mirror.baidu.com/pypi/simple
-
-# 安装PaddleNLP
-python3 -m pip install paddlenlp -i https://mirror.baidu.com/pypi/simple
+```
+安装PaddlePaddle、PaddleNLP
+```shell
+python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/pypi/simple
 ```
 
 **NOTE:**
@@ -53,10 +50,10 @@ python3 -m pip install paddlenlp -i https://mirror.baidu.com/pypi/simple
 
 ### 安装FasterTokenizers文本处理加速库（可选）
 
-如果部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。目前暂不支持Windows设备安装，将会在下个版本支持。
+推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。
 
-```
-# 注意：在容器内安装
+在容器内安装 faster_tokenizers
+```shell
 python3 -m pip install faster_tokenizers
 ```
 
@@ -73,17 +70,16 @@ python ../../export_model.py --params_path=../../checkpoint/model_state.pdparams
 ```
 
 使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成model.onnx模型文件。
-```bash
-# 模型地址根据实际填写即可
-# 转换分类模型
-paddle2onnx --model_dir infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file model.onnx --opset_version 13 --enable_onnx_checker True --enable_dev_version True
 
-# 将转换好的ONNX模型移动到模型仓库目录
+用Paddle2ONNX转换分类模型
+```shell
+paddle2onnx --model_dir infer_model/ --model_filename float32.pdmodel --params_filename float32.pdiparams --save_file model.onnx --opset_version 13 --enable_onnx_checker True --enable_dev_version True
+```
+创建空白目录/seqcls/1和seqcls_model/1，并将将转换好的ONNX模型移动到模型仓库目录
+```shell
+mkdir /models/seqcls/1
 mkdir /models/seqcls_model/1
 mv model.onnx /models/seqcls_model/1
-
-# 创建空白目录/seqcls/1
-mkdir /models/seqcls/1
 ```
 
 Paddle2ONNX的命令行参数说明请查阅：[Paddle2ONNX命令行参数说明](https://github.com/PaddlePaddle/Paddle2ONNX#%E5%8F%82%E6%95%B0%E9%80%89%E9%A1%B9)
@@ -121,14 +117,14 @@ seqcls_grpc_client.py     # 分类任务发送pipeline预测请求的脚本
 
 ### 启动服务端
 
-在容器内执行下面命令启动服务:
 
-```
-# 默认启动models下所有模型
+在容器内执行下面命令启动服务，默认启动models下所有模型:
+```shell
 tritonserver --model-repository=/models
-
-# 可通过参数只启动单一任务
-tritonserver --model-repository=/models --model-control-mode=explicit --load-model=ernie_seqcls
+```
+也可以通过设定参数只启动单一任务服务：
+```shell
+tritonserver --model-repository=/models --model-control-mode=explicit --load-model=seqcls
 ```
 
 **NOTE:**
@@ -178,11 +174,9 @@ pip install tritonclient==2.10.0
 ```
 
 方式二：拉取官网镜像并启动容器:
-```
-# 拉取镜像
-docker pull nvcr.io/nvidia/tritonserver:21.10-py3-sdk
 
-#启动容器
+```shell
+docker pull nvcr.io/nvidia/tritonserver:21.10-py3-sdk
 docker run  -it --net=host --name triton_client -v /path/to/triton:/triton_code nvcr.io/nvidia/tritonserver:21.10-py3-sdk bash
 ```
 
@@ -191,21 +185,4 @@ docker run  -it --net=host --name triton_client -v /path/to/triton:/triton_code 
 
 ```
 python seqcls_grpc_client.py
-```
-
-输出打印如下:
-
-```
-text:  ['经审理查明，2012年4月5日19时许，被告人王某在杭州市下城区朝晖路农贸市场门口贩卖盗版光碟、淫秽光碟时被民警当场抓获，并当场查获其贩卖的各类光碟5515张，其中5280张某属非法出版物、235张某属淫秽物品。上述事实，被告人王某在庭审中亦无异议，且有经庭审举证、质证的扣押物品清单、赃物照片、公安行政处罚决定书、抓获经过及户籍证明等书证；证人胡某、徐某的证言；出版物鉴定书、淫秽物品审查鉴定书及检查笔录等证据证实，足以认定。']
-label:  32,158,187
-confidence:  0.980,0.983,0.992
---------------------
-text:  ['静乐县人民检察院指控，2014年8月30日15时许，静乐县苏坊村村民张某某因占地问题去苏坊村半切沟静静铁路第五标施工地点阻拦施工时，遭被告人王某某阻止，张某某打电话叫来儿子李某某，李某某看到张某某躺在地上，打了王某某一耳光。于是王某某指使工人殴打李某某，致李某某受伤。经忻州市公安司法鉴定中心鉴定，李某某的损伤评定为轻伤一级。李某某被打伤后，被告人王某某为逃避法律追究，找到任某某，指使任某某作实施××的伪证，并承诺每月给1万元。同时王某某指使工人王某甲、韩某某去丰润派出所作由任某某打伤李某某的伪证，导致任某某被静乐县公安局以涉嫌××罪刑事拘留。公诉机关认为，被告人王某某的行为触犯了《中华人民共和国刑法》××、《中华人民共和国刑法》××××之规定，应以××罪和××罪追究其刑事责任，数罪并罚。']
-label:  0,5
-confidence:  0.547,0.732
---------------------
-text:  ['榆林市榆阳区人民检察院指控：2015年11月22日2时许，被告人王某某在自己经营的榆阳区长城福源招待所内，介绍并容留杨某向刘某某、白某向乔某某提供性服务各一次。']
-label:  26,27
-confidence:  0.999,0.997
---------------------
 ```

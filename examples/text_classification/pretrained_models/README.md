@@ -28,9 +28,8 @@
 本项目针对中文文本分类问题，开源了一系列模型，供用户可配置地使用：
 
 + BERT([Bidirectional Encoder Representations from Transformers](https://arxiv.org/abs/1810.04805))中文模型，简写`bert-base-chinese`， 其由12层Transformer网络组成。
-+ ERNIE([Enhanced Representation through Knowledge Integration](https://arxiv.org/abs/1904.09223))，支持ERNIE 1.0中文模型（简写`ernie-1.0-base-zh`）和ERNIE Tiny中文模型（简写`ernie-tiny`)。
-   其中`ernie`由12层Transformer网络组成，`ernie-tiny`由3层Transformer网络组成。
-+ RoBERTa([A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692))，支持24层Transformer网络的`roberta-wwm-ext-large`和12层Transformer网络的`roberta-wwm-ext`。
++ ERNIE[ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/abs/2112.12731)，支持ERNIE 3.0-Medium 中文模型（简写`ernie-3.0-medium-zh`）和 ERNIE 3.0-Base-zh 等 ERNIE 3.0 轻量级中文模型。
++ RoBERTa([A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692))，支持 24 层 Transformer 网络的 `roberta-wwm-ext-large` 和 12 层 Transformer 网络的 `roberta-wwm-ext`。
 
 | 模型  | dev acc | test acc |
 | ---- | ------- | -------- |
@@ -43,6 +42,7 @@
 | roberta-wwm-ext-large | 0.95250 | 0.95333 |
 | rbt3 | 0.92583 | 0.93250 |
 | rbtl3 | 0.9341 | 0.93583 |
+
 
 ## 快速开始
 
@@ -94,9 +94,9 @@ $ python -m paddle.distributed.launch --gpus "0" train.py --device gpu --save_di
 
 ```python
 # 使用ernie预训练模型
-# ernie-1.0-base-zh
-model = AutoModelForSequenceClassification.from_pretrained('ernie-1.0-base-zh',num_classes=2))
-tokenizer = AutoTokenizer.from_pretrained('ernie-1.0-base-zh')
+# ernie-3.0-medium-zh
+model = AutoModelForSequenceClassification.from_pretrained('ernie-3.0-medium-zh',num_classes=2))
+tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
 
 # 使用bert预训练模型
 # bert-base-chinese

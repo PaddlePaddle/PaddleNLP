@@ -21,6 +21,7 @@ import paddle
 import paddle.nn as nn
 import paddle.tensor as tensor
 import paddle.nn.functional as F
+from paddle import ParamAttr
 from paddle.nn import Layer
 from paddle.nn import CrossEntropyLoss
 
@@ -195,7 +196,6 @@ class LayoutLMv2Embeddings(Layer):
 
 
 class LayoutLMv2PretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "layoutlmv2-base-uncased": {
             "attention_probs_dropout_prob": 0.1,
@@ -256,15 +256,47 @@ class LayoutLMv2PretrainedModel(PretrainedModel):
             "has_relative_attention_bias": True,
             "has_spatial_attention_bias": True,
             "has_visual_segment_embedding": False,
-        }
+        },
+        "vi-layoutlmv2-base-uncased": {
+            "attention_probs_dropout_prob": 0.1,
+            "coordinate_size": 128,
+            "fast_qkv": True,
+            "gradient_checkpointing": False,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "image_feature_pool_shape": [7, 7, 256],
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "layer_norm_eps": 1e-12,
+            "max_2d_position_embeddings": 1024,
+            "max_position_embeddings": 512,
+            "max_rel_2d_pos": 256,
+            "max_rel_pos": 128,
+            "model_type": "layoutlmv2",
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "output_past": True,
+            "pad_token_id": 0,
+            "shape_size": 128,
+            "rel_2d_pos_bins": 64,
+            "rel_pos_bins": 32,
+            "type_vocab_size": 2,
+            "vocab_size": 30522,
+            "has_relative_attention_bias": True,
+            "has_spatial_attention_bias": True,
+            "has_visual_segment_embedding": False,
+            "use_visual_backbone": False,
+        },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "layoutlmv2-base-uncased":
             "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-base-uncased/model_state.pdparams",
             "layoutlmv2-large-uncased":
             "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/layoutlmv2-large-uncased/model_state.pdparams",
+            "vi-layoutlmv2-base-uncased":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlmv2/vi-layoutlmv2-base-uncased/model_state.pdparams",
         }
     }
     base_model_prefix = "layoutlmv2"
@@ -339,7 +371,7 @@ class LayoutLMv2SelfAttention(nn.Layer):
         self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + [
+        new_x_shape = list(x.shape[:-1]) + [
             self.num_attention_heads, self.attention_head_size
         ]
         x = x.reshape(new_x_shape)
@@ -389,23 +421,29 @@ class LayoutLMv2SelfAttention(nn.Layer):
             attention_scores += rel_pos
         if self.has_spatial_attention_bias:
             attention_scores += rel_2d_pos
+
+        bool_attention_mask = attention_mask.astype(paddle.bool)
+        bool_attention_mask.stop_gradient = True
+        attention_scores_shape = paddle.shape(attention_scores)
         attention_scores = paddle.where(
-            attention_mask.astype(paddle.bool).expand_as(attention_scores),
-            paddle.ones_like(attention_scores) * float("-inf"),
+            bool_attention_mask.expand(attention_scores_shape),
+            paddle.ones(attention_scores_shape) * float("-1e10"),
             attention_scores)
+
         attention_probs = F.softmax(attention_scores, axis=-1)
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        new_context_layer_shape = context_layer.shape[:-2] + [
-            self.all_head_size
-        ]
+        new_context_layer_shape = list(
+            context_layer.shape[:-2]) + [self.all_head_size]
         context_layer = context_layer.reshape(new_context_layer_shape)
 
-        outputs = (context_layer,
-                   attention_probs) if output_attentions else (context_layer, )
+        if output_attentions:
+            outputs = [context_layer, attention_probs]
+        else:
+            outputs = [context_layer]
         return outputs
 
 
@@ -442,8 +480,12 @@ class LayoutLMv2Attention(nn.Layer):
             rel_2d_pos=rel_2d_pos,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,
-                   ) + self_outputs[1:]  # add attentions if we output them
+        if output_attentions:
+            outputs = [
+                attention_output,
+            ] + self_outputs[1:]
+        else:
+            outputs = [attention_output]
         return outputs
 
 
@@ -571,7 +613,7 @@ class LayoutLMv2Encoder(nn.Layer):
 
             hidden_save["{}_data".format(i)] = hidden_states
 
-        return hidden_states,
+        return hidden_states, hidden_save
 
 
 # Copied from paddlenlp.transformers.layoutxlm.modeling.LayoutXLMIntermediate with XLM->LMv2
@@ -654,13 +696,16 @@ class LayoutLMv2Layer(nn.Layer):
         )
         attention_output = self_attention_outputs[0]
 
-        outputs = self_attention_outputs[
-            1:]  # add self attentions if we output attention weights
-
         layer_output = self.feed_forward_chunk(attention_output)
 
-        outputs = (layer_output, ) + outputs
-
+        if output_attentions:
+            outputs = self_attention_outputs[
+                1:]  # add self attentions if we output attention weights
+            outputs = [
+                layer_output,
+            ] + list(outputs)
+        else:
+            outputs = [layer_output]
         return outputs
 
 
@@ -747,19 +792,22 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
     def __init__(
         self,
         with_pool='tanh',
+        use_visual_backbone=True,
         **kwargs,
     ):
         super(LayoutLMv2Model, self).__init__()
         config = kwargs
         self.config = kwargs
+        self.use_visual_backbone = use_visual_backbone
         self.has_visual_segment_embedding = config[
             "has_visual_segment_embedding"]
         self.embeddings = LayoutLMv2Embeddings(config)
 
-        self.visual = VisualBackbone(config)
-        self.visual.stop_gradient = True
-        self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1],
-                                     config["hidden_size"])
+        if self.use_visual_backbone is True:
+            self.visual = VisualBackbone(config)
+            self.visual.stop_gradient = True
+            self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1],
+                                         config["hidden_size"])
         if self.has_visual_segment_embedding:
             self.visual_segment_embedding = self.create_parameter(
                 shape=[
@@ -786,12 +834,15 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         return embeddings
 
     def _calc_img_embeddings(self, image, bbox, position_ids):
-        visual_embeddings = self.visual_proj(
-            self.visual(image.astype(paddle.float32)))
         position_embeddings = self.embeddings.position_embeddings(position_ids)
         spatial_position_embeddings = self.embeddings._cal_spatial_position_embeddings(
             bbox)
-        embeddings = visual_embeddings + position_embeddings + spatial_position_embeddings
+        if self.use_visual_backbone is True:
+            visual_embeddings = self.visual_proj(
+                self.visual(image.astype(paddle.float32)))
+            embeddings = visual_embeddings + position_embeddings + spatial_position_embeddings
+        else:
+            embeddings = position_embeddings + spatial_position_embeddings
         if self.has_visual_segment_embedding:
             embeddings += self.visual_segment_embedding
         embeddings = self.visual_LayerNorm(embeddings)
@@ -841,15 +892,13 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 head_mask=None,
-                output_hidden_states=None,
-                output_attentions=None):
-        input_shape = input_ids.shape
+                output_hidden_states=False,
+                output_attentions=False):
+        input_shape = paddle.shape(input_ids)
 
         visual_shape = list(input_shape)
         visual_shape[1] = self.config["image_feature_pool_shape"][
             0] * self.config["image_feature_pool_shape"][1]
-        final_shape = list(input_shape)
-        final_shape[1] += visual_shape[1]
 
         visual_bbox_x = (paddle.arange(
             0,
@@ -874,14 +923,19 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([-1, bbox.shape[-1]])
-        visual_bbox = visual_bbox.expand([final_shape[0], -1, -1])
+        ).reshape([expand_shape[0] * expand_shape[1],
+                   paddle.shape(bbox)[-1]])
+        visual_bbox = visual_bbox.expand(
+            [input_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
 
         if attention_mask is None:
             attention_mask = paddle.ones(input_shape)
 
-        visual_attention_mask = paddle.ones(visual_shape)
+        if self.use_visual_backbone is True:
+            visual_attention_mask = paddle.ones(visual_shape)
+        else:
+            visual_attention_mask = paddle.zeros(visual_shape)
 
         attention_mask = attention_mask.astype(visual_attention_mask.dtype)
 
@@ -894,10 +948,10 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         if position_ids is None:
             seq_length = input_shape[1]
             position_ids = self.embeddings.position_ids[:, :seq_length]
-            position_ids = position_ids.expand_as(input_ids)
+            position_ids = position_ids.expand(input_shape)
 
         visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
-            [input_shape[0], -1])
+            [input_shape[0], visual_shape[1]])
         final_position_ids = paddle.concat([position_ids, visual_position_ids],
                                            axis=1)
 
@@ -945,8 +999,8 @@ class LayoutLMv2Model(LayoutLMv2PretrainedModel):
         )
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output)
-
-        return sequence_output, pooled_output
+        # i_data (i in [0, 12) is the key of the hidden states
+        return sequence_output, pooled_output, encoder_outputs[1]
 
 
 # Copied from paddlenlp.transformers.layoutxlm.modeling.LayoutXLMForTokenClassification with XLM->LMv2
@@ -1007,7 +1061,15 @@ class LayoutLMv2ForTokenClassification(LayoutLMv2PretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = logits,
+        hidden_states = {
+            f"hidden_states_{idx}": outputs[2][f"{idx}_data"]
+            for idx in range(12)
+        }
+
+        if self.training:
+            outputs = logits, hidden_states
+        else:
+            outputs = logits,
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
@@ -1189,8 +1251,11 @@ class REDecoder(nn.Layer):
             ])
             if len(all_possible_relations) == 0:
                 all_possible_relations = {(0, 1)}
-            positive_relations = set(
-                list(zip(relations[b]["head"], relations[b]["tail"])))
+            if "head" in relations[b]:
+                positive_relations = set(
+                    list(zip(relations[b]["head"], relations[b]["tail"])))
+            else:
+                positive_relations = set()
             negative_relations = all_possible_relations - positive_relations
             positive_relations = set(
                 [i for i in positive_relations if i in all_possible_relations])
@@ -1231,6 +1296,8 @@ class REDecoder(nn.Layer):
         loss = 0
         all_pred_relations = []
         for b in range(batch_size):
+            if "head" not in relations[b]:
+                continue
             head_entities = paddle.to_tensor(relations[b]["head"])
             tail_entities = paddle.to_tensor(relations[b]["tail"])
             relation_labels = paddle.to_tensor(relations[b]["label"])

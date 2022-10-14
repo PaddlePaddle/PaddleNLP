@@ -27,6 +27,12 @@ from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
 __all__ = ['UNIMOTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "unimo-text-1.0": 513,
+    "unimo-text-1.0-lcsts-new": 513,
+    "unimo-text-1.0-large": 512
+}
+
 
 class UNIMOTokenizer(PretrainedTokenizer):
     r"""
@@ -85,6 +91,10 @@ class UNIMOTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
+            "unimo-text-1.0-summary":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-dureader_qg-template1":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -97,7 +107,14 @@ class UNIMOTokenizer(PretrainedTokenizer):
         "unimo-text-1.0-large": {
             "do_lower_case": True
         },
+        "unimo-text-1.0-summary": {
+            "do_lower_case": True
+        },
+        "unimo-text-1.0-dureader_qg-template1": {
+            "do_lower_case": True
+        }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,
@@ -148,6 +165,13 @@ class UNIMOTokenizer(PretrainedTokenizer):
                                 bos_token=bos_token,
                                 eos_token=eos_token,
                                 **kwargs)
+        return vocab
+
+    def get_vocab(self):
+        vocab = {
+            self.convert_ids_to_tokens(i): i
+            for i in range(self.vocab_size)
+        }
         return vocab
 
     def _tokenize(self, text):

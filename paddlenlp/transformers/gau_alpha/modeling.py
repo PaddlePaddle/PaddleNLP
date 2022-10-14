@@ -257,7 +257,6 @@ class GAUAlphaPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "chinese_GAU-alpha-char_L-24_H-768": {
             "vocab_size": 12000,
@@ -277,7 +276,6 @@ class GAUAlphaPretrainedModel(PretrainedModel):
             "attention_scale": True,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "chinese_GAU-alpha-char_L-24_H-768":

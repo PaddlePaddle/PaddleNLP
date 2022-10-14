@@ -40,7 +40,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 def prepare_input(tokenizer, sentences, pad_id):
     word_pad = Pad(pad_id, dtype="int64")
     tokenized = tokenizer(sentences, return_length=True)
-    inputs = word_pad([i["input_ids"] for i in tokenized])
+    inputs = word_pad(tokenized["input_ids"])
     input_ids = paddle.to_tensor(inputs)
     return input_ids
 

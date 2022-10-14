@@ -19,7 +19,6 @@ import argparse
 import numpy as np
 
 import paddle
-import paddlenlp as ppnlp
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 # yapf: disable

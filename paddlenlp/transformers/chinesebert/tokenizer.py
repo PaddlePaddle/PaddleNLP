@@ -41,6 +41,11 @@ from paddle.utils import try_import
 
 from paddlenlp.transformers import BertTokenizer
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "ChineseBERT-base": 512,
+    "ChineseBERT-large": 512
+}
+
 
 class ChineseBertTokenizer(BertTokenizer):
     """
@@ -123,6 +128,7 @@ class ChineseBertTokenizer(BertTokenizer):
         },
     }
     padding_side = "right"
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

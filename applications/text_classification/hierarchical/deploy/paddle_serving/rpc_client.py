@@ -26,12 +26,13 @@ class Runner(object):
         self.client = PipelineClient()
         self.client.connect([server_url])
 
-    def Run(self, data):
+    def Run(self, data, label_list):
         data = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
         ret = self.client.predict(feed_dict={"sentence": data})
         for d, l, in zip(data, eval(ret.value[0])):
             print("text: ", d)
-            print("label: ", l)
+            label = ','.join([label_list[int(ll)] for ll in l.split(',')])
+            print("label: ", label)
             print("--------------------")
         return
 
@@ -39,9 +40,23 @@ class Runner(object):
 if __name__ == "__main__":
     server_url = "127.0.0.1:18090"
     runner = Runner(server_url)
-    texts = [
-        "a high degree of uncertainty associated with the emission inventory for china tends to degrade the performance of chemical transport models in predicting pm2.5 concentrations especially on a daily basis. in this study a novel machine learning algorithm, geographically -weighted gradient boosting machine (gw-gbm), was developed by improving gbm through building spatial smoothing kernels to weigh the loss function. this modification addressed the spatial nonstationarity of the relationships between pm2.5 concentrations and predictor variables such as aerosol optical depth (aod) and meteorological conditions. gw-gbm also overcame the estimation bias of pm2.5 concentrations due to missing aod retrievals, and thus potentially improved subsequent exposure analyses. gw-gbm showed good performance in predicting daily pm2.5 concentrations (r-2 = 0.76, rmse = 23.0 g/m(3)) even with partially missing aod data, which was better than the original gbm model (r-2 = 0.71, rmse = 25.3 g/m(3)). on the basis of the continuous spatiotemporal prediction of pm2.5 concentrations, it was predicted that 95% of the population lived in areas where the estimated annual mean pm2.5 concentration was higher than 35 g/m(3), and 45% of the population was exposed to pm2.5 >75 g/m(3) for over 100 days in 2014. gw-gbm accurately predicted continuous daily pm2.5 concentrations in china for assessing acute human health effects. (c) 2017 elsevier ltd. all rights reserved.",
-        "previous research exploring cognitive biases in bulimia nervosa suggests that attentional biases occur for both food-related and body-related cues. individuals with bulimia were compared to non-bulimic controls on an emotional-stroop task which contained both food-related and body-related cues. results indicated that bulimics (but not controls) demonstrated a cognitive bias for both food-related and body related cues. however, a discrepancy between the two cue-types was observed with body-related cognitive biases showing the most robust effects and food-related cognitive biases being the most strongly associated with the severity of the disorder. the results may have implications for clinical practice as bulimics with an increased cognitive bias for food-related cues indicated increased bulimic disorder severity. (c) 2016 elsevier ltd. all rights reserved.",
-        "posterior reversible encephalopathy syndrome (pres) is a reversible clinical and neuroradiological syndrome which may appear at any age and characterized by headache, altered consciousness, seizures, and cortical blindness. the exact incidence is still unknown. the most commonly identified causes include hypertensive encephalopathy, eclampsia, and some cytotoxic drugs. vasogenic edema related subcortical white matter lesions, hyperintense on t2a and flair sequences, in a relatively symmetrical pattern especially in the occipital and parietal lobes can be detected on cranial mr imaging. these findings tend to resolve partially or completely with early diagnosis and appropriate treatment. here in, we present a rare case of unilateral pres developed following the treatment with pazopanib, a testicular tumor vascular endothelial growth factor (vegf) inhibitory agent."
+    text = [
+        "消失的“外企光环”，5月份在华裁员900余人，香饽饽变“臭”了？", "卡车超载致使跨桥侧翻，没那么简单",
+        "金属卡扣安装不到位，上海乐扣乐扣贸易有限公司将召回捣碎器1162件"
     ]
-    runner.Run(texts)
+    label_list = [
+        '交往', '交往##会见', '交往##感谢', '交往##探班', '交往##点赞', '交往##道歉', '产品行为',
+        '产品行为##上映', '产品行为##下架', '产品行为##发布', '产品行为##召回', '产品行为##获奖', '人生',
+        '人生##产子/女', '人生##出轨', '人生##分手', '人生##失联', '人生##婚礼', '人生##庆生', '人生##怀孕',
+        '人生##死亡', '人生##求婚', '人生##离婚', '人生##结婚', '人生##订婚', '司法行为', '司法行为##举报',
+        '司法行为##入狱', '司法行为##开庭', '司法行为##拘捕', '司法行为##立案', '司法行为##约谈', '司法行为##罚款',
+        '司法行为##起诉', '灾害/意外', '灾害/意外##地震', '灾害/意外##坍/垮塌', '灾害/意外##坠机',
+        '灾害/意外##洪灾', '灾害/意外##爆炸', '灾害/意外##袭击', '灾害/意外##起火', '灾害/意外##车祸', '竞赛行为',
+        '竞赛行为##夺冠', '竞赛行为##晋级', '竞赛行为##禁赛', '竞赛行为##胜负', '竞赛行为##退役', '竞赛行为##退赛',
+        '组织关系', '组织关系##停职', '组织关系##加盟', '组织关系##裁员', '组织关系##解散', '组织关系##解约',
+        '组织关系##解雇', '组织关系##辞/离职', '组织关系##退出', '组织行为', '组织行为##开幕', '组织行为##游行',
+        '组织行为##罢工', '组织行为##闭幕', '财经/交易', '财经/交易##上市', '财经/交易##出售/收购',
+        '财经/交易##加息', '财经/交易##涨价', '财经/交易##涨停', '财经/交易##融资', '财经/交易##跌停',
+        '财经/交易##降价', '财经/交易##降息'
+    ]
+    runner.Run(text, label_list)

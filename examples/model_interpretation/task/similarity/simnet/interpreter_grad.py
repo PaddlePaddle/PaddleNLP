@@ -19,7 +19,6 @@ import sys
 sys.path.append("../../..")
 import paddle
 import paddle.nn.functional as F
-import paddlenlp as ppnlp
 from paddlenlp.data import Pad, Stack, Tuple, Vocab
 from paddlenlp.datasets import load_dataset
 

@@ -14,3 +14,4 @@
 
 from .base_tokenizer import BaseFasterTokenizer
 from .ernie import ErnieFasterTokenizer
+from .sentencepiece_bpe import SentencePieceBPEFasterTokenizer
