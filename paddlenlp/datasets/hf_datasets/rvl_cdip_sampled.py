@@ -35,7 +35,7 @@ _CITATION = """\
 
 _DESCRIPTION = """\
 The RVL-CDIP (Ryerson Vision Lab Complex Document Information Processing) dataset consists of 400,000 grayscale images in 16 classes, with 25,000 images per class. \
-Because of the original dataset is large and very slow for training, so we downsampling from it. \
+Because of the original dataset is large and slow for training, so we downsampling from it. \
 The sampled dataset consist of 6,400 training images, 800 validation images, and 800 test images.
 """
 
