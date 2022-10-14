@@ -734,13 +734,12 @@ def _quant_aware_training_dynamic(self, input_dir):
 
     input_spec = generate_input_spec(self.model, self.train_dataset)
 
-    self.model = _recover_auto_model_forward(self.model)
-
     quanter.save_quantized_model(self.model,
                                  os.path.join(input_dir,
                                               args.output_filename_prefix),
                                  input_spec=input_spec,
                                  onnx_format=True)
+    self.model = _recover_auto_model_forward(self.model)
     logger.info("Quant aware training ends and quantized models are saved.")
 
 

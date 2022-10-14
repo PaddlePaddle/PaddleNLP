@@ -37,19 +37,6 @@
   * 🍭 AIGC 内容生成：新增代码生成 SOTA 模型[**CodeGen**](./examples/code_generation/codegen)，支持多种编程语言代码生成；集成[**文图生成潮流模型**](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) DALL·E Mini、Disco Diffusion、Stable Diffusion，更多趣玩模型等你来玩；新增[**中文文本摘要应用**](./applications/text_summarization)，基于大规模语料的中文摘要模型首次发布，可支持 Taskflow 一键调用和定制训练；
   * 💪 框架升级：[**模型自动压缩 API**](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[**小样本 Prompt**](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
 
-
-* 👀 **2022.9.6 飞桨智慧金融行业系列直播课**
-
-  * 围绕深度学习技术在金融行业的产业实践与发展趋势，邀请行业内专家分享产业实践。探讨科技金融的未来发展；
-
-  * PaddleNLP配套课程发布产业实践范例：基于UIE的金融文件信息抽取；基于Pipelines的FAQ问答系统；
-
-  * **9月6日起每周二、周四19点直播**，扫码免费加入微信群获取直播链接，与行业专家深度交流：
-
-    <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/188596360-264415d4-5462-43ad-8517-5b7e690061ce.jpg" width="150" height="150" />
-    </div>
-
 * 🔥 **2022.5.16  发布 [PaddleNLP v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0)**
   * 💎 发布通用信息抽取技术 [**UIE**](./model_zoo/uie)，单模型支持实体识别、关系和事件抽取、情感分析等多种开放域信息抽取任务，不限领域和抽取目标，支持**零样本抽取**与全流程**小样本**高效定制开发；
   * 😊 发布文心大模型 [**ERNIE 3.0**](./model_zoo/ernie-3.0) 轻量级模型，在 [CLUE ](https://www.cluebenchmarks.com/)上实现同规模结构效果最佳，并提供**🗜️无损压缩**和**⚙️全场景部署**方案；
@@ -58,7 +45,7 @@
 
 ## 社区交流
 
-- 微信扫描二维码并填写问卷之后，加入交流群领取福利
+- 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
   - 与众多社区开发者以及官方团队深度交流。
   - 10G重磅NLP学习大礼包！
 
@@ -82,6 +69,14 @@
 Taskflow提供丰富的**📦开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**💪产业级的效果**与**⚡️极致的推理性能**。
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
+
+Taskflow最新集成了文生图的趣玩应用，三行代码体验 **Stable Diffusion**
+```python
+from paddlenlp import Taskflow
+text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
+image_list = text_to_image('"In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation"')
+```
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/16698950/194882669-f7cc7c98-d63a-45f4-99c1-0514c6712368.png">
 
 更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 

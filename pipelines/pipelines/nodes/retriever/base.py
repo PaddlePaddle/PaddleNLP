@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, Iterator
 
 import logging
 from abc import abstractmethod
@@ -84,6 +84,20 @@ class BaseRetriever(BaseComponent):
         """
         pass
 
+    @abstractmethod
+    def retrieve_batch(
+        self,
+        queries: List[str],
+        filters: Optional[Dict[str, Union[Dict, List, str, int, float,
+                                          bool]]] = None,
+        top_k: Optional[int] = None,
+        index: str = None,
+        headers: Optional[Dict[str, str]] = None,
+        batch_size: Optional[int] = None,
+        scale_score: bool = None,
+    ) -> List[List[Document]]:
+        pass
+
     def timing(self, fn, attr_name):
         """Wrapper method used to time functions."""
 
@@ -125,6 +139,33 @@ class BaseRetriever(BaseComponent):
             raise Exception(f"Invalid root_node '{root_node}'.")
         return output, stream
 
+    def run_batch(  # type: ignore
+        self,
+        root_node: str,
+        queries: Optional[List[str]] = None,
+        filters: Optional[Union[dict, List[dict]]] = None,
+        top_k: Optional[int] = None,
+        documents: Optional[Union[List[Document], List[List[Document]]]] = None,
+        index: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        if root_node == "Query":
+            self.query_count += len(queries) if isinstance(queries, list) else 1
+            run_query_batch_timed = self.timing(self.run_query_batch,
+                                                "query_time")
+            output, stream = run_query_batch_timed(queries=queries,
+                                                   filters=filters,
+                                                   top_k=top_k,
+                                                   index=index,
+                                                   headers=headers)
+        elif root_node == "File":
+            self.index_count += len(documents)  # type: ignore
+            run_indexing = self.timing(self.run_indexing, "index_time")
+            output, stream = run_indexing(documents=documents)
+        else:
+            raise Exception(f"Invalid root_node '{root_node}'.")
+        return output, stream
+
     def run_query(
         self,
         query: str,
@@ -142,6 +183,33 @@ class BaseRetriever(BaseComponent):
         logger.debug(f"Retrieved documents with IDs: {document_ids}")
         output = {"documents": documents}
 
+        return output, "output_1"
+
+    def run_query_batch(
+        self,
+        queries: List[str],
+        filters: Optional[dict] = None,
+        top_k: Optional[int] = None,
+        index: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        batch_size: Optional[int] = None,
+    ):
+        documents = self.retrieve_batch(queries=queries,
+                                        filters=filters,
+                                        top_k=top_k,
+                                        index=index,
+                                        headers=headers,
+                                        batch_size=batch_size)
+        if isinstance(queries, str):
+            document_ids = []
+            for doc in documents:
+                document_ids.append(doc.id)
+                logger.debug("Retrieved documents with IDs: %s", document_ids)
+        else:
+            for doc_list in documents:
+                document_ids = [doc.id for doc in doc_list]
+                logger.debug("Retrieved documents with IDs: %s", document_ids)
+        output = {"documents": documents}
         return output, "output_1"
 
     def run_indexing(self, documents: List[dict]):
@@ -171,3 +239,13 @@ class BaseRetriever(BaseComponent):
             print(f"Queries Performed: {self.query_count}")
             print(f"Query time: {self.query_time}s")
             print(f"{self.query_time / self.query_count} seconds per query")
+
+    @staticmethod
+    def _get_batches(queries: List[str],
+                     batch_size: Optional[int]) -> Iterator[List[str]]:
+        if batch_size is None:
+            yield queries
+            return
+        else:
+            for index in range(0, len(queries), batch_size):
+                yield queries[index:index + batch_size]
