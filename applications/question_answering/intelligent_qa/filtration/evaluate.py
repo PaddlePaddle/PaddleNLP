@@ -26,7 +26,6 @@ from utils import convert_example, reader, unify_prompt_name
 from span import SpanEvaluator
 
 
-
 @paddle.no_grad()
 def evaluate(model, metric, data_loader):
     """

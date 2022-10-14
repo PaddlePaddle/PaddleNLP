@@ -1,122 +1,375 @@
 # 问答对自动生成智能检索式问答
 
- **目录**
 
-* [1. 场景概述](#场景概述)
-* [2. 系统特色](#系统特色)
-* [3. 问答对自动生成智能检索式问答](#问答对自动生成智能检索式问答)
-* [4. 动手实践——搭建自己的端到端检索式问答系统](#动手实践——搭建自己的端到端检索式问答系统)
+**目录**
+- [问答对自动生成智能检索式问答](#问答对自动生成智能检索式问答)
+  - [简介](#简介)
+    - [项目优势](#项目优势)
+  <!-- - [开箱即用](#开箱即用)
+  - [效果展示](#效果展示) -->
+  - [方案介绍](#方案介绍)
+    - [技术方案](#技术方案)
+    <!-- - [评估指标](#评估指标) -->
+    - [代码结构说明](#代码结构说明)
+  - [系统构建](#系统构建)
+    - [环境依赖](#环境依赖)
+    - [问答对生成](#问答对生成)
+      - [数据处理](#数据处理)
+        - [数据准备](#数据准备)
+        - [数据预处理](#数据预处理)
+      - [模型微调](#模型微调)
+        - [答案抽取](#答案抽取)
+        - [问题生成](#问题生成)
+        - [过滤模型](#过滤模型)
+      - [语料生成](#语料生成)
+    - [语义索引](#语义索引)
+      - [无监督训练](#无监督训练)
+      - [评估](#评估)
+      - [模型部署](#模型部署)
+        - [动转静导出](#动转静导出)
+        - [问答检索引擎](#问答检索引擎)
+        - [Paddle-Serving部署](#Paddle-Serving部署)
+      - [整体流程](#整体流程)
+  - [References](#references)
 
-
-<a name="场景概述"></a>
-
-## 1. 场景概述
+## 简介
 问答（QA）系统中最关键的挑战之一是标记数据的稀缺性，这是因为对目标领域获取问答对或常见问答对（FAQ）的成本很高，需要消耗大量的人力和时间。由于上述制约，这导致问答系统落地困难，解决此问题的一种方法是依据问题上下文或大量非结构化文本自动生成的QA问答对。
 
-基于此背景，本项目，即问答对自动生成智能检索式问答，基于PaddleNLP检索式问答，支持以非结构化文本为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
+在此背景下，本项目，即问答对自动生成智能检索式问答，基于PaddleNLP[问题生成](../../../examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](../faq_system/README.md)，支持以非结构化文本形式为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
 
-<a name="系统特色"></a>
+若已有FAQ语料，请参考[faq_system](../faq_system)或[faq_finance](../faq_finance)。
 
-## 2. 系统特色
+### 项目优势
+具体来说，本项目具有以下优势：
+
 
 + 低代价
     + 可通过自动生成的方式快速大量合成QA语料，大大降低人力成本
-    + 可控性好，合成语料库和检索式问答系统松耦合，可以人工筛查和删除合成的问答对，也可以添加人工标注的问答对
+    + 可控性好，合成语料和语义检索问答松耦合，可以人工筛查和删除合成的问答对，也可以添加人工标注的问答对
 
 + 低门槛
-    + 手把手搭建检索式 FAQ System
-    + 无需相似 Query-Query Pair 标注数据也能构建 FAQ System
+    + 手把手搭建无监督检索式FAQ System
+    + 无需相似Query-Query Pair标注数据也能构建FAQ System
 
 + 效果好
+    + 可通过自动问答对生成提升问答对语料覆盖度，缓解中长尾问题覆盖较少的问题
     + 业界领先的检索预训练模型: RocketQA Dual Encoder
     + 针对无标注数据场景的领先解决方案: 检索预训练模型 + 增强的无监督语义索引微调
-    + 可通过自动问答对生成提升问答对语料覆盖度，缓解中长尾问题覆盖较少的问题
 
 + 性能快
-    + 基于 Paddle Inference 快速抽取向量
-    + 基于 Milvus 快速查询和高性能建库
-    + 基于 Paddle Serving 高性能部署
+    + 基于Paddle Inference 快速抽取向量
+    + 基于Milvus 快速查询和高性能建库
+    + 基于Paddle Serving 高性能部署
 
-<a name="问答对自动生成智能检索式问答"></a>
+<!--
+## 效果展示
+## 开箱即用 -->
 
-## 3. 问答对自动生成智能检索式问答
+## 方案介绍
+### 技术方案
+**问答对生成**：问答对生成主要由基于UIE的答案抽取模型、基于UNIMO-Text的问题生成模型，以及过滤模型三个模块构成，我们在一个大规模多领域的问题生成数据集上分别对三者进行预训练，用户可直接使用提供的预训练参数生成问答对，或针对特定任务进行微调。
 
-### 3.1 技术方案和评估指标
+**语义索引**：针对给定问答对语料，我们基于RocketQA提供了一个融合SimCSE和WR（word reptition）策略的无监督的解决方案。
 
-#### 3.1.1 技术方案
-**问答对生成**：针对问答对生成，我们基于一个大规模多领域的问题生成数据集，以及预训练的问题生成模型
+<!-- ### 评估指标
+**问答对生成**：问答对生成使用的指标是软召回率Recall@K，
+**语义索引**：语义索引使用的指标是Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前K个相关结果的重叠率，衡量的是检索系统的查全率。 -->
+### 代码结构说明
+以下是本项目主要代码结构及说明：
 
-**语义索引**：针对给定问答对语料，我们提供了一个 融合SimCSE 和 WR (word reptition)策略的无监督的解决方案。
-
-#### 3.1.2 评估指标
-
-* 该政务问答系统使用的指标是 Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前 K 个相关结果的重叠率，衡量的是检索系统的查全率。
-
-
-### 3.2 数据说明
-
-数据集来源于疫情政务问答比赛数据，包括源文本，问题和答案。
-
-|  阶段 |模型 |   训练集 | 评估集（用于评估模型效果） | 召回库 |
-| ------------ | ------------ |------------ | ------------ | ------------ |
-|  召回 |  SimCSE  |  4000 | 1000 | 5000 |
-
-其中评估集的问题对的构造使用了中英文回译的方法，总共有1000条评估集，其中500条数据使用的是百度翻译的API，详情请参考[百度翻译](https://fanyi-api.baidu.com/?fr=simultaneous)，另外500条数据使用了SimBERT模型生成的同义句。
-
-
-```
-├── data  # 数据集
-    ├── train.csv  # 无监督训练集
-    ├── test_pair.csv  # 测试集，用于评估模型的效果
-    ├── corpus.csv # 构建召回的数据，用于评估模型的召回效果
-    ├── qa_pair.csv # 问答对，问题对应的答案
-```
-数据集的下载链接为: [faq_data](https://paddlenlp.bj.bcebos.com/applications/faq_data.zip)
-
-### 3.3 代码说明
-
-```
-|—— data.py # 数据读取、数据转换等预处理逻辑
-|—— model.py # SimCSE模型
-|—— train.py # SimCSE训练主脚本
-|—— ann_util.py # Ann 建索引库相关函数
-|—— config.py # Milvus 配置文件
-|—— evaluate.py # 召回评估文件
-|—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
-|—— export_model.py # 动态图转换成静态图
-|—— export_to_serving.py # 静态图转 Serving
-|—— feature_extract.py # 批量提取文本的特征向量
-|—— milvus_util.py # Milvus的插入和召回类
-|—— vector_insert.py # 向 Milvus 引擎插入向量的函数
-|—— run_system.py # Client Server 模式客户端，向 server 发送文本，得到向量后，利用milvus引擎进行检索
-|—— scripts
-    |—— export_model.sh  # 动态图转换成静态图脚本
-    |—— evaluate.sh # 评估 bash 版本
-    |—— run_build_index.sh # 构建索引 bash 版本
-    |—— train.sh  # 训练 bash 版本
-    |—— feature_extract.sh  # 向量抽取 bash 版本
-    |—— export_to_serving.sh  # Paddle Inference 转 Serving 的 bash 脚本
-|—— deploy
-    |—— python
-        |—— rpc_client.py # Paddle Serving 的 Client 端
-        |—— web_service.py # Paddle Serving 的 Serving 端
-        |—— config_nlp.yml # Paddle Serving 的配置文件
+```text
+├── deploy # 部署
+│   ├── paddle_inference # PaddleInference高性能推理部署
+│   │   ├── inference_unimo_text.py # 推理部署脚本
+│   │   └── README.md # 说明文档
+│   └── paddle_serving
+│       ├── config.yml # 配置文件
+│       ├── pipeline_client.py # 客户端程序
+│       ├── pipeline_service.py # 服务器程序
+│       └── README.md # 说明文档
+├── export_model.py # 动态图参数导出静态图参数脚本
+├── train.py # 训练脚本
+├── predict.py # 预测评估脚本
+├── utils.py # 工具函数脚本
+└── README.md # 说明文档
 ```
 
-### 3.3 效果评估
+## 系统构建
 
-|  模型 |  Recall@1 |Recall@10 |
-| ------------ | ------------ |--------- |
-|  ERNIE1.0 + SimCSE |  68.068     | 85.686|
-|  RocketQA  |  81.381 | 96.997|
-|  RocketQA + SimCSE  |  83.283 | 97.297|
-|  RocketQA + SimCSE + WR |  **83.584** | **97.497**|
+### 环境依赖
+- nltk
+- evaluate
+- tqdm
 
-<a name="动手实践——搭建自己的端到端检索式问答系统"></a>
+安装方式：`pip install -r requirements.txt`
 
-## 4. 动手实践——搭建自己的端到端检索式问答系统
+### 问答对生成
+对于标准场景的问答对可以直接使用提供的预训练模型实现零样本（zero-shot）问答对生成，可直接参考[语料生成](#语料生成)部分。对于细分场景我们推荐使用轻定制功能（标注少量数据进行模型微调）以进一步提升效果。下面通过疫情政务问答的例子展示如何通过5条训练数据进行问答对生成微调。
 
-### 4.1 无监督训练
+#### 数据处理
+这一部分介绍如何准备和预处理模型微调所需的数据。
+##### 数据准备
+在许多情况下，我们需要使用本地数据集来微调模型从而得到定制化的能力，让生成的问答对更接近于理想分布，本项目支持使用固定格式本地数据集文件进行微调。
+
+这里我们提供预先标注好的文件样例[train.json]()和[dev.json]()，可直接下载放入./data。
+
+开发者也可自行构建本地数据集，具体来说，本地数据集目录结构如下：
+```text
+data/
+├── train.json # 训练数据集文件
+├── dev.json # 开发数据集文件
+└── test.json # 可选，待预测数据文件
+```
+本地数据集文件格式如下：
+- train.json/dev.json/test.json 文件格式：
+```text
+{
+  "context": <context_text>,
+  "answer": <answer_text>,
+  "question": <question_text>,
+}
+...
+```
+- train.json/dev.json/test.json 文件样例：
+```text
+{
+  "context": "欠条是永久有效的,未约定还款期限的借款合同纠纷,诉讼时效自债权人主张债权之日起计算,时效为2年。 根据《中华人民共和国民法通则》第一百三十五条:向人民法院请求保护民事权利的诉讼时效期间为二年,法律另有规定的除外。 第一百三十七条:诉讼时效期间从知道或者应当知道权利被侵害时起计算。但是,从权利被侵害之日起超过二十年的,人民法院不予保护。有特殊情况的,人民法院可以延长诉讼时效期间。 第六十二条第(四)项:履行期限不明确的,债务人可以随时履行,债权人也可以随时要求履行,但应当给对方必要的准备时间。",
+  "answer": "永久有效",
+  "question": "欠条的有效期是多久"
+}
+...
+```
+
+##### 数据预处理
+执行以下脚本对数据集进行数据预处理，得到接下来答案抽取、问题生成、过滤模块模型微调所需要的数据，注意这里答案抽取、问题生成、过滤模块的微调数据来源于相同的数据集。
+```shell
+python run_data_preprocess.py \
+    --source_file_path your_source_file_path \
+    --target_dir .data \
+    --do_answer_prompt
+```
+关键参数释义如下：
+- `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见从本地文件创建数据集部分。
+- `target_dir` 输出数据的目标文件夹，默认为".data"。
+- `do_answer_prompt` 表示在构造答案抽取数据时是否添加"答案"提示词。
+- `do_len_prompt` 表示在构造答案抽取数据时是否添加长度提示词。
+- `do_domain_prompt` 表示在构造答案抽取数据时是否添加领域提示词。
+- `domain` 表示添加的领域提示词，在`do_domain_prompt`时有效。
+
+**NOTE:** 预处理后的微调用数据将分别位于answer_extraction、question_generation、filtration三个子文件夹中。
+
+#### 模型微调
+##### 答案抽取
+运行如下命令即可在样例训练集上微调答案抽取模型。
+```shell
+# GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
+# 例如使用1号和2号卡，则：`--gpu 1,2`
+unset CUDA_VISIBLE_DEVICES
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extraction .answer_generation/finetune.py \
+    --train_path=.data/answer_extration/train.json \
+    --dev_path=.data/answer_extration/dev.json \
+    --save_dir=.log/answer_extration/checkpoints \
+    --learning_rate=1e-5 \
+    --batch_size=16 \
+    --max_seq_len=512 \
+    --num_epochs=30 \
+    --model=uie-base \
+    --seed=1000 \
+    --logging_steps=100 \
+    --valid_steps=5000 \
+    --device=gpu
+```
+关键参数释义如下：
+- `train_path`: 训练集文件路径。
+- `dev_path`: 验证集文件路径。
+- `save_dir`: 模型存储路径，默认为`.log/answer_extration/checkpoints`。
+- `learning_rate`: 学习率，默认为1e-5。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `num_epochs`: 训练轮数，默认为30。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `seed`: 随机种子，默认为1000.
+- `logging_steps`: 日志打印的间隔steps数，默认10。
+- `valid_steps`: evaluate的间隔steps数，默认100。
+- `device`: 选用什么设备进行训练，可选cpu或gpu。
+
+
+通过运行以下命令在样例验证集上进行模型评估：
+
+```shell
+python evaluate.py \
+    --model_path=.log/answer_extration/checkpoints/model_best \
+    --test_path=.data/answer_extration/dev.json  \
+    --batch_size=16 \
+    --max_seq_len=512
+```
+
+关键参数释义如下：
+- `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
+- `test_path`: 进行评估的测试集文件。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+##### 问题生成
+运行如下命令即可在样例训练集上微调问题生成模型，并在样例验证集上进行验证。
+```shell
+# GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
+# 例如使用1号和2号卡，则：`--gpu 1,2`
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generation .question_generation/train.py \
+    --train_file=.data/question_generation/train.json \
+    --predict_file=.data/question_generation/dev.json \
+    --save_dir=.log/question_generation/checkpoints \
+    --output_path=.log/question_generation/predict.txt \
+    --dataset_name=dureader_qg \
+    --model_name_or_path="unimo-text-1.0" \
+    --logging_steps=100 \
+    --save_steps=500 \
+    --epochs=20 \
+    --batch_size=16 \
+    --learning_rate=1e-5 \
+    --warmup_propotion=0.02 \
+    --weight_decay=0.01 \
+    --max_seq_len=512 \
+    --max_target_len=30 \
+    --do_train \
+    --do_predict \
+    --max_dec_len=20 \
+    --min_dec_len=3 \
+    --num_return_sequences=1 \
+    --template=1 \
+    --device=gpu
+```
+
+
+关键参数释义如下：
+- `gpus` 指示了训练所用的GPU，使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。
+- `dataset_name` 数据集名称，用来指定数据集格式，默认为`dureader_qg`。
+- `train_file` 本地训练数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None。
+- `predict_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | unimo-text-1.0      |
+   | unimo-text-1.0-large |
+
+- `save_dir` 表示模型的保存路径。
+- `output_path` 表示预测结果的保存路径。
+- `logging_steps` 表示日志打印间隔。
+- `save_steps` 表示模型保存及评估间隔。
+- `seed` 表示随机数生成器的种子。
+- `epochs` 表示训练轮数。
+- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
+- `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
+- `warmup_propotion` 表示学习率逐渐升高到基础学习率（即上面配置的learning_rate）所需要的迭代数占总步数的比例。
+- `max_seq_len` 模型输入序列的最大长度。
+- `max_target_len` 模型训练时标签的最大长度。
+- `min_dec_len` 模型生成序列的最小长度。
+- `max_dec_len` 模型生成序列的最大长度。
+- `do_train` 是否进行训练。
+- `do_predict` 是否进行预测，在验证集上会自动评估。
+- `device` 表示使用的设备，从gpu和cpu中选择。
+- `template` 表示使用的模版，从[0, 1, 2, 3, 4]中选择，0表示不选择模版，1表示使用默认模版。
+
+程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。
+
+**NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
+
+微调的baseline模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
+
+|       model_name        | DuReaderQG |
+| :-----------------------------: | :-----------: |
+|    unimo-text-1.0-dureader_qg-template1    | 41.08 |
+
+##### 过滤模型
+运行如下命令即可在样例训练集上微调过滤模型。
+```shell
+# GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
+# 例如使用1号和2号卡，则：`--gpu 1,2`
+unset CUDA_VISIBLE_DEVICES
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration filtration/finetune.py \
+    --train_path=.data/filtration/train.json \
+    --dev_path=.data/filtration/dev.json \
+    --save_dir=.log/filtration/checkpoints \
+    --learning_rate=1e-5 \
+    --batch_size=16 \
+    --max_seq_len=512 \
+    --num_epochs=30 \
+    --model=uie-base \
+    --seed=1000 \
+    --logging_steps=100 \
+    --valid_steps=5000 \
+    --device=gpu
+```
+关键参数释义如下：
+- `train_path`: 训练集文件路径。
+- `dev_path`: 验证集文件路径。
+- `save_dir`: 模型存储路径，默认为`.log/filtration/checkpoints`。
+- `learning_rate`: 学习率，默认为1e-5。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `num_epochs`: 训练轮数，默认为30。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `seed`: 随机种子，默认为1000.
+- `logging_steps`: 日志打印的间隔steps数，默认10。
+- `valid_steps`: evaluate的间隔steps数，默认100。
+- `device`: 选用什么设备进行训练，可选cpu或gpu。
+
+
+通过运行以下命令在样例验证集上进行模型评估：
+
+```shell
+python evaluate.py \
+    --model_path=.log/filtration/checkpoints/model_best \
+    --test_path=.data/filtration/dev.json  \
+    --batch_size=16 \
+    --max_seq_len=512
+```
+
+关键参数释义如下：
+- `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
+- `test_path`: 进行评估的测试集文件。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+
+#### 语料生成
+
+运行下方脚本可以使用训练好的模型进行预测。
+开发者可以使用上一步[模型微调](#模型微调)后的模型生成问答对语料，也可以使用提供的预训练模型来直接生成问答对语料。
+
+我们提以提供的上下文文件[source_file.txt]()为例，该文件可直接下载放入./data，生成问答对语料的命令如下：
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -u run_qa_pairs_generation.py \
+    --source_file_path ./data/source_file.txt \
+    --target_file_path  ./data/qa_pairs/target_file.json \
+    --answer_generation_model_path=.log/filtration/checkpoints/model_best \
+    --question_generation_model_path=.log/filtration/checkpoints/model_best \
+    --filtration_model_path=.log/filtration/checkpoints/model_best \
+    --batch_size 8 \
+    --a_max_answer_candidates 10 \
+    --a_prompt '答案,短答案' \
+    --a_position_prob 0.01  \
+    --q_num_return_sequences 3 \
+    --q_max_question_length 50 \
+    --q_decode_strategy=sampling \
+    --q_top_k=5 \
+    --q_top_p=1 \
+    --do_filtration \
+    --f_filtration_position_prob=0.01 \
+    --do_debug
+```
+关键参数释义如下：
+- `output_path` 表示预测输出结果保存的文件路径，默认为./predict.txt。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的微调好的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。
+
+
+### 语义索引
+#### 无监督训练
 
 ```
 python -u -m paddle.distributed.launch --gpus '0' \
@@ -153,8 +406,7 @@ python -u -m paddle.distributed.launch --gpus '0' \
 ```
 sh scripts/train.sh
 ```
-
-### 4.2  评估
+#### 评估
 
 效果评估分为 4 个步骤:
 
@@ -237,12 +489,9 @@ recall@10=96.997
 * `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 * `recall_num`: 对 1 个文本召回的相似文本数量
 
-## 4.3 模型部署
-
+#### 模型部署
 模型部署模块首先要把动态图转换成静态图，然后转换成serving的格式。
-
-### 动转静导出
-
+##### 动转静导出
 首先把动态图模型转换为静态图：
 
 ```
@@ -253,9 +502,7 @@ python export_model.py --params_path checkpoints/model_150/model_state.pdparams 
 ```
 sh scripts/export_model.sh
 ```
-
-### 问答检索引擎
-
+##### 问答检索引擎
 模型准备结束以后，开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，本项目使用[Milvus](https://milvus.io/)开源工具进行向量检索，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
 
 
@@ -273,9 +520,7 @@ python feature_extract.py \
 ```
 python vector_insert.py
 ```
-
-### Paddle Serving 部署
-
+##### Paddle-Serving部署
 Paddle Serving 的安装可以参考[Paddle Serving 安装文档](https://github.com/PaddlePaddle/Serving#installation)。需要在服务端和客户端安装相关的依赖，安装完依赖后就可以执行下面的步骤。
 
 
@@ -335,9 +580,7 @@ list_data = [
 ```
 python rpc_client.py
 ```
-
-## 4.4 问答系统整个流程
-
+#### 整体流程
 问答系统使用了Client Server的模式，即抽取向量的模型部署在服务端，然后启动客户端（Client）端去访问。
 
 
@@ -364,3 +607,8 @@ Search milvus time cost is 0.004535675048828125 seconds
 .....
 ```
 输出的结果包括特征提取和检索的时间，还包含检索出来的问答对。
+
+
+## References
+Zheng, Chujie, and Minlie Huang. "Exploring prompt-based few-shot learning for grounded dialog generation." arXiv preprint arXiv:2109.06513 (2021).
+Li, Wei, et al. "Unimo: Towards unified-modal understanding and generation via cross-modal contrastive learning." arXiv preprint arXiv:2012.15409 (2020).

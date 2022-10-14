@@ -35,8 +35,10 @@ class SpanEvaluator(Metric):
         """
         pred_start_ids = get_bool_ids_greater_than(start_probs, self.limit)
         pred_end_ids = get_bool_ids_greater_than(end_probs, self.limit)
-        gold_start_ids = get_bool_ids_greater_than(gold_start_ids.tolist(), self.limit)
-        gold_end_ids = get_bool_ids_greater_than(gold_end_ids.tolist(), self.limit)
+        gold_start_ids = get_bool_ids_greater_than(gold_start_ids.tolist(),
+                                                   self.limit)
+        gold_end_ids = get_bool_ids_greater_than(gold_end_ids.tolist(),
+                                                 self.limit)
         num_correct_spans = 0
         num_infer_spans = 0
         num_label_spans = 0

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ def recall(rs, N=10):
     Returns:
         Recall@N
     """
-    
+
     recall_flags = [1 if np.sum(r[0:N])>0 else 0 for r in rs]
     # recall_flags = [np.sum(r[0:N]) else 0 for r in rs]
     return np.mean(recall_flags)
@@ -70,12 +70,12 @@ if __name__ == "__main__":
     # yapf: enable
 
     if args.query_answer_file and args.question_answer_file:
-        query2answer= {}
+        query2answer = {}
         with open(args.query_answer_file, 'r', encoding='utf-8') as f:
             for line in f:
                 text, answer = line.rstrip(' ').split("\t")
                 query2answer[text] = answer.strip()
-        question2answer= {}
+        question2answer = {}
         with open(args.question_answer_file, 'r', encoding='utf-8') as f:
             for line in f:
                 text, answer = line.rstrip(' ').split("\t")
@@ -105,7 +105,8 @@ if __name__ == "__main__":
                     if not answer_query or not answer_question:
                         score = 0
                     else:
-                        score = calc_bleu_n([answer_query], [answer_question], 1)
+                        score = calc_bleu_n([answer_query], [answer_question],
+                                            1)
                     if score >= args.bleu_threshold:
                         relevance_labels.append(1)
                     else:
