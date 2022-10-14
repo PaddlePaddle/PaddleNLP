@@ -37,7 +37,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 #### HuggingFace web demo
 
-通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
+🧾 通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195749427-864d7744-1fd1-455e-99c6-53a260776483.jpg height=700 width=1100 hspace='10'/>
