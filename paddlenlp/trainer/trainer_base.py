@@ -280,11 +280,33 @@ class Trainer:
             )
 
         self.do_grad_scaling = False
-        if args.fp16:
+        if (args.fp16 or args.bf16):
             # self.scaler = paddle.amp.GradScaler(
             #     init_loss_scaling=self.args.scale_loss)
             logger.info("Using half precision")
             self.do_grad_scaling = True
+            self.amp_dtype = "float16" if args.fp16 else "bfloat16"
+
+            if self.sharding is not None:
+                if self.amp_dtype == "float16":
+                    if ShardingOption.SHARD_OP in self.args.sharding:
+                        self.scaler = fleet.distributed_scaler(self.scaler)
+                    else:
+                        # scaler for stage2 and stage3
+                        if paddle.fluid.framework.in_dygraph_mode():
+                            from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
+                            self.scaler = GroupShardedScaler(self.scaler)
+                        else:
+                            from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
+                            self.scaler = ShardingScaler(self.scaler)
+                else:
+                    self.do_grad_scaling = False
+                    self.use_cuda_amp = False
+                    self.amp_dtype = None
+
+            else:
+                self.scaler = paddle.amp.GradScaler(
+                    init_loss_scaling=self.args.scale_loss)
 
             self.scaler = paddle.amp.GradScaler(
                 init_loss_scaling=self.args.scale_loss)
@@ -1087,7 +1109,8 @@ class Trainer:
             # model, self.optimizer
             decorated = paddle.amp.decorate(models=model,
                                             optimizers=self.optimizer,
-                                            level=self.args.fp16_opt_level)
+                                            level=self.args.fp16_opt_level,
+                                            dtype=self.amp_dtype)
             if self.optimizer is None:
                 model = decorated
             else:
@@ -1174,7 +1197,8 @@ class Trainer:
                                        "c_softmax_with_cross_entropy",
                                        "elementwise_div",
                                    ],
-                                   level=self.args.fp16_opt_level)
+                                   level=self.args.fp16_opt_level,
+                                   dtype=self.amp_dtype)
         else:
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                 3, 7) else contextlib.suppress()

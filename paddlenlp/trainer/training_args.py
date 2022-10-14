@@ -402,6 +402,15 @@ class TrainingArguments:
             "help": "Random seed that will be set at the beginning of training."
         })
 
+    bf16: bool = field(
+        default=False,
+        metadata={
+            "help":
+            ("Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA"
+             " architecture or using CPU (no_cuda). This is an experimental API and it may change."
+             )
+        },
+    )
     fp16: bool = field(
         default=False,
         metadata={
@@ -417,6 +426,21 @@ class TrainingArguments:
              )
         },
     )
+    bf16_full_eval: bool = field(
+        default=False,
+        metadata={
+            "help":
+            ("Whether to use full bfloat16 evaluation instead of 32-bit. This is an experimental API and it may"
+             " change.")
+        },
+    )
+    fp16_full_eval: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use full float16 evaluation instead of 32-bit"
+        },
+    )
+
     sharding: str = field(
         default="",
         metadata={
@@ -623,6 +647,15 @@ class TrainingArguments:
             ]
         if self.run_name is None:
             self.run_name = self.output_dir
+
+        if self.fp16 and self.bf16:
+            raise ValueError(
+                "At most one of fp16 and bf16 can be True, but not both")
+
+        if self.fp16_full_eval and self.bf16_full_eval:
+            raise ValueError(
+                "At most one of fp16 and bf16 can be True for full eval, but not both"
+            )
 
         self.optim = OptimizerNames(self.optim)
 
