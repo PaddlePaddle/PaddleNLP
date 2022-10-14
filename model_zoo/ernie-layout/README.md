@@ -39,7 +39,7 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 HuggingFace web demo is available [here](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195604457-32c16d23-d971-4183-b62f-a6970225ebad.png height=500 width=1000 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195749427-864d7744-1fd1-455e-99c6-53a260776483.jpg height=500 width=1000 hspace='10'/>
 </div>
 
 <a name="22"></a>
