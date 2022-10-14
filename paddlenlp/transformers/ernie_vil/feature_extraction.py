@@ -22,7 +22,7 @@ import numpy as np
 import PIL.Image
 from PIL import Image
 
-from ..feature_extraction_utils import BatchFeature
+from ..feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from ..tokenizer_utils_base import TensorType
 from ..image_utils import ImageFeatureExtractionMixin
 
@@ -36,7 +36,8 @@ else:
 __all__ = ["ErnieViLFeatureExtractor"]
 
 
-class ErnieViLFeatureExtractor(ImageFeatureExtractionMixin):
+class ErnieViLFeatureExtractor(FeatureExtractionMixin,
+                               ImageFeatureExtractionMixin):
     r"""
     Constructs a ErnieViL feature extractor.
     This feature extractor inherits from [`ImageFeatureExtractionMixin`] which contains most of the main methods. Users
@@ -66,6 +67,12 @@ class ErnieViLFeatureExtractor(ImageFeatureExtractionMixin):
     """
 
     model_input_names = ["pixel_values"]
+    pretrained_feature_extractor_file = {
+        "ernie_vil-2.0-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/ernie_vil-2.0-base-zh/preprocessor_config.json",
+        "disco_diffusion_ernie_vil-2.0-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/disco_diffusion_ernie_vil-2.0-base-zh/preprocessor_config.json",
+    }
 
     def __init__(self,
                  do_resize=True,

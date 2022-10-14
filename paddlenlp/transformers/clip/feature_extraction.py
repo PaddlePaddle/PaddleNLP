@@ -20,7 +20,9 @@ import paddle
 import numpy as np
 import PIL.Image
 from PIL import Image
-from ..feature_extraction_utils import BatchFeature
+
+from ..feature_extraction_utils import BatchFeature, FeatureExtractionMixin
+
 from ..tokenizer_utils_base import TensorType
 from ..image_utils import ImageFeatureExtractionMixin
 
@@ -34,7 +36,10 @@ else:
 __all__ = ["CLIPFeatureExtractor"]
 
 
-class CLIPFeatureExtractor(ImageFeatureExtractionMixin):
+class CLIPFeatureExtractor(
+        FeatureExtractionMixin,
+        ImageFeatureExtractionMixin,
+):
     r"""
     Constructs a CLIP feature extractor.
     This feature extractor inherits from [`ImageFeatureExtractionMixin`] which contains most of the main methods. Users
