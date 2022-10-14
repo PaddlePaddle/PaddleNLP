@@ -40,6 +40,7 @@ from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
 from .document_intelligence import DocPromptTask
+from .question_generation import QuestionGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -450,6 +451,23 @@ TASKS = {
             "model": "docprompt"
         }
     },
+    "question_generation": {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0",
+            },
+            "unimo-text-1.0-dureader_qg-template1": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-dureader_qg-template1",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-dureader_qg-template1"
+        }
+    },
 }
 
 support_schema_list = [
@@ -469,7 +487,7 @@ support_argument_list = [
 
 class Taskflow(object):
     """
-    The Taskflow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
+    The Taskflow is the end2end interface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
         3) Offer the usage and help message.

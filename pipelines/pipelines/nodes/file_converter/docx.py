@@ -126,7 +126,8 @@ class DocxToTextConverter(BaseConverter):
                     if (raw_text == ''):
                         continue
                     meta_data = {}
-                    meta_data['name'] = meta['name']
+                    if (meta is not None and 'name' in meta):
+                        meta_data['name'] = meta['name']
                     meta_data['images'] = text_dict['images']
                     document = {
                         "content": raw_text,

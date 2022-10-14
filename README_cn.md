@@ -70,6 +70,14 @@ Taskflow提供丰富的**📦开箱即用**的产业级NLP预置模型，覆盖�
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
+Taskflow最新集成了文生图的趣玩应用，三行代码体验 **Stable Diffusion**
+```python
+from paddlenlp import Taskflow
+text_to_image = Taskflow("text_to_image", model="CompVis/stable-diffusion-v1-4")
+image_list = text_to_image('"In the morning light,Chinese ancient buildings in the mountains,Magnificent and fantastic John Howe landscape,lake,clouds,farm,Fairy tale,light effect,Dream,Greg Rutkowski,James Gurney,artstation"')
+```
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/16698950/194882669-f7cc7c98-d63a-45f4-99c1-0514c6712368.png">
+
 更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
 
 ### 丰富完备的中文模型库
