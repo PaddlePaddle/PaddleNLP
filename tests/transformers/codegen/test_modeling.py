@@ -26,9 +26,11 @@ from ...testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
+from parameterized import parameterized_class
 
 
 class CodeGenModelTester:
+    test_model_name_list = False
 
     def __init__(
         self,
@@ -351,10 +353,14 @@ class CodeGenModelTester:
         base_model = CodeGenModel(**config)
         model = CodeGenForCausalLM(base_model)
 
-        loss, logits = model(input_ids,
-                             labels=input_ids,
-                             return_dict=self.parent.return_dict)[:2]
-        self.parent.assertEqual(loss.shape, [1])
+        outputs = model(input_ids,
+                        labels=input_ids if self.parent.use_labels else None,
+                        return_dict=self.parent.return_dict)
+        if self.parent.use_labels:
+            loss, logits = outputs[:2]
+            self.parent.assertEqual(loss.shape, [1])
+        else:
+            logits = outputs[0]
         self.parent.assertEqual(
             logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
@@ -389,6 +395,12 @@ class CodeGenModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", ), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
                        unittest.TestCase):
     base_model_class = CodeGenModel
@@ -402,8 +414,9 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
     test_missing_keys = False
     test_model_parallel = False
     test_head_masking = False
-    use_labels = False,
+    use_test_model_name_list = False
     return_dict = False
+    use_labels = False
 
     # attention mask issue
     def _get_input_ids_and_config(self):
@@ -521,6 +534,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
             model = CodeGenModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
+    @unittest.skip("Not implemented")
     def test_model_name_list(self):
         pass
 
