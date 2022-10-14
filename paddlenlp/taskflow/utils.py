@@ -1560,9 +1560,9 @@ def gp_decode(batch_outputs,
 DocSpan = namedtuple("DocSpan", ["start", "length"])
 
 Example = namedtuple('Example', [
-    'keys', 'key_labels', 'doc_tokens', 'text', 'qas_id', 'model_type',
-    'seq_labels', "boxes", "segment_ids", "symbol_ids", "im_base64",
-    "image_rois"
+    "keys", "key_labels", "doc_tokens", "text", "qas_id", "model_type",
+    "seq_labels", "ori_boxes", "boxes", "segment_ids", "symbol_ids",
+    "im_base64", "image_rois"
 ])
 
 Feature = namedtuple("Feature", [
@@ -1897,7 +1897,6 @@ class ImageReader(object):
 
     def ppocr2example(self, ocr_res, img_path, querys):
         examples = []
-
         segments = []
         for rst in ocr_res:
             left = min(rst[0][0][0], rst[0][3][0])
@@ -1916,6 +1915,7 @@ class ImageReader(object):
         # 3. doc_tokens, doc_boxes, segment_ids
         doc_tokens = []
         doc_boxes = []
+        ori_boxes = []
         doc_segment_ids = []
 
         im_w_box = max(
@@ -1923,53 +1923,68 @@ class ImageReader(object):
         im_h_box = max(
             [seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20
         img = Image.open(img_path)
-        im_w, im_h = img.size  # 图片的实际大小
+        im_w, im_h = img.size
         im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
-        # box缩放
+
         scale_x = self.image_size / im_w
         scale_y = self.image_size / im_h
         for segment_id, segment in enumerate(segments):
             bbox = segment["bbox"]  # x, y, w, h
             x1, y1, w, h = bbox.left, bbox.top, bbox.width, bbox.height
-            w = int(min(w * scale_x, self.image_size - 1))
-            h = int(min(h * scale_y, self.image_size - 1))
-            y1 = int(max(0, min(y1 * scale_y, self.image_size - h - 1)))
-            x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
+            sc_w = int(min(w * scale_x, self.image_size - 1))
+            sc_h = int(min(h * scale_y, self.image_size - 1))
+            sc_y1 = int(max(0, min(y1 * scale_y, self.image_size - h - 1)))
+            sc_x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
             if w < 0:
-                logger.error("Wrong box!")
-            bbox = Bbox(*[x1, y1, w, h])
+                raise ValueError(
+                    "Incorrect bbox, please check the input word boxes.")
+            ori_bbox = Bbox(*[x1, y1, w, h])
+            sc_bbox = Bbox(*[sc_x1, sc_y1, sc_w, sc_h])
             text = segment["text"]
-            char_num = 0
+            char_num = []
             eng_word = ""
             for char in text:
                 if not check(char) and not eng_word:
                     doc_tokens.append([char])
                     doc_segment_ids.append([segment_id])
-                    char_num += 1
+                    char_num.append(2)
                 elif not check(char) and eng_word:
                     doc_tokens.append([eng_word])
                     doc_segment_ids.append([segment_id])
+                    char_num.append(len(eng_word))
                     eng_word = ""
                     doc_tokens.append([char])
                     doc_segment_ids.append([segment_id])
-                    char_num += 2
+                    char_num.append(2)
                 else:
                     eng_word += char
             if eng_word:
                 doc_tokens.append([eng_word])
                 doc_segment_ids.append([segment_id])
-                char_num += 1
-            char_width = int(bbox.width / char_num)
-            for char_idx in range(char_num):
-                doc_boxes.append([
-                    Bbox(*[
-                        bbox.left +
-                        (char_width *
-                         char_idx), bbox.top, char_width, bbox.height
+                char_num.append(len(eng_word))
+            ori_char_width = round(ori_bbox.width / sum(char_num), 1)
+            sc_char_width = round(sc_bbox.width / sum(char_num), 1)
+            for chr_idx in range(len(char_num)):
+                if chr_idx == 0:
+                    doc_boxes.append([
+                        Bbox(*[
+                            sc_bbox.left, sc_bbox.top,
+                            (sc_char_width * char_num[chr_idx]), sc_bbox.height
+                        ])
                     ])
-                ])
+                    ori_boxes.append([
+                        Bbox(*[
+                            ori_bbox.left, ori_bbox.top,
+                            (ori_char_width *
+                             char_num[chr_idx]), ori_bbox.height
+                        ])
+                    ])
+                else:
+                    doc_boxes.append([Bbox(*[sc_bbox.left + (sc_char_width * sum(char_num[:chr_idx])), \
+                        sc_bbox.top, (sc_char_width * char_num[chr_idx]), sc_bbox.height])])
+                    ori_boxes.append([Bbox(*[ori_bbox.left + (ori_char_width * sum(char_num[:chr_idx])), \
+                        ori_bbox.top, (ori_char_width * char_num[chr_idx]), ori_bbox.height])])
 
-        # 3. key、qas_id
         qas_id = 0
         for query in querys:
             example = Example(
@@ -1978,8 +1993,9 @@ class ImageReader(object):
                 doc_tokens=doc_tokens,
                 seq_labels=[0 for one in doc_tokens],
                 text='',
-                qas_id=str(qas_id),
+                qas_id="0_" + str(qas_id),
                 model_type=None,
+                ori_boxes=ori_boxes,
                 boxes=doc_boxes,
                 segment_ids=doc_segment_ids,
                 symbol_ids=None,
@@ -1987,13 +2003,8 @@ class ImageReader(object):
                 im_base64=img_base64,
             )
 
-            if not (len(example.doc_tokens) == len(example.boxes) == len(
-                    example.segment_ids)):
-                logger.error("Wrong example!")
-
             examples.append(example)
             qas_id += 1
-
         return examples
 
     def box2example(self, ocr_res, img_path, querys):
@@ -2087,10 +2098,6 @@ class ImageReader(object):
                     all_doc_tokens.append(sub_token)
                     all_doc_labels.extend([0])
 
-        if not (len(boxes) == len(segment_ids) == len(all_doc_tokens) ==
-                len(all_doc_labels)):
-            logger.error("Wrong split!")
-
         max_tokens_for_doc = self.max_seq_len - len(query_tokens) - 4
         doc_spans = []
         start_offset = 0
@@ -2152,9 +2159,6 @@ class ImageReader(object):
             position_ids = list(range(len(tokens)))
             token_ids = tokenizer.convert_tokens_to_ids(tokens)
             feature_segment_ids = [x % max_line_id for x in feature_segment_ids]
-            if not (len(feature_boxes) == len(token_ids) ==
-                    len(feature_segment_ids) == len(labels)):
-                logger.error("Wrong feature!")
 
             feature = Feature(unique_id=self.unique_id,
                               example_index=0,
@@ -2606,3 +2610,95 @@ def find_answer_pos(logits, feature):
             ans.append([start_index, end_index])
 
     return ans
+
+
+def calEuclidean(x_list, y_list):
+    """
+    Calculate euclidean distance
+    """
+    if x_list is None or y_list is None:
+        return None
+    else:
+        dist = np.sqrt(
+            np.square(x_list[0] - y_list[0]) + np.square(x_list[1] - y_list[1]))
+        return dist
+
+
+def longestCommonSequence(question_tokens, context_tokens):
+    """
+    Longest common sequence
+    """
+    max_index = -1
+    max_len = 0
+    m, n = len(question_tokens), len(context_tokens)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if question_tokens[i - 1].lower() == context_tokens[j -
+                                                                1][0].lower():
+                dp[i][j] = 1 + dp[i - 1][j - 1]
+                if dp[i][j] > max_len:
+                    max_len = dp[i][j]
+                    max_index = j - 1
+    return max_index, max_len
+
+
+def sort_res(prompt, ans_list, context, boxes, lang="en"):
+    if len(ans_list) == 1:
+        return ans_list
+    else:
+        ans_val = []
+        for ans in ans_list:
+            ans_val.append(ans["value"])
+        if len(set(ans_val)) == len(ans_val):
+            sorted_ans_list = sorted(ans_list,
+                                     key=lambda x: x["prob"],
+                                     reverse=True)
+            return sorted_ans_list
+        else:
+            if lang == "en":
+                clean_prompt = [word for word in prompt.split(" ")]
+            else:
+                clean_prompt = [word for word in prompt]
+
+            max_index, max_len = longestCommonSequence(clean_prompt, context)
+            if max_index == -1:
+                sorted_ans_list = sorted(ans_list,
+                                         key=lambda x: x["prob"],
+                                         reverse=True)
+                return sorted_ans_list
+            else:
+                prompt_center = []
+                for idx in range(max_index - max_len + 1, max_index + 1):
+                    box = boxes[idx][0]
+                    x = box.left + box.width / 2
+                    y = box.top + box.height / 2
+                    prompt_center.append([x, y])
+
+                ans_center = []
+                ans_prob = []
+                for ans in ans_list:
+                    ans_prob.append(ans["prob"])
+                    cent_list = []
+                    for idx in range(ans["start"], ans["end"] + 1):
+                        box = boxes[idx][0]
+                        x = box.left + box.width / 2
+                        y = box.top + box.height / 2
+                        cent_list.append([x, y])
+                    ans_center.append(cent_list)
+
+                ans_odist = []
+                for ans_c in ans_center:
+                    odist = 0
+                    for a_c in ans_c:
+                        for p_c in prompt_center:
+                            odist += calEuclidean(a_c, p_c)
+                    odist /= len(ans_c)
+                    ans_odist.append(odist * (-1))
+
+                ans_score = np.sum([ans_prob, ans_odist], axis=0).tolist()
+                sorted_ans_list = sorted(
+                    ans_list,
+                    key=lambda x: ans_score[ans_list.index(x)],
+                    reverse=True)
+                return sorted_ans_list

@@ -526,14 +526,16 @@ def _dynabert_export(self, ofa_model):
         ofa_model.model.set_state_dict(state_dict)
         best_config = utils.dynabert_config(ofa_model, width_mult)
         best_config = check_dynabert_config(best_config, width_mult)
-        origin_model_new = ofa_model.export(best_config,
-                                            input_shapes=[[1, 1], [1, 1]],
-                                            input_dtypes=['int64', 'int64'],
-                                            origin_model=origin_model)
+        input_spec = generate_input_spec(self.model, self.train_dataset)
+        origin_model_new = ofa_model.export(
+            best_config,
+            input_shapes=[[1, 1]] * len(input_spec),
+            input_dtypes=['int64'] * len(input_spec),
+            origin_model=origin_model)
         for name, sublayer in origin_model_new.named_sublayers():
             if isinstance(sublayer, paddle.nn.MultiHeadAttention):
                 sublayer.num_heads = int(width_mult * sublayer.num_heads)
-        input_spec = generate_input_spec(self.model, self.train_dataset)
+
         pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
         net = paddle.jit.to_static(origin_model_new, input_spec=input_spec)
         paddle.jit.save(net, pruned_infer_model_dir)
@@ -702,6 +704,7 @@ def _quant_aware_training_dynamic(self, input_dir):
             for key in batch:
                 if key in model_para_keys:
                     inputs[key] = batch[key]
+            # import pdb; pdb.set_trace()
             logits = self.model(**inputs)
             loss = self.criterion(logits, labels)
 
@@ -877,7 +880,15 @@ def auto_model_forward(self,
         attention_mask = (1.0 - attention_mask) * -1e4
     return self._ori_forward(input_ids,
                              token_type_ids,
-                             attention_mask=attention_mask)
+                             attention_mask=attention_mask,
+                             position_ids=position_ids,
+                             task_type_ids=task_type_ids,
+                             past_key_values=past_key_values,
+                             inputs_embeds=inputs_embeds,
+                             use_cache=use_cache,
+                             output_hidden_states=output_hidden_states,
+                             output_attentions=output_attentions,
+                             return_dict=return_dict)
 
 
 def soft_cross_entropy(inp, target):
