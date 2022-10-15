@@ -144,8 +144,8 @@ class ElectraModelTester:
 
     def create_and_check_electra_model_cache(self, config, input_ids,
                                              token_type_ids, input_mask,
-                                             sequence_labels, token_labels,
-                                             choice_labels):
+                                             inputs_embeds, sequence_labels,
+                                             token_labels, choice_labels):
         model = ElectraModel(**config)
         model.eval()
 
