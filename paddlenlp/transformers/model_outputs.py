@@ -71,54 +71,6 @@ def layer_init_wrapper(func):
     return _impl
 
 
-def _transformer_decoder_layer_fwd(self,
-                                   tgt,
-                                   memory=None,
-                                   tgt_mask=None,
-                                   memory_mask=None,
-                                   cache=None):
-    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
-
-    residual = tgt
-    if self.normalize_before:
-        tgt = self.norm1(tgt)
-    if cache is None:
-        tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, None)
-    else:
-        tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                cache[0])
-    tgt = residual + self.dropout1(tgt)
-    if not self.normalize_before:
-        tgt = self.norm1(tgt)
-
-    residual = tgt
-
-    if memory is not None:
-        memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
-
-        if self.normalize_before:
-            tgt = self.norm2(tgt)
-        if cache is None:
-            tgt = self.cross_attn(tgt, memory, memory, memory_mask, None)
-        else:
-            tgt, static_cache = self.cross_attn(tgt, memory, memory,
-                                                memory_mask, cache[1])
-        tgt = residual + self.dropout2(tgt)
-        if not self.normalize_before:
-            tgt = self.norm2(tgt)
-
-        residual = tgt
-
-    if self.normalize_before:
-        tgt = self.norm3(tgt)
-    tgt = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
-    tgt = residual + self.dropout3(tgt)
-    if not self.normalize_before:
-        tgt = self.norm3(tgt)
-    return tgt if cache is None else (tgt, (
-        incremental_cache, static_cache if memory is not None else None))
-
-
 def _transformer_encoder_layer_fwd(self,
                                    src,
                                    src_mask=None,
@@ -164,12 +116,12 @@ def _transformer_decoder_layer_fwd(
     cache=None,
     output_attentions=False,
 ):
-    self.self_attn.need_weights = output_attentions
-    self.cross_attn.need_weights = output_attentions
-    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
-    memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
-
     residual = tgt
+
+    # self attention
+    self.self_attn.need_weights = output_attentions
+    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+
     if self.normalize_before:
         tgt = self.norm1(tgt)
 
@@ -190,25 +142,32 @@ def _transformer_decoder_layer_fwd(
         tgt = self.norm1(tgt)
 
     residual = tgt
-    if self.normalize_before:
-        tgt = self.norm2(tgt)
 
-    cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask,
-                                         cache[1] if cache else None)
-    if isinstance(cross_attn_outputs, type(tgt)):
-        tgt = cross_attn_outputs
-    else:
-        tgt = cross_attn_outputs[0]
-        if output_attentions:
-            cross_attn_weights = cross_attn_outputs[1]
-        if cache:
-            static_cache = cross_attn_outputs[-1]
+    # cross attention
+    if memory is not None:
+        self.cross_attn.need_weights = output_attentions
+        memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
 
-    tgt = residual + self.dropout2(tgt)
-    if not self.normalize_before:
-        tgt = self.norm2(tgt)
+        if self.normalize_before:
+            tgt = self.norm2(tgt)
 
-    residual = tgt
+        cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask,
+                                             cache[1] if cache else None)
+        if isinstance(cross_attn_outputs, type(tgt)):
+            tgt = cross_attn_outputs
+        else:
+            tgt = cross_attn_outputs[0]
+            if output_attentions:
+                cross_attn_weights = cross_attn_outputs[1]
+            if cache:
+                static_cache = cross_attn_outputs[-1]
+
+        tgt = residual + self.dropout2(tgt)
+        if not self.normalize_before:
+            tgt = self.norm2(tgt)
+
+        residual = tgt
+
     if self.normalize_before:
         tgt = self.norm3(tgt)
     tgt = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
@@ -221,9 +180,11 @@ def _transformer_decoder_layer_fwd(
     else:
         outputs = (tgt, )
         if output_attentions:
-            outputs += (self_attn_weights, cross_attn_weights)
+            outputs += (self_attn_weights,
+                        cross_attn_weights if memory is not None else None)
         if cache:
-            outputs += ((incremental_cache, static_cache), )
+            outputs += ((incremental_cache,
+                         static_cache if memory is not None else None), )
         return outputs
 
 
