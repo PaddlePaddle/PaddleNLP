@@ -17,6 +17,7 @@ import paddle
 import os
 import inspect
 from distutils.util import strtobool
+from collections.abc import Mapping
 
 __all__ = ['get_vocab_list', 'stable_softmax', 'cross_entropy']
 
@@ -150,3 +151,33 @@ def get_tests_dir(append_path=None):
         return os.path.join(tests_dir, append_path)
     else:
         return tests_dir
+
+
+def nested_simplify(obj, decimals=3):
+    """
+    Simplifies an object by rounding float numbers, and downcasting tensors/numpy arrays to get simple equality test
+    within tests.
+    """
+    import numpy as np
+
+    if isinstance(obj, list):
+        return [nested_simplify(item, decimals) for item in obj]
+    elif isinstance(obj, np.ndarray):
+        return nested_simplify(obj.tolist())
+    elif isinstance(obj, Mapping):
+        return {
+            nested_simplify(k, decimals): nested_simplify(v, decimals)
+            for k, v in obj.items()
+        }
+    elif isinstance(obj, (str, int, np.int64)):
+        return obj
+    elif obj is None:
+        return obj
+    elif isinstance(obj, paddle.Tensor):
+        return nested_simplify(obj.numpy().tolist(), decimals)
+    elif isinstance(obj, float):
+        return round(obj, decimals)
+    elif isinstance(obj, (np.int32, np.float32)):
+        return nested_simplify(obj.item(), decimals)
+    else:
+        raise Exception(f"Not supported: {type(obj)}")
