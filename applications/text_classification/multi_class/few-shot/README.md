@@ -266,7 +266,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `per_device_train_batch_size`: 每次训练每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 - `per_device_eval_batch_size`: 每次评估每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 
-更多参数介绍可参考[配置文件](../../../../docs/trainer.md)。
+更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
 <a name="模型评估"></a>
 ### 3.5 模型评估

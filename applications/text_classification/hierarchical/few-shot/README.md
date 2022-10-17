@@ -282,7 +282,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `evaluation_strategy`: 模型评估的间隔策略。若为`epoch`，则每轮训练结束后评估模型。
 - `save_strategy`: 模型保存的间隔策略。若为`epoch`，则每轮训练结束后保存当前模型参数。
 
-更多参数介绍可参考[配置文件](../../../../docs/trainer.md)。
+更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
 
 <a name="模型评估"></a>
