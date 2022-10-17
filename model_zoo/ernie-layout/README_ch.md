@@ -50,7 +50,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 发票抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195809253-985c4a7b-4675-4262-a4a6-fcccede9ff66.png height=350 width=1000 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/196117506-019b8cef-a472-4864-a568-c890d0b15dec.png height=350 width=1000 hspace='10'/>
 </div>
 
 - 海报抽取问答
