@@ -71,6 +71,54 @@ def layer_init_wrapper(func):
     return _impl
 
 
+def _transformer_decoder_layer_fwd(self,
+                                   tgt,
+                                   memory=None,
+                                   tgt_mask=None,
+                                   memory_mask=None,
+                                   cache=None):
+    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+
+    residual = tgt
+    if self.normalize_before:
+        tgt = self.norm1(tgt)
+    if cache is None:
+        tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, None)
+    else:
+        tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
+                                                cache[0])
+    tgt = residual + self.dropout1(tgt)
+    if not self.normalize_before:
+        tgt = self.norm1(tgt)
+
+    residual = tgt
+
+    if memory is not None:
+        memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+
+        if self.normalize_before:
+            tgt = self.norm2(tgt)
+        if cache is None:
+            tgt = self.cross_attn(tgt, memory, memory, memory_mask, None)
+        else:
+            tgt, static_cache = self.cross_attn(tgt, memory, memory,
+                                                memory_mask, cache[1])
+        tgt = residual + self.dropout2(tgt)
+        if not self.normalize_before:
+            tgt = self.norm2(tgt)
+
+        residual = tgt
+
+    if self.normalize_before:
+        tgt = self.norm3(tgt)
+    tgt = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
+    tgt = residual + self.dropout3(tgt)
+    if not self.normalize_before:
+        tgt = self.norm3(tgt)
+    return tgt if cache is None else (tgt, (
+        incremental_cache, static_cache if memory is not None else None))
+
+
 def _transformer_encoder_layer_fwd(self,
                                    src,
                                    src_mask=None,
@@ -181,7 +229,7 @@ def _transformer_decoder_layer_fwd(
 
 def _transformer_decoder_fwd(self,
                              tgt,
-                             memory,
+                             memory=None,
                              tgt_mask=None,
                              memory_mask=None,
                              cache=None,
@@ -189,7 +237,8 @@ def _transformer_decoder_fwd(self,
                              output_hidden_states=False,
                              return_dict=False):
     tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
-    memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+    if memory is not None:
+        memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
 
     new_caches = [] if cache else None
     all_hidden_states = [tgt] if output_hidden_states else None
@@ -334,6 +383,7 @@ def _transformer_encoder_fwd(self,
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd
 paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
+paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd
 paddle.nn.TransformerDecoder.forward = _transformer_decoder_fwd
 
 _encoder_init = paddle.nn.TransformerEncoder.__init__

@@ -169,7 +169,7 @@ class Task(metaclass=abc.ABCMeta):
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
-        if self.task in ["document_question_answering", "knowledge_mining"]:
+        if self.task in ["document_intelligence", "knowledge_mining"]:
             self._config.switch_ir_optim(False)
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_names = [name for name in self.predictor.get_input_names()]

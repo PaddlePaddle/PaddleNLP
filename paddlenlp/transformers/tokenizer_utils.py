@@ -747,6 +747,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
         no_split_token = set(self.unique_no_split_tokens)
         tokens = self.tokens_trie.split(text)
+
         # ["This is something", "<special_token_1>", "  else"]
         for i, token in enumerate(tokens):
             if token in no_split_token:
