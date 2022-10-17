@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -u -m paddle.distributed.launch --gpus "0,1" train_dreambooth.py \
-  --pretrained_model_name_or_path=CompVis/stable-diffusion-v1-4 \
-  --instance_data_dir=./dream_image \
-  --instance_prompt="a photo of sks dog" \
-  --resolution=512 \
-  --train_batch_size=1 \
-  --gradient_accumulation_steps=1 \
-  --learning_rate=5e-6 \
-  --lr_scheduler="constant" \
-  --lr_warmup_steps=0 \
-  --max_train_steps=400
+export MODEL_NAME="CompVis/stable-diffusion-v1-4"
+export dataset_name="lambdalabs/pokemon-blip-captions"
 
+python -u train_text_to_image.py \
+  --pretrained_model_name_or_path=$MODEL_NAME \
+  --dataset_name=$dataset_name \
+  --use_ema \
+  --resolution=512 --center_crop --random_flip \
+  --train_batch_size=1 \
+  --gradient_accumulation_steps=4 \
+  --gradient_checkpointing \
+  --max_train_steps=15000 \
+  --learning_rate=1e-05 \
+  --max_grad_norm=1 \
+  --lr_scheduler="constant" --lr_warmup_steps=0 \
+  --output_dir="sd-pokemon-model"

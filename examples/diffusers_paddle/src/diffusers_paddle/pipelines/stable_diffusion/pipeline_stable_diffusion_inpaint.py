@@ -20,7 +20,11 @@ import numpy as np
 import paddle
 
 import PIL
-from PIL.Image import Resampling
+from paddlenlp.utils.tools import compare_version
+if compare_version(PIL.__version__, "9.1.0") >= 0:
+    Resampling = PIL.Image.Resampling
+else:
+    Resampling = PIL.Image
 from tqdm.auto import tqdm
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 

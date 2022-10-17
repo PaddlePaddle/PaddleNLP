@@ -16,6 +16,7 @@
 import argparse
 import math
 import os
+import itertools
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -427,9 +428,14 @@ def main():
     )
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
+        text_encoder = paddle.DataParallel(text_encoder)
 
+    params_to_train = itertools.chain(
+        text_encoder.parameters(),
+        unet.parameters(),
+    )
     optimizer = AdamW(learning_rate=lr_scheduler,
-                      parameters=unet.parameters(),
+                      parameters=params_to_train,
                       beta1=args.adam_beta1,
                       beta2=args.adam_beta2,
                       weight_decay=args.adam_weight_decay,
@@ -529,9 +535,9 @@ def main():
     progress_bar.set_description("Train Steps")
     global_step = 0
 
-    # Keep vae and text_encoder in eval model as we don't train these
+    # Keep vae in eval model as we don't train these
     vae.eval()
-    text_encoder.eval()
+    text_encoder.train()
     unet.train()
 
     for epoch in range(args.num_train_epochs):
@@ -554,8 +560,8 @@ def main():
                 noisy_latents = noise_scheduler.add_noise(
                     latents, noise, timesteps)
 
-                # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+            # Get the text embedding for conditioning
+            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
 
             # Predict the noise residual
             noise_pred = unet(noisy_latents, timesteps,
@@ -617,6 +623,7 @@ def main():
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unwrap_model(unet),
+            text_encoder=unwrap_model(text_encoder),
             safety_checker=None,
         )
         pipeline.save_pretrained(args.output_dir)

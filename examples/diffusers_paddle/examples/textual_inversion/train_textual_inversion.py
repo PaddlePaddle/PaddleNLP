@@ -31,8 +31,14 @@ from diffusers_paddle import AutoencoderKL, DDPMScheduler, PNDMScheduler, Stable
 from diffusers_paddle.optimization import get_scheduler
 from diffusers_paddle.modeling_utils import unwrap_model
 
+import PIL
 from PIL import Image
-from PIL.Image import Resampling
+from paddlenlp.utils.tools import compare_version
+
+if compare_version(PIL.__version__, "9.1.0") >= 0:
+    Resampling = PIL.Image.Resampling
+else:
+    Resampling = PIL.Image
 from paddle.vision.transforms import RandomHorizontalFlip
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
@@ -310,6 +316,7 @@ class TextualInversionDataset(Dataset):
             self._length = self.num_images * repeats
 
         self.interpolation = {
+            "linear": Resampling.BILINEAR,
             "bilinear": Resampling.BILINEAR,
             "bicubic": Resampling.BICUBIC,
             "lanczos": Resampling.LANCZOS,

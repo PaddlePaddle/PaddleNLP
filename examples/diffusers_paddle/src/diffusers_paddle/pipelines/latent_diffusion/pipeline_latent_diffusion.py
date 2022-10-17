@@ -121,7 +121,8 @@ class LDMBertModel(LDMBertPretrainedModel):
                  attention_dropout=0.0,
                  activation_dropout=0.0,
                  init_std=0.02,
-                 pad_token_id=0):
+                 pad_token_id=0,
+                 **kwargs):
         super().__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = init_std

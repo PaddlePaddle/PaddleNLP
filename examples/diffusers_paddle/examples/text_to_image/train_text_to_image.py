@@ -23,7 +23,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddle.io import DataLoader
+from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler
 
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import set_seed
@@ -291,8 +291,7 @@ class EMAModel:
 
         for s_param, param in zip(self.shadow_params, parameters):
             if not param.stop_gradient:
-                tmp = self.decay * (s_param - param)
-                s_param.sub_(tmp)
+                s_param.copy_(s_param - self.decay * (s_param - param), True)
             else:
                 s_param.copy_(param, True)
 
@@ -310,7 +309,7 @@ class EMAModel:
         """
         parameters = list(parameters)
         for s_param, param in zip(self.shadow_params, parameters):
-            param.copy_(s_param)
+            param.copy_(s_param, True)
 
 
 def freeze_params(params):
@@ -490,10 +489,13 @@ def main():
             "input_ids": padded_tokens.input_ids,
         }
 
+    train_sampler = DistributedBatchSampler(
+        train_dataset, batch_size=args.train_batch_size,
+        shuffle=True) if num_processes > 1 else BatchSampler(
+            train_dataset, batch_size=args.train_batch_size, shuffle=True)
     train_dataloader = DataLoader(train_dataset,
-                                  shuffle=True,
-                                  collate_fn=collate_fn,
-                                  batch_size=args.train_batch_size)
+                                  batch_sampler=train_sampler,
+                                  collate_fn=collate_fn)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
@@ -590,7 +592,6 @@ def main():
 
                 if args.use_ema:
                     ema_unet.step(unet.parameters())
-                progress_bar.update(1)
                 logs = {
                     "epoch":
                     str(epoch).zfill(4),

@@ -45,6 +45,7 @@ LOADABLE_CLASSES = {
         "SchedulerMixin": ["save_config", "from_config"],
         "DiffusionPipeline": ["save_pretrained", "from_pretrained"],
         "OnnxRuntimeModel": ["save_pretrained", "from_pretrained"],
+        "LDMBertModel": ["save_pretrained", "from_pretrained"],
     },
     "paddlenlp.transformers": {
         "PretrainedTokenizer": ["save_pretrained", "from_pretrained"],
