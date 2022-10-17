@@ -56,7 +56,7 @@ def get_package_data_files(package, data, package_dir=None):
 
 setuptools.setup(
     name="paddlenlp",
-    version="2.4.0.dev",  # modify this for each release
+    version="2.4.1.dev",  # modify this for each release
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description=
