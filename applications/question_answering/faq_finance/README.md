@@ -442,7 +442,7 @@ python export_to_serving.py \
 sh scripts/export_to_serving.sh
 ```
 
-启动 Pipeline Server:
+对于Linux和Mac用户，启动下面的Pipeline Server:
 修改Tokenizer：
 
 ```
@@ -477,6 +477,22 @@ list_data = [
 
 ```
 python rpc_client.py
+```
+
+对于Windows用户，启动下面的Pipeline Server:
+
+```
+python web_service_windows.py
+```
+
+启动客户端调用 Server, 使用 POST的方式(Windows不支持RPC的调用方式)，首先修改http_client.py中需要预测的样本：
+
+```
+data = {"feed": ["买了社保，是不是就不用买商业保险了？"], "fetch": ["output_embedding"]}
+```
+然后运行：
+```
+python http_client.py
 ```
 
 ### 4.5 问答系统整个流程
