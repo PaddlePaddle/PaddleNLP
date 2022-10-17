@@ -21,6 +21,7 @@ from tests.testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
+from parameterized import parameterized_class
 
 import paddle
 
@@ -85,7 +86,6 @@ class MBartModelTester:
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -170,9 +170,10 @@ class MBartModelTester:
         # first forward pass
         outputs = model(input_ids,
                         decoder_attention_mask=attention_mask,
-                        cache=cache)
+                        cache=cache,
+                        return_dict=self.parent.return_dict)
 
-        output, past_key_values = outputs
+        output, past_key_values = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -189,7 +190,10 @@ class MBartModelTester:
 
         output_from_no_past = model(next_input_ids,
                                     decoder_attention_mask=next_attention_mask,
-                                    cache=None)
+                                    cache=None,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(next_tokens,
                                  decoder_attention_mask=next_attention_mask,
                                  cache=past_key_values)[0]
@@ -214,6 +218,10 @@ class MBartModelTester:
                             atol=1e-3))
 
 
+@parameterized_class(("return_dict", ), [
+    [False],
+    [True],
+])
 class MBartModelTest(ModelTesterMixin, GenerationTesterMixin,
                      unittest.TestCase):
     base_model_class = MBartModel
@@ -227,6 +235,7 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin,
     }
     is_encoder_decoder = True
     test_missing_keys = False
+    return_dict = False
 
     def setUp(self):
         self.model_tester = MBartModelTester(self)
@@ -287,6 +296,10 @@ class AbstractSeq2SeqIntegrationTest(unittest.TestCase):
         return model
 
 
+@parameterized_class(("return_dict", ), [
+    [False],
+    [True],
+])
 class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
     checkpoint_name = "mbart-large-en-ro"
     src_text = [
@@ -303,6 +316,7 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
         8274, 127873, 25916, 7, 8622, 2071, 438, 67485, 53, 187895, 23, 51712,
         2, 250004
     ]
+    return_dict = False
 
     @slow
     def test_enro_generate_one(self):
@@ -348,8 +362,12 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
             dtype="int64")
         summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]],
                                    dtype="int64")
-        logits = lm_model(input_ids=context, decoder_input_ids=summary)
+        loss, logits = lm_model(input_ids=context,
+                                decoder_input_ids=summary,
+                                labels=summary,
+                                return_dict=self.return_dict)[:2]
         expected_shape = [*summary.shape, config["vocab_size"]]
+        self.assertIsInstance(loss.item(), float)
         self.assertEqual(logits.shape, expected_shape)
 
 
@@ -411,7 +429,6 @@ class MBartStandaloneDecoderModelTester:
         self.seq_length = self.decoder_seq_length
         self.is_training = is_training
         self.use_attention_mask = use_attention_mask
-        self.use_labels = use_labels
 
         self.vocab_size = vocab_size
         self.d_model = d_model
@@ -449,7 +466,7 @@ class MBartStandaloneDecoderModelTester:
                 dtype="int64")
 
         lm_labels = None
-        if self.use_labels:
+        if self.parent.use_labels:
             lm_labels = ids_tensor([self.batch_size, self.decoder_seq_length],
                                    self.vocab_size,
                                    dtype="int64")
@@ -486,9 +503,15 @@ class MBartStandaloneDecoderModelTester:
         model = MBartDecoder(**config)
         model.eval()
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids)
-        outputs_no_past = model(input_ids, use_cache=False)
+        self.parent.return_dict = True
+        outputs = model(input_ids,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids,
+                                       return_dict=self.parent.return_dict)
+        outputs_no_past = model(input_ids,
+                                use_cache=False,
+                                return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
         self.parent.assertTrue(len(outputs) == len(outputs_no_past) + 1)
@@ -503,10 +526,14 @@ class MBartStandaloneDecoderModelTester:
         # append to next input_ids and
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)
+        output_from_no_past = model(next_input_ids,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(next_tokens,
                                  past_key_values=past_key_values,
-                                 use_cache=True)[0]
+                                 use_cache=True,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -541,7 +568,8 @@ class MBartStandaloneDecoderModelTester:
         # first forward pass
         past_key_values = model(input_ids,
                                 attention_mask=attn_mask,
-                                use_cache=True)[1]
+                                use_cache=True,
+                                return_dict=self.parent.return_dict)[1]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -565,11 +593,16 @@ class MBartStandaloneDecoderModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
+        output_from_no_past = model(next_input_ids,
+                                    attention_mask=attn_mask,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past = model(next_tokens,
                                  attention_mask=attn_mask,
                                  past_key_values=past_key_values,
-                                 use_cache=True)[0]
+                                 use_cache=True,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -599,3 +632,40 @@ class MBartStandaloneDecoderModelTester:
             "attention_mask": attention_mask,
         }
         return config, inputs_dict
+
+
+@parameterized_class(("return_dict", ), [
+    [False],
+    [True],
+])
+class MBartStandaloneDecoderModelTest(ModelTesterMixin, GenerationTesterMixin,
+                                      unittest.TestCase):
+    all_model_classes = (MBartDecoder,
+                         MBartForCausalLM) if is_torch_available() else ()
+    all_generative_model_classes = (
+        MBartForCausalLM, ) if is_torch_available() else ()
+    test_pruning = False
+    is_encoder_decoder = False
+    return_dict = False
+
+    def setUp(self, ):
+        self.model_tester = MBartStandaloneDecoderModelTester(self,
+                                                              is_training=False)
+        self.config_tester = ConfigTester(self, config_class=MBartConfig)
+
+    def test_config(self):
+        self.config_tester.run_common_tests()
+
+    def test_decoder_model_past(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_decoder_model_past(
+            *config_and_inputs)
+
+    def test_decoder_model_attn_mask_past(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_decoder_model_attention_mask_past(
+            *config_and_inputs)
+
+    def test_retain_grad_hidden_states_attentions(self):
+        # decoder cannot keep gradients
+        return

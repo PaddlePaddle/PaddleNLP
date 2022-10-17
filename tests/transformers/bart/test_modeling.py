@@ -168,15 +168,18 @@ class BartModelTester:
         decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1],
                                               dtype=paddle.get_default_dtype())
 
-        encoder_output = encoder(input_ids, attention_mask)
+        encoder_output = encoder(input_ids,
+                                 attention_mask,
+                                 return_dict=self.parent.return_dict)
         origin_cache = decoder.decoder.gen_cache(encoder_output)
         outputs = decoder(decoder_input_ids,
                           decoder_attention_mask,
                           encoder_output,
                           attention_mask,
-                          cache=origin_cache)
+                          cache=origin_cache,
+                          return_dict=self.parent.return_dict)
 
-        output, cache = outputs
+        output, cache = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -191,16 +194,19 @@ class BartModelTester:
         next_attention_mask = paddle.concat(
             [decoder_attention_mask, next_attn_mask], axis=-1)
 
-        output_from_no_past, _ = decoder(next_input_ids,
-                                         next_attention_mask,
-                                         encoder_output,
-                                         attention_mask,
-                                         cache=origin_cache)
+        output_from_no_past = decoder(next_input_ids,
+                                      next_attention_mask,
+                                      encoder_output,
+                                      attention_mask,
+                                      return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past, _ = decoder(next_tokens,
                                       next_attention_mask,
                                       encoder_output,
                                       attention_mask,
-                                      cache=cache)
+                                      cache=cache,
+                                      return_dict=self.parent.return_dict)[:2]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
