@@ -3,7 +3,6 @@
     "uppercase_modelname": "BERT",
     "lowercase_modelname": "bert",
     "camelcase_modelname": "Bert",
-    "authors": "PaddlePaddle Authors",
     "checkpoint_identifier": "bert-base-uncased",
     "tokenizer_type": ["Based on Bert", "Based on BPETokenizer", "Based on SentencePiece"],
     "is_encoder_model": ["y", "n"],
