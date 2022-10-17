@@ -92,6 +92,8 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
     <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=350 width=1000 hspace='15'/>
 </div>
 
+- Demo图片可在此[下载](https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/demo.zip)
+
 <a name="23"></a>
 
 #### Taskflow

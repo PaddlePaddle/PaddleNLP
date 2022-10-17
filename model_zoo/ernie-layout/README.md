@@ -93,6 +93,8 @@ Recent years have witnessed the rise and success of pre-training techniques in v
     <img src=https://user-images.githubusercontent.com/40840292/195615648-de053dcc-312b-4c7a-a8c9-299bba3dcfd5.png height=350 width=1000 hspace='15'/>
 </div>
 
+- Demo images are available [here](https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/demo.zip)
+
 <a name="23"></a>
 
 #### Taskflow
