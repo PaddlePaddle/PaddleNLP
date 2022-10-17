@@ -1,6 +1,7 @@
 # PaddleNLP一键预测功能：Taskflow API
 
 
+
 <p align="left">
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
@@ -44,7 +45,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 基于跨模态通用文档预训练模型ERNIE-LayoutX |
-
+| [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 
 ## QuickStart
 
@@ -1620,6 +1621,55 @@ from paddlenlp import Taskflow
 
 </div></details>
 
+### 问题生成
+<details><summary>&emsp; 通过UNIMO-Text模型来根据上下文和答案生成问题 </summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 unimo-text-1.0-dureader_qg-template1
+>>> question_generator = Taskflow("question_generation")
+# 单条输入
+>>> question_generator([
+  {"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"}
+  ])
+'''
+  ['黄山最高峰是什么']
+'''
+# 多条输入
+>>> question_generator([
+  {"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"},
+  {"context": "弗朗索瓦·韦达外文名：franciscusvieta国籍：法国出生地：普瓦图出生日期：1540年逝世日期：1603年12月13日职业：数学家主要成就：为近代数学的发展奠定了基础。", "answer": "法国"}
+  ])
+'''
+  ['黄山最高峰是什么',  '弗朗索瓦是哪里人']
+'''
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为unimo-text-1.0-dureader_qg-template1，支持的模型支持的模型有["unimo-text-1.0", "unimo-text-1.0-dureader_qg-template1", ]。
+* `device`：运行设备，默认为"gpu"。
+* `template`：模版，可选项有[0, 1, 2, 3]，1表示使用默认模版，0表示不使用模版。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `output_scores`：是否要输出解码得分，默认为False。
+* `is_select_from_num_return_sequences`：是否对多个返回序列挑选最优项输出，当为True时，若num_return_sequences不为1则自动根据解码得分选择得分最高的序列最为最终结果，否则返回num_return_sequences个序列，默认为True。
+* `max_length`：生成代码的最大长度，默认为50。
+* `min_length`：生成代码的最小长度，默认为3。
+* `decode_strategy`：解码策略，支持beam_search和sampling，默认为beam_search。
+* `temperature`：解码参数temperature，默认为1.0。
+* `top_k`：解码参数top_k，默认为0。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：解码参数num_beams，表示beam_search解码的beam size，默认为6。
+* `num_beam_groups`：解码参数num_beam_groups，默认为1。
+* `diversity_rate`：解码参数diversity_rate，默认为0.0。
+* `length_penalty`：解码长度控制值，默认为1.2。
+* `num_return_sequences`：解码返回序列数，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1。
+* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为False。
+
+</div></details>
 
 ## PART Ⅱ &emsp; 定制化训练
 

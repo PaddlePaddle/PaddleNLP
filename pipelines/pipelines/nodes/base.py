@@ -127,16 +127,33 @@ class BaseComponent:
           - collate `_debug` information if present
           - merge component output with the preceding output and pass it on to the subsequent Component in the Pipeline
         """
+        return self._dispatch_run_general(self.run, **kwargs)
+
+    def _dispatch_run_batch(self, **kwargs):
+        """
+        The Pipelines call this method when run_batch() is executed. This method in turn executes the
+        _dispatch_run_general() method with the correct run method.
+        """
+        return self._dispatch_run_general(self.run_batch, **kwargs)
+
+    def _dispatch_run_general(self, run_method: Callable, **kwargs):
+        """
+        This method takes care of the following:
+          - inspect run_method's signature to validate if all necessary arguments are available
+          - pop `debug` and sets them on the instance to control debug output
+          - call run_method with the corresponding arguments and gather output
+          - collate `_debug` information if present
+          - merge component output with the preceding output and pass it on to the subsequent Component in the Pipeline
+        """
         arguments = deepcopy(kwargs)
         params = arguments.get("params") or {}
 
-        run_signature_args = inspect.signature(self.run).parameters.keys()
+        run_signature_args = inspect.signature(run_method).parameters.keys()
 
         run_params: Dict[str, Any] = {}
         for key, value in params.items():
             if key == self.name:  # targeted params for this node
                 if isinstance(value, dict):
-
                     # Extract debug attributes
                     if "debug" in value.keys():
                         self.debug = value.pop("debug")
@@ -156,7 +173,7 @@ class BaseComponent:
             if key in run_signature_args:
                 run_inputs[key] = value
 
-        output, stream = self.run(**run_inputs, **run_params)
+        output, stream = run_method(**run_inputs, **run_params)
 
         # Collect debug information
         debug_info = {}
@@ -164,11 +181,11 @@ class BaseComponent:
             # Include input
             debug_info["input"] = {**run_inputs, **run_params}
             debug_info["input"]["debug"] = self.debug
-            # Include output
+            # Include output, exclude _debug to avoid recursion
             filtered_output = {
                 key: value
                 for key, value in output.items() if key != "_debug"
-            }  # Exclude _debug to avoid recursion
+            }
             debug_info["output"] = filtered_output
         # Include custom debug info
         custom_debug = output.get("_debug", {})
@@ -182,9 +199,9 @@ class BaseComponent:
         if all_debug:
             output["_debug"] = all_debug
 
-        # add "extra" args that were not used by the node
+        # add "extra" args that were not used by the node, but not the 'inputs' value
         for k, v in arguments.items():
-            if k not in output.keys():
+            if k not in output.keys() and k != "inputs":
                 output[k] = v
 
         output["params"] = params

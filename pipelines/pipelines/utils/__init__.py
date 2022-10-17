@@ -23,10 +23,7 @@ from pipelines.utils.doc_store import (
     stop_opensearch,
     stop_service,
 )
-from pipelines.utils.export_utils import (
-    print_answers,
-    print_documents,
-    print_questions,
-    export_answers_to_csv,
-    convert_labels_to_squad,
-)
+from pipelines.utils.export_utils import (print_answers, print_documents,
+                                          print_questions,
+                                          export_answers_to_csv,
+                                          convert_labels_to_squad)
