@@ -159,7 +159,7 @@ clue_corpus_small_14g_20220104_idx.npz
 ####  开始训练
 
 将制作好的数据`clue_corpus_small_14g_20220104_ids.npy,clue_corpus_small_14g_20220104_idx.npz`移动到input_dir中，即可开始训练。
-这里以8卡训练为例任务脚本为例：
+这里以8卡GPU训练为例任务脚本为例：
 ```
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -188,6 +188,38 @@ python -u  -m paddle.distributed.launch \
     --num_workers 2 \
     --eval_freq 1000 \
     --device "gpu" \
+    --share_folder false \
+```
+
+使用8卡MLU训练示例：
+```
+python -u  -m paddle.distributed.launch \
+    --mlus "0,1,2,3,4,5,6,7" \
+    --log_dir "output/ernie-1.0-dp8-gb512/log" \
+    run_pretrain.py \
+    --model_type "ernie" \
+    --model_name_or_path "ernie-1.0-base-zh" \
+    --tokenizer_name_or_path "ernie-1.0-base-zh" \
+    --input_dir "./data" \
+    --output_dir "output/ernie-1.0-dp8-gb512" \
+    --split 949,50,1 \
+    --max_seq_len 512 \
+    --micro_batch_size 64 \
+    --use_amp true \
+    --fp16_opt_level O2 \
+    --max_lr 0.0001 \
+    --min_lr 0.00001 \
+    --max_steps 1000000 \
+    --save_steps 50000 \
+    --checkpoint_steps 5000 \
+    --decay_steps 990000 \
+    --weight_decay 0.01 \
+    --warmup_rate 0.01 \
+    --grad_clip 1.0 \
+    --logging_freq 20 \
+    --num_workers 2 \
+    --eval_freq 1000 \
+    --device "mlu" \
     --share_folder false \
 ```
 

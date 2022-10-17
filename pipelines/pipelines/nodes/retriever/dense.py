@@ -206,6 +206,60 @@ class DensePassageRetriever(BaseRetriever):
             return_embedding=False)
         return documents
 
+    def retrieve_batch(
+        self,
+        queries: List[str],
+        filters: Optional[Union[Dict[str, Union[Dict, List, str, int, float,
+                                                bool]],
+                                List[Dict[str, Union[Dict, List, str, int,
+                                                     float, bool]]], ]] = None,
+        top_k: Optional[int] = None,
+        index: str = None,
+        headers: Optional[Dict[str, str]] = None,
+        batch_size: Optional[int] = None,
+        scale_score: bool = None,
+    ) -> List[List[Document]]:
+        if top_k is None:
+            top_k = self.top_k
+        if batch_size is None:
+            batch_size = self.batch_size
+
+        if isinstance(filters, list):
+            if len(filters) != len(queries):
+                raise Exception(
+                    "Number of filters does not match number of queries. Please provide as many filters"
+                    " as queries or a single filter that will be applied to each query."
+                )
+        else:
+            filters = [filters] * len(
+                queries) if filters is not None else [{}] * len(queries)
+        if index is None:
+            index = self.document_store.index
+        if not self.document_store:
+            logger.error(
+                "Cannot perform retrieve_batch() since DensePassageRetriever initialized with document_store=None"
+            )
+            return [[] * len(queries)]  # type: ignore
+        documents = []
+        query_embs: List[np.ndarray] = []
+        for batch in self._get_batches(queries=queries, batch_size=batch_size):
+            query_embs.extend(self.embed_queries(texts=batch))
+        for query_emb, cur_filters in tqdm(zip(query_embs, filters),
+                                           total=len(query_embs),
+                                           disable=not self.progress_bar,
+                                           desc="Querying"):
+            cur_docs = self.document_store.query_by_embedding(
+                query_emb=query_emb,
+                top_k=top_k,
+                filters=cur_filters,
+                index=index,
+                headers=headers,
+                return_embedding=False,
+            )
+            documents.append(cur_docs)
+
+        return documents
+
     def _get_predictions(self, dicts):
         """
         Feed a preprocessed dataset to the model and get the actual predictions (forward pass + formatting).
