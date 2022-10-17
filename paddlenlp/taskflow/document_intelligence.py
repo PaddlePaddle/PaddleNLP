@@ -16,7 +16,7 @@ import os
 import collections
 import paddle
 from ..transformers import AutoTokenizer
-from .utils import download_file, ImageReader, get_doc_pred, find_answer_pos
+from .utils import download_file, ImageReader, get_doc_pred, find_answer_pos, sort_res
 from .task import Task
 
 usage = r"""
@@ -27,7 +27,7 @@ usage = r"""
             # Types of doc: A string containing a http link pointing to an image
             docprompt({"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]})
             '''
-            [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}]
+            [{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.74, 'start': 2, 'end': 2}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 231, 'end': 233}]}]
             '''
 
             # Batch input
@@ -37,7 +37,7 @@ usage = r"""
             ]
             docprompt(batch_input)
             '''
-            [[{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.96, 'start': 7, 'end': 10}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 263, 'end': 271}]}], [{'prompt': '五百丁本次想要担任的是什么职位?', 'result': [{'value': '客户经理', 'prob': 1.0, 'start': 180, 'end': 183}]}, {'prompt': '五百丁是在哪里上的大学?', 'result': [{'value': '广州五百丁学院', 'prob': 1.0, 'start': 32, 'end': 38}]}, {'prompt': '大学学的是什么专业?', 'result': [{'value': '金融学(本科）', 'prob': 0.74, 'start': 39, 'end': 45}]}]]
+            [[{'prompt': '发票号码是多少?', 'result': [{'value': 'No44527206', 'prob': 0.74, 'start': 2, 'end': 2}]}, {'prompt': '校验码是多少?', 'result': [{'value': '01107 555427109891646', 'prob': 1.0, 'start': 231, 'end': 233}]}], [{'prompt': '五百丁本次想要担任的是什么职位?', 'result': [{'value': '客户经理', 'prob': 1.0, 'start': 4, 'end': 7}]}, {'prompt': '五百丁是在哪里上的大学?', 'result': [{'value': '广州五百丁学院', 'prob': 1.0, 'start': 31, 'end': 37}]}, {'prompt': '大学学的是什么专业?', 'result': [{'value': '金融学(本科）', 'prob': 0.82, 'start': 38, 'end': 44}]}]]
             '''
          """
 
@@ -103,6 +103,9 @@ class DocPromptTask(Task):
             else:
                 ocr_result = self._ocr.ocr(example["doc"], cls=True)
                 example["ocr_type"] = "ppocr"
+                # Compatible with paddleocr>=2.6.0.2
+                ocr_result = ocr_result[0] if len(
+                    ocr_result) == 1 else ocr_result
             example["ocr_result"] = ocr_result
         return preprocess_results
 
@@ -128,6 +131,7 @@ class DocPromptTask(Task):
                         'end': -1
                     }]
                 } for p in prompt]
+                all_boxes = {}
             else:
                 data_loader = self._reader.data_generator(
                     ocr_result, doc_path, prompt, self._batch_size, ocr_type)
@@ -167,9 +171,13 @@ class DocPromptTask(Task):
                     unique_id_to_result[result.unique_id] = result
 
                 all_predictions = []
-
+                all_boxes = {}
                 for (example_index, example) in enumerate(all_examples):
+                    example_doc_tokens = example.doc_tokens
                     example_qas_id = example.qas_id
+                    page_id = example_qas_id.split("_")[0]
+                    if page_id not in all_boxes:
+                        all_boxes[page_id] = example.ori_boxes
                     example_query = example.keys[0]
                     features = example_index_to_features[example_qas_id]
 
@@ -195,8 +203,9 @@ class DocPromptTask(Task):
                             'end': -1
                         })
                     else:
-                        preds = sorted(
-                            preds, key=lambda x: x["prob"])[::-1][:self._topn]
+                        preds = sort_res(example_query, preds,
+                                         example_doc_tokens, all_boxes[page_id],
+                                         self._lang)[:self._topn]
                     all_predictions.append({
                         "prompt": example_query,
                         "result": preds
@@ -245,12 +254,14 @@ class DocPromptTask(Task):
                             "Invalid inputs, the inputs should contain the prompt."
                         )
                     else:
-                        if isinstance(example["prompt"], list) and all(
+                        if isinstance(example["prompt"], str):
+                            data["prompt"] = [example["prompt"]]
+                        elif isinstance(example["prompt"], list) and all(
                                 isinstance(s, str) for s in example["prompt"]):
                             data["prompt"] = example["prompt"]
                         else:
                             raise TypeError(
-                                "Incorrect prompt, prompt should be list of string."
+                                "Incorrect prompt, prompt should be string or list of string."
                             )
                     if "word_boxes" in example.keys():
                         data["word_boxes"] = example["word_boxes"]

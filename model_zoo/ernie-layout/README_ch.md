@@ -1,35 +1,104 @@
-# ERNIE-LayoutX
+[English](README.md) | 简体中文
+
+# ERNIE-Layout
 
  **目录**
 
-- [1. 模型介绍](#模型介绍)
-- [2. 开箱即用](#开箱即用)
-- [3. 模型效果](#模型效果)
-- [4. 一键复现模型效果](#一键复现模型效果)
-  - [4.1 启动文档信息抽取任务](#启动文档信息抽取任务)
-  - [4.2 启动文档视觉问答任务](#启动文档视觉问答任务)
-  - [4.3 启动文档图像分类任务](#启动文档图像分类任务)
-- [5. 部署](#部署)
-  - [5.1 静态图导出](#静态图导出)
-  - [5.2 Python部署](#Python部署)
+- [1. 模型介绍](#1)
+- [2. 开箱即用](#2)
+  - [HuggingFace web demo](#21)
+  - [应用场景展示](#22)
+  - [Taskflow](#23)
+- [3. Benchmark模型效果](#3)
+- [4. 模型微调](#4)
+  - [4.1 文档信息抽取任务](#41)
+  - [4.2 文档视觉问答任务](#42)
+  - [4.3 文档图像分类任务](#43)
+- [5. 部署](#5)
+  - [5.1 静态图导出](#51)
+  - [5.2 Python部署](#52)
 
-<a name="模型介绍"></a>
+<a name="1"></a>
 
 ## 1. 模型介绍
 
-基于布局知识增强技术，同时依托文心ERNIE，百度研究者提出了融合文本、图像、布局等信息进行联合建模的跨模态通用文档预训练模型ERNIE-Layout。如下图所示，ERNIE-Layout创新性地提出了阅读顺序预测和细粒度图文匹配两个自监督预训练任务，有效提升模型在文档任务上跨模态语义对齐能力和布局理解能力。
+
+ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布局等信息进行跨模态联合建模，创新性引入布局知识增强，提出阅读顺序预测、细粒度图文匹配等自监督预训练任务，升级空间解偶注意力机制，在各数据集上效果取得大幅度提升，相关工作[ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](http://arxiv.org/abs/2210.06155)已被EMNLP 2022 Findings会议收录[1]。考虑到文档智能在多语种上商用广泛，依托PaddleNLP对外开源业界最强的多语言跨模态文档预训练模型ERNIE-Layout。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/190966162-b26f68b8-9a36-42c0-837b-98f9b91c2adb.png height=500 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195091552-86a2d174-24b0-4ddf-825a-4503e0bc390b.png height=450 width=1000 hspace='10'/>
 </div>
 
-<a name="开箱即用"></a>
+<a name="2"></a>
 
 ## 2. 开箱即用
 
-```paddlenlp.Taskflow```基于ERNIE-LayoutX强大的跨模态语义对齐能力和布局理解能力提供开箱即用的文档抽取问答能力。
+<a name="21"></a>
 
-#### 输入格式
+#### HuggingFace web demo
+
+🧾 通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/ERNIE-Layout)体验DocPrompt功能：
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195749427-864d7744-1fd1-455e-99c6-53a260776483.jpg height=700 width=1100 hspace='10'/>
+</div>
+
+<a name="22"></a>
+
+#### 应用场景展示
+
+- 发票抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195809253-985c4a7b-4675-4262-a4a6-fcccede9ff66.png height=350 width=1000 hspace='10'/>
+</div>
+
+- 海报抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195610368-04230855-62de-439e-b708-2c195b70461f.png height=600 width=1000 hspace='15'/>
+</div>
+
+- 网页抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195611613-bdbe692e-d7f2-4a2b-b548-1a933463b0b9.png height=350 width=1000 hspace='10'/>
+</div>
+
+
+- 表格抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195610692-8367f1c8-32c2-4b5d-9514-a149795cf609.png height=350 width=1000 hspace='10'/>
+</div>
+
+
+- 试卷抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195823294-d891d95a-2ef8-4519-be59-0fedb96c00de.png height=700 width=1000 hspace='10'/>
+</div>
+
+
+- 英文票据多语种（中、英、日、泰、西班牙、俄语）抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=400 width=1000 hspace='15'/>
+</div>
+
+- 中文票据多语种（中简、中繁、英、日、法语）抽取问答
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=350 width=1000 hspace='15'/>
+</div>
+
+<a name="23"></a>
+
+#### Taskflow
+
+通过``paddlenlp.Taskflow``三行代码调用DocPrompt功能，具备多语言文档抽取问答能力，部分应用场景展示如下：
+
+- 输入格式
 
 ```
 [
@@ -46,58 +115,58 @@
 ]
 ```
 
-#### 支持单条、批量预测
+- 支持单条、批量预测
 
-- 支持本地图片路径输入
+  - 支持本地图片路径输入
 
-<div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=800 hspace='20'/>
-</div>
+  <div align="center">
+      <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
+  </div>
 
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
 
->>> docprompt = Taskflow("document_intelligence")
->>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
-[{'prompt': '五百丁本次想要担任的是什么职位?',
-  'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
- {'prompt': '五百丁是在哪里上的大学?',
-  'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
- {'prompt': '大学学的是什么专业?',
-  'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
-```
+  >>> docprompt = Taskflow("document_intelligence")
+  >>> pprint(docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}]))
+  [{'prompt': '五百丁本次想要担任的是什么职位?',
+    'result': [{'end': 7, 'prob': 1.0, 'start': 4, 'value': '客户经理'}]},
+  {'prompt': '五百丁是在哪里上的大学?',
+    'result': [{'end': 37, 'prob': 1.0, 'start': 31, 'value': '广州五百丁学院'}]},
+  {'prompt': '大学学的是什么专业?',
+    'result': [{'end': 44, 'prob': 0.82, 'start': 38, 'value': '金融学(本科）'}]}]
+  ```
 
-- http图片链接输入
+  - http图片链接输入
 
-<div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg height=400 hspace='10'/>
-</div>
+  <div align="center">
+      <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
+  </div>
 
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
 
->>> docprompt = Taskflow("document_intelligence")
->>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
-[{'prompt': '发票号码是多少?',
-  'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
- {'prompt': '校验码是多少?',
-  'result': [{'end': 271,
-              'prob': 1.0,
-              'start': 263,
-              'value': '01107 555427109891646'}]}]
-```
+  >>> docprompt = Taskflow("document_intelligence")
+  >>> pprint(docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}]))
+  [{'prompt': '发票号码是多少?',
+    'result': [{'end': 2, 'prob': 0.74, 'start': 2, 'value': 'No44527206'}]},
+  {'prompt': '校验码是多少?',
+    'result': [{'end': 233,
+                'prob': 1.0,
+                'start': 231,
+                'value': '01107 555427109891646'}]}]
+  ```
 
-#### 可配置参数说明
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
-* `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
+- 可配置参数说明
+  * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+  * `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
+  * `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
 
 
-<a name="模型效果"></a>
+<a name="3"></a>
 
-## 3. 模型效果
+## 3. Benchmark模型效果
 
 - 开源数据集介绍
 
@@ -144,9 +213,9 @@
   | ERNIE-LayoutX-Base |  2e-5, 4, _  | 1e-5, 8, 0.  |  1e-5, 4, _  | 2e-5. 8, 0.05 |
 
 
-<a name="一键复现模型效果"></a>
+<a name="4"></a>
 
-## 4. 一键复现模型效果
+## 4. 模型微调
 
 - 请执行以下命令进行安装项目依赖
 
@@ -154,11 +223,11 @@
 pip install -r requirements.txt
 ```
 
-<a name="启动文档信息抽取任务"></a>
+<a name="41"></a>
 
-#### 4.1 启动文档信息抽取任务
+#### 4.1 文档信息抽取任务
 
-启动FUNSD任务：
+- FUNSD训练
 
 ```shell
 python -u run_ner.py \
@@ -189,7 +258,7 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-启动XFUND-ZH任务：
+- XFUND-ZH训练
 
 ```shell
 python -u run_ner.py \
@@ -221,11 +290,11 @@ python -u run_ner.py \
   --overwrite_output_dir
 ```
 
-<a name="启动文档视觉问答任务"></a>
+<a name="42"></a>
 
-#### 4.2 启动文档视觉问答任务
+#### 4.2 文档视觉问答任务
 
-启动DocVQA-ZH任务：
+- DocVQA-ZH训练
 
 ```shell
 python3 -u run_mrc.py \
@@ -261,11 +330,11 @@ python3 -u run_mrc.py \
   --overwrite_output_dir
 ```
 
-<a name="启动文档图像分类任务"></a>
+<a name="43"></a>
 
-#### 4.3 启动文档图像分类任务
+#### 4.3 文档图像分类任务
 
-启动RVL-CDIP任务
+- RVL-CDIP训练
 
 ```shell
 python3 -u run_cls.py \
@@ -300,40 +369,40 @@ python3 -u run_cls.py \
     --overwrite_output_dir
 ```
 
-<a name="部署"></a>
+<a name="5"></a>
 
 ## 5. 部署
 
-<a name="静态图导出"></a>
+<a name="51"></a>
 
 #### 5.1 静态图导出
 
 使用动态图训练结束之后，还可以将动态图参数导出为静态图参数，静态图模型将用于**后续的推理部署工作**。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在`output_path`指定路径中。运行方式：
 
 
-导出在FUNSD上微调后的模型：
+- 导出在FUNSD上微调后的模型：
 
 ```shell
 python export_model.py --task_type ner --model_path ./ernie-layoutx-base-uncased/models/funsd/ --output_path ./ner_export
 ```
 
-导出在DocVQA-ZH上微调后的模型：
+- 导出在DocVQA-ZH上微调后的模型：
 
 ```shell
 python export_model.py --task_type mrc --model_path ./ernie-layoutx-base-uncased/models/docvqa_zh/ --output_path ./mrc_export
 ```
 
-导出在RVL-CDIP(sampled)上微调后的模型：
+- 导出在RVL-CDIP(sampled)上微调后的模型：
 
 ```shell
 python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased/models/rvl_cdip_sampled/ --output_path ./cls_export
 ```
 
-可支持配置的参数：
+- 可支持配置的参数：
 * `model_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
 
-程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
+- 程序运行时将会自动导出模型到指定的 `output_path` 中，保存模型文件结构如下所示：
 
 ```text
 export/
@@ -342,20 +411,18 @@ export/
 └── inference.pdmodel
 ```
 
-<a name="Python部署"></a>
+<a name="52"></a>
 
 #### 5.2 Python部署
 
-导出静态图模型之后可用于部署，项目提供了文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例，详见[ERNIE-LayoutX Python部署指南](./deploy/python/README.md)。
+导出静态图模型之后可用于部署，项目提供了文档信息抽取、文档视觉问答和文档图像分类三大场景下的使用示例，详见[ERNIE-Layout Python部署指南](./deploy/python/README_ch.md)。
 
 
 <a name="References"></a>
 
 ## References
 
-- [ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](https://openreview.net/forum?id=NHECrvMz1LL)
-
-- [ERNIE-mmLayout: Multi-grained MultiModal Transformer for Document Understanding](https://arxiv.org/abs/2209.08569)
+- [ERNIE-Layout: Layout-Knowledge Enhanced Multi-modal Pre-training for Document Understanding](http://arxiv.org/abs/2210.06155)
 
 - [ICDAR 2019 Competition on Scene Text Visual Question Answering](https://arxiv.org/pdf/1907.00490.pdf)
 
