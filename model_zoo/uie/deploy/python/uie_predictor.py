@@ -97,10 +97,11 @@ class UIEPredictor(object):
         self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
-        self.inference_backend = InferBackend(args.model_path_prefix,
-                                              device=args.device,
-                                              use_fp16=args.use_fp16,
-                                              device_id=args.device_id)
+        self.inference_backend = InferBackend(
+            args.model_path_prefix,
+            device=args.device,
+            use_fp16=args.use_fp16,
+            device_id=args.device_id if args.device == 'gpu' else 0)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):

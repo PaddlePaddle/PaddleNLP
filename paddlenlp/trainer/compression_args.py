@@ -42,6 +42,10 @@ class CompressionArguments(TrainingArguments):
         strategy (`str`):
             Compression strategy. It supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
     """
+
+    do_compress: bool = field(
+        default=False,
+        metadata={"help": "Whether to run compression after training."})
     strategy: Optional[str] = field(
         default="dynabert+ptq",
         metadata={

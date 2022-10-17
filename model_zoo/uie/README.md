@@ -16,7 +16,7 @@
 - [4. 训练定制](#训练定制)
   - [4.1 代码结构](#代码结构)
   - [4.2 数据标注](#数据标注)
-  - [4.3 模型微调](#模型微调)
+  - [4.3 模型微调和压缩](#模型微调和压缩)
   - [4.4 模型评估](#模型评估)
   - [4.5 定制模型一键预测](#定制模型一键预测)
   - [4.6 实验指标](#实验指标)
@@ -619,74 +619,89 @@ python labelstudio2doccano.py --labelstudio_file label-studio.json
 - ``doccano_file``: doccano 格式的数据文件保存路径，默认为 "doccano_ext.jsonl"。
 - ``task_type``: 任务类型，可选有抽取（"ext"）和分类（"cls"）两种类型的任务，默认为 "ext"。
 
-<a name="模型微调"></a>
+<a name="模型微调和压缩"></a>
 
-#### 4.3 模型微调
-
-单卡启动：
+#### 4.3 模型微调和压缩
 
 ```shell
-python finetune.py \
-    --train_path ./data/train.txt \
-    --dev_path ./data/dev.txt \
-    --save_dir ./checkpoint \
-    --learning_rate 1e-5 \
-    --batch_size 16 \
-    --max_seq_len 512 \
-    --num_epochs 100 \
-    --model uie-base \
-    --seed 1000 \
+python run_uie_trainer.py  \
+    --device gpu \
     --logging_steps 10 \
-    --valid_steps 100 \
-    --device gpu
+    --save_steps 100 \
+    --eval_steps 100 \
+    --seed 42 \
+    --model_name_or_path uie-base \
+    --output_dir uie_compress \
+    --train_path data/train.txt \
+    --dev_path data/dev.txt  \
+    --label_names 'start_positions' 'end_positions' \
+    --max_seq_length 512  \
+    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size  16 \
+    --num_train_epochs 50 \
+    --learning_rate 1e-5 \
+    --do_train \
+    --do_eval \
+    --do_compress \
+    --overwrite_output_dir \
+    --disable_tqdm True \
+    --metric_for_best_model eval_f1 \
+    --load_best_model_at_end  True \
+    --save_total_limit 1 \
+    --strategy 'qat' \
 ```
 
-如果在GPU环境中使用，可以指定``gpus``参数进行多卡训练：
+可支持配置的参数：
+* `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、"uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano";
+* `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
+* `device`: 选用什么设备进行训练，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
+* `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+* `learning_rate`：训练最大学习率；默认为3e-5。
+* `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
+* `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
+* `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
+* `seed`：随机种子，默认为 42。
+* `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
+* `max_seq_length`：模型使用的最大序列长度，建议与训练过程保持一致, 若出现显存不足，请适当调低这一参数；默认为128。
+
+程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中。
+
+默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+
+如果在 GPU 环境中使用，可以指定``gpus``参数进行多卡训练。
+
+由于指定了--do_eval，因此在训练完会自动进行评估。
+
+##### 模型压缩
+
+如果有模型部署上线的需求，需要进一步压缩模型体积、加快推理速度、减少内存占用，可以使用 PaddleNLP 的 [压缩API](../../docs/compression.md), 在使用 Trainer 的基础上，一行命令即可启动模型压缩。
+
+以上训练命令已指定了--do_compress，因此在训练完会对模型进行压缩（量化感知训练，QAT）。
+
+如果需要对之前已经训练完成的模型进行压缩，只需要将上面的脚本中 `model_name_or_path `设置为之前训练好的模型路径，并取消设置--do_train和--do_eval两个参数，保持开启--do_compress即可。
+
+
+使用量化感知训练功能还需要安装最新版本的 paddleslim：
 
 ```shell
-python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
-  --train_path ./data/train.txt \
-  --dev_path ./data/dev.txt \
-  --save_dir ./checkpoint \
-  --learning_rate 1e-5 \
-  --batch_size 16 \
-  --max_seq_len 512 \
-  --num_epochs 100 \
-  --model uie-base \
-  --seed 1000 \
-  --logging_steps 10 \
-  --valid_steps 100 \
-  --device gpu
+pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-可配置参数说明：
+同样，量化感知训练会将在开发集上最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可用于服务端和移动端的推理部署。
+量化后的模型
 
-- `train_path`: 训练集文件路径。
-- `dev_path`: 验证集文件路径。
-- `save_dir`: 模型存储路径，默认为`./checkpoint`。
-- `learning_rate`: 学习率，默认为1e-5。
-- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
-- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `num_epochs`: 训练轮数，默认为100。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
-- `seed`: 随机种子，默认为1000.
-- `logging_steps`: 日志打印的间隔steps数，默认10。
-- `valid_steps`: evaluate的间隔steps数，默认100。
-- `device`: 选用什么设备进行训练，可选cpu或gpu。
+| Models         | F1           |
+| -------------  |:------------:|
+| 原始模型，FP32   | 91.93        |
+| 量化后模型，INT8 | 94.12         |
+
 
 <a name="模型评估"></a>
 
 #### 4.4 模型评估
 
 通过运行以下命令进行模型评估：
-
-```shell
-python evaluate.py \
-    --model_path ./checkpoint/model_best \
-    --test_path ./data/dev.txt \
-    --batch_size 16 \
-    --max_seq_len 512
-```
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
 
@@ -730,6 +745,7 @@ python evaluate.py \
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+
 
 <a name="定制模型一键预测"></a>
 
@@ -782,6 +798,8 @@ python evaluate.py \
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+
+
 
 <a name="模型部署"></a>
 
