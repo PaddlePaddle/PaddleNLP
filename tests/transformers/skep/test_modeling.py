@@ -265,6 +265,7 @@ class SkepModelTester:
                                 outputs_without_cache.last_hidden_state))
         else:
             outputs_with_cache, _ = outputs_with_cache
+            outputs_without_cache, _ = outputs_without_cache
             self.parent.assertEqual(outputs_with_cache.shape,
                                     outputs_without_cache.shape)
             self.parent.assertFalse(
