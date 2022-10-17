@@ -51,7 +51,7 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 - Invoice VQA
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/196117506-019b8cef-a472-4864-a568-c890d0b15dec.png height=350 width=1000 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/196118171-fd3e49a0-b9f1-4536-a904-c48f709a2dec.png height=350 width=1000 hspace='10'/>
 </div>
 
 - Poster VQA
