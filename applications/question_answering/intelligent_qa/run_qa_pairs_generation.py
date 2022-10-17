@@ -28,17 +28,16 @@ def parse_args():
         '--answer_generation_model_path',
         type=str,
         default=None,
-        help='the model path to be loaded for question_generation taskflow')
+        help='the model path to be loaded for answer extraction')
     parser.add_argument(
         '--question_generation_model_path',
         type=str,
         default=None,
-        help='the model path to be loaded for question_generation taskflow')
-    parser.add_argument(
-        '--filtration_model_path',
-        type=str,
-        default=None,
-        help='the model path to be loaded for filtration taskflow')
+        help='the model path to be loaded for question generation')
+    parser.add_argument('--filtration_model_path',
+                        type=str,
+                        default=None,
+                        help='the model path to be loaded for filtration')
     parser.add_argument('--source_file_path',
                         type=str,
                         default=None,
@@ -57,12 +56,12 @@ def parse_args():
 
     parser.add_argument('--a_prompt',
                         type=str,
-                        default=None,
+                        default='答案',
                         help='the prompt when using taskflow, seperate by ,')
     parser.add_argument('--a_position_prob',
                         type=float,
                         default=0.01,
-                        help='the batch size when using taskflow')
+                        help='confidence threshold for answer extraction')
     parser.add_argument(
         '--a_max_answer_candidates',
         type=int,
@@ -82,7 +81,7 @@ def parse_args():
                         help='the max decoding length')
     parser.add_argument('--q_decode_strategy',
                         type=str,
-                        default=None,
+                        default='sampling',
                         help='the decode strategy')
     parser.add_argument('--q_num_beams',
                         type=int,
@@ -100,7 +99,7 @@ def parse_args():
         help='the diversity_rate when using diverse beam search')
     parser.add_argument('--q_top_k',
                         type=float,
-                        default=0,
+                        default=5,
                         help='the top_k when using sampling decoding strategy')
     parser.add_argument('--q_top_p',
                         type=float,
@@ -118,7 +117,7 @@ def parse_args():
     parser.add_argument('--f_filtration_position_prob',
                         type=float,
                         default=0.1,
-                        help='the batch size when using taskflow')
+                        help='confidence threshold for filtration')
     args = parser.parse_args()
     return args
 
@@ -399,12 +398,14 @@ if __name__ == '__main__':
     synthetic_answer_question_pairs = create_fake_question(
         synthetic_context_answer_pairs,
         None if args.do_filtration else args.target_file_path,
-        args.num_return_sequences, None, args.batch_size)
+        args.q_num_return_sequences, None, args.batch_size)
     print('create synthetic question-answer pairs successfully!')
 
     wf = None
     wf_debug = None
     if args.target_file_path:
+        if not os.path.exists(os.path.dirname(args.target_file_path)):
+            os.makedirs(os.path.dirname(args.target_file_path))
         wf = open(args.target_file_path, 'w', encoding='utf-8')
         if args.do_debug:
             wf_debug = open(args.target_file_path + '.debug.json',

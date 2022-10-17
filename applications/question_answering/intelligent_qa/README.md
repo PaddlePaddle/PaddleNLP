@@ -104,10 +104,10 @@
 安装方式：`pip install -r requirements.txt`
 
 ### 问答对生成
-对于标准场景的问答对可以直接使用提供的预训练模型实现零样本（zero-shot）问答对生成，可直接参考[语料生成](#语料生成)部分。对于细分场景我们推荐使用轻定制功能（标注少量数据进行模型微调）以进一步提升效果。下面通过疫情政务问答的例子展示如何通过5条训练数据进行问答对生成微调。
+对于标准场景的问答对可以直接使用提供的预训练模型实现零样本（zero-shot）问答对生成，开发者可直接参考[语料生成](#语料生成)部分。对于细分场景我们推荐使用定制功能（标注少量数据进行模型微调）以进一步提升效果，开发者可以参考[数据处理](#数据处理)和[模型微调](#模型微调)。下面通过疫情政务问答的例子展示问答对生成的完整流程。
 
 #### 数据处理
-这一部分介绍如何准备和预处理模型微调所需的数据。
+这一部分介绍如何准备和预处理[模型微调](#模型微调)所需的数据。
 ##### 数据准备
 在许多情况下，我们需要使用本地数据集来微调模型从而得到定制化的能力，让生成的问答对更接近于理想分布，本项目支持使用固定格式本地数据集文件进行微调。
 
@@ -143,7 +143,7 @@ data/
 ##### 数据预处理
 执行以下脚本对数据集进行数据预处理，得到接下来答案抽取、问题生成、过滤模块模型微调所需要的数据，注意这里答案抽取、问题生成、过滤模块的微调数据来源于相同的数据集。
 ```shell
-python run_data_preprocess.py \
+python -u run_data_preprocess.py \
     --source_file_path your_source_file_path \
     --target_dir .data \
     --do_answer_prompt
@@ -197,7 +197,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extrac
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python evaluate.py \
+python .answer_generation/evaluate.py \
     --model_path=.log/answer_extration/checkpoints/model_best \
     --test_path=.data/answer_extration/dev.json  \
     --batch_size=16 \
@@ -217,7 +217,7 @@ python evaluate.py \
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generation .question_generation/train.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generation .question_generation/train.py \
     --train_file=.data/question_generation/train.json \
     --predict_file=.data/question_generation/dev.json \
     --save_dir=.log/question_generation/checkpoints \
@@ -289,7 +289,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generat
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration filtration/finetune.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration .filtration/finetune.py \
     --train_path=.data/filtration/train.json \
     --dev_path=.data/filtration/dev.json \
     --save_dir=.log/filtration/checkpoints \
@@ -321,7 +321,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration fil
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python evaluate.py \
+python .filtration/evaluate.py \
     --model_path=.log/filtration/checkpoints/model_best \
     --test_path=.data/filtration/dev.json  \
     --batch_size=16 \
@@ -338,24 +338,23 @@ python evaluate.py \
 
 #### 语料生成
 
-运行下方脚本可以使用训练好的模型进行预测。
 开发者可以使用上一步[模型微调](#模型微调)后的模型生成问答对语料，也可以使用提供的预训练模型来直接生成问答对语料。
 
-我们提以提供的上下文文件[source_file.txt]()为例，该文件可直接下载放入./data，生成问答对语料的命令如下：
+我们以提供的上下文文件[source_file.txt]()为例，该文件可直接下载放入./data，生成问答对语料的命令如下：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -u run_qa_pairs_generation.py \
-    --source_file_path ./data/source_file.txt \
-    --target_file_path  ./data/qa_pairs/target_file.json \
+    --source_file_path=./data/source_file.txt \
+    --target_file_path=./data/qa_pairs/target_file.json \
     --answer_generation_model_path=.log/filtration/checkpoints/model_best \
     --question_generation_model_path=.log/filtration/checkpoints/model_best \
     --filtration_model_path=.log/filtration/checkpoints/model_best \
-    --batch_size 8 \
-    --a_max_answer_candidates 10 \
-    --a_prompt '答案,短答案' \
-    --a_position_prob 0.01  \
-    --q_num_return_sequences 3 \
-    --q_max_question_length 50 \
+    --batch_size=8 \
+    --a_max_answer_candidates=10 \
+    --a_prompt='答案,短答案' \
+    --a_position_prob=0.01  \
+    --q_num_return_sequences=3 \
+    --q_max_question_length=50 \
     --q_decode_strategy=sampling \
     --q_top_k=5 \
     --q_top_p=1 \
@@ -364,8 +363,36 @@ python -u run_qa_pairs_generation.py \
     --do_debug
 ```
 关键参数释义如下：
-- `output_path` 表示预测输出结果保存的文件路径，默认为./predict.txt。
-- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的微调好的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。
+- `source_file_path` 源文件路径，源文件中每一行代表一条待生成问答对的上下文文本。
+- `target_file_path` 目标文件路径，生成的目标文件为json格式。
+- `answer_generation_model_path` 要加载的答案抽取模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | unimo-text-1.0      |
+   | unimo-text-1.0-large |
+- `question_generation_model_path` 要加载的问题生成模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | unimo-text-1.0      |
+   | unimo-text-1.0-large |
+- `filtration_model_path` 要加载的过滤模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | unimo-text-1.0      |
+   | unimo-text-1.0-large |
+- `batch_size` 使用taskflow时的批处理大小，请结合机器情况进行调整，默认为8。
+- `a_max_answer_candidates` 答案抽取阶段，每个输入的最大返回答案候选数，默认为5。
+- `a_prompt` 答案抽取阶段，使用的提示词，以","分隔，默认为"答案"。
+- `a_position_prob` 答案抽取阶段，置信度阈值，默认为0.01。
+- `q_num_return_sequences` 问题生成阶段，返回问题候选数，在使用"beam_search"解码策略时它应该小于`q_num_beams`，默认为3。
+- `q_max_question_length` 问题生成阶段，最大解码长度，默认为50。
+- `q_decode_strategy` 问题生成阶段，解码策略，默认为"sampling"。
+- `q_top_k` 问题生成阶段，使用"sampling"解码策略时的top k值，默认为5。
+- `q_top_p` 问题生成阶段，使用"sampling"解码策略时的top p值，默认为0。
+- `q_num_beams` 问题生成阶段，使用"beam_search"解码策略时的beam大小，默认为6。
+- `do_filtration` 是否进行过滤。
+- `f_filtration_position_prob` 过滤阶段，过滤置信度阈值，默认为0.1。
+- `do_debug` 是否进入调试状态，调试状态下将输出过滤掉的生成问答对。
 
 
 ### 语义索引
