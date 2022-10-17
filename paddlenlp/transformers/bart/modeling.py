@@ -862,12 +862,12 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 See :class:`BartModel`.
             start_positions (Tensor, optional):
                 Labels for position (index) of the start of the labelled span for computing the token classification loss.
-                Positions are clamped to the length of the sequence (*sequence_length*). Position outside of the sequence
+                Positions are clamped to the length of the sequence (sequence_length). Position outside of the sequence
                 are not taken into account for computing the loss.
                 A tensor of shape `(batch_size, )`. Default to `None`.
             end_positions (Tensor, optional):
                 Labels for position (index) of the end of the labelled span for computing the token classification loss.
-                Positions are clamped to the length of the sequence (*sequence_length*). Position outside of the sequence
+                Positions are clamped to the length of the sequence (sequence_length). Position outside of the sequence
                 are not taken into account for computing the loss.
                 A tensor of shape `(batch_size, )`. Default to `None`.
             output_attentions (bool, optional):
