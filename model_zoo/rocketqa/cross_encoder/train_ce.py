@@ -36,6 +36,7 @@ parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The ou
 parser.add_argument("--train_set", type=str, required=True, help="The full path of train_set_file.")
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument('--model_name_or_path', default="ernie-1.0", help="The pretrained model used for training")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
@@ -71,8 +72,8 @@ def do_train():
                             data_path=args.train_set,
                             lazy=False)
 
-    pretrained_model = AutoModel.from_pretrained('ernie-1.0')
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     model = CrossEncoder(pretrained_model, num_classes=2)
 

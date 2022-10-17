@@ -39,6 +39,7 @@ parser.add_argument("--query_max_seq_length", default=32, type=int, help="The ma
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--title_max_seq_length", default=128, type=int, help="The maximum total input sequence length of title after tokenization. "
     "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument('--model_name_or_path', default="ernie-1.0", help="The pretrained model used for training")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument("--learning_rate", default=3e-5, type=float, help="The initial learning rate for Adam.")
@@ -86,9 +87,9 @@ def do_train():
                             lazy=False)
 
     pretrained_model = AutoModel.from_pretrained(
-        'ernie-1.0', enable_recompute=args.use_recompute)
+        args.model_name_or_path, enable_recompute=args.use_recompute)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     trans_func = partial(convert_train_example,
                          tokenizer=tokenizer,

@@ -48,7 +48,7 @@ RocketQA在Dureader Retrieval的实验结果如下：
 安装环境依赖paddlepaddle和paddlenlp
 
 + paddlenlp                          2.4.0
-+ paddlepaddle-gpu                   2.2.2
++ paddlepaddle-gpu                   2.3.2
 + faiss-cpu                      1.7.2
 
 ## 数据准备
@@ -205,6 +205,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 - `train_set_file` 训练数据的路径。
 - `device` 使用 cpu/gpu 进行训练
 - `save_dir` 模型保存的路径。
+- `model_name_or_path` 预训练语言模型名，用于模型的初始化，默认ernie-1.0。
 - `batch_size` 批次的大小。
 - `save_steps` 保存模型的step间隔。
 - `output_emb_size` Transformer 顶层输出的文本向量维度
@@ -242,7 +243,11 @@ bash extract_embeddings.sh
 DATA_PATH="../dureader-retrieval-baseline-dataset/passage-collection"
 TOP_K=50
 para_part_cnt=`cat $DATA_PATH/part-00 | wc -l`
-python merge.py $para_part_cnt $TOP_K 4
+python merge.py --para_part_cnt ${para_part_cnt} \
+                --top_k ${TOP_K} \
+                --total_part 4 \
+                --inputfiles output/res.top50-part0 output/res.top50-part1 output/res.top50-part2 output/res.top50-part3 \
+                --outfile output/dev.res.top${TOP_K}
 
 QUERY2ID="../dureader-retrieval-baseline-dataset/dev/q2qid.dev.json"
 PARA2ID="../dureader-retrieval-baseline-dataset/passage-collection/passage2id.map.json"
@@ -296,6 +301,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_ce.py \
 其中参数释义如下：
 - `train_set` 训练数据的路径。
 - `device` 使用 cpu/gpu 进行训练
+- `model_name_or_path` 预训练语言模型名，用于模型的初始化，默认ernie-1.0。
 - `save_dir` 模型保存的路径。
 - `batch_size` 批次的大小。
 - `save_steps` 保存模型的step间隔。

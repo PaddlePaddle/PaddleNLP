@@ -15,12 +15,15 @@
 DATA_PATH="../dureader-retrieval-baseline-dataset/passage-collection"
 TOP_K=50
 para_part_cnt=`cat $DATA_PATH/part-00 | wc -l`
-python merge.py $para_part_cnt $TOP_K 4 
+python merge.py --para_part_cnt ${para_part_cnt} \
+                --top_k ${TOP_K} \
+                --total_part 4 \
+                --inputfiles output/res.top50-part0 output/res.top50-part1 output/res.top50-part2 output/res.top50-part3 \
+                --outfile output/dev.res.top${TOP_K}
 
 QUERY2ID="../dureader-retrieval-baseline-dataset/dev/q2qid.dev.json"
 PARA2ID="../dureader-retrieval-baseline-dataset/passage-collection/passage2id.map.json"
 MODEL_OUTPUT="output/dev.res.top50"
-# python metric/convert_recall_res_to_json.py $QUERY2ID $PARA2ID $MODEL_OUTPUT
 python ../metric/utils.py --q2id_map $QUERY2ID \
                        --p2id_map $PARA2ID \
                        --recall_result $MODEL_OUTPUT \
