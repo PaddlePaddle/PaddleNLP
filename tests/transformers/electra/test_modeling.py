@@ -154,47 +154,35 @@ class ElectraModelTester:
         input_token_types = ids_tensor([self.batch_size, self.seq_length],
                                        self.type_vocab_size)
 
-        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
-        embed_size_per_head = self.hidden_size // self.num_attention_heads
-        key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
-                                    self.seq_length, embed_size_per_head))
-        values_tensor = floats_tensor(
-            (self.batch_size, self.num_attention_heads, self.seq_length,
-             embed_size_per_head))
-        past_key_values = ((
-            key_tensor,
-            values_tensor,
-        ), ) * self.num_hidden_layers
-
-        # create fully-visible attention mask for input_ids only and input_ids + past
-        attention_mask = paddle.ones([self.batch_size, self.seq_length])
-        attention_mask_with_past = paddle.ones(
-            [self.batch_size, self.seq_length * 2])
-
-        outputs_with_cache = model(input_ids,
+        # first forward pass
+        first_pass_outputs = model(input_ids,
                                    token_type_ids=input_token_types,
-                                   attention_mask=attention_mask_with_past,
-                                   past_key_values=past_key_values,
-                                   return_dict=self.parent.return_dict)
-        outputs_without_cache = model(input_ids,
-                                      token_type_ids=input_token_types,
-                                      attention_mask=attention_mask,
-                                      return_dict=self.parent.return_dict)
+                                   use_cache=True,
+                                   return_dict=True)
+        past_key_values = first_pass_outputs.past_key_values
+
+        # fully-visible attention mask
+        attention_mask = paddle.ones([self.batch_size, self.seq_length * 2])
+
+        # second forward pass with past_key_values with visible mask
+        second_pass_outputs = model(input_ids,
+                                    token_type_ids=input_token_types,
+                                    attention_mask=attention_mask,
+                                    past_key_values=past_key_values,
+                                    return_dict=self.parent.return_dict)
 
         # last_hidden_state should have the same shape but different values when given past_key_values
         if self.parent.return_dict:
-            self.parent.assertEqual(
-                outputs_with_cache.last_hidden_state.shape,
-                outputs_without_cache.last_hidden_state.shape)
+            self.parent.assertEqual(second_pass_outputs.last_hidden_state.shape,
+                                    first_pass_outputs.last_hidden_state.shape)
             self.parent.assertFalse(
-                paddle.allclose(outputs_with_cache.last_hidden_state,
-                                outputs_without_cache.last_hidden_state))
+                paddle.allclose(second_pass_outputs.last_hidden_state,
+                                first_pass_outputs.last_hidden_state))
         else:
-            outputs_with_cache, _ = outputs_with_cache
-            self.parent.assertEqual(outputs_with_cache.shape,
-                                    outputs_without_cache.shape)
+            self.parent.assertEqual(second_pass_outputs.shape,
+                                    first_pass_outputs[0].shape)
             self.parent.assertFalse(
-                paddle.allclose(outputs_with_cache, outputs_without_cache))
+                paddle.allclose(second_pass_outputs, first_pass_outputs[0]))
 
     def create_and_check_electra_for_masked_lm(
         self,

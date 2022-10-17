@@ -71,121 +71,6 @@ ACT2FN = {
 }
 
 
-class TransformerEncoderLayerPro(TransformerEncoderLayer):
-
-    def __init__(self,
-                 d_model,
-                 nhead,
-                 dim_feedforward,
-                 dropout=0.1,
-                 activation="relu",
-                 attn_dropout=None,
-                 act_dropout=None,
-                 normalize_before=False,
-                 weight_attr=None,
-                 bias_attr=None):
-        super(TransformerEncoderLayerPro,
-              self).__init__(d_model, nhead, dim_feedforward, dropout,
-                             activation, attn_dropout, act_dropout,
-                             normalize_before, weight_attr, bias_attr)
-
-    def forward(self, src, src_mask=None, cache=None, output_attentions=False):
-        self.self_attn.need_weights = output_attentions
-        src_mask = _convert_attention_mask(src_mask, src.dtype)
-        attentions = None
-
-        residual = src
-        if self.normalize_before:
-            src = self.norm1(src)
-        if cache is None:
-            src = self.self_attn(src, src, src, src_mask)
-            if output_attentions:
-                src, attentions = src
-        else:
-            output = self.self_attn(src, src, src, src_mask, cache)
-            if output_attentions:
-                src, attentions, incremental_cache = output
-            else:
-                src, incremental_cache = output
-
-        src = residual + self.dropout1(src)
-        if not self.normalize_before:
-            src = self.norm1(src)
-
-        residual = src
-        if self.normalize_before:
-            src = self.norm2(src)
-        src = self.linear2(self.dropout(self.activation(self.linear1(src))))
-        src = residual + self.dropout2(src)
-        if not self.normalize_before:
-            src = self.norm2(src)
-        if output_attentions:
-            src = (src, attentions)
-        return src if cache is None else (src, incremental_cache)
-
-
-class TransformerEncoderPro(TransformerEncoder):
-
-    def __init__(self, encoder_layer, num_layers, norm=None):
-        super(TransformerEncoderPro, self).__init__(encoder_layer, num_layers,
-                                                    norm)
-
-    def forward(self,
-                src,
-                src_mask=None,
-                cache=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
-        src_mask = _convert_attention_mask(src_mask, src.dtype)
-
-        output = src
-        new_caches = []
-        all_attentions = [] if output_attentions else None
-        all_hidden_states = [] if output_hidden_states else None
-        for i, mod in enumerate(self.layers):
-
-            if output_hidden_states:
-                all_hidden_states.append(output)
-
-            if cache is None:
-                output = mod(output,
-                             src_mask=src_mask,
-                             output_attentions=output_attentions)
-            else:
-                cache_wrapper = cache[i] if isinstance(
-                    cache[i], nn.MultiHeadAttention.Cache
-                ) else nn.MultiHeadAttention.Cache(*cache[i])
-                output, new_cache = mod(output,
-                                        src_mask=src_mask,
-                                        cache=cache_wrapper,
-                                        output_attentions=output_attentions)
-                new_caches.append(new_cache)
-            if output_attentions:
-                all_attentions.append(output[1])
-                output = output[0]
-
-        if output_hidden_states:
-            all_hidden_states.append(output)
-
-        if self.norm is not None:
-            output = self.norm(output)
-
-            if output_hidden_states:
-                all_hidden_states[-1] = output
-
-        if not return_dict:
-            if output_attentions or output_hidden_states:
-                output = (output, all_attentions, all_hidden_states)
-            return output if cache is None else (output, new_caches)
-
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=output,
-            hidden_states=all_hidden_states,
-            attentions=all_attentions,
-            past_key_values=new_caches)
-
-
 class ElectraEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
@@ -539,7 +424,7 @@ class ElectraModel(ElectraPretrainedModel):
         if embedding_size != hidden_size:
             self.embeddings_project = nn.Linear(embedding_size, hidden_size)
 
-        encoder_layer = TransformerEncoderLayerPro(
+        encoder_layer = TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
             intermediate_size,
@@ -547,7 +432,7 @@ class ElectraModel(ElectraPretrainedModel):
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
             act_dropout=0)
-        self.encoder = TransformerEncoderPro(encoder_layer, num_hidden_layers)
+        self.encoder = TransformerEncoder(encoder_layer, num_hidden_layers)
 
         self.init_weights()
 
