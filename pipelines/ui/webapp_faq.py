@@ -59,7 +59,7 @@ def on_change_text():
 def main():
 
     st.set_page_config(
-        page_title="pipelines FAQ智能问答",
+        page_title="PaddleNLP Pipelines FAQ智能问答",
         page_icon=
         "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
@@ -76,7 +76,7 @@ def main():
         st.session_state.raw_json = None
 
     # Title
-    st.write("# PaddleNLP 保险FAQ问答")
+    st.write("# PaddleNLP Pipelines FAQ智能问答")
     # Sidebar
     st.sidebar.header("选项")
     top_k_reader = st.sidebar.slider(
@@ -199,7 +199,7 @@ def main():
                 markdown(context),
                 unsafe_allow_html=True,
             )
-            st.write("**FAQ答案:** ", result["answer"])
+            st.write("**答案:** ", result["answer"])
             st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")

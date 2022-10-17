@@ -1356,7 +1356,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     def __init__(self, **kwargs):
         # inputs and kwargs for saving and re-loading (see ``from_pretrained`` and ``save_pretrained``)
         self.init_inputs = ()
-        self.init_kwargs = copy.deepcopy(kwargs)
+
+        self.init_kwargs = getattr(self, "init_kwargs",
+                                   None) or copy.deepcopy(kwargs)
         self.name_or_path = kwargs.pop("name_or_path", "")
         self._processor_class = kwargs.pop("processor_class", None)
 

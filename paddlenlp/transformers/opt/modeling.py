@@ -222,9 +222,7 @@ class OPTPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {}
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {"model_state": {}}
     base_model_prefix = "opt"
 

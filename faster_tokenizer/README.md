@@ -99,3 +99,7 @@ A：在有三种情况下，打开`use_faster=True`开关可能无法提升性�
   2. 加载的Tokenizer类型暂不支持Faster版本。目前支持4种Tokenizer的Faster版本，分别是BERT、ERNIE、TinyBERT以及ERNIE-M Tokenizer。若加载不支持Faster版本的Tokenizer情况下打开`use_faster`开关，PaddleNLP会给出以下warning："The tokenizer XXX doesn't have the faster version. Please check the map paddlenlp.transformers.auto.tokenizer.FASTER_TOKENIZER_MAPPING_NAMES to see which faster tokenizers are currently supported."
 
   3. 待切词文本长度过短（如文本平均长度小于5）。这种情况下切词开销可能不是整个文本预处理的性能瓶颈，导致在使用FasterTokenizer后仍无法提升整体性能。
+
+## 相关文档
+
+[FasterTokenizer编译指南](docs/compile/README.md)

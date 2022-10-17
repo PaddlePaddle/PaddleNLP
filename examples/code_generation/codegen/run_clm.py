@@ -252,7 +252,7 @@ def do_train(args):
                            block_size)
     dev_set = process_ds(dev_set, tokenizer, args.overwrite_cache, block_size)
 
-    batchify_fn = DataCollatorWithPadding(tokenizer)
+    batchify_fn = DataCollatorWithPadding(tokenizer, return_attention_mask=True)
 
     train_batch_sampler = DistributedBatchSampler(
         train_set, batch_size=args.train_batch_size, shuffle=True)

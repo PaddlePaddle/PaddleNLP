@@ -25,8 +25,8 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "electra-small": 512,
     "electra-base": 512,
     "electra-large": 512,
-    "chinese-electra-small": 512,
     "chinese-electra-base": 512,
+    "chinese-electra-small": 512,
     "ernie-health-chinese": 512
 }
 

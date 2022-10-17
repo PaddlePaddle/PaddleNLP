@@ -118,6 +118,35 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
+def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
+    """
+    Create dataloader.
+    Args:
+        dataset(obj:`paddle.io.Dataset`): Dataset instance.
+        mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
+        batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
+        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
+    Returns:
+        dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
+    """
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
+
+    shuffle = True if mode == 'train' else False
+    if mode == "train":
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
+    else:
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      return_list=True)
+    return dataloader
+
+
 def convert_example(example, tokenizer, max_seq_len):
     """
     example: {
@@ -193,6 +222,10 @@ def reader(data_path, max_seq_len=512):
             if len(content) <= max_content_len:
                 yield json_line
             else:
+                if result['end'] - result['start'] > max_content_len:
+                    logger.warn(
+                        "result['end '] - result ['start'] exceeds max_content_len, which will result in no valid instance being returned"
+                    )
                 result_list = json_line['result_list']
                 json_lines = []
                 accumulate = 0
@@ -201,7 +234,8 @@ def reader(data_path, max_seq_len=512):
 
                     for result in result_list:
                         if result['start'] + 1 <= max_content_len < result[
-                                'end']:
+                                'end'] and result['end'] - result[
+                                    'start'] <= max_content_len:
                             max_content_len = result['start']
                             break
 
@@ -265,6 +299,49 @@ def unify_prompt_name(prompt):
         prompt = prompt_prefix + "[" + cls_options + "]"
         return prompt
     return prompt
+
+
+def get_relation_type_dict(relation_data):
+
+    def compare(a, b):
+        a = a[::-1]
+        b = b[::-1]
+        res = ''
+        for i in range(min(len(a), len(b))):
+            if a[i] == b[i]:
+                res += a[i]
+            else:
+                break
+        if res == "":
+            return res
+        elif res[::-1][0] == "的":
+            return res[::-1][1:]
+        return ""
+
+    relation_type_dict = {}
+    added_list = []
+    for i in range(len(relation_data)):
+        added = False
+        if relation_data[i][0] not in added_list:
+            for j in range(i + 1, len(relation_data)):
+                match = compare(relation_data[i][0], relation_data[j][0])
+                if match != "":
+                    match = unify_prompt_name(match)
+                    if relation_data[i][0] not in added_list:
+                        added_list.append(relation_data[i][0])
+                        relation_type_dict.setdefault(match, []).append(
+                            relation_data[i][1])
+                    added_list.append(relation_data[j][0])
+                    relation_type_dict.setdefault(match, []).append(
+                        relation_data[j][1])
+                    added = True
+            if not added:
+                added_list.append(relation_data[i][0])
+                suffix = relation_data[i][0].rsplit("的", 1)[1]
+                suffix = unify_prompt_name(suffix)
+                relation_type_dict.setdefault(suffix,
+                                              []).append(relation_data[i][1])
+    return relation_type_dict
 
 
 def add_entity_negative_example(examples, texts, prompts, label_set,
@@ -610,26 +687,31 @@ def convert_ext_examples(raw_examples,
                     redundants1 = inverse_relation_list[i]
 
                     # 2. entity_name_set ^ subject_goldens[i]
-                    nonentity_list = list(
-                        set(entity_name_set) ^ set(subject_goldens[i]))
-                    nonentity_list.sort()
+                    redundants2 = []
+                    if len(predicate_list[i]) != 0:
+                        nonentity_list = list(
+                            set(entity_name_set) ^ set(subject_goldens[i]))
+                        nonentity_list.sort()
 
-                    redundants2 = [
-                        nonentity + "的" + predicate_list[i][random.randrange(
-                            len(predicate_list[i]))]
-                        for nonentity in nonentity_list
-                    ]
+                        redundants2 = [
+                            nonentity + "的" +
+                            predicate_list[i][random.randrange(
+                                len(predicate_list[i]))]
+                            for nonentity in nonentity_list
+                        ]
 
                     # 3. entity_label_set ^ entity_prompts[i]
-                    non_ent_label_list = list(
-                        set(entity_label_set) ^ set(entity_prompts[i]))
-                    non_ent_label_list.sort()
+                    redundants3 = []
+                    if len(subject_goldens[i]) != 0:
+                        non_ent_label_list = list(
+                            set(entity_label_set) ^ set(entity_prompts[i]))
+                        non_ent_label_list.sort()
 
-                    redundants3 = [
-                        subject_goldens[i][random.randrange(
-                            len(subject_goldens[i]))] + "的" + non_ent_label
-                        for non_ent_label in non_ent_label_list
-                    ]
+                        redundants3 = [
+                            subject_goldens[i][random.randrange(
+                                len(subject_goldens[i]))] + "的" + non_ent_label
+                            for non_ent_label in non_ent_label_list
+                        ]
 
                     redundants_list = [redundants1, redundants2, redundants3]
 
@@ -657,6 +739,7 @@ def convert_ext_examples(raw_examples,
                     positive_examples.extend(relation_examples[i])
                     negative_examples.extend(negative_example)
                     pbar.update(1)
+            all_relation_examples = positive_examples + negative_examples
         else:
             relation_examples = add_full_negative_example(
                 relation_examples, texts, relation_prompts, predicate_set,

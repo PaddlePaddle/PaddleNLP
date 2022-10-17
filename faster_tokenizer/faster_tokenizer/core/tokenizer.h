@@ -19,7 +19,7 @@ limitations under the License. */
 #include "faster_tokenizer/core/added_vocabulary.h"
 #include "faster_tokenizer/core/base.h"
 #include "faster_tokenizer/utils/utils.h"
-#include "boost/variant.hpp"
+#include "faster_tokenizer/utils/variant.h"
 #include "nlohmann/json.hpp"
 
 namespace paddlenlp {
@@ -56,9 +56,9 @@ namespace core {
 class AddedVocabulary;
 class Encoding;
 
-using InputString = boost::variant<std::string, std::vector<std::string>>;
+using InputString = paddlenlp::variant<std::string, std::vector<std::string>>;
 using EncodeInput =
-    boost::variant<InputString, std::pair<InputString, InputString>>;
+    paddlenlp::variant<InputString, std::pair<InputString, InputString>>;
 
 class FASTERTOKENIZER_DECL Tokenizer {
 public:
@@ -160,9 +160,23 @@ public:
                    bool add_special_tokens,
                    Encoding* result_encoding) const;
 
+  void MultiThreadEncodeBatchStrings(
+      const std::vector<EncodeInput>& batch_encode_input,
+      std::vector<Encoding>* encodings,
+      bool add_special_tokens,
+      size_t start_index,
+      size_t step_index) const;
+
   void EncodeBatchStrings(const std::vector<EncodeInput>& batch_encode_input,
                           std::vector<Encoding>* encodings,
                           bool add_special_tokens = true) const;
+
+  void MultiThreadEncodeBatchStringsCharOffsets(
+      const std::vector<EncodeInput>& batch_encode_input,
+      std::vector<Encoding>* encodings,
+      bool add_special_tokens,
+      size_t start_index,
+      size_t step_index) const;
 
   void EncodeBatchStringsCharOffsets(
       const std::vector<EncodeInput>& batch_encode_input,
@@ -194,6 +208,12 @@ public:
   void Decode(const std::vector<uint32_t>& token_ids,
               std::string* result,
               bool skip_special_tokens = true) const;
+  void MultiThreadDecodeBatch(
+      const std::vector<std::vector<uint32_t>>& batch_token_ids,
+      std::vector<std::string>* results,
+      bool skip_special_tokens,
+      size_t start_index,
+      size_t step_index) const;
   void DecodeBatch(const std::vector<std::vector<uint32_t>>& batch_token_ids,
                    std::vector<std::string>* results,
                    bool skip_special_tokens = true) const;

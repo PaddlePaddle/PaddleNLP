@@ -166,6 +166,26 @@ class BaseStandardPipeline(ABC):
         """
         return self.pipeline.get_document_store()
 
+    def run_batch(self,
+                  queries: List[str],
+                  params: Optional[dict] = None,
+                  debug: Optional[bool] = None):
+        """
+        Run a batch of queries through the pipeline.
+        :param queries: List of query strings.
+        :param params: Parameters for the individual nodes of the pipeline. For instance,
+                       `params={"Retriever": {"top_k": 10}, "Reader": {"top_k": 5}}`
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+                      about their execution. By default these include the input parameters
+                      they received and the output they generated.
+                      All debug information can then be found in the dict returned
+                      by this method under the key "_debug"
+        """
+        output = self.pipeline.run_batch(queries=queries,
+                                         params=params,
+                                         debug=debug)
+        return output
+
 
 class ExtractiveQAPipeline(BaseStandardPipeline):
     """

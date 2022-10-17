@@ -92,11 +92,11 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization.")
     parser.add_argument("--num_workers", type=int, default=2, help="Num of workers for DataLoader.")
     parser.add_argument("--check_accuracy", type=str2bool, nargs='?', const=False, help="Check accuracy for training process.")
-    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="select cpu, gpu, xpu devices.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "mlu"], help="select cpu, gpu, xpu devices.")
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
-    # Argument for bert
+    # Argument for bert/ernie
     parser.add_argument("--masked_lm_prob", type=float, default=0.15, help="Mask token prob.")
     parser.add_argument("--short_seq_prob", type=float, default=0.1, help="Short sequence prob.")
     parser.add_argument("--favor_longer_ngram", type=str2bool, default=False, help="Short sequence prob.")
@@ -121,5 +121,8 @@ def parse_args(MODEL_CLASSES):
             logger.warning(
                 "The attention_probs_dropout_prob should set to 0 for accuracy checking."
             )
+    if args.dp_degree * args.mp_degree * args.pp_degree * args.sharding_degree == 1:
+        if paddle.distributed.get_world_size() > 1:
+            args.dp_degree = paddle.distributed.get_world_size()
 
     return args

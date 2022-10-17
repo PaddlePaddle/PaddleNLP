@@ -100,6 +100,13 @@ class RoFormerv2Tokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
     }
+
+    # TODO(wj-Mcat): to be confirmed
+    max_model_input_sizes = {
+        "roformer_v2_chinese_char_small": 1024,
+        "roformer_v2_chinese_char_base": 1024,
+        "roformer_v2_chinese_char_large": 1024,
+    }
     padding_side = "right"
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 

@@ -86,7 +86,6 @@ class ErnieViLPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "ernie_vil-2.0-base-zh": {
@@ -142,7 +141,6 @@ class ErnieViLPretrainedModel(PretrainedModel):
             "pad_token_id": 0
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie_vil-2.0-base-zh":

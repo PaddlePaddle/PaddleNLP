@@ -457,8 +457,11 @@ class SQLDocumentStore(BaseDocumentStore):
             for doc in document_objects[i:i + batch_size]:
                 meta_fields = doc.meta or {}
                 vector_id = meta_fields.pop("vector_id", None)
+                # Support storing list type data by adding value semicolon
                 meta_orms = [
-                    MetaDocumentORM(name=key, value=value)
+                    MetaDocumentORM(
+                        name=key,
+                        value=';'.join(value) if type(value) == list else value)
                     for key, value in meta_fields.items()
                 ]
                 doc_orm = DocumentORM(

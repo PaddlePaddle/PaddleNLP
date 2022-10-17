@@ -1,0 +1,23 @@
+name: 🐛 Ask Question
+description: 请描述您使用PaddleNLP时遇到的问题
+title: "[Question]: "
+labels: 
+  - question
+body:
+- type: markdown
+  attributes:
+    value: >
+      #### 你可以在这里提出一个使用/咨询问题，提问之前请确保：
+      
+      - 1）已经百度/谷歌搜索过你的问题，但是没有找到解答；
+      
+      - 2）已经在官网查询过[API文档](https://www.paddlepaddle.org.cn/documentation/docs/zh/api/index_cn.html)与[FAQ](https://www.paddlepaddle.org.cn/documentation/docs/zh/faq/index_cn.html)，但是没有找到解答；
+      
+      - 3）已经在[历史issue](https://github.com/PaddlePaddle/Paddle/issues)中搜索过，没有找到同类issue或issue未被解答。
+      
+- type: textarea
+  id: question
+  attributes:
+    label: 请提出你的问题
+  validations:
+    required: true

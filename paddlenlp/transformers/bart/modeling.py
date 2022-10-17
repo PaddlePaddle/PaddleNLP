@@ -49,7 +49,6 @@ class BartPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "bart-base": {
             "vocab_size": 50265,
@@ -94,7 +93,6 @@ class BartPretrainedModel(PretrainedModel):
             "init_std": 0.02,
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "bart-base":

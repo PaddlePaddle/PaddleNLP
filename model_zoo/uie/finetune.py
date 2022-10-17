@@ -26,7 +26,7 @@ from paddlenlp.utils.log import logger
 
 from model import UIE
 from evaluate import evaluate
-from utils import set_seed, convert_example, reader, MODEL_MAP
+from utils import set_seed, convert_example, reader, MODEL_MAP, create_data_loader
 
 
 def do_train():
@@ -57,28 +57,18 @@ def do_train():
                           max_seq_len=args.max_seq_len,
                           lazy=False)
 
-    train_ds = train_ds.map(
-        partial(convert_example,
-                tokenizer=tokenizer,
-                max_seq_len=args.max_seq_len))
-    dev_ds = dev_ds.map(
-        partial(convert_example,
-                tokenizer=tokenizer,
-                max_seq_len=args.max_seq_len))
+    trans_fn = partial(convert_example,
+                       tokenizer=tokenizer,
+                       max_seq_len=args.max_seq_len)
 
-    train_batch_sampler = paddle.io.BatchSampler(dataset=train_ds,
-                                                 batch_size=args.batch_size,
-                                                 shuffle=True)
-    train_data_loader = paddle.io.DataLoader(dataset=train_ds,
-                                             batch_sampler=train_batch_sampler,
-                                             return_list=True)
-
-    dev_batch_sampler = paddle.io.BatchSampler(dataset=dev_ds,
-                                               batch_size=args.batch_size,
-                                               shuffle=False)
-    dev_data_loader = paddle.io.DataLoader(dataset=dev_ds,
-                                           batch_sampler=dev_batch_sampler,
-                                           return_list=True)
+    train_data_loader = create_data_loader(train_ds,
+                                           mode="train",
+                                           batch_size=args.batch_size,
+                                           trans_fn=trans_fn)
+    dev_data_loader = create_data_loader(dev_ds,
+                                         mode="dev",
+                                         batch_size=args.batch_size,
+                                         trans_fn=trans_fn)
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -95,7 +85,6 @@ def do_train():
 
     loss_list = []
     global_step = 0
-    best_step = 0
     best_f1 = 0
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):

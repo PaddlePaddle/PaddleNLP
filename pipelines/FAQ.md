@@ -127,3 +127,97 @@ document_store.update_embeddings(retriever, batch_size=256)
 #### 运行后台程序出现了错误：`Exception: Failed loading pipeline component 'DocumentStore': RequestError(400, 'illegal_argument_exception', 'Mapper for [embedding] conflicts with existing mapper:\n\tCannot update parameter [dims] from [312] to [768]')`
 
 以语义检索为例，这是因为模型的维度不对造成的，请检查一下 `elastic search`中的文本的向量的维度和`semantic_search.yaml`里面`DocumentStore`设置的维度`embedding_dim`是否一致，如果不一致，请重新使用`utils/offline_ann.py`构建索引。总之，请确保构建索引所用到的模型和`semantic_search.yaml`设置的模型是一致的。
+
+#### 安装后出现错误：`cannot import name '_registerMatType' from 'cv2'`
+
+opencv版本不匹配的原因，可以对其进行升级到最新版本，保证opencv系列的版本一致。
+
+```
+pip install opencv-contrib-python --upgrade
+pip install opencv-contrib-python-headless --upgrade
+pip install opencv-python --upgrade
+```
+
+#### 安装运行出现 `RuntimeError: Can't load weights for 'rocketqa-zh-nano-query-encoder'`
+
+rocketqa模型2.3.7之后才添加，paddlenlp版本需要升级：
+```
+pip install paddlenlp --upgrade
+```
+
+#### 安装出现问题 `The repository located at mirrors.aliyun.com is not a trusted or secure host and is being ignored.`
+
+设置pip源为清华源，然后重新安装，可运行如下命令进行设置：
+
+```
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+#### Elastic search 日志显示错误 `exception during geoip databases update`
+
+需要编辑config/elasticsearch.yml，在末尾添加：
+
+```
+ingest.geoip.downloader.enabled: false
+```
+如果是Docker启动，请添加如下的配置，然后运行：
+
+```
+docker run \
+      -d \
+      --name es02 \
+      --net elastic \
+      -p 9200:9200 \
+      -e discovery.type=single-node \
+      -e ES_JAVA_OPTS="-Xms256m -Xmx256m"\
+      -e xpack.security.enabled=false \
+      -e  ingest.geoip.downloader.enabled=false \
+      -e cluster.routing.allocation.disk.threshold_enabled=false \
+      -it \
+      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
+```
+
+#### Windows出现运行前端报错`requests.exceptions.MissingSchema: Invalid URL 'None/query': No scheme supplied. Perhaps you meant http://None/query?`
+
+环境变量没有生效，请检查一下环境变量，确保PIPELINE_YAML_PATH和API_ENDPOINT生效：
+
+```
+$env:PIPELINE_YAML_PATH='rest_api/pipeline/semantic_search.yaml'
+
+$env:API_ENDPOINT='http://127.0.0.1:8891'
+```
+
+#### Windows的GPU运行出现错误：`IndexError: index 4616429690595525704 is out of bounds for axis 0 with size 1`
+
+paddle.nozero算子出现异常，请退回到PaddlePaddle 2.2.2版本，比如您使用的是cuda 11.2，可以使用如下的命令：
+
+```
+python -m pip install paddlepaddle-gpu==2.2.2.post112 -f https://www.paddlepaddle.org.cn/whl/windows/mkl/avx/stable.html
+```
+
+#### 运行应用的时候出现错误 `assert d == self.d`
+
+这是运行多个应用引起的，请在运行其他应用之前，删除现有的db文件：
+
+```
+rm -rf faiss_document_store.db
+```
+
+#### Windows运行应用的时候出现了下面的错误：`RuntimeError: (NotFound) Cannot open file C:\Users\my_name/.paddleocr/whl\det\ch\ch_PP-OCRv3_det_infer/inference.pdmodel, please confirm whether the file is normal.`
+
+这是Windows系统用户命名为中文的原因，详细解决方法参考issue. [https://github.com/PaddlePaddle/PaddleNLP/issues/3242](https://github.com/PaddlePaddle/PaddleNLP/issues/3242)
+
+#### 怎样从GPU切换到CPU上运行？
+
+请在对应的所有`sh`文件里面加入下面的环境变量
+```
+export CUDA_VISIBLE_DEVICES=""
+```
+
+#### 运行streamlit前端程序出现错误：`AttributeError: module 'click' has no attribute 'get_os_args'`
+
+click版本过高导致：
+
+```
+pip install click==8.0
+```
