@@ -320,10 +320,9 @@ def compute_neuron_head_importance(model,
         if "labels" in batch:
             labels = batch.pop("labels")
             # For token cls tasks
-            if "length" in batch:
-                batch.pop("length")
-            if "seq_len" in batch:
-                batch.pop("seq_len")
+            for key in ("length", "seq_len"):
+                if key in batch:
+                    batch.pop(key)
         elif "start_positions" in batch and "end_positions" in batch:
             labels = (batch.pop("start_positions"), batch.pop("end_positions"))
         else:
