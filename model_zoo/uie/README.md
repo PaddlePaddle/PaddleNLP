@@ -623,8 +623,18 @@ python labelstudio2doccano.py --labelstudio_file label-studio.json
 
 #### 4.3 模型微调和压缩
 
+推荐使用 [Trainer API ](../../docs/trainer.md) 对模型进行微调、压缩。用户输入模型、数据集等就可以使用 Trainer API 高效快速的实现预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等训练配置。已经集成在 Trainer 中的模型压缩功能现在支持裁剪 + 量化的策略。
+
+如果需要使用模型压缩功能需要安装最新版本的 `paddleslim`：
+
 ```shell
-python run_uie_trainer.py  \
+pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+使用下面的命令，使用 `uie-base` 作为预训练模型进行模型微调 + 压缩：
+
+```shell
+python run_trainer.py  \
     --device gpu \
     --logging_steps 10 \
     --save_steps 100 \
@@ -638,7 +648,7 @@ python run_uie_trainer.py  \
     --max_seq_length 512  \
     --per_device_eval_batch_size 16 \
     --per_device_train_batch_size  16 \
-    --num_train_epochs 50 \
+    --num_train_epochs 100 \
     --learning_rate 1e-5 \
     --do_train \
     --do_eval \
@@ -651,57 +661,56 @@ python run_uie_trainer.py  \
     --strategy 'qat' \
 ```
 
-可支持配置的参数：
-* `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、"uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano";
-* `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
-* `device`: 选用什么设备进行训练，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
-* `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
+使用 Trainer 可支持配置的通用参数：
+* `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano";
+* `output_dir`：必须，模型训练或压缩后保存的模型目录；默认为 `None` 。
+* `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
+* `per_device_train_batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
+* `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
-* `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
-* `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
-* `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
-* `seed`：随机种子，默认为 42。
-* `width_mult_list`：裁剪宽度（multi head）保留的比例列表，表示对self_attention中的 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，保留比例乘以宽度（multi haed数量）应为整数；默认是None。
-* `max_seq_length`：模型使用的最大序列长度，建议与训练过程保持一致, 若出现显存不足，请适当调低这一参数；默认为128。
+* `num_train_epochs`: 训练轮次，使用早停法时可以选择 100；默认为10。
+* `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认100。
+* `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
+* `seed`：全局随机种子，默认为 42。
+* `label_names`：训练数据标签的key的名称，例如 'labels'、'start_postions' 或者 'end_positions' 等。自定义数据集需要设置，否则可能会造成识别错误；默认为 None。
+* `weight_decay`：除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0；
+* `do_train`:是否进行微调训练，设置该参数表示进行微调训练，默认不设置。
+* `do_eval`:是否进行评估，设置该参数表示进行评估。
+* `do_compress`:是否进行压缩，设置该参数表示进行压缩。设置时，可同时设置压缩相关的参数；
 
-程序运行时将会自动进行训练，评估，测试。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中。
+可配置的压缩相关的参数：
+* `strategy`：压缩策略，在 UIE 中目前推荐使用 `'qat'`，即量化训练（QAT）；默认是 `'dynabert+ptq'`。
+* `activation_quantize_type`：激活 tensor 的量化类型。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在'qat'策略中，它默认是 'moving_average_abs_max'。
+* `weight_quantize_type`：权重的量化类型。支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'， 这种方法得到的模型通常精度更高；
 
-默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`
+以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，得到模型的 F1 值如下：
 
-如果在 GPU 环境中使用，可以指定``gpus``参数进行多卡训练。
+|       Models         | F1           |
+| -------------------  |:------------:|
+| uie-base+微调，FP32   |    91.93     |
 
-由于指定了--do_eval，因此在训练完会自动进行评估。
+该示例代码中由于设置了参数 `--do_eval` 和 `--do_compress`，因此在训练完会自动进行评估和模型压缩。下面会对模型压缩功能再进行简单的介绍。
 
 ##### 模型压缩
 
-如果有模型部署上线的需求，需要进一步压缩模型体积、加快推理速度、减少内存占用，可以使用 PaddleNLP 的 [压缩API](../../docs/compression.md), 在使用 Trainer 的基础上，一行命令即可启动模型压缩。
+上面的模型压缩功能使用的是 PaddleNLP 的 [模型压缩 API](../../docs/compression.md)。模型压缩主要用于有模型部署上线需求的场景，模型压缩可以进一步压缩模型体积、加快推理速度、减少内存占用。
 
-以上训练命令已指定了--do_compress，因此在训练完会对模型进行压缩（量化感知训练，QAT）。
+如果需要对之前已经训练完成的模型进行压缩，只需要将上面的脚本中 `model_name_or_path ` 设置为之前训练好的模型路径，并取消设置 `--do_train`，开启 `--do_compress` 即可。
 
-如果需要对之前已经训练完成的模型进行压缩，只需要将上面的脚本中 `model_name_or_path `设置为之前训练好的模型路径，并取消设置--do_train和--do_eval两个参数，保持开启--do_compress即可。
+同样，模型压缩后得到的最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可用于服务端和移动端的推理部署。
 
-
-使用量化感知训练功能还需要安装最新版本的 paddleslim：
-
-```shell
-pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-同样，量化感知训练会将在开发集上最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可用于服务端和移动端的推理部署。
-量化后的模型
+以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
 
 | Models         | F1           |
 | -------------  |:------------:|
-| 原始模型，FP32   | 91.93        |
-| 量化后模型，INT8 | 94.12         |
-
+| uie-base+微调，FP32   | 91.93        |
+| uie-base+微调+量化，INT8 | 94.12        |
 
 <a name="模型评估"></a>
 
 #### 4.4 模型评估
 
-通过运行以下命令进行模型评估：
+除了在 Trainer 中使用 `--do_eval`，还可以通过运行以下命令进行模型评估：
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
 

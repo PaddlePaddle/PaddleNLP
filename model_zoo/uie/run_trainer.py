@@ -181,14 +181,14 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    resource_file_urls = MODEL_MAP[
-        model_args.model_name_or_path]['resource_file_urls']
+    # resource_file_urls = MODEL_MAP[
+    #     model_args.model_name_or_path]['resource_file_urls']
 
-    logger.info("Downloading resource files...")
-    for key, val in resource_file_urls.items():
-        file_path = os.path.join(model_args.model_name_or_path, key)
-        if not os.path.exists(file_path):
-            get_path_from_url(val, model_args.model_name_or_path)
+    # logger.info("Downloading resource files...")
+    # for key, val in resource_file_urls.items():
+    #     file_path = os.path.join(model_args.model_name_or_path, key)
+    #     if not os.path.exists(file_path):
+    #         get_path_from_url(val, model_args.model_name_or_path)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = UIE.from_pretrained(model_args.model_name_or_path)
@@ -243,8 +243,10 @@ def main():
         criterion=uie_loss_func,
         args=training_args,
         data_collator=data_collator,
-        train_dataset=train_ds if training_args.do_train else None,
-        eval_dataset=dev_ds if training_args.do_eval else None,
+        train_dataset=train_ds
+        if training_args.do_train or training_args.do_compress else None,
+        eval_dataset=dev_ds
+        if training_args.do_eval or training_args.do_compress else None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
     )
