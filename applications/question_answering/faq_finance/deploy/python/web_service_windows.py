@@ -14,8 +14,15 @@
 
 import numpy as np
 import sys
+import argparse
 
 from paddle_serving_server.web_service import WebService, Op
+
+# yapf: disable
+parser = argparse.ArgumentParser()
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="Select tokenizer name to for model")
+args = parser.parse_args()
+# yapf: enable
 
 
 def convert_example(example,
@@ -37,12 +44,10 @@ class ErnieService(WebService):
 
     def init_service(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            'rocketqa-zh-base-query-encoder')
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     def preprocess(self, feed=[], fetch=[]):
         from paddlenlp.data import Stack, Tuple, Pad
-        # breakpoint()
         print("input dict", feed)
         batch_size = len(feed)
         is_batch = True
@@ -53,7 +58,7 @@ class ErnieService(WebService):
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
                 ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
                 ),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
@@ -68,9 +73,10 @@ class ErnieService(WebService):
         return fetch_map
 
 
-ernie_service = ErnieService(name="ernie")
-ernie_service.load_model_config("../../serving_server")
-ernie_service.prepare_server(workdir="workdir", port=8080)
-ernie_service.init_service()
-ernie_service.run_debugger_service()
-ernie_service.run_web_service()
+if __name__ == "__main__":
+    ernie_service = ErnieService(name="ernie")
+    ernie_service.load_model_config("../../serving_server")
+    ernie_service.prepare_server(workdir="workdir", port=8080)
+    ernie_service.init_service()
+    ernie_service.run_debugger_service()
+    ernie_service.run_web_service()

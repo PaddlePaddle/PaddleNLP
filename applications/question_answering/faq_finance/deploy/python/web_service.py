@@ -60,7 +60,7 @@ class ErnieOp(Op):
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
                 ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
                 ),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)

@@ -475,7 +475,7 @@ python rpc_client.py
 对于Windows用户，启动下面的Pipeline Server:
 
 ```
-python web_service_windows.py
+python web_service_windows.py --model_name_or_path rocketqa-zh-base-query-encoder
 ```
 
 启动客户端调用 Server, 使用 POST的方式(Windows不支持RPC的调用方式)，首先修改http_client.py中需要预测的样本：
