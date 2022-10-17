@@ -21,7 +21,7 @@ import paddle
 from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.metrics import SpanEvaluator
+from span import SpanEvaluator
 from paddlenlp.utils.log import logger
 
 from model import UIE
@@ -85,6 +85,7 @@ def do_train():
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
+        print('init from checkpoint successfually.')
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -93,7 +94,7 @@ def do_train():
                                        parameters=model.parameters())
 
     criterion = paddle.nn.BCELoss()
-    metric = SpanEvaluator()
+    metric = SpanEvaluator(args.limit)
 
     loss_list = []
     global_step = 0
@@ -173,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
+    parser.add_argument("--limit", type=float, default=0.5, help="The limit when using SpanEvaluator")
 
     args = parser.parse_args()
     # yapf: enable

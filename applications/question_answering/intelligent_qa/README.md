@@ -165,7 +165,7 @@ python -u run_data_preprocess.py \
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extraction .answer_generation/finetune.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extraction answer_generation/finetune.py \
     --train_path=.data/answer_extration/train.json \
     --dev_path=.data/answer_extration/dev.json \
     --save_dir=.log/answer_extration/checkpoints \
@@ -188,6 +188,8 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extrac
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为30。
 - `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `init_from_ckpt`: 用于初始化的模型参数的路径。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `valid_steps`: evaluate的间隔steps数，默认100。
@@ -197,7 +199,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extrac
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python .answer_generation/evaluate.py \
+python answer_generation/evaluate.py \
     --model_path=.log/answer_extration/checkpoints/model_best \
     --test_path=.data/answer_extration/dev.json  \
     --batch_size=16 \
@@ -217,7 +219,7 @@ python .answer_generation/evaluate.py \
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generation .question_generation/train.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generation question_generation/train.py \
     --train_file=.data/question_generation/train.json \
     --predict_file=.data/question_generation/dev.json \
     --save_dir=.log/question_generation/checkpoints \
@@ -289,7 +291,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_gene
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration .filtration/finetune.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration filtration/finetune.py \
     --train_path=.data/filtration/train.json \
     --dev_path=.data/filtration/dev.json \
     --save_dir=.log/filtration/checkpoints \
@@ -312,6 +314,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration .f
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为30。
 - `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `init_from_ckpt`: 用于初始化的模型参数的路径。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `valid_steps`: evaluate的间隔steps数，默认100。
@@ -321,7 +324,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration .f
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python .filtration/evaluate.py \
+python filtration/evaluate.py \
     --model_path=.log/filtration/checkpoints/model_best \
     --test_path=.data/filtration/dev.json  \
     --batch_size=16 \
