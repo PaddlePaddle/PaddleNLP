@@ -51,7 +51,7 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 - Invoice VQA
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195610223-f8e22405-1a5e-4a19-a7db-49bd13f2248d.png height=350 width=1000 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/195809253-985c4a7b-4675-4262-a4a6-fcccede9ff66.png height=350 width=1000 hspace='10'/>
 </div>
 
 - Poster VQA
@@ -74,6 +74,13 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 </div>
 
 
+- Exam Paper VQA
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/195823294-d891d95a-2ef8-4519-be59-0fedb96c00de.png height=700 width=1000 hspace='10'/>
+</div>
+
+
 - English invoice VQA by multilingual(CH, EN, JP, Th, ES, RUS) prompt
 
 <div align="center">
@@ -85,6 +92,8 @@ Recent years have witnessed the rise and success of pre-training techniques in v
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195615648-de053dcc-312b-4c7a-a8c9-299bba3dcfd5.png height=350 width=1000 hspace='15'/>
 </div>
+
+- Demo images are available [here](https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/demo.zip)
 
 <a name="23"></a>
 
