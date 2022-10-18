@@ -141,7 +141,7 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
             for index in words[sent_index][:lengths[sent_index]]
         ]
         tags = [
-            id2label_dict[index]
+            id2label_dict.get(index, 'O')
             for index in preds[sent_index][:lengths[sent_index]]
         ]
 

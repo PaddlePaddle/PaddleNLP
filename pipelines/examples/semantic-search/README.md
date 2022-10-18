@@ -73,10 +73,12 @@ python setup.py install
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/semantic-search/semantic_search_example.py --device gpu
+python examples/semantic-search/semantic_search_example.py --device gpu \
+                                                          --search_engine faiss
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/semantic-search/semantic_search_example.py --device cpu
+python examples/semantic-search/semantic_search_example.py --device cpu \
+                                                          --search_engine faiss
 ```
 `semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
 
@@ -107,6 +109,7 @@ curl http://localhost:9200/_aliases?pretty=true
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
+                            --search_engine elastic \
                             --delete_index
 ```
 可以使用下面的命令来查看数据：
@@ -119,8 +122,9 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
-* `host`: Elasticsearch的IP地址
-* `port`: Elasticsearch的端口号
+* `host`: ANN索引引擎的IP地址
+* `port`: ANN索引引擎的端口号
+* `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 #### 3.4.3 启动 RestAPI 模型服务
@@ -139,7 +143,6 @@ sh examples/semantic-search/run_search_server.sh
 
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
-
 ```
 #### 3.4.4 启动 WebUI
 ```bash
@@ -158,7 +161,17 @@ sh examples/semantic-search/run_search_web.sh
 
 #### 3.4.5 数据更新
 
-数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，另一种是使用前端界面的文件上传进行数据更新，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
+数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，第二种是使用前端界面的文件上传（在界面的左侧）进行数据更新。对于第一种使用脚本的方式，可以使用多种文件更新数据，示例的文件更新建索引的命令如下，里面包含了图片（目前仅支持把图中所有的文字合并建立索引），docx（支持图文，需要按照空行进行划分段落），txt（需要按照空行划分段落）三种格式的文件建索引：
+
+```
+python utils/offline_ann.py --index_name dureader_robust_query_encoder \
+                            --doc_dir data/file_example \
+                            --port 9200 \
+                            --search_engine elastic \
+                            --delete_index
+```
+
+对于第二种使用界面的方式，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
 
 ```
 兴证策略认为，最恐慌的时候已经过去，未来一个月市场迎来阶段性修复窗口。

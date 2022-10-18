@@ -6,7 +6,7 @@
        * [Step1：获取模型压缩参数 compression_args](#获取模型压缩参数compression_args)
        * [Step2：实例化 Trainer 并调用 compress()](#实例化Trainer并调用compress())
            * [Trainer 实例化参数介绍](#Trainer实例化参数介绍)
-       * [Step3：实现自定义评估函数和 loss 计算函数（按需可选）](#实现自定义评估函数和loss计算函数（按需可选）)
+       * [Step3：实现自定义评估函数（按需可选）](#实现自定义评估函数（按需可选）)
        * [Step4：传参并运行压缩脚本](#传参并运行压缩脚本)
            * [CompressionArguments 参数介绍](#CompressionArguments参数介绍)
        * [三大场景模型压缩 API 使用示例](#三大场景模型压缩API使用示例)
@@ -40,13 +40,19 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 
 ## 如何启动模型压缩
 
-模型压缩 API 中的压缩功能依赖 `paddleslim` 包。可运行以下命令安装：
+### 环境依赖
+
+- paddlepaddle-gpu >=2.3
+- paddlenlp >= 2.4.0
+- paddleslim >= 2.3.0
+
+模型压缩 API 中的压缩功能依赖最新的 `paddleslim` 包。可运行以下命令安装：
 
 ```shell
-pip install paddleslim
+pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-大致分为四步：
+模型压缩 API 的使用大致分为四步：
 
 - Step 1: 使用 `PdArgumentParser` 解析从命令行传入的超参数，以获取压缩参数 `compression_args`；
 - Step 2: 实例化 Trainer 并调用 `compress()` 压缩 API
@@ -81,7 +87,7 @@ python compress.py \
     --output_dir ./compress_models  \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
-    --num_train_epochs 4
+    --num_train_epochs 4 \
     --width_mult_list 0.75 \
     --batch_size_list 4 8 16 \
     --batch_num_list 1 \
@@ -111,12 +117,46 @@ compression_args = parser.parse_args_into_dataclasses()
 
 #### Trainer 实例化参数介绍
 
-- **--model** 待压缩的模型，目前支持 ERNIE 等模型，是在下游任务中微调后的模型。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
-- **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
+- **--model** 待压缩的模型，目前支持 ERNIE、BERT、RoBERTa、ERNIE-M、ELECTRA、ERNIE-Gram、PP-MiniLM、TinyBERT 等结构相似的模型，是在下游任务中微调后的模型，当预训练模型选择 ERNIE 时，需要继承 `ErniePretrainedModel`。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
+- **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
 - **--train_dataset** 裁剪训练需要使用的训练集，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。不启动裁剪时，可以为 None；
 - **--eval_dataset** 裁剪训练使用的评估集，也是量化使用的校准数据，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。是 Trainer 的必选参数；
 - **--tokenizer** 模型 `model` 对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_name_or_path)` 来获取。
-- **--criterion** 模型的 loss 对象，是一个 nn.Layer 对象，用于在 ofa_utils.py 计算模型的 loss 用于计算梯度从而确定神经元重要程度。
+- **--criterion** 模型的 loss 计算方法，可以是一个 nn.Layer 对象，也可以是一个函数，用于在 ofa_utils.py 计算模型的 loss 用于计算梯度从而确定神经元重要程度。
+
+其中，`criterion` 函数定义示例：
+
+```python
+# 支持的形式一：
+def criterion(logits, labels):
+    loss_fct = paddle.nn.BCELoss()
+    start_ids, end_ids = labels
+    start_prob, end_prob = outputs
+    start_ids = paddle.cast(start_ids, 'float32')
+    end_ids = paddle.cast(end_ids, 'float32')
+    loss_start = loss_fct(start_prob, start_ids)
+    loss_end = loss_fct(end_prob, end_ids)
+    loss = (loss_start + loss_end) / 2.0
+    return loss
+
+# 支持的形式二：
+class CrossEntropyLossForSQuAD(paddle.nn.Layer):
+
+    def __init__(self):
+        super(CrossEntropyLossForSQuAD, self).__init__()
+
+    def forward(self, y, label):
+        start_logits, end_logits = y
+        start_position, end_position = label
+        start_position = paddle.unsqueeze(start_position, axis=-1)
+        end_position = paddle.unsqueeze(end_position, axis=-1)
+        start_loss = paddle.nn.functional.cross_entropy(input=start_logits,
+                                                        label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(input=end_logits,
+                                                      label=end_position)
+        loss = (start_loss + end_loss) / 2
+        return loss
+```
 
 用以上参数实例化 Trainer 对象，之后直接调用 `compress()` 。`compress()` 会根据选择的策略进入不同的分支，以进行裁剪或者量化的过程。
 
@@ -141,11 +181,11 @@ trainer = Trainer(
 trainer.compress()
 ```
 
-<a name="实现自定义评估函数和loss计算函数（按需可选）"></a>
+<a name="实现自定义评估函数(按需可选）"></a>
 
-### Step3：实现自定义评估函数和 loss 计算函数（按需可选），以适配自定义压缩任务
+### Step3：实现自定义评估函数，以适配自定义压缩任务
 
-当使用 DynaBERT 裁剪功能时，如果模型、Metrics 不符合下表的情况，那么模型压缩 API 中自带的评估函数和计算 loss 的参数可能需要自定义。
+当使用 DynaBERT 裁剪功能时，如果模型、Metrics 不符合下表的情况，那么模型压缩 API 中评估函数需要自定义。
 
 目前 DynaBERT 裁剪功能只支持 SequenceClassification 等三类 PaddleNLP 内置 class，并且内置评估器对应为 Accuracy、F1、Squad。
 
@@ -155,34 +195,28 @@ trainer.compress()
 
 需要注意以下三个条件：
 
-- 如果模型是自定义模型，模型需要支持调用 `from_pretrained()` 导入模型，且只含 `pretrained_model_name_or_path` 一个必选参数，`forward` 函数返回 `logits` 或者 `tuple of logits`；
+- 如果模型是自定义模型，需要继承 `XXXPretrainedModel`，例如当预训练模型选择 ERNIE 时，继承 `ErniePretrainedModel`，模型需要支持调用 `from_pretrained()` 导入模型，且只含 `pretrained_model_name_or_path` 一个必选参数，`forward` 函数返回 `logits` 或者 `tuple of logits`；
 
-- 如果模型是自定义模型，或者数据集比较特殊，压缩 API 中 loss 的计算不符合使用要求，需要自定义 `custom_dynabert_calc_loss` 函数。计算 loss 后计算梯度，从而得出计算神经元的重要性以便裁剪使用。可参考下方示例代码。
-    - 输入每个 batch 的数据，返回模型的 loss。
-    - 将该函数传入 `compress()` 中的 `custom_dynabert_calc_loss` 参数；
-
-- 如果评估器也不满足上述所支持情况，需实现自定义 `custom_dynabert_evaluate` 评估函数，需要同时支持 `paddleslim.nas.ofa.OFA` 模型和 `paddle.nn.layer` 模型。可参考下方示例代码。
+- 如果模型是自定义模型，或者数据集比较特殊，压缩 API 中 loss 的计算不符合使用要求，需要自定义 `custom_evaluate` 评估函数，需要同时支持 `paddleslim.nas.ofa.OFA` 模型和 `paddle.nn.layer` 模型。可参考下方示例代码。
     - 输入`model` 和 `dataloader`，返回模型的评价指标（单个 float 值）。
-    - 将该函数传入 `compress()` 中的 `custom_dynabert_evaluate` 参数；
+    - 将该函数传入 `compress()` 中的 `custom_evaluate` 参数；
 
-`custom_dynabert_evaluate()` 函数定义示例：
+`custom_evaluate()` 函数定义示例：
 
 ```python
     import paddle
     from paddle.metric import Accuracy
-    from paddleslim.nas.ofa import OFA
 
     @paddle.no_grad()
-    def evaluate_seq_cls(model, data_loader):
+    def evaluate_seq_cls(self, model, data_loader):
         metric = Accuracy()
         model.eval()
         metric.reset()
         for batch in data_loader:
-            logits = model(batch['input_ids'],
-                           batch['token_type_ids'],
-                           attention_mask=[None, None])
+            logits = model(input_ids=batch['input_ids'],
+                           token_type_ids=batch['token_type_ids'])
             # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
-            if isinstance(model, OFA):
+            if isinstance(model, paddleslim.nas.ofa.OFA):
                 logits = logits[0]
             correct = metric.compute(logits, batch['labels'])
             metric.update(correct)
@@ -192,21 +226,11 @@ trainer.compress()
         return res
 ```
 
-`custom_dynabert_calc_loss` 函数定义示例：
+
+在调用 `compress()` 时传入这个自定义函数：
 
 ```python
-def calc_loss(loss_fct, model, batch, head_mask):
-    logits = model(batch["input_ids"],
-                batch["token_type_ids"],
-                attention_mask=[None, head_mask])
-    loss = loss_fct(logits, batch["labels"])
-    return loss
-```
-在调用 `compress()` 时传入这 2 个自定义函数：
-
-```python
-trainer.compress(custom_dynabert_evaluate=evaluate_seq_cls,
-                 custom_dynabert_calc_loss=calc_loss)
+trainer.compress(custom_evaluate=evaluate_seq_cls)
 ```
 
 
@@ -226,7 +250,7 @@ python compress.py \
     --output_dir ./compress_models  \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
-    --num_train_epochs 4
+    --num_train_epochs 4 \
     --width_mult_list 0.75 \
     --batch_size_list 4 8 16 \
     --batch_num_list 1 \
@@ -245,8 +269,8 @@ python compress.py \
 
 公共参数中的参数和具体的压缩策略无关。
 
-- **--strategy** 模型压缩策略，目前支持 `'dynabert+ptq'`、 `'dynabert'` 和 `'ptq'`。
-其中 `'dynabert'` 代表基于 DynaBERT 的宽度裁剪策略，`'ptq'` 表示静态离线量化， `'dynabert+ptq'` 代表先裁剪后量化。默认是 `'dynabert+ptq'`；
+- **--strategy** 模型压缩策略，目前支持 `'dynabert+ptq'`、 `'dynabert'` 、 `'ptq'` 和 `'qat'`。
+其中 `'dynabert'` 代表基于 DynaBERT 的宽度裁剪策略，`'ptq'` 表示静态离线量化， `'dynabert+ptq'` 代表先裁剪后量化。`qat` 表示量化训练。默认是 `'dynabert+ptq'`；
 
 - **--output_dir** 模型压缩后模型保存目录；
 
@@ -268,7 +292,7 @@ python compress.py \
 
 - **--logging_steps** 两个日志之间的更新步骤数。默认为 500；
 
-- **--save_steps** 评估模型的步数。默认为 500；
+- **--save_steps** 评估模型的步数。默认为 100；
 
 - **--optim** 裁剪训练使用的优化器名称，默认为adamw，默认为 'adamw'；
 
@@ -379,7 +403,7 @@ python compress_qa.py \
 
 ### Paddle2ONNX 部署
 
-ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署指南](./deploy/paddle2onnx/README.md)
+ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署指南](../model_zoo/ernie-3.0/deploy/paddle2onnx/README.md)
 
 
 ### Paddle Lite 移动端部署
