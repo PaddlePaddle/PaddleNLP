@@ -77,7 +77,7 @@ class ErnieGramEmbeddings(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = paddle.shape(input_embeds)
+        input_shape = paddle.shape(inputs_embeds)
 
         if position_ids is None:
             seq_length = input_shape[1]
