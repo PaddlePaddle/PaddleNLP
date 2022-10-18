@@ -17,13 +17,12 @@ Image/Text processor class for ErnieViL
 """
 
 from ..tokenizer_utils_base import BatchEncoding
-from .tokenizer import ErnieViLTokenizer
-from .feature_extraction import ErnieViLFeatureExtractor
+from ..processing_utils import ProcessorMixin
 
 __all__ = ["ErnieViLProcessor"]
 
 
-class ErnieViLProcessor(object):
+class ErnieViLProcessor(ProcessorMixin):
     r"""
     Constructs a ErnieViL processor which wraps a ErnieViL feature extractor and a ErnieViL tokenizer into a single processor.
     [`ErnieViLProcessor`] offers all the functionalities of [`ErnieViLFeatureExtractor`] and [`ErnieViLTokenizer`]. See the
@@ -34,11 +33,12 @@ class ErnieViLProcessor(object):
         tokenizer ([`ErnieViLTokenizer`]):
             The tokenizer is a required input.
     """
+    feature_extractor_class = "ErnieViLFeatureExtractor"
+    tokenizer_class = "ErnieViLTokenizer"
 
     def __init__(self, feature_extractor, tokenizer):
-        super().__init__()
-        self.tokenizer = tokenizer
-        self.feature_extractor = feature_extractor
+        super().__init__(feature_extractor, tokenizer)
+        self.current_processor = self.feature_extractor
 
     def __call__(self, text=None, images=None, return_tensors=None, **kwargs):
         """
@@ -105,15 +105,3 @@ class ErnieViLProcessor(object):
         the docstring of this method for more information.
         """
         return self.tokenizer.decode(*args, **kwargs)
-
-    # TODO junnyu find a better way from_pretrained and save_pretrained
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        tokenizer = ErnieViLTokenizer.from_pretrained(
-            pretrained_model_name_or_path, *args, **kwargs)
-        feature_extractor = ErnieViLFeatureExtractor()
-        return cls(feature_extractor, tokenizer)
-
-    def save_pretrained(self, save_directory, filename_prefix=None, **kwargs):
-        return self.tokenizer.save_pretrained(save_directory, filename_prefix,
-                                              **kwargs)
