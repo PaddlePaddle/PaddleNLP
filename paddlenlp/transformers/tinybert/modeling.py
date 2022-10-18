@@ -298,9 +298,9 @@ class TinyBertModel(TinyBertPretrainedModel):
                 inputs_embeds: Optional[Tensor] = None,
                 past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
                 use_cache: Optional[bool] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r'''
         The TinyBertModel forward method, overrides the `__call__()` special method.
 
@@ -395,6 +395,12 @@ class TinyBertModel(TinyBertPretrainedModel):
                 "You cannot specify both input_ids and inputs_embeds at the same time."
             )
 
+        # init the default bool value
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+        use_cache = use_cache if use_cache is not None else False
+
         past_key_values_length = 0
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
@@ -472,9 +478,9 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
                 position_ids: Optional[Tensor] = None,
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The TinyBertForPretraining forward method, overrides the __call__() special method.
 
@@ -559,9 +565,9 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The TinyBertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -672,9 +678,9 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
                 inputs_embeds: Optional[Tensor] = None,
                 start_positions: Optional[Tensor] = None,
                 end_positions: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -804,9 +810,9 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The TinyBertForMultipleChoice forward method, overrides the __call__() special method.
 

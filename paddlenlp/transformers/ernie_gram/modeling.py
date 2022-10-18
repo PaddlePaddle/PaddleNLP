@@ -77,16 +77,19 @@ class ErnieGramEmbeddings(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
 
+        input_shape = paddle.shape(input_embeds)
+
         if position_ids is None:
-            seq_length = inputs_embeds.shape[1]
+            seq_length = input_shape[1]
             position_ids = self.position_ids[:,
                                              past_key_values_length:seq_length +
                                              past_key_values_length]
             position_ids.stop_gradient = True
 
         if token_type_ids is None:
-            token_type_ids_shape = paddle.shape(inputs_embeds)[:-1]
+            token_type_ids_shape = input_shape[:-1]
             token_type_ids = paddle.zeros(token_type_ids_shape, dtype="int64")
+
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
@@ -262,9 +265,9 @@ class ErnieGramModel(ErnieGramPretrainedModel):
                 inputs_embeds: Optional[Tensor] = None,
                 past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
                 use_cache: Optional[bool] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -352,6 +355,12 @@ class ErnieGramModel(ErnieGramPretrainedModel):
             raise ValueError(
                 "You cannot specify both input_ids and inputs_embeds at the same time."
             )
+
+        # init the default bool value
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+        use_cache = use_cache if use_cache is not None else False
 
         past_key_values_length = 0
         if past_key_values is not None:
@@ -449,9 +458,9 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -548,9 +557,9 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
                 inputs_embeds: Optional[Tensor] = None,
                 start_positions: Optional[Tensor] = None,
                 end_positions: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -685,9 +694,9 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):

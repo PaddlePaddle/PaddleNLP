@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Tuple
+from paddle import Tensor
 import paddle
 import paddle.nn as nn
 
@@ -46,17 +48,23 @@ class ErnieMEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
+        self.register_buffer(
+            "position_ids",
+            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"),
+                          shape=[1, -1]),
+        )
+
     def forward(self,
-                input_ids,
-                position_ids=None,
-                inputs_embeds=None,
-                past_key_values_length=0):
+                input_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values_length: int = 0):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
 
         if position_ids is None:
-            seq_length = inputs_embeds.shape[1]
+            seq_length = paddle.shape(inputs_embeds)[1]
             position_ids = self.position_ids[:,
                                              past_key_values_length:seq_length +
                                              past_key_values_length]
@@ -237,15 +245,15 @@ class ErnieMModel(ErnieMPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                past_key_values=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -327,6 +335,12 @@ class ErnieMModel(ErnieMPretrainedModel):
                 "You cannot specify both input_ids and inputs_embeds at the same time."
             )
 
+        # init the default bool value
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+        use_cache = use_cache if use_cache is not None else False
+
         past_key_values_length = 0
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
@@ -349,6 +363,7 @@ class ErnieMModel(ErnieMPretrainedModel):
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -409,13 +424,14 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -429,6 +445,9 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
                 Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
                 a regression loss is computed (Mean-Square loss), If `num_classes > 1`
                 a classification loss is computed (Cross-Entropy).
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -461,6 +480,7 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
         outputs = self.ernie_m(input_ids,
                                position_ids=position_ids,
                                attention_mask=attention_mask,
+                               inputs_embeds=inputs_embeds,
                                output_attentions=output_attentions,
                                output_hidden_states=output_hidden_states,
                                return_dict=return_dict)
@@ -511,14 +531,15 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                start_positions: Optional[Tensor] = None,
+                end_positions: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -535,6 +556,9 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
                 Labels for position (index) of the end of the labelled span for computing the token classification loss.
                 Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
                 are not taken into account for computing the loss.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -575,6 +599,7 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
         outputs = self.ernie_m(input_ids,
                                position_ids=position_ids,
                                attention_mask=attention_mask,
+                               inputs_embeds=inputs_embeds,
                                output_attentions=output_attentions,
                                output_hidden_states=output_hidden_states,
                                return_dict=return_dict)
@@ -640,13 +665,14 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -657,6 +683,9 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
                 See :class:`ErnieMModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -687,6 +716,7 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         outputs = self.ernie_m(input_ids,
                                position_ids=position_ids,
                                attention_mask=attention_mask,
+                               inputs_embeds=inputs_embeds,
                                output_attentions=output_attentions,
                                output_hidden_states=output_hidden_states,
                                return_dict=return_dict)
@@ -737,13 +767,14 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The ErnieMForMultipleChoice forward method, overrides the __call__() special method.
         Args:
@@ -757,6 +788,9 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
                 num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
                 `input_ids` above)
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -786,6 +820,7 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
         outputs = self.ernie_m(input_ids,
                                position_ids=position_ids,
                                attention_mask=attention_mask,
+                               inputs_embeds=inputs_embeds,
                                output_attentions=output_attentions,
                                output_hidden_states=output_hidden_states,
                                return_dict=return_dict)

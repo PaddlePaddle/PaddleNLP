@@ -593,9 +593,9 @@ class RoFormerModel(RoFormerPretrainedModel):
                 inputs_embeds: Optional[Tensor] = None,
                 past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
                 use_cache: Optional[bool] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerModel forward method, overrides the `__call__()` special method.
 
@@ -670,6 +670,12 @@ class RoFormerModel(RoFormerPretrainedModel):
             raise ValueError(
                 "You cannot specify both input_ids and inputs_embeds at the same time."
             )
+
+        # init the default bool value
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+        use_cache = use_cache if use_cache is not None else False
 
         past_key_values_length = 0
         if past_key_values is not None:
@@ -767,9 +773,9 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
                 inputs_embeds: Optional[Tensor] = None,
                 start_positions: Optional[Tensor] = None,
                 end_positions: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -893,9 +899,9 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -1010,9 +1016,9 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1118,9 +1124,9 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1257,9 +1263,9 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
                 attention_mask: Optional[Tensor] = None,
                 inputs_embeds: Optional[Tensor] = None,
                 labels: Optional[Tensor] = None,
-                output_hidden_states: bool = False,
-                output_attentions: bool = False,
-                return_dict: bool = False):
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForMaskedLM forward method, overrides the __call__() special method.
 
