@@ -399,10 +399,24 @@ python milvus_ann_search.py --data_path data/qa_pair.csv \
 
 #### Paddle Serving 部署
 
-Paddle Serving 的安装可以参考[Paddle Serving 安装文档](https://github.com/PaddlePaddle/Serving#installation)。需要在服务端和客户端安装相关的依赖，安装完依赖后就可以执行下面的步骤。
+Paddle Serving 的安装可以参考[Paddle Serving 安装文档](https://github.com/PaddlePaddle/Serving#installation)。需要在服务端和客户端安装相关的依赖，用pip安装Paddle Serving的依赖如下：
 
+```
+pip install paddle-serving-client==0.8.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install paddle-serving-app==0.8.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
+# 如果是CPU部署，只需要安装CPU Server
+pip install paddle-serving-server==0.8.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 如果是GPU Server，需要确认环境再选择执行哪一条，推荐使用CUDA 10.2的包
+# CUDA10.2 + Cudnn7 + TensorRT6（推荐）
+pip install paddle-serving-server-gpu==0.8.3.post102 -i https://pypi.tuna.tsinghua.edu.cn/simple
+# CUDA10.1 + TensorRT6
+pip install paddle-serving-server-gpu==0.8.3.post101 -i https://pypi.tuna.tsinghua.edu.cn/simple
+# CUDA11.2 + TensorRT8
+pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+更详细的安装信息请参考[链接]((https://github.com/PaddlePaddle/Serving/blob/v0.9.0/doc/Install_Linux_Env_CN.md))，安装完依赖后就可以执行下面的步骤。首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
 
 ```
 python export_to_serving.py \
@@ -429,17 +443,10 @@ sh scripts/export_to_serving.sh
 ```
 
 启动 Pipeline Server:
-修改Tokenizer：
-
-```
-self.tokenizer = AutoTokenizer.from_pretrained('rocketqa-zh-base-query-encoder')
-
-```
-然后运行：
 
 ```
 cd deploy/python/
-python web_service.py
+python web_service.py --model_name_or_path rocketqa-zh-base-query-encoder
 ```
 
 启动客户端调用 Server, 使用 POST的方式：
@@ -463,6 +470,22 @@ list_data = [
 
 ```
 python rpc_client.py
+```
+
+对于Windows用户，启动下面的Pipeline Server:
+
+```
+python web_service_windows.py --model_name_or_path rocketqa-zh-base-query-encoder
+```
+
+启动客户端调用 Server, 使用 POST的方式(Windows不支持RPC的调用方式)，首先修改http_client.py中需要预测的样本：
+
+```
+data = {"feed": ["买了社保，是不是就不用买商业保险了？"], "fetch": ["output_embedding"]}
+```
+然后运行：
+```
+python http_client.py
 ```
 
 ### 4.5 问答系统整个流程
