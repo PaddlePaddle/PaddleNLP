@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import paddle
-from paddlenlp.transformers import MBartForConditionalGeneration, MBartTokenizer
+from paddlenlp.transformers import MBartForConditionalGeneration, MBart50Tokenizer
 
 model_name = "mbart-large-50-many-to-many-mmt"
 
-tokenizer = MBartTokenizer.from_pretrained(model_name, src_lang="en_XX")
+tokenizer = MBart50Tokenizer.from_pretrained(model_name, src_lang="en_XX")
 model = MBartForConditionalGeneration.from_pretrained(model_name)
 model.eval()
 
