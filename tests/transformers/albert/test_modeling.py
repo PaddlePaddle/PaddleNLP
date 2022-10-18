@@ -27,8 +27,11 @@ from paddlenlp.transformers import (
     AlbertForTokenClassification,
     AlbertModel,
 )
-from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
-from ...testing_utils import slow
+# from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+# from ...testing_utils import slow
+
+from tests.transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+from tests.testing_utils import slow
 
 
 class AlbertModelTester:
@@ -396,3 +399,43 @@ class AlbertModelIntegrationTest(unittest.TestCase):
 
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    # @slow
+    def test_inference_with_past_key_value(self):
+        model = AlbertModel.from_pretrained("albert-base-v2")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output[0].shape, expected_shape)
+        expected_slice = paddle.to_tensor(
+            [[[-0.06635337, -1.32662833, -0.39223742],
+              [-0.24396378, -1.36314595, -1.07446611],
+              [-0.09860237, -0.79468340, -0.19317953]]])
+        print("sss")
+        print(output[0][:, 1:4, 1:4])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        print("sss")
+        print(output[0][:, 1:4, 1:4])
+        expected_slice = paddle.to_tensor(
+            [[[0.07865857, -1.07012558, -1.02596498],
+              [0.12576045, -1.76696026, -1.18682015],
+              [-0.08606864, -1.37880838, -0.12364164]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))

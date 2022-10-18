@@ -250,7 +250,7 @@ class TinyBertModelTester:
     def create_and_check_model_cache(self, config, input_ids, token_type_ids,
                                      input_mask, sequence_labels, token_labels,
                                      choice_labels):
-        model = SkepModel(**config)
+        model = TinyBertModel(**config)
         model.eval()
 
         input_ids = ids_tensor((self.batch_size, self.seq_length),
@@ -417,6 +417,42 @@ class TinyBertModelIntegrationTest(unittest.TestCase):
               [-0.76121056, -0.07496471, -0.35906711]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_past_key_value(self):
+        model = TinyBertModel.from_pretrained("tinybert-4l-312d")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+        expected_shape = [1, 11, 312]
+        self.assertEqual(output[0].shape, expected_shape)
+        expected_slice = paddle.to_tensor(
+            [[[-0.76857519, -0.04066351, -0.36538580],
+              [-0.79803109, -0.04977923, -0.37076530],
+              [-0.76121056, -0.07496471, -0.35906711]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        expected_slice = paddle.to_tensor(
+            [[[-0.61422300, -0.05978593, -0.23719205],
+              [-0.64617568, -0.04066525, -0.26458248],
+              [-0.65170693, -0.04711169, -0.29544356]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

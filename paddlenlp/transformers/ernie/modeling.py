@@ -93,7 +93,7 @@ class ErnieEmbeddings(nn.Layer):
                 past_key_values_length=0):
 
         if input_ids is not None:
-            input_embeddings = self.word_embeddings(input_ids)
+            inputs_embeds = self.word_embeddings(input_ids)
 
         input_shape = paddle.shape(inputs_embeds)[:-1]
 
@@ -106,7 +106,7 @@ class ErnieEmbeddings(nn.Layer):
             position_ids.stop_gradient = True
 
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embeddings + position_embeddings
+        embeddings = inputs_embeds + position_embeddings
 
         if self.type_vocab_size > 0:
             if token_type_ids is None:

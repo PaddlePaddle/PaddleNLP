@@ -692,11 +692,9 @@ class RoFormerModel(RoFormerPretrainedModel):
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
 
-        embedding_output = self.embeddings(
-            input_ids=input_ids,
-            token_type_ids=token_type_ids,
-            inputs_embeds=inputs_embeds,
-            past_key_values_length=past_key_values_length)
+        embedding_output = self.embeddings(input_ids=input_ids,
+                                           token_type_ids=token_type_ids,
+                                           inputs_embeds=inputs_embeds)
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 

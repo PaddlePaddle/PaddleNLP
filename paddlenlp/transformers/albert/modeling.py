@@ -23,8 +23,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (BaseModelOutput, ModelOutput,
-                             BaseModelOutputWithPooling, MaskedLMOutput,
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                             ModelOutput, BaseModelOutput, MaskedLMOutput,
                              MultipleChoiceModelOutput,
                              QuestionAnsweringModelOutput,
                              SequenceClassifierOutput, TokenClassifierOutput,
@@ -227,6 +227,7 @@ class AlbertAttention(Layer):
         attention_mask=None,
         head_mask=None,
         past_key_value=None,
+        use_cache=False,
         output_attentions=False,
     ):
         key_layer, value_layer = hidden_states, hidden_states
@@ -242,6 +243,11 @@ class AlbertAttention(Layer):
         query_layer = self.transpose_for_scores(query_layer)
         key_layer = self.transpose_for_scores(key_layer)
         value_layer = self.transpose_for_scores(value_layer)
+
+        # return the key & values if `use_cache` is True
+        new_past_key_value = None
+        if use_cache:
+            new_past_key_value = [key_layer, value_layer]
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = paddle.matmul(query_layer,
@@ -276,9 +282,12 @@ class AlbertAttention(Layer):
             projected_context_layer)
         layer_normed_context_layer = self.layer_norm(
             hidden_states + projected_context_layer_dropout)
-        return (layer_normed_context_layer,
-                attention_probs) if output_attentions else (
-                    layer_normed_context_layer, )
+        outputs = (layer_normed_context_layer,
+                   attention_probs) if output_attentions else (
+                       layer_normed_context_layer, )
+        if use_cache:
+            return outputs + (new_past_key_value, )
+        return outputs
 
 
 class AlbertLayer(Layer):
@@ -315,6 +324,7 @@ class AlbertLayer(Layer):
         attention_mask=None,
         head_mask=None,
         past_key_value: Optional[Tuple[Tuple[Tensor]]] = None,
+        use_cache=False,
         output_attentions=False,
     ):
         attention_output = self.attention(
@@ -322,6 +332,7 @@ class AlbertLayer(Layer):
             attention_mask=attention_mask,
             head_mask=head_mask,
             past_key_value=past_key_value,
+            use_cache=use_cache,
             output_attentions=output_attentions,
         )
 
@@ -382,6 +393,7 @@ class AlbertLayerGroup(Layer):
                 hidden_states,
                 attention_mask,
                 head_mask[layer_index],
+                use_cache=use_cache,
                 output_attentions=output_attentions,
             )
             hidden_states = layer_output[0]
@@ -402,6 +414,9 @@ class AlbertLayerGroup(Layer):
 
         if output_attentions:
             outputs = outputs + (layer_attentions, )
+
+        if use_cache:
+            outputs = outputs + (next_decoder_cache, )
 
         return outputs
 
@@ -446,6 +461,7 @@ class AlbertTransformer(Layer):
                 hidden_states,
                 attention_mask: Optional[Tensor] = None,
                 head_mask: Optional[Tensor] = None,
+                use_cache: Optional[bool] = False,
                 past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
                 output_hidden_states: Optional[bool] = False,
                 output_attentions: Optional[bool] = False,
@@ -1155,10 +1171,6 @@ class AlbertModel(AlbertPretrainedModel):
         if token_type_ids is None:
             token_type_ids = paddle.zeros(shape=input_shape, dtype="int64")
 
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        extended_attention_mask = paddle.cast(extended_attention_mask,
-                                              dtype=dtype_float)
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         head_mask = self.get_head_mask(head_mask, self.num_hidden_layers)
 
         embedding_output = self.embeddings(
@@ -1170,7 +1182,7 @@ class AlbertModel(AlbertPretrainedModel):
 
         encoder_outputs = self.encoder(
             embedding_output,
-            extended_attention_mask,
+            attention_mask,
             head_mask=head_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -1184,9 +1196,10 @@ class AlbertModel(AlbertPretrainedModel):
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
 
-        return BaseModelOutputWithPooling(
+        return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
+            past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
         )

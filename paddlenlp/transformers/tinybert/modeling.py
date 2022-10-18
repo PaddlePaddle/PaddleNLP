@@ -20,6 +20,7 @@ from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 
 from ..model_outputs import (BaseModelOutputWithPooling,
+                             BaseModelOutputWithPoolingAndCrossAttentions,
                              SequenceClassifierOutput,
                              QuestionAnsweringModelOutput,
                              MultipleChoiceModelOutput, tuple_output)
@@ -260,7 +261,8 @@ class TinyBertModel(TinyBertPretrainedModel):
             act_dropout=0)
 
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(config)
+
+        self.pooler = BertPooler(hidden_size, hidden_act)
         # fit_dense(s) means a hidden states' transformation from student to teacher.
         # `fit_denses` is used in v2 model, and `fit_dense` is used in other pretraining models.
         self.fit_denses = nn.LayerList([
@@ -408,6 +410,11 @@ class TinyBertModel(TinyBertPretrainedModel):
                     dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask],
                                                axis=-1)
+        elif attention_mask.ndim == 2:
+            # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
+                paddle.get_default_dtype())
+            attention_mask = (1.0 - attention_mask) * -1e4
 
         # TODO(wj-Mcat): in current branch, not support `inputs_embeds`
         embedding_output = self.embeddings(
@@ -501,17 +508,19 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 
         """
-        sequence_output, pooled_output = self.tinybert(
-            input_ids,
-            token_type_ids,
-            position_ids,
-            attention_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
+        outputs = self.tinybert(input_ids,
+                                token_type_ids,
+                                position_ids,
+                                attention_mask,
+                                inputs_embeds=inputs_embeds,
+                                output_attentions=output_attentions,
+                                output_hidden_states=output_hidden_states,
+                                return_dict=return_dict)
 
-        return sequence_output
+        # return the sequence presentation
+        if not return_dict:
+            return outputs[0]
+        return outputs
 
 
 class TinyBertForSequenceClassification(TinyBertPretrainedModel):
