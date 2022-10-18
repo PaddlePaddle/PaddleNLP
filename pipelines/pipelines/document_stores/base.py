@@ -31,7 +31,7 @@ from pipelines.schema import Document, Label
 from pipelines.nodes.base import BaseComponent
 from pipelines.errors import DuplicateDocumentError
 from pipelines.nodes.preprocessor import PreProcessor
-from pipelines.document_stores.utils import eval_data_from_json, eval_data_from_jsonl
+from pipelines.document_stores.utils import eval_data_from_json, eval_data_from_jsonl, squad_json_to_jsonl
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +227,13 @@ class BaseDocumentStore(BaseComponent):
         ret = self.get_document_by_id(curr_id)
         self.ids_iterator = self.ids_iterator[1:]
         return ret
+
+    def scale_to_unit_interval(self, score: float,
+                               similarity: Optional[str]) -> float:
+        if similarity == "cosine":
+            return (score + 1) / 2
+        else:
+            return float(expit(score / 100))
 
     @abstractmethod
     def get_all_labels(

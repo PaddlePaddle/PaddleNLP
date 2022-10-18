@@ -20,6 +20,7 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 | text_correction  |[文本纠错 (Text Correction)](./text_correction/):star: |
 | semantic_indexing | [语义索引 (Semantic Indexing)](./semantic_indexing/)|
 | information_extraction | [信息抽取 (Information Extraction)](./information_extraction/) |
+| question_generation | [问题生成 (Question Generation)](./question_generation/) |
 
 ## NLP 系统应用 (NLP System Applications)
 

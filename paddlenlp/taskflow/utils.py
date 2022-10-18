@@ -16,12 +16,20 @@
 import os
 import re
 import csv
+import six
+import math
+import copy
+import random
+import traceback
 from datetime import datetime
 import json
 import pickle
 import warnings
 import contextlib
 from dataclasses import dataclass
+from functools import cmp_to_key
+from collections import namedtuple, OrderedDict
+from PIL import Image
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -30,6 +38,17 @@ import paddle.nn.functional as F
 from paddle.dataset.common import md5file
 from ..utils.log import logger
 from ..utils.downloader import get_path_from_url, DownloaderCheck
+from ..utils.image_utils import (
+    img2base64,
+    check,
+    two_dimension_sort_layout,
+    Bbox,
+    DecodeImage,
+    ResizeImage,
+    Permute,
+    NormalizeImage,
+    PadBatch,
+)
 from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
 
 DOC_FORMAT = r"""
@@ -1536,3 +1555,1150 @@ def gp_decode(batch_outputs,
                         rel_list.append(rel)
             batch_rel_results.append(rel_list)
         return (batch_ent_results, batch_rel_results)
+
+
+DocSpan = namedtuple("DocSpan", ["start", "length"])
+
+Example = namedtuple('Example', [
+    "keys", "key_labels", "doc_tokens", "text", "qas_id", "model_type",
+    "seq_labels", "ori_boxes", "boxes", "segment_ids", "symbol_ids",
+    "im_base64", "image_rois"
+])
+
+Feature = namedtuple("Feature", [
+    "unique_id", "example_index", "qas_id", "doc_span_index", "tokens",
+    "token_to_orig_map", "token_is_max_context", "token_ids", "position_ids",
+    "text_type_ids", "text_symbol_ids", "overlaps", "key_labels", "seq_labels",
+    "se_seq_labels", "bio_seq_labels", "bioes_seq_labels", "keys", 'model_type',
+    'doc_tokens', 'doc_labels', 'text', "boxes", "segment_ids", "im_base64",
+    "image_rois"
+])
+
+
+class Compose(object):
+    """compose"""
+
+    def __init__(self, transforms, ctx=None):
+        """init"""
+        self.transforms = transforms
+        self.ctx = ctx
+
+    def __call__(self, data):
+        """call"""
+        ctx = self.ctx if self.ctx else {}
+        for f in self.transforms:
+            try:
+                data = f(data, ctx)
+            except Exception as e:
+                stack_info = traceback.format_exc()
+                logger.warning(
+                    "fail to map op [{}] with error: {} and stack:\n{}".format(
+                        f, e, str(stack_info)))
+                raise e
+        return data
+
+
+def batch_arrange(batch_samples, fields):
+
+    def _segm(samples):
+        """"""
+        assert 'gt_poly' in samples
+        segms = samples['gt_poly']
+        if 'is_crowd' in samples:
+            is_crowd = samples['is_crowd']
+            if len(segms) != 0:
+                assert len(segms) == is_crowd.shape[0]
+
+        gt_masks = []
+        valid = True
+        for i in range(len(segms)):
+            segm = segms[i]
+            gt_segm = []
+            if 'is_crowd' in samples and is_crowd[i]:
+                gt_segm.append([[0, 0]])
+            else:
+                for poly in segm:
+                    if len(poly) == 0:
+                        valid = False
+                        break
+                    gt_segm.append(np.array(poly).reshape(-1, 2))
+            if (not valid) or len(gt_segm) == 0:
+                break
+            gt_masks.append(gt_segm)
+        return gt_masks
+
+    def im_shape(samples, dim=3):
+        # hard code
+        assert 'h' in samples
+        assert 'w' in samples
+        if dim == 3:  # RCNN, ..
+            return np.array((samples['h'], samples['w'], 1), dtype=np.float32)
+        else:  # YOLOv3, ..
+            return np.array((samples['h'], samples['w']), dtype=np.int32)
+
+    arrange_batch = []
+    for samples in batch_samples:
+        one_ins = ()
+        for i, field in enumerate(fields):
+            if field == 'gt_mask':
+                one_ins += (_segm(samples), )
+            elif field == 'im_shape':
+                one_ins += (im_shape(samples), )
+            elif field == 'im_size':
+                one_ins += (im_shape(samples, 2), )
+            else:
+                if field == 'is_difficult':
+                    field = 'difficult'
+                assert field in samples, '{} not in samples'.format(field)
+                one_ins += (samples[field], )
+        arrange_batch.append(one_ins)
+    return arrange_batch
+
+
+class ProcessReader(object):
+    """
+    Args:
+        dataset (DataSet): DataSet object
+        sample_transforms (list of BaseOperator): a list of sample transforms
+            operators.
+        batch_transforms (list of BaseOperator): a list of batch transforms
+            operators.
+        batch_size (int): batch size.
+        shuffle (bool): whether shuffle dataset or not. Default False.
+        drop_last (bool): whether drop last batch or not. Default False.
+        drop_empty (bool): whether drop sample when it's gt is empty or not.
+            Default True.
+        mixup_epoch (int): mixup epoc number. Default is -1, meaning
+            not use mixup.
+        cutmix_epoch (int): cutmix epoc number. Default is -1, meaning
+            not use cutmix.
+        class_aware_sampling (bool): whether use class-aware sampling or not.
+            Default False.
+        worker_num (int): number of working threads/processes.
+            Default -1, meaning not use multi-threads/multi-processes.
+        use_process (bool): whether use multi-processes or not.
+            It only works when worker_num > 1. Default False.
+        bufsize (int): buffer size for multi-threads/multi-processes,
+            please note, one instance in buffer is one batch data.
+        memsize (str): size of shared memory used in result queue when
+            use_process is true. Default 3G.
+        inputs_def (dict): network input definition use to get input fields,
+            which is used to determine the order of returned data.
+        devices_num (int): number of devices.
+        num_trainers (int): number of trainers. Default 1.
+    """
+
+    def __init__(self,
+                 dataset=None,
+                 sample_transforms=None,
+                 batch_transforms=None,
+                 batch_size=None,
+                 shuffle=False,
+                 drop_last=False,
+                 drop_empty=True,
+                 mixup_epoch=-1,
+                 cutmix_epoch=-1,
+                 class_aware_sampling=False,
+                 use_process=False,
+                 use_fine_grained_loss=False,
+                 num_classes=80,
+                 bufsize=-1,
+                 memsize='3G',
+                 inputs_def=None,
+                 devices_num=1,
+                 num_trainers=1):
+        """"""
+        self._fields = copy.deepcopy(
+            inputs_def['fields']) if inputs_def else None
+
+        # transform
+        self._sample_transforms = Compose(sample_transforms,
+                                          {'fields': self._fields})
+        self._batch_transforms = None
+
+        if batch_transforms:
+            batch_transforms = [bt for bt in batch_transforms]
+            self._batch_transforms = Compose(batch_transforms,
+                                             {'fields': self._fields})
+
+        self._batch_size = batch_size
+        self._shuffle = shuffle
+        self._drop_last = drop_last
+        self._drop_empty = drop_empty
+
+        # sampling
+        self._mixup_epoch = mixup_epoch // num_trainers
+        self._cutmix_epoch = cutmix_epoch // num_trainers
+        self._class_aware_sampling = class_aware_sampling
+
+        self._indexes = None
+        self._pos = -1
+        self._epoch = -1
+        self._curr_iter = 0
+
+    def process(self, dataset):
+        """process
+        """
+        batch = self._load_batch(dataset)
+        res = self.worker(self._drop_empty, batch)
+        return res
+
+    def _load_batch(self, dataset):
+        batch = []
+        for data in dataset:
+            sample = copy.deepcopy(data)
+            batch.append(sample)
+        return batch
+
+    def worker(self, drop_empty=True, batch_samples=None):
+        """
+        sample transform and batch transform.
+        """
+        batch = []
+        for sample in batch_samples:
+            sample = self._sample_transforms(sample)
+            batch.append(sample)
+        if len(batch) > 0 and self._batch_transforms:
+            batch = self._batch_transforms(batch)
+        if len(batch) > 0 and self._fields:
+            batch = batch_arrange(batch, self._fields)
+        return batch
+
+
+def pad_batch_data(insts,
+                   pad_idx=0,
+                   max_seq_len=None,
+                   return_pos=False,
+                   return_input_mask=False,
+                   return_max_len=False,
+                   return_num_token=False,
+                   return_seq_lens=False,
+                   pad_2d_pos_ids=False,
+                   pad_segment_id=False,
+                   select=False,
+                   extract=False):
+    """
+    Pad the instances to the max sequence length in batch, and generate the
+    corresponding position data and attention bias.
+    """
+    return_list = []
+    max_len = max(len(inst)
+                  for inst in insts) if max_seq_len is None else max_seq_len
+    # Any token included in dict can be used to pad, since the paddings' loss
+    # will be masked out by weights and make no effect on parameter gradients.
+    if pad_2d_pos_ids:
+        boxes = [x + [[0, 0, 0, 0]] * (max_len - len(x)) for x in insts]
+        boxes = np.array(boxes, dtype="int64")
+        return boxes
+
+    inst_data = np.array(
+        [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
+    return_list += [inst_data.astype("int64").reshape([-1, max_len, 1])]
+
+    # position data
+    if return_pos:
+        inst_pos = np.array([
+            list(range(0, len(inst))) + [pad_idx] * (max_len - len(inst))
+            for inst in insts
+        ])
+
+        return_list += [inst_pos.astype("int64").reshape([-1, max_len, 1])]
+
+    if return_input_mask:
+        # This is used to avoid attention on paddings.
+        input_mask_data = np.array(
+            [[1] * len(inst) + [0] * (max_len - len(inst)) for inst in insts])
+        input_mask_data = np.expand_dims(input_mask_data, axis=-1)
+        return_list += [input_mask_data.astype("float32")]
+
+    if return_max_len:
+        return_list += [max_len]
+
+    if return_num_token:
+        num_token = 0
+        for inst in insts:
+            num_token += len(inst)
+        return_list += [num_token]
+
+    if return_seq_lens:
+        seq_lens = np.array([len(inst) for inst in insts])
+        return_list += [seq_lens.astype("int64").reshape([-1, 1])]
+
+    return return_list if len(return_list) > 1 else return_list[0]
+
+
+class ImageReader(object):
+
+    def __init__(self,
+                 super_rel_pos,
+                 tokenizer,
+                 max_key_len=16,
+                 max_seq_len=512,
+                 image_size=1024,
+                 block_w=7,
+                 block_h=7,
+                 im_npos=224):
+        self.tokenizer = tokenizer
+        self.vocab = self.tokenizer.get_vocab()
+
+        self.pad_id = self.vocab["[PAD]"]
+        self.cls_id = self.vocab["[CLS]"]
+        self.sep_id = self.vocab["[SEP]"]
+        self.mask_id = self.vocab["[MASK]"]
+        self.pad = "[PAD]"
+        self.cls = "[CLS]"
+        self.sep = "[SEP]"
+        self.mask = "[MASK]"
+
+        self.super_rel_pos = super_rel_pos
+        self.max_key_len = max_key_len
+        self.max_seq_len = max_seq_len
+        self.doc_stride = 128
+        self.unique_id = 10000000
+
+        self.examples = {}
+        self.features = {}
+
+        self.image_size = image_size
+        self.block_w = block_w
+        self.block_h = block_h
+        self.im_npos = im_npos
+        self.image_rois = []
+        cut_width, cut_height = int(self.image_size / self.block_w), int(
+            self.image_size / self.block_h)
+        for idh in range(self.block_h):
+            for idw in range(self.block_w):
+                self.image_rois.append(
+                    [idw * cut_width, idh * cut_height, cut_width, cut_height])
+
+        sample_trans = [
+            DecodeImage(),
+            ResizeImage(target_size=self.im_npos, interp=1),
+            NormalizeImage(
+                is_channel_first=False,
+                mean=[103.530, 116.280, 123.675],
+                std=[57.375, 57.120, 58.395],
+            ),
+            Permute(to_bgr=False),
+        ]
+
+        batch_trans = [PadBatch(pad_to_stride=32, use_padded_im_info=True)]
+
+        inputs_def = {
+            "fields": ["image", "im_info", "im_id", "gt_bbox"],
+        }
+        self.data_loader = ProcessReader(
+            sample_transforms=sample_trans,
+            batch_transforms=batch_trans,
+            shuffle=False,
+            drop_empty=True,
+            inputs_def=inputs_def,
+        )
+
+    def ppocr2example(self, ocr_res, img_path, querys):
+        examples = []
+        segments = []
+        for rst in ocr_res:
+            left = min(rst[0][0][0], rst[0][3][0])
+            top = min(rst[0][0][-1], rst[0][1][-1])
+            width = max(rst[0][1][0], rst[0][2][0]) - min(
+                rst[0][0][0], rst[0][3][0])
+            height = max(rst[0][2][-1], rst[0][3][-1]) - min(
+                rst[0][0][-1], rst[0][1][-1])
+            segments.append({
+                "bbox": Bbox(*[left, top, width, height]),
+                "text": rst[-1][0]
+            })
+        segments.sort(key=cmp_to_key(two_dimension_sort_layout))
+        # 2. im_base64
+        img_base64 = img2base64(img_path)
+        # 3. doc_tokens, doc_boxes, segment_ids
+        doc_tokens = []
+        doc_boxes = []
+        ori_boxes = []
+        doc_segment_ids = []
+
+        im_w_box = max(
+            [seg["bbox"].left + seg["bbox"].width for seg in segments]) + 20
+        im_h_box = max(
+            [seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20
+        img = Image.open(img_path)
+        im_w, im_h = img.size
+        im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
+
+        scale_x = self.image_size / im_w
+        scale_y = self.image_size / im_h
+        for segment_id, segment in enumerate(segments):
+            bbox = segment["bbox"]  # x, y, w, h
+            x1, y1, w, h = bbox.left, bbox.top, bbox.width, bbox.height
+            sc_w = int(min(w * scale_x, self.image_size - 1))
+            sc_h = int(min(h * scale_y, self.image_size - 1))
+            sc_y1 = int(max(0, min(y1 * scale_y, self.image_size - h - 1)))
+            sc_x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
+            if w < 0:
+                raise ValueError(
+                    "Incorrect bbox, please check the input word boxes.")
+            ori_bbox = Bbox(*[x1, y1, w, h])
+            sc_bbox = Bbox(*[sc_x1, sc_y1, sc_w, sc_h])
+            text = segment["text"]
+            char_num = []
+            eng_word = ""
+            for char in text:
+                if not check(char) and not eng_word:
+                    doc_tokens.append([char])
+                    doc_segment_ids.append([segment_id])
+                    char_num.append(2)
+                elif not check(char) and eng_word:
+                    doc_tokens.append([eng_word])
+                    doc_segment_ids.append([segment_id])
+                    char_num.append(len(eng_word))
+                    eng_word = ""
+                    doc_tokens.append([char])
+                    doc_segment_ids.append([segment_id])
+                    char_num.append(2)
+                else:
+                    eng_word += char
+            if eng_word:
+                doc_tokens.append([eng_word])
+                doc_segment_ids.append([segment_id])
+                char_num.append(len(eng_word))
+            ori_char_width = round(ori_bbox.width / sum(char_num), 1)
+            sc_char_width = round(sc_bbox.width / sum(char_num), 1)
+            for chr_idx in range(len(char_num)):
+                if chr_idx == 0:
+                    doc_boxes.append([
+                        Bbox(*[
+                            sc_bbox.left, sc_bbox.top,
+                            (sc_char_width * char_num[chr_idx]), sc_bbox.height
+                        ])
+                    ])
+                    ori_boxes.append([
+                        Bbox(*[
+                            ori_bbox.left, ori_bbox.top,
+                            (ori_char_width *
+                             char_num[chr_idx]), ori_bbox.height
+                        ])
+                    ])
+                else:
+                    doc_boxes.append([Bbox(*[sc_bbox.left + (sc_char_width * sum(char_num[:chr_idx])), \
+                        sc_bbox.top, (sc_char_width * char_num[chr_idx]), sc_bbox.height])])
+                    ori_boxes.append([Bbox(*[ori_bbox.left + (ori_char_width * sum(char_num[:chr_idx])), \
+                        ori_bbox.top, (ori_char_width * char_num[chr_idx]), ori_bbox.height])])
+
+        qas_id = 0
+        for query in querys:
+            example = Example(
+                keys=[query],
+                key_labels=[0],
+                doc_tokens=doc_tokens,
+                seq_labels=[0 for one in doc_tokens],
+                text='',
+                qas_id="0_" + str(qas_id),
+                model_type=None,
+                ori_boxes=ori_boxes,
+                boxes=doc_boxes,
+                segment_ids=doc_segment_ids,
+                symbol_ids=None,
+                image_rois=self.image_rois,
+                im_base64=img_base64,
+            )
+
+            examples.append(example)
+            qas_id += 1
+        return examples
+
+    def box2example(self, ocr_res, img_path, querys):
+        """
+        ocr_res = [[word_str, [x1, y1, x2, y2]], [word_str, [x1, y1, x2, y2]], ...]
+        """
+        examples = []
+        doc_boxes = []
+        boxes = [x[1] for x in ocr_res]
+        im_w_box = max([b[2] for b in boxes]) + 20
+        im_h_box = max([b[3] for b in boxes]) + 20
+        img = Image.open(img_path)
+        im_w, im_h = img.size
+        im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
+
+        scale_x = self.image_size / im_w
+        scale_y = self.image_size / im_h
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            if x2 <= x1 or y2 <= y1:
+                raise ValueError("Invalid bbox format")
+            w = max(x1, x2) - min(x1, x2)
+            h = max(y1, y2) - min(y1, y2)
+            w = int(min(w * scale_x, self.image_size - 1))
+            h = int(min(h * scale_y, self.image_size - 1))
+            x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
+            y1 = int(max(0, min(y1 * scale_y, self.image_size - h - 1)))
+            if w < 0:
+                raise ValueError("Invalid bbox format")
+            doc_boxes.append([Bbox(*[x1, y1, w, h])])
+
+        img_base64 = img2base64(img_path)
+
+        doc_tokens = [[x[0]] for x in ocr_res]
+        doc_segment_ids = [[0]] * len(doc_tokens)
+
+        qas_id = 0
+        for query in querys:
+            example = Example(
+                keys=[query],
+                key_labels=[0],
+                doc_tokens=doc_tokens,
+                seq_labels=[0 for one in doc_tokens],
+                text='',
+                qas_id=str(qas_id),
+                model_type=None,
+                boxes=doc_boxes,
+                segment_ids=doc_segment_ids,
+                symbol_ids=None,
+                image_rois=self.image_rois,
+                im_base64=img_base64,
+            )
+
+            if not (len(example.doc_tokens) == len(example.boxes) == len(
+                    example.segment_ids)):
+                raise ValueError(
+                    f"Incorrect word_boxes, the format should be `List[str, Tuple[float, float, float, float]]`"
+                )
+
+            examples.append(example)
+            qas_id += 1
+
+        return examples
+
+    def example2feature(self, example, tokenizer, max_line_id=128):
+        features = []
+        all_doc_tokens = []
+        tok_to_orig_index = []
+        boxes = []
+        segment_ids = []
+        all_doc_labels = []
+
+        query_tokens = tokenizer.tokenize(
+            "&" + str(example.keys[0]))[1:][:self.max_key_len]
+
+        for i, (token_list, box_list, seg_list, l) in enumerate(
+                zip(example.doc_tokens, example.boxes, example.segment_ids,
+                    example.seq_labels)):
+            assert len(token_list) == len(box_list) == len(seg_list)
+            for idt, (token, box,
+                      seg) in enumerate(zip(token_list, box_list, seg_list)):
+                sub_tokens = tokenizer.tokenize("&" + token)[1:]
+                for ii, sub_token in enumerate(sub_tokens):
+                    width_split = box.width / len(sub_tokens)
+                    boxes.append([
+                        box.left + ii * width_split, box.top, width_split,
+                        box.height
+                    ])
+                    segment_ids.append(seg)
+                    tok_to_orig_index.append(i)
+                    all_doc_tokens.append(sub_token)
+                    all_doc_labels.extend([0])
+
+        max_tokens_for_doc = self.max_seq_len - len(query_tokens) - 4
+        doc_spans = []
+        start_offset = 0
+        while start_offset < len(all_doc_tokens):
+            length = len(all_doc_tokens) - start_offset
+            if length > max_tokens_for_doc:
+                length = max_tokens_for_doc
+            doc_spans.append(DocSpan(start=start_offset, length=length))
+            if start_offset + length == len(all_doc_tokens):
+                break
+            start_offset += min(length, self.doc_stride)
+
+        for (doc_span_index, doc_span) in enumerate(doc_spans):
+            tokens = []
+            labels = []
+            feature_segment_ids = []
+            feature_boxes = []
+            token_to_orig_map = {}
+            token_is_max_context = {}
+            text_type_ids = []
+            tokens.append(self.cls)
+            feature_boxes.append([0, 0, 0, 0])
+            labels.append(0)
+            text_type_ids.append(0)
+            feature_segment_ids.append(max_line_id - 1)
+
+            for i in range(doc_span.length):
+                split_token_index = doc_span.start + i
+                token_to_orig_map[len(
+                    tokens)] = tok_to_orig_index[split_token_index]
+                is_max_context = self._check_is_max_context(
+                    doc_spans, doc_span_index, split_token_index)
+                token_is_max_context[len(tokens)] = is_max_context
+                tokens.append(all_doc_tokens[split_token_index])
+
+                feature_boxes.append(boxes[split_token_index])
+                feature_segment_ids.append(segment_ids[split_token_index])
+                text_type_ids.append(0)
+                labels.append(all_doc_labels[split_token_index])
+
+            tokens.append(self.sep)
+            feature_boxes.append([0, 0, 0, 0])
+            text_type_ids.append(0)
+            feature_segment_ids.append(max_line_id - 1)
+            labels.append(0)
+            for token in query_tokens:
+                tokens.append(token)
+                feature_boxes.append([0, 0, 0, 0])
+                feature_segment_ids.append(max_line_id - 1)
+                text_type_ids.append(1)
+                labels.append(0)
+
+            tokens = tokens + [self.sep]
+            feature_boxes.extend([[0, 0, 0, 0]])
+            feature_segment_ids = feature_segment_ids + [max_line_id - 1]
+            text_type_ids = text_type_ids + [1]
+            labels.append(0)
+
+            position_ids = list(range(len(tokens)))
+            token_ids = tokenizer.convert_tokens_to_ids(tokens)
+            feature_segment_ids = [x % max_line_id for x in feature_segment_ids]
+
+            feature = Feature(unique_id=self.unique_id,
+                              example_index=0,
+                              qas_id=example.qas_id,
+                              doc_span_index=doc_span_index,
+                              tokens=tokens,
+                              token_to_orig_map=token_to_orig_map,
+                              token_is_max_context=token_is_max_context,
+                              token_ids=token_ids,
+                              position_ids=position_ids,
+                              text_type_ids=text_type_ids,
+                              text_symbol_ids=None,
+                              overlaps=None,
+                              keys=example.keys,
+                              seq_labels=labels,
+                              se_seq_labels=None,
+                              bio_seq_labels=None,
+                              bioes_seq_labels=None,
+                              key_labels=example.key_labels,
+                              model_type=example.model_type,
+                              doc_tokens=example.doc_tokens,
+                              doc_labels=example.seq_labels,
+                              text=example.text,
+                              boxes=feature_boxes,
+                              segment_ids=feature_segment_ids,
+                              im_base64=example.im_base64,
+                              image_rois=example.image_rois)
+            features.append(feature)
+            self.unique_id += 1
+        return features
+
+    def _pad_batch_records(self, batch_records, max_line_id=128, phase="infer"):
+        """pad batch records"""
+        return_list = []
+        batch_token_ids = []
+        batch_sent_ids = []
+        batch_pos_ids = []
+        batch_2d_pos_ids = []
+        batch_segment_ids = []
+        batch_labels = []
+        batch_unique_id = []
+        batch_image_base64 = []
+        batch_image_rois = []
+
+        for i in range(len(batch_records)):
+            batch_token_ids.append(batch_records[i].token_ids)
+            batch_sent_ids.append(batch_records[i].text_type_ids)
+            batch_segment_ids.append(batch_records[i].segment_ids)
+            batch_labels.append(batch_records[i].seq_labels)
+            batch_unique_id.append(batch_records[i].unique_id)
+            batch_pos_ids.append(batch_records[i].position_ids)
+            batch_2d_pos_ids.append(batch_records[i].boxes)
+            batch_image_base64.append(batch_records[i].im_base64)
+            batch_image_rois.append(batch_records[i].image_rois)
+
+        padded_token_ids, _ = pad_batch_data(batch_token_ids,
+                                             pad_idx=self.pad_id,
+                                             return_input_mask=True)
+        padded_sent_ids = pad_batch_data(batch_sent_ids, pad_idx=self.pad_id)
+        padded_pos_ids = pad_batch_data(batch_pos_ids, pad_idx=self.pad_id)
+        new_padded_pos_ids = []
+        for idp, pos_ids in enumerate(padded_pos_ids):
+            new_padded_pos_ids.append(np.concatenate((pos_ids, np.array([[x] for x in \
+                    range(self.block_w * self.block_h)])), axis=0))
+        padded_pos_ids = np.array(new_padded_pos_ids)
+        padded_2d_pos_ids = pad_batch_data(batch_2d_pos_ids,
+                                           pad_2d_pos_ids=True,
+                                           select=False,
+                                           extract=True)
+        new_padded_2d_pos_ids = []
+        for pos_ids_2d, batch_record in zip(padded_2d_pos_ids, batch_records):
+            new_padded_2d_pos_ids.append(
+                np.concatenate((pos_ids_2d, np.array(batch_record.image_rois)),
+                               axis=0))
+        padded_2d_pos_ids = np.array(new_padded_2d_pos_ids)
+        padded_segment_ids = pad_batch_data(batch_segment_ids,
+                                            pad_idx=max_line_id - 1)
+
+        input_mask_mat = self._build_input_mask(np.array([list(x) + [\
+                [-1] for _ in range(self.block_w * self.block_h)] for x in padded_token_ids]))
+        super_rel_pos = self._build_rel_pos(np.array([list(x) + [\
+                [-1] for _ in range(self.block_w * self.block_h)] for x in padded_token_ids]))
+
+        unique_id = np.array(batch_unique_id).astype("float32").reshape([-1, 1])
+
+        bsz, seq_len, _ = padded_token_ids.shape
+        task_ids = np.ones((bsz, seq_len, 1)).astype('int64')
+        for b in range(bsz):
+            if np.sum(padded_2d_pos_ids[b]) > 0:
+                task_ids[b, :, :] = 0
+            else:
+                task_ids[b, :, :] = 1
+
+        coco_data = self.generate_coco_data(
+            [""] * len(batch_image_base64),
+            batch_image_base64,
+            [self.image_size] * len(batch_image_base64),
+            [self.image_size] * len(batch_image_base64),
+            batch_image_rois,
+        )
+
+        image_data = self.im_make_batch(
+            self.data_loader.process(coco_data),
+            self.block_w * self.block_h,
+            len(batch_image_base64),
+        )
+
+        return_list = [padded_token_ids, padded_sent_ids, padded_pos_ids, padded_2d_pos_ids, \
+                    padded_segment_ids, task_ids, input_mask_mat, super_rel_pos, \
+                    unique_id, image_data \
+                    ]
+        return return_list
+
+    def data_generator(self,
+                       ocr_res,
+                       img_path,
+                       querys,
+                       batch_size,
+                       ocr_type="ppocr",
+                       phase="infer"):
+        if ocr_type == "ppocr":
+            self.examples[phase] = self.ppocr2example(ocr_res, img_path, querys)
+        elif ocr_type == "word_boxes":
+            self.examples[phase] = self.box2example(ocr_res, img_path, querys)
+        self.features[phase] = sum([self.example2feature(e, self.tokenizer) \
+                                    for e in self.examples[phase]], [])
+        for batch_data in self._prepare_batch_data(self.features[phase],
+                                                   batch_size,
+                                                   phase=phase):
+            yield self._pad_batch_records(batch_data)
+
+    def _prepare_batch_data(self, features, batch_size, phase=None):
+        """generate batch records"""
+        batch_records = []
+        for feature in features:
+            to_append = len(batch_records) < batch_size
+            if to_append:
+                batch_records.append(feature)
+            else:
+                yield batch_records
+                batch_records = [feature]
+
+        if phase == "infer" and batch_records:
+            yield batch_records
+
+    def _build_input_mask(self, padded_token_ids):
+        """build_input_mask"""
+        bsz, seq_len, _ = padded_token_ids.shape
+        return np.ones((bsz, seq_len, seq_len)).astype("float32")
+
+    def _build_rel_pos(self, padded_token_ids):
+        """build relative position """
+        bsz, seq_len, _ = padded_token_ids.shape
+        rel_pos = np.zeros((bsz, seq_len, seq_len)).astype('int64')
+        return rel_pos
+
+    def generate_coco_data(
+        self,
+        batch_image_path,
+        batch_image_base64,
+        batch_scaled_width,
+        batch_scaled_height,
+        batch_rois,
+    ):
+        """ generator coco data """
+
+        def transform(dataset):
+            roidbs = []
+            for i in dataset:
+                rvl_rec = {
+                    'im_file': i[0],
+                    'im_id': np.array([i[1]]),
+                    'h': i[2],
+                    'w': i[3],
+                    "gt_bbox": i[4],
+                    "cover_box": i[5],
+                    "im_base64": i[6]
+                }
+
+                roidbs.append(rvl_rec)
+            return roidbs
+
+        result = []
+        for image_path, im_base64, width, height, roi in zip(
+                batch_image_path,
+                batch_image_base64,
+                batch_scaled_width,
+                batch_scaled_height,
+                batch_rois,
+        ):
+            result.append((image_path, 0, height, width, roi, None, im_base64))
+        return transform(result)
+
+    def im_make_batch(self, dataset, image_boxes_nums, bsize):
+        """ make image batch """
+        img_batch = np.array([i[0] for i in dataset], "float32")
+        return img_batch
+
+    def BIO2SPAN(self, BIO):
+        start_label, end_label = [], []
+        for seq in BIO:
+            first_one = True
+            start_pos = [1 if x == 2 else 0 for x in seq]
+            if sum(start_pos) == 0 and sum(seq) != 0:
+                start_pos = []
+                for idp, p in enumerate(seq):
+                    if p == 1 and first_one:
+                        start_pos.append(1)
+                        first_one = False
+                    else:
+                        start_pos.append(0)
+
+            start_label.append(start_pos)
+
+            end_tmp = []
+            for index, s in enumerate(seq):
+                if s == -100 or s == 0:
+                    end_tmp.append(s)
+                elif s == 2 and index + 1 < len(seq) and (seq[index + 1] == 0 or
+                                                          seq[index + 1] == 2):
+                    end_tmp.append(1)
+                elif s == 2 and index + 1 < len(seq) and seq[index + 1] != 0:
+                    end_tmp.append(0)
+                elif s == 2 and index + 1 == len(seq):
+                    end_tmp.append(1)
+                elif s == 1 and (index + 1 == len(seq) or seq[index + 1] != 1):
+                    end_tmp.append(1)
+                else:
+                    end_tmp.append(0)
+            end_label.append(end_tmp)
+
+        return start_label, end_label
+
+    def _check_is_max_context(self, doc_spans, cur_span_index, position):
+        best_score = None
+        best_span_index = None
+        for (span_index, doc_span) in enumerate(doc_spans):
+            end = doc_span.start + doc_span.length - 1
+            if position < doc_span.start:
+                continue
+            if position > end:
+                continue
+            num_left_context = position - doc_span.start
+            num_right_context = end - position
+            score = min(num_left_context,
+                        num_right_context) + 0.01 * doc_span.length
+            if best_score is None or score > best_score:
+                best_score = score
+                best_span_index = span_index
+        return cur_span_index == best_span_index
+
+
+def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
+                 all_key_probs, example_index):
+
+    def _compute_softmax(scores):
+        """Compute softmax probability over raw logits."""
+        if len(scores) == 0:
+            return []
+
+        max_score = None
+        for score in scores:
+            if max_score is None or score > max_score:
+                max_score = score
+
+        exp_scores = []
+        total_sum = 0.0
+        for score in scores:
+            x = math.exp(score - max_score)
+            exp_scores.append(x)
+            total_sum += x
+
+        probs = []
+        for score in exp_scores:
+            probs.append(score / total_sum)
+        return probs
+
+    preds = []
+    for start_index, end_index in ans_pos:
+        # process data
+        tok_tokens = feature.tokens[start_index:end_index + 1]
+        tok_text = " ".join(tok_tokens)
+        # De-tokenize WordPieces that have been split off.
+        tok_text = tok_text.replace(" ##", "")
+        tok_text = tok_text.replace("##", "")
+        tok_text = tok_text.strip()
+        tok_text = "".join(tok_text.split())
+
+        orig_doc_start = feature.token_to_orig_map[start_index]
+        orig_doc_end = feature.token_to_orig_map[end_index]
+        orig_tokens = example.doc_tokens[orig_doc_start:orig_doc_end + 1]
+
+        # Clean whitespace
+        orig_text = "".join(["".join(x) for x in orig_tokens])
+        final_text = get_final_text(tok_text, orig_text, tokenizer,
+                                    do_lower_case)
+
+        probs = []
+        for idx, logit in enumerate(result.seq_logits[start_index:end_index +
+                                                      1]):
+            if idx == 0:
+                # -1 is for B in  OIB or I in OI
+                probs.append(_compute_softmax(logit)[-1])
+            else:
+                # 1 is for I in OIB or I in OI
+                probs.append(_compute_softmax(logit)[1])
+        avg_prob = sum(probs) / len(probs)
+        preds.append({
+            'value': final_text,
+            'prob': round(avg_prob, 2),
+            'start': orig_doc_start,
+            'end': orig_doc_end
+        })
+    return preds
+
+
+def get_final_text(pred_text, orig_text, tokenizer, do_lower_case):
+    """Project the tokenized prediction back to the original text."""
+
+    def _strip_spaces(text):
+        ns_chars = []
+        ns_to_s_map = OrderedDict()
+        for (i, c) in enumerate(text):
+            if c == " ":
+                continue
+            ns_to_s_map[len(ns_chars)] = i
+            ns_chars.append(c)
+        ns_text = "".join(ns_chars)
+        return (ns_text, ns_to_s_map)
+
+    tok_text = " ".join(tokenizer.tokenize(orig_text))
+
+    start_position = tok_text.find(pred_text)
+    if start_position == -1:
+        return orig_text
+    end_position = start_position + len(pred_text) - 1
+
+    (orig_ns_text, orig_ns_to_s_map) = _strip_spaces(orig_text)
+    (tok_ns_text, tok_ns_to_s_map) = _strip_spaces(tok_text)
+
+    if len(orig_ns_text) != len(tok_ns_text):
+        return orig_text
+
+    # We then project the characters in `pred_text` back to `orig_text` using
+    # the character-to-character alignment.
+    tok_s_to_ns_map = {}
+    for (i, tok_index) in six.iteritems(tok_ns_to_s_map):
+        tok_s_to_ns_map[tok_index] = i
+
+    orig_start_position = None
+    if start_position in tok_s_to_ns_map:
+        ns_start_position = tok_s_to_ns_map[start_position]
+        if ns_start_position in orig_ns_to_s_map:
+            orig_start_position = orig_ns_to_s_map[ns_start_position]
+
+    if orig_start_position is None:
+        return orig_text
+
+    orig_end_position = None
+    if end_position in tok_s_to_ns_map:
+        ns_end_position = tok_s_to_ns_map[end_position]
+        if ns_end_position in orig_ns_to_s_map:
+            orig_end_position = orig_ns_to_s_map[ns_end_position]
+
+    if orig_end_position is None:
+        return orig_text
+
+    output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+    return output_text
+
+
+def find_bio_pos(label):
+    """ find answer position from BIO label """
+    e = []
+    cand_ans = []
+    last_l = None
+    for idx, l in enumerate(label):
+        if l == "O":
+            if e:
+                cand_ans.append([e[0], e[-1]])
+            e = []
+        elif l.startswith("B"):
+            if last_l == "O" or last_l is None:
+                if len(e) != 0:
+                    e = []
+                e.append(idx)
+            else:  # I B
+                if e:
+                    cand_ans.append([e[0], e[-1]])
+                    e = []
+                e.append(idx)
+        elif l.startswith("I"):
+            if len(e) == 0:
+                continue
+            else:
+                e.append(idx)
+        last_l = l
+    if e:
+        cand_ans.append([e[0], e[-1]])
+    return cand_ans
+
+
+def viterbi_decode(logits):
+    np_logits = np.array(logits)  # shape: L * D
+    length, dim = np_logits.shape
+    f = np.zeros(np_logits.shape)
+    path = [["" for i in range(dim)] for j in range(length)]
+    label_scheme = "OIB"
+    # oib label 0:O, 1:I, 2:B
+    # illegal matrix: [O, I ,B, start, end] * [O, I, B, start, end]
+    illegal = np.array([[0, -1, 0, -1, 0], [0, 0, 0, -1, 0], [0, 0, 0, 0, 0],
+                        [0, -1, 0, 0, 0], [-1, -1, -1, -1, -1]])
+    illegal = illegal * 1000
+
+    f[0, :] = np_logits[0, :] + illegal[3, :3]
+    path[0] = [label_scheme[i] for i in range(dim)]
+
+    for step in range(1, length):
+        last_s = f[step - 1, :]
+        for d in range(dim):
+            cand_score = illegal[:3, d] + last_s + np_logits[step, d]
+            f[step, d] = np.max(cand_score)
+            path[step][d] = path[step -
+                                 1][np.argmax(cand_score)] + label_scheme[d]
+    final_path = path[-1][np.argmax(f[-1, :])]
+    return final_path
+
+
+def find_answer_pos(logits, feature):
+    start_index = -1
+    end_index = -1
+    ans = []
+    cand_ans = []
+
+    best_path = viterbi_decode(logits)
+    cand_ans = find_bio_pos(best_path)
+
+    for start_index, end_index in cand_ans:
+        is_valid = True
+        if start_index not in feature.token_to_orig_map:
+            is_valid = False
+        if end_index not in feature.token_to_orig_map:
+            is_valid = False
+        if not feature.token_is_max_context.get(start_index, False):
+            is_valid = False
+        if end_index < start_index:
+            is_valid = False
+        if is_valid:
+            ans.append([start_index, end_index])
+
+    return ans
+
+
+def calEuclidean(x_list, y_list):
+    """
+    Calculate euclidean distance
+    """
+    if x_list is None or y_list is None:
+        return None
+    else:
+        dist = np.sqrt(
+            np.square(x_list[0] - y_list[0]) + np.square(x_list[1] - y_list[1]))
+        return dist
+
+
+def longestCommonSequence(question_tokens, context_tokens):
+    """
+    Longest common sequence
+    """
+    max_index = -1
+    max_len = 0
+    m, n = len(question_tokens), len(context_tokens)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if question_tokens[i - 1].lower() == context_tokens[j -
+                                                                1][0].lower():
+                dp[i][j] = 1 + dp[i - 1][j - 1]
+                if dp[i][j] > max_len:
+                    max_len = dp[i][j]
+                    max_index = j - 1
+    return max_index, max_len
+
+
+def sort_res(prompt, ans_list, context, boxes, lang="en"):
+    if len(ans_list) == 1:
+        return ans_list
+    else:
+        ans_val = []
+        for ans in ans_list:
+            ans_val.append(ans["value"])
+        if len(set(ans_val)) == len(ans_val):
+            sorted_ans_list = sorted(ans_list,
+                                     key=lambda x: x["prob"],
+                                     reverse=True)
+            return sorted_ans_list
+        else:
+            if lang == "en":
+                clean_prompt = [word for word in prompt.split(" ")]
+            else:
+                clean_prompt = [word for word in prompt]
+
+            max_index, max_len = longestCommonSequence(clean_prompt, context)
+            if max_index == -1:
+                sorted_ans_list = sorted(ans_list,
+                                         key=lambda x: x["prob"],
+                                         reverse=True)
+                return sorted_ans_list
+            else:
+                prompt_center = []
+                for idx in range(max_index - max_len + 1, max_index + 1):
+                    box = boxes[idx][0]
+                    x = box.left + box.width / 2
+                    y = box.top + box.height / 2
+                    prompt_center.append([x, y])
+
+                ans_center = []
+                ans_prob = []
+                for ans in ans_list:
+                    ans_prob.append(ans["prob"])
+                    cent_list = []
+                    for idx in range(ans["start"], ans["end"] + 1):
+                        box = boxes[idx][0]
+                        x = box.left + box.width / 2
+                        y = box.top + box.height / 2
+                        cent_list.append([x, y])
+                    ans_center.append(cent_list)
+
+                ans_odist = []
+                for ans_c in ans_center:
+                    odist = 0
+                    for a_c in ans_c:
+                        for p_c in prompt_center:
+                            odist += calEuclidean(a_c, p_c)
+                    odist /= len(ans_c)
+                    ans_odist.append(odist * (-1))
+
+                ans_score = np.sum([ans_prob, ans_odist], axis=0).tolist()
+                sorted_ans_list = sorted(
+                    ans_list,
+                    key=lambda x: ans_score[ans_list.index(x)],
+                    reverse=True)
+                return sorted_ans_list

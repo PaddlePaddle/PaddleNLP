@@ -204,9 +204,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --hnsw_m 100 \
     --hnsw_ef 100 \
     --recall_num 50 \
-    --similar_text_pair "recall/dev.csv" \
-    --corpus_file "recall/corpus.csv"  \
-    --similar_text_pair "recall/dev.csv"
+    --similar_text_pair_file "recall/dev.csv" \
+    --corpus_file "recall/corpus.csv"
 ```
 
 参数含义说明
@@ -228,9 +227,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 * `hnsw_m`: hnsw 算法相关参数，保持默认即可
 * `hnsw_ef`: hnsw 算法相关参数，保持默认即可
 * `recall_num`: 对 1 个文本召回的相似文本数量
-* `similar_text_pair`: 由相似文本对构成的评估集
+* `similar_text_pair_file`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
-* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
 
 也可以使用bash脚本：
 

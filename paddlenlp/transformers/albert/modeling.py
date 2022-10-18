@@ -22,16 +22,12 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutput,
-    ModelOutput,
-    BaseModelOutputWithPooling,
-    MaskedLMOutput,
-    MultipleChoiceModelOutput,
-    QuestionAnsweringModelOutput,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-)
+from ..model_outputs import (BaseModelOutput, ModelOutput,
+                             BaseModelOutputWithPooling, MaskedLMOutput,
+                             MultipleChoiceModelOutput,
+                             QuestionAnsweringModelOutput,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             tuple_output)
 
 __all__ = [
     "AlbertPretrainedModel",
@@ -1292,8 +1288,7 @@ class AlbertForPretraining(AlbertPretrainedModel):
 
         if not return_dict:
             output = (prediction_scores, sop_scores) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return AlbertForPreTrainingOutput(
             loss=total_loss,
@@ -1474,9 +1469,7 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + transformer_outputs[2:]
-            return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else (
-                        output[0] if len(output) == 1 else output)
+            return tuple_output(output, masked_lm_loss)
 
         return MaskedLMOutput(
             loss=masked_lm_loss,
@@ -1618,8 +1611,7 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + transformer_outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -1748,8 +1740,7 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
                             labels.reshape((-1, )))
         if not return_dict:
             output = (logits, ) + transformer_outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -1904,8 +1895,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
             total_loss = (start_loss + end_loss) / 2
         if not return_dict:
             output = (start_logits, end_logits) + transformer_outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,
@@ -2032,8 +2022,7 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
             loss = loss_fct(reshaped_logits, labels)
         if not return_dict:
             output = (reshaped_logits, ) + transformer_outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(
             loss=loss,

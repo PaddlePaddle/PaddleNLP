@@ -114,6 +114,25 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
+        "unimo-text-1.0-dureader_qg-template1": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
     }
     pretrained_resource_files_map = {
         "model_state": {
@@ -125,6 +144,8 @@ class UNIMOPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large.pdparams",
             "unimo-text-1.0-summary":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-summary.pdparams",
+            "unimo-text-1.0-dureader_qg-template1":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-dureader_qg-template1.pdparams"
         }
     }
     base_model_prefix = "unimo"
@@ -151,16 +172,39 @@ class UNIMOEmbeddings(nn.Layer):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=4):
+                 type_vocab_size=4,
+                 pad_token_id=None):
         super(UNIMOEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.pad_token_id = pad_token_id
 
-    def forward(self, input_ids, token_type_ids, position_ids):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None):
         input_embedings = self.word_embeddings(input_ids)
+
+        if position_ids is None:
+            if self.pad_token_id is None:
+                position_ids = paddle.expand_as(
+                    paddle.arange(end=paddle.shape(input_ids)[1],
+                                  dtype="int64"), input_ids)
+            else:
+                num_pad = paddle.sum(
+                    (input_ids == self.pad_token_id).astype("float32"),
+                    axis=-1,
+                    keepdim=True)
+                position_ids = F.relu(
+                    paddle.expand_as(
+                        paddle.arange(end=paddle.shape(input_ids)[1],
+                                      dtype="float32"), input_ids) -
+                    num_pad).astype("int64")
+            position_ids.stop_gradient = True
         position_embeddings = self.position_embeddings(position_ids)
+
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids.stop_gradient = True
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
@@ -274,7 +318,7 @@ class UNIMOModel(UNIMOPretrainedModel):
         self.embeddings = UNIMOEmbeddings(vocab_size, hidden_size,
                                           hidden_dropout_prob,
                                           max_position_embeddings,
-                                          type_vocab_size)
+                                          type_vocab_size, self.pad_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -294,11 +338,17 @@ class UNIMOModel(UNIMOPretrainedModel):
 
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
-                token_type_ids,
-                position_ids,
-                attention_mask,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
                 use_cache=False,
                 cache=None):
         r"""
@@ -364,6 +414,10 @@ class UNIMOModel(UNIMOPretrainedModel):
                 inputs = tokenizer.gen_encode("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors=True)
                 outputs = model(**inputs)
         """
+        if attention_mask is None:
+            attention_mask = ((input_ids == self.pad_token_id).astype(
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(input_ids, token_type_ids,
                                            position_ids)
@@ -435,9 +489,9 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
     def forward(self,
                 input_ids,
-                token_type_ids,
-                position_ids,
-                attention_mask,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
                 masked_positions=None,
                 use_cache=False,
                 cache=None):
@@ -527,18 +581,48 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
+                                      token_type_ids=None,
+                                      position_ids=None,
+                                      attention_mask=None,
                                       use_cache=False,
                                       cache=None,
                                       **kwargs):
+
+        if position_ids is None:
+            if self.pad_token_id is None:
+                position_ids = paddle.expand_as(
+                    paddle.arange(end=paddle.shape(input_ids)[1],
+                                  dtype="int64"), input_ids)
+            else:
+                num_pad = paddle.sum(
+                    (input_ids == self.pad_token_id).astype("float32"),
+                    axis=-1,
+                    keepdim=True)
+                position_ids = F.relu(
+                    paddle.expand_as(
+                        paddle.arange(end=paddle.shape(input_ids)[1],
+                                      dtype="float32"), input_ids) -
+                    num_pad).astype("int64")
+            position_ids.stop_gradient = True
+
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids.stop_gradient = True
+
+        if attention_mask is None:
+            attention_mask = ((input_ids == self.pad_token_id).astype(
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            attention_mask.stop_gradient = True
+
         # only last token for inputs_ids if cache is defined in kwargs
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
-            token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
-            position_ids = position_ids[:, -1].unsqueeze(-1)
-            attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+            if token_type_ids is not None:
+                token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
