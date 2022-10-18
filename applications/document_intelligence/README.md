@@ -16,7 +16,7 @@
 在实际应用中，需要解决文档格式繁杂、布局多样、信息模态多样、需求开放、业务数据少等多重难题。针对文档智能领域的痛点和难点，PaddleNLP将持续开源一系列产业实践范例，解决开发者们实际应用难题。
 
 <div align="center">
-    <img width="900" height="200" alt="文档智能技术一般流程" src="https://user-images.githubusercontent.com/40840292/196361583-6b1c66d1-6a9b-4193-949a-71e2d420a82a.png">
+    <img width="1000" height="270" alt="文档智能技术一般流程" src="https://user-images.githubusercontent.com/40840292/196361583-6b1c66d1-6a9b-4193-949a-71e2d420a82a.png">
 </div>
 
 <a name="技术特色介绍"></a>
