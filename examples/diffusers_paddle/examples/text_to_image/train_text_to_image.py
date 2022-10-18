@@ -22,7 +22,8 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-
+import contextlib
+import sys
 from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler
 
 from paddlenlp.utils.log import logger
@@ -31,6 +32,7 @@ from diffusers_paddle import AutoencoderKL, DDPMScheduler, StableDiffusionPipeli
 from diffusers_paddle.optimization import get_scheduler
 from diffusers_paddle.modeling_utils import unwrap_model
 from diffusers_paddle.training_utils import main_process_first
+from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
 from datasets import load_dataset
 
@@ -352,7 +354,7 @@ def main():
     if args.scale_lr:
         args.learning_rate = (args.learning_rate *
                               args.gradient_accumulation_steps *
-                              args.train_batch_size)
+                              args.train_batch_size * num_processes)
 
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
@@ -573,10 +575,21 @@ def main():
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0]
 
-            # Predict the noise residual and compute loss
-            noise_pred = unet(noisy_latents, timesteps,
-                              encoder_hidden_states).sample
-            loss = F.mse_loss(noise_pred, noise, reduction="mean")
+            if num_processes > 1 and (args.gradient_checkpointing or (
+                (step + 1) % args.gradient_accumulation_steps != 0)):
+                # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
+                # gradient_checkpointing, no_sync every where
+                # gradient_checkpointing + grad_acc, no_sync every where
+                ctx_manager = unet.no_sync()
+            else:
+                ctx_manager = contextlib.nullcontext() if sys.version_info >= (
+                    3, 7) else contextlib.suppress()
+
+            with ctx_manager:
+                # Predict the noise residual and compute loss
+                noise_pred = unet(noisy_latents, timesteps,
+                                  encoder_hidden_states).sample
+                loss = F.mse_loss(noise_pred, noise, reduction="mean")
 
             train_loss += loss.item()
             if args.gradient_accumulation_steps > 1:
@@ -584,6 +597,8 @@ def main():
             loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
+                if num_processes > 1 and args.gradient_checkpointing:
+                    fused_allreduce_gradients(unet.parameters(), None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()

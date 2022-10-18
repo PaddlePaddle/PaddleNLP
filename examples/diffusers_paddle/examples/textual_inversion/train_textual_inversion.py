@@ -127,12 +127,20 @@ def parse_args():
                         default=None,
                         help="A seed for reproducible training.")
     parser.add_argument(
-        "--resolution",
+        "--height",
         type=int,
         default=512,
         help=
-        ("The resolution for input images, all the images in the train/validation dataset will be resized to this"
-         " resolution"),
+        ("The height for input images, all the images in the train/validation dataset will be resized to this"
+         " height"),
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=512,
+        help=
+        ("The width for input images, all the images in the train/validation dataset will be resized to this"
+         " width"),
     )
     parser.add_argument(
         "--center_crop",
@@ -287,7 +295,8 @@ class TextualInversionDataset(Dataset):
         data_root,
         tokenizer,
         learnable_property="object",  # [object, style]
-        size=512,
+        height=512,
+        width=512,
         repeats=100,
         interpolation="bicubic",
         flip_p=0.5,
@@ -298,7 +307,8 @@ class TextualInversionDataset(Dataset):
         self.data_root = data_root
         self.tokenizer = tokenizer
         self.learnable_property = learnable_property
-        self.size = size
+        self.height = height
+        self.width = width
         self.placeholder_token = placeholder_token
         self.center_crop = center_crop
         self.flip_p = flip_p
@@ -358,7 +368,7 @@ class TextualInversionDataset(Dataset):
                       (w - crop) // 2:(w + crop) // 2]
 
         image = Image.fromarray(img)
-        image = image.resize((self.size, self.size),
+        image = image.resize((self.width, self.height),
                              resample=self.interpolation)
 
         image = self.flip_transform(image)
@@ -445,7 +455,7 @@ def main():
     if args.scale_lr:
         args.learning_rate = (args.learning_rate *
                               args.gradient_accumulation_steps *
-                              args.train_batch_size)
+                              args.train_batch_size * num_processes)
 
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
@@ -478,7 +488,8 @@ def main():
     train_dataset = TextualInversionDataset(
         data_root=args.train_data_dir,
         tokenizer=tokenizer,
-        size=args.resolution,
+        height=args.height,
+        width=args.width,
         placeholder_token=args.placeholder_token,
         repeats=args.repeats,
         learnable_property=args.learnable_property,

@@ -16,17 +16,18 @@
 import argparse
 import math
 import os
-import itertools
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import Dataset, DataLoader, BatchSampler, DistributedBatchSampler
-
+import contextlib
+import sys
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import set_seed
 from diffusers_paddle import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers_paddle.optimization import get_scheduler
 from diffusers_paddle.modeling_utils import unwrap_model
+from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
 from PIL import Image
 from paddle.vision import transforms
@@ -416,7 +417,7 @@ def main():
     if args.scale_lr:
         args.learning_rate = (args.learning_rate *
                               args.gradient_accumulation_steps *
-                              args.train_batch_size)
+                              args.train_batch_size * num_processes)
 
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
@@ -428,14 +429,9 @@ def main():
     )
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
-        text_encoder = paddle.DataParallel(text_encoder)
 
-    params_to_train = itertools.chain(
-        text_encoder.parameters(),
-        unet.parameters(),
-    )
     optimizer = AdamW(learning_rate=lr_scheduler,
-                      parameters=params_to_train,
+                      parameters=unet.parameters(),
                       beta1=args.adam_beta1,
                       beta2=args.adam_beta2,
                       weight_decay=args.adam_weight_decay,
@@ -535,9 +531,9 @@ def main():
     progress_bar.set_description("Train Steps")
     global_step = 0
 
-    # Keep vae in eval model as we don't train these
+    # Keep vae and text_encoder in eval model as we don't train these
     vae.eval()
-    text_encoder.train()
+    text_encoder.eval()
     unet.train()
 
     for epoch in range(args.num_train_epochs):
@@ -560,39 +556,52 @@ def main():
                 noisy_latents = noise_scheduler.add_noise(
                     latents, noise, timesteps)
 
-            # Get the text embedding for conditioning
-            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+                # Get the text embedding for conditioning
+                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
 
-            # Predict the noise residual
-            noise_pred = unet(noisy_latents, timesteps,
-                              encoder_hidden_states).sample
-
-            if args.with_prior_preservation:
-                # Chunk the noise and noise_pred into two parts and compute the loss on each part separately.
-                noise_pred, noise_pred_prior = noise_pred.chunk(2, axis=0)
-                noise, noise_prior = noise.chunk(2, axis=0)
-
-                # Compute instance loss
-                loss = F.mse_loss(noise_pred, noise,
-                                  reduction="none").mean([1, 2, 3]).mean()
-
-                # Compute prior loss
-                prior_loss = F.mse_loss(noise_pred_prior,
-                                        noise_prior,
-                                        reduction="none").mean([1, 2,
-                                                                3]).mean()
-
-                # Add the prior loss to the instance loss.
-                loss = loss + args.prior_loss_weight * prior_loss
+            if num_processes > 1 and (args.gradient_checkpointing or (
+                (step + 1) % args.gradient_accumulation_steps != 0)):
+                # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
+                # gradient_checkpointing, no_sync every where
+                # gradient_checkpointing + grad_acc, no_sync every where
+                ctx_manager = unet.no_sync()
             else:
-                loss = F.mse_loss(noise_pred, noise,
-                                  reduction="none").mean([1, 2, 3]).mean()
+                ctx_manager = contextlib.nullcontext() if sys.version_info >= (
+                    3, 7) else contextlib.suppress()
+
+            with ctx_manager:
+                # Predict the noise residual
+                noise_pred = unet(noisy_latents, timesteps,
+                                  encoder_hidden_states).sample
+
+                if args.with_prior_preservation:
+                    # Chunk the noise and noise_pred into two parts and compute the loss on each part separately.
+                    noise_pred, noise_pred_prior = noise_pred.chunk(2, axis=0)
+                    noise, noise_prior = noise.chunk(2, axis=0)
+
+                    # Compute instance loss
+                    loss = F.mse_loss(noise_pred, noise,
+                                      reduction="none").mean([1, 2, 3]).mean()
+
+                    # Compute prior loss
+                    prior_loss = F.mse_loss(noise_pred_prior,
+                                            noise_prior,
+                                            reduction="none").mean([1, 2,
+                                                                    3]).mean()
+
+                    # Add the prior loss to the instance loss.
+                    loss = loss + args.prior_loss_weight * prior_loss
+                else:
+                    loss = F.mse_loss(noise_pred, noise,
+                                      reduction="none").mean([1, 2, 3]).mean()
 
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
             loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
+                if num_processes > 1 and args.gradient_checkpointing:
+                    fused_allreduce_gradients(unet.parameters(), None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
@@ -623,7 +632,6 @@ def main():
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unwrap_model(unet),
-            text_encoder=unwrap_model(text_encoder),
             safety_checker=None,
         )
         pipeline.save_pretrained(args.output_dir)
