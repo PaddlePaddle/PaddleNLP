@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The IDEA-CCNL Authors and The HuggingFace Inc. team.
+# Copyright 2021 The IDEA-CCNL Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import shutil
 from paddle.utils import try_import
 from .. import PretrainedTokenizer, AddedToken
 from .. import BasicTokenizer, WordpieceTokenizer
+from ..tokenizer_utils import _is_punctuation
 
 __all__ = ['PegasusChineseTokenizer']
 
@@ -30,7 +31,7 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
 }
 
 
-def _load_vocab(vocab_file):
+def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
     vocab = collections.OrderedDict()
     with open(vocab_file, "r", encoding="utf-8") as reader:
@@ -137,7 +138,6 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
                  tokenize_chinese_chars=True,
                  strip_accents=None,
                  offset=100,
-                 pre_tokenizer=lambda x: jieba.cut(x, HMM=False),
                  **kwargs):
 
         self.offset = offset
@@ -194,9 +194,10 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
             **kwargs,
         )
 
-        self.pre_tokenizer = pre_tokenizer
+        # Function object isn't serializable
+        self.pre_tokenizer = lambda x: jieba.cut(x, HMM=False)
         self.mask_token_sent = mask_token_sent
-        self.vocab = _load_vocab(vocab_file)
+        self.vocab = load_vocab(vocab_file)
 
         self.vocab[self.eos_token] = self.vocab.pop("[unused1]")
         self.vocab[self.pad_token] = self.vocab.pop("[PAD]")
@@ -297,6 +298,10 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (string) in a single string."""
+        # for token in
+        # tokens = tokens or self.ids_to_tokens(ids)
+        # tokens = [token for token in tokens if not self._is_special(token)]
+
         text = ''
         for i, token in enumerate(tokens):
             if token[:2] == '##':
@@ -335,7 +340,9 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         return token_ids_0 + token_ids_1 + [self.eos_token_id]
 
     def _special_token_mask(self, seq):
-        all_special_ids = set(self.all_special_ids)
+        all_special_ids = set(
+            self.all_special_ids)  # call it once instead of inside list comp
+        # all_special_ids.remove(self.unk_token_id)  # <unk> is only sometimes special
 
         return [1 if x in all_special_ids else 0 for x in seq]
 

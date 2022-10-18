@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 
-def shift_tokens_right(input_ids, decoder_start_token_id):
+def shift_tokens_right(input_ids, pad_token_id, decoder_start_token_id):
     """
     Shift input ids one token to the right.
     """
@@ -39,6 +39,11 @@ def shift_tokens_right(input_ids, decoder_start_token_id):
     shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = decoder_start_token_id
 
+    if pad_token_id is None:
+        raise ValueError("self.model.config.pad_token_id has to be defined.")
+
+    shifted_input_ids = paddle.where(shifted_input_ids == -100, pad_token_id,
+                                     shifted_input_ids)
     return shifted_input_ids
 
 
@@ -122,7 +127,7 @@ class PegasusEncoder(PegasusPretrainedModel):
                  encoder_attention_heads=12,
                  encoder_ffn_dim=3072,
                  dropout=0.1,
-                 activation_function='gelu',
+                 activation_function='relu',
                  attention_dropout=0.1,
                  activation_dropout=0.1,
                  max_position_embeddings=1024,
@@ -206,7 +211,7 @@ class PegasusDecoder(PegasusPretrainedModel):
                  decoder_attention_heads=12,
                  decoder_ffn_dim=3072,
                  dropout=0.1,
-                 activation_function='gelu',
+                 activation_function='relu',
                  attention_dropout=0.1,
                  activation_dropout=0.1,
                  max_position_embeddings=1024,
@@ -269,6 +274,7 @@ class PegasusDecoder(PegasusPretrainedModel):
                 (decoder_length, decoder_length),
                 -np.inf,
                 dtype=paddle.get_default_dtype())), 1)
+
         decoder_inputs_embeds = self.embed_tokens(
             decoder_input_ids) * self.embed_scale
         past_key_values_length = paddle.shape(
@@ -495,7 +501,7 @@ class PegasusModel(PegasusPretrainedModel):
         if decoder_input_ids is None:
             assert input_ids is not None, "input_ids should be " \
                                           "specified when generating decoder_input_ids"
-            decoder_input_ids = shift_tokens_right(input_ids,
+            decoder_input_ids = shift_tokens_right(input_ids, self.pad_token_id,
                                                    self.decoder_start_token_id)
         if attention_mask is None:
             assert input_ids is not None, "input_ids should be " \
@@ -511,6 +517,7 @@ class PegasusModel(PegasusPretrainedModel):
             attention_mask.stop_gradient = True
         if encoder_output is None:
             encoder_output = self.encoder(input_ids, attention_mask)
+
         if use_cache:
             if cache is None:
                 cache = self.decoder.decoder.gen_cache(encoder_output)
@@ -545,6 +552,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         self.register_buffer(
             "final_logits_bias",
             paddle.zeros((1, self.pegasus.config['vocab_size'])))
+
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -569,15 +577,6 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             raise AttributeError(
                 "'repetition_penalty != 1' is not supported yet in the faster version"
             )
-        if kwargs['min_length'] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
-        if kwargs['forced_bos_token_id'] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'forced_bos_token_id != None' is not supported yet in the faster version"
-            )
         self._faster_entry = FasterPegasus(
             self,
             use_fp16_decoding=use_fp16_decoding,
@@ -592,7 +591,8 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 decoder_attention_mask=None,
                 encoder_output=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                labels=None):
         r"""
         The PegasusForConditionalGeneration forward method, overrides the __call__() special method.
 
@@ -646,10 +646,17 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             output, self.lm_head_weight,
             transpose_y=True) + self.final_logits_bias
 
-        return lm_logits, new_cache
+        masked_lm_loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(
+                lm_logits.reshape((-1, self.pegasus.config['vocab_size'])),
+                labels.reshape((-1, )))
+
+        return lm_logits, new_cache, masked_lm_loss
 
     def prepare_decoder_input_ids_from_labels(self, labels):
-        return shift_tokens_right(labels,
+        return shift_tokens_right(labels, self.pegasus.pad_token_id,
                                   self.pegasus.config['decoder_start_token_id'])
 
     def prepare_inputs_for_generation(self,
