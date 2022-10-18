@@ -60,9 +60,9 @@ class ErnieMEmbeddings(nn.Layer):
             position_ids = self.position_ids[:,
                                              past_key_values_length:seq_length +
                                              past_key_values_length]
+            position_ids.stop_gradient = True
 
         position_ids += 2
-        position_ids.stop_gradient = True
 
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeds + position_embeddings

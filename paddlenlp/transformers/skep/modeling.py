@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Tuple
+from paddle import Tensor
 import paddle
 import paddle.nn as nn
 
@@ -44,12 +46,12 @@ class SkepEmbeddings(nn.Layer):
     """
 
     def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 pad_token_id=0):
+                 vocab_size: int,
+                 hidden_size: Optional[int] = 768,
+                 hidden_dropout_prob: Optional[float] = 0.1,
+                 max_position_embeddings: Optional[int] = 512,
+                 type_vocab_size: Optional[int] = 16,
+                 pad_token_id: Optional[int] = 0):
         super(SkepEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size,
                                             hidden_size,
@@ -71,11 +73,11 @@ class SkepEmbeddings(nn.Layer):
         )
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                inputs_embeds=None,
-                past_key_values_length=0):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values_length: Optional[int] = 0):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
@@ -111,12 +113,12 @@ class SkepPooler(nn.Layer):
     The pooling layer on skep model.
     """
 
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size: int):
         super(SkepPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
         self.activation = nn.Tanh()
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states: Tensor):
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
@@ -269,18 +271,18 @@ class SkepModel(SkepPretrainedModel):
     """
 
     def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=2,
-                 initializer_range=0.02,
-                 pad_token_id=0):
+                 vocab_size: int,
+                 hidden_size: Optional[int] = 768,
+                 num_hidden_layers: Optional[int] = 12,
+                 num_attention_heads: Optional[int] = 12,
+                 intermediate_size: Optional[int] = 3072,
+                 hidden_act: Optional[str] = "gelu",
+                 hidden_dropout_prob: Optional[float] = 0.1,
+                 attention_probs_dropout_prob: Optional[float] = 0.1,
+                 max_position_embeddings: Optional[int] = 512,
+                 type_vocab_size: Optional[int] = 2,
+                 initializer_range: Optional[float] = 0.02,
+                 pad_token_id: Optional[int] = 0):
         super(SkepModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -301,16 +303,16 @@ class SkepModel(SkepPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                past_key_values=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = False,
+                output_hidden_states: Optional[bool] = False,
+                output_attentions: Optional[bool] = False,
+                return_dict: Optional[bool] = False):
         r"""
         The SkepModel forward method, overrides the `__call__()` special method.
 
@@ -505,15 +507,15 @@ class SkepForSequenceClassification(SkepPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                inputs_embeds=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         The SkepForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -629,15 +631,15 @@ class SkepForTokenClassification(SkepPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                inputs_embeds=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         The SkepForTokenClassification forward method, overrides the __call__() special method.
 
@@ -750,16 +752,16 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                seq_lens=None,
-                labels=None,
-                inputs_embeds=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                seq_lens: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         The SkepCrfForTokenClassification forward method, overrides the __call__() special method.
 

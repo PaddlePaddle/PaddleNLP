@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Tuple
+from paddle import Tensor
 import paddle
 import paddle.nn as nn
 
@@ -66,11 +68,11 @@ class ErnieGramEmbeddings(nn.Layer):
         )
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                inputs_embeds=None,
-                past_key_values_length=0):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values_length: int = 0):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
@@ -253,16 +255,16 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                past_key_values=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         Args:
             input_ids (Tensor):
@@ -441,15 +443,15 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         Args:
             input_ids (Tensor):
@@ -539,16 +541,16 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                start_positions: Optional[Tensor] = None,
+                end_positions: Optional[Tensor] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         Args:
             input_ids (Tensor):
@@ -677,15 +679,15 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: bool = False,
+                output_attentions: bool = False,
+                return_dict: bool = False):
         r"""
         Args:
             input_ids (Tensor):
