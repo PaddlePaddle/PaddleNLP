@@ -135,7 +135,6 @@ class BertPretrainedModel(PretrainedModel):
     config_class = BertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
-    _keys_to_ignore_on_load_missing = [r'position_ids']
 
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
