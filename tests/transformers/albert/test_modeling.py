@@ -27,11 +27,8 @@ from paddlenlp.transformers import (
     AlbertForTokenClassification,
     AlbertModel,
 )
-# from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
-# from ...testing_utils import slow
-
-from tests.transformers.test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
-from tests.testing_utils import slow
+from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin
+from ...testing_utils import slow
 
 
 class AlbertModelTester:
@@ -257,60 +254,6 @@ class AlbertModelTester:
         self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_choices])
 
-    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
-                                     input_mask, sequence_labels, token_labels,
-                                     choice_labels):
-        model = SkepModel(**config)
-        model.eval()
-
-        input_ids = ids_tensor((self.batch_size, self.seq_length),
-                               self.vocab_size)
-        input_token_types = ids_tensor([self.batch_size, self.seq_length],
-                                       self.type_vocab_size)
-
-        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
-        embed_size_per_head = self.hidden_size // self.num_attention_heads
-        key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
-                                    self.seq_length, embed_size_per_head))
-        values_tensor = floats_tensor(
-            (self.batch_size, self.num_attention_heads, self.seq_length,
-             embed_size_per_head))
-        past_key_values = ((
-            key_tensor,
-            values_tensor,
-        ), ) * self.num_hidden_layers
-
-        # create fully-visible attention mask for input_ids only and input_ids + past
-        attention_mask = paddle.ones([self.batch_size, self.seq_length])
-        attention_mask_with_past = paddle.ones(
-            [self.batch_size, self.seq_length * 2])
-
-        outputs_with_cache = model(input_ids,
-                                   token_type_ids=input_token_types,
-                                   attention_mask=attention_mask_with_past,
-                                   past_key_values=past_key_values,
-                                   return_dict=self.parent.return_dict)
-        outputs_without_cache = model(input_ids,
-                                      token_type_ids=input_token_types,
-                                      attention_mask=attention_mask,
-                                      return_dict=self.parent.return_dict)
-
-        # last_hidden_state should have the same shape but different values when given past_key_values
-        if self.parent.return_dict:
-            self.parent.assertEqual(
-                outputs_with_cache.last_hidden_state.shape,
-                outputs_without_cache.last_hidden_state.shape)
-            self.parent.assertFalse(
-                paddle.allclose(outputs_with_cache.last_hidden_state,
-                                outputs_without_cache.last_hidden_state))
-        else:
-            outputs_with_cache, _ = outputs_with_cache
-            outputs_without_cache, _ = outputs_without_cache
-            self.parent.assertEqual(outputs_with_cache.shape,
-                                    outputs_without_cache.shape)
-            self.parent.assertFalse(
-                paddle.allclose(outputs_with_cache, outputs_without_cache))
-
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
         (config, input_ids, token_type_ids, input_mask, _, _,
@@ -369,10 +312,6 @@ class AlbertModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_sequence_classification(
             *config_and_inputs)
 
-    def test_for_model_cache(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_model_cache(*config_and_inputs)
-
     @slow
     def test_model_from_pretrained(self):
         for model_name in list(
@@ -399,43 +338,3 @@ class AlbertModelIntegrationTest(unittest.TestCase):
 
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-    # @slow
-    def test_inference_with_past_key_value(self):
-        model = AlbertModel.from_pretrained("albert-base-v2")
-        model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids,
-                           attention_mask=attention_mask,
-                           use_cache=True,
-                           return_dict=True)
-
-        past_key_value = output.past_key_values[0][0]
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output[0].shape, expected_shape)
-        expected_slice = paddle.to_tensor(
-            [[[-0.06635337, -1.32662833, -0.39223742],
-              [-0.24396378, -1.36314595, -1.07446611],
-              [-0.09860237, -0.79468340, -0.19317953]]])
-        print("sss")
-        print(output[0][:, 1:4, 1:4])
-        self.assertTrue(
-            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-        # insert the past key value into model
-        with paddle.no_grad():
-            output = model(input_ids,
-                           use_cache=True,
-                           past_key_values=output.past_key_values,
-                           return_dict=True)
-        print("sss")
-        print(output[0][:, 1:4, 1:4])
-        expected_slice = paddle.to_tensor(
-            [[[0.07865857, -1.07012558, -1.02596498],
-              [0.12576045, -1.76696026, -1.18682015],
-              [-0.08606864, -1.37880838, -0.12364164]]])
-        self.assertTrue(
-            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))

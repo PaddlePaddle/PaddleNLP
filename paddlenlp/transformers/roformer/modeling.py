@@ -695,6 +695,7 @@ class RoFormerModel(RoFormerPretrainedModel):
         embedding_output = self.embeddings(input_ids=input_ids,
                                            token_type_ids=token_type_ids,
                                            inputs_embeds=inputs_embeds)
+
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 

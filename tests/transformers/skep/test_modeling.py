@@ -403,7 +403,7 @@ class SkepModelIntegrationTest(unittest.TestCase):
                            return_dict=True)
 
         past_key_value = output.past_key_values[0][0]
-        # TODO(wj-Mcat): 这里需要使用真实数据
+
         expected_shape = [1, 11, 1024]
         self.assertEqual(output[0].shape, expected_shape)
 

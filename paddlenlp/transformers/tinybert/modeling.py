@@ -246,6 +246,7 @@ class TinyBertModel(TinyBertPretrainedModel):
         super(TinyBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
+
         self.embeddings = BertEmbeddings(vocab_size, hidden_size,
                                          hidden_dropout_prob,
                                          max_position_embeddings,
@@ -261,7 +262,6 @@ class TinyBertModel(TinyBertPretrainedModel):
             act_dropout=0)
 
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-
         self.pooler = BertPooler(hidden_size, hidden_act)
         # fit_dense(s) means a hidden states' transformation from student to teacher.
         # `fit_denses` is used in v2 model, and `fit_dense` is used in other pretraining models.

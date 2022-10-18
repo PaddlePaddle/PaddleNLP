@@ -388,9 +388,9 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         expected_shape = [1, 11, 768]
         self.assertEqual(output[0].shape, expected_shape)
         expected_slice = paddle.to_tensor(
-            [[[-0.06635337, -1.32662833, -0.39223742],
-              [-0.24396378, -1.36314595, -1.07446611],
-              [-0.09860237, -0.79468340, -0.19317953]]])
+            [[[-0.43569842, -1.50805628, -2.24448967],
+              [-0.12123521, -1.35024536, -1.76512492],
+              [-0.14853711, -1.13618660, -2.87098265]]])
         self.assertTrue(
             paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
@@ -401,9 +401,9 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
                            past_key_values=output.past_key_values,
                            return_dict=True)
         expected_slice = paddle.to_tensor(
-            [[[0.07865857, -1.07012558, -1.02596498],
-              [0.12576045, -1.76696026, -1.18682015],
-              [-0.08606864, -1.37880838, -0.12364164]]])
+            [[[-0.59400421, -1.32317221, -2.88611341],
+              [-0.79759967, -0.97396499, -1.89245439],
+              [-0.47301087, -1.50476563, -2.37942648]]])
         self.assertTrue(
             paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 

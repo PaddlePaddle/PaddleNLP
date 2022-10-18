@@ -416,7 +416,7 @@ class SkepModel(SkepPretrainedModel):
                     self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
             if past_key_values is not None:
-                batch_size = past_key_values[0][0].shape[0]
+                batch_size = paddle.shape(past_key_values[0][0])[0]
 
                 past_mask = paddle.zeros(
                     [batch_size, 1, 1, past_key_values_length],
