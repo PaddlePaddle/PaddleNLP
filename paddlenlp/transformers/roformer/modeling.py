@@ -1373,9 +1373,9 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
                 labels: Optional[Tensor] = None,
                 past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
                 use_cache: Optional[bool] = None,
-                output_attentions: bool = False,
-                output_hidden_states: bool = False,
-                return_dict: bool = False):
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForCausalLM forward method, overrides the __call__() special method.
 
