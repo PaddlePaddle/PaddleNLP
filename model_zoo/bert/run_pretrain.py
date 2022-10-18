@@ -352,7 +352,7 @@ def do_train(args):
     else:
         model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(
-        getattr(model, model_class.base_model_prefix).config["vocab_size"])
+        getattr(model, model_class.base_model_prefix).config.vocab_size)
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
         specs = create_input_specs()

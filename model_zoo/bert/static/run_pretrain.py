@@ -198,7 +198,7 @@ def reset_program_state_dict(model, state_dict):
     reseting the state dict."
     """
     scale = model.initializer_range if hasattr(model, "initializer_range")\
-        else model.bert.config["initializer_range"]
+        else model.bert.config.initializer_range
 
     new_state_dict = dict()
     for n, p in state_dict.items():
@@ -308,11 +308,11 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     config = model_class.config_class.from_pretrained(args.model_name_or_path)
-    if config["vocab_size"] % 8 != 0:
-        config["vocab_size"] += 8 - (config["vocab_size"] % 8)
-    config['fuse'] = args.fuse_transformer
+    if config.vocab_size % 8 != 0:
+        config.vocab_size += 8 - (config.vocab_size % 8)
+    config.fuse = args.fuse_transformer
     model = model_class(config)
-    criterion = BertPretrainingCriterion(model.bert.config["vocab_size"])
+    criterion = BertPretrainingCriterion(model.bert.config.vocab_size)
     prediction_scores, seq_relationship_score = model(
         input_ids=input_ids,
         token_type_ids=segment_ids,
