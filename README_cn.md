@@ -32,7 +32,7 @@
 ## News 📢
 
 * 🔥 **2022.10.14 发布 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)**
-  * 🧾 发布多语言跨模态布局增强文档智能大模型 [**ERNIE-Layout**](./model_zoo/ernie-layout/)，刷新11项任务SOTA。同步发布基于ERNIE-Layout的文档抽取问答模型DocPrompt 🔖，精准理解文档图片布局与语义信息，轻松应对各类业务场景。
+  * 🧾 发布多语言跨模态布局增强文档智能大模型 [**ERNIE-Layout**](./model_zoo/ernie-layout/)，刷新11项任务SOTA。同步发布基于ERNIE-Layout的**文档抽取问答模型DocPrompt** 🔖，精准理解文档图片布局与语义信息，轻松应对各类业务场景。
 
 * 🔥 **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
   * 💎 NLP工具：**[NLP 流水线系统 Pipelines](./pipelines)** 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
