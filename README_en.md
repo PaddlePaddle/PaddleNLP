@@ -205,7 +205,7 @@ We provide question answering pipeline which can support FAQ system, Document-le
 </div>
 
 
-For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/doc_vqa).
+For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/document_intelligence/doc_vqa).
 
 
 #### 💌 Opinion Extraction and Sentiment Analysis

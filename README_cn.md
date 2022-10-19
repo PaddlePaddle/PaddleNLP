@@ -209,7 +209,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 </div>
 
 
-更多使用说明请参考[智能问答系统](./applications/question_answering)与[文档智能问答](./applications/doc_vqa)
+更多使用说明请参考[智能问答系统](./applications/question_answering)与[文档智能问答](./applications/document_intelligence/doc_vqa)
 
 #### 💌 评论观点抽取与情感分析
 

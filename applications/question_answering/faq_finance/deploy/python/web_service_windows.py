@@ -40,22 +40,20 @@ def convert_example(example,
     return result
 
 
-class ErnieOp(Op):
+class ErnieService(WebService):
 
-    def init_op(self):
+    def init_service(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    def preprocess(self, input_dicts, data_id, log_id):
+    def preprocess(self, feed=[], fetch=[]):
         from paddlenlp.data import Stack, Tuple, Pad
-
-        (_, input_dict), = input_dicts.items()
-        print("input dict", input_dict)
-        batch_size = len(input_dict.keys())
+        print("input dict", feed)
+        batch_size = len(feed)
+        is_batch = True
         examples = []
         for i in range(batch_size):
-            input_ids, segment_ids = convert_example([input_dict[str(i)]],
-                                                     self.tokenizer)
+            input_ids, segment_ids = convert_example([feed[i]], self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
@@ -67,23 +65,18 @@ class ErnieOp(Op):
         feed_dict = {}
         feed_dict['input_ids'] = input_ids
         feed_dict['token_type_ids'] = segment_ids
-        return feed_dict, False, None, ""
+        return feed_dict, fetch, is_batch
 
-    def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
-        new_dict = {}
-        new_dict["output_embedding"] = str(
-            fetch_dict["output_embedding"].tolist())
-        return new_dict, None, ""
-
-
-class ErnieService(WebService):
-
-    def get_pipeline_response(self, read_op):
-        ernie_op = ErnieOp(name="ernie", input_ops=[read_op])
-        return ernie_op
+    def postprocess(self, feed=[], fetch=[], fetch_map=None):
+        for key in fetch_map:
+            fetch_map[key] = fetch_map[key].tolist()
+        return fetch_map
 
 
 if __name__ == "__main__":
     ernie_service = ErnieService(name="ernie")
-    ernie_service.prepare_pipeline_config("config_nlp.yml")
-    ernie_service.run_service()
+    ernie_service.load_model_config("../../serving_server")
+    ernie_service.prepare_server(workdir="workdir", port=8080)
+    ernie_service.init_service()
+    ernie_service.run_debugger_service()
+    ernie_service.run_web_service()
