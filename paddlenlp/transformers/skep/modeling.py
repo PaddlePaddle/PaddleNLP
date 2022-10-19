@@ -829,13 +829,11 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
         if seq_lens is None:
             # compute seq length according to the attention mask
             if attention_mask is not None:
-                seq_lens = paddle.sum(attention_mask,
-                                      axis=1,
-                                      dtype=paddle.int64)
+                seq_lens = paddle.sum(attention_mask, axis=1, dtype="int64")
             else:
                 input_ids_shape = paddle.shape(input_ids)
                 seq_lens = paddle.ones(shape=[input_ids_shape[0]],
-                                       dtype=paddle.int64) * input_ids_shape[1]
+                                       dtype="int64") * input_ids_shape[1]
 
         loss, prediction = None, None
         if labels is not None:
