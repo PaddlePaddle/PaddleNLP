@@ -407,7 +407,7 @@ class BertConfig(PretrainedConfig):
                  pool_act: str = "tanh",
                  fuse: bool = False,
                  layer_norm_eps=1e-12,
-                 use_cache=True,
+                 use_cache=False,
                  **kwargs):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
         self.vocab_size = vocab_size

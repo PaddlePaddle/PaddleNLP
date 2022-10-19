@@ -56,11 +56,11 @@ def install_package(package_name: str,
 
     # 3. load the pypi mirror to speedup of installing packages
     mirror_key = 'PYPI_MIRROR'
-    mirror_source = os.environ.get(mirror_source, None)
+    mirror_source = os.environ.get(mirror_key, None)
     if mirror_source is None:
         logger.info(
             f"use <https://mirror.baidu.com/pypi/simple> as the default "
-            "mirror source. you can also change it by setting `{mirror_key}` environment variable"
+            f"mirror source. you can also change it by setting `{mirror_key}` environment variable"
         )
         mirror_source = "https://mirror.baidu.com/pypi/simple"
     else:
