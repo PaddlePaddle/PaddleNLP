@@ -27,7 +27,6 @@ import warnings
 import copy
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
 
-from packaging import version
 from paddlenlp.transformers.utils import resolve_cache_dir
 
 from paddlenlp.utils.env import MODEL_HOME
@@ -1034,6 +1033,11 @@ def get_configuration_file(configuration_files: List[str]) -> str:
 
     # Defaults to FULL_CONFIGURATION_FILE and then try to look at some newer versions.
     configuration_file = CONFIG_NAME
+
+    # FIXME: (wj-Mcat) remove the hard dependency of `packaging` which can compare
+    # the version of package, also be uesed in `transfromer`.
+    # **But**, we don't support version compare function now. so remove the hard dependency.
+    from packaging import version
     paddlenlp_version = version.parse(__version__)
     for v in available_versions:
         if version.parse(v) <= paddlenlp_version:

@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import copy
-from distutils.command.config import config
 import re
 import io
 import json
@@ -280,9 +279,6 @@ class PretrainedModel(Layer, GenerationMixin):
 
         Raises:
             NotImplementedError: Model has not implement `set_input_embeddings` method
-
-        Returns:
-            : 
         """
         base_model = getattr(self, self.base_model_prefix, self)
         if base_model is not self:

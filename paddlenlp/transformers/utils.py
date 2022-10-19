@@ -177,8 +177,8 @@ class InitTrackerMeta(type(Layer)):
         return super(InitTrackerMeta, self).__setattr__(name, value)
 
 
-def param_in_init(func, param_field: str) -> bool:
-    """check if the param_field is in __init__ method, eg: if the `bert` param is in __init__ params
+def param_in_func(func, param_field: str) -> bool:
+    """check if the param_field is in `func` method, eg: if the `bert` param is in `__init__` method
 
     Args:
         cls (type): the class of PretrainedModel
