@@ -97,7 +97,11 @@ class ErnieEmbeddings(nn.Layer):
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
-            position_ids = seq_length - ones + past_key_values_length
+            position_ids = seq_length - ones
+
+            if past_key_values_length > 0:
+                position_ids = position_ids + past_key_values_length
+
             position_ids.stop_gradient = True
 
         position_embeddings = self.position_embeddings(position_ids)
@@ -998,7 +1002,8 @@ class ErnieModel(ErniePretrainedModel):
 
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2])
+            attention_mask = paddle.unsqueeze(
+                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
 
         attention_mask.stop_gradient = True
