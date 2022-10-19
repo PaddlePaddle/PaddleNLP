@@ -20,6 +20,7 @@ import shutil
 from typing import Optional
 import pip
 import importlib.util
+from paddlenlp.utils.log import logger
 
 
 def is_faster_tokenizer_available():
@@ -53,17 +54,36 @@ def install_package(package_name: str,
         arguments += ['-t', cache_dir]
         sys.path.insert(0, cache_dir)
 
-    arguments += ['-i', 'https://mirror.baidu.com/pypi/simple', package_name]
+    # 3. load the pypi mirror to speedup of installing packages
+    mirror_key = 'PYPI_MIRROR'
+    mirror_source = os.environ.get(mirror_source, None)
+    if mirror_source is None:
+        logger.info(
+            f"use <https://mirror.baidu.com/pypi/simple> as the default "
+            "mirror source. you can also change it by setting `{mirror_key}` environment variable"
+        )
+        mirror_source = "https://mirror.baidu.com/pypi/simple"
+    else:
+        logger.info(
+            f"loading <{mirror_source}> as the final mirror source to install package."
+        )
+
+    arguments += ['-i', mirror_source, package_name]
 
     pip.main(arguments)
 
-    # 3. add site-package to the top of package
+    # 4. add site-package to the top of package
     for site_package_dir in site.getsitepackages():
         sys.path.insert(0, site_package_dir)
 
 
 def uninstall_package(package_name: str, module_name: Optional[str] = None):
-    """uninstall the pacakge from site-packages
+    """uninstall the pacakge from site-packages.
+
+    To remove the cache of source package module & class & method, it should:
+        1. remove the source files of packages under the `site-packages` dir.
+        2. remove the cache under the `locals()`
+        3. remove the cache under the `sys.modules`
 
     Args:
         package_name (str): the name of package
