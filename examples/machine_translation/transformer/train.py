@@ -121,7 +121,7 @@ def parse_args():
     )
     parser.add_argument("--to_static",
                         action="store_true",
-                        help="Whether to_static to train Transformer. ")
+                        help="Whether use to_static to train Transformer. ")
     args = parser.parse_args()
     return args
 
