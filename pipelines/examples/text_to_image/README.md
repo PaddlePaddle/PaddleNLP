@@ -78,6 +78,12 @@ sh examples/text_to_image/run_text_to_image.sh
 ```
 
 #### 3.3.2 启动 WebUI
+
+WebUI使用了[gradio前端](https://gradio.app/)，首先需要安装gradio，运行命令如下：
+```
+pip install gradio
+```
+然后使用如下的命令启动：
 ```bash
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891

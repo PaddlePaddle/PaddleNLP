@@ -22,7 +22,7 @@ from pipelines import ImageGenerationPipeline
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
-parser.add_argument("--secret_key", default=None, type=str, help="The API Key.")
+parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 parser.add_argument("--prompt_text", default='宁静的小镇', type=str, help="The prompt_text.")
 parser.add_argument("--style", default='探索无限', type=str, help="The style text.")
 parser.add_argument("--size", default='1024*1024',
