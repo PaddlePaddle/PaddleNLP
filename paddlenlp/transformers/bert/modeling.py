@@ -14,6 +14,7 @@
 from __future__ import annotations
 import warnings
 
+from typing import Optional, Tuple
 import paddle
 from paddle import Tensor
 import paddle.nn as nn
@@ -264,15 +265,15 @@ class BertModel(BertPretrainedModel):
         self.embeddings.word_embeddings = value
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                past_key_values=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r'''
         The BertModel forward method, overrides the `__call__()` special method.
 
@@ -317,13 +318,13 @@ class BertModel(BertPretrainedModel):
                 Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
@@ -345,6 +346,10 @@ class BertModel(BertPretrainedModel):
                 output = model(**inputs)
         '''
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
         past_key_values_length = None
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
@@ -475,13 +480,13 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 are not taken into account for computing the loss.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` if `return_dict=True`.
@@ -606,13 +611,13 @@ class BertForSequenceClassification(BertPretrainedModel):
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
@@ -729,13 +734,13 @@ class BertForTokenClassification(BertPretrainedModel):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
@@ -977,13 +982,13 @@ class BertForPretraining(BertPretrainedModel):
                 - 1 indicates sequence B is a random sequence.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput` if `return_dict=True`.
@@ -1146,13 +1151,13 @@ class BertForMultipleChoice(BertPretrainedModel):
                 `input_ids` above)
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
@@ -1291,14 +1296,14 @@ class BertForMaskedLM(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
 
         Args:
@@ -1316,13 +1321,13 @@ class BertForMaskedLM(BertPretrainedModel):
                 loss is only computed for the tokens with labels in `[0, ..., vocab_size]`
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.

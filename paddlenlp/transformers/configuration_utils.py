@@ -18,8 +18,6 @@
 from __future__ import annotations
 
 import copy
-from curses.ascii import isdigit
-from genericpath import isdir
 import json
 import os
 import os.path as osp
@@ -39,9 +37,6 @@ from ..utils.downloader import COMMUNITY_MODEL_PREFIX, is_url, get_path_from_url
 
 from paddlenlp.utils.log import logger
 from paddlenlp import __version__
-
-if TYPE_CHECKING:
-    from paddlenlp.transformers.model_utils import PretrainedModel
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -438,6 +433,8 @@ class PretrainedConfig:
         self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
+        self.use_cache = kwargs.pop("use_cache", False)
+
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
             "tie_word_embeddings", True
@@ -1046,6 +1043,3 @@ def get_configuration_file(configuration_files: List[str]) -> str:
             break
 
     return configuration_file
-
-
-PretrainedConfigClass = TypeVar("PretrainedConfigClass")
