@@ -291,53 +291,53 @@ class ErnieModelTester:
         model = ErnieModel(**config)
         model.eval()
 
-        input_ids = ids_tensor((self.batch_size, self.seq_length),
-                               self.vocab_size)
-        input_token_types = ids_tensor([self.batch_size, self.seq_length],
-                                       self.type_vocab_size)
+        # first forward pass
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[
+            2]
 
-        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
-        embed_size_per_head = self.hidden_size // self.num_attention_heads
-        key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
-                                    self.seq_length, embed_size_per_head))
-        values_tensor = floats_tensor(
-            (self.batch_size, self.num_attention_heads, self.seq_length,
-             embed_size_per_head))
-        past_key_values = ((
-            key_tensor,
-            values_tensor,
-        ), ) * self.num_hidden_layers
+        # create hypothetical multiple next token and extent to next_input_ids
+        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
+        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2)
 
-        # create fully-visible attention mask for input_ids only and input_ids + past
-        attention_mask = paddle.ones([self.batch_size, self.seq_length])
-        attention_mask_with_past = paddle.ones(
-            [self.batch_size, self.seq_length * 2])
+        # append to next input_ids and
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        outputs_with_cache = model(input_ids,
-                                   token_type_ids=input_token_types,
-                                   attention_mask=attention_mask_with_past,
-                                   past_key_values=past_key_values,
-                                   return_dict=self.parent.return_dict)
-        outputs_without_cache = model(input_ids,
-                                      token_type_ids=input_token_types,
-                                      attention_mask=attention_mask,
-                                      return_dict=self.parent.return_dict)
+        outputs = model(next_input_ids,
+                        attention_mask=next_attention_mask,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
 
-        # last_hidden_state should have the same shape but different values when given past_key_values
-        if self.parent.return_dict:
-            self.parent.assertEqual(
-                outputs_with_cache.last_hidden_state.shape,
-                outputs_without_cache.last_hidden_state.shape)
-            self.parent.assertFalse(
-                paddle.allclose(outputs_with_cache.last_hidden_state,
-                                outputs_without_cache.last_hidden_state))
-        else:
-            outputs_with_cache, _ = outputs_with_cache
-            outputs_without_cache, _ = outputs_without_cache
-            self.parent.assertEqual(outputs_with_cache.shape,
-                                    outputs_without_cache.shape)
-            self.parent.assertFalse(
-                paddle.allclose(outputs_with_cache, outputs_without_cache))
+        output_from_no_past = outputs[2][0]
+
+        outputs = model(next_tokens,
+                        attention_mask=next_attention_mask,
+                        past_key_values=past_key_values,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_past = outputs[2][0]
+
+        # select random slice
+        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:,
+                                                        random_slice_idx].detach(
+                                                        )
+        output_from_past_slice = output_from_past[:, :,
+                                                  random_slice_idx].detach()
+
+        self.parent.assertTrue(
+            output_from_past_slice.shape[1] == next_tokens.shape[1])
+
+        # test that outputs are equal for slice
+        self.parent.assertTrue(
+            paddle.allclose(output_from_past_slice,
+                            output_from_no_past_slice,
+                            atol=1e-3))
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
