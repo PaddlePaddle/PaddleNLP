@@ -76,6 +76,7 @@ def trans_func(example, tokenizer, args):
     source = tokenizer(
         text,
         max_seq_len=args.max_seq_length,
+        padding='max_length',
         return_token_type_ids=False,
         return_attention_mask=True,
     )
@@ -252,11 +253,12 @@ class T5Trainer(Trainer):
         labels = inputs["labels"]
         target_mask = inputs["decoder_attention_mask"]
 
-        outputs = model.generate(
-            input_ids=inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
-            max_length=5,
-        )[0]
+        with paddle.no_grad():
+            outputs = model.generate(
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs["attention_mask"],
+                max_length=5,
+            )[0]
 
         for p, l, m in zip(outputs.numpy(), labels.numpy(),
                            target_mask.numpy()):
@@ -265,6 +267,10 @@ class T5Trainer(Trainer):
                                           skip_special_tokens=True).strip()
 
             if self.label2id:
+                #  if pred not in self.label2id:
+                #      pred = -1
+                #  else:
+                #  	pred = self.label2id[pred]
                 pred = self.label2id[pred]
                 label = self.label2id[label]
             else:
@@ -274,7 +280,10 @@ class T5Trainer(Trainer):
             all_preds.append(pred)
             all_labels.append(label)
 
-        return (None, paddle.to_tensor(all_preds), paddle.to_tensor(all_labels))
+        all_preds = paddle.to_tensor(all_preds).detach()
+        all_labels = paddle.to_tensor(all_labels).detach()
+
+        return (None, all_preds, all_labels)
 
 
 def main():
@@ -386,7 +395,7 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()
+        # trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()

@@ -1195,7 +1195,6 @@ class Trainer:
                                    custom_black_list=[
                                        "reduce_sum",
                                        "c_softmax_with_cross_entropy",
-                                       "elementwise_div",
                                    ],
                                    level=self.args.fp16_opt_level,
                                    dtype=self.amp_dtype)

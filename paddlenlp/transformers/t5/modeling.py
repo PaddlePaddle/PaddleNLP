@@ -1203,9 +1203,12 @@ class T5Stack(nn.Layer):
             encoder_extended_attention_mask = (
                 1.0 - encoder_extended_attention_mask) * -1e4
         else:
-            raise ValueError(
-                f"{self.dtype} not recognized. `dtype` should be set to either `paddle.float32` or `paddle.float16`"
-            )
+            encoder_extended_attention_mask = (
+                1.0 - encoder_extended_attention_mask) * -1e4
+
+            # raise ValueError(
+            #     f"{self.dtype} not recognized. `dtype` should be set to either `paddle.float32` or `paddle.float16`"
+            # )
 
         return encoder_extended_attention_mask
 
@@ -1687,8 +1690,10 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
-            loss = loss_fct(lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
-                            labels.flatten())
+            loss = loss_fct(
+                lm_logits.reshape(
+                    shape=[-1, lm_logits.shape[-1]]).astype("float32"),
+                labels.flatten())
 
         if not isinstance(encoder_output, (list, tuple)):
             encoder_output = (encoder_output, )
