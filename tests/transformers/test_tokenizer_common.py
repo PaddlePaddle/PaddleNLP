@@ -868,7 +868,9 @@ class TokenizerTesterMixin:
         ):
             weights_lists_2.append(list(map_list.keys()))
 
+        weights_list.sort()
         for weights_list_2 in weights_lists_2:
+            weights_list_2.sort()
             self.assertListEqual(weights_list, weights_list_2)
 
     def test_mask_output(self):

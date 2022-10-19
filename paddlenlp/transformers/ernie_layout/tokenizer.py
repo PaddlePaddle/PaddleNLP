@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Tokenization classes for ErnieLayoutX model."""
+""" Tokenization classes for ErnieLayout model."""
 
 import os
 import itertools
@@ -45,7 +45,7 @@ def _is_start_of_word(text):
         | _is_whitespace(first_char))
 
 
-class ErnieLayoutXTokenizer(PretrainedTokenizer):
+class ErnieLayoutTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "sentencepiece_model_file": "sentencepiece.bpe.model",
         "vocab_file": "vocab.txt",
@@ -53,11 +53,11 @@ class ErnieLayoutXTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-layoutx-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layoutx/vocab.txt",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
         },
         "sentencepiece_model_file": {
             "ernie-layoutx-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layoutx/sentencepiece.bpe.model",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
         }
     }
     pretrained_init_configuration = {
