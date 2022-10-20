@@ -494,7 +494,4 @@ class ModelTesterMixin:
             return
         config = self.model_tester.get_config()
         model = self.base_model_class(**config)
-        assert len(
-            model.model_name_list
-        ) != 0, f"use_test_model_name_list={self.test_model_name_list}"
         self.assertTrue(len(model.model_name_list) != 0)
