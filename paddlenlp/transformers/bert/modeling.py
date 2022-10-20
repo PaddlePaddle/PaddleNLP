@@ -449,15 +449,15 @@ class BertForQuestionAnswering(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                start_positions: Optional[Tensor] = None,
+                end_positions: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -584,14 +584,14 @@ class BertForSequenceClassification(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -710,14 +710,14 @@ class BertForTokenClassification(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -947,16 +947,16 @@ class BertForPretraining(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                labels=None,
-                next_sentence_label=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                masked_positions: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                next_sentence_label: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
 
         Args:
@@ -1125,14 +1125,14 @@ class BertForMultipleChoice(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
