@@ -212,6 +212,7 @@ python train.py \
 --max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 5 \
+--load_best_model_at_end True \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
 --do_predict \
@@ -235,6 +236,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 5 \
+--load_best_model_at_end True \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
 --do_predict \

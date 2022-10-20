@@ -11,10 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from paddle_serving_server.pipeline import PipelineClient
-from numpy import array, float32
-
 import numpy as np
+from numpy import array
+import requests
+import json
+import sys
 
 
 class Runner(object):
@@ -23,14 +24,18 @@ class Runner(object):
         self,
         server_url: str,
     ):
-        self.client = PipelineClient()
-        self.client.connect([server_url])
+        self.server_url = server_url
 
-    def Run(self, data, label_list):
-        sentence = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
-        ret = self.client.predict(feed_dict={"sentence": sentence})
-        for d, l in zip(data, eval(ret.value[0])):
-            print("data: ", d)
+    def Run(self, text, label_list):
+        sentence = np.array([t.encode('utf-8') for t in text], dtype=np.object_)
+        sentence = sentence.__repr__()
+        data = {"key": ["sentence"], "value": [sentence]}
+        data = json.dumps(data)
+
+        ret = requests.post(url=self.server_url, data=data)
+        ret = ret.json()
+        for t, l in zip(text, eval(ret['value'][0])):
+            print("text: ", t)
             label = ','.join([label_list[int(ll)] for ll in l.split(',')])
             print("label: ", label)
             print("--------------------")
@@ -38,7 +43,7 @@ class Runner(object):
 
 
 if __name__ == "__main__":
-    server_url = "127.0.0.1:18090"
+    server_url = "http://127.0.0.1:9878/seq_cls/prediction"
     runner = Runner(server_url)
     text = [
         "五松新村房屋是被告婚前购买的；",
