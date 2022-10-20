@@ -415,8 +415,9 @@ class BartHeadTests(unittest.TestCase):
             paddle.to_tensor([0, 11349, 495, 4040, 571, 2]),
         ]
         for ex, desired_result in zip(examples, fairseq_results):
-            bart_toks = tokenizer.encode(ex, return_tensors="pd").squeeze()
-            assert_tensors_close(desired_result.long(), bart_toks, prefix=ex)
+            bart_toks = tokenizer.encode(
+                ex, return_tensors="pd")["input_ids"].squeeze()
+            assert_tensors_close(desired_result, bart_toks, prefix=ex)
 
 
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
@@ -453,11 +454,11 @@ def assert_tensors_close(a, b, atol=1e-12, prefix=""):
     if a is None and b is None:
         return True
     try:
-        if paddle.allclose(a, b, atol=atol):
+        if paddle.allclose(a.astype("float32"), b.astype("float32"), atol=atol):
             return True
         raise
     except Exception:
-        pct_different = (paddle.gt((a - b).abs(), atol)).float().mean().item()
+        pct_different = ((a - b).abs() > atol).astype("float").mean().item()
         if a.numel() > 100:
             msg = f"tensor values are {pct_different:.1%} percent different."
         else:
@@ -482,8 +483,8 @@ class FastIntegrationTests(unittest.TestCase):
         return BartForConditionalGeneration.from_pretrained("bart-base")
 
     def test_bart_base_generation(self):
-        model = self.bart_base
-        tok = self.tok
+        model = self.bart_base()
+        tok = self.tok()
         ARTICLE = (
             "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
             " Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The"
@@ -533,12 +534,12 @@ class FastIntegrationTests(unittest.TestCase):
                                           decode_strategy="beam_search",
                                           max_length=1024)
         result = tok.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        assert EXPECTED == result
+        assert EXPECTED == result, f"{EXPECTED}\n{result}"
 
     def test_xsum_1_1_batch_generation(self):
         # test batch
-
-        batch = self.tok(
+        tok = self.tok()
+        batch = tok(
             [
                 "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
                 " Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories."
@@ -686,7 +687,7 @@ class BartModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids=input_ids, attention_mask=attention_mask)
         expected_shape = [1, 11, 1024]
-        self.assertEqual(output.shape, expected_shape)
+        self.assertEqual(output[0].shape, expected_shape)
 
     @slow
     def test_cnn_summarization_same_as_fairseq(self):
