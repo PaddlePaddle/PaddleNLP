@@ -35,13 +35,10 @@ from paddlenlp.transformers import (
 )
 
 GPT2_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "gpt2-small-en",
     "gpt2-en",
     "gpt2-medium-en",
     "gpt2-large-en",
     "gpt2-xl-en",
-    "gpt3-1.3B-en",
-    "gpt3-13B-en",
     "gpt-cpm-small-cn-distill",
     "gpt-cpm-large-cn",
 ]
