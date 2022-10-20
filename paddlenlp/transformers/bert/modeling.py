@@ -431,13 +431,9 @@ class BertForQuestionAnswering(BertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to `None`.
-        """
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForQuestionAnswering.
+    """
 
     def __init__(self, config: BertConfig):
         super(BertForQuestionAnswering, self).__init__(config)
@@ -562,14 +558,8 @@ class BertForSequenceClassification(BertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_labels (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForSequenceClassification.
     """
 
     def __init__(self, config: BertConfig):
@@ -688,14 +678,8 @@ class BertForTokenClassification(BertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_labels (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForTokenClassification.
     """
 
     def __init__(self, config: BertConfig):
@@ -932,8 +916,8 @@ class BertForPretraining(BertPretrainedModel):
     Bert Model with pretraining tasks on top.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of :class:`BertModel`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForPretraining.
 
     """
 
@@ -1097,14 +1081,8 @@ class BertForMultipleChoice(BertPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
     
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Bert.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMultipleChoice.
 
     Examples:
         >>> model = BertForMultipleChoice(config, dropout=0.1)
@@ -1280,8 +1258,8 @@ class BertForMaskedLM(BertPretrainedModel):
     Bert Model with a `masked language modeling` head on top.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of :class:`BertModel`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMaskedLM.
 
     """
 
