@@ -44,7 +44,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
-| [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 基于跨模态通用文档预训练模型ERNIE-LayoutX |
+| [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 
 ## QuickStart
@@ -1549,7 +1549,7 @@ from paddlenlp import Taskflow
 </div></details>
 
 ### 文档智能
-<details><summary>&emsp; 基于跨模态通用文档预训练模型ERNIE-LayoutX </summary><div>
+<details><summary>&emsp; 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 </summary><div>
 
 #### 输入格式
 
@@ -1573,7 +1573,7 @@ from paddlenlp import Taskflow
 - 支持本地图片路径输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/resume.png height=800 hspace='20'/>
+    <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
 </div>
 
 
@@ -1582,19 +1582,19 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 
 >>> docprompt = Taskflow("document_intelligence")
->>> docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}])
+>>> pprint(docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}]))
 [{'prompt': '五百丁本次想要担任的是什么职位?',
-  'result': [{'end': 183, 'prob': 1.0, 'start': 180, 'value': '客户经理'}]},
- {'prompt': '五百丁是在哪里上的大学?',
-  'result': [{'end': 38, 'prob': 1.0, 'start': 32, 'value': '广州五百丁学院'}]},
- {'prompt': '大学学的是什么专业?',
-  'result': [{'end': 45, 'prob': 0.74, 'start': 39, 'value': '金融学(本科）'}]}]
+  'result': [{'end': 7, 'prob': 1.0, 'start': 4, 'value': '客户经理'}]},
+{'prompt': '五百丁是在哪里上的大学?',
+  'result': [{'end': 37, 'prob': 1.0, 'start': 31, 'value': '广州五百丁学院'}]},
+{'prompt': '大学学的是什么专业?',
+  'result': [{'end': 44, 'prob': 0.82, 'start': 38, 'value': '金融学(本科）'}]}]
 ```
 
 - http图片链接输入
 
 <div align="center">
-    <img src=https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg height=400 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
 </div>
 
 
@@ -1603,13 +1603,13 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 
 >>> docprompt = Taskflow("document_intelligence")
->>> docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}])
+>>> pprint(docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}]))
 [{'prompt': '发票号码是多少?',
-  'result': [{'end': 10, 'prob': 0.96, 'start': 7, 'value': 'No44527206'}]},
- {'prompt': '校验码是多少?',
-  'result': [{'end': 271,
+  'result': [{'end': 2, 'prob': 0.74, 'start': 2, 'value': 'No44527206'}]},
+{'prompt': '校验码是多少?',
+  'result': [{'end': 233,
               'prob': 1.0,
-              'start': 263,
+              'start': 231,
               'value': '01107 555427109891646'}]}]
 ```
 
