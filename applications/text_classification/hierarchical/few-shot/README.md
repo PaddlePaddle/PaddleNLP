@@ -257,7 +257,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 
 可配置参数说明：
 - `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-base-zh`。
-- `data_dir`: 训练数据集路径，数据格式要求详见[数据准备](数据准备)。
+- `data_dir`: 训练数据集路径，数据格式要求详见[数据标注](#数据标注)。
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `prompt`: 提示模板。定义了如何将文本和提示拼接结合。
 - `soft_encoder`: 提示向量的编码器，`lstm`表示双向LSTM, `mlp`表示双层线性层, None表示直接使用提示向量。默认为`lstm`。
@@ -282,7 +282,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `evaluation_strategy`: 模型评估的间隔策略。若为`epoch`，则每轮训练结束后评估模型。
 - `save_strategy`: 模型保存的间隔策略。若为`epoch`，则每轮训练结束后保存当前模型参数。
 
-更多参数介绍可参考[配置文件](../../../../paddlenlp/trainer/trainer_args.py)。
+更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
 
 <a name="模型评估"></a>
