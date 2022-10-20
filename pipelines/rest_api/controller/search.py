@@ -81,7 +81,7 @@ def query(request: QueryRequest):
         return result
 
 
-@router.post("/query_images",
+@router.post("/query_text_to_images",
              response_model=QueryImageResponse,
              response_model_exclude_none=True)
 def query_images(request: QueryRequest):

@@ -16,8 +16,8 @@ import os
 import argparse
 
 import paddle
-from pipelines.nodes import ErnieVilGImageGenerator
-from pipelines import ImageGenerationPipeline
+from pipelines.nodes import ErnieTextToImageGenerator
+from pipelines import TextToImagePipeline
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -32,19 +32,20 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def image_generation():
-    erine_image_generator = ErnieVilGImageGenerator(ak=args.api_key, sk=args.sk)
-    pipe = ImageGenerationPipeline(erine_image_generator)
+def text_to_image():
+    erine_image_generator = ErnieTextToImageGenerator(ak=args.api_key,
+                                                      sk=args.secret_key)
+    pipe = TextToImagePipeline(erine_image_generator)
     prediction = pipe.run(query=args.prompt_text,
                           params={
-                              "ImageGenerator": {
+                              "TextToImageGenerator": {
                                   "topk": args.topk,
                                   "style": args.style,
                                   "resolution": args.size
                               }
                           })
-    pipe.save_to_yaml('image_generation.yaml')
+    pipe.save_to_yaml('text_to_image.yaml')
 
 
 if __name__ == "__main__":
-    image_generation()
+    text_to_image()

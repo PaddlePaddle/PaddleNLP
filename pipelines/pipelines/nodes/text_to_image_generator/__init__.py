@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.nodes.image_generator.image_generator import ErnieVilGImageGenerator
+from pipelines.nodes.text_to_image_generator.text_to_image_generator import ErnieTextToImageGenerator

@@ -45,14 +45,19 @@ python setup.py install
 
 ### 3.2 一键体验文生图系统
 
-在运行下面的命令之前，需要在官网申请`API Key`和 `Secret key`两个密钥，然后执行下面的命令。
+在运行下面的命令之前，需要在[ERNIE-ViLG官网](https://wenxin.baidu.com/moduleApi/ernieVilg)申请`API Key`和 `Secret key`两个密钥(需要登录，登录后点击右上角的查看AK/SK，具体如下图)，然后执行下面的命令。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/196942735-06953270-ce1e-45a5-9e0d-5841068a8464.png)" width="500">
+</div>
+
 
 #### 3.2.1 快速一键启动
 
 您可以通过如下命令快速体验文生图系统的效果
 ```bash
 python examples/text_to_image/text_to_image_example.py --prompt_text 宁静的小镇 \
-                                                       --style 探索无限 \
+                                                       --style 古风 \
                                                        --api_key 你申请的apikey \
                                                        --secret_key 你申请的secretkey
 ```
@@ -64,10 +69,10 @@ python examples/text_to_image/text_to_image_example.py --prompt_text 宁静的�
 
 #### 3.3.1 启动 RestAPI 模型服务
 
-启动之前，需要把您申请的`API Key`和 `Secret key`两个密钥添加到`text_to_image_generation.yaml`的ak和sk的位置，然后运行：
+启动之前，需要把您申请的`API Key`和 `Secret key`两个密钥添加到`text_to_image.yaml`的ak和sk的位置，然后运行：
 
 ```bash
-export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image_generation.yaml
+export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```

@@ -26,9 +26,9 @@ from pipelines.schema import Document
 from pipelines.nodes.base import BaseComponent
 
 
-class ErnieVilGImageGenerator(BaseComponent):
+class ErnieTextToImageGenerator(BaseComponent):
     """
-    ErnieVilGImageGenerator that uses a Ernie Vilg for text to image generation.    
+    ErnieTextToImageGenerator that uses a Ernie Vilg for text to image generation.    
     """
 
     def __init__(self, ak=None, sk=None):
@@ -255,6 +255,7 @@ class ErnieVilGImageGenerator(BaseComponent):
             style: Optional[str] = None,
             topk: Optional[int] = None,
             resolution: Optional[str] = "1024*1024"):
+
         result_images = self.generate_image(query,
                                             style=style,
                                             topk=topk,

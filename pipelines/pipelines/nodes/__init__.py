@@ -29,4 +29,4 @@ from pipelines.nodes.preprocessor import BasePreProcessor, PreProcessor
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
 from pipelines.nodes.retriever import BaseRetriever, DensePassageRetriever
-from pipelines.nodes.image_generator import ErnieVilGImageGenerator
+from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator

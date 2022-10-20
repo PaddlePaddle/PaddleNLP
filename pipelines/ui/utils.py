@@ -31,7 +31,7 @@ DOC_REQUEST = "query"
 DOC_FEEDBACK = "feedback"
 DOC_UPLOAD = "file-upload"
 DOC_PARSE = 'files'
-IMAGE_REQUEST = 'query_images'
+IMAGE_REQUEST = 'query_text_to_images'
 
 
 def pipelines_is_ready():
@@ -195,7 +195,7 @@ def text_to_image_search(
     """
     url = f"{API_ENDPOINT}/{IMAGE_REQUEST}"
     params = {
-        "ImageGenerator": {
+        "TextToImageGenerator": {
             "style": style,
             "topk": top_k_images,
             "resolution": resolution,
