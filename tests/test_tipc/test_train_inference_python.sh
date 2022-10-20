@@ -363,7 +363,9 @@ else
                 if [ ${#gpu} -ge 2 ];then
                     cat ${WORK_PATH}/log/workerlog.0 > ${_train_log} 
                 fi
-                eval "cat ${_train_log}"
+                if [ ${#gpu} -le 2 ];then  # train with cpu or single gpu
+                    eval "cat ${_train_log}"
+                fi
                 status_check ${last_status} "${cmd}" "${status_log}" "${model_name}" "${_train_log}"
 
                 set_eval_pretrain=$(func_set_params "${pretrain_model_key}" "${save_log}/${train_model_name}")
