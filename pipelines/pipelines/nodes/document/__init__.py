@@ -12,8 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (BaseStandardPipeline,
-                                                    ExtractiveQAPipeline,
-                                                    SemanticSearchPipeline,
-                                                    DocPipeline)
+from pipelines.nodes.document.document_preprocessor import DocPreProcessor
+from pipelines.nodes.document.document_intelligence import DocPrompter
