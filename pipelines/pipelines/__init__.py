@@ -39,7 +39,8 @@ from pipelines.nodes import BaseComponent
 from pipelines.pipelines import Pipeline
 from pipelines.pipelines.standard_pipelines import (BaseStandardPipeline,
                                                     ExtractiveQAPipeline,
-                                                    SemanticSearchPipeline)
+                                                    SemanticSearchPipeline,
+                                                    TextToImagePipeline)
 
 import pandas as pd
 
