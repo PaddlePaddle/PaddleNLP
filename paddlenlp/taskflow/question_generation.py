@@ -60,8 +60,8 @@ class QuestionGenerationTask(Task):
         self._output_scores = kwargs.get("output_scores", False)
         self._is_select_from_num_return_sequences = kwargs.get(
             "is_select_from_num_return_sequences", True)
-        self._construct_tokenizer(model)
-        self._construct_model(model)
+        self._construct_tokenizer()
+        self._construct_model()
         # Hypter-parameter during generating.
         self._max_length = kwargs.get("max_length", 50)
         self._min_length = kwargs.get("min_length", 3)
@@ -79,15 +79,14 @@ class QuestionGenerationTask(Task):
         self._use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         self._template = kwargs.get("template", 1)
 
-    def _construct_model(self, model):
+    def _construct_model(self):
         """
         Construct the inference model for the predictor.
         """
-        # self._model = UNIMOLMHeadModel.from_pretrained(model)
         self._model = UNIMOLMHeadModel.from_pretrained(self._task_path)
         self._model.eval()
 
-    def _construct_tokenizer(self, model):
+    def _construct_tokenizer(self):
         """
         Construct the tokenizer for the predictor.
         """
