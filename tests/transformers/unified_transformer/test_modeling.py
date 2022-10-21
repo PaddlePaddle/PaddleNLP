@@ -453,9 +453,10 @@ class UnifiedTransformerModelTest(ModelTesterMixin, GenerationTesterMixin,
         return inputs_dict
 
     def setUp(self):
-        random.seed(1028)
-        np.random.seed(1028)
-        paddle.seed(1028)
+        seed = 1028
+        random.seed(seed)
+        np.random.seed(seed)
+        paddle.seed(seed)
 
         self.model_tester = UnifiedTransformerModelTester(self)
 

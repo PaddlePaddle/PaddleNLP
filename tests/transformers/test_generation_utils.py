@@ -446,9 +446,6 @@ class GenerationTesterMixin:
                                  output_generate[0].tolist())
 
     def test_sample_generate(self):
-        random.seed(128)
-        np.random.seed(128)
-        paddle.seed(128)
 
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
