@@ -61,8 +61,8 @@ class TextSummarizationTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._batch_size = kwargs.get("batch_size", 1)
         self._output_scores = kwargs.get("output_scores", False)
-        self._construct_tokenizer()
-        self._construct_model()
+        self._construct_tokenizer(model)
+        self._construct_model(model)
         # Hypter-parameter during generating.
         self._max_length = kwargs.get("max_length", 128)
         self._min_length = kwargs.get("min_length", 0)
@@ -77,18 +77,24 @@ class TextSummarizationTask(Task):
         self._use_faster = kwargs.get("use_faster", False)
         self._use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
 
-    def _construct_model(self):
+    def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        self._model = UNIMOLMHeadModel.from_pretrained(self._task_path)
+        if self._custom_model:
+            self._model = UNIMOLMHeadModel.from_pretrained(self._task_path)
+        else:
+            self._model = UNIMOLMHeadModel.from_pretrained(model)
         self._model.eval()
 
-    def _construct_tokenizer(self):
+    def _construct_tokenizer(self, model):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = UNIMOTokenizer.from_pretrained(self._task_path)
+        if self._custom_model:
+            self._tokenizer = UNIMOTokenizer.from_pretrained(self._task_path)
+        else:
+            self._tokenizer = UNIMOTokenizer.from_pretrained(model)
 
     def _preprocess(self, inputs):
         """
