@@ -1116,7 +1116,6 @@ class Trainer:
             else:
                 model, self.optimizer = decorated
 
-        print(model.state_dict()["t5.encoder.embed_tokens.weight"])
         # Multi-gpu training
         if self.args.world_size > 1 and self.sharding is None:
             model = paddle.DataParallel(model)

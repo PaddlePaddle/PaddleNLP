@@ -34,7 +34,7 @@ from paddlenlp.trainer import (
 from paddlenlp.utils.log import logger
 
 from utils import load_pickle, save_pickle, GLUE_METRICS
-from data import GLUE_PROCESSED
+from data import GLUE_PROCESSED, GLUE_1_1_PROCESSED
 
 label_length_map = {
     "cola": 4,
@@ -50,7 +50,10 @@ label_length_map = {
 
 def trans_func(example, tokenizer, args):
     task_name = args.task_name
-    processed, label = GLUE_PROCESSED[task_name]
+    PROCESSED = GLUE_PROCESSED
+    if "v1_1" in args.cache_dir:
+        PROCESSED = GLUE_1_1_PROCESSED
+    processed, label = PROCESSED[task_name]
     if label:
         id2label = dict(zip(range(len(label)), label))
     else:
@@ -126,7 +129,7 @@ class BatchDict(object):
 
 
 def get_train_dataset(tokenizer, args):
-    filename = os.path.join("caches", args.task_name + "_train" + ".pkl")
+    filename = os.path.join(args.cache_dir, args.task_name + "_train" + ".pkl")
 
     if os.path.exists(filename):
         ds = load_pickle(filename)
@@ -143,7 +146,7 @@ def get_train_dataset(tokenizer, args):
 
 
 def get_dev_dataset(tokenizer, args):
-    filename = os.path.join("caches", args.task_name + "_dev" + ".pkl")
+    filename = os.path.join(args.cache_dir, args.task_name + "_dev" + ".pkl")
 
     if os.path.exists(filename):
         ds = load_pickle(filename)
@@ -164,7 +167,8 @@ def get_mnli_dev_dataset(tokenizer, args, matched=True):
         split = "dev_matched"
     else:
         split = "dev_mismatched"
-    filename = os.path.join("caches", args.task_name + f"_{split}" + ".pkl")
+    filename = os.path.join(args.cache_dir,
+                            args.task_name + f"_{split}" + ".pkl")
     if os.path.exists(filename):
         ds = load_pickle(filename)
     else:
@@ -202,6 +206,8 @@ class DataArguments:
             "than this will be truncated, sequences shorter will be padded."
         },
     )
+    cache_dir: str = field(default="./caches",
+                           metadata={"help": "cache dir for datasets."})
 
 
 @dataclass
@@ -267,12 +273,13 @@ class T5Trainer(Trainer):
                                           skip_special_tokens=True).strip()
 
             if self.label2id:
-                #  if pred not in self.label2id:
-                #      pred = -1
-                #  else:
-                #  	pred = self.label2id[pred]
-                pred = self.label2id[pred]
                 label = self.label2id[label]
+                if pred not in self.label2id:
+                    pred = 0
+                    if label == 0:
+                        pred = 1
+                else:
+                    pred = self.label2id[pred]
             else:
                 pred = float(pred.replace(" ", ""))
                 label = float(label.replace(" ", ""))
@@ -290,6 +297,11 @@ def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    if "v1_1" in model_args.model_name_or_path:
+        data_args.cache_dir = "./caches_v1_1"
+    if not os.path.exists(data_args.cache_dir):
+        os.mkdir(data_args.cache_dir)
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -321,7 +333,10 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    label_name = GLUE_PROCESSED[data_args.task_name][1]
+    PROCESSED = GLUE_PROCESSED
+    if "v1_1" in data_args.cache_dir:
+        PROCESSED = GLUE_1_1_PROCESSED
+    label_name = PROCESSED[data_args.task_name][1]
     if label_name:
         label2id = dict(zip(label_name, range(len(label_name))))
     else:
@@ -334,7 +349,6 @@ def main():
         model_args.model_name_or_path)
     tokenizer = T5Tokenizer.from_pretrained(model_args.model_name_or_path)
 
-    print(model.state_dict()["t5.encoder.embed_tokens.weight"])
     # get dataloader
     train_dataset = get_train_dataset(tokenizer, data_args)
     if data_args.task_name == "mnli":
