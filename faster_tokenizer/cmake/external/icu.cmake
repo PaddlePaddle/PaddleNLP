@@ -71,15 +71,6 @@ ExternalProject_Add(
         BUILD_BYPRODUCTS ${ICU_LIBRARIES}
 )
 elseif(ANDROID)
-set(TOOLCHAIN "/home/majianping/extern_icu/icu4c/toolchain")
-set(ANDROID_ENV_CMAKE ${CMAKE_COMMAND} -E env
-        CC=${TOOLCHAIN}/bin/aarch64-linux-android-clang
-        CXX=${TOOLCHAIN}/bin/aarch64-linux-android-clang++
-        AR=${TOOLCHAIN}/bin/aarch64-linux-android-ar
-        RANLIB=${TOOLCHAIN}/bin/aarch64-linux-android-ranlib
-        CFLAGS="-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fno-addrsig -Wa,--noexecstack -Wformat -Werror=format-security"
-        CXXFLAGS="-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fno-addrsig -Wa,--noexecstack -Wformat -Werror=format-security  --std=c++11 -O3 -fPIC -ldl -fopenmp=libomp"
-)
 set(ENV {CC} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-clang")
 set(ENV {CXX} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-clang++")
 set(ENV {AR} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-ar")
