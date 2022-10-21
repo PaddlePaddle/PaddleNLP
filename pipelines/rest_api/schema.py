@@ -99,3 +99,10 @@ class DocumentResponse(BaseModel):
     meta: dict
     results: List[List[dict]] = []
     debug: Optional[Dict] = Field(None, alias="_debug")
+
+
+class QueryImageResponse(BaseModel):
+    query: str
+    answers: List[str] = []
+    documents: List[DocumentSerialized] = []
+    debug: Optional[Dict] = Field(None, alias="_debug")

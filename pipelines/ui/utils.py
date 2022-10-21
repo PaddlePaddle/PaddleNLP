@@ -31,6 +31,7 @@ DOC_REQUEST = "query"
 DOC_FEEDBACK = "feedback"
 DOC_UPLOAD = "file-upload"
 DOC_PARSE = 'files'
+IMAGE_REQUEST = 'query_text_to_images'
 
 
 def pipelines_is_ready():
@@ -181,6 +182,35 @@ def semantic_search(
             "images":
             answer["meta"]["images"] if 'images' in answer["meta"] else [],
         })
+    return results, response
+
+
+def text_to_image_search(
+        query,
+        resolution="1024*1024",
+        top_k_images=5,
+        style="探索无限") -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Send a prompt text and corresponding parameters to the REST API
+    """
+    url = f"{API_ENDPOINT}/{IMAGE_REQUEST}"
+    params = {
+        "TextToImageGenerator": {
+            "style": style,
+            "topk": top_k_images,
+            "resolution": resolution,
+        }
+    }
+    req = {"query": query, "params": params}
+    response_raw = requests.post(url, json=req)
+
+    if response_raw.status_code >= 400 and response_raw.status_code != 503:
+        raise Exception(f"{vars(response_raw)}")
+
+    response = response_raw.json()
+    if "errors" in response:
+        raise Exception(", ".join(response["errors"]))
+    results = response["answers"]
     return results, response
 
 

@@ -301,6 +301,13 @@ def do_train(args):
             logger.warning("No optimizer checkpoint file found in %s." %
                            opt_path)
 
+    # decorate @to_static for benchmark, skip it by default.
+    if args.to_static:
+        specs = None
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info(
+            "Successfully to apply @to_static with specs: {}".format(specs))
+
     global_step = 0
     tic_train = time.time()
     for epoch in range(args.num_train_epochs):
