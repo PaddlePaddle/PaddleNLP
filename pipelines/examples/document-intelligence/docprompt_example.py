@@ -38,7 +38,7 @@ def docprompt_pipeline():
     meta = {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}
 
     prediction = pipe.run(meta=meta)
-    print(prediction["results"])
+    print(prediction["results"][0])
 
 
 if __name__ == "__main__":
