@@ -24,7 +24,6 @@ from paddle.distributed.fleet.utils import recompute
 
 from ..model_utils import PretrainedModel, register_base_model
 from ..nezha.modeling import ACT2FN
-from ...utils.log import logger
 
 __all__ = [
     'T5Model',
@@ -563,7 +562,6 @@ class T5Block(nn.Layer):
         if hidden_states.dtype == paddle.float16 and paddle.isinf(
                 hidden_states).any():
             # TODO finfo
-            logger.warning("clip value")
             clamp_value = finfo(hidden_states.dtype).max - 1000
             hidden_states = paddle.clip(hidden_states,
                                         min=-clamp_value,

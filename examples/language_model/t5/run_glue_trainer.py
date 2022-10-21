@@ -281,8 +281,11 @@ class T5Trainer(Trainer):
                 else:
                     pred = self.label2id[pred]
             else:
-                pred = float(pred.replace(" ", ""))
                 label = float(label.replace(" ", ""))
+                try:
+                    pred = float(pred.replace(" ", ""))
+                except Exception as e:
+                    pred = 0.0
 
             all_preds.append(pred)
             all_labels.append(label)

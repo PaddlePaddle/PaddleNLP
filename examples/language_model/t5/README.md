@@ -81,8 +81,18 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
 |                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |         |
 | T5-base-Paddle | 61.74 | 95.18 | 90.44 | 90.09   | 91.60 | 87.18 | 93.56 | 81.95 | 86.4675 |
 
-和 torch 论文得分对比。
+###### t5_v1_1-base模型在GLUE开发集上的结果：
+使用`run_glue_trainer.py`运行，由于`t5_v1_1-base`没有在glue任务上进行训练过，直接生成label的策略需要的训练时间需要更长。
+| Model                          | cola  | sst-2  | mrpc        | sts-b             | qqp         | mnli       | qnli | rte   |
+|--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|
+|                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |
+| T5-v1_1-base Paddle | 47.6845 | 94.38 | 84.31 | 87.74   | 88.05 | 85.39 | 90.518 | 65.70 |
+| epoch | 100 | 10 | 100 | 100   | 3 | 3 | 10 | 10 |
 
+注：
+- 直接生成label的finetune方式难度较大，前期基本学习如何正确生成label标签，后期才学习分类任务。
+- 生成的label标签设计，标签差异大一些，效果会更好一些。
+- `qqp`,`mnli`数据集适当增大训练epoch数，可以取得更好效果。
 
 ### GLUE Demo测试
 
