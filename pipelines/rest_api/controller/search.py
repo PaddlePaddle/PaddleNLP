@@ -100,8 +100,8 @@ def query_images(request: QueryRequest):
     if not "answers" in result:
         result["answers"] = []
     return result
-    
-    
+
+
 @router.post("/query_documents",
              response_model=DocumentResponse,
              response_model_exclude_none=True)

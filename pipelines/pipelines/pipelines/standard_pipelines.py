@@ -300,8 +300,8 @@ class DocPipeline(BaseStandardPipeline):
         """
         output = self.pipeline.run(meta=meta, params=params, debug=debug)
         return output
-        
-        
+
+
 class TextToImagePipeline(BaseStandardPipeline):
     """
     A simple pipeline that takes prompt texts as input and generates
