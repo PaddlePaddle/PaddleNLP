@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 parser.add_argument("--prompt_text", default='宁静的小镇', type=str, help="The prompt_text.")
+parser.add_argument("--output_dir", default='ernievilg_output', type=str, help="The output path.")
 parser.add_argument("--style", default='探索无限', type=str, help="The style text.")
 parser.add_argument("--size", default='1024*1024',
     choices=['1024*1024', '1024*1536', '1536*1024'], help="Size of the generation images")
@@ -41,7 +42,8 @@ def text_to_image():
                               "TextToImageGenerator": {
                                   "topk": args.topk,
                                   "style": args.style,
-                                  "resolution": args.size
+                                  "resolution": args.size,
+                                  "output_dir": args.output_dir
                               }
                           })
     pipe.save_to_yaml('text_to_image.yaml')

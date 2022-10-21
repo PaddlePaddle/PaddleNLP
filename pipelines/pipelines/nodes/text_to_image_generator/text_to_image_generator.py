@@ -254,11 +254,13 @@ class ErnieTextToImageGenerator(BaseComponent):
             query: Document,
             style: Optional[str] = None,
             topk: Optional[int] = None,
-            resolution: Optional[str] = "1024*1024"):
+            resolution: Optional[str] = "1024*1024",
+            output_dir: Optional[str] = 'ernievilg_output'):
 
         result_images = self.generate_image(query,
                                             style=style,
                                             topk=topk,
-                                            resolution=resolution)
+                                            resolution=resolution,
+                                            output_dir=output_dir)
         results = {"results": result_images}
         return results, "output_1"

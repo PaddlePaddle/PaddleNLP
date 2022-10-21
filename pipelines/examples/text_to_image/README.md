@@ -48,7 +48,7 @@ python setup.py install
 在运行下面的命令之前，需要在[ERNIE-ViLG官网](https://wenxin.baidu.com/moduleApi/ernieVilg)申请`API Key`和 `Secret key`两个密钥(需要登录，登录后点击右上角的查看AK/SK，具体如下图)，然后执行下面的命令。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/196942735-06953270-ce1e-45a5-9e0d-5841068a8464.png)" width="500">
+    <img src="https://user-images.githubusercontent.com/12107462/196942735-06953270-ce1e-45a5-9e0d-5841068a8464.png" width="500">
 </div>
 
 
@@ -58,10 +58,12 @@ python setup.py install
 ```bash
 python examples/text_to_image/text_to_image_example.py --prompt_text 宁静的小镇 \
                                                        --style 古风 \
+                                                       --topk 5 \
                                                        --api_key 你申请的apikey \
-                                                       --secret_key 你申请的secretkey
+                                                       --secret_key 你申请的secretkey \
+                                                       --output_dir ernievilg_output
 ```
-大概运行一分钟后就可以得到结果了。
+大概运行一分钟后就可以得到结果了,生成的图片请查看您的输出目录`output_dir`。
 
 ### 3.3 构建 Web 可视化文生图系统
 
