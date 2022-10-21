@@ -70,6 +70,37 @@ ExternalProject_Add(
         INSTALL_COMMAND make install prefix="" DESTDIR=${ICU_INSTALL_DIR} install
         BUILD_BYPRODUCTS ${ICU_LIBRARIES}
 )
+elseif(ANDROID)
+set(TOOLCHAIN "/home/majianping/extern_icu/icu4c/toolchain")
+set(ANDROID_ENV_CMAKE ${CMAKE_COMMAND} -E env
+        CC=${TOOLCHAIN}/bin/aarch64-linux-android-clang
+        CXX=${TOOLCHAIN}/bin/aarch64-linux-android-clang++
+        AR=${TOOLCHAIN}/bin/aarch64-linux-android-ar
+        RANLIB=${TOOLCHAIN}/bin/aarch64-linux-android-ranlib
+        CFLAGS="-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fno-addrsig -Wa,--noexecstack -Wformat -Werror=format-security"
+        CXXFLAGS="-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fno-addrsig -Wa,--noexecstack -Wformat -Werror=format-security  --std=c++11 -O3 -fPIC -ldl -fopenmp=libomp"
+)
+set(ENV {CC} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-clang")
+set(ENV {CXX} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-clang++")
+set(ENV {AR} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-ar")
+set(ENV {RANLIB} "/home/majianping/extern_icu/icu4c/toolchain/bin/aarch64-linux-android-ranlib")
+set(ENV {CFLAGS} "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fno-addrsig -Wa,--noexecstack -Wformat -Werror=format-security")
+set(ENV {CXXFLAGS} "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -fno-addrsig -Wa,--noexecstack -Wformat -Werror=format-security  --std=c++11 -O3 -fPIC -ldl -fopenmp=libomp")
+
+ExternalProject_Add(
+        extern_icu
+        ${EXTERNAL_PROJECT_LOG_ARGS}
+        ${SHALLOW_CLONE}
+        GIT_REPOSITORY    ${ICU_REPOSITORY}
+        GIT_TAG           ${ICU_TAG}
+        GIT_PROGRESS      1
+        PREFIX            ${ICU_PREFIX_DIR}
+        UPDATE_COMMAND    ""
+        CONFIGURE_COMMAND ../extern_icu/icu4c/source/configure --with-cross-build=/home/majianping/extern_icu/icu4c/build_linux --host=aarch64-linux-android  --enable-static --disable-shared --enable-rpath
+        BUILD_COMMAND make -j8
+        INSTALL_COMMAND make install prefix="" DESTDIR=${ICU_INSTALL_DIR} install
+        BUILD_BYPRODUCTS ${ICU_LIBRARIES}
+)
 else()
 ExternalProject_Add(
         extern_icu
