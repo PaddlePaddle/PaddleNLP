@@ -67,7 +67,7 @@ python examples/text_to_image/text_to_image_example.py --prompt_text 宁静的�
 
 ### 3.3 构建 Web 可视化文生图系统
 
-整个 Web 可视化文生图系统主要包含 2 大组件: 1. 基于 RestfulAPI 构建模型服务 3. 基于 Gradio 构建 WebUI，接下来我们依次搭建这 2 个服务并最终形成可视化的文生图系统。
+整个 Web 可视化文生图系统主要包含 2 大组件: 1. 基于 RestfulAPI 构建模型服务 2. 基于 Gradio 构建 WebUI，接下来我们依次搭建这 2 个服务并最终形成可视化的文生图系统。
 
 #### 3.3.1 启动 RestAPI 模型服务
 
