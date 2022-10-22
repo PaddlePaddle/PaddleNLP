@@ -24,6 +24,7 @@ from pipelines.nodes.reader import BaseReader
 from pipelines.nodes.ranker import BaseRanker
 from pipelines.nodes.retriever import BaseRetriever
 from pipelines.document_stores import BaseDocumentStore
+from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
 from pipelines.pipelines import Pipeline
 
 logger = logging.getLogger(__name__)
@@ -262,4 +263,35 @@ class SemanticSearchPipeline(BaseStandardPipeline):
               by this method under the key "_debug"
         """
         output = self.pipeline.run(query=query, params=params, debug=debug)
+        return output
+
+
+class TextToImagePipeline(BaseStandardPipeline):
+    """
+    A simple pipeline that takes prompt texts as input and generates
+    images.
+    """
+
+    def __init__(self, text_to_image_generator: ErnieTextToImageGenerator):
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=text_to_image_generator,
+                               name="TextToImageGenerator",
+                               inputs=["Query"])
+
+    def run(self,
+            query: str,
+            params: Optional[dict] = None,
+            debug: Optional[bool] = None):
+        output = self.pipeline.run(query=query, params=params, debug=debug)
+        return output
+
+    def run_batch(
+        self,
+        documents: List[Document],
+        params: Optional[dict] = None,
+        debug: Optional[bool] = None,
+    ):
+        output = self.pipeline.run_batch(documents=documents,
+                                         params=params,
+                                         debug=debug)
         return output

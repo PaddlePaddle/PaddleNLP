@@ -54,14 +54,12 @@ class ModelArguments:
 
 
 @paddle.no_grad()
-def dynabert_evaluate(model, data_loader):
+def dynabert_evaluate(self, model, data_loader):
     metric = MetricReport()
     model.eval()
     metric.reset()
     for batch in data_loader:
-        logits = model(batch['input_ids'],
-                       batch['token_type_ids'],
-                       attention_mask=[None, None])
+        logits = model(batch['input_ids'], batch['token_type_ids'])
         # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
         if isinstance(model, OFA):
             logits = logits[0]
@@ -129,7 +127,7 @@ def main():
 
     compression_args.print_config()
 
-    trainer.compress(custom_dynabert_evaluate=dynabert_evaluate)
+    trainer.compress(custom_evaluate=dynabert_evaluate)
 
 
 if __name__ == "__main__":

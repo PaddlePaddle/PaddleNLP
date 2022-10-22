@@ -93,10 +93,6 @@ class Predictor(object):
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               device=args.device)
         if self.task_type == "ner":
-            self.label_list = [
-                'O', 'B-ANSWER', 'I-ANSWER', 'B-HEADER', 'I-HEADER',
-                'B-QUESTION', 'I-QUESTION'
-            ]
             self.label_dict = {
                 'O': 0,
                 'B-ANSWER': 1,
@@ -109,12 +105,6 @@ class Predictor(object):
             self.preprocess = self.preprocess_ner
             self.postprocess = self.postprocess_ner
         elif self.task_type == "cls":
-            self.label_list = [
-                'advertisement', 'budget', 'email', 'file folder', 'form',
-                'handwritten', 'invoice', 'letter', 'memo', 'news article',
-                'presentation', 'questionnaire', 'resume',
-                'scientific publication', 'scientific report', 'specification'
-            ]
             self.label_dict = {
                 'advertisement': 0,
                 'budget': 1,
@@ -410,7 +400,7 @@ class Predictor(object):
             for idx in features_ids:
                 pred, label = preds[idx], self.features_cache["labels"][idx]
                 prediction, prediction_score = self.get_predictions(
-                    pred, self.label_list)
+                    pred, list(self.label_dict.keys()))
 
                 token_is_max_context = self.features_cache[
                     "token_is_max_context"][idx]
@@ -587,7 +577,7 @@ class Predictor(object):
                 if pred[pred_id] > max_rcd[0]:
                     max_rcd = [pred[pred_id], pred_id]
 
-            predictions.append(self.label_list[max_rcd[1]])
+            predictions.append(list(self.label_dict.keys())[max_rcd[1]])
         return predictions
 
     def preprocess_mrc(self,
@@ -867,6 +857,8 @@ class Predictor(object):
         input_data = []
         for doc in docs:
             ocr_result = self.ocr.ocr(doc, cls=True)
+            # Compatible with paddleocr>=2.6.0.2
+            ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result
             example = ppocr2example(ocr_result, doc)
             input_data.append(example)
 
