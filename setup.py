@@ -75,6 +75,9 @@ setuptools.setup(
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
+    entry_points={
+        'console_scripts': ['paddlenlp = paddlenlp.commands.cli:main']
+    },
     python_requires='>=3.6',
     classifiers=[
         'Programming Language :: Python :: 3',
