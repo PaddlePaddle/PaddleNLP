@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 import warnings
+import os
 
 import paddle
 import paddle.nn as nn
@@ -23,6 +25,7 @@ except ImportError:
     FusedTransformerEncoderLayer = None
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -1667,3 +1670,14 @@ class BertForMaskedLM(BertPretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+def convert_pytorch_weights(model: BertPretrainedModel,
+                            pytorch_checkpoint_path: str):
+    # 1. load the pytorch model weight file
+    import torch
+    torch_weight: Dict[str, Any] = torch.load(torch_file)
+    paddle_weight = {}
+
+    # 2. load mapping configuration
+    # TODO(wj-Mcat): from existing codebase
