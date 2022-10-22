@@ -179,6 +179,8 @@
 
 - 👉 [汽车说明书跨模态智能问答](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/document_intelligence/doc_vqa#readme)
 
+更多：百度TextMind智能文档分析平台可提供包括文档信息抽取、文本内容审查、企业文档管理、文档格式解析、文档内容比对等全方位一站式的文档智能服务，已形成一套完整的企业文档场景化解决方案，满足银行、券商、法律、能源、传媒、通信、物流等不同行业和场景的文档处理需求，以AI助力企业的办公智能化升级和数字化转型。欢迎深度交流与商业合作，了解详情：https://ai.baidu.com/tech/nlp/Textanalysis
+
 ## References
 
 - [文档智能：数据集、模型和应用](http://jcip.cipsc.org.cn/CN/abstract/abstract3331.shtml)
