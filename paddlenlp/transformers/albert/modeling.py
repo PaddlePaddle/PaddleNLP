@@ -1875,7 +1875,7 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
                                                 num_or_sections=2,
                                                 axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
-        end_logits = start_logits.squeeze(axis=-1)
+        end_logits = end_logits.squeeze(axis=-1)
 
         total_loss = None
         if start_positions is not None and end_positions is not None:

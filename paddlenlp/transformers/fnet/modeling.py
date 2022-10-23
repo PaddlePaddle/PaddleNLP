@@ -1145,7 +1145,7 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
                                                 num_or_sections=1,
                                                 axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
-        end_logits = start_logits.squeeze(axis=-1)
+        end_logits = end_logits.squeeze(axis=-1)
         if return_dict:
             return {
                 "start_logits": start_logits,
