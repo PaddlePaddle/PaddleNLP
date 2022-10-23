@@ -27,13 +27,9 @@ from paddlenlp.transformers import (
     SkepForTokenClassification,
     SkepCrfForTokenClassification,
 )
-# from ..test_modeling_common import (ids_tensor, floats_tensor,
-#                                     random_attention_mask, ModelTesterMixin)
-# from ...testing_utils import slow
-from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
-                                                     random_attention_mask,
-                                                     ModelTesterMixin)
-from tests.testing_utils import slow
+from ..test_modeling_common import (ids_tensor, floats_tensor,
+                                    random_attention_mask, ModelTesterMixin)
+from ...testing_utils import slow
 
 
 @dataclass
