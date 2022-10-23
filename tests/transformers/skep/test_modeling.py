@@ -363,7 +363,7 @@ class SkepModelIntegrationTest(unittest.TestCase):
               [0.20048048, 0.04142965, -0.2655520],
               [0.49883127, -0.15263288, 0.46780178]]])
         self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
