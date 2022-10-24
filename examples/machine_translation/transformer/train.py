@@ -210,7 +210,8 @@ def do_train(args):
                                    bos_id=args.bos_idx,
                                    eos_id=args.eos_idx,
                                    pad_id=args.pad_idx,
-                                   normalize_before=args.normalize_before)
+                                   normalize_before=args.get(
+                                       "normalize_before", True))
 
     transformer = apply_to_static(args, transformer)
 

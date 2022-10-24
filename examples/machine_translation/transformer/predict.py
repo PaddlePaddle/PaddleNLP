@@ -173,7 +173,7 @@ def do_predict(args):
         max_out_len=args.max_out_len,
         use_ft=not args.without_ft,
         beam_search_version=args.beam_search_version,
-        normalize_before=args.normalize_before,
+        normalize_before=args.get("normalize_before", True),
         rel_len=args.use_rel_len,  # only works when using FT or beam search v2
         alpha=args.alpha,  # only works when using beam search v2
         diversity_rate=args.diversity_rate,  # only works when using FT

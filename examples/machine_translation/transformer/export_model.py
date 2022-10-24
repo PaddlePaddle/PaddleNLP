@@ -103,7 +103,7 @@ def do_export(args):
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         beam_search_version=args.beam_search_version,
-        normalize_before=args.normalize_before,
+        normalize_before=args.get("normalize_before", True),
         rel_len=args.use_rel_len,
         alpha=args.alpha)
 
