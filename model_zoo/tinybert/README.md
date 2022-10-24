@@ -58,7 +58,7 @@ python -u ./run_glue.py \
 
 ```
 
-训练完成之后，可将训练效果最好的模型保存在本项目下的`pretrained_models/$TASK_NAME/`下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
+训练完成之后，可将训练效果最好的模型保存在本项目下的 `$TEACHER_DIR` 下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
 
 
 ### 对TinyBERT在特定任务下蒸馏
@@ -68,7 +68,10 @@ python -u ./run_glue.py \
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 export TASK_NAME=SST-2
-export TEACHER_DIR=../pretrained_models/SST-2/best_model_610
+export TEACHER_DIR=teacher_models
+
+# Moves the best model to $TEACHER_DIR
+mv ../../examples/benchmark/glue/tmp/SST-2/sst-2_ft_model_xx.pdparams/  $TEACHER_DIR
 
 python task_distill.py \
     --model_type tinybert \
@@ -103,12 +106,9 @@ python task_distill.py \
 然后对预测层进行蒸馏：
 
 ```shell
-
-export TEACHER_DIR=../pretrained_models/SST-2/best_model_610
-
 python task_distill.py \
     --model_type tinybert \
-    --student_model_name_or_path tmp/TASK_NAME best_inter_model \
+    --student_model_name_or_path tmp/$TASK_NAME/intermediate_distill_model_final.pdparams \
     --task_name $TASK_NAME \
     --max_seq_length 64 \
     --batch_size 32   \
