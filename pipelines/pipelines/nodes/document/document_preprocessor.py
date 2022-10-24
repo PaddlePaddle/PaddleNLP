@@ -30,7 +30,7 @@ from pipelines.nodes.base import BaseComponent
 logger = logging.getLogger(__name__)
 
 
-class DocPreProcessor(BaseComponent):
+class DocOCRProcessor(BaseComponent):
     """
     Preprocess document input from image/image url/image bytestream to ocr outputs 
     """

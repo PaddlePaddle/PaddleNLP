@@ -5,7 +5,7 @@ components:
     params:
           use_gpu: True
           lang: ch
-    type: DocPreProcessor
+    type: DocOCRProcessor
   - name: Runner
     params:
           topn: 1

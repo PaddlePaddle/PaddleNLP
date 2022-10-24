@@ -15,13 +15,12 @@ import os
 import collections
 import math
 from multiprocessing import cpu_count
-from typing import Dict, List
+from typing import List
 import logging
 
 import paddle
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.taskflow.utils import download_file, ImageReader, get_doc_pred, find_answer_pos, sort_res
-from paddlenlp.taskflow.task import Task
 from paddlenlp.utils.env import PPNLP_HOME
 
 from pipelines.nodes.base import BaseComponent

@@ -17,7 +17,7 @@ import logging
 import os
 
 import paddle
-from pipelines.nodes import DocPreProcessor, DocPrompter
+from pipelines.nodes import DocOCRProcessor, DocPrompter
 from pipelines import DocPipeline
 
 # yapf: disable
@@ -32,7 +32,7 @@ def docprompt_pipeline():
 
     use_gpu = True if args.device == 'gpu' else False
 
-    preprocessor = DocPreProcessor(use_gpu=use_gpu)
+    preprocessor = DocOCRProcessor(use_gpu=use_gpu)
     docprompter = DocPrompter(use_gpu=use_gpu, batch_size=args.batch_size)
     pipe = DocPipeline(preprocessor=preprocessor, modelrunner=docprompter)
     meta = {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}
