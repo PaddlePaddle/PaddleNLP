@@ -19,18 +19,31 @@
 
  环境中paddlepaddle-gpu或paddlepaddle版本应大于或等于2.3, 请参见[飞桨快速安装](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)根据自己需求选择合适的PaddlePaddle下载命令。
 
-**安装Paddle-Pipelines：**
+**安装PaddleNLP：**
 
 ```bash
-# pip 一键安装
-pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
-# 或者源码进行安装最新版本
-cd ${HOME}/PaddleNLP/pipelines/
+pip install paddlenlp==2.4.1
+```
+
+**安装Paddle-Pipelines：**
+
+安装相关依赖：
+```bash
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+pip 一键安装Paddle-Pipelines：
+```bash
+pip install paddle-pipelines==0.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+或使用源码安装Paddle-Pipelines最新版本：
+```bash
+cd ${HOME}/PaddleNLP/pipelines/
 python setup.py install
 ```
 
-【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
+【注意】**以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录**
 
 ### 2.2 一键体验问答系统
 您可以通过如下命令快速体验开放文档抽取问答系统的效果。
