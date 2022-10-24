@@ -76,7 +76,7 @@ class DDPMPipeline(DiffusionPipeline):
             # 1. predict noise model_output
             model_output = self.unet(image, t).sample
 
-            # 2. compute previous image: x_t -> t_t-1
+            # 2. compute previous image: x_t -> x_t-1
             image = self.scheduler.step(model_output, t, image).prev_sample
 
         image = (image / 2 + 0.5).clip(0, 1)

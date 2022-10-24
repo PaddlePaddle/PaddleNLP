@@ -12,32 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from dataclasses import dataclass
-
 import paddle
 
-from ..utils import BaseOutput
-
-SCHEDULER_CONFIG_NAME = "scheduler_config.json"
+from diffusers_paddle import DiffusionPipeline
 
 
-@dataclass
-class SchedulerOutput(BaseOutput):
-    """
-    Base class for the scheduler's step function output.
+class UnetSchedulerOneForwardPipeline(DiffusionPipeline):
 
-    Args:
-        prev_sample (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)` for images):
-            Computed sample (x_{t-1}) of previous timestep. `prev_sample` should be used as next model input in the
-            denoising loop.
-    """
+    def __init__(self, unet, scheduler):
+        super().__init__()
 
-    prev_sample: paddle.Tensor
+        self.register_modules(unet=unet, scheduler=scheduler)
 
+    def __call__(self):
+        image = paddle.randn((1, self.unet.in_channels, self.unet.sample_size,
+                              self.unet.sample_size), )
+        timestep = 1
 
-class SchedulerMixin:
-    """
-    Mixin containing common functions for the schedulers.
-    """
+        model_output = self.unet(image, timestep).sample
+        scheduler_output = self.scheduler.step(model_output, timestep,
+                                               image).prev_sample
 
-    config_name = SCHEDULER_CONFIG_NAME
+        return scheduler_output

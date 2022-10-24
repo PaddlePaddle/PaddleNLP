@@ -18,18 +18,19 @@ import importlib
 import inspect
 import os
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
 import paddle.nn as nn
+from packaging import version
 
 import PIL
 from PIL import Image
 from tqdm.auto import tqdm
 
 from .configuration_utils import ConfigMixin
-from .utils import (DIFFUSERS_PADDLE_CACHE, BaseOutput, logging,
+from .utils import (DIFFUSERS_PADDLE_CACHE, BaseOutput, logging, deprecate,
                     DOWNLOAD_SERVER)
 
 from . import OnnxRuntimeModel
@@ -105,7 +106,8 @@ class DiffusionPipeline(ConfigMixin):
                     library = module.__module__.split(".")[0]
 
                 # check if the module is a pipeline module
-                pipeline_dir = module.__module__.split(".")[-2]
+                pipeline_dir = module.__module__.split(".")[-2] if len(
+                    module.__module__.split(".")) > 2 else None
                 path = module.__module__.split(".")
                 is_pipeline_module = pipeline_dir in path and hasattr(
                     pipelines, pipeline_dir)
@@ -256,6 +258,29 @@ class DiffusionPipeline(ConfigMixin):
             pipeline_class = getattr(diffusers_module,
                                      config_dict["_class_name"])
 
+
+# To be removed in 1.0.0
+        if pipeline_class.__name__ == "StableDiffusionInpaintPipeline" and version.parse(
+                version.parse(config_dict["_diffusers_version"]).base_version
+        ) <= version.parse("0.5.1"):
+            from diffusers_paddle import StableDiffusionInpaintPipeline, StableDiffusionInpaintPipelineLegacy
+
+            pipeline_class = StableDiffusionInpaintPipelineLegacy
+
+            deprecation_message = (
+                "You are using a legacy checkpoint for inpainting with Stable Diffusion, therefore we are loading the"
+                f" {StableDiffusionInpaintPipelineLegacy} class instead of {StableDiffusionInpaintPipeline}. For"
+                " better inpainting results, we strongly suggest using Stable Diffusion's official inpainting"
+                " checkpoint: https://huggingface.co/runwayml/stable-diffusion-inpainting instead or adapting your"
+                f" checkpoint {pretrained_model_name_or_path} to the format of"
+                " https://huggingface.co/runwayml/stable-diffusion-inpainting. Note that we do not actively maintain"
+                " the {StableDiffusionInpaintPipelineLegacy} class and will likely remove it in version 1.0.0."
+            )
+            deprecate("StableDiffusionInpaintPipelineLegacy",
+                      "1.0.0",
+                      deprecation_message,
+                      standard_warn=False)
+
         # some modules can be passed directly to the init
         # in this case they are already instantiated in `kwargs`
         # extract them here
@@ -267,7 +292,11 @@ class DiffusionPipeline(ConfigMixin):
             for k in expected_modules if k in kwargs
         }
 
-        init_dict, _ = pipeline_class.extract_init_dict(config_dict, **kwargs)
+        init_dict, unused_kwargs = pipeline_class.extract_init_dict(
+            config_dict, **kwargs)
+
+        if len(unused_kwargs) > 0:
+            logger.warning(f"Keyword arguments {unused_kwargs} not recognized.")
 
         init_kwargs = {}
 
@@ -395,6 +424,40 @@ class DiffusionPipeline(ConfigMixin):
         # 5. Instantiate the pipeline
         model = pipeline_class(**init_kwargs)
         return model
+
+    @property
+    def components(self) -> Dict[str, Any]:
+        r"""
+        The `self.compenents` property can be useful to run different pipelines with the same weights and
+        configurations to not have to re-allocate memory.
+        Examples:
+        ```py
+        >>> from diffusers_paddle import (
+        ...     StableDiffusionPipeline,
+        ...     StableDiffusionImg2ImgPipeline,
+        ...     StableDiffusionInpaintPipeline,
+        ... )
+        >>> img2text = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
+        >>> img2img = StableDiffusionImg2ImgPipeline(**img2text.components)
+        >>> inpaint = StableDiffusionInpaintPipeline(**img2text.components)
+        ```
+        Returns:
+            A dictionaly containing all the modules needed to initialize the pipleline.
+        """
+        components = {
+            k: getattr(self, k)
+            for k in self.config.keys() if not k.startswith("_")
+        }
+        expected_modules = set(
+            inspect.signature(self.__init__).parameters.keys()) - set(["self"])
+
+        if set(components.keys()) != expected_modules:
+            raise ValueError(
+                f"{self} has been incorrectly initialized or {self.__class__} is incorrectly implemented. Expected"
+                f" {expected_modules} to be defined, but {components} are defined."
+            )
+
+        return components
 
     @staticmethod
     def numpy_to_pil(images, **kwargs):

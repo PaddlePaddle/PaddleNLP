@@ -29,7 +29,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.trainer import set_seed
 from diffusers_paddle import AutoencoderKL, DDPMScheduler, PNDMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers_paddle.optimization import get_scheduler
-from diffusers_paddle.modeling_utils import unwrap_model
+from diffusers_paddle.modeling_utils import unwrap_model, freeze_params
 
 import PIL
 from PIL import Image
@@ -379,11 +379,6 @@ class TextualInversionDataset(Dataset):
         return example
 
 
-def freeze_params(params):
-    for param in params:
-        param.stop_gradient = True
-
-
 def main():
     args = parse_args()
     rank = paddle.distributed.get_rank()
@@ -573,23 +568,21 @@ def main():
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
-            with paddle.no_grad():
-                # Convert images to latent space
-                latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-                latents = latents * 0.18215
+            # Convert images to latent space
+            latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
+            latents = latents * 0.18215
 
-                # Sample noise that we'll add to the latents
-                noise = paddle.randn(latents.shape)
-                batch_size = latents.shape[0]
-                # Sample a random timestep for each image
-                timesteps = paddle.randint(
-                    0, noise_scheduler.config.num_train_timesteps,
-                    (batch_size, )).astype("int64")
+            # Sample noise that we'll add to the latents
+            noise = paddle.randn(latents.shape)
+            batch_size = latents.shape[0]
+            # Sample a random timestep for each image
+            timesteps = paddle.randint(
+                0, noise_scheduler.config.num_train_timesteps,
+                (batch_size, )).astype("int64")
 
-                # Add noise to the latents according to the noise magnitude at each timestep
-                # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(
-                    latents, noise, timesteps)
+            # Add noise to the latents according to the noise magnitude at each timestep
+            # (this is the forward diffusion process)
+            noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
             # Get the text embedding for conditioning
             encoder_hidden_states = text_encoder(batch["input_ids"])[0]

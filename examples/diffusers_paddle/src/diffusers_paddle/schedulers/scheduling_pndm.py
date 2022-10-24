@@ -101,15 +101,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         skip_prk_steps: bool = False,
         set_alpha_to_one: bool = False,
         steps_offset: int = 0,
-        **kwargs,
     ):
-        deprecate(
-            "tensor_format",
-            "0.6.0",
-            "If you're running your code in Paddle, you can safely remove this argument.",
-            take_from=kwargs,
-        )
-
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
@@ -152,13 +144,13 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self._timesteps = np.arange(0, num_train_timesteps)[::-1].copy()
+        self._timesteps = np.arange(
+            0, num_train_timesteps)[::-1].copy().astype("int64")
         self.prk_timesteps = None
         self.plms_timesteps = None
         self.timesteps = None
 
-    def set_timesteps(self, num_inference_steps: int,
-                      **kwargs) -> paddle.Tensor:
+    def set_timesteps(self, num_inference_steps: int) -> paddle.Tensor:
         """
         Sets the discrete timesteps used for the diffusion chain. Supporting function to be run before inference.
 
@@ -166,12 +158,6 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
             num_inference_steps (`int`):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
-        deprecated_offset = deprecate(
-            "offset",
-            "0.7.0",
-            "Please pass `steps_offset` to `__init__` instead.",
-            take_from=kwargs)
-        offset = deprecated_offset or self.config.steps_offset
 
         self.num_inference_steps = num_inference_steps
         step_ratio = self.config.num_train_timesteps // self.num_inference_steps
@@ -179,7 +165,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         # casting to int to avoid issues when num_inference_step is power of 3
         self._timesteps = (np.arange(0, num_inference_steps) *
                            step_ratio).round()
-        self._timesteps += offset
+        self._timesteps += self.config.steps_offset
 
         if self.config.skip_prk_steps:
             # for some models like stable diffusion the prk steps can/should be skipped to
@@ -341,6 +327,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         prev_timestep = timestep - self.config.num_train_timesteps // self.num_inference_steps
 
         if self.counter != 1:
+            self.ets = self.ets[-3:]
             self.ets.append(model_output)
         else:
             prev_timestep = timestep

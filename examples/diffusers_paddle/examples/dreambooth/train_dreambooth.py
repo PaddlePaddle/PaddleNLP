@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import argparse
+import hashlib
 import math
 import os
 import paddle
@@ -26,7 +27,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.trainer import set_seed
 from diffusers_paddle import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
 from diffusers_paddle.optimization import get_scheduler
-from diffusers_paddle.modeling_utils import unwrap_model
+from diffusers_paddle.modeling_utils import unwrap_model, freeze_params
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
 from PIL import Image
@@ -122,6 +123,9 @@ def parse_args():
         "--center_crop",
         action="store_true",
         help="Whether to center crop images before resizing to resolution")
+    parser.add_argument("--train_text_encoder",
+                        action="store_true",
+                        help="Whether to train the text encoder")
     parser.add_argument(
         "--train_batch_size",
         type=int,
@@ -365,7 +369,7 @@ def main():
 
             if cur_class_images < args.num_class_images:
                 pipeline = StableDiffusionPipeline.from_pretrained(
-                    args.pretrained_model_name_or_path)
+                    args.pretrained_model_name_or_path, safety_checker=None)
                 pipeline.set_progress_bar_config(disable=True)
 
                 num_new_images = args.num_class_images - cur_class_images
@@ -384,10 +388,9 @@ def main():
                     images = pipeline(example["prompt"]).images
 
                     for i, image in enumerate(images):
-                        image.save(
-                            class_images_dir /
-                            f"{example['index'][i].item() + cur_class_images}.jpg"
-                        )
+                        hash_image = hashlib.sha1(image.tobytes()).hexdigest()
+                        image_filename = class_images_dir / f"{example['index'][i] + cur_class_images}-{hash_image}.jpg"
+                        image.save(image_filename)
 
                 del pipeline
                 if paddle.device.is_compiled_with_cuda():
@@ -408,6 +411,9 @@ def main():
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
+    freeze_params(vae.paramaters())
+    if not args.train_text_encoder:
+        freeze_params(text_encoder.paramaters())
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="unet")
 
@@ -429,9 +435,15 @@ def main():
     )
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
+        if args.train_text_encoder:
+            text_encoder = paddle.DataParallel(text_encoder)
+
+    params_to_optimize = (itertools.chain(unet.parameters(),
+                                          text_encoder.parameters())
+                          if args.train_text_encoder else unet.parameters())
 
     optimizer = AdamW(learning_rate=lr_scheduler,
-                      parameters=unet.parameters(),
+                      parameters=params_to_optimize,
                       beta1=args.adam_beta1,
                       beta2=args.adam_beta2,
                       weight_decay=args.adam_weight_decay,
@@ -538,26 +550,24 @@ def main():
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
-            with paddle.no_grad():
-                # Convert images to latent space
-                latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-                latents = latents * 0.18215
+            # Convert images to latent space
+            latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
+            latents = latents * 0.18215
 
-                # Sample noise that we'll add to the latents
-                noise = paddle.randn(latents.shape)
-                batch_size = latents.shape[0]
-                # Sample a random timestep for each image
-                timesteps = paddle.randint(
-                    0, noise_scheduler.config.num_train_timesteps,
-                    (batch_size, )).astype("int64")
+            # Sample noise that we'll add to the latents
+            noise = paddle.randn(latents.shape)
+            batch_size = latents.shape[0]
+            # Sample a random timestep for each image
+            timesteps = paddle.randint(
+                0, noise_scheduler.config.num_train_timesteps,
+                (batch_size, )).astype("int64")
 
-                # Add noise to the latents according to the noise magnitude at each timestep
-                # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(
-                    latents, noise, timesteps)
+            # Add noise to the latents according to the noise magnitude at each timestep
+            # (this is the forward diffusion process)
+            noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-                # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+            # Get the text embedding for conditioning
+            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
 
             if num_processes > 1 and (args.gradient_checkpointing or (
                 (step + 1) % args.gradient_accumulation_steps != 0)):
@@ -632,6 +642,7 @@ def main():
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unwrap_model(unet),
+            text_encoder=unwrap_model(text_encoder),
             safety_checker=None,
         )
         pipeline.save_pretrained(args.output_dir)

@@ -27,6 +27,7 @@ from .scheduling_utils import SchedulerMixin
 
 
 @dataclass
+# Copied from diffusers_paddle.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->LMSDiscrete
 class LMSDiscreteSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -75,14 +76,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
         trained_betas: Optional[np.ndarray] = None,
-        **kwargs,
     ):
-        deprecate(
-            "tensor_format",
-            "0.6.0",
-            "If you're running your code in Paddle, you can safely remove this argument.",
-            take_from=kwargs,
-        )
 
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
@@ -224,7 +218,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         if (isinstance(timestep, int) or isinstance(timestep, paddle.Tensor)):
             deprecate(
                 "timestep as an index",
-                "0.7.0",
+                "0.8.0",
                 "Passing integer indices (e.g. from `enumerate(timesteps)`) as timesteps to"
                 " `LMSDiscreteScheduler.step()` will not be supported in future versions. Make sure to pass"
                 " one of the `scheduler.timesteps` as a timestep.",
@@ -276,7 +270,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         if isinstance(timesteps, paddle.Tensor):
             deprecate(
                 "timesteps as indices",
-                "0.7.0",
+                "0.8.0",
                 "Passing integer indices  (e.g. from `enumerate(timesteps)`) as timesteps to"
                 " `LMSDiscreteScheduler.add_noise()` will not be supported in future versions. Make sure to"
                 " pass values from `scheduler.timesteps` as timesteps.",

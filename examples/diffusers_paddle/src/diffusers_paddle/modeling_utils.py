@@ -29,6 +29,11 @@ from .utils import CONFIG_NAME, DIFFUSERS_PADDLE_CACHE, DOWNLOAD_SERVER, WEIGHTS
 logger = logging.get_logger(__name__)
 
 
+def freeze_params(params):
+    for param in params:
+        param.stop_gradient = True
+
+
 # device
 def get_parameter_device(parameter: nn.Layer):
     try:

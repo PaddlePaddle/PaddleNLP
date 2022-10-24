@@ -24,7 +24,7 @@ from .utils import (
     is_unidecode_available,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 from .configuration_utils import ConfigMixin
 from .onnx_utils import OnnxRuntimeModel
@@ -65,12 +65,17 @@ if is_paddle_available() and is_paddlenlp_available():
     from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
                             StableDiffusionImg2ImgPipeline,
                             StableDiffusionInpaintPipeline,
+                            StableDiffusionInpaintPipelineLegacy,
                             StableDiffusionPipeline,
                             StableDiffusionPipelineAllinOne)
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
-    from .pipelines import StableDiffusionOnnxPipeline
+    from .pipelines import (
+        OnnxStableDiffusionImg2ImgPipeline,
+        OnnxStableDiffusionInpaintPipeline,
+        OnnxStableDiffusionPipeline,
+    )
 else:
     from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403

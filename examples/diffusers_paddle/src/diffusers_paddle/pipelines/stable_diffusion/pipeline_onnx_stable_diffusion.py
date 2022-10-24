@@ -29,7 +29,7 @@ from . import StableDiffusionPipelineOutput
 logger = logging.get_logger(__name__)
 
 
-class StableDiffusionOnnxPipeline(DiffusionPipeline):
+class OnnxStableDiffusionPipeline(DiffusionPipeline):
     vae_decoder: OnnxRuntimeModel
     text_encoder: OnnxRuntimeModel
     tokenizer: CLIPTokenizer
@@ -40,6 +40,7 @@ class StableDiffusionOnnxPipeline(DiffusionPipeline):
 
     def __init__(
         self,
+        vae_encoder: OnnxRuntimeModel,
         vae_decoder: OnnxRuntimeModel,
         text_encoder: OnnxRuntimeModel,
         tokenizer: CLIPTokenizer,
@@ -50,6 +51,7 @@ class StableDiffusionOnnxPipeline(DiffusionPipeline):
     ):
         super().__init__()
         self.register_modules(
+            vae_encoder=vae_encoder,
             vae_decoder=vae_decoder,
             text_encoder=text_encoder,
             tokenizer=tokenizer,

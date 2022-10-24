@@ -24,7 +24,7 @@ import paddle
 import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput, deprecate
+from ..utils import BaseOutput
 from .scheduling_utils import SchedulerMixin
 
 
@@ -114,14 +114,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         trained_betas: Optional[np.ndarray] = None,
         variance_type: str = "fixed_small",
         clip_sample: bool = True,
-        **kwargs,
     ):
-        deprecate(
-            "tensor_format",
-            "0.6.0",
-            "If you're running your code in Paddle, you can safely remove this argument.",
-            take_from=kwargs,
-        )
 
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
@@ -157,7 +150,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         # setable values
         self.num_inference_steps = None
         self.timesteps = paddle.to_tensor(
-            np.arange(0, num_train_timesteps)[::-1].copy())
+            np.arange(0, num_train_timesteps)[::-1].copy().astype("int64"))
 
         self.variance_type = variance_type
 

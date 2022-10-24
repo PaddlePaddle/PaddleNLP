@@ -30,7 +30,12 @@ if is_paddle_available() and is_paddlenlp_available():
     from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
                                    StableDiffusionInpaintPipeline,
                                    StableDiffusionPipeline,
+                                   StableDiffusionInpaintPipelineLegacy,
                                    StableDiffusionPipelineAllinOne)
 
 if is_paddlenlp_available() and is_onnx_available():
-    from .stable_diffusion import StableDiffusionOnnxPipeline
+    from .stable_diffusion import (
+        OnnxStableDiffusionImg2ImgPipeline,
+        OnnxStableDiffusionInpaintPipeline,
+        OnnxStableDiffusionPipeline,
+    )
