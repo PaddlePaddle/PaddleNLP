@@ -19,16 +19,25 @@ from typing import List, Optional, Union
 
 import paddle
 import numpy as np
+import PIL.Image
 from PIL import Image
 
-from ..feature_extraction_utils import BatchFeature
+from ..feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from ..tokenizer_utils_base import TensorType
 from ..image_utils import ImageFeatureExtractionMixin
+
+from ...utils.tools import compare_version
+
+if compare_version(PIL.__version__, "9.1.0") >= 0:
+    Resampling = PIL.Image.Resampling
+else:
+    Resampling = PIL.Image
 
 __all__ = ["ErnieViLFeatureExtractor"]
 
 
-class ErnieViLFeatureExtractor(ImageFeatureExtractionMixin):
+class ErnieViLFeatureExtractor(FeatureExtractionMixin,
+                               ImageFeatureExtractionMixin):
     r"""
     Constructs a ErnieViL feature extractor.
     This feature extractor inherits from [`ImageFeatureExtractionMixin`] which contains most of the main methods. Users
@@ -38,10 +47,10 @@ class ErnieViLFeatureExtractor(ImageFeatureExtractionMixin):
             Whether to resize the input to a certain `size`.
         size (`int`, *optional*, defaults to 224):
             Resize the input to the given size. Only has an effect if `do_resize` is set to `True`.
-        resample (`int`, *optional*, defaults to `PIL.Image.BICUBIC`):
-            An optional resampling filter. This can be one of `PIL.Image.NEAREST`, `PIL.Image.BOX`,
-            `PIL.Image.BILINEAR`, `PIL.Image.HAMMING`, `PIL.Image.BICUBIC` or `PIL.Image.LANCZOS`. Only has an effect
-            if `do_resize` is set to `True`.
+        resample (`int`, *optional*, defaults to `PIL.Image.[Resampling.]BICUBIC`):
+            An optional resampling filter. This can be one of `PIL.Image.[Resampling.]NEAREST`, `PIL.Image.[Resampling.]BOX`,
+            `PIL.Image.[Resampling.]BILINEAR`, `PIL.Image.[Resampling.]HAMMING`, `PIL.Image.[Resampling.]BICUBIC` or 
+            `PIL.Image.[Resampling.]LANCZOS`. Only has an effect if `do_resize` is set to `True`.
         do_center_crop (`bool`, *optional*, defaults to `True`):
             Whether to crop the input at the center. If the input size is smaller than `crop_size` along any edge, the
             image is padded with 0's and then center cropped.
@@ -58,11 +67,17 @@ class ErnieViLFeatureExtractor(ImageFeatureExtractionMixin):
     """
 
     model_input_names = ["pixel_values"]
+    pretrained_feature_extractor_file = {
+        "ernie_vil-2.0-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/ernie_vil-2.0-base-zh/preprocessor_config.json",
+        "disco_diffusion_ernie_vil-2.0-base-zh":
+        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/disco_diffusion_ernie_vil-2.0-base-zh/preprocessor_config.json",
+    }
 
     def __init__(self,
                  do_resize=True,
                  size=224,
-                 resample=Image.BICUBIC,
+                 resample=Resampling.BICUBIC,
                  do_center_crop=True,
                  crop_size=224,
                  do_normalize=True,

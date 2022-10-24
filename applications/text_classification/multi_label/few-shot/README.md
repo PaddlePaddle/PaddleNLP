@@ -2,17 +2,18 @@
 
 ## 目录
 
-  * [1. 项目说明](1.项目说明)
-  * [2. 效果展示](2.效果展示)
-  * [3. 定制训练](3.定制训练)
-    * [3.1 运行环境](3.1运行环境)
-    * [3.2 代码结构](3.2代码结构)
-    * [3.3 数据标注](3.3数据标注)
-    * [3.4 模型训练](3.4模型训练)
-    * [3.5 模型评估](3.5模型评估)
-    * [3.6 模型部署](3.6模型部署)
-  * [4. References](4.References)
+- [1. 项目说明](#项目说明)
+- [2. 效果展示](#效果展示)
+- [3. 定制训练](#定制训练)
+  - [3.1 运行环境](#运行环境)
+  - [3.2 代码结构](#代码结构)
+  - [3.3 数据标注](#数据标注)
+  - [3.4 模型训练](#模型训练)
+  - [3.5 模型评估](#模型评估)
+  - [3.6 模型部署](#模型部署)
+- [4. References](#References)
 
+<a name="项目说明"></a>
 ## 1. 项目说明
 
 本项目提供了小样本场景下文本多标签分类的解决方案，在 ERNIE3.0 的基础上利用提示学习取得比微调更好的分类效果，充分利用标注信息。
@@ -46,6 +47,7 @@
 - **标注成本低**：以往的微调方式需要大量的数据标注才能保证模型分类效果。提示学习可以降低数据标注依赖，在小样本（few-shot）的场景下取得比微调更好的分类效果。
 - **全流程打通**：提供了从训练到部署的完整解决方案，可以低成本迁移至实际应用场景。
 
+<a name="效果展示"></a>
 ## 2.效果展示
 
 本项目中使用了 ERNIE3.0 模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们测评了 Base 模型在婚姻家庭要素提取任务上的表现。测试配置如下：
@@ -96,18 +98,20 @@
    | ernie-3.0-base-zh | 微调学习 | 0.7419 | 0.5105 |
    | ernie-3.0-base-zh | 提示学习 | 0.7838 | 0.6985 |
 
-
+<a name="定制训练"></a>
 ## 3.定制训练
 
 下边通过婚姻家庭要素提取的例子展示如何使用小样本学习来进行文本分类。
 
+<a name="运行环境"></a>
 ### 3.1 运行环境
 
 - python >= 3.6
-- paddlepaddle >= 2.3
+- paddlepaddle > 2.3（2.4版本发布前推荐安装[develop版本](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html)）
 - paddlenlp >= 2.3.5
 - paddle2onnx >= 1.0.0rc3
 
+<a name="代码结构"></a>
 ### 3.2 代码结构
 
 ```text
@@ -118,6 +122,7 @@
 └── README.md
 ```
 
+<a name="数据标注"></a>
 ### 3.3 数据标注
 
 我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano)进行自定义数据标注，本项目也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](../../doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考[doccano数据标注指南](../../doccano.md)。
@@ -198,6 +203,7 @@ data/
 ...
 ```
 
+<a name="模型训练"></a>
 ### 3.4 模型训练
 
 **单卡训练**
@@ -252,7 +258,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 
 可配置参数说明：
 - `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-base-zh`。
-- `data_dir`: 训练数据集路径，数据格式要求详见[数据准备](数据准备)。
+- `data_dir`: 训练数据集路径，数据格式要求详见[数据标注](#数据标注)。
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `prompt`: 提示模板。定义了如何将文本和提示拼接结合。
 - `soft_encoder`: 提示向量的编码器，`lstm`表示双向LSTM, `mlp`表示双层线性层, None表示直接使用提示向量。默认为`lstm`。
@@ -277,8 +283,9 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `evaluation_strategy`: 模型评估的间隔策略。若为`epoch`，则每轮训练结束后评估模型。
 - `save_strategy`: 模型保存的间隔策略。若为`epoch`，则每轮训练结束后保存当前模型参数。
 
-更多参数介绍可参考[配置文件](../../../../paddlenlp/trainer/trainer_args.py)。
+更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
+<a name="模型评估"></a>
 ### 3.5 模型评估
 
 在模型训练时开启`--do_predict`，训练结束后直接在测试集上`test.txt`进行评估，也可以在训练结束后，通过运行以下命令加载模型参数进行评估：
@@ -294,6 +301,7 @@ python train.py --do_predict --data_dir ./data --output_dir ./predict_checkpoint
 - `do_predict`: 是否进行测试集评估。
 - `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 
+<a name="模型部署"></a>
 ### 3.6 模型部署
 
 #### 模型导出
@@ -355,6 +363,7 @@ python infer.py --model_path_prefix checkpoints/export/model --data_dir ./data -
 
 **Note**: 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。
 
+<a name="References"></a>
 ## 4. References
 
 - Liu, Xiao, et al. "GPT understands, too." arXiv preprint arXiv:2103.10385 (2021). [[PDF]](https://arxiv.org/abs/2103.10385)

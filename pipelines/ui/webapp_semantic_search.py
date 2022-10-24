@@ -197,6 +197,9 @@ def main():
                 markdown(context),
                 unsafe_allow_html=True,
             )
+            # Sqlalchemy Support storing list type data by adding value semicolon, so split str data into separate files
+            if (type(result['images']) == str):
+                result['images'] = result['images'].split(';')
             for image_path in result['images']:
                 image_url = pipelines_files(image_path)
                 st.image(

@@ -198,10 +198,9 @@ class MultiHeadAttention(nn.Layer):
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
                                                cache)
         # scale dot product attention
-        product = layers.matmul(x=q,
+        product = paddle.matmul(x=q * (self.head_dim**-0.5),
                                 y=k,
-                                transpose_y=True,
-                                alpha=self.head_dim**-0.5)
+                                transpose_y=True)
 
         if attn_mask is not None:
             product = product + attn_mask
@@ -833,16 +832,16 @@ class GPTModel(GPTPretrainedModel):
             length = length + cache_length
         else:
             cache_length = 0
-        casual_mask = self.bias[:, :, cache_length:length, :length]
+        causal_mask = self.bias[:, :, cache_length:length, :length]
 
         if attention_mask is not None:
             if attention_mask.dtype != paddle.int64:
                 attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & casual_mask)) * -1e4
+            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
         else:
-            attention_mask = (1.0 - casual_mask) * -1e4
+            attention_mask = (1.0 - causal_mask) * -1e4
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -1182,7 +1181,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None and len(attention_mask.shape) == 4:
+        if attention_mask is not None and attention_mask.ndim == 4:
             attention_mask = attention_mask[:, -1:, -1:, :]
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)

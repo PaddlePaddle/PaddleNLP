@@ -178,9 +178,12 @@ class MultiLabelPredictor(object):
         text = [InputExample(text_a=x) for x in input_data]
         inputs = [self._template.wrap_one_example(x) for x in text]
         inputs = {
-            "input_ids": np.array([x["input_ids"] for x in inputs]),
-            "mask_ids": np.array([x["mask_ids"] for x in inputs]),
-            "soft_token_ids": np.array([x["soft_token_ids"] for x in inputs])
+            "input_ids":
+            np.array([x["input_ids"] for x in inputs], dtype="int64"),
+            "mask_ids":
+            np.array([x["mask_ids"] for x in inputs], dtype="int64"),
+            "soft_token_ids":
+            np.array([x["soft_token_ids"] for x in inputs], dtype="int64")
         }
         return inputs
 

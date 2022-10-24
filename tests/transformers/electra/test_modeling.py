@@ -133,6 +133,60 @@ class ElectraModelTester:
             result[0].shape,
             [self.batch_size, self.seq_length, self.hidden_size])
 
+    def create_and_check_electra_model_cache(self, config, input_ids,
+                                             token_type_ids, input_mask,
+                                             sequence_labels, token_labels,
+                                             choice_labels):
+        model = ElectraModel(**config)
+        model.eval()
+
+        input_ids = ids_tensor((self.batch_size, self.seq_length),
+                               self.vocab_size)
+        input_token_types = ids_tensor([self.batch_size, self.seq_length],
+                                       self.type_vocab_size)
+
+        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
+        embed_size_per_head = self.hidden_size // self.num_attention_heads
+        key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
+                                    self.seq_length, embed_size_per_head))
+        values_tensor = floats_tensor(
+            (self.batch_size, self.num_attention_heads, self.seq_length,
+             embed_size_per_head))
+        past_key_values = ((
+            key_tensor,
+            values_tensor,
+        ), ) * self.num_hidden_layers
+
+        # create fully-visible attention mask for input_ids only and input_ids + past
+        attention_mask = paddle.ones([self.batch_size, self.seq_length])
+        attention_mask_with_past = paddle.ones(
+            [self.batch_size, self.seq_length * 2])
+
+        outputs_with_cache = model(input_ids,
+                                   token_type_ids=input_token_types,
+                                   attention_mask=attention_mask_with_past,
+                                   past_key_values=past_key_values,
+                                   return_dict=self.parent.return_dict)
+        outputs_without_cache = model(input_ids,
+                                      token_type_ids=input_token_types,
+                                      attention_mask=attention_mask,
+                                      return_dict=self.parent.return_dict)
+
+        # last_hidden_state should have the same shape but different values when given past_key_values
+        if self.parent.return_dict:
+            self.parent.assertEqual(
+                outputs_with_cache.last_hidden_state.shape,
+                outputs_without_cache.last_hidden_state.shape)
+            self.parent.assertFalse(
+                paddle.allclose(outputs_with_cache.last_hidden_state,
+                                outputs_without_cache.last_hidden_state))
+        else:
+            outputs_with_cache, _ = outputs_with_cache
+            self.parent.assertEqual(outputs_with_cache.shape,
+                                    outputs_without_cache.shape)
+            self.parent.assertFalse(
+                paddle.allclose(outputs_with_cache, outputs_without_cache))
+
     def create_and_check_electra_for_masked_lm(
         self,
         config,
@@ -150,6 +204,8 @@ class ElectraModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -178,6 +234,9 @@ class ElectraModelTester:
                        token_type_ids=token_type_ids,
                        labels=token_labels,
                        return_dict=self.parent.return_dict)
+
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -226,6 +285,8 @@ class ElectraModelTester:
                        token_type_ids=token_type_ids,
                        labels=sequence_labels,
                        return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -253,6 +314,7 @@ class ElectraModelTester:
                        start_positions=sequence_labels,
                        end_positions=sequence_labels,
                        return_dict=self.parent.return_dict)
+
         if token_labels is not None:
             result = result[1:]
 
@@ -285,6 +347,9 @@ class ElectraModelTester:
                        token_type_ids=multiple_choice_token_type_ids,
                        labels=choice_labels,
                        return_dict=self.parent.return_dict)
+
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
 
         if paddle.is_tensor(result):
             result = [result]
@@ -344,6 +409,11 @@ class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
     def test_electra_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_electra_model(*config_and_inputs)
+
+    def test_electra_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_electra_model_cache(
+            *config_and_inputs)
 
     def test_for_masked_lm(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

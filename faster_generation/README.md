@@ -43,25 +43,25 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 - torch version 1.10.0+cu113
 - transformers version 4.12.5
 
-**BART** (bart-base, batch_size=4, max_length=32)
+### **BART** (bart-base, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183384011-0df9a81e-72ac-429e-88da-166d48128b67.png" width="800" height ="400" />
 </p>
 
-**GPT** (gpt2, batch_size=4, max_length=32)
+### **GPT** (gpt2, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183376427-638a7dd1-94b0-4b45-bd52-7c38f12f090f.png" width="800" height ="400" />
 </p>
 
-**OPT** (opt, batch_size=4, max_length=32)
+### **OPT** (opt, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183376428-7e7a0998-803c-4bc3-acf6-971a9471b300.png" width="800" height ="400" />
 </p>
 
-**CodeGen:**
+### **CodeGen:**
 * 环境和超参
 - Platform: Tesla V100-SXM2-32GB
 - CUDA 10.1

@@ -17,13 +17,12 @@ Image/Text processor class for CLIP
 """
 
 from ..tokenizer_utils_base import BatchEncoding
-from .tokenizer import CLIPTokenizer
-from .feature_extraction import CLIPFeatureExtractor
+from ..processing_utils import ProcessorMixin
 
 __all__ = ["CLIPProcessor"]
 
 
-class CLIPProcessor(object):
+class CLIPProcessor(ProcessorMixin):
     r"""
     Constructs a CLIP processor which wraps a CLIP feature extractor and a CLIP tokenizer into a single processor.
     [`CLIPProcessor`] offers all the functionalities of [`CLIPFeatureExtractor`] and [`CLIPTokenizer`]. See the
@@ -34,11 +33,12 @@ class CLIPProcessor(object):
         tokenizer ([`CLIPTokenizer`]):
             The tokenizer is a required input.
     """
+    feature_extractor_class = "CLIPFeatureExtractor"
+    tokenizer_class = "CLIPTokenizer"
 
     def __init__(self, feature_extractor, tokenizer):
-        super().__init__()
-        self.tokenizer = tokenizer
-        self.feature_extractor = feature_extractor
+        super().__init__(feature_extractor, tokenizer)
+        self.current_processor = self.feature_extractor
 
     def __call__(self, text=None, images=None, return_tensors=None, **kwargs):
         """
@@ -105,15 +105,3 @@ class CLIPProcessor(object):
         the docstring of this method for more information.
         """
         return self.tokenizer.decode(*args, **kwargs)
-
-    # TODO junnyu find a better way from_pretrained and save_pretrained
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path,
-                                                  *args, **kwargs)
-        feature_extractor = CLIPFeatureExtractor()
-        return cls(feature_extractor, tokenizer)
-
-    def save_pretrained(self, save_directory, filename_prefix=None, **kwargs):
-        return self.tokenizer.save_pretrained(save_directory, filename_prefix,
-                                              **kwargs)
