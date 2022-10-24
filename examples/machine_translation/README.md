@@ -11,6 +11,7 @@
 * attrdict
 * pyyaml
 * subword_nmt
+* sacreBLEU
 * fastBPE (可选，若不使用 preprocessor.py 的 bpe 分词功能可以不需要)
 
 ### 数据准备

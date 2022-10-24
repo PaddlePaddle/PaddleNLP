@@ -197,7 +197,8 @@ def do_train(args):
                                    weight_sharing=args.weight_sharing,
                                    bos_id=args.bos_idx,
                                    eos_id=args.eos_idx,
-                                   pad_id=args.pad_idx)
+                                   pad_id=args.pad_idx,
+                                   normalize_before=args.normalize_before)
 
     transformer = apply_to_static(args, transformer)
 

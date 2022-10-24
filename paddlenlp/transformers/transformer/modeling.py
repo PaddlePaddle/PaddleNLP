@@ -19,10 +19,14 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.layers.utils import map_structure
 
+from paddle.nn import (TransformerEncoder, TransformerDecoder,
+                       TransformerEncoderLayer, TransformerDecoderLayer)
+
 __all__ = [
     "position_encoding_init", "WordEmbedding", "PositionalEmbedding",
     "CrossEntropyCriterion", "TransformerDecodeCell",
-    "TransformerBeamSearchDecoder", "TransformerModel", "InferTransformerModel"
+    "TransformerBeamSearchDecoder", "TransformerModel", "InferTransformerModel",
+    "LabelSmoothedCrossEntropyCriterion"
 ]
 
 
@@ -286,6 +290,60 @@ class CrossEntropyCriterion(nn.Layer):
         token_num.stop_gradient = True
         avg_cost = sum_cost / token_num
         return sum_cost, avg_cost, token_num
+
+
+def label_smoothed_nll_loss(lprobs,
+                            target,
+                            epsilon,
+                            ignore_index=None,
+                            reduce=True):
+    if target.dim() == lprobs.dim() - 1:
+        target = target.unsqueeze(-1)
+
+    num_tokens = paddle.shape(lprobs)[0]
+    index = paddle.arange(0, num_tokens, dtype="int64").unsqueeze(-1)
+    index = paddle.concat([index, target], axis=-1)
+    index.stop_gradient = True
+
+    log_probs = -lprobs
+
+    nll_loss = paddle.gather_nd(log_probs, index=index).unsqueeze(-1)
+    smooth_loss = log_probs.sum(axis=-1, keepdim=True)
+
+    pad_mask = paddle.cast(target != ignore_index,
+                           dtype=paddle.get_default_dtype())
+    nll_loss = nll_loss * pad_mask
+    smooth_loss = smooth_loss * pad_mask
+    if reduce:
+        nll_loss = nll_loss.sum()
+        smooth_loss = smooth_loss.sum()
+    eps_i = epsilon / (lprobs.shape[-1] - 1)
+    loss = (1.0 - epsilon - eps_i) * nll_loss + eps_i * smooth_loss
+    token_num = paddle.sum(pad_mask)
+    return loss, loss / token_num, token_num
+
+
+class LabelSmoothedCrossEntropyCriterion(nn.Layer):
+
+    def __init__(self, label_smoothing, padding_idx=0):
+        super().__init__()
+        self.eps = label_smoothing
+        self.padding_idx = padding_idx
+
+    def forward(self, predict, label, reduce=True):
+        return self.compute_loss(predict, label, reduce=reduce)
+
+    def get_lprobs_and_target(self, predict, label):
+        lprobs = paddle.nn.functional.log_softmax(predict, axis=-1)
+        return lprobs.reshape([-1, lprobs.shape[-1]]), label.reshape([-1])
+
+    def compute_loss(self, predict, label, reduce=True):
+        lprobs, label = self.get_lprobs_and_target(predict, label)
+        return label_smoothed_nll_loss(lprobs,
+                                       label,
+                                       self.eps,
+                                       ignore_index=self.padding_idx,
+                                       reduce=reduce)
 
 
 class TransformerDecodeCell(nn.Layer):
@@ -675,6 +733,8 @@ class TransformerModel(nn.Layer):
             The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         activation (str, optional):
             The activation used in FFN. Defaults to "relu".
+        normalize_before (bool, optional):
+            Whether to apply pre-normalization. Defaults to True.
     """
 
     def __init__(self,
@@ -693,7 +753,8 @@ class TransformerModel(nn.Layer):
                  bos_id=0,
                  eos_id=1,
                  pad_id=None,
-                 activation="relu"):
+                 activation="relu",
+                 normalize_before=True):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
@@ -720,6 +781,31 @@ class TransformerModel(nn.Layer):
             self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
                                                          max_length=max_length)
 
+        if not normalize_before:
+            encoder_layer = TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=n_head,
+                dim_feedforward=d_inner_hid,
+                dropout=dropout,
+                activation=activation,
+                attn_dropout=attn_dropout,
+                act_dropout=act_dropout,
+                normalize_before=normalize_before)
+            encoder_with_post_norm = TransformerEncoder(encoder_layer,
+                                                        num_encoder_layers)
+
+            decoder_layer = TransformerDecoderLayer(
+                d_model=d_model,
+                nhead=n_head,
+                dim_feedforward=d_inner_hid,
+                dropout=dropout,
+                activation=activation,
+                attn_dropout=attn_dropout,
+                act_dropout=act_dropout,
+                normalize_before=normalize_before)
+            decoder_with_post_norm = TransformerDecoder(decoder_layer,
+                                                        num_decoder_layers)
+
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
             nhead=n_head,
@@ -730,7 +816,9 @@ class TransformerModel(nn.Layer):
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
             activation=activation,
-            normalize_before=True)
+            normalize_before=normalize_before,
+            custom_encoder=None if normalize_before else encoder_with_post_norm,
+            custom_decoder=None if normalize_before else decoder_with_post_norm)
 
         if weight_sharing:
             self.linear = lambda x: paddle.matmul(x=x,
@@ -887,6 +975,8 @@ class InferTransformerModel(TransformerModel):
             penalty. Default to `v1`.
         activation (str, optional):
             The activation used in FFN. Defaults to "relu".
+        normalize_before (bool, optional):
+            Whether to apply pre-normalization. Defaults to True.
         kwargs:
             The key word arguments can be `rel_len` and `alpha`:
 
@@ -921,6 +1011,7 @@ class InferTransformerModel(TransformerModel):
                  output_time_major=False,
                  beam_search_version='v1',
                  activation="relu",
+                 normalize_before=True,
                  **kwargs):
         args = dict(locals())
         args.pop("self")
