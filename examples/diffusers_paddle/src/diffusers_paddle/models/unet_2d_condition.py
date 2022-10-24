@@ -251,7 +251,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         timestep: Union[paddle.Tensor, float, int],
         encoder_hidden_states: paddle.Tensor,
         return_dict: bool = True,
-    ) -> Union[UNet2DConditionOutput, Tuple]:
+    ):
         r"""
         Args:
             sample (`paddle.Tensor`): (batch, channel, height, width) noisy inputs tensor

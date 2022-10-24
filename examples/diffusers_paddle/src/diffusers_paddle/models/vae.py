@@ -495,9 +495,7 @@ class VQModel(ModelMixin, ConfigMixin):
             norm_num_groups=norm_num_groups,
         )
 
-    def encode(self,
-               x: paddle.Tensor,
-               return_dict: bool = True) -> VQEncoderOutput:
+    def encode(self, x: paddle.Tensor, return_dict: bool = True):
         h = self.encoder(x)
         h = self.quant_conv(h)
 
@@ -509,7 +507,7 @@ class VQModel(ModelMixin, ConfigMixin):
     def decode(self,
                h: paddle.Tensor,
                force_not_quantize: bool = False,
-               return_dict: bool = True) -> Union[DecoderOutput, paddle.Tensor]:
+               return_dict: bool = True):
         # also go through quantization layer
         if not force_not_quantize:
             quant, emb_loss, info = self.quantize(h)
@@ -523,10 +521,7 @@ class VQModel(ModelMixin, ConfigMixin):
 
         return DecoderOutput(sample=dec)
 
-    def forward(
-            self,
-            sample: paddle.Tensor,
-            return_dict: bool = True) -> Union[DecoderOutput, paddle.Tensor]:
+    def forward(self, sample: paddle.Tensor, return_dict: bool = True):
         r"""
         Args:
             sample (`paddle.Tensor`): Input sample.
@@ -606,9 +601,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         self.quant_conv = nn.Conv2D(2 * latent_channels, 2 * latent_channels, 1)
         self.post_quant_conv = nn.Conv2D(latent_channels, latent_channels, 1)
 
-    def encode(self,
-               x: paddle.Tensor,
-               return_dict: bool = True) -> AutoencoderKLOutput:
+    def encode(self, x: paddle.Tensor, return_dict: bool = True):
         h = self.encoder(x)
         moments = self.quant_conv(h)
         posterior = DiagonalGaussianDistribution(moments)
@@ -618,9 +611,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
 
         return AutoencoderKLOutput(latent_dist=posterior)
 
-    def decode(self,
-               z: paddle.Tensor,
-               return_dict: bool = True) -> Union[DecoderOutput, paddle.Tensor]:
+    def decode(self, z: paddle.Tensor, return_dict: bool = True):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)
 
@@ -634,7 +625,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         sample: paddle.Tensor,
         sample_posterior: bool = False,
         return_dict: bool = True,
-    ) -> Union[DecoderOutput, paddle.Tensor]:
+    ):
         r"""
         Args:
             sample (`paddle.Tensor`): Input sample.

@@ -62,13 +62,11 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipelines import (
-        LDMBertModel,
-        LDMTextToImagePipeline,
-        StableDiffusionImg2ImgPipeline,
-        StableDiffusionInpaintPipeline,
-        StableDiffusionPipeline,
-    )
+    from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
+                            StableDiffusionImg2ImgPipeline,
+                            StableDiffusionInpaintPipeline,
+                            StableDiffusionPipeline,
+                            StableDiffusionPipelineAllinOne)
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 

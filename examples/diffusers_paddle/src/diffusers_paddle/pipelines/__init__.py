@@ -27,11 +27,10 @@ else:
 
 if is_paddle_available() and is_paddlenlp_available():
     from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel
-    from .stable_diffusion import (
-        StableDiffusionImg2ImgPipeline,
-        StableDiffusionInpaintPipeline,
-        StableDiffusionPipeline,
-    )
+    from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
+                                   StableDiffusionInpaintPipeline,
+                                   StableDiffusionPipeline,
+                                   StableDiffusionPipelineAllinOne)
 
 if is_paddlenlp_available() and is_onnx_available():
     from .stable_diffusion import StableDiffusionOnnxPipeline

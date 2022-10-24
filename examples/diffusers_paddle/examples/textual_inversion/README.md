@@ -15,7 +15,7 @@
 # 进入examples/diffusers_paddle文件夹，安装diffusers_paddle
 pip install -e .
 # 安装其他所需的依赖
-pip install paddlenlp>=2.4.1 ftfy regex Pillow visualdl
+pip install "paddlenlp>=2.4.1" ftfy regex Pillow visualdl
 ```
 
 

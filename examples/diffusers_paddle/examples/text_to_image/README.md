@@ -16,7 +16,7 @@ ___该训练代码是实验性质的。由于这里的代码微调了整个`UNet
 # 进入examples/diffusers_paddle文件夹，安装diffusers_paddle
 pip install -e .
 # 安装其他所需的依赖
-pip install paddlenlp>=2.4.1 ftfy regex Pillow visualdl
+pip install "paddlenlp>=2.4.1" ftfy regex Pillow visualdl
 ```
 
 ### 1.2 Pokemon训练教程
@@ -126,7 +126,34 @@ bash run_multi.sh
 ```
 
 #### 1.2.4 预测生成图片
+
 当训练完成后，模型将自动保存到`output_dir`目录，在上述例子中，我们的模型最终保存到了`sd-pokemon-model`文件夹。我们可以使用`StableDiffusionPipeline`快速加载该模型。
+
+```
+├── run_multi.sh # 4卡训练命令
+├── run_single.sh # 单卡训练命令
+├── train_text_to_image.py # 训练脚本
+├── sd-pokemon-model  # 我们指定的输出文件路径
+    ├── vae # vae权重文件夹
+        ├── model_state.pdparams
+        ├── config.json
+    ├── text_encoder # text_encoder权重文件夹
+        ├── model_config.json
+        ├── model_state.pdparams
+    ├── unet # unet权重文件夹
+        ├── model_state.pdparams
+        ├── config.json
+    ├── scheduler # scheduler文件夹
+        ├── scheduler_config.json
+    ├── feature_extractor # feature_extractor文件夹
+        ├── preprocessor_config.json
+    ├── tokenizer # tokenizer文件夹
+        ├── tokenizer_config.json
+        ├── merges.txt
+        ├── special_tokens_map.json
+        ├── added_tokens.json
+        ├── vocab.json
+```
 
 ```python
 from diffusers_paddle import StableDiffusionPipeline

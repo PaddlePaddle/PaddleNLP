@@ -591,10 +591,10 @@ def main():
                                   encoder_hidden_states).sample
                 loss = F.mse_loss(noise_pred, noise, reduction="mean")
 
-            train_loss += loss.item()
-            if args.gradient_accumulation_steps > 1:
-                loss = loss / args.gradient_accumulation_steps
-            loss.backward()
+                train_loss += loss.item()
+                if args.gradient_accumulation_steps > 1:
+                    loss = loss / args.gradient_accumulation_steps
+                loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
