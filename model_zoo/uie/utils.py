@@ -227,10 +227,14 @@ def reader(data_path, max_seq_len=512):
                 accumulate = 0
                 while True:
                     cur_result_list = []
-
                     for result in result_list:
+                        if result['end'] - result['start'] > max_content_len:
+                            logger.warning(
+                                "result['end'] - result ['start'] exceeds max_content_len, which will result in no valid instance being returned"
+                            )
                         if result['start'] + 1 <= max_content_len < result[
-                                'end']:
+                                'end'] and result['end'] - result[
+                                    'start'] <= max_content_len:
                             max_content_len = result['start']
                             break
 
@@ -334,7 +338,8 @@ def get_relation_type_dict(relation_data):
                 added_list.append(relation_data[i][0])
                 suffix = relation_data[i][0].rsplit("的", 1)[1]
                 suffix = unify_prompt_name(suffix)
-                relation_type_dict[suffix] = relation_data[i][1]
+                relation_type_dict.setdefault(suffix,
+                                              []).append(relation_data[i][1])
     return relation_type_dict
 
 

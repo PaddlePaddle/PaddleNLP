@@ -42,7 +42,7 @@ def parse_args():
     parser.add_argument("--device",
                         default="gpu",
                         type=str,
-                        choices=["gpu", "xpu", "cpu"],
+                        choices=["gpu", "xpu", "cpu", "npu"],
                         help="Device to use during inference. ")
     parser.add_argument("--use_mkl",
                         default=False,
@@ -183,7 +183,9 @@ class Predictor(object):
             if args.device == "gpu":
                 config.enable_use_gpu(100, 0)
             elif args.device == "xpu":
-                config.enable_xpu(100)
+                config.enable_xpu()
+            elif args.device == "npu":
+                config.enable_npu()
             else:
                 # CPU
                 config.disable_gpu()

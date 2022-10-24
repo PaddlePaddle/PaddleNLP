@@ -42,7 +42,8 @@ parser.add_argument("--params_path", default="../checkpoint/", type=str, help="T
 parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--seed", type=int, default=3, help="random seed for initialization")
-parser.add_argument("--rationale_num", type=int, default=3, help="Number of rationales per example.")
+parser.add_argument("--rationale_num_sparse", type=int, default=3, help="Number of rationales per example for sparse data.")
+parser.add_argument("--rationale_num_support", type=int, default=6, help="Number of rationales per example for support data.")
 parser.add_argument("--sparse_num", type=int, default=100, help="Number of sparse data.")
 parser.add_argument("--support_threshold", type=float, default="0.7", help="The threshold to select support data.")
 parser.add_argument("--support_num", type=int, default=100, help="Number of support data.")
@@ -180,7 +181,8 @@ def find_sparse_data():
     # Feature similarity analysis & select sparse data
     analysis_result = []
     for batch in dev_data_loader:
-        analysis_result += feature_sim(batch, sample_num=args.rationale_num)
+        analysis_result += feature_sim(batch,
+                                       sample_num=args.rationale_num_sparse)
     sparse_indexs, sparse_scores, preds = get_sparse_data(
         analysis_result, args.sparse_num)
 
@@ -285,7 +287,8 @@ def find_support_data():
     # Feature similarity analysis
     analysis_result = []
     for batch in sparse_data_loader:
-        analysis_result += feature_sim(batch, sample_num=-1)
+        analysis_result += feature_sim(batch,
+                                       sample_num=args.rationale_num_support)
 
     support_indexs, support_scores = get_support_data(analysis_result,
                                                       args.support_num,

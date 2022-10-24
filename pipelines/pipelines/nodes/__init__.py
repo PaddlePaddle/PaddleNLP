@@ -29,3 +29,5 @@ from pipelines.nodes.preprocessor import BasePreProcessor, PreProcessor
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
 from pipelines.nodes.retriever import BaseRetriever, DensePassageRetriever
+from pipelines.nodes.document import DocOCRProcessor, DocPrompter
+from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator

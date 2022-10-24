@@ -133,6 +133,11 @@ def parse_args():
         help=
         "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
     )
+    parser.add_argument("--device",
+                        default="gpu",
+                        choices=["gpu", "cpu", "xpu", "npu"],
+                        help="Device selected for inference.")
+
     args = parser.parse_args()
     return args
 
@@ -147,6 +152,14 @@ def do_train(args):
     if args.device == "gpu":
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
+    elif args.device == "npu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("npu")
+    elif args.device == "xpu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("xpu")
     else:
         rank = 0
         trainer_count = 1
@@ -402,6 +415,8 @@ if __name__ == "__main__":
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     args.pad_token = ARGS.pad_token
+
+    args.device = ARGS.device
     pprint(args)
 
     do_train(args)

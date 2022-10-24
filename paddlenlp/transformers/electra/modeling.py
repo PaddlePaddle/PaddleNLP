@@ -23,10 +23,11 @@ from paddle.nn import TransformerEncoderLayer, TransformerEncoder
 from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (BaseModelOutput, SequenceClassifierOutput,
-                             TokenClassifierOutput,
+from ..model_outputs import (BaseModelOutputWithPastAndCrossAttentions,
+                             SequenceClassifierOutput, TokenClassifierOutput,
                              QuestionAnsweringModelOutput,
-                             MultipleChoiceModelOutput, MaskedLMOutput)
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             tuple_output)
 
 __all__ = [
     'ElectraModel', 'ElectraPretrainedModel', 'ElectraForTotalPretraining',
@@ -152,9 +153,12 @@ class TransformerEncoderPro(TransformerEncoder):
                              src_mask=src_mask,
                              output_attentions=output_attentions)
             else:
+                cache_wrapper = cache[i] if isinstance(
+                    cache[i], nn.MultiHeadAttention.Cache
+                ) else nn.MultiHeadAttention.Cache(*cache[i])
                 output, new_cache = mod(output,
                                         src_mask=src_mask,
-                                        cache=cache[i],
+                                        cache=cache_wrapper,
                                         output_attentions=output_attentions)
                 new_caches.append(new_cache)
             if output_attentions:
@@ -173,14 +177,13 @@ class TransformerEncoderPro(TransformerEncoder):
         if not return_dict:
             if output_attentions or output_hidden_states:
                 output = (output, all_attentions, all_hidden_states)
-
             return output if cache is None else (output, new_caches)
 
-        return BaseModelOutput(
+        return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=output,
             hidden_states=all_hidden_states,
             attentions=all_attentions,
-        )
+            past_key_values=new_caches)
 
 
 class ElectraEmbeddings(nn.Layer):
@@ -198,11 +201,17 @@ class ElectraEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(embedding_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                past_key_values_length=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
+            if past_key_values_length is not None:
+                position_ids += past_key_values_length
             position_ids.stop_gradient = True
         position_ids = position_ids.astype("int64")
 
@@ -549,6 +558,8 @@ class ElectraModel(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                past_key_values=None,
+                use_cache=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -584,6 +595,17 @@ class ElectraModel(ElectraPretrainedModel):
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                Precomputed key and value hidden states of the attention blocks of each layer. This can be used to speedup
+                auto-regressive decoding for generation tasks or to support use cases such as Prefix-Tuning where vectors are prepended
+                to each attention layer. The length of tuple equals to the number of layers, and each tuple having 2 tensors of shape
+                `(batch_size, num_heads, past_key_values_length, embed_size_per_head)`)
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -612,26 +634,40 @@ class ElectraModel(ElectraPretrainedModel):
                 output = model(**inputs)
 
         '''
+        past_key_values_length = None
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(
                     paddle.get_default_dtype()) * -1e4,
                 axis=[1, 2])
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
         else:
             if attention_mask.ndim == 2:
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            past_key_values_length=past_key_values_length)
 
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 
+        self.encoder._use_cache = use_cache  # To be consistent with HF
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask,
+            cache=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
@@ -816,7 +852,7 @@ class ElectraGenerator(ElectraPretrainedModel):
 
         if not return_dict:
             output = (prediction_scores, ) + generator_sequence_output[1:]
-            return ((loss, ) + output) if loss is not None else output
+            return tuple_output(output, loss)
 
         return MaskedLMOutput(
             loss=loss,
@@ -1072,9 +1108,8 @@ class ElectraForSequenceClassification(ElectraPretrainedModel):
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, ) + sequence_output[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            output = (logits, ) + sequence_output[1:]
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -1186,7 +1221,7 @@ class ElectraForTokenClassification(ElectraPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + sequence_output[1:]
-            return ((loss, ) + output) if loss is not None else output
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -1744,13 +1779,15 @@ class ElectraForMultipleChoice(ElectraPretrainedModel):
             (-1, self.num_choices))  # logits: (bs, num_choice)
 
         loss = None
+        output = (reshaped_logits, ) + sequence_output[1:]
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(reshaped_logits, labels)
+            output = (loss, ) + output
 
         if not return_dict:
             output = (reshaped_logits, ) + sequence_output[1:]
-            return ((loss, ) + output) if loss is not None else output
+            return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(
             loss=loss,
@@ -2117,8 +2154,7 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
             total_loss = (start_loss + end_loss) / 2
         if not return_dict:
             output = (start_logits, end_logits) + sequence_output[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return tuple_output(output, total_loss)
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,

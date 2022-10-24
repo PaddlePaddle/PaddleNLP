@@ -1,4 +1,19 @@
 #!/bin/bash
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 source test_tipc/common_func.sh
 
 # run benchmark sh 
@@ -67,6 +82,12 @@ function set_gpu_id(){
     echo $seq
 }
 
+function get_world_size(){
+    IFS="C"
+    arr=($1) 
+    echo ${arr[1]}
+}
+
 function get_repo_name(){
     IFS=";"
     cur_dir=$(pwd)
@@ -84,12 +105,13 @@ FILENAME=$new_filename
 MODE=$2
 PARAMS=$3
 REST_ARGS=$4
-# bash test_tipc/benchmark_train.sh test_tipc/configs/transformer/base/train_infer_python.txt benchmark_train to_static
+# bash test_tipc/benchmark_train.sh test_tipc/configs/transformer/base/train_infer_python.txt benchmark_train dynamicTostatic_bs64_fp32_DP_N1C1
 
-to_static="d2sF"
+
+to_static=""
 # parse "to_static" options and modify trainer into "to_static_trainer"
-if [ $REST_ARGS = "to_static" ] || [ $PARAMS = "to_static" ] ;then
-   to_static="d2sT"
+if [[ $PARAMS =~ "dynamicTostatic" ]] ;then
+   to_static="d2sT_"
    sed -i 's/trainer:norm_train/trainer:to_static_train/g' $FILENAME
    # clear PARAM contents
    if [ $PARAMS = "to_static" ] ;then
@@ -202,10 +224,10 @@ for batch_size in ${batch_size_list[*]}; do
 
             # NOTE: Only for GPT for now.
             if [[ ${model_name} =~ gpt* ]]; then
-                num_gpu_devices=$[(${#gpu_id}+1)/2]
+                num_gpu_devices=`get_world_size $device_num`
                 sed_norm_train=$norm_train
 
-                global_batch_size=$[$batch_size*$num_gpu_devices]
+                global_batch_size=$(($batch_size*$num_gpu_devices))
                 extra_params="--global_batch_size=$global_batch_size --dp_degree=$num_gpu_devices"
                 sed_norm_train="$sed_norm_train $extra_params"
 
@@ -220,7 +242,7 @@ for batch_size in ${batch_size_list[*]}; do
             if [ ${#gpu_id} -le 1 ];then
                 log_path="$SAVE_LOG/profiling_log"
                 mkdir -p $log_path
-                log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}_profiling"
+                log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}profiling"
                 func_sed_params "$FILENAME" "${line_gpuid}" "0"  # sed used gpu_id 
                 # set profile_option params
                 tmp=`sed -i "${line_profile}s/.*/${profile_option}/" "${FILENAME}"`
@@ -236,8 +258,8 @@ for batch_size in ${batch_size_list[*]}; do
                 speed_log_path="$SAVE_LOG/index"
                 mkdir -p $log_path
                 mkdir -p $speed_log_path
-                log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}_log"
-                speed_log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}_speed"
+                log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}log"
+                speed_log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}speed"
                 func_sed_params "$FILENAME" "${line_profile}" "null"  # sed profile_id as null
                 cmd="bash test_tipc/test_train_inference_python.sh ${FILENAME} benchmark_train > ${log_path}/${log_name} 2>&1 "
                 echo $cmd
@@ -271,8 +293,8 @@ for batch_size in ${batch_size_list[*]}; do
                 speed_log_path="$SAVE_LOG/index"
                 mkdir -p $log_path
                 mkdir -p $speed_log_path
-                log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}_log"
-                speed_log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}_speed"
+                log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}log"
+                speed_log_name="${repo_name}_${model_name}_bs${batch_size}_${precision}_${run_mode}_${device_num}_${to_static}speed"
                 func_sed_params "$FILENAME" "${line_gpuid}" "$gpu_id"  # sed used gpu_id 
                 func_sed_params "$FILENAME" "${line_profile}" "null"  # sed --profile_option as null
                 cmd="bash test_tipc/test_train_inference_python.sh ${FILENAME} benchmark_train > ${log_path}/${log_name} 2>&1 "
