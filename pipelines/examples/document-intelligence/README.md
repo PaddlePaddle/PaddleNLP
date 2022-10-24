@@ -6,6 +6,7 @@
 
 本项目提供了低成本搭建端到端开放文档抽取问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的开放文档抽取问答系统模型(文档OCR预处理模型、文档抽取问答模型)快速搭建一个针对自己业务数据的文档抽取问答系统，并提供基于[Gradio](https://gradio.app/) 的 Web 可视化服务。
 
+![gradio](https://user-images.githubusercontent.com/63761690/197500524-17013358-8d19-43c4-9796-abac1e2d675f.gif)
 
 ## 2. 快速开始
 
@@ -27,11 +28,6 @@ pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simp
 cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
-```
-
-**安装OpenCV：**
-```bash
-pip install opencv-python==4.6.0.66
 ```
 
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
@@ -76,7 +72,7 @@ curl --request POST --url 'http://0.0.0.0:8891/query_documents' -H "Content-Type
 #### 2.3.2 启动 WebUI
 
 ```bash
-python ui/webapp_docprompt_gradio.py
+python ui/webapp_docprompt_gradio.py  --serving_port 8891
 ```
 
 Linux 用户推荐采用 Shell 脚本来启动服务：
