@@ -26,6 +26,7 @@ from pipelines.nodes.retriever import BaseRetriever
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
 from pipelines.pipelines import Pipeline
+from pipelines.nodes.base import BaseComponent
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +264,41 @@ class SemanticSearchPipeline(BaseStandardPipeline):
               by this method under the key "_debug"
         """
         output = self.pipeline.run(query=query, params=params, debug=debug)
+        return output
+
+
+class DocPipeline(BaseStandardPipeline):
+    """
+    Pipeline for document intelligence.
+    """
+
+    def __init__(self, preprocessor: BaseComponent, modelrunner: BaseComponent):
+        """
+        :param preprocessor: file/image preprocessor instance
+        :param modelrunner: document model runner instance
+        """
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=preprocessor,
+                               name="PreProcessor",
+                               inputs=["Query"])
+        self.pipeline.add_node(component=modelrunner,
+                               name="Runner",
+                               inputs=["PreProcessor"])
+
+    def run(self,
+            meta: dict,
+            params: Optional[dict] = None,
+            debug: Optional[bool] = None):
+        """
+        :param query: the query string.
+        :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+              about their execution. By default these include the input parameters
+              they received and the output they generated.
+              All debug information can then be found in the dict returned
+              by this method under the key "_debug"
+        """
+        output = self.pipeline.run(meta=meta, params=params, debug=debug)
         return output
 
 
