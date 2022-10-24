@@ -13,12 +13,20 @@
 # limitations under the License.
 import os
 import setuptools
-import sys
 import io
-import paddlenlp
 
-with open("requirements.txt") as fin:
-    REQUIRED_PACKAGES = fin.read()
+
+def read_requirements_file(filepath):
+    with open(filepath) as fin:
+        requirements = fin.read()
+    return requirements
+
+
+extras = {}
+REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
+extras["tests"] = read_requirements_file("tests/requirements.txt")
+extras["docs"] = read_requirements_file("docs/requirements.txt")
+extras["dev"] = extras["tests"] + extras["docs"]
 
 
 def read(*names, **kwargs):
@@ -51,7 +59,7 @@ def get_package_data_files(package, data, package_dir=None):
 
 setuptools.setup(
     name="paddlenlp",
-    version=paddlenlp.__version__,
+    version="2.4.1.dev",  # modify this for each release
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description=
@@ -75,6 +83,7 @@ setuptools.setup(
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
+    extras_require=extras,
     python_requires='>=3.6',
     classifiers=[
         'Programming Language :: Python :: 3',
