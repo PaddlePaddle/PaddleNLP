@@ -29,6 +29,11 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
 
+**安装OpenCV：**
+```bash
+pip install opencv-python==4.6.0.66
+```
+
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 2.2 一键体验问答系统
