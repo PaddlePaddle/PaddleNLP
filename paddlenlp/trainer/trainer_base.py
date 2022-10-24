@@ -293,7 +293,7 @@ class Trainer:
                         self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
                         # scaler for stage2 and stage3
-                        if paddle.fluid.framework.in_dygraph_mode():
+                        if paddle.framework.in_dygraph_mode():
                             from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
                             self.scaler = GroupShardedScaler(self.scaler)
                         else:
@@ -316,7 +316,7 @@ class Trainer:
                     self.scaler = fleet.distributed_scaler(self.scaler)
                 else:
                     # scaler for stage2 and stage3
-                    if paddle.fluid.framework.in_dygraph_mode():
+                    if paddle.framework.in_dygraph_mode():
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
                         self.scaler = GroupShardedScaler(self.scaler)
                     else:
@@ -1126,7 +1126,7 @@ class Trainer:
                 model = fleet.distributed_model(model)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
-                ###### 3.dp通信组内广播参数，然后用sharding api封装
+                # sync params (broadcast) buffers in dp group
                 if self.args.dp_degree > 1:
                     hcg = fleet.get_hybrid_communicate_group()
                     dp_group = hcg.get_data_parallel_group()

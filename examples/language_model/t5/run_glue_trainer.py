@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -230,7 +230,7 @@ class ModelArguments:
     )
 
 
-class T5Trainer(Trainer):
+class T5GlueTrainer(Trainer):
 
     def __init__(self, do_generation: bool, label2id, **kwargs):
         super().__init__(**kwargs)
@@ -273,18 +273,22 @@ class T5Trainer(Trainer):
                                           skip_special_tokens=True).strip()
 
             if self.label2id:
+                # for classifaction task.
                 label = self.label2id[label]
                 if pred not in self.label2id:
+                    # set to wrong label if the generated text not in the labal set.
                     pred = 0
                     if label == 0:
                         pred = 1
                 else:
                     pred = self.label2id[pred]
             else:
+                # for regression task.
                 label = float(label.replace(" ", ""))
                 try:
                     pred = float(pred.replace(" ", ""))
                 except Exception as e:
+                    # set to zero if the generated text can not convert to float
                     pred = 0.0
 
             all_preds.append(pred)
@@ -376,8 +380,6 @@ def main():
     }): fn(samples)
     data_collator = batchify_fn
 
-    # data_collator = DataCollatorWithPadding(tokenizer, max_length=data_args.max_seq_length)
-
     # Define the metrics of tasks.
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions,
@@ -389,7 +391,7 @@ def main():
 
         return results
 
-    trainer = T5Trainer(
+    trainer = T5GlueTrainer(
         model=model,
         criterion=None,
         args=training_args,

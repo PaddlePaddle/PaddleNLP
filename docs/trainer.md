@@ -404,6 +404,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                             stage3 : parameter + gradient + optimizer  中的参数都切分到不同卡
                             offload ： offload parameters to cpu 部分参数存放到cpu中
                          (`str`,  可选, 默认为 `` 不使用sharding)
+                         注意：当前stage3暂时不可用
 
                         Whether or not to use Paddle Sharding Data Parallel training (in distributed training
                         only). The base option should be `stage1`, `stage2` or `stage3` and you can add
@@ -413,6 +414,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                             stage2 : optimizer state + gradient segmentation
                             stage3 : parameter + gradient + optimizer state segmentation
                             offload ： offload parameters to cpu
+                        NOTICE： stage3 is temporarily unavaliable.
 
   --sharding_degree
                         设置sharding的通信组参数，表示通信组的大小。同一个sharding通信组内的参数，进行sharding，分布到不同卡上。
