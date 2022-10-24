@@ -33,7 +33,7 @@ fitz_tools = fitz.Tools()
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--serving_name', default="0.0.0.0", help="Serving ip.")
-parser.add_argument("--serving_port", default=8891, type=int, help="Serving port.")
+parser.add_argument("--serving_port", default=7860, type=int, help="Serving port.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -271,8 +271,7 @@ with gr.Blocks(css=CSS) as demo:
             prompt = gr.Textbox(
                 label=
                 "Prompt (No restrictions on the setting of prompt. You can type any prompt.)",
-                placeholder=
-                "e.g. What is the total actual and/or obligated expenses of ECG Center?",
+                placeholder="e.g. 校验码是多少?",
                 lines=1,
                 max_lines=1,
             )

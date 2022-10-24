@@ -53,6 +53,7 @@ python examples/document-intelligence/docprompt_example.py --device cpu
 ```bash
 # 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/docprompt.yaml
+export QUERY_PIPELINE_NAME=query_documents
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
@@ -64,7 +65,7 @@ sh examples/document-intelligence/run_docprompt_server.sh
 启动后可以使用curl命令验证是否成功运行：
 
 ```
-curl --request POST --url 'http://localhost:/query_documents' -H "Content-Type: application/json"  --data '{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}'
+curl --request POST --url 'http://0.0.0.0:8891/query_documents' -H "Content-Type: application/json"  --data '{"meta": {"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}}'
 ```
 
 #### 2.3.2 启动 WebUI
@@ -79,4 +80,4 @@ Linux 用户推荐采用 Shell 脚本来启动服务：
 sh examples/document-intelligence/run_docprompt_web.sh
 ```
 
-到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验开放文档抽取问答系统系统服务了。
+到这里您就可以打开浏览器访问 http://127.0.0.1:7860 地址体验开放文档抽取问答系统系统服务了。
