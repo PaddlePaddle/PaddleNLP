@@ -33,7 +33,7 @@ fitz_tools = fitz.Tools()
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--serving_name', default="0.0.0.0", help="Serving ip.")
-parser.add_argument("--serving_port", default=7860, type=int, help="Serving port.")
+parser.add_argument("--serving_port", default=8891, type=int, help="Serving port.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -110,7 +110,7 @@ def get_base64(path):
 
 def process_prompt(prompt, document):
     if not prompt:
-        prompt = "What is the total actual and/or obligated expenses of ECG Center?"
+        prompt = "校验码是多少？"
     if document is None:
         return None, None, None
 
@@ -123,6 +123,7 @@ def process_prompt(prompt, document):
                       }})
     response = r.json()
     predictions = response['results'][0]
+
     pages = [Image.open(BytesIO(base64.b64decode(base64_str)))]
 
     text_value = predictions[0]['result'][0]['value']
@@ -271,7 +272,7 @@ with gr.Blocks(css=CSS) as demo:
             prompt = gr.Textbox(
                 label=
                 "Prompt (No restrictions on the setting of prompt. You can type any prompt.)",
-                placeholder="e.g. 校验码是多少?",
+                placeholder="e.g. 校验码是多少？",
                 lines=1,
                 max_lines=1,
             )
