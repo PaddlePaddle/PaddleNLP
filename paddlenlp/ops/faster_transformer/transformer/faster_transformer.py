@@ -625,7 +625,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     output_time_major=self.output_time_major,
                     beam_search_version=beam_search_version,
                     activation="relu",
-                    normalize_before=True,
+                    normalize_before=normalize_before,
                     rel_len=rel_len,
                     alpha=alpha)
         else:
@@ -651,6 +651,8 @@ class TransformerGenerator(paddle.nn.Layer):
                 max_out_len=max_out_len,
                 output_time_major=self.output_time_major,
                 beam_search_version=beam_search_version,
+                activation="relu",
+                normalize_before=normalize_before,
                 rel_len=rel_len,
                 alpha=alpha)
 
