@@ -272,6 +272,9 @@ def parse_args(MODEL_CLASSES):
                         type=float,
                         default=0.1,
                         help="The attention probs dropout prob.")
+    parser.add_argument("--to_static",
+                        action="store_true",
+                        help="Whether use to_static to train.")
 
     # Other config
     parser.add_argument("--seed",
@@ -286,7 +289,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--device",
                         type=str,
                         default="gpu",
-                        choices=["cpu", "gpu", "xpu"],
+                        choices=["cpu", "gpu", "xpu", "npu"],
                         help="select cpu, gpu, xpu devices.")
     parser.add_argument("--lr_decay_style",
                         type=str,

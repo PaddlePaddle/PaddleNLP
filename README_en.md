@@ -29,6 +29,17 @@
 **PaddleNLP** is an *easy-to-use* and *powerful* NLP library with **Awesome** pre-trained model zoo, supporting wide-range of NLP tasks from research to industrial applications.
 
 ## News 📢
+
+* 💥**Live Preview: Oct 25 - Oct 28**,  Engineers@PaddleNLP will show new features of PaddleNLP v2.4 and more cutting-edge technology.
+
+  - Scan the QR code below using WeChat, follow the PaddlePaddle official account and fill out the questionnaire to join the WeChat group, get the live link and 10G NLP learning materials.
+
+    <div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/197535273-75db1fb3-3a34-4bd2-bac3-bcacb1b986a8.jpg" width="150" height="150" />
+    </div>
+
+* 🔥 **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**
+  * 🧾 Release multilingual/cross-lingual pre-trained models [**ERNIE-Layout**](./model_zoo/ernie-layout/) which achieves new SOTA results in 11 downstream tasks. **DocPrompt** 🔖 based on ERNIE-Layout is also released which has the ability for multilingual document information extraction and question ansering.
 * 🔥 **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
 
   * 💎 NLP Tool：**[Pipelines](./pipelines)** released. Supports for fast construction of search engine and question answering systems, and it is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
@@ -40,23 +51,7 @@
   * 💪 Framework upgrade: Release [**Auto Model Compression API**](./docs/compression.md), supports for pruning and quantization automatically, lower the barriers of model compression; Release [**Few-shot Prompt**](./applications/text_classification/multi_class/few-shot), includes the algorithms such as PET, P-Tuning and RGL.
 
 
-* 👀 **2022.9.6 PaddlePaddle intelligent financial industry series live course**
 
-  * Centering on the industrial practice and development trend of deep learning technology in the financial industry, experts in the industry are invited to share the industrial practice. Discussion on the Future Development of Science and Technology Finance.
-
-  * Release the practical examples of industrial practice: Financial document information extraction based on UIE; FAQ question answering system based on Pipelines.
-
-  * **Live broadcast at 19:00 on Tuesdays and Thursdays from September 6th.**, scan the QR code to join the WeChat group and get the live link for free, discuss the experience with experts:
-
-    <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/188596360-264415d4-5462-43ad-8517-5b7e690061ce.jpg" width="150" height="150" />
-    </div>
-
-* 🔥 2022.5.16 PaddleNLP [v2.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.3.0) Released!🎉
-  * 💎 Release [**UIE** (Universal Information Extraction)](./model_zoo/uie) technique, single model supports multiple **open-domain** IE tasks. Super easy to use and finetune with few examples via [Taskflow](./docs/model_zoo/taskflow.md).
-  * 😊 Release [**ERNIE 3.0**](./model_zoo/ernie-3.0) light-weight model achieved better results compared to ERNIE 2.0 on [CLUE](https://www.cluebenchmarks.com/), also including **🗜️lossless model compression** and **⚙️end-to-end deployment**.
-  * 🏥 Release [**ERNIE-Health**](./model_zoo/ernie-health), a **SOTA** biomedical pretrained model on [CBLUE](https://github.com/CBLUEbenchmark/CBLUE).
-  * 💬 Release [**PLATO-XL**](./model_zoo/plato-xl) with ⚡**FasterGeneration**⚡, the *11B open-domain SOTA chatbot model* can be deployed on multi-GPU and do parallel inference easily.
 
 ## Features
 
@@ -81,7 +76,7 @@ For more usage please refer to [Taskflow Docs](./docs/model_zoo/taskflow.md).
 
 #### 🀄 Comprehensive Chinese Transformer Models
 
-We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained mdoels of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
+We provide **45+** network architectures and over **500+** pretrained models. Not only includes all the SOTA model like ERNIE, PLATO and SKEP released by Baidu, but also integrates most of the high-quality Chinese pretrained model developed by other organizations. Use `AutoModel` API to **⚡SUPER FAST⚡** download pretrained models of different architecture. We welcome all developers to contribute your Transformer models to PaddleNLP!
 
 ```python
 from paddlenlp.transformers import *
@@ -205,7 +200,7 @@ We provide question answering pipeline which can support FAQ system, Document-le
 </div>
 
 
-For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/doc_vqa).
+For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/document_intelligence/doc_vqa).
 
 
 #### 💌 Opinion Extraction and Sentiment Analysis
