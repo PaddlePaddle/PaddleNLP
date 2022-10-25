@@ -528,9 +528,9 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                 embed = paddle.lerp(embed_a, embed_b, t)
 
                 noise_batch = noise if noise_batch is None else paddle.concat(
-                    [noise_batch, noise], dim=0)
+                    [noise_batch, noise], axis=0)
                 embeds_batch = embed if embeds_batch is None else paddle.concat(
-                    [embeds_batch, embed], dim=0)
+                    [embeds_batch, embed], axis=0)
 
                 batch_is_ready = embeds_batch.shape[
                     0] == batch_size or i + 1 == T.shape[0]
