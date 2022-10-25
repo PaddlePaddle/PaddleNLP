@@ -84,9 +84,7 @@ class WildcardStableDiffusionPipeline(DiffusionPipeline):
     r"""
     Example Usage:
         pipe = WildcardStableDiffusionPipeline.from_pretrained(
-            "CompVis/stable-diffusion-v1-4",
-            revision="fp16",
-            torch_dtype=torch.float16,
+            "CompVis/stable-diffusion-v1-4"
         )
         prompt = "__animal__ sitting on a __object__ wearing a __clothing__"
         out = pipe(
@@ -170,7 +168,7 @@ class WildcardStableDiffusionPipeline(DiffusionPipeline):
             feature_extractor=feature_extractor,
         )
 
-    @torch.no_grad()
+    @paddle.no_grad()
     def __call__(
         self,
         prompt: Union[str, List[str]],

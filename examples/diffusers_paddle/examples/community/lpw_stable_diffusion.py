@@ -346,7 +346,7 @@ def get_weighted_text_embeddings(
         no_boseos_middle=no_boseos_middle,
         chunk_length=pipe.tokenizer.model_max_length,
     )
-    prompt_tokens = paddle.to_tensor(prompt_tokens, dtype=paddle.long)
+    prompt_tokens = paddle.to_tensor(prompt_tokens, dtype=paddle.int64)
     if uncond_prompt is not None:
         uncond_tokens, uncond_weights = pad_tokens_and_weights(
             uncond_tokens,
@@ -357,7 +357,7 @@ def get_weighted_text_embeddings(
             no_boseos_middle=no_boseos_middle,
             chunk_length=pipe.tokenizer.model_max_length,
         )
-        uncond_tokens = paddle.to_tensor(uncond_tokens, dtype=paddle.long)
+        uncond_tokens = paddle.to_tensor(uncond_tokens, dtype=paddle.int64)
 
     # get the embeddings
     text_embeddings = get_unweighted_text_embeddings(
@@ -666,9 +666,10 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             **kwargs,
         )
         bs_embed, seq_len, _ = text_embeddings.shape
-        text_embeddings = text_embeddings.repeat(1, num_images_per_prompt, 1)
-        text_embeddings = text_embeddings.view(bs_embed * num_images_per_prompt,
-                                               seq_len, -1)
+        text_embeddings = paddle.tile(text_embeddings,
+                                      [1, num_images_per_prompt, 1])
+        text_embeddings = text_embeddings.reshape(
+            [bs_embed * num_images_per_prompt, seq_len, -1])
 
         if do_classifier_free_guidance:
             bs_embed, seq_len, _ = uncond_embeddings.shape
@@ -751,7 +752,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             timesteps = self.scheduler.timesteps[-init_timestep]
             timesteps = paddle.to_tensor([timesteps] * batch_size *
                                          num_images_per_prompt,
-                                         device=self.device)
+                                         dtype="int64")
 
             noise = paddle.randn(
                 init_latents.shape,
@@ -807,17 +808,17 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         latents = 1 / 0.18215 * latents
         image = self.vae.decode(latents).sample
 
-        image = (image / 2 + 0.5).clamp(0, 1)
+        image = (image / 2 + 0.5).clip(0, 1)
 
         # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
-        image = image.cpu().permute(0, 2, 3, 1).float().numpy()
+        image = image.transpose([0, 2, 3, 1]).astype("float32").numpy()
 
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="pt").to(self.device)
+                self.numpy_to_pil(image), return_tensors="pd")
             image, has_nsfw_concept = self.safety_checker(
                 images=image,
-                clip_input=safety_checker_input.pixel_values.to(
+                clip_input=safety_checker_input.pixel_values.astype(
                     text_embeddings.dtype),
             )
         else:
