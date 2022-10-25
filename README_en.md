@@ -30,9 +30,16 @@
 
 ## News 📢
 
+* 💥**Live Preview: Oct 25 - Oct 28**,  Engineers@PaddleNLP will show new features of PaddleNLP v2.4 and more cutting-edge technology.
+
+  - Scan the QR code below using WeChat, follow the PaddlePaddle official account and fill out the questionnaire to join the WeChat group, get the live link and 10G NLP learning materials.
+
+    <div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/197535273-75db1fb3-3a34-4bd2-bac3-bcacb1b986a8.jpg" width="150" height="150" />
+    </div>
+
 * 🔥 **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**
   * 🧾 Release multilingual/cross-lingual pre-trained models [**ERNIE-Layout**](./model_zoo/ernie-layout/) which achieves new SOTA results in 11 downstream tasks. **DocPrompt** 🔖 based on ERNIE-Layout is also released which has the ability for multilingual document information extraction and question ansering.
-
 * 🔥 **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
 
   * 💎 NLP Tool：**[Pipelines](./pipelines)** released. Supports for fast construction of search engine and question answering systems, and it is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
@@ -44,17 +51,6 @@
   * 💪 Framework upgrade: Release [**Auto Model Compression API**](./docs/compression.md), supports for pruning and quantization automatically, lower the barriers of model compression; Release [**Few-shot Prompt**](./applications/text_classification/multi_class/few-shot), includes the algorithms such as PET, P-Tuning and RGL.
 
 
-* 👀 **2022.9.6 PaddlePaddle intelligent financial industry series live course**
-
-  * Centering on the industrial practice and development trend of deep learning technology in the financial industry, experts in the industry are invited to share the industrial practice. Discussion on the Future Development of Science and Technology Finance.
-
-  * Release the practical examples of industrial practice: Financial document information extraction based on UIE; FAQ question answering system based on Pipelines.
-
-  * **Live broadcast at 19:00 on Tuesdays and Thursdays from September 6th.**, scan the QR code to join the WeChat group and get the live link for free, discuss the experience with experts:
-
-    <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/188596360-264415d4-5462-43ad-8517-5b7e690061ce.jpg" width="150" height="150" />
-    </div>
 
 
 ## Features
