@@ -579,8 +579,6 @@ class UnifiedTransformerModelLanguageGenerationTest(unittest.TestCase):
             top_k=1)
         output_str = postprocess_response(output_ids[0].numpy(), tokenizer)
 
-        print(output_str)
-
         EXPECTED_OUTPUT_STR = ("你 在 做 什么 呢 ?")
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 
