@@ -99,14 +99,14 @@ pip install -r requirements.txt
 
 **训练、开发、测试数据集**
 
-train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(可选，测试数据集文件)，文件中文本与标签类别名用tab符`'\t'`分隔开，标签中多个标签之间用`','`英文逗号分隔开。训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替。
+train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(可选，测试数据集文件)，文件中文本与标签类别名用tab符`'\t'`分隔开，层次标签之间用`'##'`号分隔开。训练集指用于训练模型的数据；开发集指用于评测模型表现的数据，可以根据模型在开发集上的精度调整训练参数和模型；测试集用于测试模型表现，没有测试集时可以使用开发集代替。
 
 **注意文本中不能包含tab符`'\t'`**。
 
 - train.txt/dev.txt/test.txt 文件格式：
 ```text
-<文本>'\t'<标签>','<标签>','<标签>
-<文本>'\t'<标签>','<标签>
+<文本>'\t'<标签>'##'<标签>'##'<标签>
+<文本>'\t'<标签>'##'<标签>
 ...
 ...
 ```
@@ -121,7 +121,7 @@ train.txt(训练数据集文件)， dev.txt(开发数据集文件)，test.txt(�
 ```
 **分类标签**
 
-label.txt(层次分类标签文件)记录数据集中所有标签路径集合，在标签路径中，高层的标签指向底层标签，标签之间用`'##'`连接。
+label.txt(层次分类标签文件)记录数据集中所有标签路径集合，层次标签之间用`'##'`连接即可，标签的行先后顺序对结果没有影响。
 
 - label.txt 文件格式：
 
@@ -136,13 +136,11 @@ label.txt(层次分类标签文件)记录数据集中所有标签路径集合，
 ```
 - label.txt  文件样例：
 ```text
-体育/运动##游泳
-电脑/网络##程序设计
-健康##整形美容##胸部整形
-教育/科学##外语学习##日语
+教育/科学
+教育/科学##院校信息
+教育/科学##外语学习##英语考试
+教育/科学##理工学科##生物学
 教育/科学##职业教育##会计资格考试
-健康##内科##呼吸内科
-生活##美食/烹饪##餐厅/酒店
 ...
 ```
 
@@ -191,7 +189,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" \
     --recall_result_file "recall_result.txt" \
     --train_set_file ${data_path}/train.txt \
     --corpus_file ${data_path}/label.txt   \
-    --similar_text_pair ${data_path}/dev.txt \
+    --similar_text_pair_file ${data_path}/dev.txt \
     --evaluate True
 ```
 
@@ -215,7 +213,6 @@ python -u -m paddle.distributed.launch --gpus "0,1" \
 * `recall_num`: 对 1 个文本召回的相似文本数量
 * `similar_text_pair`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
-* `similar_text_pair`: 由相似文本对构成的评估集
 
 也可以使用bash脚本：
 
