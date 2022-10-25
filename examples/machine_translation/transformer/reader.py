@@ -356,6 +356,7 @@ def prepare_train_input(insts,
     Put all padded data needed by training into a list.
     """
     word_pad = Pad(pad_idx, dtype=dtype)
+
     src_max_len = (max([len(inst["source"])
                         for inst in insts]) + pad_seq) // pad_seq * pad_seq
     trg_max_len = (max([len(inst["target"])
@@ -388,6 +389,7 @@ def prepare_infer_input(insts,
     Put all padded data needed by beam search decoder into a list.
     """
     word_pad = Pad(pad_idx, dtype=dtype)
+
     src_max_len = (max([len(inst["source"])
                         for inst in insts]) + pad_seq) // pad_seq * pad_seq
     src_word = word_pad([
