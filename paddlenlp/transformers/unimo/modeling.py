@@ -13,6 +13,7 @@
 # limitations under the License.
 """Modeling classes for UNIMO model."""
 
+from tkinter.messagebox import NO
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -439,9 +440,8 @@ class UNIMOModel(UNIMOPretrainedModel):
         embedding_output = self.encoder_norm(embedding_output)
         embedding_output = self.dropout(embedding_output)
 
-        if use_cache:
-            if cache is None:
-                cache = self.encoder.gen_cache(embedding_output)
+        if use_cache and cache is None:
+            cache = self.encoder.gen_cache(embedding_output)
 
         outputs = self.encoder(
             embedding_output,
