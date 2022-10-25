@@ -318,6 +318,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
             uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
 
             # duplicate unconditional embeddings for each generation per prompt
+            seq_len = uncond_embeddings.shape[1]
             uncond_embeddings = paddle.tile(
                 uncond_embeddings, [batch_size, num_images_per_prompt, 1])
             uncond_embeddings = uncond_embeddings.reshape(
