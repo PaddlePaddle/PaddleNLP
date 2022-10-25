@@ -43,12 +43,10 @@
 
 ## 社区交流
 
-- 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
-  - 与众多社区开发者以及官方团队深度交流。
-  - 10G重磅NLP学习大礼包！
+- **💥 直播预告：10.25-10.28**，PaddleNLP研发团队详解PaddleNLP v2.4新发功能，并带来前沿技术分享，以及企业落地实践。微信扫描下方二维码，关注公众号并填写问卷后进入官方交流群，获取直播链接与10G重磅NLP学习大礼包。
 
   <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/184784832-bb97930f-a738-4480-99be-517aeb65afac.png" width="150" height="150" />
+  <img src="https://user-images.githubusercontent.com/11793384/197535273-75db1fb3-3a34-4bd2-bac3-bcacb1b986a8.jpg" width="150" height="150" />
   </div>
 
 ## 特性
