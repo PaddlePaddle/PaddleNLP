@@ -76,7 +76,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
-            Please, refer to the [model card](https://huggingface.co/CompVis/stable-diffusion-v1-4) for details.
+            Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
@@ -279,8 +279,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
-        text_embeddings = paddle.tile(text_embeddings,
-                                      [1, num_images_per_prompt, 1])
+        text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
         text_embeddings = text_embeddings.reshape(
             [bs_embed * num_images_per_prompt, seq_len, -1])
 
@@ -319,8 +318,8 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = paddle.tile(
-                uncond_embeddings, [batch_size, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.tile(
+                [batch_size, num_images_per_prompt, 1])
             uncond_embeddings = uncond_embeddings.reshape(
                 [batch_size * num_images_per_prompt, seq_len, -1])
 

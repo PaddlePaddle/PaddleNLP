@@ -42,6 +42,7 @@ class DDPMPipeline(DiffusionPipeline):
         self,
         batch_size: int = 1,
         seed: Optional[int] = None,
+        num_inference_steps: int = 1000,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         **kwargs,
@@ -50,8 +51,11 @@ class DDPMPipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 The number of images to generate.
-            generator (`int`, *optional*):
+            seed (`int`, *optional*):
                 A random seed.
+            num_inference_steps (`int`, *optional*, defaults to 1000):
+                The number of denoising steps. More denoising steps usually lead to a higher quality image at the
+                expense of slower inference.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
@@ -67,10 +71,10 @@ class DDPMPipeline(DiffusionPipeline):
             paddle.seed(seed)
         # Sample gaussian noise to begin loop
         image = paddle.randn((batch_size, self.unet.in_channels,
-                              self.unet.sample_size, self.unet.sample_size), )
+                              self.unet.sample_size, self.unet.sample_size))
 
         # set step values
-        self.scheduler.set_timesteps(1000)
+        self.scheduler.set_timesteps(num_inference_steps)
 
         for t in self.progress_bar(self.scheduler.timesteps):
             # 1. predict noise model_output

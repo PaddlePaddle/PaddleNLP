@@ -215,18 +215,18 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
                 "See `StableDiffusionPipeline` for a usage example.")
 
-        if (isinstance(timestep, int) or isinstance(timestep, paddle.Tensor)):
-            deprecate(
-                "timestep as an index",
-                "0.8.0",
-                "Passing integer indices (e.g. from `enumerate(timesteps)`) as timesteps to"
-                " `LMSDiscreteScheduler.step()` will not be supported in future versions. Make sure to pass"
-                " one of the `scheduler.timesteps` as a timestep.",
-                standard_warn=False,
-            )
-            step_index = timestep
-        else:
-            step_index = (self.timesteps == timestep).nonzero().item()
+        # if (isinstance(timestep, int) or isinstance(timestep, paddle.Tensor)):
+        #     deprecate(
+        #         "timestep as an index",
+        #         "0.8.0",
+        #         "Passing integer indices (e.g. from `enumerate(timesteps)`) as timesteps to"
+        #         " `LMSDiscreteScheduler.step()` will not be supported in future versions. Make sure to pass"
+        #         " one of the `scheduler.timesteps` as a timestep.",
+        #         standard_warn=False,
+        #     )
+        #     step_index = timestep
+        # else:
+        step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]
 
         # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
@@ -267,19 +267,19 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         schedule_timesteps = self.timesteps
 
-        if isinstance(timesteps, paddle.Tensor):
-            deprecate(
-                "timesteps as indices",
-                "0.8.0",
-                "Passing integer indices  (e.g. from `enumerate(timesteps)`) as timesteps to"
-                " `LMSDiscreteScheduler.add_noise()` will not be supported in future versions. Make sure to"
-                " pass values from `scheduler.timesteps` as timesteps.",
-                standard_warn=False,
-            )
-            step_indices = timesteps
-        else:
-            step_indices = [(schedule_timesteps == t).nonzero().item()
-                            for t in timesteps]
+        # if isinstance(timesteps, paddle.Tensor):
+        #     deprecate(
+        #         "timesteps as indices",
+        #         "0.8.0",
+        #         "Passing integer indices  (e.g. from `enumerate(timesteps)`) as timesteps to"
+        #         " `LMSDiscreteScheduler.add_noise()` will not be supported in future versions. Make sure to"
+        #         " pass values from `scheduler.timesteps` as timesteps.",
+        #         standard_warn=False,
+        #     )
+        #     step_indices = timesteps
+        # else:
+        step_indices = [(schedule_timesteps == t).nonzero().item()
+                        for t in timesteps]
 
         sigma = self.sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):

@@ -56,15 +56,6 @@ if is_paddle_available() and is_paddlenlp_available():
     import paddle
     from paddlenlp.transformers import PretrainedModel
 
-    @patch_to(paddle.Tensor)
-    def repeat_interleave(self, tensor, axis=0):
-        if self.dtype == paddle.float16:
-            return paddle.repeat_interleave(self.astype("float32"),
-                                            tensor,
-                                            axis=axis).astype(self.dtype)
-        else:
-            return paddle.repeat_interleave(self, tensor, axis=axis)
-
     @patch_to(PretrainedModel, as_prop=True)
     def dtype(self):
         try:

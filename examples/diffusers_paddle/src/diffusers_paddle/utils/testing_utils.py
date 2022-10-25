@@ -28,8 +28,10 @@ import PIL.Image
 import PIL.ImageOps
 import requests
 
+from .import_utils import is_paddle_available, is_onnx_available
+
 global_rng = random.Random()
-paddle_device = "gpu:0" if paddle.device.is_compiled_with_cuda() else "cpu"
+paddle_device = "gpu" if paddle.device.is_compiled_with_cuda() else "cpu"
 
 
 def get_tests_dir(append_path=None):
@@ -96,6 +98,28 @@ def slow(test_case):
 
     """
     return unittest.skipUnless(_run_slow_tests, "test is slow")(test_case)
+
+
+def require_paddle(test_case):
+    """
+    Decorator marking a test that requires Paddle. These tests are skipped when Paddle isn't installed.
+    """
+    return unittest.skipUnless(is_paddle_available(),
+                               "test requires Paddle")(test_case)
+
+
+def require_torch_gpu(test_case):
+    """Decorator marking a test that requires CUDA and Paddle."""
+    return unittest.skipUnless(is_paddle_available() and paddle_device == "gpu",
+                               "test requires Paddle+CUDA")(test_case)
+
+
+def require_onnxruntime(test_case):
+    """
+    Decorator marking a test that requires onnxruntime. These tests are skipped when onnxruntime isn't installed.
+    """
+    return unittest.skipUnless(is_onnx_available(),
+                               "test requires onnxruntime")(test_case)
 
 
 def load_image(image: Union[str, PIL.Image.Image]) -> PIL.Image.Image:

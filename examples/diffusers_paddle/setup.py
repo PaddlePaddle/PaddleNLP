@@ -24,5 +24,5 @@ setup(
     author="paddlenlp",
     url="https://github.com/PaddlePaddle/PaddleNLP",
     keywords=["diffusers_paddle", "paddle", "paddlenlp"],
-    install_requires=["paddlenlp>=2.4.1", "ftfy", "regex", "fastcore"],
+    install_requires=["paddlenlp>=2.4.1", "ftfy", "regex"],
 )
