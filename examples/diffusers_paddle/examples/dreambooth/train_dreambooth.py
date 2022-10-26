@@ -30,17 +30,24 @@ from diffusers_paddle.optimization import get_scheduler
 from diffusers_paddle.modeling_utils import unwrap_model, freeze_params
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
+import itertools
 from PIL import Image
 from paddle.vision import transforms
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer, AutoTokenizer
 from pathlib import Path
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Simple example of a training dreambooth script.")
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=500,
+        help="Save pipe every X updates steps.",
+    )
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
@@ -412,7 +419,7 @@ def main():
 
     # Load the tokenizer
     if args.tokenizer_name:
-        tokenizer = CLIPTokenizer.from_pretrained(args.tokenizer_name)
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
         tokenizer = CLIPTokenizer.from_pretrained(
             os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
@@ -555,9 +562,12 @@ def main():
     progress_bar.set_description("Train Steps")
     global_step = 0
 
-    # Keep vae and text_encoder in eval model as we don't train these
+    # Keep vae in eval model as we don't train these
     vae.eval()
-    text_encoder.eval()
+    if args.train_text_encoder:
+        text_encoder.train()
+    else:
+        text_encoder.eval()
     unet.train()
 
     for epoch in range(args.num_train_epochs):
@@ -644,6 +654,16 @@ def main():
                         writer.add_scalar(f"train/{name}",
                                           val,
                                           step=global_step)
+
+                    if global_step % args.save_steps == 0:
+                        # Create the pipeline using using the trained modules and save it.
+                        pipeline = StableDiffusionPipeline.from_pretrained(
+                            args.pretrained_model_name_or_path,
+                            unet=unwrap_model(unet),
+                            text_encoder=unwrap_model(text_encoder),
+                            safety_checker=None,
+                        )
+                        pipeline.save_pretrained(args.output_dir)
 
             if global_step >= args.max_train_steps:
                 break

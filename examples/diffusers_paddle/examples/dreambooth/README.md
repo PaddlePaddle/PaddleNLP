@@ -77,6 +77,7 @@ bash run_single.sh
 > * `--with_prior_preservation`: 是否将生成的同类图片（先验知识）一同加入训练，当为`True`的时候，`class_prompt`、`class_data_dir`、`num_class_images`、`sample_batch_size`和`prior_loss_weight`才生效。
 > * `--num_train_epochs`: 训练的轮数，默认值为`1`。
 > * `--max_train_steps`: 最大的训练步数，当我们设置这个值后，它会重新计算所需的`num_train_epochs`轮数。
+> * `--save_steps`: 每间隔多少步`（global step步数）`，保存学习到的`pipe`。
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的step中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size。
 > * `--train_text_encoder`: 是否一同训练文本编码器的部分，默认为`False`。
 
