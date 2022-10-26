@@ -1622,13 +1622,13 @@ from paddlenlp import Taskflow
 </div></details>
 
 ### 问题生成
-<details><summary>&emsp; 通过UNIMO-Text模型来根据上下文和答案生成问题 </summary><div>
+<details><summary>&emsp; 基于百度自研中文预训练模型UNIMO-Text和大规模多领域问题生成数据集</summary><div>
 
 #### 支持单条、批量预测
 
 ```python
 >>> from paddlenlp import Taskflow
-# 默认模型为 unimo-text-1.0-dureader_qg-template1
+# 默认模型为 unimo-text-1.0-dureader_qg
 >>> question_generator = Taskflow("question_generation")
 # 单条输入
 >>> question_generator([
@@ -1648,7 +1648,7 @@ from paddlenlp import Taskflow
 ```
 
 #### 可配置参数说明
-* `model`：可选模型，默认为unimo-text-1.0-dureader_qg-template1，支持的模型支持的模型有["unimo-text-1.0", "unimo-text-1.0-dureader_qg-template1", ]。
+* `model`：可选模型，默认为unimo-text-1.0-dureader_qg，支持的模型有["unimo-text-1.0", "unimo-text-1.0-dureader_qg", "unimo-text-1.0-question-generation", "unimo-text-1.0-question-generation-dureader_qg"]。
 * `device`：运行设备，默认为"gpu"。
 * `template`：模版，可选项有[0, 1, 2, 3]，1表示使用默认模版，0表示不使用模版。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
