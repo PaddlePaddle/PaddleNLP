@@ -272,21 +272,22 @@ else(ON_INFER)
     )
   endif()
 
-  if(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
+  if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
+    set(lib_link
+      -lpaddle
+    )
+  elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
     set(lib_link
       -l:core_avx.so
-    )
-    link_directories(
-      ${PY_LIB_DIR}/../fluid/
     )
   else()
     set(lib_link
       -l:core_noavx.so
     )
-    link_directories(
-      ${PY_LIB_DIR}/../fluid/
-    )
   endif()
+  link_directories(
+    ${PY_LIB_DIR}/../fluid/
+  )
 
   set(ft_lib_link
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -93,6 +93,7 @@ def parse_decodes(sentences, predictions, lengths, label_vocab):
     outputs = []
     for idx, end in enumerate(lengths):
         sent = sentences[idx][:end]
+        print(predictions[idx][:end])
         tags = [id_label[x] for x in predictions[idx][:end]]
         sent_out = []
         tags_out = []
@@ -112,14 +113,19 @@ def parse_decodes(sentences, predictions, lengths, label_vocab):
     return outputs
 
 
-def convert_to_features(example, tokenizer):
+def convert_tokens_to_ids(tokens, vocab, oov_token=None):
+    token_ids = []
+    oov_id = vocab.get(oov_token) if oov_token else None
+    for token in tokens:
+        token_id = vocab.get(token, oov_id)
+        token_ids.append(token_id)
+    return token_ids
+
+
+def convert_to_features(example, word_vocab):
     tokens = example[0]
-    tokenized_input = tokenizer(tokens,
-                                return_length=True,
-                                is_split_into_words='token')
-    # Token '[CLS]' and '[SEP]' will get label 'O'
-    return tokenized_input['input_ids'], tokenized_input[
-        'token_type_ids'], tokenized_input['seq_len']
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
+    return token_ids, len(token_ids)
 
 
 def read(data_path):
@@ -208,13 +214,13 @@ class Predictor(object):
                                                warmup=0,
                                                logger=logger)
 
-    def predict(self, dataset, batchify_fn, tokenizer, label_vocab):
+    def predict(self, dataset, batchify_fn, word_vocab, label_vocab):
         if args.benchmark:
             self.autolog.times.start()
         all_preds = []
         all_lens = []
         num_of_examples = len(dataset)
-        trans_func = partial(convert_to_features, tokenizer=tokenizer)
+        trans_func = partial(convert_to_features, word_vocab=word_vocab)
         start_idx = 0
         while start_idx < num_of_examples:
             end_idx = start_idx + self.batch_size
@@ -225,18 +231,17 @@ class Predictor(object):
 
             if args.benchmark:
                 self.autolog.times.stamp()
-            input_ids, segment_ids, lens = batchify_fn(batch_data)
+            input_ids, lens = batchify_fn(batch_data)
             self.input_handles[0].copy_from_cpu(input_ids)
-            self.input_handles[1].copy_from_cpu(segment_ids)
+            self.input_handles[1].copy_from_cpu(lens)
             self.predictor.run()
-            logits = self.output_handle.copy_to_cpu()
+            preds = self.output_handle.copy_to_cpu()
 
             if args.benchmark:
                 self.autolog.times.stamp()
-            preds = np.argmax(logits, axis=-1)
             # Drop CLS prediction
-            preds = preds[:, 1:]
             all_preds.append(preds)
+            print(preds.shape)
             all_lens.append(lens)
 
             start_idx += self.batch_size
@@ -249,16 +254,17 @@ class Predictor(object):
 
 
 if __name__ == '__main__':
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
     test_ds = load_dataset(read,
                            data_path=os.path.join(args.data_dir, 'test.txt'),
                            lazy=False)
     label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
+    word_vocab = load_dict(os.path.join(args.data_dir, 'word.dic'))
+
+    trans_func = partial(convert_to_features, word_vocab=word_vocab)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # token_type_ids
+        Pad(axis=0, pad_val=word_vocab.get('OOV', 0), dtype='int64'
+            ),  # token_ids
         Stack(dtype='int64'),  # seq_len
     ): fn(samples)
 
@@ -266,7 +272,7 @@ if __name__ == '__main__':
                           args.use_tensorrt, args.precision, args.enable_mkldnn,
                           args.benchmark, args.save_log_path)
 
-    results = predictor.predict(test_ds, batchify_fn, tokenizer, label_vocab)
+    results = predictor.predict(test_ds, batchify_fn, word_vocab, label_vocab)
     print("\n".join(results))
     if args.benchmark:
         predictor.autolog.report()
