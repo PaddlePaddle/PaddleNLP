@@ -151,7 +151,7 @@ def _dynabert(self, model, output_dir):
                                    args.num_train_epochs)
 
     # Each width_mult best model would be exported.
-    _dynabert_export(self, ofa_model)
+    _dynabert_export(self)
 
     ofa_model, ofa_model.model = _recover_transformer_func(
         ofa_model, True), _recover_transformer_func(ofa_model.model, True)
@@ -510,34 +510,44 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader,
     return ofa_model
 
 
-def get_dynabert_model(model, width_mult):
+def _get_dynabert_model(model, width_mult):
     for layer in model.base_model.encoder.layers:
         # Multi-Head Attention
         layer.self_attn.num_heads = int(layer.self_attn.num_heads * width_mult)
         layer.self_attn.q_proj = nn.Linear(
             layer.self_attn.q_proj.weight.shape[0],
-            int(layer.self_attn.q_proj.weight.shape[1] * width_mult))
+            int(layer.self_attn.q_proj.weight.shape[1] * width_mult),
+            layer.self_attn.q_proj._weight_attr,
+            layer.self_attn.q_proj._bias_attr)
         layer.self_attn.k_proj = nn.Linear(
             layer.self_attn.k_proj.weight.shape[0],
-            int(layer.self_attn.k_proj.weight.shape[1] * width_mult))
+            int(layer.self_attn.k_proj.weight.shape[1] * width_mult),
+            layer.self_attn.k_proj._weight_attr,
+            layer.self_attn.k_proj._bias_attr)
         layer.self_attn.v_proj = nn.Linear(
             layer.self_attn.v_proj.weight.shape[0],
-            int(layer.self_attn.v_proj.weight.shape[1] * width_mult))
+            int(layer.self_attn.v_proj.weight.shape[1] * width_mult),
+            layer.self_attn.v_proj._weight_attr,
+            layer.self_attn.v_proj._bias_attr)
         layer.self_attn.out_proj = nn.Linear(
             int(layer.self_attn.out_proj.weight.shape[0] * width_mult),
-            layer.self_attn.out_proj.weight.shape[1])
+            layer.self_attn.out_proj.weight.shape[1],
+            layer.self_attn.out_proj._weight_attr,
+            layer.self_attn.out_proj._bias_attr)
 
         # Feed Forward
         layer.linear1 = nn.Linear(
             layer.linear1.weight.shape[0],
-            int(layer.linear1.weight.shape[1] * width_mult))
+            int(layer.linear1.weight.shape[1] * width_mult),
+            layer.linear1._weight_attr, layer.linear1._bias_attr)
         layer.linear2 = nn.Linear(
             int(layer.linear2.weight.shape[0] * width_mult),
-            layer.linear2.weight.shape[1])
+            layer.linear2.weight.shape[1], layer.linear2._weight_attr,
+            layer.linear2._bias_attr)
     return model
 
 
-def load_parameters(dynabert_model, ori_state_dict):
+def _load_parameters(dynabert_model, ori_state_dict):
     dynabert_state_dict = dynabert_model.state_dict()
     for key in ori_state_dict.keys():
         dynabert_key = key.replace(".fn", "")
@@ -555,25 +565,21 @@ def load_parameters(dynabert_model, ori_state_dict):
     return dynabert_model
 
 
-def export_dynamic_dynabert_model(origin_model, width_mult):
-    state_dict = origin_model.state_dict()
-    dynabert_model = get_dynabert_model(origin_model, width_mult)
-    dynabert_model = load_parameters(dynabert_model, state_dict)
+def _export_dynamic_dynabert_model(self, width_mult):
+    model_dir = os.path.join(self.args.output_dir,
+                             "width_mult_" + str(round(width_mult, 2)))
+    state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
+    origin_model = self.model.__class__.from_pretrained(model_dir)
+    dynabert_model = _get_dynabert_model(origin_model, width_mult)
+    dynabert_model = _load_parameters(dynabert_model, state_dict)
     return dynabert_model
 
 
-def _dynabert_export(self, ofa_model):
+def _dynabert_export(self):
     for width_mult in self.args.width_mult_list:
-        model_dir = os.path.join(self.args.output_dir,
-                                 "width_mult_" + str(round(width_mult, 2)))
-        state_dict = paddle.load(os.path.join(model_dir,
-                                              "model_state.pdparams"))
-        origin_model = self.model.__class__.from_pretrained(model_dir)
-        dynabert_model = export_dynamic_dynabert_model(origin_model, width_mult)
-
-        if "qat" in self.args.strategy:
-            self.model = dynabert_model
-        else:
+        dynabert_model = _export_dynamic_dynabert_model(self, width_mult)
+        self.model = dynabert_model
+        if "qat" not in self.args.strategy:
             input_spec = generate_input_spec(self.model, self.train_dataset)
             pruned_infer_model_dir = os.path.join(model_dir)
             export_model(model=dynabert_model,
@@ -700,9 +706,6 @@ def _quant_aware_training_dynamic(self, input_dir):
     else:
         args.num_training_steps = len(train_dataloader) * args.num_train_epochs
         args.num_train_epochs = math.ceil(args.num_train_epochs)
-
-    self.create_optimizer_and_scheduler(
-        num_training_steps=args.num_training_steps)
 
     global_step = 0
     tic_train = time.time()
