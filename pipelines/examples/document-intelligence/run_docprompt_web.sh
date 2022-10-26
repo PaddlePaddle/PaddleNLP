@@ -13,4 +13,4 @@
 # limitations under the License.
 unset http_proxy && unset https_proxy
 # 配置模型服务地址
-python ui/webapp_docprompt_gradio.py
+python ui/webapp_docprompt_gradio.py --serving_port 8891

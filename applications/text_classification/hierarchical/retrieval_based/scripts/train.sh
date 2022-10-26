@@ -31,5 +31,5 @@ python -u -m paddle.distributed.launch --gpus "0,1" \
     --recall_result_file "recall_result.txt" \
     --train_set_file ${data_path}/train.txt \
     --corpus_file ${data_path}/label.txt   \
-    --similar_text_pair ${data_path}/dev.txt \
+    --similar_text_pair_file ${data_path}/dev.txt \
     --evaluate True
