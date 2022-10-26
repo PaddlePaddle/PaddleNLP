@@ -5,8 +5,8 @@
 - [问题生成](#问题生成)
   - [简介](#简介)
     <!-- - [基于预训练语言模型的问题生成](#基于预训练语言模型的问题生成) -->
-  <!-- - [效果展示](#效果展示)
-  - [开箱即用](#开箱即用) -->
+  <!-- - [效果展示](#效果展示) -->
+  - [开箱即用](#开箱即用)
   - [训练定制](#训练定制)
     - [环境依赖](#环境依赖)
     - [代码结构说明](#代码结构说明)
@@ -27,6 +27,13 @@ Question Generation（QG），即问题生成，指的是给定一段上下文�
 
 问题生成技术在教育、咨询、搜索、推荐等多个领域均有着巨大的应用价值。具体来说，问题生成可广泛应用于问答系统语料库构建，事实性问题生成，教育行业题库生成，对话提问，聊天机器人意图理解，对话式搜索意图提问，闲聊机器人主动提问等等场景。
 
+本项目是基于预训练语言模型UNIMO-Text的问题生成，具有以下优势：
+
+- 效果领先。基于百度自研中文预训练语言模型UNIMO-Text，并提供基于大规模多领域问题生成数据集训练的通用问题生成预训练模型`unimo-text-1.0-question-generation`。
+- 开箱即用。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
+- 高性能推理。本项目基于FasterTransformer进行推理加速，能够提供更高性能的推理体验，优化后的推理模型在dureader_qg开发集的推理耗时缩短为优化前的1/5。
+- 训练推理部署全流程打通。本项目提供了全面的定制训练流程，从数据准备、模型训练预测，到模型推理部署，一应俱全。
+
 <!-- ### 基于预训练语言模型的问题生成
 
 基于预训练语言模型（Pretrained Language Models, PLMs）范式的问题生成是目前最常用、效果最好(SOTA)的方式。
@@ -40,10 +47,34 @@ model_name = "ernie-1.0"
 model = UNIMOLMHeadModel.from_pretrained(model_name)
 tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 ``` -->
-<!--
-## 效果展示
 
-## 开箱即用 -->
+## 开箱即用
+PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，一键预测。
+#### 支持单条、批量预测
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 unimo-text-1.0-dureader_qg-template1
+>>> question_generator = Taskflow("question_generation")
+# 单条输入
+>>> question_generator([
+  {"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"}
+  ])
+'''
+  ['黄山最高峰是什么']
+'''
+# 多条输入
+>>> question_generator([
+  {"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"},
+  {"context": "弗朗索瓦·韦达外文名：franciscusvieta国籍：法国出生地：普瓦图出生日期：1540年逝世日期：1603年12月13日职业：数学家主要成就：为近代数学的发展奠定了基础。", "answer": "法国"}
+  ])
+'''
+  ['黄山最高峰是什么',  '弗朗索瓦是哪里人']
+'''
+```
+关键配置参数说明：
+- model：可选模型，默认为`unimo-text-1.0-dureader_qg`。
+
+具体参数配置可参考[Taskflow文档](../../../docs/model_zoo/taskflow.md)。
 
 ## 训练定制
 
@@ -83,7 +114,7 @@ tokenizer = UNIMOTokenizer.from_pretrained(model_name)
 
 2. **模型训练**
 
-- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用"unimo-text-1.0"模型，unimo-text-1.0还支持large模型，详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)，可以根据任务和设备需求进行选择。
+- 数据准备完成后，可以开始使用我们的数据集对预训练模型进行微调训练。我们可以根据任务需求，调整可配置参数，选择使用GPU或CPU进行模型训练，脚本默认保存在开发集最佳表现模型。中文任务默认使用`unimo-text-1.0`模型，unimo-text-1.0还支持large模型。此外本项目还提供基于大规模多领域问题生成数据集训练的通用问题生成预训练模型`unimo-text-1.0-question-generation`，详见[UNIMO模型汇总](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers/UNIMO/contents.html)，可以根据任务和设备需求进行选择。
 
 
 3. **模型预测**
@@ -192,6 +223,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log 
    |---------------------------------|
    | unimo-text-1.0      |
    | unimo-text-1.0-large |
+   | unimo-text-1.0-question-generation |
 
    <!-- | T5-PEGASUS |
    | ernie-1.0 |
