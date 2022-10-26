@@ -152,7 +152,7 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
-        "unimo-text-1.0-question-generation-v2": {
+        "unimo-text-1.0-question-generation-full_domain": {
             "vocab_size": 18000,
             "hidden_size": 768,
             "num_hidden_layers": 12,
@@ -206,7 +206,7 @@ class UNIMOPretrainedModel(PretrainedModel):
             "unimo-text-1.0-question-generation":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation.pdparams",
             "unimo-text-1.0-question-generation-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation-v2.pdparams",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation-full_domain.pdparams",
             "unimo-text-1.0-question-generation-dureader_qg":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation-dureader_qg.pdparams",
         }

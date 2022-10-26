@@ -97,7 +97,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-question-generation":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-question-generation-v2":
+            "unimo-text-1.0-question-generation-full_domain":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
             "unimo-text-1.0-question-generation-dureader_qg":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
@@ -122,7 +122,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
         "unimo-text-1.0-question-generation": {
             "do_lower_case": True
         },
-        "unimo-text-1.0-question-generation-v2": {
+        "unimo-text-1.0-question-generation-full_domain": {
             "do_lower_case": True
         },
         "unimo-text-1.0-question-generation-dureader_qg": {
