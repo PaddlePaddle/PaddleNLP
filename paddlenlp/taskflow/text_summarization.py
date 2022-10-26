@@ -34,15 +34,15 @@ usage = r"""
            from paddlenlp import Taskflow 
 
            text_summarization = Taskflow("text_summarization")
-           text_summarization("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+           text_summarization(2022年，中国房地产进入转型阵痛期，传统“高杠杆、快周转”的模式难以为继，万科甚至直接喊话，中国房地产进入“黑铁时代”)
            '''
-            ['雪后的景色可真美丽呀！']
+            ['万科喊话中国房地产进入“黑铁时代”']
            '''
 
-           text_summarization(["雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
-           "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"])
+           text_summarization(['据悉，2022年教育部将围绕“巩固提高、深化落实、创新突破”三个关键词展开工作。要进一步强化学校教育主阵地作用，继续把落实“双减”作为学校工作的重中之重，重点从提高作业设计水平、提高课后服务水平、提高课堂教学水平、提高均衡发展水平四个方面持续巩固提高学校“双减”工作水平。',
+          '党参有降血脂，降血压的作用，可以彻底消除血液中的垃圾，从而对冠心病以及心血管疾病的患者都有一定的稳定预防工作作用，因此平时口服党参能远离三高的危害。另外党参除了益气养血，降低中枢神经作用，调整消化系统功能，健脾补肺的功能。'])
            '''
-            ['雪后的世界', '成品油调价窗口8月23日24时开启']
+            ['教育部：将从四个方面持续巩固提高学校“双减”工作水平', '党参能降低三高的危害']
            '''
          """
 
@@ -181,8 +181,7 @@ class TextSummarizationTask(Task):
         input_ids = pad_func(
             [example['input_ids'] for example in batch_examples])
         if self._model_type != 'unimo-text':
-            attention_mask = pad_mask(
-                [example['attention_mask'] for example in batch_examples])
+            attention_mask = (input_ids != pad_val).astype('float32')
             batch_dict['input_ids'] = input_ids
             batch_dict['attention_mask'] = attention_mask
         else:
