@@ -1654,7 +1654,8 @@ class FasterPegasus(PegasusPretrainedModel):
                  model,
                  decoding_lib=None,
                  use_fp16_decoding=False,
-                 enable_faster_encoder=True):
+                 enable_faster_encoder=False,
+                 **kwargs):
         super(FasterPegasus, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1662,12 +1663,15 @@ class FasterPegasus(PegasusPretrainedModel):
         self.decoder = model.get_decoder()
         self.pad_token_id = model.pegasus.config['pad_token_id']
         self.enable_faster_encoder = enable_faster_encoder
+        self.trans_out = kwargs.get("trans_out", False)
 
         self.decoding = InferPegasusDecoding(
             model=self._model,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
             hidden_act=model.pegasus.config['activation_function'])
+
+        #TODO(gongenlei): Support faster_encoder
         # if self.enable_faster_encoder:
         #     # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
         #     self.encoder = FasterPegasus.enable_faster_encoder_func(self.encoder)
@@ -1682,22 +1686,22 @@ class FasterPegasus(PegasusPretrainedModel):
                 input_ids=None,
                 encoder_output=None,
                 seq_len=None,
-                forced_bos_token_id=None,
+                min_length=0,
+                max_length=256,
                 num_beams=4,
-                top_k=1,
-                top_p=0.0,
                 decode_strategy="beam_search_v3",
+                decoder_start_token_id=None,
                 bos_token_id=None,
                 eos_token_id=None,
                 pad_token_id=None,
-                decoder_start_token_id=None,
-                max_length=256,
-                min_length=0,
                 diversity_rate=0.0,
                 length_penalty=0.6,
+                top_k=1,
+                top_p=0.0,
                 temperature=1.0,
                 num_return_sequences=1,
                 early_stopping=False,
+                forced_bos_token_id=None,
                 forced_eos_token_id=None,
                 **model_kwargs):
 
@@ -1710,6 +1714,7 @@ class FasterPegasus(PegasusPretrainedModel):
         decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
             self._model, 'decoder_start_token_id', None)
 
+        # import pdb;pdb.set_trace()
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
@@ -1737,21 +1742,29 @@ class FasterPegasus(PegasusPretrainedModel):
         if decoder_start_token_id is not None:
             bos_token_id = decoder_start_token_id
 
-        return self.decoding(enc_output=encoder_output,
-                             memory_seq_lens=seq_len,
-                             beam_size=num_beams,
-                             top_k=top_k,
-                             top_p=top_p,
-                             decoding_strategy=decode_strategy,
-                             max_out_len=max_length,
-                             min_out_len=min_length,
-                             diversity_rate=diversity_rate,
-                             bos_token_id=bos_token_id,
-                             eos_token_id=eos_token_id,
-                             pad_token_id=pad_token_id,
-                             alpha=length_penalty,
-                             temperature=temperature,
-                             early_stopping=early_stopping,
-                             forced_eos_token_id=forced_eos_token_id)
+        ids = self.decoding(enc_output=encoder_output,
+                            memory_seq_lens=seq_len,
+                            beam_size=num_beams,
+                            top_k=top_k,
+                            top_p=top_p,
+                            decoding_strategy=decode_strategy,
+                            max_out_len=max_length,
+                            min_out_len=min_length,
+                            diversity_rate=diversity_rate,
+                            bos_token_id=bos_token_id,
+                            eos_token_id=eos_token_id,
+                            pad_token_id=pad_token_id,
+                            alpha=length_penalty,
+                            temperature=temperature,
+                            early_stopping=early_stopping,
+                            forced_eos_token_id=forced_eos_token_id)
+
+        if self.trans_out:
+            if decode_strategy.startswith("beam_search"):
+                ids = ids.transpose([1, 2, 0])
+            else:
+                ids = ids.transpose([1, 0])
+
+        return ids
 
     generate = forward
