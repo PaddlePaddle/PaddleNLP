@@ -27,11 +27,11 @@ def parse_args():
         "--model_name_or_path",
         default="IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
         type=str,
-        help="The model name to specify the UNIMOText to use. ")
+        help="The model name to specify the Pegasus to use. ")
     parser.add_argument("--inference_model_dir",
                         default="./inference_model",
                         type=str,
-                        help="Path to save inference model of UNIMOText. ")
+                        help="Path to save inference model of Pegasus. ")
     parser.add_argument(
         "--topk",
         default=4,
