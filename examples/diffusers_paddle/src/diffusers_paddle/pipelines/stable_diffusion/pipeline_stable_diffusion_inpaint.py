@@ -364,9 +364,9 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         masked_image_latents = 0.18215 * masked_image_latents
 
         # duplicate mask and masked_image_latents for each generation per prompt, using mps friendly method
-        mask = mask.repeat(num_images_per_prompt, 1, 1, 1)
-        masked_image_latents = masked_image_latents.repeat(
-            num_images_per_prompt, 1, 1, 1)
+        mask = mask.tile([num_images_per_prompt, 1, 1, 1])
+        masked_image_latents = masked_image_latents.tile(
+            [num_images_per_prompt, 1, 1, 1])
 
         mask = paddle.concat([mask] *
                              2) if do_classifier_free_guidance else mask

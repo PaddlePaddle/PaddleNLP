@@ -52,7 +52,7 @@ class DDIMPipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 The number of images to generate.
-            generator (`int`, *optional*):
+            seed (`int`, *optional*):
                 A random seed.
             eta (`float`, *optional*, defaults to 0.0):
                 The eta parameter which controls the scale of the variance (0 is DDIM and 1 is one type of DDPM).

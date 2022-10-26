@@ -70,7 +70,7 @@ bash run_single.sh
 
 `train_textual_inversion.py`代码可传入的参数解释如下：
 > 主要修改的参数
-> * `--pretrained_model_name_or_path`: 所使用的Stable Diffusion模型权重名称或者本地下载的模型路径，目前支持了上表中的7种模型权重，我们可直接替换使用。
+> * `--pretrained_model_name_or_path`: 所使用的Stable Diffusion模型权重名称或者本地下载的模型路径，目前支持了上表中的8种模型权重，我们可直接替换使用。
 > * `--train_data_dir`: 训练数据文件夹所在的地址，上述例子我们使用了`cat_toy_image`目录。
 > * `--placeholder_token`: 用来表示所需训练`物体(object)`的占位符token，上述例子我们使用了`<cat-toy>`这个占位符，建议用户以这种带有`< >`和`-`的形式设计占位符。
 > * `--initializer_token`: 用来初始化占位符token的一个token。通过给`placeholder_token`指定`initializer_token`，模型可以快速掌握新`placeholder_token`所表示的意思，从而加速模型的学习速度。注：上述例子我们使用`toy`这个单词初始化了`<cat-toy>`这个token。这样，在训练的时候模型就会有一定的先验知识，知道`<cat-toy>`是一种`玩具toy`。

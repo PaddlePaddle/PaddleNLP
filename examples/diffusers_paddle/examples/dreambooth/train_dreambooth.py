@@ -112,12 +112,20 @@ def parse_args():
                         default=None,
                         help="A seed for reproducible training.")
     parser.add_argument(
-        "--resolution",
+        "--height",
         type=int,
         default=512,
         help=
-        ("The resolution for input images, all the images in the train/validation dataset will be resized to this"
-         " resolution"),
+        ("The height for input images, all the images in the train/validation dataset will be resized to this"
+         " height"),
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=512,
+        help=
+        ("The width for input images, all the images in the train/validation dataset will be resized to this"
+         " width"),
     )
     parser.add_argument(
         "--center_crop",
@@ -133,7 +141,7 @@ def parse_args():
         help="Batch size (per device) for the training dataloader.")
     parser.add_argument("--sample_batch_size",
                         type=int,
-                        default=4,
+                        default=1,
                         help="Batch size (per device) for sampling images.")
     parser.add_argument("--num_train_epochs", type=int, default=1)
     parser.add_argument(
@@ -246,10 +254,12 @@ class DreamBoothDataset(Dataset):
         tokenizer,
         class_data_root=None,
         class_prompt=None,
-        size=512,
+        height=512,
+        width=512,
         center_crop=False,
     ):
-        self.size = size
+        self.height = height
+        self.width = width
         self.center_crop = center_crop
         self.tokenizer = tokenizer
 
@@ -279,9 +289,10 @@ class DreamBoothDataset(Dataset):
             self.class_data_root = None
 
         self.image_transforms = transforms.Compose([
-            transforms.Resize(size, interpolation="bilinear"),
-            transforms.CenterCrop(size)
-            if center_crop else transforms.RandomCrop(size),
+            transforms.Resize((height, width), interpolation="bilinear"),
+            transforms.CenterCrop(
+                (height, width)) if center_crop else transforms.RandomCrop(
+                    (height, width)),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ])
@@ -463,7 +474,8 @@ def main():
         if args.with_prior_preservation else None,
         class_prompt=args.class_prompt,
         tokenizer=tokenizer,
-        size=args.resolution,
+        height=args.height,
+        width=args.width,
         center_crop=args.center_crop,
     )
 

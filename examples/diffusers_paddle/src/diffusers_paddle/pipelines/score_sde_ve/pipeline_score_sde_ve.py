@@ -51,7 +51,7 @@ class ScoreSdeVePipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 The number of images to generate.
-            generator (`int`, *optional*):
+            seed (`int`, *optional*):
                 A random seed.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between

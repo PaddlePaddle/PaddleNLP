@@ -57,9 +57,7 @@ class PNDMPipeline(DiffusionPipeline):
             num_inference_steps (`int`, `optional`, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.
-            generator (`paddle.Generator`, `optional`): A [paddle
-                generator](https://pypaddle.org/docs/stable/generated/paddle.Generator.html) to make generation
-                deterministic.
+            seed (`int`, `optional`): A random seed.
             output_type (`str`, `optional`, defaults to `"pil"`): The output format of the generate image. Choose
                 between [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
             return_dict (`bool`, `optional`, defaults to `True`): Whether or not to return a

@@ -56,7 +56,7 @@ class LDMPipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 Number of images to generate.
-            generator (`int`, *optional*):
+            seed (`int`, *optional*):
                 A random seed.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the

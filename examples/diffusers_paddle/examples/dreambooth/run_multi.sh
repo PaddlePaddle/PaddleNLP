@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -u -m paddle.distributed.launch --gpus "0,1" train_dreambooth.py \
-  --pretrained_model_name_or_path=CompVis/stable-diffusion-v1-4 \
-  --instance_data_dir=./dream_image \
+export MODEL_NAME="CompVis/stable-diffusion-v1-4"
+export INSTANCE_DIR="./dream_image"
+export OUTPUT_DIR="./dream_outputs"
+
+python -u train_dreambooth.py \
+  --pretrained_model_name_or_path=$MODEL_NAME \
+  --instance_data_dir=$INSTANCE_DIR \
+  --output_dir=$OUTPUT_DIR \
   --instance_prompt="a photo of sks dog" \
   --resolution=512 \
   --train_batch_size=1 \

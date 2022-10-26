@@ -205,7 +205,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            generator (`int`, *optional*):
+            seed (`int`, *optional*):
                 A random seed.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
@@ -362,8 +362,9 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
         init_timestep = min(init_timestep, num_inference_steps)
 
         timesteps = self.scheduler.timesteps[-init_timestep]
-        timesteps = paddle.to_tensor([timesteps] * batch_size *
-                                     num_images_per_prompt)
+        timesteps = timesteps.tile([
+            batch_size * num_images_per_prompt,
+        ])
 
         if seed is not None:
             paddle.seed(seed)

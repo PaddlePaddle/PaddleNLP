@@ -53,7 +53,7 @@ image = pipe(prompt).images[0]
 
 image.save("astronaut_rides_horse.png")
 ```
-
+<center><image src="https://user-images.githubusercontent.com/50394665/197779466-04543823-8b83-41d6-94e8-146a7dac00d7.png" width="600"></center>
 
 ### 3.2 使用Stable Diffusion体验基于文本引导的图片-图片的生成
 
@@ -83,8 +83,11 @@ with paddle.amp.auto_cast(True):
 image.save("fantasy_landscape.png")
 ```
 
+<center><image src="https://user-images.githubusercontent.com/50394665/197780044-34e6f8ca-6864-4c3d-bb99-28e0aadf867b.png" width="600"></center>
+
 ### 3.3 使用Stable Diffusion进行补全图片
 
+Tips: 下面的使用方法是旧版本的代码。
 ```python
 import paddle
 from io import BytesIO
@@ -112,6 +115,35 @@ with paddle.amp.auto_cast(True):
 
 image.save("cat_on_bench.png")
 ```
+<center><image src="https://user-images.githubusercontent.com/50394665/197783711-ab3caf2e-5a4d-4099-8d01-d6ca80ca8e78.png" width="600"></center>
+
+Tips: 下面的使用方法是新版本的代码，也是官方推荐的代码，注意必须配合**runwayml/stable-diffusion-inpainting**才可正常使用。
+```python
+import PIL
+import requests
+from io import BytesIO
+
+from diffusers_paddle import StableDiffusionInpaintPipeline
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+
+img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
+
+init_image = download_image(img_url).resize((512, 512))
+mask_image = download_image(mask_url).resize((512, 512))
+
+pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting")
+
+prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
+image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
+
+image.save("cat_on_bench_new.png")
+```
+<center><image src="https://user-images.githubusercontent.com/50394665/198016801-87cec13b-0d89-41c3-aedb-c89a43d76153.png" width="600"></center>
 
 ## 4. Credits
 

@@ -750,9 +750,9 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             init_timestep = min(init_timestep, num_inference_steps)
 
             timesteps = self.scheduler.timesteps[-init_timestep]
-            timesteps = paddle.to_tensor([timesteps] * batch_size *
-                                         num_images_per_prompt,
-                                         dtype="int64")
+            timesteps = timesteps.tile([
+                batch_size * num_images_per_prompt,
+            ])
 
             noise = paddle.randn(
                 init_latents.shape,
@@ -798,7 +798,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             if mask is not None:
                 # masking
                 init_latents_proper = self.scheduler.add_noise(
-                    init_latents_orig, noise, paddle.to_tensor([t]))
+                    init_latents_orig, noise, t)
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
             # call the callback, if provided

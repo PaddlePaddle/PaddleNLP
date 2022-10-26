@@ -827,7 +827,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            generator (`int`, *optional*):
+            seed (`int`, *optional*):
                 A random seed.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
@@ -959,8 +959,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         init_timestep = min(init_timestep, num_inference_steps)
 
         timesteps = self.scheduler.timesteps[-init_timestep]
-        timesteps = paddle.to_tensor([timesteps] * batch_size *
-                                     num_images_per_prompt)
+        timesteps = timesteps.tile([
+            batch_size * num_images_per_prompt,
+        ])
 
         if seed is not None:
             paddle.seed(seed)
@@ -1230,8 +1231,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         init_timestep = min(init_timestep, num_inference_steps)
 
         timesteps = self.scheduler.timesteps[-init_timestep]
-        timesteps = paddle.to_tensor([timesteps] * batch_size *
-                                     num_images_per_prompt)
+        timesteps = timesteps.tile([
+            batch_size * num_images_per_prompt,
+        ])
 
         # add noise to latents using the timesteps
         noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
@@ -1278,7 +1280,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                                           **extra_step_kwargs).prev_sample
             # masking
             init_latents_proper = self.scheduler.add_noise(
-                init_latents_orig, noise, paddle.to_tensor([t]))
+                init_latents_orig, noise, t)
 
             latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
