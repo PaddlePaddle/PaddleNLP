@@ -60,13 +60,6 @@ class ErnieGramEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(emb_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer(
-            "position_ids",
-            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"),
-                          shape=[1, -1]),
-        )
-
     def forward(self,
                 input_ids: Optional[Tensor] = None,
                 token_type_ids: Optional[Tensor] = None,
@@ -77,17 +70,21 @@ class ErnieGramEmbeddings(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = paddle.shape(inputs_embeds)
+        input_shape = paddle.shape(inputs_embeds)[:-1]
 
         if position_ids is None:
-            seq_length = input_shape[1]
-            position_ids = self.position_ids[:,
-                                             past_key_values_length:seq_length +
-                                             past_key_values_length]
+            # maybe need use shape op to unify static graph and dynamic graph
+            ones = paddle.ones(input_shape, dtype="int64")
+            seq_length = paddle.cumsum(ones, axis=1)
+            position_ids = seq_length - ones
+
+            if past_key_values_length > 0:
+                position_ids = position_ids + past_key_values_length
+
             position_ids.stop_gradient = True
 
         if token_type_ids is None:
-            token_type_ids_shape = input_shape[:-1]
+            token_type_ids_shape = input_shape
             token_type_ids = paddle.zeros(token_type_ids_shape, dtype="int64")
 
         position_embeddings = self.position_embeddings(position_ids)
