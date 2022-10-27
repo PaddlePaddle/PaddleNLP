@@ -657,6 +657,8 @@ def _quant_aware_training_dynamic(self, input_dir):
         'quantizable_layer_type': ['Linear', 'Conv2D'],
         'moving_rate':
         args.moving_rate,
+        'onnx_format':
+        True
     }
 
     if not os.path.exists(args.output_dir):
@@ -750,8 +752,7 @@ def _quant_aware_training_dynamic(self, input_dir):
     quanter.save_quantized_model(self.model,
                                  os.path.join(input_dir,
                                               args.output_filename_prefix),
-                                 input_spec=input_spec,
-                                 onnx_format=True)
+                                 input_spec=input_spec)
     if os.path.exists(output_param_path):
         os.remove(output_param_path)
 

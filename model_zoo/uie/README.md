@@ -16,10 +16,10 @@
 - [4. 训练定制](#训练定制)
   - [4.1 代码结构](#代码结构)
   - [4.2 数据标注](#数据标注)
-  - [4.3 模型微调和压缩](#模型微调和压缩)
-  - [4.4 模型评估](#模型评估)
-  - [4.5 定制模型一键预测](#定制模型一键预测)
-  - [4.6 实验指标](#实验指标)
+  - [4.3 模型微调和评估](#模型微调和评估)
+  - [4.4 定制模型一键预测](#定制模型一键预测)
+  - [4.5 实验指标](#实验指标)
+  - [4.6 模型压缩](#模型压缩)
   - [4.7 模型部署](#模型部署)
 - [5. CCKS比赛](#CCKS比赛)
 
@@ -619,29 +619,25 @@ python labelstudio2doccano.py --labelstudio_file label-studio.json
 - ``doccano_file``: doccano 格式的数据文件保存路径，默认为 "doccano_ext.jsonl"。
 - ``task_type``: 任务类型，可选有抽取（"ext"）和分类（"cls"）两种类型的任务，默认为 "ext"。
 
-<a name="模型微调和压缩"></a>
+<a name="模型微调和评估"></a>
 
-#### 4.3 模型微调和压缩
+#### 4.3 模型微调和评估
 
-推荐使用 [Trainer API ](../../docs/trainer.md) 对模型进行微调、压缩。用户输入模型、数据集等就可以使用 Trainer API 高效快速的实现预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等训练配置。已经集成在 Trainer 中的模型压缩功能现在支持裁剪 + 量化的策略。
+推荐使用 [Trainer API ](../../docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
-如果需要使用模型压缩功能需要安装最新版本的 `paddleslim`：
-
-```shell
-pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-使用下面的命令，使用 `uie-base` 作为预训练模型进行模型微调 + 压缩：
+使用下面的命令，使用 `uie-base` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
 
 ```shell
-python run_trainer.py  \
+export finetuned_model=uie_finetuned
+
+python finetune.py  \
     --device gpu \
     --logging_steps 10 \
     --save_steps 100 \
     --eval_steps 100 \
     --seed 42 \
     --model_name_or_path uie-base \
-    --output_dir uie_compress \
+    --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
     --label_names 'start_positions' 'end_positions' \
@@ -652,13 +648,14 @@ python run_trainer.py  \
     --learning_rate 1e-5 \
     --do_train \
     --do_eval \
-    --do_compress \
+    --do_export \
+    --export_model_dir $finetuned_model \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
     --load_best_model_at_end  True \
     --save_total_limit 1 \
-    --strategy 'qat' \
+
 ```
 
 使用 Trainer 可支持配置的通用参数：
@@ -676,89 +673,12 @@ python run_trainer.py  \
 * `weight_decay`：除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0；
 * `do_train`:是否进行微调训练，设置该参数表示进行微调训练，默认不设置。
 * `do_eval`:是否进行评估，设置该参数表示进行评估。
-* `do_compress`:是否进行压缩，设置该参数表示进行压缩。设置时，可同时设置压缩相关的参数；
 
-可配置的压缩相关的参数：
-* `strategy`：压缩策略，在 UIE 中目前推荐使用 `'qat'`，即量化训练（QAT）；默认是 `'dynabert+ptq'`。
-* `activation_quantize_type`：激活 tensor 的量化类型。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在'qat'策略中，它默认是 'moving_average_abs_max'。
-* `weight_quantize_type`：权重的量化类型。支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'， 这种方法得到的模型通常精度更高；
-
-以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，得到模型的 F1 值如下：
-
-|       Models         | F1           |
-| -------------------  |:------------:|
-| uie-base+微调，FP32   |    91.93     |
-
-该示例代码中由于设置了参数 `--do_eval` 和 `--do_compress`，因此在训练完会自动进行评估和模型压缩。下面会对模型压缩功能再进行简单的介绍。
-
-##### 模型压缩
-
-上面的模型压缩功能使用的是 PaddleNLP 的 [模型压缩 API](../../docs/compression.md)。模型压缩主要用于有模型部署上线需求的场景，模型压缩可以进一步压缩模型体积、加快推理速度、减少内存占用。
-
-如果需要对之前已经训练完成的模型进行压缩，只需要将上面的脚本中 `model_name_or_path ` 设置为之前训练好的模型路径，并取消设置 `--do_train`，开启 `--do_compress` 即可。
-
-同样，模型压缩后得到的最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可用于服务端和移动端的推理部署。
-
-以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
-
-| Models         | F1           |
-| -------------  |:------------:|
-| uie-base+微调，FP32   | 91.93        |
-| uie-base+微调+量化，INT8 | 94.12        |
-
-<a name="模型评估"></a>
-
-#### 4.4 模型评估
-
-除了在 Trainer 中使用 `--do_eval`，还可以通过运行以下命令进行模型评估：
-
-评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
-
-可开启`debug`模式对每个正例类别分别进行评估，该模式仅用于模型调试：
-
-```shell
-python evaluate.py \
-    --model_path ./checkpoint/model_best \
-    --test_path ./data/dev.txt \
-    --debug
-```
-
-输出打印示例：
-
-```text
-[2022-09-14 03:13:58,877] [    INFO] - -----------------------------
-[2022-09-14 03:13:58,877] [    INFO] - Class Name: 疾病
-[2022-09-14 03:13:58,877] [    INFO] - Evaluation Precision: 0.89744 | Recall: 0.83333 | F1: 0.86420
-[2022-09-14 03:13:59,145] [    INFO] - -----------------------------
-[2022-09-14 03:13:59,145] [    INFO] - Class Name: 手术治疗
-[2022-09-14 03:13:59,145] [    INFO] - Evaluation Precision: 0.90000 | Recall: 0.85714 | F1: 0.87805
-[2022-09-14 03:13:59,439] [    INFO] - -----------------------------
-[2022-09-14 03:13:59,440] [    INFO] - Class Name: 检查
-[2022-09-14 03:13:59,440] [    INFO] - Evaluation Precision: 0.77778 | Recall: 0.56757 | F1: 0.65625
-[2022-09-14 03:13:59,708] [    INFO] - -----------------------------
-[2022-09-14 03:13:59,709] [    INFO] - Class Name: X的手术治疗
-[2022-09-14 03:13:59,709] [    INFO] - Evaluation Precision: 0.90000 | Recall: 0.85714 | F1: 0.87805
-[2022-09-14 03:13:59,893] [    INFO] - -----------------------------
-[2022-09-14 03:13:59,893] [    INFO] - Class Name: X的实验室检查
-[2022-09-14 03:13:59,894] [    INFO] - Evaluation Precision: 0.71429 | Recall: 0.55556 | F1: 0.62500
-[2022-09-14 03:14:00,057] [    INFO] - -----------------------------
-[2022-09-14 03:14:00,058] [    INFO] - Class Name: X的影像学检查
-[2022-09-14 03:14:00,058] [    INFO] - Evaluation Precision: 0.69231 | Recall: 0.45000 | F1: 0.54545
-```
-
-可配置参数说明：
-
-- `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
-- `test_path`: 进行评估的测试集文件。
-- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
-- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
-- `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
-
+该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
 <a name="定制模型一键预测"></a>
 
-#### 4.5 定制模型一键预测
+#### 4.4 定制模型一键预测
 
 `paddlenlp.Taskflow`装载定制模型，通过`task_path`指定模型权重文件的路径，路径下需要包含训练好的模型权重文件`model_state.pdparams`。
 
@@ -790,7 +710,7 @@ python evaluate.py \
 
 <a name="实验指标"></a>
 
-#### 4.6 实验指标
+#### 4.5 实验指标
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
@@ -808,40 +728,112 @@ python evaluate.py \
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
 
+<a name="模型压缩"></a>
 
+#### 4.6 模型压缩
+
+模型压缩功能使用的是 PaddleNLP [模型压缩 API](../../docs/compression.md)。模型压缩主要用于有模型部署上线需求的场景，可以进一步压缩模型体积、加快推理速度、减少内存占用。
+
+如果需要使用 **模型压缩** 功能需要安装最新版本的 `paddleslim`：
+
+```shell
+pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+压缩与微调共用了一个脚本，压缩时开启了 `--do_compress`，并取消设置 `--do_train` 和 `--do_eval`。使用下面的命令，使用上面微调好的模型 `$finetuned_model` 进行压缩：
+
+```shell
+python finetune.py  \
+    --device gpu \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --eval_steps 100 \
+    --seed 42 \
+    --model_name_or_path  $finetuned_model \
+    --output_dir uie_compress \
+    --train_path data/train.txt \
+    --dev_path data/dev.txt  \
+    --label_names 'start_positions' 'end_positions' \
+    --max_seq_length 512  \
+    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size  16 \
+    --num_train_epochs 200 \
+    --learning_rate 1e-5 \
+    --do_compress \
+    --overwrite_output_dir \
+    --disable_tqdm True \
+    --metric_for_best_model eval_f1 \
+    --save_total_limit 1 \
+    --strategy 'qat' \
+```
+
+可配置的压缩相关的参数：
+* `strategy`：压缩策略，在 UIE 中目前推荐使用 `'qat'`，即量化训练（QAT）。由于有训练过程，因此训练相关的参数也可以重新调整。例如上面微调时已介绍过的`per_device_train_batch_size`、`per_device_eval_batch_size`、`learning_rate`、`num_train_epochs`。
+* `activation_quantize_type`：激活 tensor 的量化类型，使用默认值即可。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在'qat'策略中，它默认是 'moving_average_abs_max'。
+* `weight_quantize_type`：权重的量化类型，使用默认值即可。支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'，这种方法得到的模型通常精度更高；
+- `use_pact`： 是否使用 PACT 量化策略，是对普通方法的改进，参考论文 [PACT: Parameterized Clipping Activation for Quantized Neural Networks](https://arxiv.org/abs/1805.06085)，打开后可能精度更高，默认是 True。
+* `do_compress`：是否进行压缩，该参数需要与脚本配合；默认是 False。
+
+同样，模型压缩后得到的最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可直接用于服务端和移动端的推理部署，不需要再使用 `export_model.py`脚本 来导出模型了。
+
+以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
+
+|         Models         |        F1         |
+| ---------------------  |:-----------------:|
+| uie-base+微调，FP32     |       91.93       |
+| uie-base+微调+量化，INT8 |       94.12       |
 
 <a name="模型部署"></a>
 
 #### 4.7 模型部署
 
-以下是UIE Python端的部署流程，包括环境准备、模型导出和使用示例。
+以下是 UIE Python 端的部署流程，包括环境准备、模型导出和使用示例。
 
 - 环境准备
-  UIE的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
+
+  UIE的部署分为 CPU 和 GPU 两种情况，请根据你的部署环境安装对应的依赖。
 
   - CPU端
 
-    CPU端的部署请使用如下命令安装所需依赖
+    CPU端的部署请使用如下命令安装所需依赖：
 
     ```shell
     pip install -r deploy/python/requirements_cpu.txt
     ```
+    在命令行输入 `lscpu` 查看本机支持指令，如果机器支持完整的 AVX-512 指令集，推荐使用 INT8 部署。可参考 [支持 AVX-512 指令集扩展的处理器](https://www.intel.cn/content/www/cn/zh/support/articles/000058341/processors/intel-xeon-processors.html)
+
+    ```text
+    在支持 AVX512_VNNI 的 CPU 服务器上，如：Casecade Lake,  Model name: Intel(R) Xeon(R) Gold X2XX，INT8 精度和性能最高，INT8 性能提升为 FP32 模型的 3 ~ 3.7 倍。
+
+    在支持 AVX-512 但是不支持 AVX512_VNNI 的 CPU 服务器上，如：SkyLake, Model name：Intel(R) Xeon(R) Gold X1XX，INT8 性能为 FP32 性能的 1.5 倍左右。
+    ```
+
+    否则，只支持 FP32 部署。
 
   - GPU端
 
-    为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保**CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖
+    为了在 GPU 上获得最佳的推理性能和稳定性，请先确保机器已正确安装 NVIDIA 相关驱动和基础软件，确保 **CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖
 
     ```shell
     pip install -r deploy/python/requirements_gpu.txt
     ```
 
-    如需使用半精度（FP16）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。
-    更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
+    如果 GPU 设备的 CUDA 计算能力大于等于 7.2，例如 T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用 INT8 部署，部署之前需要进行模型压缩（参考 4.6 节的内容）。要注意的是，V100 卡可以进行 INT8 推理，但是加速不充分。
+
+    如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，但达不到上方 INT8 模型推理的要求，比如 V100 等。推荐使用半精度（FP16）部署。直接使用微调后导出的模型，运行时设置 `--use_fp16` 即可。
+
+    如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
+
+    更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 
 
 - 模型导出
 
-  将训练后的动态图参数导出为静态图参数：
+  如果对 INT8 模型进行预测，模型压缩后已经自动进行了导出，可跳过这一节。
+
+  而如果对 FP32 或者 FP16 模型进行预测，而且按照上面 4.3 节的脚本进行了模型训练，$finetuned_model 中会带有`*.pdmodel`、`*.pdiparams`文件，也可以跳过这一节。
+
+  否则，还需要调用 `export_model.py` 脚本，产出静态图模型，执行方式如下：
 
   ```shell
   python export_model.py --model_path ./checkpoint/model_best --output_path ./export
@@ -865,9 +857,9 @@ python evaluate.py \
     可配置参数说明：
 
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
-    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
 
   - GPU端推理样例
 
@@ -879,12 +871,12 @@ python evaluate.py \
 
     可配置参数说明：
 
-    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    - `use_fp16`: 是否使用FP16进行加速，默认关闭。
-    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
-    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
-    - `device_id`: GPU设备ID，默认为0。
+    - `model_path_prefix`: 用于推理的 Paddle 模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `use_fp16`: FP32 模型是否使用 FP16 进行加速，使用 FP32、INT8 推理时不需要设置，默认关闭。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
+    - `device_id`: GPU 设备 ID，默认为 0。
 
 <a name="CCKS比赛"></a>
 
