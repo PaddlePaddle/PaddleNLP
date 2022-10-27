@@ -23,10 +23,8 @@ from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
 
 __all__ = [
-    "UNIMOPretrainedModel",
-    'UNIMOModel',
-    'UNIMOLMHeadModel',
-    'UNIMOForMaskedLM',
+    "UNIMOPretrainedModel", 'UNIMOModel', 'UNIMOLMHeadModel',
+    'UNIMOForMaskedLM', 'UNIMOForConditionalGeneration'
 ]
 
 
@@ -773,3 +771,4 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel
+UNIMOForConditionalGeneration = UNIMOLMHeadModel

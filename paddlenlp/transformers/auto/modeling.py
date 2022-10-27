@@ -93,6 +93,7 @@ MAPPING_NAMES = OrderedDict([
     ("Artist", "artist"),
     ("OPT", 'opt'),
     ("ErnieViL", 'ernie_vil'),
+    ("Pegasus", 'pegasus'),
 ])
 
 MAPPING_TASKS = OrderedDict([
