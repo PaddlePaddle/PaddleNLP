@@ -19,7 +19,8 @@ clean:
 	rm -fr dist/*
 
 .PHONY: lint
-lint: pylint pycodestyle flake8 mypy
+lint: pylint
+# lint: pylint mypy
 
 
 # disable: TODO list temporay
@@ -27,22 +28,8 @@ lint: pylint pycodestyle flake8 mypy
 pylint:
 	pylint \
 		--load-plugins pylint_quotes \
-		--disable=W0511,R0801,cyclic-import,C4001 \
 		$(SOURCE_GLOB)
 
-.PHONY: pycodestyle
-pycodestyle:
-	pycodestyle \
-		--statistics \
-		--count \
-		--ignore="${IGNORE_PEP}" \
-		$(SOURCE_GLOB)
-
-.PHONY: flake8
-flake8:
-	flake8 \
-		--ignore="${IGNORE_PEP}" \
-		$(SOURCE_GLOB)
 
 .PHONY: mypy
 mypy:
