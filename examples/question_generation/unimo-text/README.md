@@ -265,7 +265,7 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log 
 
 **NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
 
-微调的baseline模型在dureader_qg验证集上有如下结果(指标为BLEU-4)，其中`unimo-text-1.0-dureader_qg-w/o-template`表示不使用模版策略微调的结果：，`unimo-text-1.0-question-generation-dureader_qg`表示在通用问题生成预训练模型`unimo-text-1.0-question-generation`上微调的结果：
+微调的模型在dureader_qg验证集上有如下结果(指标为BLEU-4)，其中`unimo-text-1.0-dureader_qg-w/o-template`表示不使用模版策略微调的结果，`unimo-text-1.0-large-dureader_qg`表示使用large模型微调的结果，`unimo-text-1.0-question-generation-dureader_qg`表示在通用问题生成预训练模型`unimo-text-1.0-question-generation`上微调的结果：
 
 |       model_name        | DuReaderQG |
 | :-----------------------------: | :-----------: |
