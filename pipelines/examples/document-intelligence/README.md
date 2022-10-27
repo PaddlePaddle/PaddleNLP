@@ -10,7 +10,7 @@
 
 ## 2. 快速开始
 
-以下是针对mac和linux的安装流程：
+**以下是针对mac和linux的安装流程，windows的安装和使用流程请参考[windows](./README_windows.md)：**
 
 
 ### 2.1 运行环境
