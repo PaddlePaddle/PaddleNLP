@@ -83,3 +83,26 @@ class QueryResponse(BaseModel):
     answers: List[AnswerSerialized] = []
     documents: List[DocumentSerialized] = []
     debug: Optional[Dict] = Field(None, alias="_debug")
+
+
+class DocumentRequest(BaseModel):
+    meta: dict
+    params: Optional[dict] = None
+    debug: Optional[bool] = False
+
+    class Config:
+        # Forbid any extra fields in the request to avoid silent failures
+        extra = Extra.forbid
+
+
+class DocumentResponse(BaseModel):
+    meta: dict
+    results: List[List[dict]] = []
+    debug: Optional[Dict] = Field(None, alias="_debug")
+
+
+class QueryImageResponse(BaseModel):
+    query: str
+    answers: List[str] = []
+    documents: List[DocumentSerialized] = []
+    debug: Optional[Dict] = Field(None, alias="_debug")

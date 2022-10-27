@@ -28,7 +28,7 @@ def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference_model_dir",
-                        default="./infer_model",
+                        default="../../inference_model",
                         type=str,
                         help="Path to save inference model of UNIMOText. ")
     args = parser.parse_args()
