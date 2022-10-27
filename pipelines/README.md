@@ -205,7 +205,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 - Tutorial 1 - Pipelines [Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)
 - Tutorial 2 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
 - Tutorial 3 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
-- Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/frequently-asked-question/dense_faq_example.py)
+- Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/FAQ/dense_faq_example.py)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">

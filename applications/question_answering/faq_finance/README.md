@@ -15,7 +15,7 @@
 
 智能问答是获取信息和知识的更直接、更高效的方式之一，传统的信息检索方法智能找到相关的文档，而智能问答能够直接找到精准的答案，极大的节省了人们查询信息的时间。问答按照技术分为基于阅读理解的问答和检索式的问答，阅读理解的问答是在正文中找到对应的答案片段，检索式问答则是匹配高频的问题，然后把答案返回给用户。本项目属于检索式的问答，问答的领域用途很广，比如搜索引擎，小度音响等智能硬件，政府，金融，银行，电信，电商领域的智能客服，聊天机器人等。
 
-- 本方案是场景的定制化的方案，用户可以使用自己的数据训练一个特定场景的方案。另外，想快速体验FAQ智能问答系统请参考Pipelines的实现[FAQ智能问答](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)
+- 本方案是场景的定制化的方案，用户可以使用自己的数据训练一个特定场景的方案。另外，想快速体验FAQ智能问答系统请参考Pipelines的实现[FAQ智能问答](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/FAQ)
 
 - 本项目的详细教程请参考（包括数据和代码实现）[aistudio教程](https://aistudio.baidu.com/aistudio/projectdetail/3882519)
 
@@ -416,7 +416,7 @@ pip install paddle-serving-server-gpu==0.8.3.post101 -i https://pypi.tuna.tsingh
 # CUDA11.2 + TensorRT8
 pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
-更详细的安装信息请参考[链接]((https://github.com/PaddlePaddle/Serving/blob/v0.9.0/doc/Install_Linux_Env_CN.md))，安装完依赖后就可以执行下面的步骤。首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
+更详细的安装信息请参考[链接](https://github.com/PaddlePaddle/Serving/blob/v0.9.0/doc/Install_Linux_Env_CN.md)，安装完依赖后就可以执行下面的步骤。首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
 
 ```
 python export_to_serving.py \
