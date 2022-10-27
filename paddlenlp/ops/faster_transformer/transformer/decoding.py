@@ -3033,12 +3033,13 @@ class InferPegasusDecoding(nn.Layer):
                            dtype="float16" if use_fp16_decoding else "float32",
                            restore_data=True)
         ]
-        self.linear_weight = [
+        setattr(
+            self, "lm_head_weight_",
             transfer_param(model.lm_head_weight.t(),
                            is_bias=False,
                            dtype="float16" if use_fp16_decoding else "float32",
-                           restore_data=True)
-        ]
+                           restore_data=True))
+        self.linear_weight = [getattr(self, "lm_head_weight_")]
         self.linear_bias = [
             transfer_param(model.final_logits_bias,
                            is_bias=True,
