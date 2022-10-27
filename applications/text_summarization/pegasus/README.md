@@ -78,7 +78,7 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 - 模型部署需要将保存的最佳模型参数（动态图）导出成静态图参数，用于后续的推理部署。
 
-- 文本摘要应用提供了基于Paddle Serving的本地部署predictor，并且支持在GPU设备使用Faster Generation进行加速。
+- 文本摘要应用提供了基于Paddle Inference的本地部署predictor，并且支持在GPU设备使用FasterGeneration进行加速。
 
 - 文本摘要应用提供了基于Paddle Serving的服务端部署方案。
 
