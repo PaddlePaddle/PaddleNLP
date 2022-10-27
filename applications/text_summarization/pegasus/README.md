@@ -17,7 +17,7 @@
     - [模型训练](#模型训练)
     - [模型预测](#模型预测)
     - [模型推理部署](#模型推理部署)
-      - [FasterTransformer加速及模型静态图导出](#fastertransformer加速及模型静态图导出)
+      - [FasterGeneration加速及模型静态图导出](#fastergeneration加速及模型静态图导出)
       - [模型部署](#模型部署)
   - [References](#references)
 
@@ -235,9 +235,9 @@ Finetuned baseline的模型在[LCSTS](https://aclanthology.org/D15-1229/)测试�
 
 ### 模型推理部署
 
-#### FasterTransformer加速及模型静态图导出
+#### FasterGeneration加速及模型静态图导出
 
-使用动态图训练结束之后，可以通过[静态图导出脚本](export_model.py)实现基于FasterTransformer的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
+使用动态图训练结束之后，可以通过[静态图导出脚本](export_model.py)实现基于FasterGeneration的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
 python export_model.py \
