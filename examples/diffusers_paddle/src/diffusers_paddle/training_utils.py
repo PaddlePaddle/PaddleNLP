@@ -79,7 +79,7 @@ class EMAModel:
         """
 
         self.averaged_model = copy.deepcopy(model).eval()
-        for params in self.averaged_model.paramaters():
+        for params in self.averaged_model.parameters():
             params.stop_gradient = True
 
         self.update_after_step = update_after_step

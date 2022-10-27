@@ -431,9 +431,9 @@ def main(args):
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
-    freeze_params(vae.paramaters())
+    freeze_params(vae.parameters())
     if not args.train_text_encoder:
-        freeze_params(text_encoder.paramaters())
+        freeze_params(text_encoder.parameters())
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path, subfolder="unet")
 
