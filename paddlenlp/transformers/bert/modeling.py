@@ -516,7 +516,8 @@ class BertModel(BertPretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  pool_act="tanh",
-                 fuse=False):
+                 fuse=False,
+                 **kwargs):
         super(BertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range

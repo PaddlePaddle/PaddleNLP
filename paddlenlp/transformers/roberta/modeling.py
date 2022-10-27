@@ -83,7 +83,9 @@ class RobertaEmbeddings(nn.Layer):
                     0] == 0:  # postion_ids for RobertaBPETokenizer
                 position_ids = seq_length + self.padding_idx + 1 - ones
             else:  # postion_ids for RobertaTokenizer
-                position_ids = seq_length - ones
+                position_ids = seq_length
+                if self.padding_idx > 0:
+                    position_ids = position_ids + self.padding_idx
             if past_key_values_length is not None:
                 position_ids += past_key_values_length
             position_ids.stop_gradient = True
@@ -320,7 +322,8 @@ class RobertaModel(RobertaPretrainedModel):
                  initializer_range=0.02,
                  pad_token_id=0,
                  layer_norm_eps=1e-12,
-                 cls_token_id=101):
+                 cls_token_id=101,
+                 **kwargs):
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
