@@ -17,15 +17,15 @@ Paddle Inference Python端预测部署主要包含两个步骤：
 
 
 ## 导出预测部署模型
-部署时需要使用预测格式的模型（即动态图转静态图操作）。预测格式模型相对训练格式模型而言，在拓扑上裁剪掉了预测不需要的算子，并且会做特定部署优化。具体操作详见[FasterTransformer加速及模型静态图导出](../../README.md)。
+部署时需要使用预测格式的模型（即动态图转静态图操作）。预测格式模型相对训练格式模型而言，在拓扑上裁剪掉了预测不需要的算子，并且会做特定部署优化。具体操作详见[FasterGeneration加速及模型静态图导出](../../README.md)。
 
 ## 基于Python预测
 <!-- 同上，高性能预测的默认输入和输出形式也为文件，可分别通过 test_path 和 save_path 进行指定，通过如下命令便可以基于Paddle Inference 进行高性能预测： -->
 
 在终端输入以下命令可在GPU上进行预测：
 ```shell
-python deploy/paddle_inference/inference_unimo_text.py --inference_model_dir ./inference_model
+python inference_unimo_text.py --inference_model_dir ../../inference_model
 ```
 
 关键参数释义如下：
-* `inference_model_dir`：用于高性能推理的静态图模型参数路径；默认为"./inference_model"。
+* `inference_model_dir`：用于高性能推理的静态图模型参数路径；默认为"../../inference_model"。

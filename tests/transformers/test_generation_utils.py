@@ -568,7 +568,7 @@ class GenerationTesterMixin:
         config, _, _, max_length = self._get_input_ids_and_config()
 
         # if no bos token id => cannot generate from None
-        if config["bos_token_id"] is None:
+        if config.get("bos_token_id", None) is None:
             return
 
         for model_class in self.all_generative_model_classes.keys():
