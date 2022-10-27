@@ -81,14 +81,20 @@ class TextSummarizationTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        self._model = UNIMOLMHeadModel.from_pretrained(model)
+        if self._custom_model:
+            self._model = UNIMOLMHeadModel.from_pretrained(self._task_path)
+        else:
+            self._model = UNIMOLMHeadModel.from_pretrained(model)
         self._model.eval()
 
     def _construct_tokenizer(self, model):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = UNIMOTokenizer.from_pretrained(model)
+        if self._custom_model:
+            self._tokenizer = UNIMOTokenizer.from_pretrained(self._task_path)
+        else:
+            self._tokenizer = UNIMOTokenizer.from_pretrained(model)
 
     def _preprocess(self, inputs):
         """
