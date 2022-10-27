@@ -53,11 +53,11 @@ pip install paddle-serving-server-gpu==0.8.3.post112 # -i https://pypi.tuna.tsin
 
 模型转换命令如下：
 ```shell
-python -m paddle_serving_client.convert --dirname ./inference_model \
+python -m paddle_serving_client.convert --dirname ../../inference_model \
                                         --model_filename unimo_text.pdmodel \
                                         --params_filename unimo_text.pdiparams \
-                                        --serving_server ./deploy/paddle_serving/inference_model_server \
-                                        --serving_client ./deploy/paddle_serving/inference_model_client
+                                        --serving_server inference_model_server \
+                                        --serving_client inference_model_client
 ```
 关键参数释义如下：
 * `dirname`：模型文件夹地址。
@@ -66,11 +66,13 @@ python -m paddle_serving_client.convert --dirname ./inference_model \
 * `serving_server`：server的模型文件和配置文件路径，默认"serving_server"。
 * `serving_client`：client的配置文件路径，默认"serving_client"。
 
+也可以直接使用`export_serving.sh`.
+
 更多参数可通过以下命令查询：
 ```shell
 python -m paddle_serving_client.convert --help
 ```
-模型转换完成后，会在./delopy/paddle_serving文件夹多出inference_model_server和inference_model_client的文件夹，文件夹目录格式如下：
+模型转换完成后，会在paddle_serving文件夹多出inference_model_server和inference_model_client的文件夹，文件夹目录格式如下：
 ```
 inference_model_server/
 ├── unimo_text.pdiparams
@@ -99,7 +101,6 @@ paddle_serving/
 ### server启动服务
 修改好配置文件后，执行下面命令启动服务:
 ```shell
-cd deploy/paddle_serving
 # 启动服务
 python pipeline_service.py
 ```
