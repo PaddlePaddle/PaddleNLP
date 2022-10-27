@@ -457,15 +457,25 @@ TASKS = {
                 "task_class": QuestionGenerationTask,
                 "task_flag": "question_generation-unimo-text-1.0",
             },
-            "unimo-text-1.0-dureader_qg-template1": {
+            "unimo-text-1.0-dureader_qg": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0-dureader_qg",
+            },
+            "unimo-text-1.0-question-generation": {
                 "task_class":
                 QuestionGenerationTask,
                 "task_flag":
-                "question_generation-unimo-text-1.0-dureader_qg-template1",
+                "question_generation-unimo-text-1.0-question-generation",
+            },
+            "unimo-text-1.0-question-generation-dureader_qg": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-question-generation-dureader_qg",
             },
         },
         "default": {
-            "model": "unimo-text-1.0-dureader_qg-template1"
+            "model": "unimo-text-1.0-dureader_qg"
         }
     },
 }
