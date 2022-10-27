@@ -205,6 +205,8 @@ def do_predict(args):
                     id_list = post_process_seq(beam, args.bos_idx, args.eos_idx)
                     word_list = to_tokens(id_list)
                     sequence = " ".join(word_list) + "\n"
+                    import pdb
+                    pdb.set_trace()
                     f.write(sequence)
 
 
@@ -220,7 +222,7 @@ if __name__ == "__main__":
 
     if ARGS.vocab_file is not None:
         args.src_vocab = ARGS.vocab_file
-        args.trg_vocab = ARG.vocab_file
+        args.trg_vocab = ARGS.vocab_file
         args.joined_dictionary = True
     elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
         args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab

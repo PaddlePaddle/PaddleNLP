@@ -297,7 +297,7 @@ if __name__ == "__main__":
 
     if ARGS.vocab_file is not None:
         args.src_vocab = ARGS.vocab_file
-        args.trg_vocab = ARG.vocab_file
+        args.trg_vocab = ARGS.vocab_file
         args.joined_dictionary = True
     elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
         args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
