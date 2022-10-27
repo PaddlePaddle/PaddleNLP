@@ -102,7 +102,7 @@ def parse_args():
                         help="Whether to use amp to train Transformer. ")
     parser.add_argument("--device",
                         default="gpu",
-                        choices=["gpu", "cpu", "xpu", "npu"],
+                        choices=["gpu", "cpu", "xpu", "npu", "mlu"],
                         help="Device selected for inference.")
     parser.add_argument(
         "--amp_level",
@@ -121,7 +121,7 @@ def parse_args():
     )
     parser.add_argument("--to_static",
                         action="store_true",
-                        help="Whether to_static to train Transformer. ")
+                        help="Whether use to_static to train Transformer. ")
     args = parser.parse_args()
     return args
 
@@ -138,6 +138,10 @@ def do_train(args):
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
         paddle.set_device("xpu")
+    elif args.device == "mlu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("mlu")
     else:
         rank = 0
         trainer_count = 1
