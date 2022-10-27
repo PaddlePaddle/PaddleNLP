@@ -98,6 +98,7 @@ text_summarization/
 │       ├── config.yml # 配置文件
 │       ├── pipeline_client.py # 客户端程序
 │       ├── pipeline_service.py # 服务器程序
+│       ├── export_serving.sh # serving模型导出脚本
 │       └── README.md # 说明文档
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── export_model.sh # 动态图参数导出静态图参数shell脚本

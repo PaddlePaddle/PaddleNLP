@@ -24,8 +24,8 @@ Paddle Inference Python端预测部署主要包含两个步骤：
 
 在终端输入以下命令可在GPU上进行预测：
 ```shell
-python deploy/paddle_inference/inference_pegasus.py --inference_model_dir ./inference_model
+python inference_pegasus.py --inference_model_dir ../../inference_model
 ```
 
 关键参数释义如下：
-* `inference_model_dir`：用于高性能推理的静态图模型参数路径；默认为"./inference_model"。
+* `inference_model_dir`：用于高性能推理的静态图模型参数路径；默认为"../../inference_model"。
