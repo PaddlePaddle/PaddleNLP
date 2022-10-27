@@ -1111,7 +1111,7 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
 
     """
 
-    def __init__(self, fnet, num_labels):
+    def __init__(self, fnet, num_labels=2):
         super(FNetForQuestionAnswering, self).__init__()
         self.num_labels = num_labels
         self.fnet = fnet
@@ -1142,7 +1142,7 @@ class FNetForQuestionAnswering(FNetPretrainedModel):
             "last_hidden_state"]
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = paddle.split(logits,
-                                                num_or_sections=1,
+                                                num_or_sections=2,
                                                 axis=-1)
         start_logits = start_logits.squeeze(axis=-1)
         end_logits = end_logits.squeeze(axis=-1)
