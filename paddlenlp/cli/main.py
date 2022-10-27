@@ -12,16 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from genericpath import isdir
 import os
 import json
-from typing import Type, List, Tuple
+from typing import Type, List, Tuple, Optional
+import typer
 from typer import Typer
 import shutil
 import importlib, inspect
+from paddlenlp import __version__
 from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.downloader import is_url
+from paddlenlp.cli.converter import convert_from_local_file, convert_from_online_model
 
 from tabulate import tabulate
 
@@ -103,53 +107,16 @@ def search(query: str):
 
 
 @app.command()
-def convert(model_type: str,
-            config_or_model_name: str,
-            pytorch_checkpoint_path: str = 'pytorch',
-            dump_output: str = "model_state.pdparams"):
-    # convert pytorch weight file to paddle weight file
-
-    # Args:
-    #     model_type (str): the name of target paddle model name, which can be: bert, bert-base-uncased
-    #     torch_checkpoint_path (str, optional): the path of target pytorch weight file . Defaults to 'pytorch'.
-
-    # 1. resolve pytorch weight file path
-    if os.path.isdir(pytorch_checkpoint_path):
-        pytorch_checkpoint_path = os.path.join(pytorch_checkpoint_path,
-                                               "pytorch_model.bin")
-        if not os.path.isfile(pytorch_checkpoint_path):
-            raise FileNotFoundError(
-                "pytorch checkpoint file {} not found".format(
-                    pytorch_checkpoint_path))
-    elif not os.path.exists(pytorch_checkpoint_path):
-        raise FileNotFoundError("pytorch checkpoint file {} not found".format(
-            pytorch_checkpoint_path))
-
-    def resolve_configuration(model_class: Type[PretrainedModel]) -> dict:
-        if config_or_model_name in model_class.pretrained_init_configuration:
-            return model_class.pretrained_init_configuration[
-                config_or_model_name]
-        assert os.path.isfile(
-            config_or_model_name
-        ), f'can"t not find the configuration file by <{config_or_model_name}>'
-        with open(config_or_model_name, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        return config
-
-    # 2. convert different model weight file with
-    if model_type == 'bert':
-        from paddlenlp.transformers.bert.modeling import convert_pytorch_weights, BertModel
-        config = resolve_configuration(BertModel)
-        model = BertModel(**config)
-        convert_pytorch_weights(model,
-                                pytorch_checkpoint_path=pytorch_checkpoint_path)
-    elif model_type == 'albert':
-        from paddlenlp.transformers.albert.modeling import AlbertModel
-        config = resolve_configuration(AlbertModel)
-        model = AlbertModel(**config)
-        # call `convert` method
+def convert(input: Optional[str] = None, output: Optional[str] = None):
+    if os.path.isdir(input):
+        convert_from_local_file()
+    convert_from_online_model()
 
 
 def main():
     """the PaddleNLPCLI entry"""
     app()
+
+
+if __name__ == "__main__":
+    main()

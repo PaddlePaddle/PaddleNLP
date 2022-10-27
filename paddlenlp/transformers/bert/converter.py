@@ -15,6 +15,7 @@
 from __future__ import annotations
 from typing import List, Union
 
+from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.converter import StateDictNameMapping, Converter
 
 
@@ -24,8 +25,8 @@ class BertConverter(Converter):
 
     def get_paddle_pytorch_model_classes(self):
         from paddlenlp.transformers import BertModel as PaddleBertModel
-        from transformers import BertModel as PytorchBertModel
-        return PaddleBertModel, PytorchBertModel
+        pytorch_bert_model_class = import_module("transformers.BertModel")
+        return PaddleBertModel, pytorch_bert_model_class
 
     def get_name_mapping(
         self,
