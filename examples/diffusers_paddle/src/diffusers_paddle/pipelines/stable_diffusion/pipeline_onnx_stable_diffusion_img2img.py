@@ -140,6 +140,7 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
+        generator: Optional[np.random.RandomState] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
@@ -177,6 +178,8 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
+            generator (`np.random.RandomState`, *optional*):
+                A np.random.RandomState to make generation deterministic.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
@@ -215,6 +218,8 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
                 f" {type(callback_steps)}.")
+        if generator is None:
+            generator = np.random
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -260,7 +265,7 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
                     f" {type(prompt)}.")
             elif isinstance(negative_prompt, str):
-                uncond_tokens = [negative_prompt]
+                uncond_tokens = [negative_prompt] * batch_size
             elif batch_size != len(negative_prompt):
                 raise ValueError(
                     "The length of `negative_prompt` should be equal to batch_size."
@@ -282,7 +287,7 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
 
             # duplicate unconditional embeddings for each generation per prompt
             uncond_embeddings = np.repeat(uncond_embeddings,
-                                          batch_size * num_images_per_prompt,
+                                          num_images_per_prompt,
                                           axis=0)
 
             # For classifier free guidance, we need to do two forward passes.
@@ -291,6 +296,8 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             text_embeddings = np.concatenate(
                 [uncond_embeddings, text_embeddings])
 
+        latents_dtype = text_embeddings.dtype
+        init_image = init_image.astype(latents_dtype)
         # encode the init image into latents and scale the latents
         init_latents = self.vae_encoder(sample=init_image)[0]
         init_latents = 0.18215 * init_latents
@@ -335,7 +342,7 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                              dtype="int64")
 
         # add noise to latents using the timesteps
-        noise = np.random.randn(*init_latents.shape).astype(np.float32)
+        noise = generator.randn(*init_latents.shape).astype(latents_dtype)
         init_latents = self.scheduler.add_noise(paddle.to_tensor(init_latents),
                                                 paddle.to_tensor(noise),
                                                 paddle.to_tensor(timesteps))
@@ -385,16 +392,28 @@ class OnnxStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 callback(i, t, latents)
 
         latents = 1 / 0.18215 * latents
-        image = self.vae_decoder(latent_sample=latents)[0]
-
+        # image = self.vae_decoder(latent_sample=latents)[0]
+        # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
+        image = np.concatenate([
+            self.vae_decoder(latent_sample=latents[i:i + 1])[0]
+            for i in range(latents.shape[0])
+        ])
         image = np.clip(image / 2 + 0.5, 0, 1)
         image = image.transpose((0, 2, 3, 1))
 
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="np")
-            image, has_nsfw_concept = self.safety_checker(
-                clip_input=safety_checker_input.pixel_values, images=image)
+                self.numpy_to_pil(image),
+                return_tensors="np").pixel_values.astype(image.dtype)
+            # There will throw an error if use safety_checker batchsize>1
+            images, has_nsfw_concept = [], []
+            for i in range(image.shape[0]):
+                image_i, has_nsfw_concept_i = self.safety_checker(
+                    clip_input=safety_checker_input[i:i + 1],
+                    images=image[i:i + 1])
+                images.append(image_i)
+                has_nsfw_concept.append(has_nsfw_concept_i[0])
+            image = np.concatenate(images)
         else:
             has_nsfw_concept = None
 
