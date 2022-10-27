@@ -39,7 +39,7 @@ from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer, AutoTokenizer
 from pathlib import Path
 
 
-def parse_args():
+def parse_args(input_args):
     parser = argparse.ArgumentParser(
         description="Simple example of a training dreambooth script.")
     parser.add_argument(
@@ -232,7 +232,10 @@ def parse_args():
                         choices=["tensorboard", "visualdl"],
                         help="Log writer type.")
 
-    args = parser.parse_args()
+    if input_args is not None:
+        args = parser.parse_args(input_args)
+    else:
+        args = parser.parse_args()
 
     if args.instance_data_dir is None:
         raise ValueError("You must specify a train data directory.")
@@ -366,8 +369,7 @@ def get_writer(args):
     return writer
 
 
-def main():
-    args = parse_args()
+def main(args):
     rank = paddle.distributed.get_rank()
     num_processes = paddle.distributed.get_world_size()
     if num_processes > 1:
@@ -516,7 +518,8 @@ def main():
             train_dataset, batch_size=args.train_batch_size, shuffle=True)
     train_dataloader = DataLoader(train_dataset,
                                   batch_sampler=train_sampler,
-                                  collate_fn=collate_fn)
+                                  collate_fn=collate_fn,
+                                  num_workers=1)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
@@ -681,4 +684,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(args)
