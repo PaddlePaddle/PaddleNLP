@@ -232,9 +232,25 @@ TASKS = {
                 "task_flag": "text_summarization-unimo-text-1.0-summary",
                 "task_priority_path": "unimo-text-1.0-summary",
             },
+            "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+            },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
+            },
         },
         "default": {
-            "model": "unimo-text-1.0-summary"
+            "model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"
         }
     },
     "word_segmentation": {

@@ -21,10 +21,8 @@ from paddle.nn import TransformerEncoder
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    "UNIMOPretrainedModel",
-    'UNIMOModel',
-    'UNIMOLMHeadModel',
-    'UNIMOForMaskedLM',
+    "UNIMOPretrainedModel", 'UNIMOModel', 'UNIMOLMHeadModel',
+    'UNIMOForMaskedLM', 'UNIMOForConditionalGeneration'
 ]
 
 
@@ -710,3 +708,4 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel
+UNIMOForConditionalGeneration = UNIMOLMHeadModel
