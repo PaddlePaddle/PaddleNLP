@@ -74,11 +74,14 @@ def do_eval():
             class_name = unify_prompt_name(data['prompt'])
             # Only positive examples are evaluated in debug mode
             if len(data['result_list']) != 0:
-                if "的" not in data['prompt']:
+                p = "的" if args.schema_lang == "ch" else " of "
+                if p not in data['prompt']:
                     class_dict.setdefault(class_name, []).append(data)
                 else:
                     relation_data.append((data['prompt'], data))
-        relation_type_dict = get_relation_type_dict(relation_data)
+
+        relation_type_dict = get_relation_type_dict(
+            relation_data, schema_lang=args.schema_lang)
     else:
         class_dict["all_classes"] = test_ds
 
@@ -118,7 +121,10 @@ def do_eval():
             metric = SpanEvaluator()
             precision, recall, f1 = evaluate(model, metric, test_data_loader)
             logger.info("-----------------------------")
-            logger.info("Class Name: X的%s" % key)
+            if args.schema_lang == "ch":
+                logger.info("Class Name: X的%s" % key)
+            else:
+                logger.info("Class Name: %s of X" % key)
             logger.info("Evaluation Precision: %.5f | Recall: %.5f | F1: %.5f" %
                         (precision, recall, f1))
 
@@ -133,6 +139,8 @@ if __name__ == "__main__":
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--debug", action='store_true', help="Precision, recall and F1 score are calculated for each class separately if this option is enabled.")
     parser.add_argument("--multilingual", action='store_true', help="Whether is the multilingual model.")
+    parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")
+
     args = parser.parse_args()
     # yapf: enable
 

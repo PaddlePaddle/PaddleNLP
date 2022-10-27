@@ -350,11 +350,13 @@ def unify_prompt_name(prompt):
     return prompt
 
 
-def get_relation_type_dict(relation_data):
+def get_relation_type_dict(relation_data, schema_lang="ch"):
 
-    def compare(a, b):
-        a = a[::-1]
-        b = b[::-1]
+    def compare(a, b, schema_lang="ch"):
+        if schema_lang == "ch":
+            a = a[::-1]
+            b = b[::-1]
+
         res = ''
         for i in range(min(len(a), len(b))):
             if a[i] == b[i]:
@@ -363,8 +365,10 @@ def get_relation_type_dict(relation_data):
                 break
         if res == "":
             return res
-        elif res[::-1][0] == "的":
+        if schema_lang == "ch" and res[::-1][0] == "的":
             return res[::-1][1:]
+        elif schema_lang == "en" and res[-3:] == " of":
+            return res[:-3]
         return ""
 
     relation_type_dict = {}
@@ -373,7 +377,9 @@ def get_relation_type_dict(relation_data):
         added = False
         if relation_data[i][0] not in added_list:
             for j in range(i + 1, len(relation_data)):
-                match = compare(relation_data[i][0], relation_data[j][0])
+                match = compare(relation_data[i][0],
+                                relation_data[j][0],
+                                schema_lang=schema_lang)
                 if match != "":
                     match = unify_prompt_name(match)
                     if relation_data[i][0] not in added_list:
@@ -386,9 +392,15 @@ def get_relation_type_dict(relation_data):
                     added = True
             if not added:
                 added_list.append(relation_data[i][0])
-                suffix = relation_data[i][0].rsplit("的", 1)[1]
-                suffix = unify_prompt_name(suffix)
-                relation_type_dict.setdefault(suffix,
+                if schema_lang == "ch":
+                    suffix = relation_data[i][0].rsplit("的", 1)[1]
+                    suffix = unify_prompt_name(suffix)
+                    relation_type = suffix
+                else:
+                    prefix = relation_data[i][0].split(" of ", 1)[0]
+                    prefix = unify_prompt_name(prefix)
+                    relation_type = prefix
+                relation_type_dict.setdefault(relation_type,
                                               []).append(relation_data[i][1])
     return relation_type_dict
 
@@ -469,7 +481,7 @@ def add_full_negative_example(examples,
                               relation_prompts,
                               predicate_set,
                               subject_goldens,
-                              schema_lang="zh"):
+                              schema_lang="ch"):
     with tqdm(total=len(relation_prompts)) as pbar:
         for i, relation_prompt in enumerate(relation_prompts):
             negative_sample = []
@@ -478,7 +490,7 @@ def add_full_negative_example(examples,
                     # The relation prompt is constructed as follows:
                     # subject + "的" + predicate -> Chinese
                     # predicate + " of " + subject -> English
-                    if schema_lang == "zh":
+                    if schema_lang == "ch":
                         prompt = subject + "的" + predicate
                     else:
                         prompt = predicate + " of " + subject
@@ -536,7 +548,7 @@ def convert_ext_examples(raw_examples,
                          options=["正向", "负向"],
                          separator="##",
                          is_train=True,
-                         schema_lang="zh"):
+                         schema_lang="ch"):
     """
     Convert labeled data export from doccano for extraction and aspect-level classification task.
     """
@@ -635,7 +647,7 @@ def convert_ext_examples(raw_examples,
                 # Define the prompt prefix for entity-level classification
                 # xxx + "的" + 情感倾向 -> Chinese
                 # Sentiment classification + " of " + xxx -> English
-                if schema_lang == "zh":
+                if schema_lang == "ch":
                     entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
                 else:
                     entity_cls_prompt_prefix = prompt_prefix + " of " + entity_name
@@ -686,7 +698,7 @@ def convert_ext_examples(raw_examples,
                 # The relation prompt is constructed as follows:
                 # subject + "的" + predicate -> Chinese
                 # predicate + " of " + subject -> English
-                if schema_lang == "zh":
+                if schema_lang == "ch":
                     prompt = entity_map[subject_id]["name"] + "的" + predicate
                     inverse_negative = entity_map[object_id][
                         "name"] + "的" + predicate
@@ -763,7 +775,7 @@ def convert_ext_examples(raw_examples,
                             set(entity_name_set) ^ set(subject_goldens[i]))
                         nonentity_list.sort()
 
-                        if schema_lang == "zh":
+                        if schema_lang == "ch":
                             redundants2 = [
                                 nonentity + "的" +
                                 predicate_list[i][random.randrange(
@@ -784,7 +796,7 @@ def convert_ext_examples(raw_examples,
                             set(entity_label_set) ^ set(entity_prompts[i]))
                         non_ent_label_list.sort()
 
-                        if schema_lang == "zh":
+                        if schema_lang == "ch":
                             redundants3 = [
                                 subject_goldens[i][random.randrange(
                                     len(subject_goldens[i]))] + "的" +

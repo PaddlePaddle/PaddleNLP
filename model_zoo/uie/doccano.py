@@ -56,7 +56,7 @@ def do_convert():
                              separator="##",
                              shuffle=False,
                              is_train=True,
-                             schema_lang="zh"):
+                             schema_lang="ch"):
         entities, relations, aspects = convert_ext_examples(
             examples, negative_ratio, prompt_prefix, options, separator,
             is_train, schema_lang)
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--separator", type=str, default='##', help="Used only for entity/aspect-level classification task, separator for entity label and classification label")
-    parser.add_argument("--schema_lang", choices=["zh", "en"], default="zh", help="Select the language type for schema.")
+    parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")
 
     args = parser.parse_args()
     # yapf: enable
