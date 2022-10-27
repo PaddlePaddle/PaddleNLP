@@ -107,7 +107,6 @@ class PPMiniLMPretrainedModel(FasterPretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ppminilm-6l-768h": {
             "attention_probs_dropout_prob": 0.1,

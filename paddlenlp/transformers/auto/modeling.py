@@ -55,6 +55,7 @@ MAPPING_NAMES = OrderedDict([
     ("ErnieDoc", "ernie_doc"),
     ("ErnieGen", "ernie_gen"),
     ("ErnieGram", "ernie_gram"),
+    ("ErnieLayout", "ernie_layout"),
     ("ErnieM", "ernie_m"),
     ("Ernie", "ernie"),
     ("FNet", "fnet"),
@@ -92,6 +93,7 @@ MAPPING_NAMES = OrderedDict([
     ("Artist", "artist"),
     ("OPT", 'opt'),
     ("ErnieViL", 'ernie_vil'),
+    ("Pegasus", 'pegasus'),
 ])
 
 MAPPING_TASKS = OrderedDict([

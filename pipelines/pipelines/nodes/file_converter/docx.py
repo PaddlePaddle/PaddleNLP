@@ -117,41 +117,39 @@ class DocxToTextConverter(BaseConverter):
                 else:
                     text_dict['text'].append(text)
             # Extracting images from the paragraph
-            else:
-                image_list = self.get_image_list(file, paragraph)
-                # If there are not text and images, adding text_dict to documents
-                if (image_list is None and bool(text_dict)):
-                    raw_text = ''.join(text_dict['text'])
-                    # If the extracted text is "", skip it
-                    if (raw_text == ''):
-                        continue
-                    meta_data = {}
+            image_list = self.get_image_list(file, paragraph)
+            # If there are not text and images, adding text_dict to documents
+            if (image_list is None and bool(text_dict)):
+                raw_text = ''.join(text_dict['text'])
+                # If the extracted text is "", skip it
+                if (raw_text == ''):
+                    continue
+                meta_data = {}
+                if (meta is not None and 'name' in meta):
                     meta_data['name'] = meta['name']
-                    meta_data['images'] = text_dict['images']
-                    document = {
-                        "content": raw_text,
-                        "content_type": "text",
-                        "meta": meta_data
-                    }
-                    documents.append(document)
+                meta_data['images'] = text_dict['images']
+                document = {
+                    "content": raw_text,
+                    "content_type": "text",
+                    "meta": meta_data
+                }
+                documents.append(document)
 
-                    text = paragraph.text
-                    text_dict = {'text': [text], 'images': []}
-                # If there are images, adding image to text_dict
-                elif (image_list is not None):
-                    for i, image in enumerate(image_list):
-                        if image:
-                            # File extension & file content
-                            ext, blob = image.ext, image.blob
-                            # Using md5 to generate image name and save image into desc_path
-                            md5hash = hashlib.md5(blob)
-                            md5_name = md5hash.hexdigest()
-                            image_name = '{}_{}.{}'.format(md5_name, i, ext)
-                            image_path = os.path.join(self.desc_path,
-                                                      image_name)
-                            Image.open(BytesIO(blob)).save(image_path)
-                            # Adding image_name into the text_dict as the image for the text
-                            text_dict['images'].append(image_name)
+                text = paragraph.text
+                text_dict = {'text': [text], 'images': []}
+            elif (image_list is not None):
+                for i, image in enumerate(image_list):
+                    if image:
+                        # File extension & file content
+                        ext, blob = image.ext, image.blob
+                        # Using md5 to generate image name and save image into desc_path
+                        md5hash = hashlib.md5(blob)
+                        md5_name = md5hash.hexdigest()
+                        image_name = '{}_{}.{}'.format(md5_name, i, ext)
+                        image_path = os.path.join(self.desc_path, image_name)
+                        Image.open(BytesIO(blob)).save(image_path)
+                        # Adding image_name into the text_dict as the image for the text
+                        text_dict['images'].append(image_name)
                 else:
                     continue
         return documents

@@ -27,7 +27,7 @@ from paddlenlp.transformers.bert.tokenizer import (
 )
 
 from ...testing_utils import slow, get_tests_dir
-from ...transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/spiece.model")
 

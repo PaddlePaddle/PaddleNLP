@@ -306,7 +306,6 @@ class CLIPPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "openai/clip-vit-base-patch32": {
             # vision
@@ -393,7 +392,6 @@ class CLIPPretrainedModel(PretrainedModel):
             "logit_scale_init_value": 2.6592
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "openai/clip-vit-base-patch32":
@@ -1121,6 +1119,12 @@ class CLIPTextModel(CLIPTextPretrainedModel):
                                           normalize_before=True)
         self.apply(self._init_weights)
 
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.text_model.token_embedding
+
+    def set_input_embeddings(self, value):
+        self.text_model.token_embedding = value
+
     def forward(
         self,
         input_ids=None,
@@ -1263,6 +1267,9 @@ class CLIPVisionModel(CLIPVisionPretrainedModel):
                                               normalize_before=True)
 
         self.apply(self._init_weights)
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.vision_model.conv1
 
     def forward(
         self,

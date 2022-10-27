@@ -68,7 +68,7 @@ rm KUAKE_QIC.tar.gz
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.3.4
+- paddlenlp >= 2.4
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -80,7 +80,7 @@ rm KUAKE_QIC.tar.gz
 
 安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 ```shell
-python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
+python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
 ```
 
 
@@ -203,21 +203,23 @@ python train.py \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
 ```shell
 python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
     --dataset_dir "data" \
-    --device "gpu" \
+    --device "cpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
 
-如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况:
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
@@ -227,9 +229,9 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
-
 
 可支持配置的参数：
 
@@ -237,7 +239,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-1.0-large-zh-cw","ernie-m-base","ernie-m-large"；默认为"ernie-3.0-medium-zh"。
+* `model_name`：选择预训练模型,可选"ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"；默认为"ernie-3.0-medium-zh"。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
@@ -266,8 +268,9 @@ checkpoint/
 **NOTE:**
 
 * 如需恢复模型训练，则可以设置 `init_from_ckpt` ， 如 `init_from_ckpt=checkpoint/model_state.pdparams` 。
-* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
-* 英文和中文以外文本分类任务建议使用多语言预训练模型"ernie-m-base","ernie-m-large"， 多语言模型暂不支持文本分类模型部署，相关功能正在加速开发中。
+* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
+* 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
+
 #### 2.4.2 训练评估与模型优化
 
 训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
@@ -335,8 +338,13 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_
 python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 
-可支持配置的参数：
+如果使用ERNIE M作为预训练模型，运行方式：
+```shell
+python export_model.py --params_path ./checkpoint/ --output_path ./export --multilingual
+```
 
+可支持配置的参数：
+* `multilingual`：是否为多语言任务（是否使用ERNIE M作为预训练模型）；默认为False。
 * `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
 
@@ -397,9 +405,9 @@ python prune.py \
 ```text
 prune/
 ├── width_mult_0.75
-│   ├── float32.pdiparams
-│   ├── float32.pdiparams.info
-│   ├── float32.pdmodel
+│   ├── pruned_model.pdiparams
+│   ├── pruned_model.pdiparams.info
+│   ├── pruned_model.pdmodel
 │   ├── model_state.pdparams
 │   └── model_config.json
 └── ...
@@ -413,7 +421,7 @@ prune/
 
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
-
+4. **压缩API暂不支持多语言预训练模型ERNIE-M**，相关功能正在加紧开发中。
 
 #### 2.5.3 部署方案
 
@@ -456,6 +464,7 @@ PaddleNLP提供ERNIE 3.0 全系列轻量化模型，对于中文训练任务可�
 
 |  model_name  | 模型结构  |Accuracy(%)   | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |
+|ERNIE 1.0 Large Cw |24-layer, 1024-hidden, 20-heads|82.30| 5.62 |
 |ERNIE 3.0 Base  |12-layer, 768-hidden, 12-heads|82.25| 2.07 |
 |ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|81.79| 1.07|
 |ERNIE 3.0 Mini |6-layer, 384-hidden, 12-heads|79.80| 0.38|

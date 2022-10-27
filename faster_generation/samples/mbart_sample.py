@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import paddle
-from paddlenlp.transformers import MBartForConditionalGeneration, MBartTokenizer
+from paddlenlp.transformers import MBartForConditionalGeneration, MBart50Tokenizer
 
-model_name = "mbart-large-50-one-to-many-mmt"
+model_name = "mbart-large-50-many-to-many-mmt"
 
-tokenizer = MBartTokenizer.from_pretrained(model_name)
-model = MBartForConditionalGeneration.from_pretrained(model_name,
-                                                      src_lang="en_XX")
+tokenizer = MBart50Tokenizer.from_pretrained(model_name, src_lang="en_XX")
+model = MBartForConditionalGeneration.from_pretrained(model_name)
 model.eval()
 
 
@@ -41,7 +40,7 @@ eos_id = model.mbart.config["eos_token_id"]
 
 inputs = "PaddleNLP is a powerful NLP library with Awesome pre-trained models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications."
 input_ids = tokenizer(inputs)["input_ids"]
-input_ids = paddle.to_tensor(input_ids, dtype='int64').unsqueeze(0)
+input_ids = paddle.to_tensor(input_ids, dtype='int32').unsqueeze(0)
 
 outputs, _ = model.generate(input_ids=input_ids,
                             forced_bos_token_id=bos_id,
@@ -53,5 +52,6 @@ outputs, _ = model.generate(input_ids=input_ids,
 result = postprocess_response(outputs[0].numpy().tolist(), bos_id, eos_id)
 
 print("Model input:", inputs)
+
 print("Result:", result)
 # PaddleNLP是一个强大的NLP库,具有超乎寻常的预训练模型和易于使用的接口,支持从研究到工业应用的广泛的NLP任务。

@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import yaml
 import logging
@@ -60,6 +74,11 @@ def parse_args():
         type=str,
         help="The eos token. It should be provided when use custom vocab_file. "
     )
+    parser.add_argument("--device",
+                        default="gpu",
+                        choices=["gpu", "cpu", "xpu", "npu", "mlu"],
+                        help="Device selected for inference.")
+
     args = parser.parse_args()
     return args
 
@@ -83,6 +102,12 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
 def do_predict(args):
     if args.device == "gpu":
         place = "gpu"
+    elif args.device == "xpu":
+        place = "xpu"
+    elif args.device == "npu":
+        place = "npu"
+    elif args.device == "mlu":
+        place = "mlu"
     else:
         place = "cpu"
 
@@ -157,6 +182,7 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.device = ARGS.device
     pprint(args)
 
     do_predict(args)

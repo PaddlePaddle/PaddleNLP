@@ -28,7 +28,7 @@ parser.add_argument("--model_dir", type=str, default='./output', help="The path 
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
 parser.add_argument("--max_seq_len", type=int, default=128, help="Number of words of the longest seqence.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "npu", "xpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument("--benchmark", type=eval, default=False, help="To log some information about environment and running.")
 parser.add_argument("--save_log_path", type=str, default="./log_output/", help="The file path to save log.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False], help='Enable to use tensorrt to speed up.')
@@ -108,7 +108,7 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
             for index in words[sent_index][:lengths[sent_index]]
         ]
         tags = [
-            id2label_dict[index]
+            id2label_dict.get(index, 'O')
             for index in preds[sent_index][:lengths[sent_index]]
         ]
 
@@ -202,7 +202,10 @@ class Predictor(object):
             config.set_cpu_math_library_num_threads(args.cpu_threads)
         elif device == "xpu":
             # set XPU configs accordingly
-            config.enable_xpu(100)
+            config.enable_xpu()
+        elif device == "npu":
+            # set NPU configs accordingly
+            config.enable_npu()
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
