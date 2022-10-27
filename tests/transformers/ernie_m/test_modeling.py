@@ -25,10 +25,9 @@ from paddlenlp.transformers import (ErnieMPretrainedModel, ErnieMModel,
                                     ErnieMForTokenClassification,
                                     ErnieMForQuestionAnswering,
                                     ErnieMForMultipleChoice)
-from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
-                                                     random_attention_mask,
-                                                     ModelTesterMixin)
-from tests.testing_utils import slow
+from ..test_modeling_common import (ids_tensor, floats_tensor,
+                                    random_attention_mask, ModelTesterMixin)
+from ...testing_utils import slow
 
 
 @dataclass
@@ -404,7 +403,7 @@ class ErnieMModelIntegrationTest(unittest.TestCase):
               [-0.10798159, 0.02311476, -0.17285497],
               [0.05675533, 0.01330730, -0.06826267]]])
         self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
