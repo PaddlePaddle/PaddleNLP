@@ -220,7 +220,9 @@ def do_train(args):
     transformer = apply_to_static(args, transformer)
 
     # Define loss
-    criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
+    criterion = CrossEntropyCriterion(
+        args.label_smooth_eps,
+        args.bos_idx if args.pad_idx is None else args.pad_idx)
 
     scheduler = paddle.optimizer.lr.NoamDecay(args.d_model,
                                               args.warmup_steps,
