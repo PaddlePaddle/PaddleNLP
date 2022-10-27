@@ -197,6 +197,22 @@ transformers: 4.20.1
 |          |       top_k=8       |            763.43             |             413.32             |       1366.45        |             1.79             |             3.31             |
 |          |       top_k=16      |            762.79             |             413.83             |       1376.69        |             1.80             |             3.33             |
 |          |      top_p=0.4      |            771.77             |             419.16             |       1366.49        |             1.77             |             3.26             |
+
+
+**Pegasus:**
+
+| Model Size | Decode Strategy| FasterGeneration(FP32)<br>(ms) | FasterGeneration(FP16)<br>(ms) | HF generate<br>(ms) | Speed Up Rate<br>(Faster32/HF) | Speed Up Rate<br>(Faster16/HF) |
+|-----|----|---|---|---|---|---|
+|IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese|num_beams=2|87.41|75.47|1322.24|15.13|17.52
+| |num_beams=4    |91.55|66.47|1364.43|14.90|20.53|
+| |num_beams=6    |94.55|73.25|1391.35|14.72|18.99|
+| |num_beams=8   |100.48|84.82|1467.64|14.61|17.30|
+|IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese|num_beams=2|120.15|94.26|1735.21|14.44|18.41|
+| |num_beams=4    |126.42|99.07|1622.31|12.83|16.38|
+| |num_beams=6    |142.21|99.95|1717.49|12.08|17.18|
+| |num_beams=8   |158.26|104.31|1697.65|10.73|16.27|
+
+
 ## 测试方法
 
 运行如下命令即可bart性能测试：
