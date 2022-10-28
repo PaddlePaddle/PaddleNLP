@@ -9,6 +9,10 @@ ERNIE-ViLG是一个知识增强跨模态图文生成大模型，将文生成图�
 
 本项目提供了低成本搭建端到端文生图的能力。用户需要进行简单的参数配置，然后输入prompts就可以生成各种风格的画作，另外，Pipelines提供了 Web 化产品服务，让用户在本地端就能搭建起来文生图系统。
 
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/198007539-51863b31-715c-4cf4-921a-9ddf036c036b.gif" width="500px">
+</div>
+
 
 ## 3. 快速开始: 快速搭建文生图系统
 
