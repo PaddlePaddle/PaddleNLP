@@ -14,6 +14,10 @@
 
 本项目提供了低成本搭建端到端问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的问答系统模型(召回模型、排序模型、阅读理解模型)快速搭建一个针对自己业务数据的问答系统，并可以提供基于[Streamlit](https://streamlit.io/) 的 Web 可视化服务。
 
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190298926-a1fc92f3-5ec7-4265-8357-ab860cc1fed2.gif" width="500px">
+</div>
+
 ### 2.1 系统特色
 
 + 端到端
@@ -80,13 +84,14 @@ python examples/question-answering/dense_qa_example.py --device cpu
 #### 3.4.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
-首先修改`config/elasticsearch.yml`的配置。 如果你是用 Linux 系统依赖管理比如 Ubuntu 的 apt-get 或 yum 安装的 elasticsearch的话，那么你的 elasticsearch.yml 会出现在文件夹 /etc/elasticsearch/elasticsearch.yml 内。如果你在 Linux，Mac或者 Windows 下直接解压的 ElasaticSearch.zip 安装包的话，那么 elasticsearch.yml 的位置会在你解压的路径下的 config/ 这个文件夹里：
+首先修改`config/elasticsearch.yml`的配置：
 ```
 xpack.security.enabled: false
 ```
 然后启动：
+
 ```bash
-bin/elasticsearch
+./bin/elasticsearch
 ```
 3. 检查确保 ES 服务启动成功
 ```bash
