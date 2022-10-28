@@ -249,30 +249,31 @@ class FasterTransformer(TransformerModel):
 
         return ids
 
-    def load(self, init_from_params):
+    def load(self, init_from_params=None, state_dict=None):
         # Load the trained model
-        assert init_from_params, (
-            "Please set init_from_params to load the infer model.")
+        if init_from_params is None and state_dict is None:
+            raise ValueError(
+                "Either init_from_params or state_dict must be given to load the infer model. "
+            )
 
-        model_dict = paddle.load(init_from_params, return_numpy=True)
+        if state_dict is None:
+            state_dict = paddle.load(init_from_params, return_numpy=True)
+        else:
+            for state in state_dict:
+                # NOTE: This API only used in dygraph, so paddle.Tensor is enough.
+                if isinstance(state_dict[state], paddle.Tensor):
+                    state_dict[state] = state_dict[state].numpy()
 
         # To set weight[padding_idx] to 0.
-        model_dict["trg_word_embedding.word_embedding.weight"][
+        state_dict["trg_word_embedding.word_embedding.weight"][
             self.bos_id] = [0] * self.d_model
 
         # Dealing with weight sharing.
         if self.weight_sharing:
-            model_dict["decoding_linear.weight"] = np.transpose(
-                model_dict["trg_word_embedding.word_embedding.weight"])
+            state_dict["decoding_linear.weight"] = np.transpose(
+                state_dict["trg_word_embedding.word_embedding.weight"])
         else:
-            model_dict["decoding_linear.weight"] = model_dict["linear.weight"]
-
-        # To avoid a longer length than training, reset the size of position
-        # encoding to max_length
-        model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-            self.max_length, self.d_model)
-        model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-            self.max_length, self.d_model)
+            state_dict["decoding_linear.weight"] = state_dict["linear.weight"]
 
         if self.decoding._fuse_qkv:
             for item in self.state_dict():
@@ -280,14 +281,14 @@ class FasterTransformer(TransformerModel):
                     num_layer = item.split(".")[3]
                     param_type = item.split(".")[-1]
 
-                    model_dict["decoding.slf_q_" + param_type + "_" +
+                    state_dict["decoding.slf_q_" + param_type + "_" +
                                num_layer] = np.concatenate(
-                                   (model_dict[item],
-                                    model_dict["transformer.decoder.layers." +
+                                   (state_dict[item],
+                                    state_dict["transformer.decoder.layers." +
                                                num_layer +
                                                ".self_attn.k_proj." +
                                                param_type],
-                                    model_dict["transformer.decoder.layers." +
+                                    state_dict["transformer.decoder.layers." +
                                                num_layer +
                                                ".self_attn.v_proj." +
                                                param_type]),
@@ -296,17 +297,17 @@ class FasterTransformer(TransformerModel):
         if self.use_fp16_decoding:
             for item in self.state_dict():
                 if "decoder" in item or "decoding.slf" in item:
-                    model_dict[item] = np.float16(model_dict[item])
-            model_dict["decoding_linear.weight"] = np.float16(
-                model_dict["decoding_linear.weight"])
-            model_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
-                model_dict["trg_word_embedding.word_embedding.weight"])
-            model_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
-                model_dict["trg_pos_embedding.pos_encoder.weight"])
-            model_dict["decoding_linear.bias"] = np.zeros([self.trg_vocab_size],
+                    state_dict[item] = np.float16(state_dict[item])
+            state_dict["decoding_linear.weight"] = np.float16(
+                state_dict["decoding_linear.weight"])
+            state_dict["trg_word_embedding.word_embedding.weight"] = np.float16(
+                state_dict["trg_word_embedding.word_embedding.weight"])
+            state_dict["trg_pos_embedding.pos_encoder.weight"] = np.float16(
+                state_dict["trg_pos_embedding.pos_encoder.weight"])
+            state_dict["decoding_linear.bias"] = np.zeros([self.trg_vocab_size],
                                                           dtype="float16")
 
-        self.load_dict(model_dict)
+        self.load_dict(state_dict)
 
         if self.enable_faster_encoder:
             self = enable_faster_encoder(self, use_fp16=self.use_fp16_encoder)
@@ -695,12 +696,18 @@ class TransformerGenerator(paddle.nn.Layer):
             out = paddle.transpose(out, [1, 0, 2])
         return out
 
-    def load(self, path):
+    def load(self, path=None, state_dict=None):
+        if path is None and state_dict is None:
+            raise ValueError(
+                "Either path or state_dict must be given to load the infer model. "
+            )
+
         if isinstance(self.transformer, FasterTransformer):
-            self.transformer.load(path)
+            self.transformer.load(path, state_dict)
         else:
-            model_dict = paddle.load(path)
-            self.transformer.load_dict(model_dict)
+            if state_dict is None:
+                state_dict = paddle.load(path)
+            self.transformer.load_dict(state_dict)
 
 
 class FasterOPT(OPTPretrainedModel):
