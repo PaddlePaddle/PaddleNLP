@@ -10,7 +10,7 @@ a. 依赖安装：
 ```bash
 git clone https://github.com/tvst/htbuilder.git
 cd htbuilder/
-python setup install
+python setup.py install
 # pip 一键安装
 pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 或者源码进行安装最新版本

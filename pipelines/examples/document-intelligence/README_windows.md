@@ -20,7 +20,7 @@ pip install paddlenlp==2.4.1
 ```bash
 git clone https://github.com/tvst/htbuilder.git
 cd htbuilder/
-python setup install
+python setup.py install
 ```
 
 pip 一键安装Paddle-Pipelines：
