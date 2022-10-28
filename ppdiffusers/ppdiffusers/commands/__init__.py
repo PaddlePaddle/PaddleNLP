@@ -1,4 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .storage_process import assign_group_by_size
-from .storage_process import flatten_dense_tensors
-from .storage_process import obtain_storage
-from paddle.optimizer import AdamW
-from .group_sharded import group_sharded_parallel
+from abc import ABC, abstractmethod
+from argparse import ArgumentParser
+
+
+class BasePPDiffusersCLICommand(ABC):
+
+    @staticmethod
+    @abstractmethod
+    def register_subcommand(parser: ArgumentParser):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def run(self):
+        raise NotImplementedError()
