@@ -31,7 +31,7 @@
 
 ## News 📢
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
-  * NLG能力扩充：📄 新增[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；❓新增[**问题生成解决方案**](./examples/question_generation/unimo-text)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的**通用问题生成预训练模型**。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
+  * NLG能力扩充：📄 新增[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；❓新增[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的**通用问题生成预训练模型**。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
 
 * 🔥 **2022.10.14 发布 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)**
   * 🧾 发布多语言跨模态布局增强文档智能大模型 [**ERNIE-Layout**](./model_zoo/ernie-layout/)，刷新11项任务SOTA。同步发布基于ERNIE-Layout的**文档抽取问答模型DocPrompt** 🔖，精准理解文档图片布局与语义信息，轻松应对各类业务场景。
