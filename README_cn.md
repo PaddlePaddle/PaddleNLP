@@ -30,6 +30,8 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
+* 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
+  * ❓新增[**问题生成解决方案**](./examples/question_generation/unimo-text)，提供基于百度自研UNIMO-Text和大规模多领域问题生成数据集训练的**通用问题生成预训练模型**，支持高性能推理，训练推理部署全流程打通。
 
 * 🔥 **2022.10.14 发布 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)**
   * 🧾 发布多语言跨模态布局增强文档智能大模型 [**ERNIE-Layout**](./model_zoo/ernie-layout/)，刷新11项任务SOTA。同步发布基于ERNIE-Layout的**文档抽取问答模型DocPrompt** 🔖，精准理解文档图片布局与语义信息，轻松应对各类业务场景。
