@@ -431,13 +431,9 @@ class BertForQuestionAnswering(BertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to `None`.
-        """
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForQuestionAnswering.
+    """
 
     def __init__(self, config: BertConfig):
         super(BertForQuestionAnswering, self).__init__(config)
@@ -449,15 +445,15 @@ class BertForQuestionAnswering(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                start_positions: Optional[Tensor] = None,
+                end_positions: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -562,14 +558,8 @@ class BertForSequenceClassification(BertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_labels (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForSequenceClassification.
     """
 
     def __init__(self, config: BertConfig):
@@ -584,14 +574,14 @@ class BertForSequenceClassification(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -688,14 +678,8 @@ class BertForTokenClassification(BertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_labels (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForTokenClassification.
     """
 
     def __init__(self, config: BertConfig):
@@ -710,14 +694,14 @@ class BertForTokenClassification(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -932,8 +916,8 @@ class BertForPretraining(BertPretrainedModel):
     Bert Model with pretraining tasks on top.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of :class:`BertModel`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForPretraining.
 
     """
 
@@ -947,16 +931,16 @@ class BertForPretraining(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                labels=None,
-                next_sentence_label=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                masked_positions: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                next_sentence_label: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
 
         Args:
@@ -1097,14 +1081,8 @@ class BertForMultipleChoice(BertPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
     
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Bert.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMultipleChoice.
 
     Examples:
         >>> model = BertForMultipleChoice(config, dropout=0.1)
@@ -1125,14 +1103,14 @@ class BertForMultipleChoice(BertPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=None):
+                input_ids: Tensor,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1280,8 +1258,8 @@ class BertForMaskedLM(BertPretrainedModel):
     Bert Model with a `masked language modeling` head on top.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of :class:`BertModel`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMaskedLM.
 
     """
 
