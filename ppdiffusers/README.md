@@ -9,7 +9,7 @@
 
 
 ## 2. 安装
-**使用 `pip` 安装** (并未支持，未来将会支持)
+**使用 `pip` 安装**
 
 ```bash
 pip install --upgrade ppdiffusers

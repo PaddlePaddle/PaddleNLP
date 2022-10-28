@@ -18,14 +18,14 @@ from argparse import ArgumentParser
 
 from .. import __version__ as version
 from ..utils import is_paddle_available, is_paddlenlp_available
-from . import BaseDiffusersPaddleCLICommand
+from . import BasePPDiffusersCLICommand
 
 
 def info_command_factory(_):
     return EnvironmentCommand()
 
 
-class EnvironmentCommand(BaseDiffusersPaddleCLICommand):
+class EnvironmentCommand(BasePPDiffusersCLICommand):
 
     @staticmethod
     def register_subcommand(parser: ArgumentParser):

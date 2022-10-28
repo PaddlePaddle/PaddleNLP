@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 
 
-class BaseDiffusersPaddleCLICommand(ABC):
+class BasePPDiffusersCLICommand(ABC):
 
     @staticmethod
     @abstractmethod
