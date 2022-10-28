@@ -40,7 +40,8 @@ from pipelines.pipelines import Pipeline
 from pipelines.pipelines.standard_pipelines import (BaseStandardPipeline,
                                                     ExtractiveQAPipeline,
                                                     SemanticSearchPipeline,
-                                                    TextToImagePipeline)
+                                                    TextToImagePipeline,
+                                                    QAGenerationPipeline)
 
 import pandas as pd
 
