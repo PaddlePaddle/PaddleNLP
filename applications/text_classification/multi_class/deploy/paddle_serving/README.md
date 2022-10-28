@@ -21,7 +21,8 @@
 
 ### 安装PaddleNLP
 
-安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+
+安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以删去` -i https://mirror.baidu.com/pypi/simple` ，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 ```shell
 python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
