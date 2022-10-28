@@ -416,7 +416,8 @@ if __name__ == "__main__":
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
-    args.to_static = ARGS.to_static
+    if ARGS.to_static:
+        args.to_static = ARGS.to_static
     args.device = ARGS.device
     pprint(args)
 

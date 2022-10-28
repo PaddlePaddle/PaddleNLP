@@ -84,6 +84,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("CLIPTokenizer", "clip"),
     ("ArtistTokenizer", "artist"),
     ("ErnieViLTokenizer", "ernie_vil"),
+    ("PegasusChineseTokenizer", 'pegasus'),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
