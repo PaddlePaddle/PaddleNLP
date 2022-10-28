@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from importlib.metadata import entry_points
 import io
 import os
 from setuptools import find_packages, setup
@@ -21,24 +22,45 @@ with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()
 
 
-def read(*names, **kwargs):
-    with io.open(os.path.join(os.path.dirname(__file__), *names),
-                 encoding=kwargs.get("encoding", "utf8")) as fp:
-        return fp.read()
+def read(file: str):
+    current_dir = os.path.dirname(__file__)
+    path = os.path.join(current_dir, file)
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read().strip()
+    return content
+
+
+def read_version():
+    """read version of ppdiffusers"""
+    return read("VERSION")
+
+
+def read_readme():
+    return read("README.md")
+
+
+def read_requirements():
+    content = read('requirements.txt')
+    packages = content.split("\n")
+    return packages
 
 
 setup(name="ppdiffusers",
       packages=find_packages(),
-      version="0.6.0",
+      version=read_version(),
       author="PaddleNLP Team",
       author_email="paddlenlp@baidu.com",
       description=description,
-      long_description=read("README.md"),
+      long_description=read_readme(),
       long_description_content_type="text/markdown",
       url="https://github.com/PaddlePaddle/PaddleNLP/ppdiffusers",
       keywords=["ppdiffusers", "paddle", "paddlenlp"],
       install_requires=REQUIRED_PACKAGES,
       python_requires='>=3.6',
+      entry_points={
+          "console_scripts":
+          ["diffusers-cli=diffusers.commands.diffusers_cli:main"]
+      },
       classifiers=[
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.6',
