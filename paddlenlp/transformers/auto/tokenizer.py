@@ -44,6 +44,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ErnieDocTokenizer", "ernie_doc"),
     ("ErnieDocBPETokenizer", "ernie_doc"),
     ("ErnieGramTokenizer", "ernie_gram"),
+    ("ErnieLayoutTokenizer", "ernie_layout"),
     ("ErnieMTokenizer", "ernie_m"),
     ("ErnieTokenizer", "ernie"),
     ("FNetTokenizer", "fnet"),
@@ -53,6 +54,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("LayoutLMTokenizer", "layoutlm"),
     ("LukeTokenizer", "luke"),
     ("MBartTokenizer", "mbart"),
+    ("MBart50Tokenizer", "mbart"),
     ("MegatronBertTokenizer", "megatronbert"),
     ("MobileBertTokenizer", "mobilebert"),
     ("MPNetTokenizer", "mpnet"),
@@ -82,6 +84,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("CLIPTokenizer", "clip"),
     ("ArtistTokenizer", "artist"),
     ("ErnieViLTokenizer", "ernie_vil"),
+    ("PegasusChineseTokenizer", 'pegasus'),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([

@@ -19,6 +19,11 @@
 
 本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想接入自己训练的模型，可以参考[Neural Search的流程](./Neural_Search.md)。
 
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+</div>
+
+
 ### 2.1 系统特色
 
 + 端到端
@@ -161,7 +166,17 @@ sh examples/semantic-search/run_search_web.sh
 
 #### 3.4.5 数据更新
 
-数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，另一种是使用前端界面的文件上传进行数据更新，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
+数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，第二种是使用前端界面的文件上传（在界面的左侧）进行数据更新。对于第一种使用脚本的方式，可以使用多种文件更新数据，示例的文件更新建索引的命令如下，里面包含了图片（目前仅支持把图中所有的文字合并建立索引），docx（支持图文，需要按照空行进行划分段落），txt（需要按照空行划分段落）三种格式的文件建索引：
+
+```
+python utils/offline_ann.py --index_name dureader_robust_query_encoder \
+                            --doc_dir data/file_example \
+                            --port 9200 \
+                            --search_engine elastic \
+                            --delete_index
+```
+
+对于第二种使用界面的方式，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
 
 ```
 兴证策略认为，最恐慌的时候已经过去，未来一个月市场迎来阶段性修复窗口。

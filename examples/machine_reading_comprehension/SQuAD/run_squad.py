@@ -288,27 +288,46 @@ def run(args):
             apply_decay_param_fun=lambda x: x in decay_params)
         criterion = CrossEntropyLossForSQuAD()
 
+        if args.use_amp:
+            scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
+
         global_step = 0
         tic_train = time.time()
 
         for epoch in range(num_train_epochs):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
-                logits = model(input_ids=batch['input_ids'],
-                               token_type_ids=batch['token_type_ids'],
-                               attention_mask=batch['attention_mask'])
-                loss = criterion(
-                    logits, (batch['start_positions'], batch['end_positions']))
+                if args.use_amp:
+                    with paddle.amp.auto_cast(
+                            args.use_amp,
+                            custom_white_list=["layer_norm", "softmax",
+                                               "gelu"]):
+                        logits = model(input_ids=batch['input_ids'],
+                                       token_type_ids=batch['token_type_ids'],
+                                       attention_mask=batch['attention_mask'])
+                        loss = criterion(
+                            logits,
+                            (batch['start_positions'], batch['end_positions']))
+                    scaler.scale(loss).backward()
+                    scaler.minimize(optimizer, loss)
+                else:
+                    logits = model(input_ids=batch['input_ids'],
+                                   token_type_ids=batch['token_type_ids'],
+                                   attention_mask=batch['attention_mask'])
+                    loss = criterion(
+                        logits,
+                        (batch['start_positions'], batch['end_positions']))
+                    loss.backward()
+                    optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
+
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
                         % (global_step, epoch + 1, step + 1, loss,
                            args.logging_steps / (time.time() - tic_train)))
                     tic_train = time.time()
-                loss.backward()
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.clear_grad()
 
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     if rank == 0:

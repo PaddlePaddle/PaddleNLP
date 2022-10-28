@@ -100,6 +100,10 @@ def parse_args():
                         type=str,
                         choices=['true', 'false', 'True', 'False'],
                         help="Whether to use amp to train Transformer. ")
+    parser.add_argument("--device",
+                        default="gpu",
+                        choices=["gpu", "cpu", "xpu", "npu", "mlu"],
+                        help="Device selected for inference.")
     parser.add_argument(
         "--amp_level",
         default=None,
@@ -117,7 +121,7 @@ def parse_args():
     )
     parser.add_argument("--to_static",
                         action="store_true",
-                        help="Whether to_static to train Transformer. ")
+                        help="Whether use to_static to train Transformer. ")
     args = parser.parse_args()
     return args
 
@@ -126,6 +130,18 @@ def do_train(args):
     if args.device == "gpu":
         rank = dist.get_rank()
         trainer_count = dist.get_world_size()
+    elif args.device == "npu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("npu")
+    elif args.device == "xpu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("xpu")
+    elif args.device == "mlu":
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
+        paddle.set_device("mlu")
     else:
         rank = 0
         trainer_count = 1
@@ -401,6 +417,7 @@ if __name__ == "__main__":
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     args.to_static = ARGS.to_static
+    args.device = ARGS.device
     pprint(args)
 
     args.profiler_options = ARGS.profiler_options

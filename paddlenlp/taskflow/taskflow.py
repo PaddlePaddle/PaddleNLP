@@ -39,6 +39,8 @@ from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
 from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
+from .document_intelligence import DocPromptTask
+from .question_generation import QuestionGenerationTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -230,9 +232,25 @@ TASKS = {
                 "task_flag": "text_summarization-unimo-text-1.0-summary",
                 "task_priority_path": "unimo-text-1.0-summary",
             },
+            "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+            },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
+            },
         },
         "default": {
-            "model": "unimo-text-1.0-summary"
+            "model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"
         }
     },
     "word_segmentation": {
@@ -437,7 +455,45 @@ TASKS = {
         "default": {
             "model": "pai-painter-painting-base-zh",
         }
-    }
+    },
+    "document_intelligence": {
+        "models": {
+            "docprompt": {
+                "task_class": DocPromptTask,
+                "task_flag": "document_intelligence-docprompt",
+            },
+        },
+        "default": {
+            "model": "docprompt"
+        }
+    },
+    "question_generation": {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0",
+            },
+            "unimo-text-1.0-dureader_qg": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0-dureader_qg",
+            },
+            "unimo-text-1.0-question-generation": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-question-generation",
+            },
+            "unimo-text-1.0-question-generation-dureader_qg": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-question-generation-dureader_qg",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-dureader_qg"
+        }
+    },
 }
 
 support_schema_list = [
@@ -457,7 +513,7 @@ support_argument_list = [
 
 class Taskflow(object):
     """
-    The Taskflow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
+    The Taskflow is the end2end interface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
         3) Offer the usage and help message.

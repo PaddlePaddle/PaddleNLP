@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import paddle
+import paddle.nn.functional as F
 from ..dallebart.modeling import VQGanDetokenizer
 from ..gpt.modeling import GPTLMHeadModel, GPTLMHead, GPTModel
 
@@ -23,6 +24,9 @@ __all__ = [
     'ArtistForConditionalGeneration',
 ]
 
+# set gelu_new
+F.gelu_python = F.gelu
+
 pretrained_init_configuration = {
     "pai-painter-base-zh": {
         "vocab_size": 37512,
@@ -30,7 +34,7 @@ pretrained_init_configuration = {
         "num_hidden_layers": 12,
         "num_attention_heads": 12,
         "intermediate_size": 3072,
-        "hidden_act": "gelu",
+        "hidden_act": "gelu_python",
         "hidden_dropout_prob": 0.0,
         "attention_probs_dropout_prob": 0.0,
         "max_position_embeddings": 288,
@@ -47,7 +51,7 @@ pretrained_init_configuration = {
         "num_hidden_layers": 12,
         "num_attention_heads": 12,
         "intermediate_size": 3072,
-        "hidden_act": "gelu",
+        "hidden_act": "gelu_python",
         "hidden_dropout_prob": 0.0,
         "attention_probs_dropout_prob": 0.0,
         "max_position_embeddings": 288,
@@ -64,7 +68,7 @@ pretrained_init_configuration = {
         "num_hidden_layers": 12,
         "num_attention_heads": 12,
         "intermediate_size": 3072,
-        "hidden_act": "gelu",
+        "hidden_act": "gelu_python",
         "hidden_dropout_prob": 0.0,
         "attention_probs_dropout_prob": 0.0,
         "max_position_embeddings": 288,
@@ -81,7 +85,7 @@ pretrained_init_configuration = {
         "num_hidden_layers": 12,
         "num_attention_heads": 12,
         "intermediate_size": 3072,
-        "hidden_act": "gelu",
+        "hidden_act": "gelu_python",
         "hidden_dropout_prob": 0.0,
         "attention_probs_dropout_prob": 0.0,
         "max_position_embeddings": 288,
@@ -98,7 +102,7 @@ pretrained_init_configuration = {
         "num_hidden_layers": 24,
         "num_attention_heads": 16,
         "intermediate_size": 4096,
-        "hidden_act": "gelu",
+        "hidden_act": "gelu_python",
         "hidden_dropout_prob": 0.0,
         "attention_probs_dropout_prob": 0.0,
         "max_position_embeddings": 288,

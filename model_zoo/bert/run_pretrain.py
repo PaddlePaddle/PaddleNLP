@@ -150,7 +150,7 @@ def parse_args():
     parser.add_argument("--device",
                         type=str,
                         default="gpu",
-                        choices=["cpu", "gpu", "xpu"],
+                        choices=["cpu", "gpu", "xpu", "npu"],
                         help="Device for selecting for the training.")
     parser.add_argument("--use_amp",
                         type=distutils.util.strtobool,
