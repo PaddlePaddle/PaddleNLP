@@ -167,7 +167,7 @@ def attribute_map(config: PretrainedConfig,
         if old_key in kwargs:
             if new_key in kwargs:
                 logger.warning(
-                    'receive param<%s> and param<%s>, but the first one will be adopt'
+                    f'receive param<{old_key}> and param<{new_key}>, but the first one will be adopt'
                 )
             kwargs[new_key] = kwargs.pop(old_key)
     return kwargs
