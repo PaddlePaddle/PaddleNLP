@@ -124,6 +124,8 @@ std::vector<paddle::Tensor> decoding_kernel(
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
 
+  int inner_coeff = ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim;
+
   auto q_weight_shape = self_attn_query_weight[0].shape();
   auto k_weight_shape = self_attn_key_weight[0].shape();
   bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
@@ -265,7 +267,19 @@ std::vector<paddle::Tensor> decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,  // is_fuse_topk_softMax
-        fuse_qkv);
+        fuse_qkv,
+        false,  // keep_alive_beam
+        0.6,  // alpha
+        true,  // normalization_before
+        0,  // pos_offset
+        ActivationType::RELU,  // act
+        false,  // pos_bias
+        false,  // prefix_lm
+        -1,  // finished_candidate_num
+        false,  // early_stopping
+        false,  // is_mbart
+        0,  // min_length
+        inner_coeff);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -289,7 +303,17 @@ std::vector<paddle::Tensor> decoding_kernel(
         true,   // is_fuse_topk_softMax
         fuse_qkv,
         true,   // keep_alive_beam
-        alpha);
+        alpha,
+        true,  // normalization_before
+        0,  // pos_offset
+        ActivationType::RELU,  // act
+        false,  // pos_bias
+        false,  // prefix_lm
+        -1,  // finished_candidate_num
+        false,  // early_stopping
+        false,  // is_mbart
+        0,  // min_length
+        inner_coeff);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -312,7 +336,17 @@ std::vector<paddle::Tensor> decoding_kernel(
                                                       end_id_,
                                                       candidate_num_,
                                                       probability_threshold_,
-                                                      fuse_qkv);
+                                                      fuse_qkv,
+                                                      true,  // normalization_before
+                                                      0,  // pos_offset
+                                                      ActivationType::RELU,  // act
+                                                      false,  // pos_bias
+                                                      1.0,  // temperature
+                                                      1.0,  // repeat_penalty
+                                                      false,  // prefix_lm
+                                                      false,  // is_mbart
+                                                      0,  // min_length
+                                                      inner_coeff);
 
     decoding_sampling_->forward(params, decoding_params);
 
