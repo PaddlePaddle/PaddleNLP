@@ -363,8 +363,9 @@ class BartHeadTests(unittest.TestCase):
             paddle.to_tensor([0, 11349, 495, 4040, 571, 2]),
         ]
         for ex, desired_result in zip(examples, fairseq_results):
-            bart_toks = tokenizer.encode(ex, return_tensors="pd").squeeze()
-            assert_tensors_close(desired_result.long(), bart_toks, prefix=ex)
+            bart_toks = tokenizer.encode(
+                ex, return_tensors="pd")["input_ids"].squeeze()
+            assert_tensors_close(desired_result, bart_toks, prefix=ex)
 
 
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
@@ -398,7 +399,7 @@ def assert_tensors_close(a, b, atol=1e-12, prefix=""):
     if a is None and b is None:
         return True
     try:
-        if paddle.allclose(a, b, atol=atol):
+        if paddle.allclose(a.astype("float32"), b.astype("float32"), atol=atol):
             return True
         raise
     except Exception:
@@ -427,8 +428,9 @@ class FastIntegrationTests(unittest.TestCase):
         return BartForConditionalGeneration.from_pretrained("bart-base")
 
     def test_bart_base_generation(self):
-        model = self.bart_base
-        tok = self.tok
+        model = self.bart_base()
+        model.eval()
+        tok = self.tok()
         ARTICLE = (
             "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
             " Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The"
@@ -467,7 +469,7 @@ class FastIntegrationTests(unittest.TestCase):
             " 2002 to prosecute genocide, crimes against humanity and war crimes."
         )
         EXPECTED = (
-            " The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC's founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed \"in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014.\" Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday's ceremony said it was a move toward greater justice. \"As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice,\" he said, according to an ICC news release. \"Indeed, today brings us closer to our shared goals of ending a long era of impunity and peace. \"Indeed, today brings us closer to our shared goals of justice and peace,\" he said, according to an ICC news release. \"The ICC is a step closer to ending a long era of impunity and injustice,\" he said, according to an ICC news release. \"Indeed, today brings us closer to our shared goals of justice and peace.\" Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. \"As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly,\" she said. Rights group Human Rights Watch said the development. \"Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court's treaty should speak out to welcome its membership. \"What's objectionable is the attempts to undermine international justice, not Palestine's decision to join a treaty to which over 100 countries around the world are members.\" In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. \"As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that Palestine is eligible to join the ICC,\" the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. \"We will continue to support actions against Palestine,\" it said in a statement, it said. \"We will continue to support the court's decision. \"We will continue to fight against the ICC and the ICC. We will continue to fight for the rights of the Palestinians, and we will continue to fight for the cause of Palestine. We will continue to fight for justice and justice,\" it said in a statement. \"We will continue to fight against the ICC for its purposes and refers to the territories as \"Palestine.\" While a preliminary examination is not a formal investigation, it allows the court. The court is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would \"conduct its analysis in full independence and impartiality.\" The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes. "
+            'The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC\'s founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed "in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014." Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians\' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday\'s ceremony, said it was a move toward greater justice. "As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly," she said. Rights group Human Rights Watch welcomed the development. "Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court\'s treaty should speak out to welcome its membership," said Balkees Jarrah, international justice counsel for the group. "What\'s objectionable is the attempts to undermine international justice, not Palestine\'s decision to join a treaty to which over 100 countries around the world are members." In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. The United States also said it "strongly" disagreed with the court\'s decision. "As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that it is eligible to join the ICC," the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. "We will continue to oppose actions against Israel at the ICC as counterproductive to the cause of peace," it said. But the ICC begs to differ with the definition of a state for its purposes and refers to the territories as "Palestine." While a preliminary examination is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would "conduct its analysis in full independence and impartiality." The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes.'
         )
 
         dct = tok(ARTICLE, return_tensors="pd")
@@ -483,7 +485,7 @@ class FastIntegrationTests(unittest.TestCase):
     def test_xsum_1_1_batch_generation(self):
         # test batch
 
-        batch = self.tok(
+        batch = self.tok()(
             [
                 "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
                 " Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories."
@@ -600,16 +602,22 @@ class FastIntegrationTests(unittest.TestCase):
             padding="longest",
             truncation=True,
         )
-        generated_ids = self.xsum_1_1_model.generate(**batch, num_beams=4)
-        result = self.tok.batch_decode(generated_ids, skip_special_tokens=True)
+        model = self.bart_base()
+        model.eval()
+
+        generated_ids, _ = model.generate(**batch,
+                                          num_beams=4,
+                                          decode_strategy="beam_search")
+        result = self.tok().batch_decode(generated_ids,
+                                         skip_special_tokens=True)
         assert (
             result[0] ==
-            " The International Criminal Court (ICC) has announced that it has been announced by the International"
-            " Criminal court.")
+            "The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a"
+        )
         assert (
             result[1] ==
-            " An investigation into the crash that killed at least 10 people in the French capital has been"
-            " released by the French police investigating the crash.")
+            "The French prosecutor leading an investigation into the crash of Germanwings Flight 9525 insisted Wednesday that"
+        )
 
 
 class BartModelIntegrationTests(unittest.TestCase):
