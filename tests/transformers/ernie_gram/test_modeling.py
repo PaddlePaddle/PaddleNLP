@@ -272,7 +272,7 @@ class ErnieGramModelTester:
         self.parent.assertTrue(
             paddle.allclose(output_from_past_slice,
                             output_from_no_past_slice,
-                            atol=1e-3))
+                            atol=1e-4))
 
     def get_config(self) -> dict:
         """get the base model kwargs
@@ -348,7 +348,7 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
               [-0.12123521, -1.35024536, -1.76512492],
               [-0.14853711, -1.13618660, -2.87098265]]])
         self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
     @slow
     def test_inference_with_attention(self):

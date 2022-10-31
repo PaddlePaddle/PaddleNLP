@@ -67,10 +67,9 @@ class RoFormerEmbeddings(nn.Layer):
             token_type_ids_shape = paddle.shape(inputs_embeds)[:-1]
             token_type_ids = paddle.zeros(token_type_ids_shape, dtype="int64")
 
-        input_embedings = self.word_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + token_type_embeddings
+        embeddings = inputs_embeds + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings

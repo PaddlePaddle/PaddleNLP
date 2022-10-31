@@ -845,16 +845,26 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
 
         """
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape(shape=(
-            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time."
+            )
+
+        if input_ids is None and inputs_embeds is None:
+            raise ValueError(
+                "input_ids and inputs_embeds should not be None at the same time."
+            )
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(
+                [-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
+        else:
+            input_ids = input_ids.reshape(shape=(
+                -1,
+                input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape(
                 shape=(-1, token_type_ids.shape[-1]))
-
-        if inputs_embeds is not None:
-            inputs_embeds = inputs_embeds.reshape(
-                [-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
 
         if position_ids is not None:
             position_ids = position_ids.reshape(shape=(-1,
@@ -867,6 +877,7 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
         outputs = self.tinybert(input_ids,
                                 token_type_ids=token_type_ids,
                                 position_ids=position_ids,
+                                inputs_embeds=inputs_embeds,
                                 attention_mask=attention_mask,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
