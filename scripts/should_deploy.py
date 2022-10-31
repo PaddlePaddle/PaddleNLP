@@ -15,9 +15,13 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import os
+import argparse
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def get_version_of_package(name: str) -> str:
+def read_version_of_remote_package(name: str) -> str:
     """get version of remote package,
 
     apdapted from: https://stackoverflow.com/a/58649262/6894382
@@ -40,6 +44,37 @@ def get_version_of_package(name: str) -> str:
     return latest_version
 
 
-def read_version():
-    """read version of ppdiffusers"""
-    pass
+def read_version_of_local_package(version_file_path: str) -> str:
+    """get version of local package
+
+    Args:
+        version_file_path (str): the path of `VERSION` file
+
+    Returns:
+        str: the version of local package
+    """
+    with open(version_file_path, 'r', encoding='utf-8') as f:
+        version = f.read().strip()
+    return version
+
+
+def should_ppdiffusers_deploy():
+    """print the result to terminal"""
+    local_version_file = os.path.join(PROJECT_ROOT, 'ppdiffusers/VERSION')
+    remote_version = read_version_of_remote_package("ppdiffusers")
+    local_version = read_version_of_local_package(local_version_file)
+
+    should_deploy = str(remote_version != local_version).lower()
+    print(f"should_deploy={should_deploy}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--name', required=True)
+
+    args = parser.parse_args()
+
+    if args.name == 'ppdiffusers':
+        should_ppdiffusers_deploy()
+    else:
+        raise ValueError(f"package<{args.name}> not supported")
