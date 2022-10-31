@@ -20,3 +20,11 @@ deploy-version:
 .PHONY: install
 install:
 	pip install -r requirements.txt
+
+.PHONY: version
+version:
+	@newVersion=$$(awk -F. '{print $$1"."$$2"."$$3+1}' < VERSION) \
+		&& echo $${newVersion} > VERSION \
+		&& git add VERSION \
+		&& git commit -m "🔥 update version to $${newVersion}" > /dev/null \
+		&& echo "Bumped version to $${newVersion}"
