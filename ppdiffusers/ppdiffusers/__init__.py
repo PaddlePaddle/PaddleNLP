@@ -23,8 +23,9 @@ from .utils import (
     is_paddlenlp_available,
     is_unidecode_available,
 )
+from .version import VERSION
 
-__version__ = "0.6.0"
+__version__ = VERSION
 
 from .configuration_utils import ConfigMixin
 from .onnx_utils import OnnxRuntimeModel
