@@ -14,6 +14,10 @@
 
 本项目提供了低成本搭建端到端问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的问答系统模型(召回模型、排序模型、阅读理解模型)快速搭建一个针对自己业务数据的问答系统，并可以提供基于[Streamlit](https://streamlit.io/) 的 Web 可视化服务。
 
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190298926-a1fc92f3-5ec7-4265-8357-ab860cc1fed2.gif" width="500px">
+</div>
+
 ### 2.1 系统特色
 
 + 端到端
