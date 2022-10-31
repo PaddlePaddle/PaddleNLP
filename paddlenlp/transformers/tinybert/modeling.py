@@ -20,6 +20,7 @@ import paddle.nn as nn
 
 from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
+from ..configuration_utils import PretrainedConfig
 
 from ..model_outputs import (BaseModelOutputWithPooling,
                              BaseModelOutputWithPoolingAndCrossAttentions,
@@ -249,10 +250,17 @@ class TinyBertModel(TinyBertPretrainedModel):
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
 
-        self.embeddings = BertEmbeddings(vocab_size, hidden_size,
-                                         hidden_dropout_prob,
-                                         max_position_embeddings,
-                                         type_vocab_size)
+        # TODO(wj-Mcat): construct config temporary
+        # to be removed when TinyBertConfig is completed
+        config = PretrainedConfig(
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            hidden_dropout_prob=hidden_dropout_prob,
+            max_position_embeddings=max_position_embeddings,
+            type_vocab_size=type_vocab_size,
+            # the default pool_act is `tanh`
+            pool_act="tanh")
+        self.embeddings = BertEmbeddings(config)
 
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
@@ -264,7 +272,8 @@ class TinyBertModel(TinyBertPretrainedModel):
             act_dropout=0)
 
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = BertPooler(hidden_size, hidden_act)
+        
+        self.pooler = BertPooler(config)
         # fit_dense(s) means a hidden states' transformation from student to teacher.
         # `fit_denses` is used in v2 model, and `fit_dense` is used in other pretraining models.
         self.fit_denses = nn.LayerList([

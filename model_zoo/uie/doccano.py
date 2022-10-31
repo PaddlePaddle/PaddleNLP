@@ -55,10 +55,11 @@ def do_convert():
                              options=["正向", "负向"],
                              separator="##",
                              shuffle=False,
-                             is_train=True):
+                             is_train=True,
+                             schema_lang="ch"):
         entities, relations, aspects = convert_ext_examples(
             examples, negative_ratio, prompt_prefix, options, separator,
-            is_train)
+            is_train, schema_lang)
         examples = entities + relations + aspects
         if shuffle:
             indexes = np.random.permutation(len(examples))
@@ -83,9 +84,13 @@ def do_convert():
 
     if len(args.splits) == 0:
         if args.task_type == "ext":
-            examples = _create_ext_examples(raw_examples, args.negative_ratio,
-                                            args.prompt_prefix, args.options,
-                                            args.separator, args.is_shuffle)
+            examples = _create_ext_examples(raw_examples,
+                                            args.negative_ratio,
+                                            args.prompt_prefix,
+                                            args.options,
+                                            args.separator,
+                                            args.is_shuffle,
+                                            schema_lang=args.schema_lang)
         else:
             examples = _create_cls_examples(raw_examples, args.prompt_prefix,
                                             args.options, args.is_shuffle)
@@ -116,20 +121,24 @@ def do_convert():
             train_examples = _create_ext_examples(raw_examples[:p1],
                                                   args.negative_ratio,
                                                   args.prompt_prefix,
-                                                  args.options, args.separator,
-                                                  args.is_shuffle)
+                                                  args.options,
+                                                  args.separator,
+                                                  args.is_shuffle,
+                                                  schema_lang=args.schema_lang)
             dev_examples = _create_ext_examples(raw_examples[p1:p2],
                                                 -1,
                                                 args.prompt_prefix,
                                                 args.options,
                                                 args.separator,
-                                                is_train=False)
+                                                is_train=False,
+                                                schema_lang=args.schema_lang)
             test_examples = _create_ext_examples(raw_examples[p2:],
                                                  -1,
                                                  args.prompt_prefix,
                                                  args.options,
                                                  args.separator,
-                                                 is_train=False)
+                                                 is_train=False,
+                                                 schema_lang=args.schema_lang)
         else:
             train_examples = _create_cls_examples(raw_examples[:p1],
                                                   args.prompt_prefix,
@@ -162,6 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--separator", type=str, default='##', help="Used only for entity/aspect-level classification task, separator for entity label and classification label")
+    parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")
 
     args = parser.parse_args()
     # yapf: enable
