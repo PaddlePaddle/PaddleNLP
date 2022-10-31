@@ -336,7 +336,7 @@ class UIETask(Task):
                 "f144bd065ea90cc26eaa91197124bdcc"
             ],
             "sentencepiece_model_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/sentencepiece.bpe.model",
                 "bf25eb5120ad92ef5c7d8596b5dc4046"
             ],
         },
@@ -344,7 +344,6 @@ class UIETask(Task):
 
     def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-
         if model in ['uie-m-base', 'uie-m-large']:
             self._multilingual = True
             self.resource_files_names[

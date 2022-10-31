@@ -26,7 +26,7 @@ from paddle.io import DataLoader
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import RobertaForMaskedLM, RobertaTokenizer, RobertaModel
+from paddlenlp.transformers import RobertaForMaskedLM, RobertaTokenizer, RobertaModel, RobertaConfig
 from paddlenlp.data import Stack, Tuple, Pad, Dict
 import copy
 from tqdm import tqdm
@@ -88,10 +88,8 @@ def do_train(args):
         paddle.distributed.init_parallel_env()
 
     # Load model and train from scratch
-    # model = RobertaForMaskedLM(
-    #     RobertaModel(**RobertaForMaskedLM.pretrained_init_configuration[
-    #         args.model_name_or_path]))
-    model = RobertaForMaskedLM(RobertaModel(**roberta_arch))
+    config = RobertaConfig(**roberta_arch)
+    model = RobertaForMaskedLM(config)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
     ignore_label = IGNORE
