@@ -153,6 +153,9 @@ T5模型汇总
 |``google/t5-small-ssm-nq``                                                        | English      | Please refer to:                                                                 |                                   
 |                                                                                  |              | `google/t5-small-ssm-nq`_                                                        |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
+|``mrm8488/t5-base-finetuned-question-generation-ap``                              | English      | Please refer to:                                                                 |                                   
+|                                                                                  |              | `mrm8488/t5-base-finetuned-question-generation-ap`_                              |
++----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
 
 
@@ -200,4 +203,4 @@ T5模型汇总
 .. _razent/SciFive-base-Pubmed_PMC: https://huggingface.co/razent/SciFive-base-Pubmed_PMC
 .. _google/t5-small-ssm-nq: https://huggingface.co/google/t5-small-ssm-nq
 .. _flexudy/t5-small-wav2vec2-grammar-fixer: https://huggingface.co/flexudy/t5-small-wav2vec2-grammar-fixer
-
+.. _mrm8488/t5-base-finetuned-question-generation-ap: https://huggingface.co/mrm8488/t5-base-finetuned-question-generation-ap
