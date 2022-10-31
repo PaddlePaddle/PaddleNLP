@@ -17,5 +17,6 @@ deploy:
 deploy-version:
 	echo "VERSION = '$$(cat VERSION)'" > ppdiffusers/version.py
 
+.PHONY: install
 install:
 	pip install -r requirements.txt
