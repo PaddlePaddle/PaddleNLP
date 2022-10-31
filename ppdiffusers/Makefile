@@ -11,8 +11,7 @@ build:
 .PHONY: deploy
 deploy:
 	make deploy-version
-	# twine upload --skip-existing dist/*
-	twine upload --repository testpypi --skip-existing dist/*
+	twine upload --skip-existing dist/*
 
 .PHONY: deploy-version
 deploy-version:
