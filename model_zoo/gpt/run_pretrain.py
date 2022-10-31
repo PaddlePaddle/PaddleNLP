@@ -150,6 +150,13 @@ def do_train(args):
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
 
+    # decorate @to_static for benchmark, skip it by default.
+    if args.to_static:
+        specs = None
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info(
+            "Successfully to apply @to_static with specs: {}".format(specs))
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -200,13 +207,6 @@ def do_train(args):
         else:
             logger.warning("No optimizer checkpoint file found in %s." %
                            opt_path)
-
-    # decorate @to_static for benchmark, skip it by default.
-    if args.to_static:
-        specs = None
-        model = paddle.jit.to_static(model, input_spec=specs)
-        logger.info(
-            "Successfully to apply @to_static with specs: {}".format(specs))
 
     global_step = 0
     epoch = 0
