@@ -46,7 +46,7 @@ jobs:
       - name: Is A Publish Branch
         if: steps.check-branch.outputs.match == 'true' && steps.should-deploy.outputs.should_deploy == 'true'
         env:
-          TWINE_USERNAME: __token__
+          TWINE_USERNAME: paddle-dev
           TWINE_PASSWORD: ${{ secrets.paddlenlp }}
         run: |
           make deploy-ppdiffusers
