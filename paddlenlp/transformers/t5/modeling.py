@@ -26,6 +26,7 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
 
 from ..model_utils import PretrainedModel, register_base_model
+from ...utils.log import logger
 from ..nezha.modeling import ACT2FN
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -193,6 +194,7 @@ class T5Attention(nn.Layer):
         self.n_heads = num_heads
         self.dropout = dropout_rate
         self.inner_dim = self.n_heads * self.key_value_proj_dim
+        self.enable_recompute = False
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
         self.q = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
@@ -367,6 +369,8 @@ class T5Attention(nn.Layer):
                     shape=(1, self.n_heads, real_seq_length, key_length),
                     dtype=scores.dtype,
                 )
+                if self.training and self.enable_recompute:
+                    position_bias.stop_gradient = False
             else:
                 position_bias = self.compute_bias(real_seq_length, key_length)
 
@@ -1060,14 +1064,27 @@ class T5Stack(nn.Layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states, )
 
-            if self.enable_recompute:
-                layer_outputs = recompute(layer_module, hidden_states,
+            if self.enable_recompute and self.training:
+                if use_cache:
+                    logger.warning(
+                        "`use_cache=True` is incompatible with `config.enable_recompute=True`. Setting "
+                        "`use_cache=False`...")
+                    use_cache = False
+
+                def create_custom_forward(module):
+
+                    def custom_forward(*inputs):
+                        return tuple(
+                            module(*inputs, use_cache, output_attentions))
+
+                    return custom_forward
+
+                layer_outputs = recompute(create_custom_forward(layer_module),
+                                          hidden_states,
                                           extended_attention_mask,
                                           position_bias, encoder_hidden_states,
                                           encoder_extended_attention_mask,
-                                          encoder_decoder_position_bias,
-                                          past_key_value, use_cache,
-                                          output_attentions)
+                                          encoder_decoder_position_bias, None)
             else:
                 layer_outputs = layer_module(
                     hidden_states,
@@ -1591,7 +1608,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 encoder_output=None,
                 cache=None,
                 labels=None,
-                use_cache=True,
+                use_cache=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -1685,6 +1702,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
 
         """
 
+        use_cache = use_cache if use_cache is not None else False
         # Encode if needed (training, first prediction pass)
         if encoder_output is None:
             # Convert encoder inputs in embeddings if needed

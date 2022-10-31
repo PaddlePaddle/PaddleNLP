@@ -21,6 +21,7 @@ import json
 import math
 import os
 from dataclasses import asdict, dataclass, field
+from paddle.distributed import fleet
 from enum import Enum
 import types
 from typing import Any, Dict, List, Optional
@@ -677,7 +678,8 @@ class TrainingArguments:
             )
         if len(self.sharding) > 0:
             if self.sharding_degree == -1:
-                self.sharding_degree = self.world_size
+                # self.sharding_degree = self.world_size
+                self.sharding_degree = paddle.distributed.get_world_size()
 
             assert self.world_size % self.sharding_degree == 0, (
                 "The world size for workers should be divided by sharding_degree, "
@@ -751,7 +753,25 @@ class TrainingArguments:
         The number of processes used in parallel.
         """
         if self.local_rank != -1:
-            return paddle.distributed.get_world_size()
+            world_size = paddle.distributed.get_world_size()
+            # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
+            if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
+            ):
+                if len(self.sharding) > 0:
+                    self.dp_degree = world_size // self.sharding_degree
+                    strategy = fleet.DistributedStrategy()
+                    strategy.hybrid_configs = {
+                        "dp_degree": self.dp_degree,
+                        "mp_degree": 1,
+                        "pp_degree": 1,
+                        "sharding_degree": self.sharding_degree
+                    }
+                    self.strategy = strategy
+                    fleet.init(is_collective=True, strategy=strategy)
+                else:
+                    paddle.distributed.init_parallel_env()
+
+            return world_size
         return 1
 
     @property

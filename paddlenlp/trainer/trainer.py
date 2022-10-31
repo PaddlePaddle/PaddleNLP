@@ -215,23 +215,9 @@ class Trainer:
         # init parallel env
         if paddle.distributed.get_world_size() > 1:
             if self.sharding:
-                self.args.dp_degree = self.args.world_size // self.args.sharding_degree
-                strategy = fleet.DistributedStrategy()
-                strategy.hybrid_configs = {
-                    "dp_degree": self.args.dp_degree,
-                    "mp_degree": 1,
-                    "pp_degree": 1,
-                    "sharding_degree": self.args.sharding_degree
-                }
-                self.strategy = strategy
-                fleet.init(is_collective=True, strategy=strategy)
                 self.hcg = fleet.get_hybrid_communicate_group()
                 self.dp_group = self.hcg.get_data_parallel_group()
                 self.sharding_group = self.hcg.get_sharding_parallel_group()
-
-            elif not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
-            ):
-                paddle.distributed.init_parallel_env()
 
         default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(
             tokenizer)
@@ -281,13 +267,13 @@ class Trainer:
 
         self.do_grad_scaling = False
         if (args.fp16 or args.bf16):
-            # self.scaler = paddle.amp.GradScaler(
-            #     init_loss_scaling=self.args.scale_loss)
             logger.info("Using half precision")
             self.do_grad_scaling = True
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
 
             if self.sharding is not None:
+                self.scaler = paddle.amp.GradScaler(
+                    init_loss_scaling=self.args.scale_loss)
                 if self.amp_dtype == "float16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
                         self.scaler = fleet.distributed_scaler(self.scaler)
@@ -307,21 +293,6 @@ class Trainer:
             else:
                 self.scaler = paddle.amp.GradScaler(
                     init_loss_scaling=self.args.scale_loss)
-
-            self.scaler = paddle.amp.GradScaler(
-                init_loss_scaling=self.args.scale_loss)
-
-            if self.sharding is not None:
-                if ShardingOption.SHARD_OP in self.args.sharding:
-                    self.scaler = fleet.distributed_scaler(self.scaler)
-                else:
-                    # scaler for stage2 and stage3
-                    if paddle.framework.in_dygraph_mode():
-                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
-                        self.scaler = GroupShardedScaler(self.scaler)
-                    else:
-                        from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
-                        self.scaler = ShardingScaler(self.scaler)
 
         if args.recompute:
 
@@ -988,7 +959,7 @@ class Trainer:
                 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
                 self.optimizer = DygraphShardingOptimizer(
                     hcg=fleet.get_hybrid_communicate_group(),
-                    user_defined_strategy=self.strategy,
+                    user_defined_strategy=self.args.strategy,
                     params=self.model.parameters(),
                     inner_optimizer_class=optimizer_cls,
                     learning_rate=self.lr_scheduler
@@ -1104,7 +1075,7 @@ class Trainer:
         if not training:
             return model
 
-        # Mixed precision training with apex (torch < 1.6)
+        # Mixed precision training
         if training and self.do_grad_scaling:  # self.args.fp16_opt_level=="O2":
             # model, self.optimizer
             decorated = paddle.amp.decorate(models=model,

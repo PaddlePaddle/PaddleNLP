@@ -120,6 +120,7 @@ class PretrainedModel(Layer, GenerationMixin):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
+    main_input_name = "input_ids"
 
     def _post_init(self, original_init, *args, **kwargs):
         """
