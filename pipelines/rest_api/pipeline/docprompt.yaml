@@ -1,0 +1,29 @@
+version: '1.1.0'
+
+components:
+  - name: PreProcessor
+    params:
+          use_gpu: True
+          lang: ch
+    type: DocOCRProcessor
+  - name: Runner
+    params:
+          topn: 1
+          use_gpu: True
+          task_path:
+          model: docprompt
+          device_id: 0
+          num_threads:
+          lang: ch
+          batch_size: 1
+    type: DocPrompter
+
+pipelines:
+  - name: query_documents
+    nodes:
+      - name: PreProcessor
+        inputs: [Query]
+      - name: Runner
+        inputs: [PreProcessor]
+
+

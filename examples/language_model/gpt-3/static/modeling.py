@@ -1121,7 +1121,7 @@ class GPTForGeneration(GPTPretrainedModel):
         old_probs = probs
         candidate_probs = sorted_probs * lt_cond
         probs = candidate_probs / paddle.sum(
-            candidate_probs, axis=-1, keep_dim=True)
+            candidate_probs, axis=-1, keepdim=True)
         sampling_ids = layers.sampling_id(probs, dtype="int")
         sampling_ids = paddle.index_sample(sorted_idx,
                                            paddle.unsqueeze(sampling_ids, [1]))

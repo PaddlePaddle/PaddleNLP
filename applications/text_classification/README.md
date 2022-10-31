@@ -115,7 +115,6 @@
 
 【快速开始】
 - 快速开启多分类任务参见 👉 [语义索引-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/retrieval_based#readme)
-- 快速开启多标签分类任务参见 👉 [语义索引-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/retrieval_based#readme)
 - 快速开启层次分类任务参见 👉 [语义索引-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/retrieval_based#readme)
 
 
@@ -179,7 +178,7 @@
 
 - 体验模型分析模块 👉 [多分类-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/analysis)
 - 体验模型分析模块 👉 [多标签-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/analysis)
-- 体验模型分析模块 👉 [层次分类多-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/analysis)
+- 体验模型分析模块 👉 [层次分类-模型分析模块](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/analysis)
 
 <a name="产业级全流程方案"></a>
 

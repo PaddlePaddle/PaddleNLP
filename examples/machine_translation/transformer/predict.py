@@ -76,7 +76,7 @@ def parse_args():
     )
     parser.add_argument("--device",
                         default="gpu",
-                        choices=["gpu", "cpu", "xpu", "npu"],
+                        choices=["gpu", "cpu", "xpu", "npu", "mlu"],
                         help="Device selected for inference.")
 
     args = parser.parse_args()
@@ -106,6 +106,8 @@ def do_predict(args):
         place = "xpu"
     elif args.device == "npu":
         place = "npu"
+    elif args.device == "mlu":
+        place = "mlu"
     else:
         place = "cpu"
 
@@ -145,6 +147,11 @@ def do_predict(args):
 
     transformer.load(os.path.join(args.init_from_params,
                                   "transformer.pdparams"))
+
+    # Providing model_dict still works.
+    # state_dict = paddle.load(os.path.join(args.init_from_params,
+    #                          "transformer.pdparams"))
+    # transformer.load(state_dict=state_dict)
 
     # Set evaluate mode
     transformer.eval()
