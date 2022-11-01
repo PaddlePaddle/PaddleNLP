@@ -15,6 +15,7 @@
 from typing import List, Dict, Union, Optional, Type
 from rich.console import Console
 from rich.theme import Theme
+from rich.markdown import Markdown
 from rich.table import Table
 from rich.highlighter import RegexHighlighter
 
@@ -34,6 +35,19 @@ def _get_highlighter(word: str) -> Type[RegexHighlighter]:
         highlights = [f"(?P<keyword>{word})"]
 
     return KeywordHighlighter()
+
+
+def print_example_code():
+    # 1. define the console
+    console = Console()
+    markdown = """
+## you can download the above model with the following command:
+
+### ***paddlenlp download --cache_dir ./paddle_pretrained_models -c <model name>***
+
+### ***the <model name> is copied from above table***
+    """
+    console.print(Markdown(markdown))
 
 
 def tabulate(tables: List[Union[List[str], Dict[str, str]]],

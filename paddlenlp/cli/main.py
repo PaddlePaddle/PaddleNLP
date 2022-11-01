@@ -25,11 +25,11 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, Pr
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.downloader import is_url
 from paddlenlp.cli.converter import convert_from_local_file, convert_from_online_model
-from paddlenlp.cli.utils.tabulate import tabulate
+from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
 from paddlenlp.cli.download import load_community_models
 
 
-def load_all_models() -> List[Tuple[str, str]]:
+def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
     """load all model_name infos
 
     Returns:
@@ -54,10 +54,11 @@ def load_all_models() -> List[Tuple[str, str]]:
             model_names.add(("official", obj.base_model_prefix, model_name))
     logger.info(f"find {len(model_names)} official models ...")
 
-    # load & extend community models
-    community_model_names = load_community_models()
-    for model_name in community_model_names:
-        model_names.add(model_name)
+    if include_community:
+        # load & extend community models
+        community_model_names = load_community_models()
+        for model_name in community_model_names:
+            model_names.add(model_name)
 
     return model_names
 
@@ -67,12 +68,23 @@ app = Typer()
 
 @app.command()
 def download(model_name: str,
-             cache_dir: str = "./models",
-             force_download: bool = False):
+             cache_dir: str = typer.Option(
+                 './pretrained_models',
+                 '--cache-dir',
+                 '-c',
+                 help="cache_dir for download pretrained model"),
+             force_download: bool = typer.Option(
+                 False,
+                 '--force-download',
+                 '-f',
+                 help="force download pretrained model")):
     """download the paddlenlp models with command, you can specific `model_name`
 
+    >>> paddlenlp download bert \n
+    >>> paddlenlp download -c ./my-models -f bert \n
+
     Args:\n
-        model_name (str): pretarined model name, you can checkout all of model from source code.
+        model_name (str): pretarined model name, you can checkout all of model from source code. \n
         cache_dir (str, optional): the cache_dir. Defaults to "./models".
     """
     if not os.path.isabs(cache_dir):
@@ -96,23 +108,32 @@ def download(model_name: str,
 
 
 @app.command()
-def search(query):
+def search(query=typer.Argument(..., help='the query of searching model'),
+           include_community: bool = typer.Option(
+               False,
+               "--include-community",
+               '-i',
+               help="whether searching community models")):
     """search the model with query, eg: paddlenlp search bert
 
-    Args:
-        query (Optional[str]): the str fragment of bert-name
+    >>> paddlenlp search bert \n
+    >>> paddlenlp search -i bert \n
+
+    Args: \n
+        query (Optional[str]): the str fragment of bert-name \n
+        include_community (Optional[bool]): whether searching community models
     """
     logger.info("start to search models ...")
-    model_names = load_all_models()
+    model_names = load_all_models(include_community)
 
     tables = []
-    if query:
-        for model_category, model_type, model_name in model_names:
-            if query in model_name:
-                tables.append([model_category, model_type, model_name])
+    for model_category, model_type, model_name in model_names:
+        if not query or query in model_name:
+            tables.append([model_category, model_type, model_name])
     tabulate(tables,
              headers=["model source", 'model type', 'model name'],
              highlight_word=query)
+    print_example_code()
 
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
 
