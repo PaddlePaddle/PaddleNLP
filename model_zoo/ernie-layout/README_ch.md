@@ -50,7 +50,7 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 - 发票抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195809253-985c4a7b-4675-4262-a4a6-fcccede9ff66.png height=350 width=1000 hspace='10'/>
+    <img src=https://user-images.githubusercontent.com/40840292/196118171-fd3e49a0-b9f1-4536-a904-c48f709a2dec.png height=350 width=1000 hspace='10'/>
 </div>
 
 - 海报抽取问答
@@ -91,6 +91,8 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=350 width=1000 hspace='15'/>
 </div>
+
+- Demo图片可在此[下载](https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/demo.zip)
 
 <a name="23"></a>
 
@@ -188,8 +190,8 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
 
 - 具体评测方式
 
-  - 以上所有任务均基于Grid Search方式进行超参寻优。FUNSD和XFUND-ZH每间隔 100 steps 评估验证集效果，评价指标为Accuracy。
-    RVL-CDIP每间隔2000 steps评估验证集效果，评价指标为F1-Score。DocVQA-ZH每间隔10000 steps评估验证集效果，取验证集最优效果作为表格中的汇报指标，评价指标为ANLS（计算方法参考https://arxiv.org/pdf/1907.00490.pdf）。
+  - 以上所有任务均基于Grid Search方式进行超参寻优。FUNSD和XFUND-ZH每间隔 100 steps 评估验证集效果，评价指标为F1-Score。
+    RVL-CDIP每间隔2000 steps评估验证集效果，评价指标为Accuracy。DocVQA-ZH每间隔10000 steps评估验证集效果，取验证集最优效果作为表格中的汇报指标，评价指标为ANLS（计算方法参考https://arxiv.org/pdf/1907.00490.pdf）。
 
   - 以上每个下游任务的超参范围如下表所示：
 

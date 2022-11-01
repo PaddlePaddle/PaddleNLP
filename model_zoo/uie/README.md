@@ -583,7 +583,8 @@ python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --task_type ext \
     --save_dir ./data \
-    --splits 0.8 0.2 0
+    --splits 0.8 0.2 0 \
+    --schema_lang ch
 ```
 
 
@@ -599,6 +600,7 @@ python doccano.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+- ``schema_lang``: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
@@ -693,10 +695,12 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --save_total_limit 1 \
 
 ```
+**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual True`。
 
 可配置参数说明：
 
-* `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano";
+* `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-m-base", "uie-m-large"。
+* `multilingual`：是否是跨语言模型，用 "uie-m-base", "uie-m-large" 等模型进微调得到的模型也是多语言模型，需要设置为 True；默认为 False。
 * `output_dir`：必须，模型训练或压缩后保存的模型目录；默认为 `None` 。
 * `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
 * `per_device_train_batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
@@ -713,7 +717,6 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
 
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
-
 <a name="模型评估"></a>
 
 #### 4.4 模型评估
@@ -728,7 +731,7 @@ python evaluate.py \
     --max_seq_len 512
 ```
 
-通过运行以下命令对UIE-M进行模型评估：
+通过运行以下命令对 UIE-M 进行模型评估：
 
 ```
 python evaluate.py \
@@ -873,6 +876,8 @@ python finetune.py  \
     --save_total_limit 1 \
     --strategy 'qat' \
 ```
+
+**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual True`。
 
 可配置的压缩相关的参数：
 * `strategy`：压缩策略，在 UIE 中目前推荐使用 `'qat'`，即量化训练（QAT）。由于有训练过程，因此训练相关的参数也可以重新调整。例如上面微调时已介绍过的`per_device_train_batch_size`、`per_device_eval_batch_size`、`learning_rate`、`num_train_epochs`。

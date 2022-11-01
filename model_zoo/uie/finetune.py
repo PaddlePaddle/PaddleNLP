@@ -29,7 +29,7 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments, CompressionAr
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
-from model import UIE
+from model import UIE, UIEM
 from utils import reader, MODEL_MAP, map_offset
 
 
@@ -72,33 +72,22 @@ class ModelArguments:
         default="uie-base",
         metadata={
             "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+            "Path to pretrained model, such as 'uie-base', 'uie-tiny', " \
+            "'uie-medium', 'uie-mini', 'uie-micro', 'uie-nano', 'uie-base-en', " \
+            "'uie-m-base', 'uie-m-large', or finetuned model path."
         })
-    config_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Pretrained config name or path if not the same as model_name"
-        })
-    tokenizer_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Pretrained tokenizer name or path if not the same as model_name"
-        })
-    cache_dir: Optional[str] = field(
-        default=None,
-        metadata={"help": "Path to directory to store the dataset cache."},
-    )
     export_model_dir: Optional[str] = field(
         default=None,
         metadata={
             "help": "Path to directory to store the exported inference model."
         },
     )
+    multilingual: bool = field(
+        default=False,
+        metadata={"help": "Whether the model is a multilingual model."})
 
 
-def convert_example(example, tokenizer, max_seq_len):
+def convert_example(example, tokenizer, max_seq_len, multilingual=False):
     """
     example: {
         title
@@ -134,15 +123,22 @@ def convert_example(example, tokenizer, max_seq_len):
         end = map_offset(item["end"] - 1 + bias, offset_mapping)
         start_ids[start] = 1.0
         end_ids[end] = 1.0
-
-    tokenized_output = {
-        "input_ids": encoded_inputs["input_ids"],
-        "token_type_ids": encoded_inputs["token_type_ids"],
-        "pos_ids": encoded_inputs["position_ids"],
-        "att_mask": encoded_inputs["attention_mask"],
-        "start_positions": start_ids,
-        "end_positions": end_ids
-    }
+    if multilingual:
+        tokenized_output = {
+            "input_ids": encoded_inputs["input_ids"],
+            "pos_ids": encoded_inputs["position_ids"],
+            "start_positions": start_ids,
+            "end_positions": end_ids
+        }
+    else:
+        tokenized_output = {
+            "input_ids": encoded_inputs["input_ids"],
+            "token_type_ids": encoded_inputs["token_type_ids"],
+            "pos_ids": encoded_inputs["position_ids"],
+            "att_mask": encoded_inputs["attention_mask"],
+            "start_positions": start_ids,
+            "end_positions": end_ids
+        }
     return tokenized_output
 
 
@@ -181,7 +177,10 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = UIE.from_pretrained(model_args.model_name_or_path)
+    if model_args.multilingual:
+        model = UIEM.from_pretrained(model_args.model_name_or_path)
+    else:
+        model = UIE.from_pretrained(model_args.model_name_or_path)
 
     train_ds = load_dataset(reader,
                             data_path=data_args.train_path,
@@ -194,7 +193,8 @@ def main():
 
     trans_fn = partial(convert_example,
                        tokenizer=tokenizer,
-                       max_seq_len=data_args.max_seq_length)
+                       max_seq_len=data_args.max_seq_length,
+                       multilingual=False)  #model_args.multilingual)
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
@@ -217,7 +217,6 @@ def main():
         metric = SpanEvaluator()
         start_prob, end_prob = p.predictions
         start_ids, end_ids = p.label_ids
-
         metric.reset()
 
         num_correct, num_infer, num_label = metric.compute(
@@ -268,16 +267,30 @@ def main():
     if training_args.do_export:
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
-        input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # segment_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # position_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # attention_mask
-        ]
+        if model_args.multilingual:
+            input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+            ]
+        else:
+            input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='token_type_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='att_mask'),
+            ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir,
                                                        "export")
@@ -292,10 +305,14 @@ def main():
             model.eval()
             metric.reset()
             for batch in data_loader:
-                logits = model(input_ids=batch['input_ids'],
-                               token_type_ids=batch['token_type_ids'],
-                               pos_ids=batch["pos_ids"],
-                               att_mask=batch["att_mask"])
+                if model_args.multilingual:
+                    logits = model(input_ids=batch['input_ids'],
+                                   pos_ids=batch["pos_ids"])
+                else:
+                    logits = model(input_ids=batch['input_ids'],
+                                   token_type_ids=batch['token_type_ids'],
+                                   pos_ids=batch["pos_ids"],
+                                   att_mask=batch["att_mask"])
                 start_prob, end_prob = logits
                 start_ids, end_ids = batch["start_positions"], batch[
                     "end_positions"]

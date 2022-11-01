@@ -444,7 +444,7 @@ class MBartStandaloneDecoderModelTester:
         attention_mask = None
         if self.use_attention_mask:
             attention_mask = ids_tensor(
-                [self.batch_size, self.decoder_seq_length],
+                [self.batch_size, 1, 1, self.decoder_seq_length],
                 vocab_size=2,
                 dtype="int64")
 
@@ -455,16 +455,17 @@ class MBartStandaloneDecoderModelTester:
                                    dtype="int64")
 
         config = {
+            "embed_tokens": None,
             "vocab_size": self.vocab_size,
             "d_model": self.d_model,
-            "decoder_layers": self.decoder_layers,
+            "num_decoder_layers": self.decoder_layers,
             "decoder_ffn_dim": self.decoder_ffn_dim,
-            "encoder_attention_heads": self.encoder_attention_heads,
+            # "encoder_attention_heads": self.encoder_attention_heads,
             "decoder_attention_heads": self.decoder_attention_heads,
-            "eos_token_id": self.eos_token_id,
-            "bos_token_id": self.bos_token_id,
-            "pad_token_id": self.pad_token_id,
-            "decoder_start_token_id": self.decoder_start_token_id,
+            # "eos_token_id": self.eos_token_id,
+            # "bos_token_id": self.bos_token_id,
+            # "pad_token_id": self.pad_token_id,
+            # "decoder_start_token_id": self.decoder_start_token_id,
             "max_position_embeddings": self.max_position_embeddings,
         }
 
@@ -485,15 +486,19 @@ class MBartStandaloneDecoderModelTester:
         # self.use_cache = True
         model = MBartDecoder(**config)
         model.eval()
+
+        encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
+        origin_cache = model.decoder.gen_cache(encoder_output)
+
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
+        outputs = model(input_ids, cache=origin_cache)
         outputs_use_cache_conf = model(input_ids)
-        outputs_no_past = model(input_ids, use_cache=False)
+        outputs_no_past = model(input_ids, cache=None)
 
-        self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
-        self.parent.assertTrue(len(outputs) == len(outputs_no_past) + 1)
+        self.parent.assertTrue(len(outputs[0]) == len(outputs_use_cache_conf))
+        self.parent.assertTrue(len(outputs[0]) == len(outputs_no_past))
 
-        past_key_values = outputs[0]
+        past_key_values = outputs[1]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -504,9 +509,7 @@ class MBartStandaloneDecoderModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
         output_from_no_past = model(next_input_ids)
-        output_from_past = model(next_tokens,
-                                 past_key_values=past_key_values,
-                                 use_cache=True)[0]
+        output_from_past = model(next_tokens, cache=past_key_values)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -537,11 +540,15 @@ class MBartStandaloneDecoderModelTester:
 
         half_seq_length = input_ids.shape[-1] // 2
         attn_mask[:, half_seq_length:] = 0
+        attn_mask = attn_mask.unsqueeze([1, 2])
+
+        encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
+        origin_cache = model.decoder.gen_cache(encoder_output)
 
         # first forward pass
         past_key_values = model(input_ids,
-                                attention_mask=attn_mask,
-                                use_cache=True)[1]
+                                decoder_attention_mask=attn_mask,
+                                cache=origin_cache)[1]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -559,17 +566,19 @@ class MBartStandaloneDecoderModelTester:
         # append to next input_ids and attn_mask
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         attn_mask = paddle.concat(
-            [attn_mask,
-             paddle.ones((attn_mask.shape[0], 1), dtype="int64")],
-            axis=1,
+            [
+                attn_mask,
+                paddle.ones((attn_mask.shape[0], 1, 1, 1), dtype="int64")
+            ],
+            axis=-1,
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
+        output_from_no_past = model(next_input_ids,
+                                    decoder_attention_mask=attn_mask)
         output_from_past = model(next_tokens,
-                                 attention_mask=attn_mask,
-                                 past_key_values=past_key_values,
-                                 use_cache=True)[0]
+                                 decoder_attention_mask=attn_mask,
+                                 cache=past_key_values)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -599,3 +608,34 @@ class MBartStandaloneDecoderModelTester:
             "attention_mask": attention_mask,
         }
         return config, inputs_dict
+
+
+class MBartStandaloneDecoderModelTest(ModelTesterMixin, GenerationTesterMixin,
+                                      unittest.TestCase):
+    base_model_class = MBartModel
+
+    all_model_classes = ()
+
+    all_generative_model_classes = {}
+    is_encoder_decoder = False
+
+    def setUp(self):
+        self.model_tester = MBartStandaloneDecoderModelTester(self,
+                                                              is_training=False)
+
+    def test_decoder_model_past(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_decoder_model_past(
+            *config_and_inputs)
+
+    def test_decoder_model_attn_mask_past(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_decoder_model_attention_mask_past(
+            *config_and_inputs)
+
+    def test_retain_grad_hidden_states_attentions(self):
+        # decoder cannot keep gradients
+        return
+
+    def test_model_name_list(self):
+        pass
