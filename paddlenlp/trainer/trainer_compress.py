@@ -874,6 +874,7 @@ def auto_model_forward(self,
                        output_hidden_states=False,
                        output_attentions=False,
                        return_dict=False):
+    kwargs = locals()
     past_key_values_length = None
     if past_key_values is not None:
         past_key_values_length = past_key_values[0][0].shape[2]
@@ -892,17 +893,14 @@ def auto_model_forward(self,
         attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(
             paddle.get_default_dtype())
         attention_mask = (1.0 - attention_mask) * -1e4
-    return self._ori_forward(input_ids,
-                             token_type_ids,
-                             attention_mask=attention_mask,
-                             position_ids=position_ids,
-                             task_type_ids=task_type_ids,
-                             past_key_values=past_key_values,
-                             inputs_embeds=inputs_embeds,
-                             use_cache=use_cache,
-                             output_hidden_states=output_hidden_states,
-                             output_attentions=output_attentions,
-                             return_dict=return_dict)
+
+    kwargs_keys = inspect.signature(self._ori_forward).parameters.keys()
+
+    model_kwargs = {}
+    for key in kwargs_keys:
+        model_kwargs[key] = kwargs[key]
+    model_kwargs["attention_mask"] = attention_mask
+    return self._ori_forward(**model_kwargs)
 
 
 def soft_cross_entropy(inp, target):
