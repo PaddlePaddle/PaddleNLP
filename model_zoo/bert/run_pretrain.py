@@ -34,7 +34,7 @@ from paddle.io import DataLoader, Dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion
+from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion, BertConfig
 from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
 from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
@@ -345,14 +345,14 @@ def do_train(args):
     pretrained_models_list = list(
         model_class.pretrained_init_configuration.keys())
     if args.model_name_or_path in pretrained_models_list:
-        config = model_class.pretrained_init_configuration[
-            args.model_name_or_path]
-        config['fuse'] = args.fuse_transformer
-        model = model_class(base_class(**config))
+        config = model_class.config_class.from_pretrained(
+            args.model_name_or_path)
+        config.fuse = args.fuse_transformer
+        model = model_class(config)
     else:
         model = model_class.from_pretrained(args.model_name_or_path)
     criterion = criterion_class(
-        getattr(model, model_class.base_model_prefix).config["vocab_size"])
+        getattr(model, model_class.base_model_prefix).config.vocab_size)
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
         specs = create_input_specs()
