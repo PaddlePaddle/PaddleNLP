@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# 环境变量设置
 unset http_proxy && unset https_proxy
 export CUDA_VISIBLE_DEVICES=1
+
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8896
-# 在指定端口 8502 启动 WebUI
+
+# 在指定端口8896启动WebUI
 python -m streamlit run ui/webapp_unsupervised_question_answering.py --server.port 8508
-# python -m streamlit run ui/webapp_text_to_image.py --server.port 8508

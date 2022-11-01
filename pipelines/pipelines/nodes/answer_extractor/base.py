@@ -108,6 +108,7 @@ class UIEComponent(BaseComponent, Task):
                  model=None,
                  schema=None,
                  task_path=None,
+                 device="gpu",
                  schema_lang="zh",
                  max_seq_len=512,
                  batch_size=64,
@@ -116,6 +117,7 @@ class UIEComponent(BaseComponent, Task):
                  lazy_load=False,
                  num_workers=0,
                  use_faster=False):
+        paddle.set_device(device)
         if model in ['uie-m-base', 'uie-m-large']:
             self._multilingual = True
             self.resource_files_names[

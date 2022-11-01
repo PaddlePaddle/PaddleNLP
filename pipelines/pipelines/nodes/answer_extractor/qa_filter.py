@@ -18,6 +18,7 @@ from multiprocessing import cpu_count
 from tqdm import tqdm
 import json
 
+import paddle
 from paddlenlp.taskflow.utils import download_file
 from pipelines.nodes.answer_extractor import UIEComponent
 from paddlenlp.utils.env import PPNLP_HOME
@@ -60,6 +61,7 @@ class QAFilter(UIEComponent):
                  model='uie-base-qa-filter',
                  schema=['答案'],
                  task_path=None,
+                 device="gpu",
                  schema_lang="zh",
                  max_seq_len=512,
                  batch_size=64,
@@ -68,6 +70,7 @@ class QAFilter(UIEComponent):
                  lazy_load=False,
                  num_workers=0,
                  use_faster=False):
+        paddle.set_device(device)
         if model in ['uie-m-base', 'uie-m-large']:
             self._multilingual = True
             self.resource_files_names[

@@ -18,6 +18,7 @@ from multiprocessing import cpu_count
 from tqdm import tqdm
 import json
 
+import paddle
 from paddlenlp.taskflow.utils import download_file
 from pipelines.nodes.answer_extractor import UIEComponent
 from paddlenlp.utils.env import PPNLP_HOME
@@ -25,11 +26,7 @@ from paddlenlp.utils.env import PPNLP_HOME
 
 class AnswerExtractor(UIEComponent):
     """
-    Universal Information Extraction Task. 
-    Args:
-        task(string): The name of task.
-        model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    Universal Information Extraction Component. 
     """
     resource_files_urls = {
         "uie-base-answer-extractor-v1": {
@@ -60,6 +57,7 @@ class AnswerExtractor(UIEComponent):
                  model='uie-base-answer-extractor',
                  schema=['答案'],
                  task_path=None,
+                 device="gpu",
                  schema_lang="zh",
                  max_seq_len=512,
                  batch_size=64,
@@ -68,6 +66,7 @@ class AnswerExtractor(UIEComponent):
                  lazy_load=False,
                  num_workers=0,
                  use_faster=False):
+        paddle.set_device(device)
         if model in ['uie-m-base', 'uie-m-large']:
             self._multilingual = True
             self.resource_files_names[
@@ -151,9 +150,9 @@ class AnswerExtractor(UIEComponent):
                         else:
                             answers += []
                             probabilitys += []
-                    candidates = sorted(
-                        [(a, p) for a, p in zip(answers, probabilitys)],
-                        key=lambda x: -x[1])
+                    candidates = sorted(list(
+                        set([(a, p) for a, p in zip(answers, probabilitys)])),
+                                        key=lambda x: -x[1])
                     if len(candidates) > max_answer_candidates:
                         candidates = candidates[:max_answer_candidates]
                     outdict = {

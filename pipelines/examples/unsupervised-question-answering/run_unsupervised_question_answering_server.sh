@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+# 环境变量设置
 export PYTHONPATH=/root/project/paddle/paddlenlp/unsupervised_qa_pipelines/PaddleNLP/pipelines:$PYTHONPATH
-
 export CUDA_VISIBLE_DEVICES=1
+
 # 指定语义检索系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/unsupervised_qa.yaml
+
 # 使用端口号 8896 启动模型服务
 python rest_api/application.py 8896
