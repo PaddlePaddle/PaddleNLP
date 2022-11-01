@@ -111,7 +111,9 @@ def search(query):
         for model_category, model_type, model_name in model_names:
             if query in model_name:
                 tables.append([model_category, model_type, model_name])
-    tabulate(tables, headers=["模型归类", '模型类型', '模型名称'], highlight_word=query)
+    tabulate(tables,
+             headers=["model source", 'model type', 'model name'],
+             highlight_word=query)
 
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
 
