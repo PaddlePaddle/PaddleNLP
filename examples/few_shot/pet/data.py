@@ -61,67 +61,40 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
     """
 
-    # Replace <unk> with '[MASK]'
-
-    # Step1: gen mask ids
     if is_test:
         label_length = example["label_length"]
     else:
         text_label = example["text_label"]
         label_length = len(text_label)
 
-    mask_tokens = ["[MASK]"] * label_length
-    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
-
-    sentence1 = example["sentence1"]
-    if "<unk>" in sentence1:
-        start_mask_position = sentence1.index("<unk>") + 1
-        sentence1 = sentence1.replace("<unk>", "")
-        encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-        src_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
-
-        # Step2: Insert "[MASK]" to src_ids based on start_mask_position
-        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-            start_mask_position:]
-        token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-            mask_ids) + token_type_ids[start_mask_position:]
-
-        # calculate mask_positions
-        mask_positions = [
-            index + start_mask_position for index in range(label_length)
-        ]
-    else:
-        sentence2 = example['sentence2']
-        start_mask_position = sentence2.index("<unk>") + 1
-        sentence2 = sentence2.replace("<unk>", "")
-
-        encoded_inputs = tokenizer(text=sentence2, max_seq_len=max_seq_length)
-        src_ids = encoded_inputs["input_ids"]
-        token_type_ids = encoded_inputs["token_type_ids"]
-        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-            start_mask_position:]
-        token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-            mask_ids) + token_type_ids[start_mask_position:]
-
-        encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-        sentence1_src_ids = encoded_inputs["input_ids"][1:]
-        src_ids = sentence1_src_ids + src_ids
-        token_type_ids += [1] * len(src_ids)
-        mask_positions = [
-            index + start_mask_position + len(sentence1)
-            for index in range(label_length)
-        ]
-
-    token_type_ids = [0] * len(src_ids)
+    # Concatenate two sentences if "sentence2" exists.
+    sentence = example["sentence1"]
+    if "sentence2" in example:
+        if len(sentence) + len(example["sentence2"]) > 512:
+            post_index = 512 - len(sentence) - len(example["sentence2"])
+            if "<unk>" in example["sentence2"]:
+                sentence = sentence[:post_index]
+            else:
+                example["sentence2"] = example["sentence2"][:post_index]
+        sentence += example["sentence2"]
+    if len(sentence) > 512:
+        m_index = sentence.index("<unk>")
+        if m_index > 256:
+            sentence = sentence[len(sentence) - 512:]
+        else:
+            sentence = sentence[:512]
+    # Insert [MASK] tokens.
+    mask_tokens = "".join([tokenizer.mask_token for _ in range(label_length)])
+    sentence = sentence.replace("<unk>", mask_tokens)
+    # Encode the sentence.
+    encoded_inputs = tokenizer(text=sentence, max_seq_len=max_seq_length)
+    src_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
+    mask_positions = np.where(np.array(src_ids) == tokenizer.mask_token_id)
+    mask_positions = mask_positions[0].tolist()
 
     assert len(src_ids) == len(
         token_type_ids), "length src_ids, token_type_ids must be equal"
-
-    length = len(src_ids)
-    if length > 512:
-        src_ids = src_ids[:512]
-        token_type_ids = token_type_ids[:512]
 
     if is_test:
         return src_ids, token_type_ids, mask_positions
@@ -155,46 +128,29 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
     # FewClue Task `Chid`' label's position must be calculated by special token: "淠"
 
-    seg_tokens = tokenizer.tokenize(example["sentence1"])
-
-    # find insert position of `[MASK]`
-    start_mask_position = seg_tokens.index("淠") + 1
-    seg_tokens.remove("淠")
-
-    sentence1 = "".join(seg_tokens)
-    candidates = example["candidates"]
-    candidate_labels_ids = [
-        tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates
-    ]
-
-    sentence1 = example["sentence1"]
-
-    encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-    src_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
     # Step1: gen mask ids
     if is_test:
         label_length = example["label_length"]
     else:
         text_label = example["text_label"]
         label_length = len(text_label)
+    mask_tokens = "".join([tokenizer.mask_token for _ in range(label_length)])
 
-    mask_tokens = ["[MASK]"] * label_length
-    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
+    # Step2: Insert "[MASK]" to sentence.
+    sentence = example["sentence1"]
+    sentence = sentence.replace("淠", mask_tokens)
+    encoded_inputs = tokenizer(text=sentence, max_seq_len=max_seq_length)
+    src_ids = encoded_inputs["input_ids"]
+    token_type_ids = encoded_inputs["token_type_ids"]
 
-    # Step2: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-        start_mask_position:]
-    token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-        mask_ids) + token_type_ids[start_mask_position:]
-
-    # calculate mask_positions
-    mask_positions = [
-        index + start_mask_position for index in range(label_length)
+    candidates = example["candidates"]
+    candidate_labels_ids = [
+        tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates
     ]
 
-    # token_type_ids = [0] * len(src_ids)
+    # Calculate mask_positions.
+    mask_positions = np.where(np.array(src_ids) == tokenizer.mask_token_id)
+    mask_positions = mask_positions[0].tolist()
 
     assert len(src_ids) == len(
         token_type_ids), "length src_ids, token_type_ids must be equal"
@@ -315,13 +271,13 @@ def transform_eprstmt(example,
         example["label_length"] = 1
 
         if pattern_id == 0:
-            example["sentence1"] = u'感觉很<unk>！' + example["sentence"]
+            example["sentence1"] = u'感觉<unk>好！' + example["sentence"]
         elif pattern_id == 1:
-            example["sentence1"] = u'综合来讲很<unk>！，' + example["sentence"]
+            example["sentence1"] = u'综合来讲<unk>满意！' + example["sentence"]
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'感觉非常<unk>'
+            example["sentence1"] = example["sentence"] + u'感觉<unk>好。'
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'， 我感到非常<unk>'
+            example["sentence1"] = example["sentence"] + u'， 我感到<unk>满意。'
 
         return example
     else:
@@ -330,13 +286,13 @@ def transform_eprstmt(example,
         example['text_label'] = label_normalize_dict[origin_label]
 
         if pattern_id == 0:
-            example["sentence1"] = u'感觉很<unk>！' + example["sentence"]
+            example["sentence1"] = u'感觉<unk>好！' + example["sentence"]
         elif pattern_id == 1:
-            example["sentence1"] = u'综合来讲很<unk>！，' + example["sentence"]
+            example["sentence1"] = u'综合来讲<unk>满意！，' + example["sentence"]
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'感觉非常<unk>'
+            example["sentence1"] = example["sentence"] + u'感觉<unk>好'
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'， 我感到非常<unk>'
+            example["sentence1"] = example["sentence"] + u'， 我感到<unk>满意'
 
         del example["sentence"]
         del example["label"]
@@ -351,13 +307,13 @@ def transform_ocnli(example,
     if is_test:
         example["label_length"] = 2
         if pattern_id == 0:
-            example['sentence1'] = example['sentence1'] + "， <unk>"
+            example['sentence1'] = example['sentence1'] + "， 按<unk>关系可以得到"
         elif pattern_id == 1:
-            example["sentence2"] = "和" + example['sentence2'] + u"？看来<unk>一句话"
+            example["sentence2"] = "和" + example['sentence2'] + u"之间的关系是<unk>。"
         elif pattern_id == 2:
-            example["sentence1"] = "和" + example['sentence2'] + u"？<unk>一样"
+            example["sentence1"] = "和" + example['sentence2'] + u"是相互<unk>的。"
         elif pattern_id == 3:
-            example["sentence2"] = "和" + example['sentence2'] + u"？<unk>一句话"
+            example["sentence2"] = "和" + example['sentence2'] + u"这两句话是<unk>的。"
 
         return example
     else:
@@ -365,13 +321,13 @@ def transform_ocnli(example,
         # Normalize some of the labels, eg. English -> Chinese
         example['text_label'] = label_normalize_dict[origin_label]
         if pattern_id == 0:
-            example['sentence1'] = example['sentence1'] + "， <unk>"
+            example['sentence1'] = example['sentence1'] + "， 按<unk>关系可以得到"
         elif pattern_id == 1:
-            example["sentence2"] = "和" + example['sentence2'] + u"？看来<unk>一句话"
+            example["sentence2"] = "和" + example['sentence2'] + u"之间的关系是<unk>。"
         elif pattern_id == 2:
-            example["sentence1"] = "和" + example['sentence2'] + u"？<unk>一样"
+            example["sentence1"] = "和" + example['sentence2'] + u"是相互<unk>的。"
         elif pattern_id == 3:
-            example["sentence2"] = "和" + example['sentence2'] + u"？<unk>一句话"
+            example["sentence2"] = "和" + example['sentence2'] + u"这两句话是<unk>的。"
 
         del example["label"]
 
@@ -479,7 +435,7 @@ def transform_bustm(example,
         elif pattern_id == 2:
             example['sentence1'] = "讲的<unk>是一句话。" + example['sentence1'] + "，"
         elif pattern_id == 3:
-            example['sentence1'] = "，" + example['sentence2'] + "。讲的<unk>是一句话. "
+            example['sentence2'] = "，" + example['sentence2'] + "。讲的<unk>是一句话. "
 
         return example
     else:
@@ -494,7 +450,7 @@ def transform_bustm(example,
         elif pattern_id == 2:
             example['sentence1'] = "讲的<unk>是一句话。" + example['sentence1'] + "，"
         elif pattern_id == 3:
-            example['sentence1'] = "，" + example['sentence2'] + "。讲的<unk>是一句话. "
+            example['sentence2'] = "，" + example['sentence2'] + "。讲的<unk>是一句话. "
 
         del example["label"]
 
@@ -540,7 +496,8 @@ def transform_cluewsc(example,
         if pattern_id == 0:
             example["sentence1"] = text + span2_text + "<unk>地指代" + span1_text
         elif pattern_id == 1:
-            example["sentence1"] = text + span2_text + "<unk>地意味着" + span1_text
+            example[
+                "sentence1"] = text + span2_text + "指的是" + span1_text + "吗？<unk>"
         elif pattern_id == 2:
             example["sentence1"] = text + span2_text + "<unk>地代表" + span1_text
         elif pattern_id == 3:
@@ -562,7 +519,8 @@ def transform_cluewsc(example,
         if pattern_id == 0:
             example["sentence1"] = text + span2_text + "<unk>地指代" + span1_text
         elif pattern_id == 1:
-            example["sentence1"] = text + span2_text + "<unk>地意味着" + span1_text
+            example[
+                "sentence1"] = text + span2_text + "指的是" + span1_text + "吗？<unk>"
         elif pattern_id == 2:
             example["sentence1"] = text + span2_text + "<unk>地代表" + span1_text
         elif pattern_id == 3:
