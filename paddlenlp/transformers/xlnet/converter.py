@@ -13,14 +13,18 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import List, Union
+from typing import List, Union, Dict, Type
 
+from paddlenlp.transformers import PretrainedModel, XLNetModel
 from paddlenlp.utils.converter import StateDictNameMapping, Converter
+
+__all__ = ["XLNetConverter"]
 
 
 class XLNetConverter(Converter):
     _ignore_state_dict_keys = ['embeddings.position_ids']
     num_layer_key = "n_layer"
+    architectures: Dict[str, Type[PretrainedModel]] = {"XLNetModel": XLNetModel}
 
     def get_paddle_pytorch_model_classes(self):
         from paddlenlp.transformers import XLNetModel as PaddleModel

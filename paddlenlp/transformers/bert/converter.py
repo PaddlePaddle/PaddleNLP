@@ -13,15 +13,22 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import List, Union
+from typing import List, Union, Dict, Type
 
+from paddlenlp.transformers import PretrainedModel, BertForMaskedLM, BertModel
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.converter import StateDictNameMapping, Converter
+
+__all__ = ["BertConverter"]
 
 
 class BertConverter(Converter):
     """Bert Converter which handle the converting operations"""
     _ignore_state_dict_keys = ['embeddings.position_ids']
+    architectures: Dict[str, Type[PretrainedModel]] = {
+        "BertForMaskedLM": BertForMaskedLM,
+        "BertModel": BertModel
+    }
 
     def get_paddle_pytorch_model_classes(self):
         from paddlenlp.transformers import BertModel as PaddleBertModel

@@ -15,7 +15,9 @@
 import json
 import os
 import shutil
-from paddlenlp.utils.converter import Converter
+from typing import Type
+from paddlenlp.utils.log import logger
+from paddlenlp.utils.converter import Converter, load_all_converters
 from paddlenlp.transformers.bert.converter import BertConverter
 
 
@@ -26,8 +28,50 @@ def convert_from_local_dir(pretrained_dir: str, output: str):
         pretrained_dir (str): the pretrained dir
         output (str): the output dir
     """
-    converter = BertConverter()
-    converter.convert(input_dir=pretrained_dir, output_dir=output)
+    # 1. checking the related files
+    files = os.listdir(pretrained_dir)
+    assert 'pytorch_model.bin' in files, f"`pytorch_model.bin` file must exist in dir<{pretrained_dir}>"
+    assert 'config.json' in files, f"`config.json` file must exist in dir<{pretrained_dir}>"
+
+    # 2. get model architecture from config.json
+    config_file = os.path.join(pretrained_dir, 'config.json')
+    with open(config_file, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    architectures = config.pop("architectures", []) or config.pop(
+        "init_class", None)
+    if not architectures:
+        raise ValueError(
+            "can not find the model weight architectures with field: <architectures> and <init_class>"
+        )
+
+    if isinstance(architectures, str):
+        architectures = [architectures]
+
+    if len(architectures) > 1:
+        raise ValueError("only support one model architecture")
+
+    architecture = architectures[0]
+
+    # 3. retrieve Model Converter
+    target_converter_classes = [
+        converter_class for converter_class in load_all_converters()
+        if architecture in converter_class.architectures
+    ]
+    if not target_converter_classes:
+        logger.error(
+            f"can not find target Converter based on architecture<{architecture}>"
+        )
+    if len(target_converter_classes) > 1:
+        logger.warning(
+            f"{len(target_converter_classes)} found, we will adopt the first one as the target converter ..."
+        )
+
+    target_converter_class: Type[Converter] = target_converter_classes[0]
+
+    # 4. do converting
+    converter = target_converter_class()
+    converter.convert(pretrained_dir, output_dir=output)
 
 
 def convert_from_local_file(weight_file_path: str, output: str):

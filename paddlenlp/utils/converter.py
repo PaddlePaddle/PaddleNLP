@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 import json
 import os
 import re
-from typing import Callable, Dict, Optional, List, Tuple, Union, TypeVar
+from typing import Callable, Dict, Optional, List, Tuple, Type, Union, TypeVar
 from dataclasses import dataclass
 
 import paddle
@@ -25,8 +25,10 @@ from paddle import Tensor
 from paddle.nn import Layer
 import numpy as np
 from numpy import ndarray, transpose, allclose
+from paddlenlp.transformers import PretrainedModel
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.import_utils import is_package_available, is_torch_available, is_transformers_available
+from paddlenlp.utils.import_utils import import_module, is_package_available, is_torch_available, is_transformers_available
 
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
@@ -64,7 +66,7 @@ def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list,
         tensor = tensor.detach().cpu().numpy()
 
     tensor = np.reshape(tensor, [-1])
-    top_3_tensor = str(tensor[:3])
+    top_3_tensor = str(tensor[1:4])
     return top_3_tensor
 
 
@@ -87,6 +89,26 @@ def _compare_model_weights(first_state_dict: Dict[str, ndarray],
         if not is_close:
             mismatched_keys.append(key)
     return mismatched_keys
+
+
+def load_all_converters() -> List[Type[Converter]]:
+    """load all sub-converter class
+
+    Returns:
+        List[Type[Converter]]: the classes of Converter
+    """
+    transformer_module = import_module("paddlenlp.transformers")
+
+    converter_classes: List[Type[Converter]] = []
+    for obj_name in dir(transformer_module):
+        if not obj_name.endswith("Converter"):
+            continue
+
+        obj = getattr(transformer_module, obj_name, None)
+        if obj and issubclass(obj, Converter):
+            converter_classes.append(obj)
+
+    return converter_classes
 
 
 @dataclass
@@ -121,6 +143,7 @@ class StateDictNameMapping:
             shape = tensor.shape
             assert len(shape) == 3
             return np.reshape(tensor, [shape[0], -1])
+        return tensor
 
 
 class TensorInfoSaver:
@@ -133,13 +156,13 @@ class TensorInfoSaver:
         """add 
 
         Args:
-            state_dict_key (str): _description_
-            key (str): _description_
-            values (Union[float, ndarray, Tensor]): _description_
-
-        Raises:
-            NotImplementedError: _description_
+            state_dict_key (str): the state_dict key to compare, eg: embedding.weight
+            key (str): the field to compare, eg: paddle_input
+            values (Union[float, ndarray, Tensor]): the tensor
         """
+        if state_dict_key not in self.series:
+            self.series[state_dict_key] = {}
+
         if state_dict_key not in self.series[state_dict_key]:
             self.series[state_dict_key]["state_dict_key"] = state_dict_key
 
@@ -151,11 +174,11 @@ class TensorInfoSaver:
         Args:
             output_path (Optional[str], optional): the dir/file of sumamry file. Defaults to None.
         """
-        if os.path.isdir(output_path):
+        if output_path and os.path.isdir(output_path):
             output_path = os.path.join(output_path, "tensor_summary.xlsx")
+            self.summary_to_excel(output_path)
 
         self.summary_to_terminal()
-        self.summary_to_excel(output_path)
 
     def summary_to_excel(self, file: str):
         if not is_package_available("pandas"):
@@ -176,7 +199,7 @@ class TensorInfoSaver:
     def summary_to_terminal(self):
         """print table info into terminal with tabulate"""
         from tabulate import tabulate
-        headers = {key: key for key in self.series[0].keys()}
+        headers = {key: key for key in self.series.keys()}
         print(
             tabulate(list(self.series.values()),
                      tablefmt='grid',
@@ -322,6 +345,7 @@ class Converter(ABC):
     num_layer_regex = "\.\d+\."
 
     num_layer_key: str = "num_hidden_layers"
+    architectures: Dict[str, Type[PretrainedModel]] = {}
 
     @classmethod
     def get_num_layer(
@@ -362,7 +386,7 @@ class Converter(ABC):
         Returns:
             int: the number of transformer layer
         """
-        if isinstance(config_or_num_layers, dict):
+        if isinstance(config_or_num_layers, (dict, PretrainedConfig)):
             num_layer = config_or_num_layers[cls.num_layer_key]
         elif isinstance(config_or_num_layers, int):
             num_layer = config_or_num_layers
@@ -450,12 +474,18 @@ class Converter(ABC):
         for name_mapping in name_mappings:
             model_state_saver.add(name_mapping.target_name, "pytorch_key",
                                   name_mapping.source_name)
-            model_state_saver.add(
-                name_mapping.target_name, "paddle",
-                paddle_state_dict.pop(name_mapping.target_name))
-            model_state_saver.add(
-                name_mapping.target_name, "pytorch",
-                pytorch_state_dict.pop(name_mapping.source_name))
+
+            paddle_numpy = paddle_state_dict.pop(name_mapping.target_name)
+            model_state_saver.add(name_mapping.target_name, "paddle",
+                                  paddle_numpy)
+            model_state_saver.add(name_mapping.target_name, "paddle-shape",
+                                  str(paddle_numpy.shape))
+
+            pytorch_numpy = pytorch_state_dict.pop(name_mapping.source_name)
+            model_state_saver.add(name_mapping.target_name, "pytorch",
+                                  pytorch_numpy)
+            model_state_saver.add(name_mapping.target_name, "pytorch-shape",
+                                  str(pytorch_numpy.shape))
 
         model_state_saver.summary()
 
@@ -508,7 +538,7 @@ class Converter(ABC):
         logger.info(tensor_summary(pytorch_logits))
 
         # 3. compare the logits
-        result = allclose(paddle_logits[:3], pytorch_logits[:3], atol=1e-4)
+        result = allclose(paddle_logits[1:4], pytorch_logits[1:4], atol=1e-4)
 
         if not result:
             print(
@@ -618,7 +648,11 @@ class Converter(ABC):
                 )
                 continue
 
-            value = torch_state_dict.pop(mapping.source_name)
+            value = torch_state_dict.pop(mapping.source_name, None)
+            if value is None:
+                logger.warning(
+                    f"can't find weight by key<{mapping.source_name}>")
+                continue
 
             # run custom operation on tensor, eg: transpose, merge_last_two_dim
             value = mapping.run(value)

@@ -13,13 +13,19 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import List, Union
+from typing import List, Union, Dict, Type
 
+from paddlenlp.transformers import PretrainedModel, RobertaModel
 from paddlenlp.utils.converter import StateDictNameMapping, Converter
+
+__all__ = ["RobertaConverter"]
 
 
 class RobertaConverter(Converter):
     _ignore_state_dict_keys = ['embeddings.position_ids']
+    architectures: Dict[str, Type[PretrainedModel]] = {
+        "RobertaModel": RobertaModel
+    }
 
     def get_paddle_pytorch_model_classes(self):
         from paddlenlp.transformers import RobertaModel as PaddleRobertaModel
