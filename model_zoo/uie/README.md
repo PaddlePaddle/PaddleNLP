@@ -582,7 +582,8 @@ python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --task_type ext \
     --save_dir ./data \
-    --splits 0.8 0.2 0
+    --splits 0.8 0.2 0 \
+    --schema_lang ch
 ```
 
 
@@ -598,6 +599,7 @@ python doccano.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+- ``schema_lang``: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
@@ -668,11 +670,12 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为100。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`，`uie-base-en`, `uie-m-base`, `uie-m-large`, 默认为`uie-base`。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
 - `valid_steps`: evaluate的间隔steps数，默认100。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
+- `init_from_ckpt`：指定模型参数路径，恢复模型训练；默认为None。
 
 <a name="模型评估"></a>
 
@@ -686,6 +689,16 @@ python evaluate.py \
     --test_path ./data/dev.txt \
     --batch_size 16 \
     --max_seq_len 512
+```
+
+通过运行以下命令对UIE-M进行模型评估：
+
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --batch_size 16 \
+    --max_seq_len 512 \
+    --multilingual
 ```
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
@@ -728,8 +741,9 @@ python evaluate.py \
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+- `multilingual`: 是否是跨语言模型，默认关闭。
+- `schema_lang`: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 <a name="定制模型一键预测"></a>
 
