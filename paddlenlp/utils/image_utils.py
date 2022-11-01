@@ -18,6 +18,7 @@ import copy
 import uuid
 import math
 import json
+import imghdr
 import gzip
 import tqdm
 import random
@@ -29,6 +30,7 @@ from collections.abc import Sequence
 from PIL import Image
 from io import BytesIO
 import numpy as np
+import requests
 from .log import logger
 
 
@@ -258,6 +260,27 @@ class PadBatch(BaseOperator):
         return samples
 
 
+def load_image(image):
+    """
+    Convert path/url input to base64
+    """
+    if isinstance(image, str):
+        if image.startswith("http://") or image.startswith("https://"):
+            image = Image.open(requests.get(image, stream=True).raw)
+            base64_str = pil2base64(image)
+        elif os.path.isfile(image):
+            image_type = imghdr.what(image)
+            image = Image.open(image)
+            base64_str = pil2base64(image, image_type=image_type)
+        else:
+            base64_str = image
+    else:
+        raise ValueError(
+            f"Incorrect path/url/base64/PIL image, for URLs input must start with `http://` or `https://`"
+        )
+    return base64_str
+
+
 def check(s):
     """Check whether is English"""
     my_re = re.compile(r'[A-Za-z0-9]', re.S)
@@ -272,6 +295,86 @@ def img2base64(img_path):
     with open(img_path, "rb") as f:
         base64_str = base64.b64encode(f.read()).decode('utf-8')
     return base64_str
+
+
+def pil2base64(image, image_type=None, size=False):
+    if not image_type:
+        image_type = "JPEG"
+    img_buffer = BytesIO()
+    image.save(img_buffer, format=image_type)
+
+    byte_data = img_buffer.getvalue()
+    base64_str = base64.b64encode(byte_data)
+
+    base64_string = base64_str.decode("utf-8")
+
+    if size:
+        return base64_string, image.size
+    else:
+        return base64_string
+
+
+# def expand_img_to_a4_size(image, center=False):
+#     """expand image to a4 size"""
+#     import cv2
+#     image = cv2.imread(image)
+
+#     # image = np.array(Image.open(image).convert("RGB"))
+
+#     h, w = image.shape[:2]
+#     offset_x, offset_y = 0, 0
+#     if h * 1.0 / w >= 1.42:
+#         exp_w = int(h / 1.414 - w)
+#         if center:
+#             offset_x = int(exp_w / 2)
+#             exp_img = np.zeros((h, offset_x, 3), dtype='uint8')
+#             exp_img.fill(255)
+#             image = np.hstack([exp_img, image, exp_img])
+#         else:
+#             exp_img = np.zeros((h, exp_w, 3), dtype='uint8')
+#             exp_img.fill(255)
+#             image = np.hstack([image, exp_img])
+#     elif h * 1.0 / w <= 1.40:
+#         exp_h = int(w * 1.414 - h)
+#         if center:
+#             offset_y = int(exp_h / 2)
+#             exp_img = np.zeros((offset_y, w, 3), dtype='uint8')
+#             exp_img.fill(255)
+#             image = np.vstack([exp_img, image, exp_img])
+#         else:
+#             exp_img = np.zeros((exp_h, w, 3), dtype='uint8')
+#             exp_img.fill(255)
+#             image = np.vstack([image, exp_img])
+#     return image, offset_x, offset_y
+
+
+def expand_img_to_a4_size(image, center=False):
+    """expand image to a4 size"""
+    h, w = image.shape[:2]
+    offset_x, offset_y = 0, 0
+    if h * 1.0 / w >= 1.42:
+        exp_w = int(h / 1.414 - w)
+        if center:
+            offset_x = int(exp_w / 2)
+            exp_img = np.zeros((h, offset_x, 3), dtype='uint8')
+            exp_img.fill(255)
+            image = np.hstack([exp_img, image, exp_img])
+        else:
+            exp_img = np.zeros((h, exp_w, 3), dtype='uint8')
+            exp_img.fill(255)
+            image = np.hstack([image, exp_img])
+    elif h * 1.0 / w <= 1.40:
+        exp_h = int(w * 1.414 - h)
+        if center:
+            offset_y = int(exp_h / 2)
+            exp_img = np.zeros((offset_y, w, 3), dtype='uint8')
+            exp_img.fill(255)
+            image = np.vstack([exp_img, image, exp_img])
+        else:
+            exp_img = np.zeros((exp_h, w, 3), dtype='uint8')
+            exp_img.fill(255)
+            image = np.vstack([image, exp_img])
+    return image, offset_x, offset_y
 
 
 class Bbox(object):

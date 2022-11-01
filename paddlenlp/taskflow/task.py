@@ -24,6 +24,7 @@ from paddle.dataset.common import md5file
 
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
+from ..utils.image_utils import load_image
 from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file, cut_chinese_sent
 
 
@@ -154,6 +155,22 @@ class Task(metaclass=abc.ABCMeta):
                         "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
                     )
 
+    def _construct_ocr_engine(self, lang="ch", use_angle_cls=True):
+        """
+        Construct the OCR engine
+        """
+        try:
+            from paddleocr import PaddleOCR
+        except:
+            raise ImportError(
+                "Please install the dependencies first, pip install paddleocr --upgrade"
+            )
+        use_gpu = False if paddle.get_device() == 'cpu' else True
+        self._ocr = PaddleOCR(use_angle_cls=use_angle_cls,
+                              show_log=False,
+                              use_gpu=use_gpu,
+                              lang=lang)
+
     def _prepare_static_mode(self):
         """
         Construct the input data and predictor in the PaddlePaddele static mode. 
@@ -255,6 +272,9 @@ class Task(metaclass=abc.ABCMeta):
         logger.info("The inference model save in the path:{}".format(save_path))
 
     def _check_input_text(self, inputs):
+        """
+        Check whether the input text meet the requirement.
+        """
         inputs = inputs[0]
         if isinstance(inputs, str):
             if len(inputs) == 0:
@@ -273,13 +293,54 @@ class Task(metaclass=abc.ABCMeta):
                 .format(type(inputs)))
         return inputs
 
-    def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
+    def _check_input_doc(self, inputs):
+        """
+        Check whether the input doc meet the requirement.
+        """
+        inputs = inputs[0]
+        if isinstance(inputs, dict):
+            inputs = [inputs]
+        if isinstance(inputs, list):
+            input_list = []
+            for example in inputs:
+                data = {}
+                if isinstance(example, dict):
+                    if "doc" in example.keys():
+                        data["doc"] = load_image(example["doc"])
+                    elif "text" in example.keys():
+                        if not isinstance(example["text"], str):
+                            raise TypeError(
+                                "Invalid inputs, the input text should be string. but type of {} found!"
+                                .format(type(example["text"])))
+                        data["text"] = example["text"]
+                    else:
+                        raise ValueError(
+                            "Invalid inputs, the input should contain a doc or a text."
+                        )
+                    input_list.append(data)
+                else:
+                    raise TypeError(
+                        "Invalid inputs, the input should be dict or list of dict, but type of {} found!"
+                        .format(type(example)))
+        else:
+            raise TypeError(
+                "Invalid inputs, the input should be dict or list of dict, but type of {} found!"
+                .format(type(inputs)))
+        return input_list
+
+    def _auto_splitter(self,
+                       input_texts,
+                       max_text_len,
+                       bboxes_list=None,
+                       split_sentence=False):
         '''
         Split the raw texts automatically for model inference.
         Args:
             input_texts (List[str]): input raw texts.
             max_text_len (int): cutting length.
-            split_sentence (bool): If True, sentence-level split will be performed.
+            bboxes_list (List[float, float,float, float]): bbox for document input. 
+            split_sentence (bool): If True, sentence-level split will be performed. 
+                `split_sentence` will be set to False if bboxes_list is not None since sentence-level split is not support for document.
         return:
             short_input_texts (List[str]): the short input texts for model inference.
             input_mapping (dict): mapping between raw text and short input texts.
@@ -288,19 +349,28 @@ class Task(metaclass=abc.ABCMeta):
         short_input_texts = []
         cnt_org = 0
         cnt_short = 0
-        for text in input_texts:
+        with_bbox = False
+        if bboxes_list:
+            with_bbox = True
+            short_bboxes_list = []
+            if split_sentence:
+                logger.warning(
+                    "`split_sentence` will be set to False if bboxes_list is not None since sentence-level split is not support for document."
+                )
+                split_sentence = False
+
+        for idx in range(len(input_texts)):
             if not split_sentence:
-                sens = [text]
+                sens = [input_texts[idx]]
             else:
-                sens = cut_chinese_sent(text)
+                sens = cut_chinese_sent(input_texts[idx])
             for sen in sens:
                 lens = len(sen)
                 if lens <= max_text_len:
                     short_input_texts.append(sen)
-                    if cnt_org not in input_mapping.keys():
-                        input_mapping[cnt_org] = [cnt_short]
-                    else:
-                        input_mapping[cnt_org].append(cnt_short)
+                    if with_bbox:
+                        short_bboxes_list.append(bboxes_list[idx])
+                    input_mapping.setdefault(cnt_org, []).append(cnt_short)
                     cnt_short += 1
                 else:
                     temp_text_list = [
@@ -308,17 +378,23 @@ class Task(metaclass=abc.ABCMeta):
                         for i in range(0, lens, max_text_len)
                     ]
                     short_input_texts.extend(temp_text_list)
+                    if with_bbox:
+                        temp_bboxes_list = [
+                            bboxes_list[idx][i:i + max_text_len]
+                            for i in range(0, lens, max_text_len)
+                        ]
+                        short_bboxes_list.extend(temp_bboxes_list)
                     short_idx = cnt_short
                     cnt_short += math.ceil(lens / max_text_len)
                     temp_text_id = [
                         short_idx + i for i in range(cnt_short - short_idx)
                     ]
-                    if cnt_org not in input_mapping.keys():
-                        input_mapping[cnt_org] = temp_text_id
-                    else:
-                        input_mapping[cnt_org].extend(temp_text_id)
+                    input_mapping.setdefault(cnt_org, []).extend(temp_text_id)
             cnt_org += 1
-        return short_input_texts, input_mapping
+        if with_bbox:
+            return short_input_texts, short_bboxes_list, input_mapping
+        else:
+            return short_input_texts, input_mapping
 
     def _auto_joiner(self, short_results, input_mapping, is_dict=False):
         '''

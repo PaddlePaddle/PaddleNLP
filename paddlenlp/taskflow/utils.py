@@ -883,6 +883,16 @@ def get_span(start_ids, end_ids, with_prob=False):
     return result
 
 
+def map_offset(ori_offset, offset_mapping):
+    """
+    map ori offset to token offset
+    """
+    for index, span in enumerate(offset_mapping):
+        if span[0] <= ori_offset < span[1]:
+            return index
+    return -1
+
+
 def get_id_and_prob(span_set, offset_mapping):
     """
     Return text id and probability of predicted spans
@@ -897,9 +907,9 @@ def get_id_and_prob(span_set, offset_mapping):
     """
     prompt_end_token_id = offset_mapping[1:].index([0, 0])
     bias = offset_mapping[prompt_end_token_id][1] + 1
-    for index in range(1, prompt_end_token_id + 1):
-        offset_mapping[index][0] -= bias
-        offset_mapping[index][1] -= bias
+    for idx in range(1, prompt_end_token_id + 1):
+        offset_mapping[idx][0] -= bias
+        offset_mapping[idx][1] -= bias
 
     sentence_id = []
     prob = []

@@ -15,7 +15,7 @@
 
 import paddle
 import paddle.nn as nn
-from paddlenlp.transformers import ErniePretrainedModel, ErnieMPretrainedModel
+from paddlenlp.transformers import ErniePretrainedModel, ErnieMPretrainedModel, ErnieLayoutPretrainedModel
 
 
 class UIE(ErniePretrainedModel):
@@ -55,6 +55,36 @@ class UIEM(ErnieMPretrainedModel):
     def forward(self, input_ids, pos_ids):
         sequence_output, _ = self.encoder(input_ids=input_ids,
                                           position_ids=pos_ids)
+        start_logits = self.linear_start(sequence_output)
+        start_logits = paddle.squeeze(start_logits, -1)
+        start_prob = self.sigmoid(start_logits)
+        end_logits = self.linear_end(sequence_output)
+        end_logits = paddle.squeeze(end_logits, -1)
+        end_prob = self.sigmoid(end_logits)
+        return start_prob, end_prob
+
+
+class UIEX(ErnieLayoutPretrainedModel):
+
+    def __init__(self, encoding_model):
+        super(UIEX, self).__init__()
+        self.encoder = encoding_model
+        hidden_size = self.encoder.config["hidden_size"]
+        self.linear_start = paddle.nn.Linear(hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+        self.sigmoid = paddle.nn.Sigmoid()
+
+    def forward(self, input_ids, token_type_ids, position_ids, attention_mask,
+                bbox, image):
+        """
+        forward
+        """
+        sequence_output, _ = self.encoder(input_ids=input_ids,
+                                          token_type_ids=token_type_ids,
+                                          position_ids=position_ids,
+                                          attention_mask=attention_mask,
+                                          bbox=bbox,
+                                          image=image)
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
         start_prob = self.sigmoid(start_logits)

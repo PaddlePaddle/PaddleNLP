@@ -60,20 +60,10 @@ class DocPromptTask(Task):
 
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        try:
-            from paddleocr import PaddleOCR
-        except:
-            raise ImportError(
-                "Please install the dependencies first, pip install paddleocr --upgrade"
-            )
         self._batch_size = kwargs.get("batch_size", 1)
         self._topn = kwargs.get("topn", 1)
         self._lang = kwargs.get("lang", "ch")
-        self._use_gpu = False if paddle.get_device() == 'cpu' else True
-        self._ocr = PaddleOCR(use_angle_cls=True,
-                              show_log=False,
-                              use_gpu=self._use_gpu,
-                              lang=self._lang)
+        self._construct_ocr_engine(lang=self._lang)
         self._usage = usage
         download_file(self._task_path, "docprompt_params.tar",
                       URLS[self.model][0], URLS[self.model][1])

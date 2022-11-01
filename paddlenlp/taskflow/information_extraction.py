@@ -16,14 +16,26 @@
 import re
 import os
 import json
+import imghdr
+import base64
+from io import BytesIO
+from PIL import Image
 import numpy as np
 import paddle
 from ..datasets import load_dataset
 from ..transformers import AutoTokenizer, AutoModel
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from .models import UIE, UIEM
+from ..utils.image_utils import (
+    expand_img_to_a4_size,
+    pil2base64,
+    ResizeImage,
+    Permute,
+    NormalizeImage,
+)
+from .models import UIE, UIEM, UIEX
 from .task import Task
-from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc, gp_decode, DataCollatorGP
+from .utils import (get_span, get_id_and_prob, get_bool_ids_greater_than,
+                    dbc2sbc, gp_decode, map_offset, SchemaTree, DataCollatorGP)
 
 usage = r"""
             from paddlenlp import Taskflow
@@ -91,6 +103,12 @@ usage = r"""
             [{'Person': [{'text': 'Steve', 'start': 9, 'end': 14, 'probability': 0.9998436034905893, 'relations': {'Company': [{'text': 'Apple', 'start': 48, 'end': 53, 'probability': 0.9842775467359672}], 'Position': [{'text': 'CEO', 'start': 41, 'end': 44, 'probability': 0.9628799853543271}]}}]}]
             '''
          """
+
+resize_func = ResizeImage(target_size=224, interp=1)
+norm_func = NormalizeImage(is_channel_first=False,
+                           mean=[123.675, 116.280, 103.530],
+                           std=[58.395, 57.120, 57.375])
+permute_func = Permute(to_bgr=False)
 
 
 class UIETask(Task):
@@ -340,12 +358,38 @@ class UIETask(Task):
                 "bf25eb5120ad92ef5c7d8596b5dc4046"
             ],
         },
+        "uie-x-base": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v0.1/model_state.pdparams",
+                "0e06dd6f9598578b16917c246c77ebc1"
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
+                "c0588ac92ec6a8468f6dd2c2a896bbc5"
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e"
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/special_tokens_map.json",
+                "ba000b17745bb5b5b40236789318847f"
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/tokenizer_config.json",
+                "09456ba644dac6f9d0b367353a36abe7"
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046"
+            ],
+        },
     }
 
-    def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
+    def __init__(self, task, model, schema, schema_lang="ch", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
-        if model in ['uie-m-base', 'uie-m-large']:
+        if model in ['uie-m-base', 'uie-m-large', 'uie-x-base']:
             self._multilingual = True
             self.resource_files_names[
                 'sentencepiece_model_file'] = "sentencepiece.bpe.model"
@@ -353,28 +397,30 @@ class UIETask(Task):
             self._multilingual = False
             if 'sentencepiece_model_file' in self.resource_files_names.keys():
                 del self.resource_files_names['sentencepiece_model_file']
+        self._is_en = True if model in ['uie-base-en'
+                                        ] or schema_lang == 'en' else False
+
+        self._summary_token_num = 3
+        self._multimodal = True if model in ['uie-x-base'] else False
+        self._ocr_lang = kwargs.get("ocr_lang", "ch")
+        if self._multimodal:
+            self._construct_ocr_engine(lang=self._ocr_lang)
+            self._summary_token_num = 4  # [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
+
         self._schema_tree = None
         self.set_schema(schema)
         self._check_task_files()
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
-        self._is_en = True if model in ['uie-base-en'
-                                        ] or schema_lang == 'en' else False
-        self._max_seq_len = self.kwargs[
-            'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
-        self._batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 64
-        self._split_sentence = self.kwargs[
-            'split_sentence'] if 'split_sentence' in self.kwargs else False
-        self._position_prob = self.kwargs[
-            'position_prob'] if 'position_prob' in self.kwargs else 0.5
-        self._lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
-        self._num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
-        self.use_faster = self.kwargs[
-            'use_faster'] if 'use_faster' in self.kwargs else False
+
+        self._max_seq_len = kwargs.get("max_seq_len", 512)
+        self._batch_size = kwargs.get("batch_size", 64)
+        self._split_sentence = kwargs.get("split_sentence", False)
+        self._position_prob = kwargs.get("position_prob", 0.5)
+        self._lazy_load = kwargs.get("lazy_load", False)
+        self._num_workers = kwargs.get("num_workers", 0)
+        self.use_faster = kwargs.get("use_faster", False)
         self._construct_tokenizer()
 
     def set_schema(self, schema):
@@ -386,7 +432,28 @@ class UIETask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        if self._multilingual:
+        if self._multimodal:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='token_type_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='position_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='attention_mask'),
+                paddle.static.InputSpec(shape=[None, None, 4],
+                                        dtype="int64",
+                                        name='bbox'),
+                paddle.static.InputSpec(shape=[None, 3, 224, 224],
+                                        dtype="int64",
+                                        name='image'),
+            ]
+        elif self._multilingual:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
@@ -415,7 +482,9 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        if self._multilingual:
+        if self._multimodal:
+            model_instance = UIEX.from_pretrained(self._task_path)
+        elif self._multilingual:
             model_instance = UIEM.from_pretrained(self._task_path)
         else:
             model_instance = UIE.from_pretrained(self._task_path)
@@ -435,32 +504,55 @@ class UIETask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        inputs = self._check_input_text(inputs)
+        if self._multimodal:
+            inputs = self._check_input_doc(inputs)
+        else:
+            inputs = self._check_input_text(inputs)
         outputs = {}
         outputs['text'] = inputs
         return outputs
 
     def _single_stage_predict(self, inputs):
-        input_texts = []
-        prompts = []
-        for i in range(len(inputs)):
-            input_texts.append(inputs[i]["text"])
-            prompts.append(inputs[i]["prompt"])
-        # max predict length should exclude the length of prompt and summary tokens
-        max_predict_len = self._max_seq_len - len(max(prompts)) - 3
+        input_texts = [d["text"] for d in inputs]
+        prompts = [d["prompt"] for d in inputs]
 
-        short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len, split_sentence=self._split_sentence)
+        # max predict length should exclude the length of prompt and summary tokens
+        max_predict_len = self._max_seq_len - len(
+            max(prompts)) - self._summary_token_num
+
+        if self._multimodal:
+            bboxes_list = [d["bboxes"] for d in inputs]
+            short_input_texts, short_bboxes_list, input_mapping = self._auto_splitter(
+                input_texts,
+                max_predict_len,
+                bboxes_list=bboxes_list,
+                split_sentence=self._split_sentence)
+        else:
+            short_input_texts, input_mapping = self._auto_splitter(
+                input_texts,
+                max_predict_len,
+                split_sentence=self._split_sentence)
 
         short_texts_prompts = []
-        for k, v in self.input_mapping.items():
-            short_texts_prompts.extend([prompts[k] for i in range(len(v))])
-        short_inputs = [{
-            "text": short_input_texts[i],
-            "prompt": short_texts_prompts[i]
-        } for i in range(len(short_input_texts))]
+        for k, v in input_mapping.items():
+            short_texts_prompts.extend([prompts[k] for _ in range(len(v))])
+        if self._multimodal:
+            image_list = []
+            for k, v in input_mapping.items():
+                image_list.extend([inputs[k]["image"] for _ in range(len(v))])
+            short_inputs = [{
+                "text": short_input_texts[i],
+                "prompt": short_texts_prompts[i],
+                "bboxes": short_bboxes_list[i],
+                "image": image_list[i]
+            } for i in range(len(short_input_texts))]
+        else:
+            short_inputs = [{
+                "text": short_input_texts[i],
+                "prompt": short_texts_prompts[i]
+            } for i in range(len(short_input_texts))]
 
-        def read(inputs):
+        def text_reader(inputs):
             for example in inputs:
                 encoded_inputs = self._tokenizer(text=[example["prompt"]],
                                                  text_pair=[example["text"]],
@@ -489,7 +581,215 @@ class UIETask(Task):
                 ]
                 yield tuple(tokenized_output)
 
-        infer_ds = load_dataset(read, inputs=short_inputs, lazy=self._lazy_load)
+        def doc_reader(inputs, pad_id=1, c_sep_id=2):
+
+            def _process_bbox(tokens, bbox_lines, offset_mapping, offset_bias):
+                bbox_list = [[0, 0, 0, 0] for x in range(len(tokens))]
+                prev_bbox = [0, 0, 0, 0]
+
+                for index, bbox in enumerate(bbox_lines):
+                    index_token = map_offset(index + offset_bias,
+                                             offset_mapping)
+                    if 0 <= index_token < len(bbox_list):
+                        bbox_list[index_token] = bbox
+                    prev_bbox = bbox
+                return bbox_list
+
+            def _pad_image_data(image_data):
+                if not image_data:
+                    image = np.zeros([3, 224, 224])
+                    return image
+                # decode image
+                data = np.frombuffer(bytearray(image_data), dtype="uint8")
+                image = np.array(Image.open(BytesIO(data)).convert('RGB'))
+                sample = {"image": image}
+                # resize image
+                sample = resize_func(sample)
+                # norm image
+                sample = norm_func(sample)
+                # permute
+                sample = permute_func(sample)
+                return sample['image']
+
+            def _encode_doc(tokenizer, offset_mapping, last_offset, prompt,
+                            this_text_line, inputs_ids, q_sep_index,
+                            max_seq_len):
+                if len(offset_mapping) == 0:
+                    content_encoded_inputs = tokenizer(
+                        text=[prompt],
+                        text_pair=[this_text_line],
+                        max_seq_len=max_seq_len,
+                        return_dict=False,
+                        return_offsets_mapping=True)
+                    content_encoded_inputs = content_encoded_inputs[0]
+                    inputs_ids = content_encoded_inputs["input_ids"][:-1]
+                    sub_offset_mapping = [
+                        list(x)
+                        for x in content_encoded_inputs["offset_mapping"]
+                    ]
+                    q_sep_index = content_encoded_inputs["input_ids"].index(
+                        2, 1)
+
+                    bias = 0
+                    for index in range(len(sub_offset_mapping)):
+                        if index == 0:
+                            continue
+                        mapping = sub_offset_mapping[index]
+                        if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
+                            bias = sub_offset_mapping[index - 1][-1] + 1
+                        if mapping[0] == 0 and mapping[1] == 0:
+                            continue
+                        sub_offset_mapping[index][0] += bias
+                        sub_offset_mapping[index][1] += bias
+
+                    offset_mapping = sub_offset_mapping[:-1]
+                    last_offset = offset_mapping[-1][-1]
+                else:
+                    content_encoded_inputs = tokenizer(
+                        text=this_text_line,
+                        max_seq_len=max_seq_len,
+                        return_dict=False,
+                        return_offsets_mapping=True)
+                    inputs_ids += content_encoded_inputs["input_ids"][1:-1]
+                    sub_offset_mapping = [
+                        list(x)
+                        for x in content_encoded_inputs["offset_mapping"]
+                    ]
+
+                    for sub_list in sub_offset_mapping[1:-1]:
+                        offset_mapping += [[
+                            last_offset, sub_list[1] - sub_list[0] + last_offset
+                        ]]
+                        last_offset = offset_mapping[-1][-1]
+                return offset_mapping, last_offset, q_sep_index, inputs_ids
+
+            for example in inputs:
+                content = example["text"]
+                prompt = example["prompt"]
+                bbox_lines = example.get("bboxes", None)
+                image_buff_string = example.get("image", None)
+
+                # Text
+                if bbox_lines is None:
+                    encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=self._max_seq_len,
+                        pad_to_max_seq_len=True,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_offsets_mapping=True,
+                        return_dict=False)
+
+                    encoded_inputs = encoded_inputs[0]
+
+                    inputs_ids = encoded_inputs["input_ids"]
+                    position_ids = encoded_inputs["position_ids"]
+                    attention_mask = encoded_inputs["attention_mask"]
+
+                    q_sep_index = inputs_ids.index(2, 1)
+                    c_sep_index = attention_mask.index(0)
+
+                    offset_mapping = [
+                        list(x) for x in encoded_inputs["offset_mapping"]
+                    ]
+
+                    bbox_list = [[0, 0, 0, 0] for x in range(len(inputs_ids))]
+                    token_type_ids = [
+                        1 if token_index <= q_sep_index
+                        or token_index > c_sep_index else 0
+                        for token_index in range(self._max_seq_len)
+                    ]
+                    padded_image = np.zeros([3, 224, 224])
+                # Doc
+                else:
+                    inputs_ids = []
+                    prev_bbox = [-1, -1, -1, -1]
+                    this_text_line = ""
+                    q_sep_index = -1
+                    offset_mapping = []
+                    last_offset = 0
+                    for char_index, (char, bbox) in enumerate(
+                            zip(content, bbox_lines)):
+                        if char_index == 0:
+                            prev_bbox = bbox
+                            this_text_line = char
+                            continue
+
+                        if all([bbox[x] == prev_bbox[x] for x in range(4)]):
+                            this_text_line += char
+                        else:
+                            offset_mapping, last_offset, q_sep_index, inputs_ids = _encode_doc(
+                                self._tokenizer, offset_mapping, last_offset,
+                                prompt, this_text_line, inputs_ids, q_sep_index,
+                                self._max_seq_len)
+                            this_text_line = char
+                        prev_bbox = bbox
+
+                    if len(this_text_line) > 0:
+                        offset_mapping, last_offset, q_sep_index, inputs_ids = _encode_doc(
+                            self._tokenizer, offset_mapping, last_offset,
+                            prompt, this_text_line, inputs_ids, q_sep_index,
+                            self._max_seq_len)
+
+                    if len(inputs_ids) > self._max_seq_len:
+                        inputs_ids = inputs_ids[:(self._max_seq_len -
+                                                  1)] + [c_sep_id]
+                        offset_mapping = offset_mapping[:(self._max_seq_len -
+                                                          1)] + [[0, 0]]
+                    else:
+                        inputs_ids += [c_sep_id]
+                        offset_mapping += [[0, 0]]
+
+                    offset_bias = offset_mapping[q_sep_index - 1][-1] + 1
+
+                    seq_len = len(inputs_ids)
+                    inputs_ids += [pad_id] * (self._max_seq_len - seq_len)
+                    token_type_ids = [1] * (q_sep_index + 1) + [0] * (
+                        seq_len - q_sep_index - 1)
+                    token_type_ids += [pad_id] * (self._max_seq_len - seq_len)
+
+                    bbox_list = _process_bbox(inputs_ids, bbox_lines,
+                                              offset_mapping, offset_bias)
+
+                    offset_mapping += [[0, 0]] * (self._max_seq_len - seq_len)
+
+                    # Reindex the text
+                    text_start_idx = offset_mapping[1:].index(
+                        [0, 0]) + self._summary_token_num - 1
+                    for idx in range(text_start_idx, self._max_seq_len):
+                        offset_mapping[idx][0] -= offset_bias
+                        offset_mapping[idx][1] -= offset_bias
+
+                    position_ids = list(range(seq_len))
+
+                    position_ids = position_ids + [0] * (self._max_seq_len -
+                                                         seq_len)
+                    attention_mask = [1] * seq_len + [0] * (self._max_seq_len -
+                                                            seq_len)
+
+                    image_data = base64.b64decode(
+                        image_buff_string.encode("utf8"))
+                    padded_image = _pad_image_data(image_data)
+
+                input_list = [
+                    inputs_ids, token_type_ids, position_ids, attention_mask,
+                    bbox_list, padded_image, offset_mapping
+                ]
+
+                assert len(inputs_ids) == self._max_seq_len
+                assert len(token_type_ids) == self._max_seq_len
+                assert len(position_ids) == self._max_seq_len
+                assert len(attention_mask) == self._max_seq_len
+                assert len(bbox_list) == self._max_seq_len
+
+                yield tuple([np.array(x, dtype="int64") for x in input_list])
+
+        reader = doc_reader if self._multimodal else text_reader
+        infer_ds = load_dataset(reader,
+                                inputs=short_inputs,
+                                lazy=self._lazy_load)
         batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
                                                batch_size=self._batch_size,
                                                shuffle=False)
@@ -502,12 +802,21 @@ class UIETask(Task):
         sentence_ids = []
         probs = []
         for batch in infer_data_loader:
-            if self._multilingual:
+            if self._multimodal:
+                input_ids, token_type_ids, pos_ids, att_mask, bbox, image, offset_maps = batch
+            elif self._multilingual:
                 input_ids, pos_ids, offset_maps = batch
             else:
                 input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
             if self._predictor_type == "paddle-inference":
-                if self._multilingual:
+                if self._multimodal:
+                    self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                    self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                    self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                    self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                    self.input_handles[4].copy_from_cpu(bbox.numpy())
+                    self.input_handles[5].copy_from_cpu(image.numpy())
+                elif self._multilingual:
                     self.input_handles[0].copy_from_cpu(input_ids.numpy())
                     self.input_handles[1].copy_from_cpu(pos_ids.numpy())
                 else:
@@ -519,7 +828,16 @@ class UIETask(Task):
                 start_prob = self.output_handle[0].copy_to_cpu().tolist()
                 end_prob = self.output_handle[1].copy_to_cpu().tolist()
             else:
-                if self._multilingual:
+                if self._multimodal:
+                    input_dict = {
+                        "input_ids": input_ids.numpy(),
+                        "token_type_ids": token_type_ids.numpy(),
+                        "position_ids": pos_ids.numpy(),
+                        "attention_mask": att_mask.numpy(),
+                        "bbox": bbox.numpy(),
+                        "image": image.numpy()
+                    }
+                elif self._multilingual:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
                         "pos_ids": pos_ids.numpy(),
@@ -550,8 +868,7 @@ class UIETask(Task):
                 probs.append(prob)
         results = self._convert_ids_to_results(short_inputs, sentence_ids,
                                                probs)
-        results = self._auto_joiner(results, short_input_texts,
-                                    self.input_mapping)
+        results = self._auto_joiner(results, short_input_texts, input_mapping)
         return results
 
     def _auto_joiner(self, short_results, short_inputs, input_mapping):
@@ -613,9 +930,83 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs['text']
-        results = self._multi_stage_predict(raw_inputs)
+        _inputs = self._parse_inputs(raw_inputs)
+        results = self._multi_stage_predict(_inputs)
         inputs['result'] = results
         return inputs
+
+    def _parse_inputs(self, inputs):
+
+        def _normalize_bbox(bbox, size):
+            return [
+                int(1000 * bbox[0] / size[0]),
+                int(1000 * bbox[1] / size[1]),
+                int(1000 * bbox[2] / size[0]),
+                int(1000 * bbox[3] / size[1]),
+            ]
+
+        _inputs = []
+        for d in inputs:
+            if isinstance(d, dict):
+                if self._multimodal and 'doc' in d.keys():
+
+                    image_buff = base64.b64decode(d['doc'])
+                    image = np.array(Image.open(BytesIO(image_buff)))
+                    image_size = (image.shape[1], image.shape[0])
+
+                    ocr_result = self._ocr.ocr(image, cls=True)
+                    ocr_result = ocr_result[0] if len(
+                        ocr_result) == 1 else ocr_result
+
+                    image, offset_x, offset_y = expand_img_to_a4_size(
+                        image, center=True)
+
+                    content = u""
+                    bboxes = []
+                    for sub_res in ocr_result:
+                        word = sub_res[1][0]
+                        source_bbox = sub_res[0]
+                        bbox = source_bbox[0] + source_bbox[2]
+                        bbox = _normalize_bbox([
+                            bbox[0] + offset_x, bbox[1] + offset_y,
+                            bbox[2] + offset_x, bbox[3] + offset_y
+                        ], image_size)
+                        bboxes.extend([bbox for word_index in range(len(word))])
+                        content += word
+                    _inputs.append({
+                        "text": content,
+                        "bboxes": bboxes,
+                        "image": d['doc']
+                    })
+
+                    # image_path = d['doc']
+                    # ocr_result = self._ocr.ocr(image_path, cls=True)
+                    # ocr_result = ocr_result[0] if len(
+                    #     ocr_result) == 1 else ocr_result
+                    # image_type = imghdr.what(image_path)
+                    # content = u""
+                    # bboxes = []
+                    # image, offset_x, offset_y = expand_img_to_a4_size(image_path, center=True)
+                    # image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                    # base64_str, image_size = pil2base64(image, image_type=image_type, size=True)
+
+                    # for sub_res in ocr_result:
+                    #     word = sub_res[1][0]
+                    #     source_bbox = sub_res[0]
+                    #     bbox = source_bbox[0] + source_bbox[2]
+                    #     bbox = _normalize_bbox([bbox[0]+offset_x, bbox[1]+offset_y, bbox[2]+offset_x, bbox[3]+offset_y], image_size)
+                    #     bboxes.extend([bbox for word_index in range(len(word))])
+                    #     content+=word
+                    # _inputs.append({"text": content, "bboxes": bboxes, "image": base64_str})
+                else:
+                    _inputs.append({
+                        "text": d['text'],
+                        "bboxes": None,
+                        "image": None
+                    })
+            else:
+                _inputs.append({"text": d, "bboxes": None, "image": None})
+        return _inputs
 
     def _multi_stage_predict(self, data):
         """
@@ -629,11 +1020,11 @@ class UIETask(Task):
                 equals to the length of `data`
         """
         results = [{} for _ in range(len(data))]
-        # input check to early return
+        # Input check to early return
         if len(data) < 1 or self._schema_tree is None:
             return results
 
-        # copy to stay `self._schema_tree` unchanged
+        # Copy to stay `self._schema_tree` unchanged
         schema_list = self._schema_tree.children[:]
         while len(schema_list) > 0:
             node = schema_list.pop(0)
@@ -644,7 +1035,9 @@ class UIETask(Task):
             if not node.prefix:
                 for one_data in data:
                     examples.append({
-                        "text": one_data,
+                        "text": one_data["text"],
+                        "bboxes": one_data["bboxes"],
+                        "image": one_data["image"],
                         "prompt": dbc2sbc(node.name)
                     })
                     input_map[cnt] = [idx]
@@ -669,7 +1062,9 @@ class UIETask(Task):
                             else:
                                 prompt = p + node.name
                             examples.append({
-                                "text": one_data,
+                                "text": one_data["text"],
+                                "bboxes": one_data["bboxes"],
+                                "image": one_data["image"],
                                 "prompt": dbc2sbc(prompt)
                             })
                         input_map[cnt] = [i + idx for i in range(len(pre))]
@@ -824,14 +1219,11 @@ class GPTask(Task):
         self._load_config()
         self._construct_tokenizer()
         self._get_inference_model()
-        self._max_seq_len = self.kwargs[
-            'max_seq_len'] if 'max_seq_len' in self.kwargs else 256
-        self._batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 64
-        self._lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
-        self._num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
+
+        self._max_seq_len = kwargs.get("max_seq_len", 256)
+        self._batch_size = kwargs.get("batch_size", 64)
+        self._lazy_load = kwargs.get("lazy_load", False)
+        self._num_workers = kwargs.get("num_workers", 0)
 
     def _load_config(self):
         model_config_file = os.path.join(
