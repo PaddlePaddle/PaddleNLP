@@ -23,11 +23,10 @@ import importlib, inspect
 from paddlenlp import __version__
 from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.downloader import is_url
 from paddlenlp.cli.converter import convert_from_local_file, convert_from_online_model
-
-from tabulate import tabulate
+from paddlenlp.cli.utils.tabulate import tabulate
+from paddlenlp.cli.download import load_community_models
 
 
 def load_all_models() -> List[Tuple[str, str]]:
@@ -52,7 +51,15 @@ def load_all_models() -> List[Tuple[str, str]]:
             continue
         configurations = obj.pretrained_init_configuration
         for model_name in configurations.keys():
-            model_names.add((obj.base_model_prefix, model_name))
+            model_names.add(("official", obj.base_model_prefix, model_name))
+    logger.info(f"find {len(model_names)} official models ...")
+
+    # load & extend community models
+    community_model_names = load_community_models()
+    for model_name in community_model_names:
+        model_names.add(model_name)
+
+    logger.info(f"finding {len(model_names)} models ...")
     return model_names
 
 
@@ -90,20 +97,23 @@ def download(model_name: str,
 
 
 @app.command()
-def search(query: str):
+def search(query):
     """search the model with query, eg: paddlenlp search bert
 
     Args:
-        query (str): the str fragment of bert-name
+        query (Optional[str]): the str fragment of bert-name
     """
+    logger.info("start to search models ...")
     model_names = load_all_models()
 
     tables = []
-    for model_type, model_name in model_names:
-        if query in model_name:
-            tables.append([model_type, model_name])
-    print(
-        tabulate(tables, headers=['model type', 'model name'], tablefmt="grid"))
+    if query:
+        for model_category, model_type, model_name in model_names:
+            if query in model_name:
+                tables.append([model_category, model_type, model_name])
+    tabulate(tables, headers=["模型归类", '模型类型', '模型名称'], highlight_word=query)
+
+    logger.info(f"the retrieved number of models results is {len(tables)} ...")
 
 
 @app.command()
