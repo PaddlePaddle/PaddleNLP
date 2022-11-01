@@ -37,7 +37,7 @@
 
 - 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习多分类方案](./few-shot#readme)
 
-- 【标签类别不固定场景】 👉 [语义索引多分类方案](./retrieval_based#readme)
+- 【标签类别不固定场景、标签类别众多】 👉 [语义索引多分类方案](./retrieval_based#readme)
 
 
 <a name="快速开始"></a>
@@ -95,20 +95,13 @@ python3 -m  pip install scikit-learn==1.0.2
 
 ```text
 multi_class/
+├── few-shot # 小样本学习方案
+├── retrieval_based # 语义索引方案
+├── analysis # 分析模块
 ├── deploy # 部署
 │   └── predictor # 离线部署
-│   │   ├── infer.py # 测试脚本
-│   │   ├── predictor.py 离线部署脚本
-│   │   └── README.md # 离线部署使用说明
 │   ├── paddle_serving # PaddleServing在线服务化部署
-│   │   ├──config.yml # 服务端的配置文件
-│   │   ├──rpc_client.py # 客户端预测脚本
-│   │   ├──service.py # 服务端的脚本
-│   │   └── README.md # 在线服务化部署使用说明
 │   └── triton_serving # Triton在线服务化部署
-│       ├── README.md # Triton部署使用说明
-│       ├── seqcls_grpc_client.py # 客户端预测脚本
-│       └── models
 ├── train.py # 训练评估脚本
 ├── predict.py # 预测脚本
 ├── export_model.py # 静态图模型导出脚本
@@ -132,7 +125,7 @@ data/
 └── data.txt # 待预测数据文件
 ```
 
-**训练、开发、测试数据集** 文件中文本与标签类别名用tab符`'\t'`分隔开。
+**训练、开发、测试数据集** 文件中文本与标签类别名用tab符`'\t'`分隔开，文本中避免出现tab符`'\t'`。
 
 - train.txt/dev.txt/test.txt 文件格式：
 ```text
@@ -273,10 +266,16 @@ checkpoint/
 
 #### 2.4.2 训练评估与模型优化
 
-训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
+文本分类预测过程中常会遇到诸如"模型为什么会预测出错误的结果"，"如何提升模型的表现"等问题。[Analysis模块](./analysis) 提供了**模型评估、可解释性分析、数据优化**等功能，旨在帮助开发者更好地分析文本分类模型预测结果和对模型效果进行优化。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/63761690/195241942-70068989-df17-4f53-9f71-c189d8c5c88d.png" width="600">
+</div>
+
+**模型评估：** 训练后的模型我们可以使用 [Analysis模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_file "bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
 ```
 
 输出打印示例：
@@ -301,15 +300,40 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 预测错误的样本保存在bad_case.txt文件中：
 
 ```text
-Confidence	Prediction	Label	Text
-0.77	注意事项	其他	您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？
-0.94	就医建议	其他	输卵管粘连的基本检查
-0.78	病情诊断	其他	经常干呕恶心，这是生病了吗
-0.79	后果表述	其他	吃左旋肉碱后的不良反应
+Text	Label	Prediction
+您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？	其他	注意事项
+输卵管粘连的基本检查	其他	就医建议
+会是胎动么？	其他	病情诊断
+经常干呕恶心，这是生病了吗	其他	病情诊断
+菏泽哪个医院治疗白癜风比较好?怎么治好	就医建议	治疗方案
 ...
 ```
 
-模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
+**可解释性分析：** 基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)提供单词和句子级别的模型可解释性分析，帮助理解模型预测结果，用于错误样本（bad case）分析，细节详见[训练评估与模型优化指南](analysis/README.md)。
+
+- 单词级别可解释性分析，也即分析待预测样本中哪一些单词对模型预测结果起重要作用。以下图为例，用颜色深浅表示单词对预测结果的重要性。
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/63761690/195086276-6ee16e96-4ec3-4a0f-821f-37546d21746b.png" width="1000">
+</div>
+
+- 句子级别可解释性分析 ，也即分析对待预测样本的模型预测结果与训练集中中哪些样本有重要关系。下面的例子表明句子级别可解释性分析可以帮助理解待预测样本的预测结果与训练集中样本之间的关联。
+```text
+text: 您好，请问一岁三个月的孩子可以服用复方锌布颗粒吗？
+predict label: 注意事项
+label: 其他
+examples with positive influence
+support1 text: 感冒期间钙产品要继续服用吗? 钙尔奇就可以，也可以吃婴儿吃的乳钙	label: 注意事项	score: 0.96602
+support2 text: 打喷嚏可以吃布洛芬缓释胶囊么	label: 注意事项	score: 0.95687
+support3 text: 孕后期可以足疗吗	label: 注意事项	score: 0.94021
+...
+```
+
+**数据优化：** 结合[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化策略，从多角度优化训练数据提升模型效果，策略细节详见[训练评估与模型优化指南](analysis/README.md)。
+
+- 稀疏数据筛选主要是解决数据不均衡、训练数据覆盖不足的问题，通过数据增强和数据标注两种方式解决这一问题。
+- 脏数据清洗可以帮助开发者筛选训练集中错误标注的数据，对这些数据重新进行人工标注，得到标注正确的数据再重新进行训练。
+- 数据增强策略提供多种数据增强方案，可以快速扩充数据，提高模型泛化性和鲁棒性。
+
 #### 2.4.3 模型预测
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
 
@@ -338,7 +362,7 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_
 python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 
-如果使用ERNIE M作为预训练模型，运行方式：
+如果使用多语言模型 ERNIE M作为预训练模型，运行方式：
 ```shell
 python export_model.py --params_path ./checkpoint/ --output_path ./export --multilingual
 ```
@@ -421,7 +445,6 @@ prune/
 
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
 
-4. **压缩API暂不支持多语言预训练模型ERNIE-M**，相关功能正在加紧开发中。
 
 #### 2.5.3 部署方案
 
