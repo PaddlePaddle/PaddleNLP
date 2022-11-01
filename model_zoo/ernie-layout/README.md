@@ -192,7 +192,7 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
 
 - Evaluation Methods
 
-  - All the above tasks do the Hyper Parameter searching based on Grid Search method. The evaluation step interval of FUNSD and XFUND-ZH are both 100, metric is Accuracy. The evaluation step interval of RVL-CDIP is 2000, metric is F1-Score. The evaluation step interval of DocVQA-ZH is 10000, metric is [ANLS](https://arxiv.org/pdf/1907.00490.pdf),
+  - All the above tasks do the Hyper Parameter searching based on Grid Search method. The evaluation step interval of FUNSD and XFUND-ZH are both 100, metric is F1-Score. The evaluation step interval of RVL-CDIP is 2000, metric is Accuracy. The evaluation step interval of DocVQA-ZH is 10000, metric is [ANLS](https://arxiv.org/pdf/1907.00490.pdf),
 
   - Hyper Parameters search ranges
 

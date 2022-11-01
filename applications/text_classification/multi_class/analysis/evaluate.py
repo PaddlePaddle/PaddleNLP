@@ -37,7 +37,7 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
 parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
 parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
-parser.add_argument("--bad_case_path", type=str, default="./bad_case.txt", help="Bad case saving file path")
+parser.add_argument("--bad_case_file", type=str, default="bad_case.txt", help="Bad case saving file name")
 args = parser.parse_args()
 # yapf: enable
 
@@ -192,17 +192,16 @@ def evaluate():
             logger.info("Evaluation examples in dev dataset: 0 (0%)")
 
         logger.info("----------------------------")
-    with open(args.bad_case_path, 'w', encoding="utf-8") as f:
-        f.write("Confidence\tPrediction\tLabel\tText\n")
+    bad_case_path = os.path.join(args.dataset_dir, args.bad_case_file)
+    with open(bad_case_path, 'w', encoding="utf-8") as f:
+        f.write("Text\tLabel\tPrediction\n")
         for i, (p, l) in enumerate(zip(preds, labels)):
             p, l = int(p), int(l)
             if p != l:
-                f.write("{:.2f}".format(probs[i][p]) + "\t" + label_list[p] +
-                        "\t" + label_list[l] + "\t" + dev_ds.data[i]["text"] +
-                        "\n")
+                f.write(dev_ds.data[i]["text"] + "\t" + label_list[l] + "\t" +
+                        label_list[p] + "\n")
     f.close()
-    logger.info("Bad case in dev dataset saved in {}".format(
-        args.bad_case_path))
+    logger.info("Bad case in dev dataset saved in {}".format(bad_case_path))
 
     return
 

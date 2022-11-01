@@ -503,7 +503,8 @@ if __name__ == "__main__":
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     args.pad_token = ARGS.pad_token
-    args.to_static = ARGS.to_static
+    if ARGS.to_static:
+        args.to_static = ARGS.to_static
     args.device = ARGS.device
     pprint(args)
 

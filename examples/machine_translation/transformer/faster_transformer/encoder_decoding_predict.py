@@ -231,6 +231,11 @@ def do_predict(args):
     transformer.load(init_from_params=os.path.join(args.init_from_params,
                                                    "transformer.pdparams"))
 
+    # Providing model_dict still works.
+    # state_dict = paddle.load(os.path.join(args.init_from_params,
+    #                          "transformer.pdparams"))
+    # transformer.load(state_dict=state_dict)
+
     f = open(args.output_file, "w")
     with paddle.no_grad():
         if args.profile:

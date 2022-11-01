@@ -93,7 +93,13 @@ class UNIMOTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
             "unimo-text-1.0-summary":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-dureader_qg-template1":
+            "unimo-text-1.0-dureader_qg":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-question-generation":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-question-generation-full_domain":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-question-generation-dureader_qg":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
         }
     }
@@ -110,9 +116,18 @@ class UNIMOTokenizer(PretrainedTokenizer):
         "unimo-text-1.0-summary": {
             "do_lower_case": True
         },
-        "unimo-text-1.0-dureader_qg-template1": {
+        "unimo-text-1.0-dureader_qg": {
             "do_lower_case": True
-        }
+        },
+        "unimo-text-1.0-question-generation": {
+            "do_lower_case": True
+        },
+        "unimo-text-1.0-question-generation-full_domain": {
+            "do_lower_case": True
+        },
+        "unimo-text-1.0-question-generation-dureader_qg": {
+            "do_lower_case": True
+        },
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 

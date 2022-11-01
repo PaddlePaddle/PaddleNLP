@@ -24,8 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ..transformers import UNIMOLMHeadModel
-from ..transformers import UNIMOTokenizer
+from ..transformers import AutoTokenizer, AutoModelForConditionalGeneration, UNIMOForConditionalGeneration, PegasusForConditionalGeneration
 from ..datasets import load_dataset
 from ..data import Stack, Pad, Tuple
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
@@ -35,15 +34,15 @@ usage = r"""
            from paddlenlp import Taskflow 
 
            text_summarization = Taskflow("text_summarization")
-           text_summarization("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
+           text_summarization(2022年，中国房地产进入转型阵痛期，传统“高杠杆、快周转”的模式难以为继，万科甚至直接喊话，中国房地产进入“黑铁时代”)
            '''
-            ['雪后的景色可真美丽呀！']
+            ['万科喊话中国房地产进入“黑铁时代”']
            '''
 
-           text_summarization(["雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
-           "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"])
+           text_summarization(['据悉，2022年教育部将围绕“巩固提高、深化落实、创新突破”三个关键词展开工作。要进一步强化学校教育主阵地作用，继续把落实“双减”作为学校工作的重中之重，重点从提高作业设计水平、提高课后服务水平、提高课堂教学水平、提高均衡发展水平四个方面持续巩固提高学校“双减”工作水平。',
+          '党参有降血脂，降血压的作用，可以彻底消除血液中的垃圾，从而对冠心病以及心血管疾病的患者都有一定的稳定预防工作作用，因此平时口服党参能远离三高的危害。另外党参除了益气养血，降低中枢神经作用，调整消化系统功能，健脾补肺的功能。'])
            '''
-            ['雪后的景色可真美丽呀！', '成品油调价窗口8月23日24时开启']
+            ['教育部：将从四个方面持续巩固提高学校“双减”工作水平', '党参能降低三高的危害']
            '''
          """
 
@@ -61,17 +60,18 @@ class TextSummarizationTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._batch_size = kwargs.get("batch_size", 1)
         self._output_scores = kwargs.get("output_scores", False)
+        self._model_type = None
         self._construct_tokenizer(model)
         self._construct_model(model)
         # Hypter-parameter during generating.
         self._max_length = kwargs.get("max_length", 128)
         self._min_length = kwargs.get("min_length", 0)
         self._decode_strategy = kwargs.get("decode_strategy", 'beam_search')
-        self._temperature = kwargs.get("temperature", 0.6)
+        self._temperature = kwargs.get("temperature", 1.0)
         self._top_k = kwargs.get("top_k", 5)
         self._top_p = kwargs.get("top_p", 1.)
         self._num_beams = kwargs.get("num_beams", 4)
-        self._length_penalty = kwargs.get("length_penalty", 1.0)
+        self._length_penalty = kwargs.get("length_penalty", 0.0)
         self._num_return_sequences = kwargs.get("num_return_sequences", 1)
         self._repetition_penalty = kwargs.get("repetition_penalty", 1)
         self._use_faster = kwargs.get("use_faster", False)
@@ -82,19 +82,23 @@ class TextSummarizationTask(Task):
         Construct the inference model for the predictor.
         """
         if self._custom_model:
-            self._model = UNIMOLMHeadModel.from_pretrained(self._task_path)
+            self._model = AutoModelForConditionalGeneration.from_pretrained(
+                self._task_path)
         else:
-            self._model = UNIMOLMHeadModel.from_pretrained(model)
+            self._model = AutoModelForConditionalGeneration.from_pretrained(
+                model)
         self._model.eval()
+        if isinstance(self._model, UNIMOForConditionalGeneration):
+            self._model_type = 'unimo-text'
 
     def _construct_tokenizer(self, model):
         """
         Construct the tokenizer for the predictor.
         """
         if self._custom_model:
-            self._tokenizer = UNIMOTokenizer.from_pretrained(self._task_path)
+            self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
         else:
-            self._tokenizer = UNIMOTokenizer.from_pretrained(model)
+            self._tokenizer = AutoTokenizer.from_pretrained(model)
 
     def _preprocess(self, inputs):
         """
@@ -111,28 +115,39 @@ class TextSummarizationTask(Task):
         """
         Generate input batches.
         """
+        pad_right = False
+        if self._model_type != 'unimo-text':
+            pad_right = True
         examples = [self._convert_example(i) for i in data]
         # Seperates data into some batches.
         one_batch = []
         for example in examples:
             one_batch.append(example)
             if len(one_batch) == batch_size:
-                yield self._parse_batch(one_batch, self._tokenizer.pad_token_id)
+                yield self._parse_batch(one_batch, self._tokenizer.pad_token_id,
+                                        pad_right)
                 one_batch = []
         if one_batch:
-            yield self._parse_batch(one_batch, self._tokenizer.pad_token_id)
+            yield self._parse_batch(one_batch, self._tokenizer.pad_token_id,
+                                    pad_right)
 
     def _convert_example(self, example, max_seq_len=512, return_length=True):
         """
         Convert all examples into necessary features.
         """
-        source = example
-        tokenized_example = self._tokenizer.gen_encode(
-            source,
-            max_seq_len=max_seq_len,
-            add_start_token_for_decoding=True,
-            return_length=True,
-            is_split_into_words=False)
+        if self._model_type != 'unimo-text':
+            tokenized_example = self._tokenizer(example,
+                                                max_length=max_seq_len,
+                                                padding=False,
+                                                truncation=True,
+                                                return_attention_mask=True)
+        else:
+            tokenized_example = self._tokenizer.gen_encode(
+                example,
+                max_seq_len=max_seq_len,
+                add_start_token_for_decoding=True,
+                return_length=True,
+                is_split_into_words=False)
         # Use to gather the logits corresponding to the labels during training
         return tokenized_example
 
@@ -162,22 +177,28 @@ class TextSummarizationTask(Task):
             return attention_mask
 
         pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype='int32')
+        batch_dict = {}
         input_ids = pad_func(
             [example['input_ids'] for example in batch_examples])
-        token_type_ids = pad_func(
-            [example['token_type_ids'] for example in batch_examples])
-        position_ids = pad_func(
-            [example['position_ids'] for example in batch_examples])
-        attention_mask = pad_mask(
-            [example['attention_mask'] for example in batch_examples])
-        seq_len = np.asarray([example['seq_len'] for example in batch_examples],
-                             dtype='int32')
-        batch_dict = {}
-        batch_dict['input_ids'] = input_ids
-        batch_dict['token_type_ids'] = token_type_ids
-        batch_dict['position_ids'] = position_ids
-        batch_dict['attention_mask'] = attention_mask
-        batch_dict['seq_len'] = seq_len
+        if self._model_type != 'unimo-text':
+            attention_mask = (input_ids != pad_val).astype('float32')
+            batch_dict['input_ids'] = input_ids
+            batch_dict['attention_mask'] = attention_mask
+        else:
+            token_type_ids = pad_func(
+                [example['token_type_ids'] for example in batch_examples])
+            position_ids = pad_func(
+                [example['position_ids'] for example in batch_examples])
+            attention_mask = pad_mask(
+                [example['attention_mask'] for example in batch_examples])
+            seq_len = np.asarray(
+                [example['seq_len'] for example in batch_examples],
+                dtype='int32')
+            batch_dict['input_ids'] = input_ids
+            batch_dict['token_type_ids'] = token_type_ids
+            batch_dict['position_ids'] = position_ids
+            batch_dict['attention_mask'] = attention_mask
+            batch_dict['seq_len'] = seq_len
         return batch_dict
 
     def _run_model(self, inputs):
@@ -189,13 +210,16 @@ class TextSummarizationTask(Task):
 
         for batch in inputs["batches"]:
             input_ids = paddle.to_tensor(batch['input_ids'], dtype='int64')
-            token_type_ids = paddle.to_tensor(batch['token_type_ids'],
-                                              dtype='int64')
-            position_ids = paddle.to_tensor(batch['position_ids'],
-                                            dtype='int64')
+            token_type_ids = paddle.to_tensor(
+                batch['token_type_ids'],
+                dtype='int64') if 'token_type_ids' in batch else None
+            position_ids = paddle.to_tensor(
+                batch['position_ids'],
+                dtype='int64') if 'position_ids' in batch else None
             attention_mask = paddle.to_tensor(batch['attention_mask'],
                                               dtype='float32')
-            seq_len = paddle.to_tensor(batch['seq_len'], dtype='int64')
+            seq_len = paddle.to_tensor(
+                batch['seq_len'], dtype='int64') if 'seq_len' in batch else None
             ids, scores = self._model.generate(
                 input_ids=input_ids,
                 token_type_ids=token_type_ids,
@@ -211,8 +235,10 @@ class TextSummarizationTask(Task):
                 length_penalty=self._length_penalty,
                 num_return_sequences=self._num_return_sequences,
                 repetition_penalty=self._repetition_penalty,
-                bos_token_id=self._tokenizer.cls_token_id,
-                eos_token_id=self._tokenizer.mask_token_id,
+                bos_token_id=None if self._model_type != 'unimo-text' else
+                self._tokenizer.cls_token_id,
+                eos_token_id=None if self._model_type != 'unimo-text' else
+                self._tokenizer.mask_token_id,
                 use_faster=self._use_faster,
                 use_fp16_decoding=self._use_fp16_decoding)
             all_ids.extend(ids)
@@ -227,10 +253,18 @@ class TextSummarizationTask(Task):
         """
         ids_list = inputs['ids']
         scores_list = inputs['scores']
-        results = self._select_from_num_return_sequences(
-            ids_list, scores_list, self._max_length, self._num_return_sequences)
-        output_tokens = [result[0] for result in results]
-        output_scores = [result[1] for result in results]
+        if self._model_type != 'unimo-text':
+            output_tokens = self._tokenizer.batch_decode(
+                ids_list,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False)
+            output_scores = [i.numpy() for i in scores_list]
+        else:
+            results = self._select_from_num_return_sequences(
+                ids_list, scores_list, self._max_length,
+                self._num_return_sequences)
+            output_tokens = [result[0] for result in results]
+            output_scores = [result[1] for result in results]
 
         if self._output_scores:
             return output_tokens, output_scores
