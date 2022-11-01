@@ -176,6 +176,16 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
+
+    resource_file_urls = MODEL_MAP[
+        model_args.model_name_or_path]['resource_file_urls']
+
+    logger.info("Downloading resource files...")
+    for key, val in resource_file_urls.items():
+        file_path = os.path.join(model_args.model_name_or_path, key)
+        if not os.path.exists(file_path):
+            get_path_from_url(val, model_args.model_name_or_path)
+
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if model_args.multilingual:
         model = UIEM.from_pretrained(model_args.model_name_or_path)
@@ -194,7 +204,7 @@ def main():
     trans_fn = partial(convert_example,
                        tokenizer=tokenizer,
                        max_seq_len=data_args.max_seq_length,
-                       multilingual=False)  #model_args.multilingual)
+                       multilingual=model_args.multilingual)
 
     train_ds = train_ds.map(trans_fn)
     dev_ds = dev_ds.map(trans_fn)
