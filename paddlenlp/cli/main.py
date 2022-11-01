@@ -35,6 +35,7 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
     Returns:
         List[Tuple[str, str]]: [model_type, model_name]
     """
+    # 1. load official models
     module = importlib.import_module("paddlenlp.transformers")
     model_names = set()
     for attr_name in dir(module):
@@ -54,8 +55,8 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
             model_names.add(("official", obj.base_model_prefix, model_name))
     logger.info(f"find {len(model_names)} official models ...")
 
+    # 2. load & extend community models
     if include_community:
-        # load & extend community models
         community_model_names = load_community_models()
         for model_name in community_model_names:
             model_names.add(model_name)
