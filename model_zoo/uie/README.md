@@ -695,7 +695,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --save_total_limit 1 \
 
 ```
-**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual True`。
+**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual`。
 
 可配置参数说明：
 
@@ -877,7 +877,7 @@ python finetune.py  \
     --strategy 'qat' \
 ```
 
-**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual True`。
+**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual`。
 
 可配置的压缩相关的参数：
 * `strategy`：压缩策略，在 UIE 中目前推荐使用 `'qat'`，即量化训练（QAT）。由于有训练过程，因此训练相关的参数也可以重新调整。例如上面微调时已介绍过的`per_device_train_batch_size`、`per_device_eval_batch_size`、`learning_rate`、`num_train_epochs`。
@@ -886,7 +886,7 @@ python finetune.py  \
 - `use_pact`： 是否使用 PACT 量化策略，是对普通方法的改进，参考论文 [PACT: Parameterized Clipping Activation for Quantized Neural Networks](https://arxiv.org/abs/1805.06085)，打开后可能精度更高，默认是 True。
 * `do_compress`：是否进行压缩，该参数需要与脚本配合；默认是 False。
 
-同样，模型压缩后得到的最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可直接用于服务端和移动端的推理部署，不需要再使用 `export_model.py`脚本 来导出模型了。
+同样，模型压缩后得到的最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可直接用于服务端和移动端的推理部署，不需要再后面再调用 `finetune.py` 脚本来导出模型了。
 
 以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
 
@@ -912,7 +912,7 @@ python finetune.py  \
     ```shell
     pip install -r deploy/python/requirements_cpu.txt
     ```
-    在命令行输入 `lscpu` 查看本机支持指令，如果机器支持完整的 AVX-512 指令集，推荐使用 INT8 部署。可参考 [支持 AVX-512 指令集扩展的处理器](https://www.intel.cn/content/www/cn/zh/support/articles/000058341/processors/intel-xeon-processors.html)
+    如果有模型推理加速、内存显存占用优化的需求，可以尝试使用 INT8 部署。INT8 部署需要用户机器支持完整的 AVX-512 指令集。用户在命令行输入 `lscpu` 可查看本机支持指令，可参考 [支持 AVX-512 指令集扩展的处理器](https://www.intel.cn/content/www/cn/zh/support/articles/000058341/processors/intel-xeon-processors.html)
 
     ```text
     在支持 AVX512_VNNI 的 CPU 服务器上，如：Casecade Lake,  Model name: Intel(R) Xeon(R) Gold X2XX，INT8 精度和性能最高，INT8 性能提升为 FP32 模型的 3 ~ 3.7 倍。
@@ -920,7 +920,7 @@ python finetune.py  \
     在支持 AVX-512 但是不支持 AVX512_VNNI 的 CPU 服务器上，如：SkyLake, Model name：Intel(R) Xeon(R) Gold X1XX，INT8 性能为 FP32 性能的 1.5 倍左右。
     ```
 
-    否则，只支持 FP32 部署。
+    如果用户使用 INT8 部署，部署之前的模型需要进行量化（参考 4.7 节的内容）。
 
   - GPU端
 
@@ -930,11 +930,13 @@ python finetune.py  \
     pip install -r deploy/python/requirements_gpu.txt
     ```
 
-    如果 GPU 设备的 CUDA 计算能力大于等于 7.2，例如 T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用 INT8 部署，部署之前模型需要进行量化（参考 4.6 节的内容）。要注意的是，V100 卡可以进行 INT8 推理，但是加速不充分。
+    如果有模型推理加速、内存显存占用优化的需求，并且 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，可以尝试使用 FP16 或者 INT8 部署：
 
-    如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，但达不到上方 INT8 模型推理的要求，比如 V100 等，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
+    - 如果 GPU 设备的 CUDA 计算能力大于等于 7.2，例如 T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，可以使用 INT8 部署，部署之前模型需要进行量化（参考 4.7 节的内容）。要注意的是，V100 卡可以进行 INT8 推理，但是加速不充分。
 
-    如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
+    - 如果 GPU 设备的 CUDA 计算能力大于等于 7.0，但达不到上方 INT8 模型推理的要求，比如 V100 等，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
+
+    如果 GPU 设备的 CUDA 计算能力较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
 
     更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 
@@ -945,16 +947,24 @@ python finetune.py  \
 
   而如果对 FP32 或者 FP16 模型进行预测，而且按照上面 4.3 节的脚本进行了模型训练，`$finetuned_model` 中会带有 `*.pdmodel`、`*.pdiparams` 文件，也可以跳过这一节。
 
-  否则，还需要调用 `export_model.py` 脚本，产出静态图模型，执行方式如下：
+  否则，还需要调用 `finetune.py` 脚本，产出静态图模型，执行方式如下：
 
-  ```shell
-  python export_model.py --model_path ./checkpoint/model_best --output_path ./export
-  ```
+```shell
+ python finetune.py \
+    --model_name_or_path $finetuned_model  \
+    --do_export  \
+    --export_model_dir $finetuned_model \
+    --output_dir ./ \
+    --train_path data/train.txt  \
+    --dev_path data/dev.txt \
+
+```
 
   可配置参数说明：
 
-  - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件 `model_state.pdparams`和模型配置文件 `model_config.json`。
-  - `output_path`: 静态图参数导出路径，默认导出路径为 `./export`。
+  - `do_export`: 是否导出，导出时需要选择。
+  - `export_model_dir`：静态图参数导出路径，默认导出路径为 `./export`。
+  - `output_dir`：模型训练导出路径，此处可传入任意路径，导出模型所处路径取决于 `export_model_dir`。
 
 - 推理
 
