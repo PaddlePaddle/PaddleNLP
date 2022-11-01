@@ -59,7 +59,6 @@ def load_all_models() -> List[Tuple[str, str]]:
     for model_name in community_model_names:
         model_names.add(model_name)
 
-    logger.info(f"finding {len(model_names)} models ...")
     return model_names
 
 

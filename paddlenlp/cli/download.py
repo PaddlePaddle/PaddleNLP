@@ -58,5 +58,5 @@ def load_community_models() -> List[Tuple[str, str]]:
     model_names = set()
     for model_name, obj in config.items():
         model_names.add(("community", model_name, obj.get("type", model_name)))
-    logger.info(f"finding {len(model_names)} community models ...")
+    logger.info(f"find {len(model_names)} community models ...")
     return model_names
