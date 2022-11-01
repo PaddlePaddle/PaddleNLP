@@ -860,7 +860,7 @@ python finetune.py  \
     --eval_steps 100 \
     --seed 42 \
     --model_name_or_path  $finetuned_model \
-    --output_dir uie_compress \
+    --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
     --label_names 'start_positions' 'end_positions' \
@@ -940,31 +940,9 @@ python finetune.py  \
 
     更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 
-
 - 模型导出
 
-  如果对 INT8 模型进行预测，模型压缩后已经自动进行了导出，可跳过这一节。
-
-  而如果对 FP32 或者 FP16 模型进行预测，而且按照上面 4.3 节的脚本进行了模型训练，`$finetuned_model` 中会带有 `*.pdmodel`、`*.pdiparams` 文件，也可以跳过这一节。
-
-  否则，还需要调用 `finetune.py` 脚本，产出静态图模型，执行方式如下：
-
-```shell
- python finetune.py \
-    --model_name_or_path $finetuned_model  \
-    --do_export  \
-    --export_model_dir $finetuned_model \
-    --output_dir ./ \
-    --train_path data/train.txt  \
-    --dev_path data/dev.txt \
-
-```
-
-  可配置参数说明：
-
-  - `do_export`: 是否导出，导出时需要选择。
-  - `export_model_dir`：静态图参数导出路径，默认导出路径为 `./export`。
-  - `output_dir`：模型训练导出路径，此处可传入任意路径，导出模型所处路径取决于 `export_model_dir`。
+模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdmodel`、`*.pdiparams` 模型文件可用于推理。
 
 - 推理
 
@@ -973,12 +951,12 @@ python finetune.py  \
     在CPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_cpu.py --model_path_prefix export/inference
+    python deploy/python/infer_cpu.py --model_path_prefix ${finetuned_model}/model
     ```
 
     可配置参数说明：
 
-    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
     - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
@@ -988,12 +966,12 @@ python finetune.py  \
     在GPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16 --device_id 0
+    python deploy/python/infer_gpu.py --model_path_prefix export/model --use_fp16 --device_id 0
     ```
 
     可配置参数说明：
 
-    - `model_path_prefix`: 用于推理的 Paddle 模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
+    - `model_path_prefix`: 用于推理的 Paddle 模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
     - `use_fp16`: FP32 模型是否使用 FP16 进行加速，使用 FP32、INT8 推理时不需要设置，默认关闭。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
