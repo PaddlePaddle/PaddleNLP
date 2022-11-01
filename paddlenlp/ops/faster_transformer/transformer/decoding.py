@@ -684,6 +684,118 @@ def infer_gptj_decoding(input, attn_mask, mem_seq_len, word_emb, slf_ln_weight,
                       outputs_dtype=outputs_dtype)
 
 
+def infer_pegasus_decoding(
+        enc_output, memory_seq_lens, word_emb, slf_ln_weight, slf_ln_bias,
+        slf_q_weight, slf_q_bias, slf_k_weight, slf_k_bias, slf_v_weight,
+        slf_v_bias, slf_out_weight, slf_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, decoder_ln_weight,
+        decoder_ln_bias, linear_weight, linear_bias, pos_emb,
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _max_out_len, _min_out_len, _diversity_rate,
+        _rel_len, _alpha, _temperature, _early_stopping, _hidden_act):
+
+    inputs_names = [
+        'Input',
+        'MemSeqLen',
+        'WordEmbedding',
+        'SelfLayernormWeight@VECTOR',
+        'SelfLayernormBias@VECTOR',
+        'SelfQueryWeight@VECTOR',
+        'SelfQueryBias@VECTOR',
+        'SelfKeyWeight@VECTOR',
+        'SelfKeyBias@VECTOR',
+        'SelfValueWeight@VECTOR',
+        'SelfValueBias@VECTOR',
+        'SelfOutWeight@VECTOR',
+        'SelfOutBias@VECTOR',
+        'CrossLayernormWeight@VECTOR',
+        'CrossLayernormBias@VECTOR',
+        'CrossQueryWeight@VECTOR',
+        'CrossQueryBias@VECTOR',
+        'CrossKeyWeight@VECTOR',
+        'CrossKeyBias@VECTOR',
+        'CrossValueWeight@VECTOR',
+        'CrossValueBias@VECTOR',
+        'CrossOutWeight@VECTOR',
+        'CrossOutBias@VECTOR',
+        'FFNLayernormWeight@VECTOR',
+        'FFNLayernormBias@VECTOR',
+        'FFNInterWeight@VECTOR',
+        'FFNInterBias@VECTOR',
+        'FFNOutWeight@VECTOR',
+        'FFNOutBias@VECTOR',
+        'DecoderLayernormWeight',
+        'DecoderLayernormBias',
+        'EmbWeight',
+        'EmbBias',
+        'PositionEncEmb',
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+    ]
+
+    inputs_var = [
+        enc_output,
+        memory_seq_lens,
+        word_emb,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_bias,
+        cross_ln_weight,
+        cross_ln_bias,
+        cross_q_weight,
+        cross_q_bias,
+        cross_k_weight,
+        cross_k_bias,
+        cross_v_weight,
+        cross_v_bias,
+        cross_out_weight,
+        cross_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_bias,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        linear_weight,
+        linear_bias,
+        pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+    ]
+
+    attrs_names = [
+        'decoding_strategy', 'beam_size', 'topk', 'topp', 'n_head',
+        'size_per_head', 'num_layer', 'bos_id', 'eos_id', 'temperature',
+        'max_len', 'min_len', 'beam_search_diversity_rate', "rel_len", "alpha",
+        "early_stopping", "hidden_act", "emb_scale"
+    ]
+
+    attrs_val = [
+        _decoding_strategy, _beam_size, _topk, _topp, _n_head, _size_per_head,
+        _n_layer, _bos_id, _eos_id, _temperature, _max_out_len, _min_out_len,
+        _diversity_rate, _rel_len, _alpha, _early_stopping, _hidden_act
+    ]
+
+    outputs_names = ['OutputIds', 'ParentIds', 'SequenceLength']
+
+    outputs_dtype = ["int32"] * len(outputs_names)
+
+    return run_custom("fusion_pegasus_decoding", inputs_names, inputs_var,
+                      attrs_names, attrs_val, outputs_names, outputs_dtype)
+
+
 def finalize(beam_size,
              output_ids,
              parent_ids,
@@ -884,12 +996,10 @@ def convert_params(faster_model,
     params = defaultdict(_list)
 
     def _convert(module):
-        if isinstance(
-                module,
-            (
-                nn.TransformerEncoder,  # nn.TransformerDecoder,
-                paddlenlp.transformers.gpt.modeling.TransformerDecoder,
-                paddlenlp.transformers.opt.modeling.TransformerDecoder)):
+        if isinstance(module,
+                      (nn.TransformerEncoder, nn.TransformerDecoder,
+                       paddlenlp.transformers.gpt.modeling.TransformerDecoder,
+                       paddlenlp.transformers.opt.modeling.TransformerDecoder)):
             num_layer = len(module.layers)
             for i, layer in enumerate(module.layers):
                 if not ft_para_conf.is_load(i, num_layer):
@@ -909,6 +1019,7 @@ def convert_params(faster_model,
                         (layer.self_attn.v_proj, "weight", 1))
                     params["slf_v_bias"].append(
                         (layer.self_attn.v_proj, "bias", 1))
+
                 else:
                     # TODO(guosheng): Tensor with size 0 might be failed in
                     # paddle develop, thus use tensor with size 1 instead
@@ -956,6 +1067,24 @@ def convert_params(faster_model,
                         while hasattr(faster_model, attr):
                             attr += "_"
                         setattr(faster_model, attr, params[key][-1])
+                if hasattr(layer, 'cross_attn'):
+                    # nn.TransformerDecoder
+                    params["cross_q_weight"].append(
+                        (layer.cross_attn.q_proj, "weight", 1))
+                    params["cross_q_bias"].append(
+                        (layer.cross_attn.q_proj, "bias", 1))
+                    params["cross_k_weight"].append(
+                        (layer.cross_attn.k_proj, "weight", 1))
+                    params["cross_k_bias"].append(
+                        (layer.cross_attn.k_proj, "bias", 1))
+                    params["cross_v_weight"].append(
+                        (layer.cross_attn.v_proj, "weight", 1))
+                    params["cross_v_bias"].append(
+                        (layer.cross_attn.v_proj, "bias", 1))
+                    params["cross_out_weight"].append(
+                        (layer.cross_attn.out_proj, "weight", 0))
+                    params["cross_out_bias"].append(
+                        (layer.cross_attn.out_proj, "bias", 0))
 
                 params["slf_out_weight"].append(
                     (layer.self_attn.out_proj, "weight", 0))
@@ -969,11 +1098,15 @@ def convert_params(faster_model,
                 params["ffn_inter_bias"].append((layer.linear1, "bias", 1))
                 params["ffn_out_weight"].append((layer.linear2, "weight", 0))
                 params["ffn_out_bias"].append((layer.linear2, "bias"))
-                params["ffn_ln_weight"].append((layer.norm2, "weight"))
-                params["ffn_ln_bias"].append((layer.norm2, "bias"))
-                if isinstance(module, nn.TransformerDecoder):
-                    # TODO(guosheng): support nn.TransformerDecoder
-                    pass
+                if hasattr(layer, 'norm3'):
+                    # nn.TransformerDecoder
+                    params["cross_ln_weight"].append((layer.norm2, "weight"))
+                    params["cross_ln_bias"].append((layer.norm2, "bias"))
+                    params["ffn_ln_weight"].append((layer.norm3, "weight"))
+                    params["ffn_ln_bias"].append((layer.norm3, "bias"))
+                else:
+                    params["ffn_ln_weight"].append((layer.norm2, "weight"))
+                    params["ffn_ln_bias"].append((layer.norm2, "bias"))
 
             if getattr(module, 'norm', None) is not None:
                 params["decoder_ln_weight"].append((module.norm, "weight"))
@@ -2841,3 +2974,140 @@ class InferGptJDecoding(nn.Layer):
         if forced_eos_token_id is not None:
             output_ids[:, -1] = forced_eos_token_id
         return output_ids
+
+
+class InferPegasusDecoding(nn.Layer):
+
+    def __init__(self,
+                 model,
+                 decoding_lib=None,
+                 use_fp16_decoding=False,
+                 hidden_act="gelu"):
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
+        else:
+            if decoding_lib is not None:
+                logger.warning(
+                    "The specified decoding_lib does not exist, and it will be built automatically."
+                )
+            load("FasterTransformer", verbose=True)
+
+        super(InferPegasusDecoding, self).__init__()
+        self._hidden_act = hidden_act
+        self._num_decoder_layers = model.pegasus.config['num_decoder_layers']
+        self._n_head = model.pegasus.config['decoder_attention_heads']
+        self._d_model = model.pegasus.config['d_model']
+
+        params = convert_params(self,
+                                model.decoder.decoder,
+                                fuse_qkv=2,
+                                use_fp16=use_fp16_decoding,
+                                restore_data=True)
+
+        self.decoder_ln_weight = [
+            transfer_param(model.decoder.decoder_layernorm.weight,
+                           is_bias=False,
+                           dtype="float16" if use_fp16_decoding else "float32",
+                           restore_data=True)
+        ]
+        self.decoder_ln_bias = [
+            transfer_param(model.decoder.decoder_layernorm.bias,
+                           is_bias=True,
+                           dtype="float16" if use_fp16_decoding else "float32",
+                           restore_data=True)
+        ]
+
+        self.pos_emb = [
+            transfer_param(model.decoder.decoder_embed_positions.weight,
+                           is_bias=False,
+                           dtype="float16" if use_fp16_decoding else "float32",
+                           restore_data=True)
+        ]
+        self.word_emb = [
+            transfer_param(model.decoder.embed_tokens.weight,
+                           is_bias=False,
+                           dtype="float16" if use_fp16_decoding else "float32",
+                           restore_data=True)
+        ]
+        setattr(
+            self, "lm_head_weight_",
+            transfer_param(model.lm_head_weight.t(),
+                           is_bias=False,
+                           dtype="float16" if use_fp16_decoding else "float32",
+                           restore_data=True))
+        self.linear_weight = [getattr(self, "lm_head_weight_")]
+        self.linear_bias = [
+            transfer_param(model.final_logits_bias,
+                           is_bias=True,
+                           dtype="float16" if use_fp16_decoding else "float32",
+                           restore_data=True)
+        ]
+        for k, v in params.items():
+            setattr(self, k, v)
+
+    def forward(self,
+                enc_output,
+                memory_seq_lens,
+                beam_size=4,
+                top_k=1,
+                top_p=0.0,
+                decoding_strategy="beam_search_v3",
+                max_out_len=256,
+                min_out_len=256,
+                diversity_rate=0.0,
+                rel_len=False,
+                bos_token_id=None,
+                eos_token_id=None,
+                pad_token_id=None,
+                alpha=0.6,
+                temperature=1.0,
+                early_stopping=False,
+                forced_eos_token_id=None):
+        # Beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
+        if decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v3"
+        elif decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
+            top_k = 1
+            top_p = 0.0
+        elif decoding_strategy in [
+                "sampling", "topk_sampling", "topp_sampling"
+        ]:
+            if top_p == 1 and top_k > 0:
+                decoding_strategy = "topk_sampling"
+                top_p = 0.0
+            elif top_p > 0 and top_k == 0:
+                decoding_strategy = "topp_sampling"
+            else:
+                raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version. ")
+        output_ids, parent_ids, sequence_length = infer_pegasus_decoding(
+            [enc_output], [memory_seq_lens], self.word_emb, self.slf_ln_weight,
+            self.slf_ln_bias, self.slf_q_weight, self.slf_q_bias,
+            self.slf_k_weight, self.slf_k_bias, self.slf_v_weight,
+            self.slf_v_bias, self.slf_out_weight, self.slf_out_bias,
+            self.cross_ln_weight, self.cross_ln_bias, self.cross_q_weight,
+            self.cross_q_bias, self.cross_k_weight, self.cross_k_bias,
+            self.cross_v_weight, self.cross_v_bias, self.cross_out_weight,
+            self.cross_out_bias, self.ffn_ln_weight, self.ffn_ln_bias,
+            self.ffn_inter_weight, self.ffn_inter_bias, self.ffn_out_weight,
+            self.ffn_out_bias, self.decoder_ln_weight, self.decoder_ln_bias,
+            self.linear_weight, self.linear_bias, self.pos_emb,
+            decoding_strategy, beam_size, top_k, top_p, self._n_head,
+            int(self._d_model /
+                self._n_head), self._num_decoder_layers, bos_token_id,
+            eos_token_id, max_out_len, min_out_len, diversity_rate, rel_len,
+            alpha, temperature, early_stopping, self._hidden_act)
+
+        ids = finalize(beam_size,
+                       output_ids,
+                       parent_ids,
+                       sequence_length,
+                       forced_eos_token_id=forced_eos_token_id,
+                       decoding_strategy=decoding_strategy)
+        return ids

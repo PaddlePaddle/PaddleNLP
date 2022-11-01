@@ -354,7 +354,7 @@ class UIETask(Task):
                 "f144bd065ea90cc26eaa91197124bdcc"
             ],
             "sentencepiece_model_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/sentencepiece.bpe.model",
                 "bf25eb5120ad92ef5c7d8596b5dc4046"
             ],
         },
