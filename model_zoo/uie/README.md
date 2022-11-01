@@ -16,11 +16,12 @@
 - [4. 训练定制](#训练定制)
   - [4.1 代码结构](#代码结构)
   - [4.2 数据标注](#数据标注)
-  - [4.3 模型微调和评估](#模型微调和评估)
-  - [4.4 定制模型一键预测](#定制模型一键预测)
-  - [4.5 实验指标](#实验指标)
-  - [4.6 模型压缩](#模型压缩)
-  - [4.7 模型部署](#模型部署)
+  - [4.3 模型微调](#模型微调)
+  - [4.4 模型评估](#模型评估)
+  - [4.5 定制模型一键预测](#定制模型一键预测)
+  - [4.6 实验指标](#实验指标)
+  - [4.7 模型压缩](#模型压缩)
+  - [4.8 模型部署](#模型部署)
 - [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
@@ -540,7 +541,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 ├── model.py          # 模型组网脚本
 ├── doccano.py        # 数据标注脚本
 ├── doccano.md        # 数据标注文档
-├── finetune.py       # 模型微调脚本
+├── finetune.py       # 模型微调、压缩脚本
 ├── evaluate.py       # 模型评估脚本
 └── README.md
 ```
@@ -619,16 +620,18 @@ python labelstudio2doccano.py --labelstudio_file label-studio.json
 - ``doccano_file``: doccano 格式的数据文件保存路径，默认为 "doccano_ext.jsonl"。
 - ``task_type``: 任务类型，可选有抽取（"ext"）和分类（"cls"）两种类型的任务，默认为 "ext"。
 
-<a name="模型微调和评估"></a>
+<a name="模型微调"></a>
 
-#### 4.3 模型微调和评估
+#### 4.3 模型微调
 
 推荐使用 [Trainer API ](../../docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
 使用下面的命令，使用 `uie-base` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
 
+单卡启动：
+
 ```shell
-export finetuned_model=uie_finetuned
+export finetuned_model=./checkpoint/model_best
 
 python finetune.py  \
     --device gpu \
@@ -658,7 +661,41 @@ python finetune.py  \
 
 ```
 
-使用 Trainer 可支持配置的通用参数：
+如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
+
+```shell
+export finetuned_model=./checkpoint/model_best
+
+python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
+    --device gpu \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --eval_steps 100 \
+    --seed 42 \
+    --model_name_or_path uie-base \
+    --output_dir $finetuned_model \
+    --train_path data/train.txt \
+    --dev_path data/dev.txt  \
+    --label_names 'start_positions' 'end_positions' \
+    --max_seq_length 512  \
+    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size  16 \
+    --num_train_epochs 100 \
+    --learning_rate 1e-5 \
+    --do_train \
+    --do_eval \
+    --do_export \
+    --export_model_dir $finetuned_model \
+    --overwrite_output_dir \
+    --disable_tqdm True \
+    --metric_for_best_model eval_f1 \
+    --load_best_model_at_end  True \
+    --save_total_limit 1 \
+
+```
+
+可配置参数说明：
+
 * `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano";
 * `output_dir`：必须，模型训练或压缩后保存的模型目录；默认为 `None` 。
 * `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
@@ -676,9 +713,79 @@ python finetune.py  \
 
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
+
+<a name="模型评估"></a>
+
+#### 4.4 模型评估
+
+通过运行以下命令进行模型评估：
+
+```shell
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --batch_size 16 \
+    --max_seq_len 512
+```
+
+通过运行以下命令对UIE-M进行模型评估：
+
+```
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --batch_size 16 \
+    --max_seq_len 512 \
+    --multilingual
+```
+
+评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
+
+可开启`debug`模式对每个正例类别分别进行评估，该模式仅用于模型调试：
+
+```shell
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --debug
+```
+
+输出打印示例：
+
+```text
+[2022-09-14 03:13:58,877] [    INFO] - -----------------------------
+[2022-09-14 03:13:58,877] [    INFO] - Class Name: 疾病
+[2022-09-14 03:13:58,877] [    INFO] - Evaluation Precision: 0.89744 | Recall: 0.83333 | F1: 0.86420
+[2022-09-14 03:13:59,145] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,145] [    INFO] - Class Name: 手术治疗
+[2022-09-14 03:13:59,145] [    INFO] - Evaluation Precision: 0.90000 | Recall: 0.85714 | F1: 0.87805
+[2022-09-14 03:13:59,439] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,440] [    INFO] - Class Name: 检查
+[2022-09-14 03:13:59,440] [    INFO] - Evaluation Precision: 0.77778 | Recall: 0.56757 | F1: 0.65625
+[2022-09-14 03:13:59,708] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,709] [    INFO] - Class Name: X的手术治疗
+[2022-09-14 03:13:59,709] [    INFO] - Evaluation Precision: 0.90000 | Recall: 0.85714 | F1: 0.87805
+[2022-09-14 03:13:59,893] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,893] [    INFO] - Class Name: X的实验室检查
+[2022-09-14 03:13:59,894] [    INFO] - Evaluation Precision: 0.71429 | Recall: 0.55556 | F1: 0.62500
+[2022-09-14 03:14:00,057] [    INFO] - -----------------------------
+[2022-09-14 03:14:00,058] [    INFO] - Class Name: X的影像学检查
+[2022-09-14 03:14:00,058] [    INFO] - Evaluation Precision: 0.69231 | Recall: 0.45000 | F1: 0.54545
+```
+
+可配置参数说明：
+
+- `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
+- `test_path`: 进行评估的测试集文件。
+- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
+- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
+- `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+- `multilingual`: 是否是跨语言模型，默认关闭。
+- `schema_lang`: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
+
 <a name="定制模型一键预测"></a>
 
-#### 4.4 定制模型一键预测
+#### 4.5 定制模型一键预测
 
 `paddlenlp.Taskflow`装载定制模型，通过`task_path`指定模型权重文件的路径，路径下需要包含训练好的模型权重文件`model_state.pdparams`。
 
@@ -710,7 +817,7 @@ python finetune.py  \
 
 <a name="实验指标"></a>
 
-#### 4.5 实验指标
+#### 4.6 实验指标
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
@@ -730,9 +837,9 @@ python finetune.py  \
 
 <a name="模型压缩"></a>
 
-#### 4.6 模型压缩
+#### 4.7 模型压缩
 
-模型压缩功能使用的是 PaddleNLP [模型压缩 API](../../docs/compression.md)。模型压缩主要用于有模型部署上线需求的场景，可以进一步压缩模型体积、加快推理速度、减少内存占用。
+模型压缩功能使用的是 PaddleNLP [模型压缩 API](../../docs/compression.md)，文档可[点此](../../docs/compression.md)查看。模型压缩主要用于有模型部署上线需求的场景，可以进一步压缩模型体积、加快推理速度、减少内存占用。
 
 如果需要使用 **模型压缩** 功能需要安装最新版本的 `paddleslim`：
 
@@ -785,7 +892,7 @@ python finetune.py  \
 
 <a name="模型部署"></a>
 
-#### 4.7 模型部署
+#### 4.8 模型部署
 
 以下是 UIE Python 端的部署流程，包括环境准备、模型导出和使用示例。
 
@@ -818,9 +925,9 @@ python finetune.py  \
     pip install -r deploy/python/requirements_gpu.txt
     ```
 
-    如果 GPU 设备的 CUDA 计算能力大于等于 7.2，例如 T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用 INT8 部署，部署之前需要进行模型压缩（参考 4.6 节的内容）。要注意的是，V100 卡可以进行 INT8 推理，但是加速不充分。
+    如果 GPU 设备的 CUDA 计算能力大于等于 7.2，例如 T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用 INT8 部署，部署之前模型需要进行量化（参考 4.6 节的内容）。要注意的是，V100 卡可以进行 INT8 推理，但是加速不充分。
 
-    如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，但达不到上方 INT8 模型推理的要求，比如 V100 等。推荐使用半精度（FP16）部署。直接使用微调后导出的模型，运行时设置 `--use_fp16` 即可。
+    如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，但达不到上方 INT8 模型推理的要求，比如 V100 等，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
 
     如果 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
 
@@ -831,7 +938,7 @@ python finetune.py  \
 
   如果对 INT8 模型进行预测，模型压缩后已经自动进行了导出，可跳过这一节。
 
-  而如果对 FP32 或者 FP16 模型进行预测，而且按照上面 4.3 节的脚本进行了模型训练，$finetuned_model 中会带有`*.pdmodel`、`*.pdiparams`文件，也可以跳过这一节。
+  而如果对 FP32 或者 FP16 模型进行预测，而且按照上面 4.3 节的脚本进行了模型训练，`$finetuned_model` 中会带有 `*.pdmodel`、`*.pdiparams` 文件，也可以跳过这一节。
 
   否则，还需要调用 `export_model.py` 脚本，产出静态图模型，执行方式如下：
 
@@ -841,8 +948,8 @@ python finetune.py  \
 
   可配置参数说明：
 
-  - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
-  - `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
+  - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件 `model_state.pdparams`和模型配置文件 `model_config.json`。
+  - `output_path`: 静态图参数导出路径，默认导出路径为 `./export`。
 
 - 推理
 
@@ -889,3 +996,5 @@ python finetune.py  \
 
 ## References
 - **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**
+- **[Quantizing deep convolutional networks for efficient inference: A whitepaper](https://arxiv.org/pdf/1806.08342.pdf)**
+- **[PACT: Parameterized Clipping Activation for Quantized Neural Networks](https://arxiv.org/abs/1805.06085)**
