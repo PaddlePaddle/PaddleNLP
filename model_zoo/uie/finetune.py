@@ -24,7 +24,7 @@ from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
-from model import UIE
+from model import UIE, UIEM
 from evaluate import evaluate
 from utils import set_seed, convert_example, reader, MODEL_MAP, create_data_loader
 
@@ -46,7 +46,12 @@ def do_train():
             get_path_from_url(val, args.model)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = UIE.from_pretrained(args.model)
+    if args.model in ["uie-m-large", "uie-m-base"]:
+        multilingual = True
+        model = UIEM.from_pretrained(args.model)
+    else:
+        multilingual = False
+        model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(reader,
                             data_path=args.train_path,
@@ -59,7 +64,8 @@ def do_train():
 
     trans_fn = partial(convert_example,
                        tokenizer=tokenizer,
-                       max_seq_len=args.max_seq_len)
+                       max_seq_len=args.max_seq_len,
+                       multilingual=multilingual)
 
     train_data_loader = create_data_loader(train_ds,
                                            mode="train",
@@ -89,9 +95,13 @@ def do_train():
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):
         for batch in train_data_loader:
-            input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
-            start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
-                                         pos_ids)
+            if multilingual:
+                input_ids, pos_ids, start_ids, end_ids = batch
+                start_prob, end_prob = model(input_ids, pos_ids)
+            else:
+                input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
+                start_prob, end_prob = model(input_ids, token_type_ids,
+                                             att_mask, pos_ids)
             start_ids = paddle.cast(start_ids, 'float32')
             end_ids = paddle.cast(end_ids, 'float32')
             loss_start = criterion(start_prob, start_ids)
@@ -123,7 +133,8 @@ def do_train():
                 tokenizer.save_pretrained(save_dir)
                 logger.enable()
 
-                precision, recall, f1 = evaluate(model, metric, dev_data_loader)
+                precision, recall, f1 = evaluate(model, metric, dev_data_loader,
+                                                 multilingual)
                 logger.info(
                     "Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
                     (precision, recall, f1))
@@ -157,8 +168,8 @@ if __name__ == "__main__":
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
     parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
-    parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
+    parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
+    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-base-en", "uie-m-base", "uie-m-large"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 
     args = parser.parse_args()

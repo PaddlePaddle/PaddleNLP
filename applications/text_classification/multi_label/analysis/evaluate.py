@@ -37,7 +37,7 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--train_file", type=str, default="train.txt", help="Train dataset file name")
 parser.add_argument("--dev_file", type=str, default="dev.txt", help="Dev dataset file name")
 parser.add_argument("--label_file", type=str, default="label.txt", help="Label file name")
-parser.add_argument("--bad_case_path", type=str, default="./bad_case.txt", help="Bad case saving file path")
+parser.add_argument("--bad_case_file", type=str, default="bad_case.txt", help="Bad case saving file name")
 args = parser.parse_args()
 # yapf: enable
 
@@ -201,23 +201,22 @@ def evaluate():
                     report[str(i)]['recall'] * 100,
                     report[str(i)]['f1-score'] * 100))
         logger.info("----------------------------")
-
-    with open(args.bad_case_path, 'w', encoding="utf-8") as f:
-        f.write("Prediction\tLabel\tText\n")
+    bad_case_path = os.path.join(args.dataset_dir, args.bad_case_file)
+    with open(bad_case_path, 'w', encoding="utf-8") as f:
+        f.write("Text\tLabel\tPrediction\n")
         for i in range(len(preds)):
             for p, l in zip(preds[i], labels[i]):
                 if (p and l == 0) or (not p and l == 1):
                     pred_n = [
                         label_map[i] for i, pp in enumerate(preds[i]) if pp
                     ]
-                    f.write(",".join(pred_n) + "\t" +
+                    f.write(dev_ds.data[i]["text"] + "\t" +
                             dev_ds.data[i]["label_n"] + "\t" +
-                            dev_ds.data[i]["text"] + "\n")
+                            ",".join(pred_n) + "\n")
                     break
 
     f.close()
-    logger.info("Bad case in dev dataset saved in {}".format(
-        args.bad_case_path))
+    logger.info("Bad case in dev dataset saved in {}".format(bad_case_path))
 
     return
 
