@@ -95,6 +95,8 @@ def convert_from_local_file(weight_file_path: str, output: str):
 def convert_from_online_model(model_name: str, cache_dir: str, output_dir):
     """convert the model which is not maintained in paddlenlp community, eg: vblagoje/bert-english-uncased-finetuned-pos
 
+    TODO(wj-Mcat): to deeply test this method
+
     Args:
         model_name (str): the name of model
         cache_dir (str): the cache_dir to save pytorch model
