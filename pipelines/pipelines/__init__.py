@@ -37,7 +37,11 @@ from pipelines import pipelines
 from pipelines.schema import Document, Answer, Label, Span
 from pipelines.nodes import BaseComponent
 from pipelines.pipelines import Pipeline
-
+from pipelines.pipelines.standard_pipelines import (BaseStandardPipeline,
+                                                    ExtractiveQAPipeline,
+                                                    SemanticSearchPipeline,
+                                                    DocPipeline,
+                                                    TextToImagePipeline)
 import pandas as pd
 
 pd.options.display.max_colwidth = 80

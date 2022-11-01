@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Optional
 
 import io
@@ -53,7 +67,7 @@ def _optional_component_not_installed(component: str, dep_group: str,
     raise ImportError(
         f"Failed to import '{component}', "
         "which is an optional component in pipelines.\n"
-        f"Run 'pip install farm-pipelines[{dep_group}]' "
+        f"Run 'pip install -r requirements.txt' "
         "to install the required dependencies and make this component available."
     ) from source_error
 

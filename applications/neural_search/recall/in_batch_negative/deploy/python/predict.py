@@ -40,7 +40,7 @@ parser.add_argument("--batch_size", default=15, type=int,
     help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu",
     help="Select which device to train model, defaults to gpu.")
-
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="model name.")
 parser.add_argument('--use_tensorrt', default=False, type=eval, choices=[True, False],
     help='Enable to use tensorrt to speed up.')
 parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],
@@ -156,22 +156,21 @@ class Predictor(object):
         if args.benchmark:
             import auto_log
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(model_name="ernie-3.0-medium-zh",
-                                               model_precision=precision,
-                                               batch_size=self.batch_size,
-                                               data_shape="dynamic",
-                                               save_path=args.save_log_path,
-                                               inference_config=config,
-                                               pids=pid,
-                                               process_name=None,
-                                               gpu_ids=0,
-                                               time_keys=[
-                                                   'preprocess_time',
-                                                   'inference_time',
-                                                   'postprocess_time'
-                                               ],
-                                               warmup=0,
-                                               logger=logger)
+            self.autolog = auto_log.AutoLogger(
+                model_name=args.model_name_or_path,
+                model_precision=precision,
+                batch_size=self.batch_size,
+                data_shape="dynamic",
+                save_path=args.save_log_path,
+                inference_config=config,
+                pids=pid,
+                process_name=None,
+                gpu_ids=0,
+                time_keys=[
+                    'preprocess_time', 'inference_time', 'postprocess_time'
+                ],
+                warmup=0,
+                logger=logger)
 
     def extract_embedding(self, data, tokenizer):
         """
@@ -279,7 +278,7 @@ if __name__ == "__main__":
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
     output_emb_size = 256
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     res = predictor.extract_embedding(corpus_list, tokenizer)

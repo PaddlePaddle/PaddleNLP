@@ -99,11 +99,11 @@ def parse_args(MODEL_CLASSES):
                         type=float,
                         help="Grad clip for the parameter.")
     parser.add_argument("--max_lr",
-                        default=1e-5,
+                        default=1e-4,
                         type=float,
                         help="The initial max learning rate for Adam.")
     parser.add_argument("--min_lr",
-                        default=5e-5,
+                        default=1e-5,
                         type=float,
                         help="The initial min learning rate for Adam.")
     parser.add_argument(

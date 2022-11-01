@@ -17,7 +17,12 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。
+本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想接入自己训练的模型，可以参考[Neural Search的流程](./Neural_Search.md)。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+</div>
+
 
 ### 2.1 系统特色
 
@@ -52,11 +57,15 @@ b. 硬件环境：
 c. 依赖安装：
 首先需要安装PaddlePaddle，PaddlePaddle的安装请参考文档[官方安装文档](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，然后安装下面的依赖：
 ```bash
+# pip 一键安装
+pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 或者源码进行安装最新版本
+cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-# 1) 安装 pipelines package
-cd ${HOME}/PaddleNLP/applications/experimental/pipelines/
 python setup.py install
 ```
+【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
+
 ### 3.2 数据说明
 语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
@@ -69,72 +78,15 @@ python setup.py install
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/semantic-search/semantic_search_example.py --device gpu
+python examples/semantic-search/semantic_search_example.py --device gpu \
+                                                          --search_engine faiss
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/semantic-search/semantic_search_example.py --device cpu
+python examples/semantic-search/semantic_search_example.py --device cpu \
+                                                          --search_engine faiss
 ```
-#### 3.3.2 Docker一键启动
+`semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
 
-可以使用预编译好的镜像一键启动elastic search和 pipelines的镜像：
-
-```
-docker network create elastic
-docker run \
-      -d \
-      --name es02 \
-      --net elastic \
-      -p 9200:9200 \
-      -e discovery.type=single-node \
-      -e ES_JAVA_OPTS="-Xms1g -Xmx1g"\
-      -e xpack.security.enabled=false \
-      -e cluster.routing.allocation.disk.threshold_enabled=false \
-      -it \
-      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
-
-# cpu paddlepaddle 2.3.1
-docker pull w5688414/pipeline_cpu_server:1.3
-docker run -d --name pipcpuserver --net host -ti w5688414/pipeline_cpu_server:1.3
-
-# gpu cuda 10.2 cudnn 7 paddlepaddle-gpu 2.3.1
-docker pull w5688414/pipeline_server:1.1
-nvidia-docker run -d --name pipserver --net host -ti w5688414/pipeline_server:1.1
-```
-cpu版本大概等待20分钟左右，gpu版本大概3分钟左右，到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
-
-#### 3.3.3 Docker本地构建镜像启动
-
-另外，我们提供了Dockerfile来构建一个镜像.
-
-```
-cd docker
-# GPU
-docker build --tag=pipeline_server . -f Dockerfile-GPU
-# CPU
-docker build --tag=pipeline_cpu_server . -f Dockerfile
-```
-构建完以后就可以运行：
-
-```
-docker network create elastic
-docker run \
-      -d \
-      --name es02 \
-      --net elastic \
-      -p 9200:9200 \
-      -e discovery.type=single-node \
-      -e ES_JAVA_OPTS="-Xms1g -Xmx1g"\
-      -e xpack.security.enabled=false \
-      -e cluster.routing.allocation.disk.threshold_enabled=false \
-      -it \
-      docker.elastic.co/elasticsearch/elasticsearch:8.3.3
-# cpu
-docker run -d --name pipcpuserver --net host -it pipeline_cpu_server
-# gpu
-nvidia-docker run -d --name pipserver --net host -it pipeline_server
-```
-
-cpu版本大概等待20分钟左右，gpu版本大概3分钟左右，到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
 ### 3.4 构建 Web 可视化语义检索系统
 
@@ -161,14 +113,23 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
-                            --doc_dir data/dureader_dev
+                            --doc_dir data/dureader_dev \
+                            --search_engine elastic \
+                            --delete_index
+```
+可以使用下面的命令来查看数据：
+
+```
+# 打印几条数据
+curl http://localhost:9200/dureader_robust_query_encoder/_search
 ```
 
 参数含义说明
 * `index_name`: 索引的名称
 * `doc_dir`: txt文本数据的路径
-* `host`: Elasticsearch的IP地址
-* `port`: Elasticsearch的端口号
+* `host`: ANN索引引擎的IP地址
+* `port`: ANN索引引擎的端口号
+* `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 #### 3.4.3 启动 RestAPI 模型服务
@@ -181,13 +142,12 @@ python rest_api/application.py 8891
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh scripts/run_search_server.sh
+sh examples/semantic-search/run_search_server.sh
 ```
 启动后可以使用curl命令验证是否成功运行：
 
 ```
-curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "亚马逊河流的介绍","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
-
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
 ```
 #### 3.4.4 启动 WebUI
 ```bash
@@ -199,14 +159,24 @@ python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh scripts/run_search_web.sh
+sh examples/semantic-search/run_search_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
 #### 3.4.5 数据更新
 
-数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，另一种是使用前端界面的文件上传进行数据更新，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
+数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，第二种是使用前端界面的文件上传（在界面的左侧）进行数据更新。对于第一种使用脚本的方式，可以使用多种文件更新数据，示例的文件更新建索引的命令如下，里面包含了图片（目前仅支持把图中所有的文字合并建立索引），docx（支持图文，需要按照空行进行划分段落），txt（需要按照空行划分段落）三种格式的文件建索引：
+
+```
+python utils/offline_ann.py --index_name dureader_robust_query_encoder \
+                            --doc_dir data/file_example \
+                            --port 9200 \
+                            --search_engine elastic \
+                            --delete_index
+```
+
+对于第二种使用界面的方式，支持txt，pdf，image，word的格式，以txt格式的文件为例，每段文本需要使用空行隔开，程序会根据空行进行分段建立索引，示例数据如下(demo.txt)：
 
 ```
 兴证策略认为，最恐慌的时候已经过去，未来一个月市场迎来阶段性修复窗口。
@@ -217,51 +187,7 @@ sh scripts/run_search_web.sh
 
 长期，继续聚焦科技创新的五大方向。1)新能源(新能源汽车、光伏、风电、特高压等)，2)新一代信息通信技术(人工智能、大数据、云计算、5G等)，3)高端制造(智能数控机床、机器人、先进轨交装备等)，4)生物医药(创新药、CXO、医疗器械和诊断设备等)，5)军工(导弹设备、军工电子元器件、空间站、航天飞机等)。
 ```
-
-## FAQ
-
-#### 语义检索系统可以跑通，但终端输出字符是乱码怎么解决？
-
-+ 通过如下命令设置操作系统默认编码为 zh_CN.UTF-8
-```bash
-export LANG=zh_CN.UTF-8
-```
-
-#### Linux上安装elasticsearch出现错误 `java.lang.RuntimeException: can not run elasticsearch as root`
-
-elasticsearch 需要在非root环境下运行，可以做如下的操作：
-
-```
-adduser est
-chown est:est -R ${HOME}/elasticsearch-8.3.2/
-cd ${HOME}/elasticsearch-8.3.2/
-su est
-./bin/elasticsearch
-```
-
-#### Mac OS上安装elasticsearch出现错误 `flood stage disk watermark [95%] exceeded on.... all indices on this node will be marked read-only`
-
-elasticsearch默认达到95％就全都设置只读，可以腾出一部分空间出来再启动，或者修改 `config/elasticsearch.pyml`。
-```
-cluster.routing.allocation.disk.threshold_enabled: false
-```
-
-#### nltk_data加载失败的错误 `[nltk_data] Error loading punkt: [Errno 60] Operation timed out`
-
-在命令行里面输入python,然后输入下面的命令进行下载：
-
-```
-import nltk
-nltk.download('punkt')
-```
-如果下载还是很慢，可以手动[下载](https://github.com/nltk/nltk_data/tree/gh-pages/packages/tokenizers)，然后放入本地的`~/nltk_data/tokenizers`进行解压即可。
-
-#### 服务端运行报端口占用的错误 `[Errno 48] error while attempting to bind on address ('0.0.0.0',8891): address already in use`
-
-```
-lsof -i:8891
-kill -9 PID # PID为8891端口的进程
-```
+如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
 
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137

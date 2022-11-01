@@ -26,6 +26,13 @@ from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
 
 SPIECE_UNDERLINE = "▁"
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "layoutxlm-base-uncased": 514,
+
+    # FIXME(wj-Mcat): why this model-name not in the init-configuration
+    # "layoutxlm-wo-backbone-base-uncased": 514
+}
+
 
 def _is_end_of_word(text):
     """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
@@ -56,10 +63,7 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
             "do_lower_case": False
         },
     }
-    pretrained_positional_embedding_sizes = {
-        "layoutxlm-base-uncased": 512,
-    }
-    max_model_input_sizes = pretrained_positional_embedding_sizes
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids", "attention_mask"]
 
     SPECIAL_TOKENS_ATTRIBUTES = [

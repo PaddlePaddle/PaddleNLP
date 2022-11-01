@@ -93,9 +93,6 @@ def main():
 
     compression_args.print_config()
 
-    if not os.path.exists(compression_args.output_dir):
-        os.makedirs(compression_args.output_dir)
-
     trainer.compress()
 
 

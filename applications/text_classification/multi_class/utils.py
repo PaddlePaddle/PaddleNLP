@@ -34,9 +34,8 @@ def evaluate(model, criterion, metric, data_loader):
     metric.reset()
     losses = []
     for batch in data_loader:
-        input_ids, token_type_ids, labels = batch['input_ids'], batch[
-            'token_type_ids'], batch['labels']
-        logits = model(input_ids, token_type_ids)
+        labels = batch.pop("labels")
+        logits = model(**batch)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
@@ -65,14 +64,24 @@ def preprocess_function(examples, tokenizer, max_seq_length, is_test=False):
     Returns:
         result(obj:`dict`): The preprocessed data including input_ids, token_type_ids, labels.
     """
-    result = tokenizer(text=examples["text_a"], max_seq_len=max_seq_length)
+    result = tokenizer(text=examples["text"], max_seq_len=max_seq_length)
     if not is_test:
         result["labels"] = np.array([examples['label']], dtype='int64')
     return result
 
 
-def read_local_dataset(path, label_list):
+def read_local_dataset(path, label_list=None, is_test=False):
+    """
+    Read dataset
+    """
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
-            sentence, label = line.strip().split('\t')
-            yield {'text_a': sentence, 'label': label_list[label]}
+            if is_test:
+                items = line.strip().split('\t')
+                sentence = ''.join(items)
+                yield {'text': sentence}
+            else:
+                items = line.strip().split('\t')
+                sentence = ''.join(items[:-1])
+                label = items[-1]
+                yield {'text': sentence, 'label': label_list[label]}

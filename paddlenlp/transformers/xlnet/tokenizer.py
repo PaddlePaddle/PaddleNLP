@@ -21,7 +21,7 @@ from typing import List, Optional
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer
+from .. import PretrainedTokenizer, AddedToken
 
 __all__ = ['XLNetTokenizer']
 
@@ -144,13 +144,23 @@ class XLNetTokenizer(PretrainedTokenizer):
                  cls_token="<cls>",
                  mask_token="<mask>",
                  additional_special_tokens=["<eop>", "<eod>"],
+                 sp_model_kwargs=None,
                  **kwargs):
+        # Mask token behave like a normal word, i.e. include the space before it
+        mask_token = AddedToken(mask_token,
+                                lstrip=True, rstrip=False) if isinstance(
+                                    mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(mask_token=mask_token)
+
+        self._pad_token_type_id = 3
+        self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.vocab_file = vocab_file
-        self.sp_model = spm.SentencePieceProcessor()
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(vocab_file)
 
     @property
@@ -162,6 +172,7 @@ class XLNetTokenizer(PretrainedTokenizer):
             self.convert_ids_to_tokens(i): i
             for i in range(self.vocab_size)
         }
+        vocab.update(self.added_tokens_encoder)
         return vocab
 
     def __getstate__(self):
@@ -171,7 +182,12 @@ class XLNetTokenizer(PretrainedTokenizer):
 
     def __setstate__(self, d):
         self.__dict__ = d
-        self.sp_model = spm.SentencePieceProcessor()
+
+        # for backward compatibility
+        if not hasattr(self, "sp_model_kwargs"):
+            self.sp_model_kwargs = {}
+
+        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(self.vocab_file)
 
     def preprocess_text(self, inputs):
@@ -190,14 +206,10 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         return outputs
 
-    def _tokenize(self, text, sample=False):
+    def _tokenize(self, text):
         """Tokenize a string."""
         text = self.preprocess_text(text)
-
-        if not sample:
-            pieces = self.sp_model.EncodeAsPieces(text)
-        else:
-            pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
+        pieces = self.sp_model.encode(text, out_type=str)
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
@@ -382,15 +394,13 @@ class XLNetTokenizer(PretrainedTokenizer):
                                                   sep) * [1] + cls_segment_id
 
     def save_resources(self, save_directory):
-        """
-        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
-        (ends with '.spm') under `save_directory`.
-
-        Args:
-            save_directory (str):
-                Directory to save files into.
-        """
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(self.vocab_file) != os.path.abspath(save_path):
+            if os.path.abspath(self.vocab_file) != os.path.abspath(
+                    save_path) and os.path.isfile(self.vocab_file):
                 copyfile(self.vocab_file, save_path)
+            elif not os.path.isfile(self.vocab_file):
+                with open(save_path, "wb") as fi:
+                    content_spiece_model = self.sp_model.serialized_model_proto(
+                    )
+                    fi.write(content_spiece_model)

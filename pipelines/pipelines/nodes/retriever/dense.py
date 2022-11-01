@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from typing import List, Dict, Union, Optional
+import os
 
 import logging
 import numpy as np
@@ -22,11 +23,12 @@ from tqdm.auto import tqdm
 
 import paddle
 from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieDualEncoder, AutoTokenizer
+from paddlenlp.transformers import ErnieDualEncoder, AutoTokenizer, AutoModel
 
 from pipelines.schema import Document
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.retriever.base import BaseRetriever
+from pipelines.nodes.models import SemanticIndexBatchNeg
 from pipelines.data_handler.processor import TextSimilarityProcessor
 from pipelines.utils.common_utils import initialize_device_settings
 
@@ -45,7 +47,9 @@ class DensePassageRetriever(BaseRetriever):
             Path, str] = "rocketqa-zh-dureader-query-encoder",
         passage_embedding_model: Union[
             Path, str] = "rocketqa-zh-dureader-para-encoder",
+        params_path: Optional[str] = "",
         model_version: Optional[str] = None,
+        output_emb_size=256,
         max_seq_len_query: int = 64,
         max_seq_len_passage: int = 256,
         top_k: int = 10,
@@ -133,13 +137,25 @@ class DensePassageRetriever(BaseRetriever):
                 "This can be set when initializing the DocumentStore")
 
         # Init & Load Encoders
-        #self.query_encoder = ErnieDualEncoder.from_pretrained(query_embedding_model)
-        self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
-                                                   passage_embedding_model)
-        self.query_tokenizer = AutoTokenizer.from_pretrained(
-            query_embedding_model)
-        self.passage_tokenizer = AutoTokenizer.from_pretrained(
-            passage_embedding_model)
+        if (os.path.exists(params_path)):
+            pretrained_model = AutoModel.from_pretrained(query_embedding_model)
+            self.ernie_dual_encoder = SemanticIndexBatchNeg(
+                pretrained_model, output_emb_size=output_emb_size)
+            # Load Custom models
+            print("Loading Parameters from:{}".format(params_path))
+            state_dict = paddle.load(params_path)
+            self.ernie_dual_encoder.set_dict(state_dict)
+            self.query_tokenizer = AutoTokenizer.from_pretrained(
+                query_embedding_model)
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(
+                query_embedding_model)
+        else:
+            self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
+                                                       passage_embedding_model)
+            self.query_tokenizer = AutoTokenizer.from_pretrained(
+                query_embedding_model)
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(
+                passage_embedding_model)
 
         self.processor = TextSimilarityProcessor(
             query_tokenizer=self.query_tokenizer,
@@ -188,6 +204,60 @@ class DensePassageRetriever(BaseRetriever):
             index=index,
             headers=headers,
             return_embedding=False)
+        return documents
+
+    def retrieve_batch(
+        self,
+        queries: List[str],
+        filters: Optional[Union[Dict[str, Union[Dict, List, str, int, float,
+                                                bool]],
+                                List[Dict[str, Union[Dict, List, str, int,
+                                                     float, bool]]], ]] = None,
+        top_k: Optional[int] = None,
+        index: str = None,
+        headers: Optional[Dict[str, str]] = None,
+        batch_size: Optional[int] = None,
+        scale_score: bool = None,
+    ) -> List[List[Document]]:
+        if top_k is None:
+            top_k = self.top_k
+        if batch_size is None:
+            batch_size = self.batch_size
+
+        if isinstance(filters, list):
+            if len(filters) != len(queries):
+                raise Exception(
+                    "Number of filters does not match number of queries. Please provide as many filters"
+                    " as queries or a single filter that will be applied to each query."
+                )
+        else:
+            filters = [filters] * len(
+                queries) if filters is not None else [{}] * len(queries)
+        if index is None:
+            index = self.document_store.index
+        if not self.document_store:
+            logger.error(
+                "Cannot perform retrieve_batch() since DensePassageRetriever initialized with document_store=None"
+            )
+            return [[] * len(queries)]  # type: ignore
+        documents = []
+        query_embs: List[np.ndarray] = []
+        for batch in self._get_batches(queries=queries, batch_size=batch_size):
+            query_embs.extend(self.embed_queries(texts=batch))
+        for query_emb, cur_filters in tqdm(zip(query_embs, filters),
+                                           total=len(query_embs),
+                                           disable=not self.progress_bar,
+                                           desc="Querying"):
+            cur_docs = self.document_store.query_by_embedding(
+                query_emb=query_emb,
+                top_k=top_k,
+                filters=cur_filters,
+                index=index,
+                headers=headers,
+                return_embedding=False,
+            )
+            documents.append(cur_docs)
+
         return documents
 
     def _get_predictions(self, dicts):
@@ -248,7 +318,6 @@ class DensePassageRetriever(BaseRetriever):
         ) as progress_bar:
             for batch in data_loader:
                 input_ids, token_type_ids = batch
-                #input_ids, token_type_ids, label_ids = batch
                 with paddle.no_grad():
                     cls_embeddings = self.ernie_dual_encoder.get_pooled_embedding(
                         input_ids=input_ids, token_type_ids=token_type_ids)

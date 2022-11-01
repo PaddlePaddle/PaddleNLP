@@ -18,9 +18,11 @@ from typing import List, Dict, Any, Tuple, Optional
 import os
 import logging
 import requests
+import socket
 from time import sleep
 from uuid import uuid4
 import streamlit as st
+from io import StringIO
 
 API_ENDPOINT = os.getenv("API_ENDPOINT")
 STATUS = "initialized"
@@ -28,6 +30,8 @@ HS_VERSION = "hs_version"
 DOC_REQUEST = "query"
 DOC_FEEDBACK = "feedback"
 DOC_UPLOAD = "file-upload"
+DOC_PARSE = 'files'
+IMAGE_REQUEST = 'query_text_to_images'
 
 
 def pipelines_is_ready():
@@ -51,6 +55,17 @@ def pipelines_version():
     """
     url = f"{API_ENDPOINT}/{HS_VERSION}"
     return requests.get(url, timeout=0.1).json()["hs_version"]
+
+
+def pipelines_files(file_name):
+    """
+    Get the pipelines files from the REST API
+    # http://server_ip:server_port/files?file_name=8f6435d7ff1f1913dbcd74feb47e2fdb_0.png
+    """
+    server_ip = socket.gethostbyname(socket.gethostname())
+    server_port = API_ENDPOINT.split(':')[-1]
+    url = f"http://{server_ip}:{server_port}/files?file_name={file_name}"
+    return url
 
 
 def query(query,
@@ -155,10 +170,47 @@ def semantic_search(
     answers = response["documents"]
     for answer in answers:
         results.append({
-            "context": answer["content"],
-            "source": answer["meta"]["name"],
-            "relevance": round(answer["score"] * 100, 2),
+            "context":
+            answer["content"],
+            "source":
+            answer["meta"]["name"],
+            "answer":
+            answer["meta"]["answer"]
+            if "answer" in answer["meta"].keys() else "",
+            "relevance":
+            round(answer["score"] * 100, 2),
+            "images":
+            answer["meta"]["images"] if 'images' in answer["meta"] else [],
         })
+    return results, response
+
+
+def text_to_image_search(
+        query,
+        resolution="1024*1024",
+        top_k_images=5,
+        style="探索无限") -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Send a prompt text and corresponding parameters to the REST API
+    """
+    url = f"{API_ENDPOINT}/{IMAGE_REQUEST}"
+    params = {
+        "TextToImageGenerator": {
+            "style": style,
+            "topk": top_k_images,
+            "resolution": resolution,
+        }
+    }
+    req = {"query": query, "params": params}
+    response_raw = requests.post(url, json=req)
+
+    if response_raw.status_code >= 400 and response_raw.status_code != 503:
+        raise Exception(f"{vars(response_raw)}")
+
+    response = response_raw.json()
+    if "errors" in response:
+        raise Exception(", ".join(response["errors"]))
+    results = response["answers"]
     return results, response
 
 

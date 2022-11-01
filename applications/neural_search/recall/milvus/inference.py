@@ -54,8 +54,9 @@ if __name__ == "__main__":
     batch_size = 1
     params_path = 'checkpoints/model_40/model_state.pdparams'
     id2corpus = {0: '国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据'}
+    model_name_or_path = "rocketqa-zh-base-query-encoder"
     paddle.set_device(device)
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     trans_func = partial(convert_example,
                          tokenizer=tokenizer,
                          max_seq_length=max_seq_length)
@@ -65,7 +66,7 @@ if __name__ == "__main__":
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
             ),  # text_segment
     ): [data for data in fn(samples)]
-    pretrained_model = AutoModel.from_pretrained("ernie-1.0")
+    pretrained_model = AutoModel.from_pretrained(model_name_or_path)
     model = SemanticIndexBaseStatic(pretrained_model,
                                     output_emb_size=output_emb_size)
     # Load pretrained semantic model

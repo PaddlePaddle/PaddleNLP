@@ -18,6 +18,12 @@ from ..bert.tokenizer import BertTokenizer
 
 __all__ = ['LayoutLMv2Tokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "layoutlmv2-base-uncased": 512,
+    "layoutlmv2-large-uncased": 512,
+    "layoutlmv2-wo-backbone-base-uncased": 512
+}
+
 
 class LayoutLMv2Tokenizer(BertTokenizer):
     """
@@ -42,3 +48,5 @@ class LayoutLMv2Tokenizer(BertTokenizer):
             "do_lower_case": True
         },
     }
+
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES

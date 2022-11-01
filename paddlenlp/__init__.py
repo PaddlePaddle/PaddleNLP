@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '2.3.0.dev'  # Maybe dev is better
+__version__ = '2.4.0.dev'  # Maybe dev is better
 import sys
 if 'datasets' in sys.modules.keys():
     from paddlenlp.utils.log import logger
@@ -34,6 +34,7 @@ from . import losses
 from . import experimental
 from .taskflow import Taskflow
 from . import trainer
+from . import prompt
 from . import dataaug
 import paddle
 

@@ -63,9 +63,11 @@ class ErnieEmbeddings(nn.Layer):
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size,
                                                 weight_attr=weight_attr)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size,
-                                                  hidden_size,
-                                                  weight_attr=weight_attr)
+        self.type_vocab_size = type_vocab_size
+        if self.type_vocab_size > 0:
+            self.token_type_embeddings = nn.Embedding(type_vocab_size,
+                                                      hidden_size,
+                                                      weight_attr=weight_attr)
         self.use_task_id = use_task_id
         self.task_id = task_id
         if self.use_task_id:
@@ -80,27 +82,38 @@ class ErnieEmbeddings(nn.Layer):
                 token_type_ids=None,
                 position_ids=None,
                 task_type_ids=None,
+                inputs_embeds=None,
                 past_key_values_length=None):
+        if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_embeddings = inputs_embeds
+
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
             #seq_length = input_ids.shape[1]
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=1)
             position_ids = seq_length - ones
             if past_key_values_length is not None:
                 position_ids += past_key_values_length
             position_ids.stop_gradient = True
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
-        input_embedings = self.word_embeddings(input_ids)
-        position_embeddings = self.position_embeddings(position_ids)
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        position_embeddings = self.position_embeddings(position_ids)
+        embeddings = input_embeddings + position_embeddings
+
+        if self.type_vocab_size > 0:
+            if token_type_ids is None:
+                token_type_ids = paddle.zeros(input_shape, dtype="int64")
+            token_type_embeddings = self.token_type_embeddings(token_type_ids)
+            embeddings = embeddings + token_type_embeddings
+
         if self.use_task_id:
             if task_type_ids is None:
-                task_type_ids = paddle.ones_like(input_ids,
-                                                 dtype="int64") * self.task_id
+                task_type_ids = paddle.ones(input_shape,
+                                            dtype="int64") * self.task_id
             task_type_embeddings = self.task_type_embeddings(task_type_ids)
             embeddings = embeddings + task_type_embeddings
         embeddings = self.layer_norm(embeddings)
@@ -136,7 +149,6 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         # Deprecated, alias for ernie-1.0-base-zh
         "ernie-1.0": {
@@ -164,6 +176,20 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 2,
             "vocab_size": 18000,
             "pad_token_id": 0,
+        },
+        "ernie-1.0-base-zh-cw": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
         },
         "ernie-1.0-large-zh-cw": {
             "attention_probs_dropout_prob": 0.1,
@@ -425,6 +451,228 @@ class ErniePretrainedModel(PretrainedModel):
             "use_task_id": True,
             "vocab_size": 40000
         },
+        "rocketqa-base-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-medium-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-mini-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-micro-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-nano-cross-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-base-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-base-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-medium-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-medium-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-mini-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-mini-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-micro-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-micro-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-nano-query-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
+        "rocketqa-zh-nano-para-encoder": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
@@ -434,6 +682,8 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
             "ernie-1.0-base-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_v1_chn_base.pdparams",
+            "ernie-1.0-base-zh-cw":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_base_zh_cw.pdparams",
             "ernie-1.0-large-zh-cw":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_large_zh_cw.pdparams",
             "ernie-tiny":
@@ -472,6 +722,36 @@ class ErniePretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
             "ernie-3.0-nano-zh":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
+            "rocketqa-zh-base-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-query-encoder.pdparams",
+            "rocketqa-zh-base-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-para-encoder.pdparams",
+            "rocketqa-zh-medium-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-medium-query-encoder.pdparams",
+            "rocketqa-zh-medium-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-medium-para-encoder.pdparams",
+            "rocketqa-zh-mini-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-mini-query-encoder.pdparams",
+            "rocketqa-zh-mini-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-mini-para-encoder.pdparams",
+            "rocketqa-zh-micro-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-micro-query-encoder.pdparams",
+            "rocketqa-zh-micro-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-micro-para-encoder.pdparams",
+            "rocketqa-zh-nano-query-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-nano-query-encoder.pdparams",
+            "rocketqa-zh-nano-para-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-nano-para-encoder.pdparams",
+            "rocketqa-base-cross-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-base-cross-encoder.pdparams",
+            "rocketqa-medium-cross-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-medium-cross-encoder.pdparams",
+            "rocketqa-mini-cross-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-mini-cross-encoder.pdparams",
+            "rocketqa-micro-cross-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-micro-cross-encoder.pdparams",
+            "rocketqa-nano-cross-encoder":
+            "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-nano-cross-encoder.pdparams",
         }
     }
     base_model_prefix = "ernie"
@@ -595,6 +875,12 @@ class ErnieModel(ErniePretrainedModel):
         self.pooler = ErniePooler(hidden_size, weight_attr)
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
                 token_type_ids=None,
@@ -602,6 +888,7 @@ class ErnieModel(ErniePretrainedModel):
                 attention_mask=None,
                 task_type_ids=None,
                 past_key_values=None,
+                inputs_embeds=None,
                 use_cache=None,
                 output_hidden_states=False,
                 output_attentions=False,
@@ -640,6 +927,9 @@ class ErnieModel(ErniePretrainedModel):
                 We use whole-word-mask in ERNIE, so the whole word will have the same value. For example, "使用" as a word,
                 "使" and "用" will have the same value.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+             inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             past_key_values (tuple(tuple(Tensor)), optional):
                 The length of tuple equals to the number of layers, and each inner
                 tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
@@ -680,9 +970,22 @@ class ErnieModel(ErniePretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time."
+            )
+        elif input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+        elif inputs_embeds is not None:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+        else:
+            raise ValueError(
+                "You have to specify either input_ids or inputs_embeds")
+
         past_key_values_length = None
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(
@@ -707,6 +1010,7 @@ class ErnieModel(ErniePretrainedModel):
             position_ids=position_ids,
             token_type_ids=token_type_ids,
             task_type_ids=task_type_ids,
+            inputs_embeds=inputs_embeds,
             past_key_values_length=past_key_values_length)
 
         self.encoder._use_cache = use_cache  # To be consistent with HF
@@ -765,6 +1069,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
@@ -778,6 +1083,8 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
@@ -818,6 +1125,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=attention_mask,
+                             inputs_embeds=inputs_embeds,
                              output_attentions=output_attentions,
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)
@@ -873,6 +1181,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 start_positions=None,
                 end_positions=None,
                 output_hidden_states=False,
@@ -887,6 +1196,8 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             start_positions (Tensor of shape `(batch_size,)`, optional):
                 Labels for position (index) of the start of the labelled span for computing the token classification loss.
@@ -929,6 +1240,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=attention_mask,
+                             inputs_embeds=inputs_embeds,
                              output_attentions=output_attentions,
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)
@@ -1000,6 +1312,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
@@ -1013,6 +1326,8 @@ class ErnieForTokenClassification(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
@@ -1048,6 +1363,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=attention_mask,
+                             inputs_embeds=inputs_embeds,
                              output_attentions=output_attentions,
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)
@@ -1203,6 +1519,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 position_ids=None,
                 attention_mask=None,
                 masked_positions=None,
+                inputs_embeds=None,
                 labels=None,
                 next_sentence_label=None,
                 output_hidden_states=False,
@@ -1217,6 +1534,8 @@ class ErnieForPretraining(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -1249,6 +1568,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                                  token_type_ids=token_type_ids,
                                  position_ids=position_ids,
                                  attention_mask=attention_mask,
+                                 inputs_embeds=inputs_embeds,
                                  output_attentions=output_attentions,
                                  output_hidden_states=output_hidden_states,
                                  return_dict=return_dict)
@@ -1261,7 +1581,7 @@ class ErnieForPretraining(ErniePretrainedModel):
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 masked_lm_loss = loss_fct(
                     prediction_scores.reshape(
-                        (-1, prediction_scores.shape[-1])),
+                        (-1, paddle.shape(prediction_scores)[-1])),
                     labels.reshape((-1, )))
                 next_sentence_loss = loss_fct(
                     seq_relationship_score.reshape((-1, 2)),
@@ -1379,6 +1699,8 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                masked_positions=None,
+                inputs_embeds=None,
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
@@ -1393,6 +1715,10 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`ErnieModel`.
             attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+            masked_positions:
+                masked positions of output. 
+            inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -1435,18 +1761,21 @@ class ErnieForMaskedLM(ErniePretrainedModel):
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=attention_mask,
+                             inputs_embeds=inputs_embeds,
                              output_attentions=output_attentions,
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output,
+                                     masked_positions=masked_positions)
 
         masked_lm_loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss(
             )  # -100 index = padding token
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
+                prediction_scores.reshape(
+                    (-1, paddle.shape(prediction_scores)[-1])),
                 labels.reshape((-1, )))
         if not return_dict:
             output = (prediction_scores, ) + outputs[2:]
@@ -1492,6 +1821,7 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 labels=None,
                 output_hidden_states=False,
                 output_attentions=False,
@@ -1508,6 +1838,8 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
                 See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
                 See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length].
+            inputs_embeds(Tensor, optional):
+                See :class:`ErnieModel` and shape as [batch_size, num_choice, sequence_length, hidden_size].
             labels (Tensor of shape `(batch_size, )`, optional):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
                 num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
@@ -1543,10 +1875,15 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             attention_mask = attention_mask.reshape(
                 shape=(-1, attention_mask.shape[-1]))
 
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(
+                shape=(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
+
         outputs = self.ernie(input_ids,
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=attention_mask,
+                             inputs_embeds=inputs_embeds,
                              output_attentions=output_attentions,
                              output_hidden_states=output_hidden_states,
                              return_dict=return_dict)

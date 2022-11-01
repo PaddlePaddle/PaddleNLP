@@ -27,7 +27,7 @@ from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassificatio
 from paddlenlp.utils.log import logger
 
 sys.path.append("../ernie-1.0/finetune")
-from utils import ALL_DATASETS, DataArguments, ModelArguments
+from utils import DataArguments, ModelArguments
 
 
 def tokenize_and_align_labels(example,
@@ -76,19 +76,6 @@ def main():
     paddle.set_device(compression_args.device)
 
     data_args.dataset = data_args.dataset.strip()
-    if data_args.dataset not in ALL_DATASETS:
-        raise ValueError("Not found dataset {}".format(data_args.dataset))
-
-    if data_args.dataset in ALL_DATASETS:
-        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
-        config = ALL_DATASETS[data_args.dataset]
-        for args in (model_args, data_args, compression_args):
-            for arg in vars(args):
-                if arg in config.keys():
-                    setattr(args, arg, config[arg])
-
-        compression_args.per_device_train_batch_size = config["batch_size"]
-        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
     compression_args.print_config(model_args, "Model")
@@ -147,9 +134,6 @@ def main():
                       train_dataset=train_dataset,
                       eval_dataset=eval_dataset,
                       tokenizer=tokenizer)
-
-    if not os.path.exists(compression_args.output_dir):
-        os.makedirs(compression_args.output_dir)
 
     compression_args.print_config()
 

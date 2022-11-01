@@ -12,28 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp.transformers import GPTLMHeadModel, GPTChineseTokenizer
+from paddlenlp.transformers import OPTForCausalLM, GPTTokenizer
 import paddle
 
-model_name = 'facebook/opt-1.3b'
+model_name = 'facebook/opt-350m'
 
-tokenizer = GPTChineseTokenizer.from_pretrained(model_name)
-model = GPTLMHeadModel.from_pretrained(model_name)
+tokenizer = GPTTokenizer.from_pretrained(model_name)
+model = OPTForCausalLM.from_pretrained(model_name)
 model.eval()
 
-inputs = """Question:If x is 2 and y is 5, what is x+y?
-Answer: 7
-Question: if x is 12 and y is 9, what is x+y?
-Answer:21"
-Question: if x is 3 and y is 4, what is x+y?"""
+inputs = """a chat between a curious human and Statue of Liberty.
+Human: What is your name?
+Statue: I am statue of liberty.
+Human: where do you live?
+Statue: New york city.
+Human: how long have you lived there?。"""
 
 inputs_ids = tokenizer([inputs])["input_ids"]
-inputs_ids = paddle.to_tensor(inputs_ids, dtype='int64').unsqueeze(0)
+inputs_ids = paddle.to_tensor(inputs_ids, dtype='int64')
 
-outputs, _ = model.generate(input_ids=inputs_ids,
-                            max_length=10,
-                            decode_strategy='greedy_search',
-                            use_faster=True)
+outputs, _ = model.generate(
+    input_ids=inputs_ids,
+    max_length=20,
+    decode_strategy='greedy_search',
+    use_faster=True,
+)
 
 result = tokenizer.convert_ids_to_string(outputs[0].numpy().tolist())
 

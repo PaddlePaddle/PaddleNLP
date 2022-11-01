@@ -17,6 +17,7 @@ import sys
 from functools import partial
 
 import paddle
+import paddle.nn.functional as F
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import PdArgumentParser, CompressionArguments, Trainer
@@ -38,17 +39,6 @@ def main():
 
     paddle.set_device(compression_args.device)
     data_args.dataset = data_args.dataset.strip()
-
-    if data_args.dataset in ALL_DATASETS:
-        # if you custom you hyper-parameters in yaml config, it will overwrite all args.
-        config = ALL_DATASETS[data_args.dataset]
-        for args in (model_args, data_args, compression_args):
-            for arg in vars(args):
-                if arg in config.keys():
-                    setattr(args, arg, config[arg])
-
-        compression_args.per_device_train_batch_size = config["batch_size"]
-        compression_args.per_device_eval_batch_size = config["batch_size"]
 
     # Log model and data config
     compression_args.print_config(model_args, "Model")
@@ -125,6 +115,16 @@ def main():
         } for ex in examples]
         return EvalPrediction(predictions=predictions, label_ids=references)
 
+    def criterion(outputs, label):
+        start_logits, end_logits = outputs
+        start_position, end_position = label
+        start_position = paddle.unsqueeze(start_position, axis=-1)
+        end_position = paddle.unsqueeze(end_position, axis=-1)
+        start_loss = F.cross_entropy(input=start_logits, label=start_position)
+        end_loss = F.cross_entropy(input=end_logits, label=end_position)
+        loss = (start_loss + end_loss) / 2
+        return loss
+
     trainer = QuestionAnsweringTrainer(
         model=model,
         args=compression_args,
@@ -133,10 +133,8 @@ def main():
         eval_examples=eval_examples,
         data_collator=data_collator,
         post_process_function=post_processing_function,
-        tokenizer=tokenizer)
-
-    if not os.path.exists(compression_args.output_dir):
-        os.makedirs(compression_args.output_dir)
+        tokenizer=tokenizer,
+        criterion=criterion)
 
     compression_args.print_config()
 

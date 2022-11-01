@@ -101,9 +101,6 @@ class InferBackend(object):
                 onnx_model,
                 sess_options=sess_options,
                 providers=['CPUExecutionProvider'])
-        input_name1 = self.predictor.get_inputs()[1].name
-        input_name2 = self.predictor.get_inputs()[0].name
-        self.input_handles = [input_name1, input_name2]
 
         logger.info(">>> [InferBackend] Engine Created ...")
 
@@ -124,7 +121,6 @@ class Predictor(object):
         self.label_list = label_list
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
-
         self.inference_backend = InferBackend(args.model_path_prefix,
                                               args.device, args.device_id,
                                               args.use_fp16, args.use_quantize,
@@ -136,12 +132,14 @@ class Predictor(object):
         data = self.tokenizer(input_data,
                               max_length=self.max_seq_length,
                               padding=True,
-                              truncation=True)
-
-        return {
-            "input_ids": np.array(data["input_ids"], dtype="int64"),
-            "token_type_ids": np.array(data["token_type_ids"], dtype="int64")
-        }
+                              truncation=True,
+                              return_position_ids=False,
+                              return_attention_mask=False)
+        tokenized_data = {}
+        for tokenizer_key in data:
+            tokenized_data[tokenizer_key] = np.array(data[tokenizer_key],
+                                                     dtype="int64")
+        return tokenized_data
 
     def postprocess(self, infer_data):
 
@@ -161,17 +159,13 @@ class Predictor(object):
         infer_result = None
         for i in range(0, sample_num, self.batch_size):
             batch_size = min(self.batch_size, sample_num - i)
-            input_ids = [
-                preprocess_result["input_ids"][i + j] for j in range(batch_size)
-            ]
-            token_type_ids = [
-                preprocess_result["token_type_ids"][i + j]
-                for j in range(batch_size)
-            ]
-            preprocess_result_batch = {
-                "input_ids": input_ids,
-                "token_type_ids": token_type_ids
-            }
+            preprocess_result_batch = {}
+            for tokenizer_key in preprocess_result:
+                preprocess_result_batch[tokenizer_key] = [
+                    preprocess_result[tokenizer_key][i + j]
+                    for j in range(batch_size)
+                ]
+
             result = self.infer(preprocess_result_batch)
             if infer_result is None:
                 infer_result = result

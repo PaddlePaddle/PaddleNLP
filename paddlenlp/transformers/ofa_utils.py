@@ -270,7 +270,7 @@ def compute_neuron_head_importance(model,
                                    intermediate_name='linear1',
                                    output_name='linear2'):
     """
-    Compute the importance of multi-head attention and feed-forward  neuron in
+    Computes the importance of multi-head attention and feed-forward  neuron in
     each transformer layer.
 
     Args:
@@ -316,27 +316,31 @@ def compute_neuron_head_importance(model,
     for w in intermediate_weight:
         neuron_importance.append(np.zeros(shape=[w.shape[1]], dtype='float32'))
 
-    for batch in data_loader:
-        if isinstance(batch, dict):
-            if "QuestionAnswering" in model.__class__.__name__:
-                input_ids, segment_ids, start_positions, end_positions = batch[
-                    'input_ids'], batch['token_type_ids'], batch[
-                        'start_positions'], batch['end_positions']
-            else:
-                input_ids, segment_ids, labels = batch['input_ids'], batch[
-                    'token_type_ids'], batch['labels']
+    for i, batch in enumerate(data_loader):
+        if "labels" in batch:
+            labels = batch.pop("labels")
+            # For token cls tasks
+            for key in ("length", "seq_len"):
+                if key in batch:
+                    batch.pop(key)
+        elif "start_positions" in batch and "end_positions" in batch:
+            labels = (batch.pop("start_positions"), batch.pop("end_positions"))
         else:
-            input_ids, segment_ids, labels = batch
-        logits = model(input_ids, segment_ids, attention_mask=[None, head_mask])
-        if "QuestionAnswering" in model.__class__.__name__:
-            start_logits, end_logits = logits
-            loss = (loss_fct(start_logits, start_positions) +
-                    loss_fct(end_logits, end_positions)) / 2
-        else:
+            labels = None
+        batch["attention_mask"] = [None, head_mask]
+        logits = model(**batch)
+
+        if loss_fct is not None:
             loss = loss_fct(logits, labels)
+        else:
+            raise NotImplementedError(
+                "Model to be compressed is an instance of a custom class, " \
+                "so function `loss_fct(logits, labels)` should " \
+                "be implemented, and it should return a single float for precision " \
+                "value, such as acc.")
+
         loss.backward()
         head_importance += paddle.abs(paddle.to_tensor(head_mask.gradient()))
-
         for w1, b1, w2, current_importance in zip(intermediate_weight,
                                                   intermediate_bias,
                                                   output_weight,
@@ -346,5 +350,4 @@ def compute_neuron_head_importance(model,
                  b1.numpy() * b1.gradient()))
             current_importance += np.abs(
                 np.sum(w2.numpy() * w2.gradient(), axis=1))
-
     return head_importance, neuron_importance
