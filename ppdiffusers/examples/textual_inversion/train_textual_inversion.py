@@ -42,7 +42,7 @@ else:
 from paddle.vision.transforms import RandomHorizontalFlip
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer, BertModel
 
 
 def get_writer(args):
@@ -396,9 +396,9 @@ def main():
 
     # Load the tokenizer and add the placeholder token as a additional special token
     if args.tokenizer_name:
-        tokenizer = CLIPTokenizer.from_pretrained(args.tokenizer_name)
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
-        tokenizer = CLIPTokenizer.from_pretrained(
+        tokenizer = AutoModel.from_pretrained(
             os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
 
     # Add the placeholder token in tokenizer
@@ -420,7 +420,7 @@ def main():
         args.placeholder_token)
 
     # Load models and create wrapper for stable diffusion
-    text_encoder = CLIPTextModel.from_pretrained(
+    text_encoder = AutoModel.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
@@ -439,12 +439,24 @@ def main():
     # Freeze vae and unet
     freeze_params(vae.parameters())
     freeze_params(unet.parameters())
-    # Freeze all parameters except for the token embeddings in text encoder
-    params_to_freeze = itertools.chain(
-        text_encoder.text_model.transformer.parameters(),
-        text_encoder.text_model.ln_final.parameters(),
-        text_encoder.text_model.positional_embedding.parameters(),
-    )
+
+    if isinstance(text_encoder.text_model, BertModel):
+        params_to_freeze = itertools.chain(
+            text_encoder.text_model.encoder.parameters(),
+            text_encoder.text_model.pooler.parameters(),
+            text_encoder.text_model.embeddings.position_embeddings.parameters(),
+            text_encoder.text_model.embeddings.token_type_embeddings.parameters(
+            ),
+            text_encoder.text_model.embeddings.layer_norm.parameters(),
+        )
+    else:
+        # clip text_encoder
+        # Freeze all parameters except for the token embeddings in text encoder
+        params_to_freeze = itertools.chain(
+            text_encoder.text_model.transformer.parameters(),
+            text_encoder.text_model.ln_final.parameters(),
+            text_encoder.text_model.positional_embedding.parameters(),
+        )
     freeze_params(params_to_freeze)
 
     if args.scale_lr:

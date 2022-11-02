@@ -398,8 +398,6 @@ class DiffusionPipeline(ConfigMixin):
                 load_method = getattr(class_obj, load_method_name)
                 loading_kwargs = {}
 
-                if issubclass(class_obj, nn.Layer):
-                    loading_kwargs["paddle_dtype"] = paddle_dtype
                 if issubclass(class_obj, OnnxRuntimeModel):
                     loading_kwargs["provider"] = provider
                     loading_kwargs["sess_options"] = sess_options
@@ -413,6 +411,8 @@ class DiffusionPipeline(ConfigMixin):
                 if next(loaded_sub_model.named_parameters()
                         )[1].dtype != paddle_dtype:
                     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
+                # paddlenlp model is training mode not eval mode
+                loaded_sub_model.eval()
             init_kwargs[
                 name] = loaded_sub_model  # UNet(...), # DiffusionSchedule(...)
 

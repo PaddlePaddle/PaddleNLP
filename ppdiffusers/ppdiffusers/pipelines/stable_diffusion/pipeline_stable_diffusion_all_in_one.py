@@ -507,7 +507,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
+                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
@@ -1195,12 +1195,10 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             self, prompt, negative_prompt, max_embeddings_multiples,
             no_boseos_middle, skip_parsing, skip_weighting)
 
-        # preprocess image
-        if not isinstance(init_image, paddle.Tensor):
+        if isinstance(init_image, PIL.Image.Image):
             init_image = init_image.resize((width, height))
             init_image = preprocess_image(init_image)
 
-        init_image.resize((width, height))
         # encode the init image into latents and scale the latents
         latents_dtype = text_embeddings.dtype
         init_image = init_image.astype(latents_dtype)
@@ -1215,9 +1213,10 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         init_latents_orig = init_latents
 
         # preprocess mask
-        if not isinstance(mask_image, paddle.Tensor):
+        if isinstance(mask_image, PIL.Image.Image):
             mask_image = mask_image.resize((width, height))
             mask_image = preprocess_mask(mask_image)
+
         mask_image = mask_image.astype(latents_dtype)
         mask = paddle.concat([mask_image] * batch_size * num_images_per_prompt)
 

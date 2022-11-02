@@ -39,7 +39,7 @@ from datasets import load_dataset
 from paddle.vision import transforms, BaseTransform
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 
 class Lambda(BaseTransform):
@@ -330,9 +330,9 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Load models and create wrapper for stable diffusion
-    tokenizer = CLIPTokenizer.from_pretrained(
+    tokenizer = AutoTokenizer.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
-    text_encoder = CLIPTextModel.from_pretrained(
+    text_encoder = AutoModel.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")

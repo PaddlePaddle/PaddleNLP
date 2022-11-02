@@ -13,10 +13,7 @@ ___该训练代码是实验性质的。由于这里的代码微调了整个`UNet
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-# 进入ppdiffusers文件夹，安装ppdiffusers
-pip install -e .
-# 安装其他所需的依赖
-pip install "paddlenlp>=2.4.1" ftfy regex Pillow visualdl
+pip install -U ppdiffusers visualdl
 ```
 
 ### 1.2 Pokemon训练教程
