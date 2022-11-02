@@ -31,9 +31,8 @@ class BertConverter(Converter):
     }
 
     def get_paddle_pytorch_model_classes(self):
-        from paddlenlp.transformers import BertModel as PaddleBertModel
-        pytorch_bert_model_class = import_module("transformers.BertModel")
-        return PaddleBertModel, pytorch_bert_model_class
+        pytorch_model_class = import_module("transformers.BertModel")
+        return BertModel, pytorch_model_class
 
     def get_name_mapping(
         self,

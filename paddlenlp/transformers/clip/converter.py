@@ -13,11 +13,12 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import List, Union, Dict, Type
+from typing import List, Union, Dict, Type, Tuple
 
 from paddlenlp.utils.import_utils import import_module
+from paddlenlp.utils.log import logger
 from paddlenlp.transformers import CLIPModel, PretrainedModel
-from paddlenlp.utils.converter import StateDictNameMapping, Converter
+from paddlenlp.utils.converter import *
 
 
 class CLIPConverter(Converter):
@@ -28,6 +29,19 @@ class CLIPConverter(Converter):
         'vision_model.embeddings.position_ids'
     ]
     architectures: Dict[str, Type[PretrainedModel]] = {"CLIPModel": CLIPModel}
+    try_compare_logits: bool = False
+
+    def get_paddle_pytorch_model_classes(self) -> Tuple[Type, Type]:
+        """get paddle & pytorch model class
+
+        Returns:
+            Tuple[object, object]: the class of pretrained-model 
+        """
+        pytorch_model_class = import_module("transformers.CLIPModel")
+        return CLIPModel, pytorch_model_class
+
+    def get_inputs(self):
+        return super().get_inputs()
 
     @classmethod
     def resolve_num_layer(cls,
@@ -42,11 +56,9 @@ class CLIPConverter(Converter):
             int: the number of transformer layer
         """
         if isinstance(config_or_num_layers, dict):
-            num_layer = [
-                config_or_num_layers[name][k]
-                for name in ["text_config", "vision_config"]
-                for k in cls.num_layer_key
-            ]
+            return config_or_num_layers['vision_layers'], config_or_num_layers[
+                'text_layers']
+
         elif isinstance(config_or_num_layers, int):
             num_layer = config_or_num_layers
         else:
@@ -169,8 +181,8 @@ class CLIPConverter(Converter):
             ['vision_model.post_layernorm.bias', 'vision_model.ln_post.bias'],
 
             # projection
-            ['visual_projection.weight', 'vision_projection'],
-            ['text_projection.weight', 'text_projection'],
+            ['visual_projection.weight', 'vision_projection', 'transpose'],
+            ['text_projection.weight', 'text_projection', 'transpose'],
             ['logit_scale', 'logit_scale']
         ]
         for layer_index in range(num_text_layer):

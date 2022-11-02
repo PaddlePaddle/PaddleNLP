@@ -70,8 +70,8 @@ def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list,
     return top_3_tensor
 
 
-def _compare_model_weights(first_state_dict: Dict[str, ndarray],
-                           second_state_dict: Dict[str, ndarray]) -> List[str]:
+def compare_model_weights(first_state_dict: Dict[str, ndarray],
+                          second_state_dict: Dict[str, ndarray]) -> List[str]:
     """compare the values of two state_dict
 
     Args:
@@ -346,6 +346,10 @@ class Converter(ABC):
 
     num_layer_key: str = "num_hidden_layers"
     architectures: Dict[str, Type[PretrainedModel]] = {}
+    try_compare_logits: bool = True
+
+    # try to compare weights between two paddle model
+    try_compare_weight: bool = True
 
     @classmethod
     def get_num_layer(
@@ -540,33 +544,19 @@ class Converter(ABC):
         # 3. compare the logits
         result = allclose(paddle_logits[1:4], pytorch_logits[1:4], atol=1e-4)
 
-        if not result:
+        if not result and self.try_compare_logits:
             print(
                 "============================== compare model state dict =============================="
             )
+
             self.compare_model_state_dicts(paddle_model, pytorch_model,
                                            name_mappings)
             del paddle_model, pytorch_model
 
-            # 4. init two paddle model to check that if there are any weights not initialized correctly.
-            first_paddle_model = PaddleModel.from_pretrained(
-                paddle_pretrained_dir)
-            first_state_dict = self.get_model_state_dict(first_paddle_model)
-
-            second_paddle_model = PaddleModel.from_pretrained(
-                paddle_pretrained_dir)
-            second_state_dict = self.get_model_state_dict(second_paddle_model)
-
-            keys = _compare_model_weights(first_state_dict, second_state_dict)
-            if keys:
-                for key in keys:
-                    logger.error(f"the key<{key}> is not set with weight")
-            else:
-                # 5. compare the logits of paddle & pytorch model
-                print(
-                    "============================== compare model inputs & outputs =============================="
-                )
-                logit_hooker.summary()
+            print(
+                "============================== compare model inputs & outputs =============================="
+            )
+            logit_hooker.summary()
 
         return result
 
@@ -739,7 +729,23 @@ class Converter(ABC):
             paddle.save(paddle_state_dict,
                         os.path.join(output_dir, 'model_state.pdparams'))
 
-        if is_torch_available() and is_transformers_available():
+            if self.try_compare_weight:
+                PaddleModelClass, _ = self.get_paddle_pytorch_model_classes()
+                first_paddle_model = PaddleModelClass.from_pretrained(
+                    output_dir)
+                second_paddle_model = PaddleModelClass.from_pretrained(
+                    output_dir)
+
+                mismatched_keys = compare_model_weights(
+                    self.get_model_state_dict(first_paddle_model),
+                    self.get_model_state_dict(second_paddle_model),
+                )
+                for key in mismatched_keys:
+                    logger.error(
+                        f"the key<{key}> is not set correctly with weight")
+
+        if is_torch_available() and is_transformers_available(
+        ) and self.try_compare_logits:
             result = self.compare_logits(paddle_pretrained_dir=output_dir,
                                          pytorch_pretrained_dir=input_dir)
             if result is True:
