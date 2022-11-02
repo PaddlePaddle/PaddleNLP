@@ -674,7 +674,7 @@ class Converter(ABC):
         """
         # TODO(wj-Mcat): use torch to load model file
         import torch
-        state_dict = torch.load(model_file)
+        state_dict = torch.load(model_file, map_location='cpu')
         for key in state_dict.keys():
             state_dict[key] = state_dict[key].numpy()
         return state_dict
