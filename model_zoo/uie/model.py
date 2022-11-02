@@ -27,7 +27,7 @@ class UIE(ErniePretrainedModel):
         self.linear_end = paddle.nn.Linear(hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input_ids, token_type_ids, pos_ids, att_mask):
+    def forward(self, input_ids, token_type_ids, pos_ids=None, att_mask=None):
         sequence_output, _ = self.encoder(input_ids=input_ids,
                                           token_type_ids=token_type_ids,
                                           position_ids=pos_ids,
