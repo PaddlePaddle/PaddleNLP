@@ -13,19 +13,95 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import List, Union
+from typing import List, Union, Dict, Type
 
 from paddlenlp.utils.import_utils import import_module
-from paddlenlp.utils.converter import Converter, StateDictNameMapping
+from paddlenlp.transformers import CLIPModel, PretrainedModel
+from paddlenlp.utils.converter import StateDictNameMapping, Converter
 
 
 class CLIPConverter(Converter):
     """CLIP Converter which handle the converting operations"""
-    num_layer_key = "text_layer"
+    num_layer_key = "num_hidden_layers"
     _ignore_state_dict_keys = [
         'text_model.embeddings.position_ids',
         'vision_model.embeddings.position_ids'
     ]
+    architectures: Dict[str, Type[PretrainedModel]] = {"CLIPModel": CLIPModel}
+
+    @classmethod
+    def resolve_num_layer(cls,
+                          config_or_num_layers: Union[dict, int,
+                                                      list] = None) -> int:
+        """resolve the number of transformer layer based on the key of model config, eg: `num_hidden_layers` in BertModel
+        Args:
+            config_or_num_layers (Union[dict, int], optional): the instance of config or num_layers. Defaults to None.
+        Raises:
+            ValueError: when `config_or_num_layers` is not dict/int, it will raise the error
+        Returns:
+            int: the number of transformer layer
+        """
+        if isinstance(config_or_num_layers, dict):
+            num_layer = [
+                config_or_num_layers[name][k]
+                for name in ["text_config", "vision_config"]
+                for k in cls.num_layer_key
+            ]
+        elif isinstance(config_or_num_layers, int):
+            num_layer = config_or_num_layers
+        else:
+            raise ValueError(
+                f"the type of config_or_num_layers<{config_or_num_layers}> should be one of <dict, int>"
+            )
+        return num_layer
+
+    def convert_config(self, pytorch_config: dict) -> dict:
+        """convert torch config to paddle config
+        Args:
+            pytorch_config (dict): the object of pytorch config file
+        Returns:
+            dict: the final converted config object
+        """
+        paddle_config = {
+            # vision
+            'image_resolution':
+            pytorch_config['vision_config']['image_size'],
+            'vision_layers':
+            pytorch_config['vision_config']['num_hidden_layers'],
+            'vision_heads':
+            pytorch_config['vision_config']['num_attention_heads'],
+            'vision_embed_dim':
+            pytorch_config['vision_config']['hidden_size'],
+            'vision_patch_size':
+            pytorch_config['vision_config']['patch_size'],
+            'vision_mlp_ratio':
+            pytorch_config['vision_config']['intermediate_size'] //
+            pytorch_config['vision_config']['hidden_size'],
+            'vision_hidden_act':
+            pytorch_config['vision_config']['hidden_act'],
+            # text
+            'max_text_length':
+            pytorch_config['text_config']['max_position_embeddings'],
+            'vocab_size':
+            pytorch_config['text_config']['vocab_size'],
+            'text_embed_dim':
+            pytorch_config['text_config']['hidden_size'],
+            'text_heads':
+            pytorch_config['text_config']['num_attention_heads'],
+            'text_layers':
+            pytorch_config['text_config']['num_hidden_layers'],
+            'text_hidden_act':
+            pytorch_config['text_config']['hidden_act'],
+            'projection_dim':
+            pytorch_config["projection_dim"],
+            'initializer_range':
+            pytorch_config['text_config']['initializer_range'],
+            'initializer_factor':
+            pytorch_config['initializer_factor'],
+            'logit_scale_init_value':
+            pytorch_config['logit_scale_init_value']
+        }
+        return paddle_config
 
     def load_torch_weight_file(self, model_file: str):
         """load torch weight file with torch which should be removed later.
@@ -42,29 +118,6 @@ class CLIPConverter(Converter):
                 state_dict[key] = state_dict[key].reshape((1, ))
         return state_dict
 
-    def convert_config(self, pytorch_config: dict) -> dict:
-        return {
-            # vision
-            "image_resolution": pytorch_config['image_resolution'],
-            "vision_layers": 12,
-            "vision_heads": 12,
-            "vision_mlp_ratio": pytorch_config['vision']['mlp_ratio'],
-            "vision_embed_dim": 768,
-            "vision_patch_size": 32,
-            "vision_hidden_act": "quick_gelu",
-            # text
-            "max_text_length": 77,
-            "vocab_size": 49408,
-            "text_embed_dim": 512,
-            "text_heads": 8,
-            "text_layers": 12,
-            "text_hidden_act": "quick_gelu",
-            # others
-            "projection_dim": 512,
-            "initializer_range": 0.02,
-            "logit_scale_init_value": 2.6592
-        }
-
     def get_paddle_pytorch_model_classes(self):
         from paddlenlp.transformers import CLIPModel as PaddleCLIPModel
         pytorch_clip_model_class = import_module("transformers.CLIPModel")
@@ -74,8 +127,8 @@ class CLIPConverter(Converter):
         self,
         config_or_num_layers: Union[dict, int] = None
     ) -> List[StateDictNameMapping]:
-        num_layer = self.resolve_num_layer(config_or_num_layers)
-
+        num_text_layer, num_vision_layer = self.resolve_num_layer(
+            config_or_num_layers)
         mappings: List[StateDictNameMapping] = []
 
         hard_mappings = [
@@ -120,7 +173,7 @@ class CLIPConverter(Converter):
             ['text_projection.weight', 'text_projection'],
             ['logit_scale', 'logit_scale']
         ]
-        for layer_index in range(num_layer):
+        for layer_index in range(num_text_layer):
             text_model_layer_mappings = [
                 # qkv out
                 [
@@ -196,6 +249,9 @@ class CLIPConverter(Converter):
                     f"text_model.transformer.layers.{layer_index}.norm2.bias"
                 ],
             ]
+            hard_mappings.extend(text_model_layer_mappings)
+
+        for layer_index in range(num_vision_layer):
             vision_model_layer_mappings = [
                 # qkv out
                 [
@@ -271,7 +327,6 @@ class CLIPConverter(Converter):
                     f"vision_model.transformer.layers.{layer_index}.norm2.bias"
                 ],
             ]
-            hard_mappings.extend(text_model_layer_mappings)
             hard_mappings.extend(vision_model_layer_mappings)
 
         mappings = [

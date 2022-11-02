@@ -139,6 +139,7 @@ from .clip.modeling import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
+from .clip.converter import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
