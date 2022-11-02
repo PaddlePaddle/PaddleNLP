@@ -42,6 +42,10 @@ class CompressionArguments(TrainingArguments):
         strategy (`str`):
             Compression strategy. It supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
     """
+
+    do_compress: bool = field(
+        default=False,
+        metadata={"help": "Whether to run compression after training."})
     strategy: Optional[str] = field(
         default="dynabert+ptq",
         metadata={
@@ -147,24 +151,12 @@ class CompressionArguments(TrainingArguments):
         },
     )
     # qat
-    activation_preprocess_type: Optional[str] = field(
-        default=None,
+    use_pact: Optional[bool] = field(
+        default=True,
         metadata={
             "help":
-            "Method of preprocessing the activation value of the quantitative " \
-            "model. Currently, PACT method is supported. If necessary, it can be " \
-            "set to 'PACT'. The default value is None, which means that no " \
-            "preprocessing is performed on the active value."
-        },
-    )
-    weight_preprocess_type: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Method of preprocessing the weight parameters of the quantitative " \
-            "model. Currently, method 'PACT' is supported. If necessary, it can " \
-            "be set to 'PACT'. The default value is None, which means that " \
-            "no preprocessing is performed on weights."
+            "Whether to use PACT(Parameterized Clipping Activation for Quantized Neural Networks) "\
+            "method in quantization aware training."
         },
     )
     moving_rate: Optional[float] = field(
