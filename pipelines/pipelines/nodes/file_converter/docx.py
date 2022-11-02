@@ -149,6 +149,10 @@ class DocxToTextConverter(BaseConverter):
         return documents
 
     def save_images(self, image_list):
+        """
+        Save the parsed image into desc_path
+        :param image_list: image files from the docx file
+        """
         image_names = []
         for i, image in enumerate(image_list):
             if image:

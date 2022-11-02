@@ -354,7 +354,7 @@ class PreProcessor(BasePreProcessor):
                 text_arr = doc["content"].split('\t')
                 if (len(text_arr) > 2):
                     raise Exception(
-                        "Each line text need be two columns and separated by \t"
+                        "Each line text must be two columns and separated by \t"
                     )
                 # Maybe empty lines
                 if (len(text_arr) == 1):
