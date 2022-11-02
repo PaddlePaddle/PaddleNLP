@@ -191,7 +191,7 @@ class QuestionGenerationTask(Task):
                 target = '在已知答案的前提下，问题：' + target
         elif self._template == 3:
             ### use template 3
-            source = '这是一个问题生成任务，根据提供的答案和上下文，来生成问题。' + title + tokenizer.sep_token + '上下文：' + source
+            source = '这是一个问题生成任务，根据提供的答案和上下文，来生成问题。' + title + self._tokenizer.sep_token + '上下文：' + source
             title = None
             if target:
                 target = '问题：' + target

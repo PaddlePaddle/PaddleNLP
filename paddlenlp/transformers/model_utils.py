@@ -399,13 +399,15 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                              pretrained_model_name_or_path,
-                                              file_name)
+                full_file_name = "/".join([
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                    file_name
+                ])
                 resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = os.path.join(
+            resource_files["model_config_file"] = "/".join([
                 COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                cls.model_config_file)
+                cls.model_config_file
+            ])
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
