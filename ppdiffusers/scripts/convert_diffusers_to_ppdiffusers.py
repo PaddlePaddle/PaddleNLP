@@ -26,7 +26,7 @@ from diffusers import StableDiffusionPipeline as PytorchStableDiffusionPipeline
 def convert_vae_to_paddlenlp(vae, dtype="float32"):
     need_transpose = []
     for k, v in vae.named_modules():
-        if isinstance(v, torch.nn.Linear):
+        if isinstance(v, paddle.nn.Linear):
             need_transpose.append(k + ".weight")
     new_vae = OrderedDict()
     for k, v in vae.state_dict().items():
@@ -40,7 +40,7 @@ def convert_vae_to_paddlenlp(vae, dtype="float32"):
 def convert_unet_to_paddlenlp(unet, dtype="float32"):
     need_transpose = []
     for k, v in unet.named_modules():
-        if isinstance(v, torch.nn.Linear):
+        if isinstance(v, paddle.nn.Linear):
             need_transpose.append(k + ".weight")
     new_unet = OrderedDict()
     for k, v in unet.state_dict().items():
