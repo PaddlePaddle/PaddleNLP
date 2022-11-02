@@ -16,8 +16,11 @@ import six
 import os
 import math
 import numpy as np
-import paddle2onnx
 import onnxruntime as ort
+
+import paddle
+import paddle2onnx
+
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
 
@@ -27,7 +30,6 @@ class InferBackend(object):
     def __init__(self,
                  model_path_prefix,
                  device='cpu',
-                 use_quantize=False,
                  use_fp16=False,
                  device_id=0):
         print(">>> [InferBackend] Creating Engine ...")
@@ -37,6 +39,7 @@ class InferBackend(object):
             opset_version=13,
             enable_onnx_checker=True)
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
+
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
         with open(float_onnx_file, "wb") as f:
             f.write(onnx_model)
@@ -60,6 +63,7 @@ class InferBackend(object):
             print(">>> [InferBackend] Use CPU to inference ...")
 
         sess_options = ort.SessionOptions()
+
         self.predictor = ort.InferenceSession(onnx_model,
                                               sess_options=sess_options,
                                               providers=providers)
@@ -97,10 +101,11 @@ class UIEPredictor(object):
         self.set_schema(args.schema)
         if args.device == 'cpu':
             args.use_fp16 = False
-        self.inference_backend = InferBackend(args.model_path_prefix,
-                                              device=args.device,
-                                              use_fp16=args.use_fp16,
-                                              device_id=args.device_id)
+        self.inference_backend = InferBackend(
+            args.model_path_prefix,
+            device=args.device,
+            use_fp16=args.use_fp16,
+            device_id=args.device_id if args.device == 'gpu' else 0)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
