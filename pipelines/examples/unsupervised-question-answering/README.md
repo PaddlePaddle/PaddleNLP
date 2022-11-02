@@ -6,7 +6,9 @@
 
 本项目，即无监督智能检索问答(问答对自动生成智能检索式问答)，基于PaddleNLP问题生成、UIE、检索式问答，支持以非结构化文本形式为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
 
-![gradio](https://user-images.githubusercontent.com/63761690/197500524-17013358-8d19-43c4-9796-abac1e2d675f.gif)
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/20476674/199488926-c64d3f4e-8117-475f-afe6-b02088105d09.gif" >
+</div>
 
 若开发者已有FAQ语料，请参考FAQ检索式问答。
 ## 2. 产品功能介绍

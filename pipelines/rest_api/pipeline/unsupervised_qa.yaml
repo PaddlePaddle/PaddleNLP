@@ -42,10 +42,12 @@ components:    # define all the building-blocks for Pipeline
       model: uie-base-answer-extractor-v1
       schema: ['答案']
       position_prob: 0.01
+      max_answer_candidates: 3
   - name: QuestionGenerator
     type: QuestionGenerator
     params:
-      model: unimo-text-1.0-question-generator-v1
+      model: unimo-text-1.0-question-generation
+      num_return_sequences: 2
   - name: QAFilter
     type: QAFilter
     params:

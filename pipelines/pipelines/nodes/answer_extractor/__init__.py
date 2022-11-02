@@ -11,6 +11,5 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from pipelines.nodes.answer_extractor.base import UIEComponent
 from pipelines.nodes.answer_extractor.answer_extractor import AnswerExtractor
 from pipelines.nodes.answer_extractor.qa_filter import QAFilter

@@ -13,21 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import math
-from multiprocessing import cpu_count
-from tqdm import tqdm
 import json
+import sys
+import argparse
+import re
+from tqdm import tqdm
 
 import paddle
-from paddlenlp.taskflow.utils import download_file
-from pipelines.nodes.answer_extractor import UIEComponent
+from paddlenlp import Taskflow
+from pipelines.nodes.base import BaseComponent
 from paddlenlp.utils.env import PPNLP_HOME
+from paddlenlp.taskflow.utils import download_file
+from paddle.dataset.common import md5file
 
 
-class AnswerExtractor(UIEComponent):
+class AnswerExtractor(BaseComponent):
     """
-    Universal Information Extraction Component. 
+    Answer Extractor based on Universal Information Extraction. 
     """
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json"
+    }
+
     resource_files_urls = {
         "uie-base-answer-extractor-v1": {
             "model_state": [
@@ -53,74 +64,77 @@ class AnswerExtractor(UIEComponent):
         },
     }
 
+    return_no_answers: bool
+    outgoing_edges = 1
+    query_count = 0
+    query_time = 0
+
     def __init__(self,
                  model='uie-base-answer-extractor',
                  schema=['答案'],
                  task_path=None,
                  device="gpu",
-                 schema_lang="zh",
-                 max_seq_len=512,
                  batch_size=64,
-                 split_sentence=False,
                  position_prob=0.01,
-                 lazy_load=False,
-                 num_workers=0,
-                 use_faster=False):
+                 max_answer_candidates=5):
         paddle.set_device(device)
-        if model in ['uie-m-base', 'uie-m-large']:
-            self._multilingual = True
-            self.resource_files_names[
-                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
-        else:
-            self._multilingual = False
-            if 'sentencepiece_model_file' in self.resource_files_names.keys():
-                del self.resource_files_names['sentencepiece_model_file']
-        self._schema_tree = None
-        self.set_schema(schema)
-
-        self._is_en = True if model in ['uie-base-en'
-                                        ] or schema_lang == 'en' else False
-        #### task parameters
         self.model = model
-        self.task = None
-        self._priority_path = None
-        self._usage = ""
-        self._model = None
-        self._input_spec = None
-        self._config = None
+        self._from_taskflow = False
         self._custom_model = False
-        self._param_updated = False
-        self._num_threads = math.ceil(cpu_count() / 2)
-        self._infer_precision = 'fp32'
-        self._predictor_type = 'paddle-inference'
-        self._home_path = PPNLP_HOME
-        self._task_flag = self.model
         if task_path:
             self._task_path = task_path
             self._custom_model = True
         else:
-            self._task_path = os.path.join(PPNLP_HOME, "pipelines",
-                                           "unsupervised_question_answering",
-                                           self.model)
+            if model in ["uie-base"]:
+                self._task_path = None
+                self._from_taskflow = True
+            else:
+                self._task_path = os.path.join(
+                    PPNLP_HOME, "pipelines", "unsupervised_question_answering",
+                    self.model)
+                self._check_task_files()
+        self.batch_size = batch_size
+        self.max_answer_candidates = max_answer_candidates
+        self.schema = schema
+        self.answer_generator = Taskflow(
+            "information_extraction",
+            model=self.model if self._from_taskflow else "uie-base",
+            schema=schema,
+            task_path=self._task_path,
+            batch_size=batch_size,
+            position_prob=position_prob)
 
-        self._check_task_files()
-        self._check_predictor_type()
-        self._get_inference_model()
-        self._construct_tokenizer(model)
+    def _check_task_files(self):
+        """
+        Check files required by the task.
+        """
+        for file_id, file_name in self.resource_files_names.items():
+            path = os.path.join(self._task_path, file_name)
+            url = self.resource_files_urls[self.model][file_id][0]
+            md5 = self.resource_files_urls[self.model][file_id][1]
 
-        self._schema = schema
-        self._max_seq_len = max_seq_len
-        self._batch_size = batch_size
-        self._split_sentence = split_sentence
-        self._position_prob = position_prob
-        self._lazy_load = lazy_load
-        self._num_workers = num_workers
-        self.use_faster = use_faster
+            downloaded = True
+            if not os.path.exists(path):
+                downloaded = False
+            else:
+                if not self._custom_model:
+                    if os.path.exists(path):
+                        # Check whether the file is updated
+                        if not md5file(path) == md5:
+                            downloaded = False
+                            if file_id == "model_state":
+                                self._param_updated = True
+                    else:
+                        downloaded = False
+            if not downloaded:
+                download_file(self._task_path, file_name, url, md5)
 
     def answer_generation_from_paragraphs(self,
                                           paragraphs,
+                                          batch_size=16,
                                           model=None,
                                           max_answer_candidates=5,
+                                          schema=None,
                                           wf=None):
         """Generate answer from given paragraphs."""
         result = []
@@ -129,14 +143,14 @@ class AnswerExtractor(UIEComponent):
         len_paragraphs = len(paragraphs)
         for paragraph_tobe in tqdm(paragraphs):
             buffer.append(paragraph_tobe)
-            if len(buffer) == self._batch_size or (i + 1) == len_paragraphs:
-                predicts = self.model_run(buffer)
+            if len(buffer) == batch_size or (i + 1) == len_paragraphs:
+                predicts = model(buffer)
                 paragraph_list = buffer
                 buffer = []
                 for predict_dict, paragraph in zip(predicts, paragraph_list):
                     answers = []
                     probabilitys = []
-                    for prompt in self._schema:
+                    for prompt in schema:
                         if prompt in predict_dict:
                             answer_dicts = predict_dict[prompt]
                             answers += [
@@ -165,14 +179,15 @@ class AnswerExtractor(UIEComponent):
             i += 1
         return result
 
-    def model_run(self, str_list):
-        preprocessed = self._preprocess(str_list)
-        generated = self._run_model(preprocessed)
-        postprocessed = self._postprocess(generated)
-        return postprocessed
-
     def run(self, meta):
+        print('createing synthetic answers...')
         synthetic_context_answer_pairs = self.answer_generation_from_paragraphs(
-            meta)
+            meta,
+            batch_size=self.batch_size,
+            model=self.answer_generator,
+            max_answer_candidates=self.max_answer_candidates,
+            schema=self.schema,
+            wf=None)
+        print('create synthetic answers successfully!')
         results = {"ca_pairs": synthetic_context_answer_pairs}
         return results, "output_1"

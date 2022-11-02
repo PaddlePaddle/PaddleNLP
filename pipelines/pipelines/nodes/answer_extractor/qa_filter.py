@@ -13,25 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import math
-from multiprocessing import cpu_count
-from tqdm import tqdm
 import json
+import sys
+import argparse
+import re
+from tqdm import tqdm
 
 import paddle
-from paddlenlp.taskflow.utils import download_file
-from pipelines.nodes.answer_extractor import UIEComponent
+from paddlenlp import Taskflow
+from pipelines.nodes.base import BaseComponent
 from paddlenlp.utils.env import PPNLP_HOME
+from paddlenlp.taskflow.utils import download_file
+from paddle.dataset.common import md5file
 
 
-class QAFilter(UIEComponent):
+class QAFilter(BaseComponent):
     """
-    Universal Information Extraction Task. 
-    Args:
-        task(string): The name of task.
-        model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    Question Answer Pairs Filter based on Universal Information Extraction. 
     """
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "model_config": "model_config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json"
+    }
+
     resource_files_urls = {
         "uie-base-qa-filter-v1": {
             "model_state": [
@@ -57,71 +64,78 @@ class QAFilter(UIEComponent):
         },
     }
 
-    def __init__(self,
-                 model='uie-base-qa-filter',
-                 schema=['答案'],
-                 task_path=None,
-                 device="gpu",
-                 schema_lang="zh",
-                 max_seq_len=512,
-                 batch_size=64,
-                 split_sentence=False,
-                 position_prob=0.1,
-                 lazy_load=False,
-                 num_workers=0,
-                 use_faster=False):
+    return_no_answers: bool
+    outgoing_edges = 1
+    query_count = 0
+    query_time = 0
+
+    def __init__(
+        self,
+        model='uie-base-qa-filter',
+        schema=['答案'],
+        task_path=None,
+        device="gpu",
+        batch_size=64,
+        position_prob=0.1,
+    ):
         paddle.set_device(device)
-        if model in ['uie-m-base', 'uie-m-large']:
-            self._multilingual = True
-            self.resource_files_names[
-                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
-        else:
-            self._multilingual = False
-            if 'sentencepiece_model_file' in self.resource_files_names.keys():
-                del self.resource_files_names['sentencepiece_model_file']
-        self._schema_tree = None
-        self.set_schema(schema)
-
-        self._is_en = True if model in ['uie-base-en'
-                                        ] or schema_lang == 'en' else False
-
         self.model = model
-        self.task = None
-        self._priority_path = None
-        self._usage = ""
-        self._model = None
-        self._input_spec = None
-        self._config = None
         self._custom_model = False
-        self._param_updated = False
-        self._num_threads = math.ceil(cpu_count() / 2)
-        self._infer_precision = 'fp32'
-        self._predictor_type = 'paddle-inference'
-        self._home_path = PPNLP_HOME
-        self._task_flag = self.model
+        self._from_taskflow = False
         if task_path:
             self._task_path = task_path
             self._custom_model = True
         else:
-            self._task_path = os.path.join(PPNLP_HOME, "pipelines",
-                                           "unsupervised_question_answering",
-                                           self.model)
+            if model in ["uie-base"]:
+                self._task_path = None
+                self._from_taskflow = True
+            else:
+                self._task_path = os.path.join(
+                    PPNLP_HOME, "pipelines", "unsupervised_question_answering",
+                    self.model)
+                self._check_task_files()
+        self.batch_size = batch_size
+        self.schema = schema
+        self.filtration_model = Taskflow(
+            "information_extraction",
+            model=self.model if self._from_taskflow else "uie-base",
+            schema=schema,
+            task_path=self._task_path,
+            batch_size=batch_size,
+            position_prob=position_prob)
 
-        self._check_task_files()
-        self._check_predictor_type()
-        self._get_inference_model()
-        self._construct_tokenizer(model)
+    def _check_task_files(self):
+        """
+        Check files required by the task.
+        """
+        for file_id, file_name in self.resource_files_names.items():
+            path = os.path.join(self._task_path, file_name)
+            url = self.resource_files_urls[self.model][file_id][0]
+            md5 = self.resource_files_urls[self.model][file_id][1]
 
-        self._schema = schema
-        self._max_seq_len = max_seq_len
-        self._batch_size = batch_size
-        self._split_sentence = split_sentence
-        self._position_prob = position_prob
-        self._lazy_load = lazy_load
-        self._num_workers = num_workers
-        self.use_faster = use_faster
+            downloaded = True
+            if not os.path.exists(path):
+                downloaded = False
+            else:
+                if not self._custom_model:
+                    if os.path.exists(path):
+                        # Check whether the file is updated
+                        if not md5file(path) == md5:
+                            downloaded = False
+                            if file_id == "model_state":
+                                self._param_updated = True
+                    else:
+                        downloaded = False
+            if not downloaded:
+                download_file(self._task_path, file_name, url, md5)
 
-    def filtration(self, paragraphs, wf=None, wf_debug=None):
+    def filtration(self,
+                   paragraphs,
+                   batch_size=16,
+                   model=None,
+                   schema=None,
+                   wf=None,
+                   wf_debug=None):
         result = []
         buffer = []
         valid_num, invalid_num = 0, 0
@@ -129,7 +143,7 @@ class QAFilter(UIEComponent):
         len_paragraphs = len(paragraphs)
         for paragraph_tobe in tqdm(paragraphs):
             buffer.append(paragraph_tobe)
-            if len(buffer) == self._batch_size or (i + 1) == len_paragraphs:
+            if len(buffer) == batch_size or (i + 1) == len_paragraphs:
                 model_inputs = []
                 for d in buffer:
                     context = d['context']
@@ -137,7 +151,7 @@ class QAFilter(UIEComponent):
                     prefix = '问题：' + synthetic_question + '上下文：'
                     content = prefix + context
                     model_inputs.append(content)
-                predicts = self.model_run(model_inputs)
+                predicts = model(model_inputs)
                 paragraph_list = buffer
                 buffer = []
                 for predict_dict, paragraph in zip(predicts, paragraph_list):
@@ -151,7 +165,7 @@ class QAFilter(UIEComponent):
 
                     answers = []
                     probabilitys = []
-                    for prompt in self._schema:
+                    for prompt in schema:
                         if prompt in predict_dict:
                             answer_dicts = predict_dict[prompt]
                             answers += [
@@ -198,16 +212,16 @@ class QAFilter(UIEComponent):
         print('invalid sythetic question-answer pairs numbewr:', invalid_num)
         return result
 
-    def model_run(self, str_list):
-        preprocessed = self._preprocess(str_list)
-        generated = self._run_model(preprocessed)
-        postprocessed = self._postprocess(generated)
-        return postprocessed
-
     def run(self, cqa_triples, is_filter=True):
         if is_filter:
-            filtered_cqa_triples = self.filtration(cqa_triples)
+            print('filtering synthetic question-answer pairs...')
+            filtered_cqa_triples = self.filtration(cqa_triples,
+                                                   batch_size=self.batch_size,
+                                                   model=self.filtration_model,
+                                                   schema=self.schema)
+            print('filter synthetic question-answer pairs successfully!')
         else:
             filtered_cqa_triples = cqa_triples
+
         results = {"filtered_cqa_triples": filtered_cqa_triples}
         return results, "output_1"

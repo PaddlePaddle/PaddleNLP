@@ -18,7 +18,7 @@ import os
 from pprint import pprint
 
 import paddle
-from pipelines.nodes import AnswerExtractor, QAFilter, UIEComponent, QuestionGenerator
+from pipelines.nodes import AnswerExtractor, QAFilter, QuestionGenerator
 from pipelines.nodes import ErnieRanker, DensePassageRetriever
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
@@ -104,12 +104,14 @@ def qa_generation_pipeline():
         model='uie-base-answer-extractor-v1',
         device=args.device,
         schema=['答案'],
+        max_answer_candidates=3,
         position_prob=0.01,
     )
 
     question_generator = QuestionGenerator(
-        model='unimo-text-1.0-question-generator-v1',
+        model='unimo-text-1.0-question-generation',
         device=args.device,
+        num_return_sequences=2,
     )
 
     qa_filter = QAFilter(

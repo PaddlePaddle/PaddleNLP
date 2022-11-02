@@ -142,7 +142,7 @@ def main():
                             value=st.session_state.qag_question,
                             key="qag_quest",
                             on_change=on_change_text_qag,
-                            max_chars=100,
+                            max_chars=350,
                             placeholder='请输入要抽取问答对的文本')
     qag_col1, qag_col2 = st.columns(2)
     qag_col1.markdown("<style>.stButton button {width:100%;}</style>",
