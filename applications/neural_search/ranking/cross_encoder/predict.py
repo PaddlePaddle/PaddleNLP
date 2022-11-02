@@ -24,7 +24,6 @@ from tqdm import tqdm
 from paddlenlp.transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification
 
 from data import convert_example, read_text_pair, create_dataloader
-from model import CrossEncoder
 
 # yapf: disable
 parser = argparse.ArgumentParser()
