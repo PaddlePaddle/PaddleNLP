@@ -111,7 +111,9 @@ class CLIPConverter(Converter):
             'initializer_factor':
             pytorch_config['initializer_factor'],
             'logit_scale_init_value':
-            pytorch_config['logit_scale_init_value']
+            pytorch_config['logit_scale_init_value'],
+            "init_class":
+            "CLIPModel"
         }
         return paddle_config
 
