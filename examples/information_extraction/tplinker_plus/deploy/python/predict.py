@@ -101,7 +101,7 @@ if __name__ == "__main__":
     # Define predictor to do prediction.
     predictor = Predictor(args.model_path_prefix, args.device, args.task_type,
                           label_maps)
-
+    all_preds = predictor.predict(infer_dataloader)
     # Entity extraction sample
     input_list = [
         "金石开：阿森纳的伤病还是对球队有一定的影响，尤其是杜尔的缺席，让老将西尔维斯特必须要出任主力，",
