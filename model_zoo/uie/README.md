@@ -645,7 +645,6 @@ python finetune.py  \
     --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
-    --label_names 'start_positions' 'end_positions' \
     --max_seq_length 512  \
     --per_device_eval_batch_size 16 \
     --per_device_train_batch_size  16 \
@@ -678,7 +677,6 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
-    --label_names 'start_positions' 'end_positions' \
     --max_seq_length 512  \
     --per_device_eval_batch_size 16 \
     --per_device_train_batch_size  16 \
@@ -705,12 +703,11 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
 * `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
 * `per_device_train_batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
 * `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
-* `learning_rate`：训练最大学习率；默认为3e-5。
+* `learning_rate`：训练最大学习率，UIE 推荐设置为 1e-5；默认值为3e-5。
 * `num_train_epochs`: 训练轮次，使用早停法时可以选择 100；默认为10。
 * `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认100。
 * `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
 * `seed`：全局随机种子，默认为 42。
-* `label_names`：训练数据标签的key的名称，例如 'labels'、'start_postions' 或者 'end_positions' 等。自定义数据集需要设置，否则可能会造成识别错误；默认为 None。
 * `weight_decay`：除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0；
 * `do_train`:是否进行微调训练，设置该参数表示进行微调训练，默认不设置。
 * `do_eval`:是否进行评估，设置该参数表示进行评估。
@@ -863,7 +860,6 @@ python finetune.py  \
     --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
-    --label_names 'start_positions' 'end_positions' \
     --max_seq_length 512  \
     --per_device_eval_batch_size 16 \
     --per_device_train_batch_size  16 \
