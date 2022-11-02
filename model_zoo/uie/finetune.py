@@ -16,163 +16,327 @@ import argparse
 import time
 import os
 from functools import partial
+from typing import Optional
+from dataclasses import dataclass, field
 
 import paddle
 from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, export_model
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, CompressionArguments, Trainer
+from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
 from model import UIE, UIEM
-from evaluate import evaluate
-from utils import set_seed, convert_example, reader, MODEL_MAP, create_data_loader
+from utils import reader, MODEL_MAP, map_offset
 
 
-def do_train():
-    paddle.set_device(args.device)
-    rank = paddle.distributed.get_rank()
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+@dataclass
+class DataArguments:
+    """
+    Arguments pertaining to what data we are going to input our model for training and eval.
+    Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
+    specify them on the command line.
+    """
+    train_path: str = field(
+        default=None,
+        metadata={
+            "help": "The name of the dataset to use (via the datasets library)."
+        })
 
-    set_seed(args.seed)
+    dev_path: str = field(
+        default=None,
+        metadata={
+            "help": "The name of the dataset to use (via the datasets library)."
+        })
 
-    resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
+    max_seq_length: Optional[int] = field(
+        default=512,
+        metadata={
+            "help":
+            "The maximum total input sequence length after tokenization. Sequences longer "
+            "than this will be truncated, sequences shorter will be padded."
+        },
+    )
 
-    logger.info("Downloading resource files...")
-    for key, val in resource_file_urls.items():
-        file_path = os.path.join(args.model, key)
-        if not os.path.exists(file_path):
-            get_path_from_url(val, args.model)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model)
-    if args.model in ["uie-m-large", "uie-m-base"]:
-        multilingual = True
-        model = UIEM.from_pretrained(args.model)
+@dataclass
+class ModelArguments:
+    """
+    Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
+    """
+
+    model_name_or_path: Optional[str] = field(
+        default="uie-base",
+        metadata={
+            "help":
+            "Path to pretrained model, such as 'uie-base', 'uie-tiny', " \
+            "'uie-medium', 'uie-mini', 'uie-micro', 'uie-nano', 'uie-base-en', " \
+            "'uie-m-base', 'uie-m-large', or finetuned model path."
+        })
+    export_model_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Path to directory to store the exported inference model."
+        },
+    )
+    multilingual: bool = field(
+        default=False,
+        metadata={"help": "Whether the model is a multilingual model."})
+
+
+def convert_example(example, tokenizer, max_seq_len, multilingual=False):
+    """
+    example: {
+        title
+        prompt
+        content
+        result_list
+    }
+    """
+    encoded_inputs = tokenizer(text=[example["prompt"]],
+                               text_pair=[example["content"]],
+                               truncation=True,
+                               max_seq_len=max_seq_len,
+                               pad_to_max_seq_len=True,
+                               return_attention_mask=True,
+                               return_position_ids=True,
+                               return_dict=False,
+                               return_offsets_mapping=True)
+    encoded_inputs = encoded_inputs[0]
+    offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
+    bias = 0
+    for index in range(1, len(offset_mapping)):
+        mapping = offset_mapping[index]
+        if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
+            bias = offset_mapping[index - 1][1] + 1  # Includes [SEP] token
+        if mapping[0] == 0 and mapping[1] == 0:
+            continue
+        offset_mapping[index][0] += bias
+        offset_mapping[index][1] += bias
+    start_ids = [0.0 for x in range(max_seq_len)]
+    end_ids = [0.0 for x in range(max_seq_len)]
+    for item in example["result_list"]:
+        start = map_offset(item["start"] + bias, offset_mapping)
+        end = map_offset(item["end"] - 1 + bias, offset_mapping)
+        start_ids[start] = 1.0
+        end_ids[end] = 1.0
+    if multilingual:
+        tokenized_output = {
+            "input_ids": encoded_inputs["input_ids"],
+            "pos_ids": encoded_inputs["position_ids"],
+            "start_positions": start_ids,
+            "end_positions": end_ids
+        }
     else:
-        multilingual = False
-        model = UIE.from_pretrained(args.model)
+        tokenized_output = {
+            "input_ids": encoded_inputs["input_ids"],
+            "token_type_ids": encoded_inputs["token_type_ids"],
+            "pos_ids": encoded_inputs["position_ids"],
+            "att_mask": encoded_inputs["attention_mask"],
+            "start_positions": start_ids,
+            "end_positions": end_ids
+        }
+    return tokenized_output
+
+
+def main():
+    parser = PdArgumentParser(
+        (ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # Log model and data config
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
+
+    paddle.set_device(training_args.device)
+
+    # Log on each process the small summary:
+    logger.warning(
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
+        +
+        f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+    )
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(
+            training_args.output_dir
+    ) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(
+                training_args.output_dir)) > 0:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome.")
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+    if model_args.model_name_or_path in MODEL_MAP:
+        resource_file_urls = MODEL_MAP[
+            model_args.model_name_or_path]['resource_file_urls']
+
+        logger.info("Downloading resource files...")
+        for key, val in resource_file_urls.items():
+            file_path = os.path.join(model_args.model_name_or_path, key)
+            if not os.path.exists(file_path):
+                get_path_from_url(val, model_args.model_name_or_path)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if model_args.multilingual:
+        model = UIEM.from_pretrained(model_args.model_name_or_path)
+    else:
+        model = UIE.from_pretrained(model_args.model_name_or_path)
 
     train_ds = load_dataset(reader,
-                            data_path=args.train_path,
-                            max_seq_len=args.max_seq_len,
+                            data_path=data_args.train_path,
+                            max_seq_len=data_args.max_seq_length,
                             lazy=False)
     dev_ds = load_dataset(reader,
-                          data_path=args.dev_path,
-                          max_seq_len=args.max_seq_len,
+                          data_path=data_args.dev_path,
+                          max_seq_len=data_args.max_seq_length,
                           lazy=False)
 
     trans_fn = partial(convert_example,
                        tokenizer=tokenizer,
-                       max_seq_len=args.max_seq_len,
-                       multilingual=multilingual)
+                       max_seq_len=data_args.max_seq_length,
+                       multilingual=model_args.multilingual)
 
-    train_data_loader = create_data_loader(train_ds,
-                                           mode="train",
-                                           batch_size=args.batch_size,
-                                           trans_fn=trans_fn)
-    dev_data_loader = create_data_loader(dev_ds,
-                                         mode="dev",
-                                         batch_size=args.batch_size,
-                                         trans_fn=trans_fn)
+    train_ds = train_ds.map(trans_fn)
+    dev_ds = dev_ds.map(trans_fn)
 
-    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
-        state_dict = paddle.load(args.init_from_ckpt)
-        model.set_dict(state_dict)
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    optimizer = paddle.optimizer.AdamW(learning_rate=args.learning_rate,
-                                       parameters=model.parameters())
+    data_collator = DataCollatorWithPadding(tokenizer)
 
     criterion = paddle.nn.BCELoss()
-    metric = SpanEvaluator()
 
-    loss_list = []
-    global_step = 0
-    best_f1 = 0
-    tic_train = time.time()
-    for epoch in range(1, args.num_epochs + 1):
-        for batch in train_data_loader:
-            if multilingual:
-                input_ids, pos_ids, start_ids, end_ids = batch
-                start_prob, end_prob = model(input_ids, pos_ids)
-            else:
-                input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
-                start_prob, end_prob = model(input_ids, token_type_ids,
-                                             att_mask, pos_ids)
-            start_ids = paddle.cast(start_ids, 'float32')
-            end_ids = paddle.cast(end_ids, 'float32')
-            loss_start = criterion(start_prob, start_ids)
-            loss_end = criterion(end_prob, end_ids)
-            loss = (loss_start + loss_end) / 2.0
-            loss.backward()
-            optimizer.step()
-            optimizer.clear_grad()
-            loss_list.append(float(loss))
+    def uie_loss_func(outputs, labels):
+        start_ids, end_ids = labels
+        start_prob, end_prob = outputs
+        start_ids = paddle.cast(start_ids, 'float32')
+        end_ids = paddle.cast(end_ids, 'float32')
+        loss_start = criterion(start_prob, start_ids)
+        loss_end = criterion(end_prob, end_ids)
+        loss = (loss_start + loss_end) / 2.0
+        return loss
 
-            global_step += 1
-            if global_step % args.logging_steps == 0 and rank == 0:
-                time_diff = time.time() - tic_train
-                loss_avg = sum(loss_list) / len(loss_list)
-                logger.info(
-                    "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss_avg,
-                       args.logging_steps / time_diff))
-                tic_train = time.time()
+    def compute_metrics(p):
+        metric = SpanEvaluator()
+        start_prob, end_prob = p.predictions
+        start_ids, end_ids = p.label_ids
+        metric.reset()
 
-            if global_step % args.valid_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
-                model_to_save.save_pretrained(save_dir)
-                logger.disable()
-                tokenizer.save_pretrained(save_dir)
-                logger.enable()
+        num_correct, num_infer, num_label = metric.compute(
+            start_prob, end_prob, start_ids, end_ids)
+        metric.update(num_correct, num_infer, num_label)
+        precision, recall, f1 = metric.accumulate()
+        metric.reset()
 
-                precision, recall, f1 = evaluate(model, metric, dev_data_loader,
-                                                 multilingual)
-                logger.info(
-                    "Evaluation precision: %.5f, recall: %.5f, F1: %.5f" %
-                    (precision, recall, f1))
-                if f1 > best_f1:
-                    logger.info(
-                        f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"
-                    )
-                    best_f1 = f1
-                    save_dir = os.path.join(args.save_dir, "model_best")
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
-                    model_to_save.save_pretrained(save_dir)
-                    logger.disable()
-                    tokenizer.save_pretrained(save_dir)
-                    logger.enable()
-                tic_train = time.time()
+        return {"precision": precision, "recall": recall, "f1": f1}
+
+    trainer = Trainer(
+        model=model,
+        criterion=uie_loss_func,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_ds
+        if training_args.do_train or training_args.do_compress else None,
+        eval_dataset=dev_ds
+        if training_args.do_eval or training_args.do_compress else None,
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
+    )
+
+    trainer.optimizer = paddle.optimizer.AdamW(
+        learning_rate=training_args.learning_rate,
+        parameters=model.parameters())
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
+    # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    # Evaluate and tests model
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+
+    # export inference model
+    if training_args.do_export:
+        # You can also load from certain checkpoint
+        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+        if model_args.multilingual:
+            input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+            ]
+        else:
+            input_spec = [
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='input_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='token_type_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='pos_ids'),
+                paddle.static.InputSpec(shape=[None, None],
+                                        dtype="int64",
+                                        name='att_mask'),
+            ]
+        if model_args.export_model_dir is None:
+            model_args.export_model_dir = os.path.join(training_args.output_dir,
+                                                       "export")
+        export_model(model=trainer.model,
+                     input_spec=input_spec,
+                     path=model_args.export_model_dir)
+    if training_args.do_compress:
+
+        @paddle.no_grad()
+        def custom_evaluate(self, model, data_loader):
+            metric = SpanEvaluator()
+            model.eval()
+            metric.reset()
+            for batch in data_loader:
+                if model_args.multilingual:
+                    logits = model(input_ids=batch['input_ids'],
+                                   pos_ids=batch["pos_ids"])
+                else:
+                    logits = model(input_ids=batch['input_ids'],
+                                   token_type_ids=batch['token_type_ids'],
+                                   pos_ids=batch["pos_ids"],
+                                   att_mask=batch["att_mask"])
+                start_prob, end_prob = logits
+                start_ids, end_ids = batch["start_positions"], batch[
+                    "end_positions"]
+                num_correct, num_infer, num_label = metric.compute(
+                    start_prob, end_prob, start_ids, end_ids)
+                metric.update(num_correct, num_infer, num_label)
+            precision, recall, f1 = metric.accumulate()
+            logger.info("f1: %s, precision: %s, recall: %s" %
+                        (f1, precision, f1))
+            model.train()
+            return f1
+
+        trainer.compress(custom_evaluate=custom_evaluate)
 
 
 if __name__ == "__main__":
-    # yapf: disable
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
-    parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
-    parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
-        "Sequences longer than this will be split automatically.")
-    parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")
-    parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
-    parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
-    parser.add_argument("--valid_steps", default=100, type=int, help="The interval steps to evaluate model performance.")
-    parser.add_argument("--device", choices=["cpu", "gpu"], default="gpu", help="Select which device to train model, defaults to gpu.")
-    parser.add_argument("--model", choices=["uie-base", "uie-tiny", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-base-en", "uie-m-base", "uie-m-large"], default="uie-base", type=str, help="Select the pretrained model for few-shot learning.")
-    parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
-
-    args = parser.parse_args()
-    # yapf: enable
-
-    do_train()
+    main()
