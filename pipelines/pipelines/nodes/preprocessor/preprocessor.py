@@ -329,14 +329,10 @@ class PreProcessor(BasePreProcessor):
             # concatenate individual elements based on split_length & split_stride
             # FAQ text process don't need split text into fix lengths
             if (not split_answers):
-                if split_overlap:
-                    segments = windowed(elements,
-                                        n=split_length,
-                                        step=split_length - split_overlap)
-                else:
-                    segments = windowed(elements,
-                                        n=split_length,
-                                        step=split_length)
+                segments = windowed(elements,
+                                    n=split_length,
+                                    step=split_length - split_overlap)
+
                 text_splits = []
                 for seg in segments:
                     txt = " ".join([t for t in seg if t is not None])
