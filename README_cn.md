@@ -31,7 +31,8 @@
 
 ## News 📢
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
-  * NLG能力扩充：📄 新增[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；❓新增[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的**通用问题生成预训练模型**。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
+  * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
+  * 发布 🖼[**PPDiffusers**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，可快速体验、二次开发 **Stable Diffusion**，持续支持更多模型。
 
 * 🔥 **2022.10.14 发布 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)**
   * 🧾 发布多语言跨模态布局增强文档智能大模型 [**ERNIE-Layout**](./model_zoo/ernie-layout/)，刷新11项任务SOTA。同步发布基于ERNIE-Layout的**文档抽取问答模型DocPrompt** 🔖，精准理解文档图片布局与语义信息，轻松应对各类业务场景。
@@ -45,7 +46,7 @@
 
 ## 社区交流
 
-- **💥 直播预告：10.25-10.28**，PaddleNLP研发团队详解PaddleNLP v2.4新发功能，并带来前沿技术分享，以及企业落地实践。微信扫描下方二维码，关注公众号并填写问卷后进入官方交流群，获取直播链接与10G重磅NLP学习大礼包。
+- **💥 直播回放：10.25-10.28**，PaddleNLP研发团队详解PaddleNLP v2.4新发功能，并带来前沿技术分享，以及企业落地实践。微信扫描下方二维码，关注公众号并填写问卷后进入官方交流群，获取直播回放与10G重磅NLP学习大礼包。
 
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/197535273-75db1fb3-3a34-4bd2-bac3-bcacb1b986a8.jpg" width="150" height="150" />

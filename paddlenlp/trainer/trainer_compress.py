@@ -603,7 +603,7 @@ def _post_training_quantization_grid_search(self, model_dir):
             if args.activation_quantize_type is None else
             args.activation_quantize_type,
             weight_quantize_type=args.weight_quantize_type,
-            onnx_format=False,
+            onnx_format=True,
             optimize_model=False)
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
@@ -625,13 +625,21 @@ def _post_training_quantization_grid_search(self, model_dir):
 
 
 def _quant_aware_training_dynamic(self, input_dir):
+    # TODO: Switch from multiple GPUs to a single GPU.
+    from paddleslim import QAT
+
     args = self.args
     args.output_filename_prefix = "int8"
+
     quant_config = {
+        # It defauts to None, which means that no preprocessing is performed
+        # on the active value."
         'activation_preprocess_type':
-        args.activation_preprocess_type,  # PACT or None
+        'PACT' if args.use_pact else None,
+        # It defauts to None, which means that no preprocessing is performed
+        # on weights.
         'weight_preprocess_type':
-        args.weight_preprocess_type,  # PACT or None
+        'PACT' if args.use_pact else None,
         'weight_quantize_type':
         args.weight_quantize_type,
         'activation_quantize_type':
@@ -649,14 +657,9 @@ def _quant_aware_training_dynamic(self, input_dir):
         'quantizable_layer_type': ['Linear', 'Conv2D'],
         'moving_rate':
         args.moving_rate,
+        'onnx_format':
+        True
     }
-
-    from paddleslim import QAT
-    self.model = _replace_auto_model_qat_forward(self.model)
-
-    quanter = QAT(config=quant_config)
-
-    quanter.quantize(self.model)
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -678,36 +681,45 @@ def _quant_aware_training_dynamic(self, input_dir):
     self.create_optimizer_and_scheduler(
         num_training_steps=args.num_training_steps)
 
-    global_step = 0
-    tic_train = time.time()
-    best_acc, acc = 0.0, 0.0
-
     logger.info("FP32 model's evaluation starts.")
 
     tic_eval = time.time()
     acc = evaluate(self, self.model, eval_dataloader)
     logger.info("eval done total: %s s" % (time.time() - tic_eval))
+
+    quanter = QAT(config=quant_config)
+    self.model = _replace_auto_model_qat_forward(self.model)
+    quanter.quantize(self.model)
+
+    global_step = 0
+    tic_train = time.time()
+    best_acc, acc = 0.0, 0.0
     logger.info("Quant aware training starts.")
     # Train self.model
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_dataloader):
             global_step += 1
             labels = None
-            if "labels" in batch:
-                labels = batch.pop("labels")
-            elif "start_positions" in batch and "end_positions" in batch:
-                labels = (batch.pop("start_positions"),
-                          batch.pop("end_positions"))
+            if self.args.label_names is None:
+                if "labels" in batch:
+                    labels = batch.pop("labels")
+                elif "start_positions" in batch and "end_positions" in batch:
+                    labels = (batch.pop("start_positions"),
+                              batch.pop("end_positions"))
+            else:
+                labels = []
+                for label in self.args.label_names:
+                    labels.append(batch.pop(label))
+                labels = tuple(labels)
             model_para_keys = inspect.signature(
                 self.model.forward).parameters.keys()
             inputs = {}
             for key in batch:
                 if key in model_para_keys:
                     inputs[key] = batch[key]
-            # import pdb; pdb.set_trace()
+
             logits = self.model(**inputs)
             loss = self.criterion(logits, labels)
-
             loss.backward()
             self.optimizer.step()
             self.lr_scheduler.step()
@@ -740,8 +752,10 @@ def _quant_aware_training_dynamic(self, input_dir):
     quanter.save_quantized_model(self.model,
                                  os.path.join(input_dir,
                                               args.output_filename_prefix),
-                                 input_spec=input_spec,
-                                 onnx_format=True)
+                                 input_spec=input_spec)
+    if os.path.exists(output_param_path):
+        os.remove(output_param_path)
+
     self.model = _recover_auto_model_forward(self.model)
     logger.info("Quant aware training ends and quantized models are saved.")
 
@@ -860,6 +874,7 @@ def auto_model_forward(self,
                        output_hidden_states=False,
                        output_attentions=False,
                        return_dict=False):
+    kwargs = locals()
     past_key_values_length = None
     if past_key_values is not None:
         past_key_values_length = past_key_values[0][0].shape[2]
@@ -878,17 +893,14 @@ def auto_model_forward(self,
         attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(
             paddle.get_default_dtype())
         attention_mask = (1.0 - attention_mask) * -1e4
-    return self._ori_forward(input_ids,
-                             token_type_ids,
-                             attention_mask=attention_mask,
-                             position_ids=position_ids,
-                             task_type_ids=task_type_ids,
-                             past_key_values=past_key_values,
-                             inputs_embeds=inputs_embeds,
-                             use_cache=use_cache,
-                             output_hidden_states=output_hidden_states,
-                             output_attentions=output_attentions,
-                             return_dict=return_dict)
+
+    kwargs_keys = inspect.signature(self._ori_forward).parameters.keys()
+
+    model_kwargs = {}
+    for key in kwargs_keys:
+        model_kwargs[key] = kwargs[key]
+    model_kwargs["attention_mask"] = attention_mask
+    return self._ori_forward(**model_kwargs)
 
 
 def soft_cross_entropy(inp, target):
