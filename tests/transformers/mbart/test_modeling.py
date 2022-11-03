@@ -308,10 +308,8 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
         """ Secretary-General Ban Ki-moon says his response to Russia's stepped up military support for Syria is that "there is no military solution" to the nearly five-year conflict and more weapons will only worsen the violence and misery for millions of people.""",
     ]
     tgt_text = [
-        "Şeful ONU declară că nu există o soluţie militară în Siria",
-        "Secretarul General Ban Ki-moon declară că răspunsul său la intensificarea sprijinului militar al Rusiei"
-        ' pentru Siria este că "nu există o soluţie militară" la conflictul de aproape cinci ani şi că noi arme nu vor'
-        " face decât să înrăutăţească violenţa şi mizeria pentru milioane de oameni.",
+        'Şeful ONU declară că nu există o soluţie militară în Siria',
+        'Secretarul General Ban Ki-moon declară că răspunsul său la intensificarea sprijinului militar acordat de Rusia Siriei este că "nu există o soluţie militară" la conflictul de aproape cinci ani şi că noi arme nu vor face decât să înrăutăţească violenţele şi mizeria a milioane de oameni.',
     ]
     expected_src_tokens = [
         8274, 127873, 25916, 7, 8622, 2071, 438, 67485, 53, 187895, 23, 51712,
@@ -341,7 +339,9 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
                                truncation=True,
                                return_token_type_ids=False)
         model = self.model()
-        translated_tokens = model.generate(**batch, max_length=128)[0]
+        translated_tokens = model.generate(**batch,
+                                           max_length=128,
+                                           decode_strategy="greedy_search")[0]
         decoded = self.tokenizer.batch_decode(translated_tokens,
                                               skip_special_tokens=True)
 
