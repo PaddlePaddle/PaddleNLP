@@ -38,7 +38,7 @@
 
 a. 软件环境：
 - python >= 3.7.0
-- paddlenlp >= 2.3.5
+- paddlenlp >= 2.4.3
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
