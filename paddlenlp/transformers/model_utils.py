@@ -399,13 +399,15 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                              pretrained_model_name_or_path,
-                                              file_name)
+                full_file_name = "/".join([
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                    file_name
+                ])
                 resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = os.path.join(
+            resource_files["model_config_file"] = "/".join([
                 COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                cls.model_config_file)
+                cls.model_config_file
+            ])
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
@@ -1194,7 +1196,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 1. retrieve the model related config
 
-        # save the string version of dtype to the config, e.g. convert torch.float32 => "float32"
+        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
         model_to_save = unwrap_model(self)
         dtype = get_parameter_dtype(model_to_save)

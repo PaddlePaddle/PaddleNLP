@@ -49,6 +49,7 @@
 
    Transformer预训练模型 <model_zoo/index>
    使用Trainer API训练 <trainer.md>
+   使用Trainer API进行模型压缩 <compression.md>
    一键预测功能 <model_zoo/taskflow>
    预训练词向量 <model_zoo/embeddings>
    
