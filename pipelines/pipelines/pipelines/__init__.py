@@ -15,4 +15,6 @@
 from pipelines.pipelines.base import Pipeline, RootNode
 from pipelines.pipelines.standard_pipelines import (BaseStandardPipeline,
                                                     ExtractiveQAPipeline,
-                                                    SemanticSearchPipeline)
+                                                    SemanticSearchPipeline,
+                                                    DocPipeline,
+                                                    TextToImagePipeline)

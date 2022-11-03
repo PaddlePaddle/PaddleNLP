@@ -14,8 +14,15 @@
 
 import numpy as np
 import sys
+import argparse
 
 from paddle_serving_server.web_service import WebService, Op
+
+# yapf: disable
+parser = argparse.ArgumentParser()
+parser.add_argument('--model_name_or_path', default="rocketqa-zh-base-query-encoder", help="Select tokenizer name to for model")
+args = parser.parse_args()
+# yapf: enable
 
 
 def convert_example(example,
@@ -37,8 +44,7 @@ class ErnieOp(Op):
 
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            'rocketqa-zh-base-query-encoder')
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
@@ -54,7 +60,7 @@ class ErnieOp(Op):
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
                 ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
                 ),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
@@ -77,6 +83,7 @@ class ErnieService(WebService):
         return ernie_op
 
 
-ernie_service = ErnieService(name="ernie")
-ernie_service.prepare_pipeline_config("config_nlp.yml")
-ernie_service.run_service()
+if __name__ == "__main__":
+    ernie_service = ErnieService(name="ernie")
+    ernie_service.prepare_pipeline_config("config_nlp.yml")
+    ernie_service.run_service()

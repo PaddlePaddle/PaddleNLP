@@ -123,3 +123,4 @@ FETCH_HEAD
 
 # vscode
 .vscode
+./ppdiffusers/ppdiffusers/version.py

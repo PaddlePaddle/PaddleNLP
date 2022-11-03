@@ -1117,7 +1117,7 @@ class T5Stack(nn.Layer):
                                           [batch_size, seq_length, 1
                                            ]) <= seq_ids.unsqueeze(axis=[0, 2])
                 # in case cache are used we need to add a prefix ones mask to the causal mask
-                # causal and attention masks must have same type with pytorch version < 1.3
+                # causal and attention masks must have same type
                 causal_mask = causal_mask.astype(attention_mask.dtype)
 
                 if causal_mask.shape[1] < attention_mask.shape[-1]:
