@@ -479,7 +479,8 @@ def main():
         pixel_values = pixel_values.astype("float32")
         input_ids = [example["input_ids"] for example in examples]
         padded_tokens = tokenizer.pad({"input_ids": input_ids},
-                                      padding=True,
+                                      padding="max_length",
+                                      max_length=tokenizer.model_max_length,
                                       return_tensors="pd")
         return {
             "pixel_values": pixel_values,

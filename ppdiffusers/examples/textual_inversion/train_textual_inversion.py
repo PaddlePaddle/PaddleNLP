@@ -581,7 +581,8 @@ def main():
         input_ids = tokenizer.pad({
             "input_ids": input_ids
         },
-                                  padding=True,
+                                  padding="max_length",
+                                  max_length=tokenizer.model_max_length,
                                   return_tensors="pd").input_ids
         batch = {
             "input_ids": input_ids,

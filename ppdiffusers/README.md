@@ -5,6 +5,7 @@
 
 ## 1. News 📢
 
+* 🔥 **2022.11.03 支持 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 和 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 中文权重**
 * 🔥 **2022.10.27 发布 PPDiffusers仓库**
 
 
@@ -74,10 +75,10 @@ from io import BytesIO
 
 from ppdiffusers import StableDiffusionImg2ImgPipeline
 
-# load the pipeline
+# 加载pipeline
 pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
 
-# let's download an initial image
+# 下载初始图片
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
 response = requests.get(url)
