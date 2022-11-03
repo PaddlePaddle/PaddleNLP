@@ -155,8 +155,8 @@ def answer_generation_from_paragraphs(paragraphs,
                     else:
                         answers += []
                         probabilitys += []
-                candidates = sorted([(a, p)
-                                     for a, p in zip(answers, probabilitys)],
+                candidates = sorted(list(
+                    set([(a, p) for a, p in zip(answers, probabilitys)])),
                                     key=lambda x: -x[1])
                 if len(candidates) > max_answer_candidates:
                     candidates = candidates[:max_answer_candidates]

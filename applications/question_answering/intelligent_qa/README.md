@@ -23,6 +23,7 @@
         - [过滤模型](#过滤模型)
       - [语料生成](#语料生成)
     - [语义索引](#语义索引)
+      - [语料构建](#语料构建)
       - [无监督训练](#无监督训练)
       - [评估](#评估)
       - [模型部署](#模型部署)
@@ -399,6 +400,24 @@ python -u run_qa_pairs_generation.py \
 
 
 ### 语义索引
+#### 语料构建
+执行以下脚本对生成的问答对进行转换，得到语意索引所需要的语料。
+```shell
+python -u run_data_preprocess.py \
+    --source_file_path your_source_file_path \
+    --target_dir_path .data \
+    --do_answer_prompt
+```
+关键参数释义如下：
+- `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见从本地文件创建数据集部分。指示了要转换的问答对json文件路径，生成的目标文件为json格式
+- `target_dir_path` 输出数据的目标文件夹，默认为".data"。
+- `test_sample_num` 表示在构造答案抽取数据时是否添加"答案"提示词。
+- `train_sample_num` 表示在构造答案抽取数据时是否添加长度提示词。
+- `all_sample_num` 表示在构造答案抽取数据时是否添加领域提示词。
+- `domain` 表示添加的领域提示词，在`do_domain_prompt`时有效。
+
+**NOTE:** 预处理后的微调用数据将分别位于answer_extraction、question_generation、filtration三个子文件夹中。
+
 #### 无监督训练
 
 ```

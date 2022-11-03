@@ -19,12 +19,6 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument(
-        "--do_create_faq_corpus",
-        action='store_true',
-        help=
-        "Whether to do create faq corpus, inculding qa_pair.csv, qac_triple.csv, train.csv, q_corpus.csv, dev.csv"
-    )
     parser.add_argument('--source_file_path',
                         type=str,
                         default=None,
@@ -104,7 +98,6 @@ def convert_json_to_data(json_file,
 
 if __name__ == '__main__':
     args = parse_args()
-    if args.do_create_faq_corpus:
-        convert_json_to_data(args.source_file_path, args.target_dir_path,
-                             args.test_sample_num, args.train_sample_num,
-                             args.all_sample_num)
+    convert_json_to_data(args.source_file_path, args.target_dir_path,
+                         args.test_sample_num, args.train_sample_num,
+                         args.all_sample_num)
