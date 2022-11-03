@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 import json
 import os
 import re
+from copy import deepcopy
 from typing import Callable, Dict, Optional, List, Tuple, Type, Union, TypeVar
 from dataclasses import dataclass
 
@@ -109,6 +110,142 @@ def load_all_converters() -> List[Type[Converter]]:
             converter_classes.append(obj)
 
     return converter_classes
+
+
+def state_dict_contains_prefix(state_dict: Dict[str, ndarray],
+                               prefix: str) -> bool:
+    """check whether state-dict contains `prefix`"""
+    prefix_count = sum(
+        [1 for key in state_dict.keys() if key.startswith(prefix)])
+    return prefix_count > 0
+
+
+class StateDictKeysChecker:
+    """State Dict Keys Checker"""
+
+    def __init__(self,
+                 model_or_state_dict: Union[Layer, Dict[str, ndarray]],
+                 loaded_state_dict: Dict[str, ndarray],
+                 check_shape: bool = True,
+                 base_model_prefix: Optional[str] = None,
+                 ignore_keys: Optional[List[str]] = None) -> None:
+        if isinstance(model_or_state_dict, Layer):
+            base_model_prefix = base_model_prefix or getattr(
+                model_or_state_dict, "base_model_prefix", None)
+            model_or_state_dict = {
+                key: value.detach().cpu().numpy()
+                for key, value in model_or_state_dict.state_dict().items()
+            }
+
+        self.model_state_dict = model_or_state_dict
+        self.loaded_state_dict = loaded_state_dict
+        self.check_shape = check_shape
+        self.ignore_keys = ignore_keys or []
+        self.base_model_prefix = base_model_prefix
+
+    def change_base_downstream_mismatched_keys(self):
+        """when model is base-model, loaded state-dict is downstream-model,
+            it should re-change the downstream state-dict.
+
+            eg: init `BertModel` with `BertForTokenClassification` state-dict 
+
+            # <model-base>-<loaded-downstream>
+            # remove base-prefix
+        """
+        for key in list(self.loaded_state_dict.keys()):
+            if key.startswith(self.base_model_prefix):
+                value = self.loaded_state_dict.pop(key)
+                new_key = key.replace(f"{self.base_model_prefix}.", '')
+                self.loaded_state_dict[new_key] = value
+
+    def change_downstream_base_mismatched_keys(self):
+        """when model is downstream-model, loaded state-dict is base-model,
+            it should re-change the downstream state-dict.
+
+            eg: init `BertModel` with `BertForTokenClassification` state-dict 
+
+            # <model>-<loaded>: <downstream>-<base>
+        """
+        for key in list(self.model_state_dict.keys()):
+            if key.startswith(self.base_model_prefix):
+
+                key_in_loaded = key.replace(f"{self.base_model_prefix}.", "")
+                assert key_in_loaded in self.loaded_state_dict
+                # check loaded keys
+                value = self.loaded_state_dict.pop(key_in_loaded)
+                self.loaded_state_dict[key] = value
+
+    def change_diff_keys(self) -> List[str]:
+        """change the loaded-state-dict by base-model & base_model_prefix
+
+        Returns:
+            List[str]: the diff keys between models and loaded-state-dict
+        """
+        # 1. is absolute same
+        all_diff_keys, not_in_model_keys, not_in_loaded_keys = self.get_diff_keys(
+            return_all_diff=True)
+        if len(all_diff_keys) == 0:
+            return []
+
+        if self.base_model_prefix is None:
+            return all_diff_keys
+
+        # 2. <model>-<loaded>: <base>-<downstream>
+        if not state_dict_contains_prefix(self.model_state_dict,
+                                          self.base_model_prefix):
+
+            # the base-static must be same
+            if not state_dict_contains_prefix(self.loaded_state_dict,
+                                              self.base_model_prefix):
+                error_msg = [
+                    f"also the base model, but contains the diff keys: \n"
+                ]
+                if not_in_model_keys:
+                    error_msg.append(
+                        f"in loaded state-dict, not in model keys: <{not_in_model_keys}>\n"
+                    )
+                if not_in_loaded_keys:
+                    error_msg.append(
+                        f"in model keys, not in loaded state-dict keys: <{not_in_model_keys}>\n"
+                    )
+                logger.error(error_msg)
+                return []
+            self.change_base_downstream_mismatched_keys()
+        elif not state_dict_contains_prefix(self.loaded_state_dict,
+                                            self.base_model_prefix):
+            # <model>-<loaded>: <downstream>-<base>
+            self.change_downstream_base_mismatched_keys()
+
+    def get_unexpected_keys(self):
+        """get unexpected keys which are not in model"""
+        self.change_diff_keys()
+        _, unexpected_keys, _ = self.get_diff_keys(True)
+        return unexpected_keys
+
+    def get_mismatched_keys(self):
+        """get mismatched keys which not found in loaded state-dict"""
+        self.change_diff_keys()
+        _, _, mismatched_keys = self.get_diff_keys(True)
+        return mismatched_keys
+
+    def get_diff_keys(self, return_all_diff: bool = False) -> List[str]:
+        """get diff keys
+
+        Args:
+            return_all_diff (bool, optional): return. Defaults to False.
+
+        Returns:
+            List[str]: the diff keys betweens model and loaded state-dict
+        """
+        mismatched_keys = set(self.model_state_dict.keys()) - set(
+            self.loaded_state_dict.keys())
+        unexpected_keys = set(self.loaded_state_dict.keys()) - set(
+            self.model_state_dict.keys())
+
+        all_diff_keys = mismatched_keys | unexpected_keys
+        if return_all_diff:
+            return all_diff_keys, unexpected_keys, mismatched_keys
+        return all_diff_keys
 
 
 @dataclass
@@ -439,7 +576,8 @@ class Converter(ABC):
         return output.detach().cpu().reshape([-1]).numpy()
 
     @staticmethod
-    def get_model_state_dict(model: Union[Layer, Module]) -> Dict[str, ndarray]:
+    def get_model_state_dict(model: Union[Layer, Module],
+                             copy: bool = False) -> Dict[str, ndarray]:
         """get the state_dict of pytorch/paddle model
 
         Args:
@@ -450,10 +588,13 @@ class Converter(ABC):
         """
         from torch import nn
         assert isinstance(model, (Layer, nn.Module))
-        return {
+        state_dict = {
             key: value.detach().cpu().numpy()
             for key, value in model.state_dict().items()
         }
+        if copy:
+            state_dict = deepcopy(state_dict)
+        return state_dict
 
     def compare_model_state_dicts(self, paddle_model: Layer,
                                   pytorch_model: Module,
