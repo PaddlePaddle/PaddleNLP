@@ -1721,7 +1721,6 @@ class FasterPegasus(PegasusPretrainedModel):
         decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
             self._model, 'decoder_start_token_id', None)
 
-        # import pdb;pdb.set_trace()
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(
