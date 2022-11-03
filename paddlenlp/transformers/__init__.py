@@ -21,10 +21,12 @@ from .export import export_model
 
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .bert.configuration import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
+from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *
 from .albert.modeling import *
@@ -55,8 +57,8 @@ from .ernie_doc.tokenizer import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
-from .ernie_layoutx.modeling import *
-from .ernie_layoutx.tokenizer import *
+from .ernie_layout.modeling import *
+from .ernie_layout.tokenizer import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .fnet.modeling import *
@@ -135,6 +137,8 @@ from .clip.tokenizer import *
 from .clip.procesing import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
+from .pegasus.modeling import *
+from .pegasus.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_faster_tokenizer_available

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,9 +76,9 @@ class ErnieCrfForTokenClassification(nn.Layer):
     def forward(self,
                 input_ids,
                 token_type_ids=None,
+                lengths=None,
                 position_ids=None,
                 attention_mask=None,
-                lengths=None,
                 labels=None):
         logits = self.ernie(input_ids,
                             token_type_ids=token_type_ids,

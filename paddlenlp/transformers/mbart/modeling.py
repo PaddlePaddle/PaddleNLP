@@ -501,6 +501,12 @@ class MBartModel(MBartPretrainedModel):
     def get_decoder(self):
         return self.decoder
 
+    def get_input_embeddings(self):
+        return self.shared
+
+    def set_input_embeddings(self, value):
+        self.shared = value
+
     def forward(self,
                 input_ids,
                 attention_mask=None,

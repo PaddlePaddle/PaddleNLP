@@ -228,6 +228,9 @@ def parse_args(MODEL_CLASSES):
                         type=float,
                         default=0.1,
                         help="The attention probs dropout prob.")
+    parser.add_argument("--to_static",
+                        action="store_true",
+                        help="Whether use to_static to train.")
     # Other config
     parser.add_argument("--seed",
                         type=int,

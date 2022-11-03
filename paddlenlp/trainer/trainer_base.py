@@ -257,9 +257,10 @@ class Trainer:
 
             model.apply(fn)
 
-        default_label_names = ([
-            "start_positions", "end_positions"
-        ] if "QusetionAnswering" in type(self.model).__name__ else ["labels"])
+        default_label_names = (["start_positions", "end_positions"] if
+                               "QusetionAnswering" in type(self.model).__name__
+                               or "UIE" in type(self.model).__name__ else
+                               ["labels"])
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
         self.control = self.callback_handler.on_init_end(
