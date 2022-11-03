@@ -115,6 +115,8 @@ def do_eval():
 
     if args.debug and len(relation_type_dict.keys()) != 0:
         for key in relation_type_dict.keys():
+            test_ds = MapDataset(relation_type_dict[key])
+            test_ds = test_ds.map(trans_fn)
             test_data_loader = create_data_loader(test_ds,
                                                   mode="test",
                                                   batch_size=args.batch_size,
