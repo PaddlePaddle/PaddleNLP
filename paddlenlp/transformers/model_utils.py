@@ -1196,7 +1196,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 1. retrieve the model related config
 
-        # save the string version of dtype to the config, e.g. convert torch.float32 => "float32"
+        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
         model_to_save = unwrap_model(self)
         dtype = get_parameter_dtype(model_to_save)
