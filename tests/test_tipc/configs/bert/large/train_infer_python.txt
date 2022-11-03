@@ -17,7 +17,7 @@ norm_train:../examples/language_model/bert/run_pretrain.py --max_predictions_per
 pact_train:null
 fpgm_train:null
 distill_train:null
-null:null
+to_static_train:--to_static True
 null:null
 ##
 ===========================eval_params=========================== 

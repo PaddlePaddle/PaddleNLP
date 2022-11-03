@@ -13,15 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import random
+import shutil
 import copy
 import inspect
 import tempfile
 import unittest
 import numpy as np
-import paddle
 
-global_rng = random.Random()
+import paddle
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils.env import MODEL_HOME
+from ..testing_utils import slow
 
 
 def ids_tensor(shape, vocab_size, dtype="int32"):
@@ -39,6 +44,18 @@ def random_attention_mask(shape, dtype="int32"):
 def floats_tensor(shape, scale=1.0):
     """Creates a random float32 tensor"""
     return scale * paddle.randn(shape, dtype="float32")
+
+
+def check_two_model_parameter(first_model: PretrainedModel,
+                              second_model: PretrainedModel):
+    assert len(
+        set(first_model.state_dict().keys()) -
+        set(second_model.state_dict().keys())) == 0
+
+    # random choice the keys to compare
+    key = random.choice(list(first_model.state_dict().keys()))
+    diff = first_model.state_dict()[key] - second_model.state_dict()[key]
+    assert diff.sum().numpy().item() == 0
 
 
 class ModelTesterMixin:
@@ -66,10 +83,12 @@ class ModelTesterMixin:
         return inputs_dict
 
     def _make_model_instance(self, config, model_class):
+        if isinstance(config, PretrainedConfig):
+            return model_class(config)
         if model_class == self.base_model_class:
             return model_class(**config)
-        else:
-            return model_class(self.base_model_class(**config))
+
+        return model_class(self.base_model_class(**config))
 
     def test_save_load(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
@@ -490,5 +509,83 @@ class ModelTesterMixin:
 
     def test_model_name_list(self):
         config = self.model_tester.get_config()
-        model = self.base_model_class(**config)
+        if isinstance(config, PretrainedConfig):
+            model = self.base_model_class(config)
+        else:
+            model = self.base_model_class(**config)
         self.assertTrue(len(model.model_name_list) != 0)
+
+
+class ModelTesterPretrainedMixin:
+    base_model_class: PretrainedModel = None
+
+    @slow
+    def test_model_from_pretrained_with_cache_dir(self):
+        for model_name in list(
+                self.base_model_class.pretrained_init_configuration)[:1]:
+            with tempfile.TemporaryDirectory() as tempdir:
+                tempdir = str(tempdir)
+
+                model = self.base_model_class.from_pretrained(model_name,
+                                                              cache_dir=tempdir)
+                self.assertIsNotNone(model)
+                self.assertTrue(
+                    os.path.isfile(
+                        os.path.join(
+                            tempdir, self.base_model_class.
+                            resource_files_names['model_state'])))
+                self.assertTrue(
+                    os.path.isfile(
+                        os.path.join(tempdir,
+                                     self.base_model_class.model_config_file)))
+
+    @slow
+    def test_pretrained_save_and_load(self):
+        """test the pretrained model save and load with two different ways: url-file-name & model_state name
+
+            eg: `bert-base-uncased.pdparams` and `model_state.pdparams`
+        """
+        for model_name in list(
+                self.base_model_class.pretrained_init_configuration)[:1]:
+            model = self.base_model_class.from_pretrained(model_name)
+            self.assertIsNotNone(model)
+
+            # 1. save and load
+            with tempfile.TemporaryDirectory() as tempdir:
+                tempdirname = str(tempdir)
+                model.save_pretrained(tempdirname)
+
+                loaded_model = self.base_model_class.from_pretrained(
+                    tempdirname)
+
+                check_two_model_parameter(model, loaded_model)
+
+            # 2. convert the weight file name
+            with tempfile.TemporaryDirectory() as tempdir:
+                tempdirname = str(tempdir) + '_old'
+
+                shutil.copytree(
+                    os.path.join(MODEL_HOME, model_name),
+                    tempdirname,
+                )
+                files = os.listdir(tempdirname)
+
+                saved_model_state_file = os.path.join(
+                    tempdirname,
+                    self.base_model_class.resource_files_names['model_state'])
+
+                self.assertTrue(os.path.isfile(saved_model_state_file))
+
+                # rename it to the old style: name of url, eg: model_state.pdparams -> bert-base-uncased.pdparams
+                url = self.base_model_class.pretrained_resource_files_map[
+                    'model_state'][model_name]
+                pretrained_resource_file_name = os.path.split(url)[-1]
+                target_file_path = os.path.join(tempdirname,
+                                                pretrained_resource_file_name)
+
+                shutil.copyfile(saved_model_state_file, target_file_path)
+                os.remove(saved_model_state_file)
+
+                new_model = self.base_model_class.from_pretrained(tempdirname)
+
+                check_two_model_parameter(model, new_model)
