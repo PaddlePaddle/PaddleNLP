@@ -304,7 +304,7 @@ class EMAModel:
         """
         Copy current averaged parameters into given collection of parameters.
         Args:
-            parameters: Iterable of `torch.nn.Parameter`; the parameters to be
+            parameters: Iterable of `paddle.nn.Parameter`; the parameters to be
                 updated with the stored moving averages. If `None`, the
                 parameters with which this `ExponentialMovingAverage` was
                 initialized will be used.
