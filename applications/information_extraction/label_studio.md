@@ -47,6 +47,28 @@ label-studio start
 
 #### 2.1 项目创建
 
+点击创建（Create）开始创建一个新的项目，填写项目名称、描述，然后选择``Object Detection with Bounding Boxes``。
+
+- 填写项目名称、描述
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199661377-d9664165-61aa-4462-927d-225118b8535b.png height=200 width=1200 />
+</div>
+
+- 选择``Relation Extraction`
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=300 width=1200 />
+</div>
+
+- 添加标签(也可跳过后续在Setting/Labeling Interface中配置)
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199662737-ed996a2c-7a24-4077-8a36-239c4bfb0a16.png height=320 width=1200 />
+</div>
+
+图中展示了实体类型标签的构建，其他类型标签的构建可参考[2.3标签构建](#33)
+
 <a name="22"></a>
 
 #### 2.2 数据上传
@@ -114,23 +136,27 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 
 #### 3.1 项目创建
 
-点击创建（Create）开始创建一个新的项目，填写项目名称、描述，然后选择``Object Detection with Bounding Boxes``。点击创建成功创建一个label-studio项目。
+点击创建（Create）开始创建一个新的项目，填写项目名称、描述，然后选择``Object Detection with Bounding Boxes``。
 
-填写项目名称、描述
+- 填写项目名称、描述
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199445809-1206f887-2782-459e-9001-fbd790d59a5e.png height=300 width=1200 />
 </div>
 
-选择``Object Detection with Bounding Boxes`
-
-
-添加标签
+- 选择``Object Detection with Bounding Boxes`
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199450930-4c0cd189-6085-465a-aca0-6ba6f52a0c0d.png height=600 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199660090-d84901dd-001d-4620-bffa-0101a4ecd6e5.png height=400 width=1200 />
 </div>
 
+- 添加标签(也可跳过后续在Setting/Labeling Interface中添加)
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199450930-4c0cd189-6085-465a-aca0-6ba6f52a0c0d.png height=500 width=1200 />
+</div>
+
+图中展示了实体类型标签的构建，其他类型标签的构建可参考[3.3标签构建](#33)
 
 <a name="32"></a>
 
@@ -149,7 +175,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 - 构建实体标签
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199456432-ce601ab0-7d6c-458f-ac46-8839dbc4d013.png height=500 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199456432-ce601ab0-7d6c-458f-ac46-8839dbc4d013.png height=470 width=1200 />
 </div>
 
 
