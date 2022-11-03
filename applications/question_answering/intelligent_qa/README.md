@@ -1,37 +1,28 @@
 # 问答对自动生成智能检索式问答
 
-
 **目录**
 - [问答对自动生成智能检索式问答](#问答对自动生成智能检索式问答)
   - [简介](#简介)
     - [项目优势](#项目优势)
-  <!-- - [开箱即用](#开箱即用)
-  - [效果展示](#效果展示) -->
   - [方案介绍](#方案介绍)
     - [技术方案](#技术方案)
-    <!-- - [评估指标](#评估指标) -->
     - [代码结构说明](#代码结构说明)
-  - [系统构建](#系统构建)
+  - [基于Pipelines快速构建问答系统](#基于Pipelines快速构建问答系统)
+    - [运行环境和安装说明](#运行环境和安装说明)
+    - [数据说明](#数据说明)
+    - [快速体验问答对自动生成智能检索式问答](#快速体验问答对自动生成智能检索式问答)
+  - [基于Paddle-Serving构建问答系统](#基于Paddle-Serving构建问答系统)
     - [环境依赖](#环境依赖)
-    - [问答对生成](#问答对生成)
-      - [数据处理](#数据处理)
-        - [数据准备](#数据准备)
-        - [数据预处理](#数据预处理)
-      - [模型微调](#模型微调)
-        - [答案抽取](#答案抽取)
-        - [问题生成](#问题生成)
-        - [过滤模型](#过滤模型)
-      - [语料生成](#语料生成)
-    - [语义索引](#语义索引)
-      - [语料构建](#语料构建)
-      - [无监督训练](#无监督训练)
-      - [评估](#评估)
-      - [模型部署](#模型部署)
-        - [动转静导出](#动转静导出)
-        - [问答检索引擎](#问答检索引擎)
-        - [Paddle-Serving部署](#Paddle-Serving部署)
-      - [整体流程](#整体流程)
-  - [References](#references)
+    - [数据说明](#数据说明)
+    - [语料构建](#语料构建)
+    - [检索模型训练部署](#检索模型训练部署)
+  - [自定义模型](#自定义模型)
+    - [数据准备](#数据准备)
+    - [模型微调](#模型微调)
+      - [答案抽取](#答案抽取)
+      - [问题生成](#问题生成)
+      - [过滤模型](#过滤模型)
+  - [References](#References)
 
 ## 简介
 问答（QA）系统中最关键的挑战之一是标记数据的稀缺性，这是因为对目标领域获取问答对或常见问答对（FAQ）的成本很高，需要消耗大量的人力和时间。由于上述制约，这导致问答系统落地困难，解决此问题的一种方法是依据问题上下文或大量非结构化文本自动生成的QA问答对。
@@ -42,7 +33,6 @@
 
 ### 项目优势
 具体来说，本项目具有以下优势：
-
 
 + 低成本
     + 可通过自动生成的方式快速大量合成QA语料，大大降低人力成本
@@ -58,13 +48,9 @@
     + 针对无标注数据场景的领先解决方案: 检索预训练模型 + 增强的无监督语义索引微调
 
 + 性能快
-    + 基于Paddle Inference 快速抽取向量
+    + 基于Paddle Inferenc快速抽取向量
     + 基于Milvus 快速查询和高性能建库
-    + 基于Paddle Serving 高性能部署
-
-<!--
-## 效果展示
-## 开箱即用 -->
+    + 基于Paddle Serving高性能部署
 
 ## 方案介绍
 ### 技术方案
@@ -95,35 +81,160 @@
 └── README.md # 说明文档
 ```
 
-## 系统构建
+## 基于Pipelines快速构建问答系统
+### 运行环境和安装说明
+基于Pipelines构建问答系统需要安装paddle-pipelines依赖，使用pip安装命令如下：
+```bash
+# pip一键安装
+pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+或者进入pipelines目录下，针对源码进行安装：
+```bash
+# 源码进行安装
+cd PaddleNLP/pipelines/
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python setup.py install
+```
 
+### 数据说明
+我们以提供的纯文本文件[source_file.txt](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/source_file.txt)为例，系统将每一条都视为一个上下文并基于此生成多个问答对，并基于此构建索引库，该文件可直接下载放入`data/pipelines`，开发者也可以使用自己的文件。
+
+### 快速体验问答对自动生成智能检索式问答
+开发者可以通过如下命令快速体验无监督智能检索问答系统的效果，系统将自动根据提供的纯文本文件构建问答对语料库，并基于生成的问答对语料库构造索引库。
+我们建议在GPU环境下运行本示例，运行速度较快，运行命令如下：
+```bash
+# GPU环境下运行示例
+# 设置1个空闲的GPU卡，此处假设0卡为空闲GPU
+export CUDA_VISIBLE_DEVICES=0
+python unsupervised_question_answering_example.py --device gpu --source_file data/pipelines/source_file.txt --doc_dir data/pipelines/my_data --index_name faiss_index --retriever_batch_size 16
+```
+关键参数释义如下：
+- `device`: 使用的设备，默认为'gpu'，可选择['cpu', 'gpu']。
+- `source_file`: 源文件路径，指定该路径将自动为其生成问答对至`doc_dir`。
+- `doc_dir`: 生成的问答对语料保存的位置，系统将根据该位置自动构建检索数据库，默认为'data/pipelines/my_data'。
+- `index_name`: FAISS的ANN索引名称，默认为'faiss_index'。
+- `retriever_batch_size`: 构建ANN索引时的批量大小，默认为16。
+
+如果只有CPU机器，可以通过--device参数指定cpu即可, 运行耗时较长，运行命令如下：
+```bash
+# CPU环境下运行示例
+unset CUDA_VISIBLE_DEVICES
+python unsupervised_question_answering_example.py --device cpu --source_file data/pipelines/source_file.txt --doc_dir data/pipelines/my_data --index_name faiss_index --retriever_batch_size 16
+```
+**【注意】**  关于构建Web可视化问答对自动生成智能检索式问答系统，请参考[Pipelines-无监督智能检索问答系统](../../../pipelines/examples/unsupervised_question_answering/README.md)。
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/20476674/199488926-c64d3f4e-8117-475f-afe6-b02088105d09.gif" >
+</div>
+
+## 基于Paddle-Serving构建问答系统
 ### 环境依赖
-- nltk
-- evaluate
-- tqdm
-
 安装方式：`pip install -r requirements.txt`
 
-### 问答对生成
-对于标准场景的问答对可以直接使用提供的预训练模型实现零样本（zero-shot）问答对生成，开发者可直接参考[语料生成](#语料生成)部分。对于细分场景我们推荐使用定制功能（标注少量数据进行模型微调）以进一步提升效果，开发者可以参考[数据处理](#数据处理)和[模型微调](#模型微调)。下面通过疫情政务问答的例子展示问答对生成的完整流程。
+### 数据说明
+我们以提供的纯文本文件[source_file.txt](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/source_file.txt)为例，系统将每一条都视为一个上下文并基于此生成多个问答对，系统将基于此构建索引库，该文件可直接下载放入`data/serving`，开发者也可以使用自己的文件。
 
-#### 数据处理
-这一部分介绍如何准备和预处理[模型微调](#模型微调)所需的数据。
-##### 数据准备
+### 语料构建
+#### 问答对生成
+对于标准场景的问答对可以直接使用提供的预训练模型实现零样本（zero-shot）问答对生成。对于细分场景开发者可以根据个人需求训练[自定义模型](#自定义模型)，加载自定义模型进行问答对生成，以进一步提升效果。
+
+生成问答对语料的命令如下：
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python -u run_qa_pairs_generation.py \
+    --source_file_path=data/serving/source_file.txt \
+    --target_file_path=data/serving/target_file.json \
+    --answer_generation_model_path=uie-base-answer-extractor-v1 \
+    --question_generation_model_path=unimo-text-1.0-question-generation \
+    --filtration_model_path=uie-base-qa-filter-v1 \
+    --batch_size=8 \
+    --a_max_answer_candidates=10 \
+    --a_prompt='答案' \
+    --a_position_prob=0.01  \
+    --q_num_return_sequences=3 \
+    --q_max_question_length=50 \
+    --q_decode_strategy=sampling \
+    --q_top_k=5 \
+    --q_top_p=1 \
+    --do_filtration \
+    --f_filtration_position_prob=0.01 \
+    --do_debug
+```
+关键参数释义如下：
+- `source_file_path` 源文件路径，源文件中每一行代表一条待生成问答对的上下文文本。
+- `target_file_path` 目标文件路径，生成的目标文件为json格式。
+- `answer_generation_model_path` 要加载的答案抽取模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地模型checkpoint路径。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | uie-base-answer-extractor-v1    |
+
+- `question_generation_model_path` 要加载的问题生成模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地模型checkpoint路径。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | unimo-text-1.0-question-generation      |
+   | unimo-text-1.0-dureader_qg |
+   | unimo-text-1.0-question-generation-dureader_qg |
+
+- `filtration_model_path` 要加载的过滤模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地模型checkpoint路径。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+   | 可选预训练模型        |
+   |---------------------------------|
+   | uie-base-qa-filter-v1     |
+
+- `batch_size` 使用taskflow时的批处理大小，请结合机器情况进行调整，默认为8。
+- `a_max_answer_candidates` 答案抽取阶段，每个输入的最大返回答案候选数，默认为5。
+- `a_prompt` 答案抽取阶段，使用的提示词，以","分隔，默认为"答案"。
+- `a_position_prob` 答案抽取阶段，置信度阈值，默认为0.01。
+- `q_num_return_sequences` 问题生成阶段，返回问题候选数，在使用"beam_search"解码策略时它应该小于`q_num_beams`，默认为3。
+- `q_max_question_length` 问题生成阶段，最大解码长度，默认为50。
+- `q_decode_strategy` 问题生成阶段，解码策略，默认为"sampling"。
+- `q_top_k` 问题生成阶段，使用"sampling"解码策略时的top k值，默认为5。
+- `q_top_p` 问题生成阶段，使用"sampling"解码策略时的top p值，默认为0。
+- `q_num_beams` 问题生成阶段，使用"beam_search"解码策略时的beam大小，默认为6。
+- `do_filtration` 是否进行过滤。
+- `f_filtration_position_prob` 过滤阶段，过滤置信度阈值，默认为0.1。
+- `do_debug` 是否进入调试状态，调试状态下将输出过滤掉的生成问答对。
+
+#### 语料转换
+执行以下脚本对生成的问答对进行转换，得到语义索引所需要的语料train.csv、dev.csv、q_corpus.csv、qa_pair.csv：
+```shell
+python -u run_corpus_preparation.py \
+    --source_file_path data/serving/target_file.json \
+    --target_dir_path data/serving/my_corpus
+```
+关键参数释义如下：
+- `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见从本地文件创建数据集部分。指示了要转换的问答对json文件路径，生成的目标文件为json格式
+- `target_dir_path` 输出数据的目标文件夹，默认为"data/serving/my_corpus"。
+- `test_sample_num` 构建检索系统时保留的测试样本数目，默认为0。
+- `train_sample_num` 构建检索系统时保留的有监督训练样本数目，默认为0。
+- `all_sample_num` 构建检索系统时保留的总样本数目，默认为None，表示保留除了前`test_sample_num`+`train_sample_num`个样本外的所有样本。
+
+
+### 检索模型训练部署
+在已有问答语料库和语义检索模型前提下，模型部署首先要把语义检索模型由动态图转换成静态图，然后转换成serving的格式，此外还需要基于Milvus和问答语料库构建语义检索引擎。
+
+关于如何对语义检索模型进行无监督训练，以及针对给定问答语料库进行模型部署，请参考[faq_system](../README.md)。
+
+
+
+
+
+## 自定义模型
+### 数据准备
+这一部分介绍如何准备和预处理答案抽取、问题生成、过滤模块微调所需的数据。关于如何准备通过无监督方式训练自定义语义索引模型所需的数据，见[语料转换](#语料转换)。
+#### 自定义数据
 在许多情况下，我们需要使用本地数据集来微调模型从而得到定制化的能力，让生成的问答对更接近于理想分布，本项目支持使用固定格式本地数据集文件进行微调。
 
-这里我们提供预先标注好的文件样例[train.json]()和[dev.json]()，可直接下载放入./data。
+这里我们提供预先标注好的文件样例[train.json]()和[dev.json]()，可直接下载放入./data/finetune。
 
 开发者也可自行构建本地数据集，具体来说，本地数据集目录结构如下：
 ```text
-data/
+data/finetune/
 ├── train.json # 训练数据集文件
 ├── dev.json # 开发数据集文件
 └── test.json # 可选，待预测数据文件
 ```
 本地数据集文件格式如下：
-- train.json/dev.json/test.json 文件格式：
 ```text
+# train.json/dev.json/test.json文件格式：
 {
   "context": <context_text>,
   "answer": <answer_text>,
@@ -131,8 +242,9 @@ data/
 }
 ...
 ```
-- train.json/dev.json/test.json 文件样例：
+本地数据集文件具体样例如下：
 ```text
+train.json/dev.json/test.json文件样例：
 {
   "context": "欠条是永久有效的,未约定还款期限的借款合同纠纷,诉讼时效自债权人主张债权之日起计算,时效为2年。 根据《中华人民共和国民法通则》第一百三十五条:向人民法院请求保护民事权利的诉讼时效期间为二年,法律另有规定的除外。 第一百三十七条:诉讼时效期间从知道或者应当知道权利被侵害时起计算。但是,从权利被侵害之日起超过二十年的,人民法院不予保护。有特殊情况的,人民法院可以延长诉讼时效期间。 第六十二条第(四)项:履行期限不明确的,债务人可以随时履行,债权人也可以随时要求履行,但应当给对方必要的准备时间。",
   "answer": "永久有效",
@@ -141,17 +253,17 @@ data/
 ...
 ```
 
-##### 数据预处理
+#### 数据预处理
 执行以下脚本对数据集进行数据预处理，得到接下来答案抽取、问题生成、过滤模块模型微调所需要的数据，注意这里答案抽取、问题生成、过滤模块的微调数据来源于相同的数据集。
 ```shell
 python -u run_data_preprocess.py \
-    --source_file_path your_source_file_path \
+    --source_file_path data/finetune/train.json \
     --target_dir .data \
     --do_answer_prompt
 ```
 关键参数释义如下：
-- `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见从本地文件创建数据集部分。
-- `target_dir` 输出数据的目标文件夹，默认为".data"。
+- `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见[自定义数据](#自定义数据)部分。
+- `target_dir` 输出数据的目标文件夹，默认为".data/finetune"。
 - `do_answer_prompt` 表示在构造答案抽取数据时是否添加"答案"提示词。
 - `do_len_prompt` 表示在构造答案抽取数据时是否添加长度提示词。
 - `do_domain_prompt` 表示在构造答案抽取数据时是否添加领域提示词。
@@ -159,14 +271,14 @@ python -u run_data_preprocess.py \
 
 **NOTE:** 预处理后的微调用数据将分别位于answer_extraction、question_generation、filtration三个子文件夹中。
 
-#### 模型微调
-##### 答案抽取
+### 模型微调
+#### 答案抽取
 运行如下命令即可在样例训练集上微调答案抽取模型。
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extraction answer_generation/finetune.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extraction finetune/answer_generation/finetune.py \
     --train_path=.data/answer_extration/train.json \
     --dev_path=.data/answer_extration/dev.json \
     --save_dir=.log/answer_extration/checkpoints \
@@ -214,7 +326,7 @@ python answer_generation/evaluate.py \
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
-##### 问题生成
+#### 问题生成
 运行如下命令即可在样例训练集上微调问题生成模型，并在样例验证集上进行验证。
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
@@ -286,7 +398,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_gene
 | :-----------------------------: | :-----------: |
 |    unimo-text-1.0-dureader_qg-template1    | 41.08 |
 
-##### 过滤模型
+#### 过滤模型
 运行如下命令即可在样例训练集上微调过滤模型。
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
@@ -339,323 +451,6 @@ python filtration/evaluate.py \
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
-
-#### 语料生成
-
-开发者可以使用上一步[模型微调](#模型微调)后的模型生成问答对语料，也可以使用提供的预训练模型来直接生成问答对语料。
-
-我们以提供的上下文文件[source_file.txt]()为例，该文件可直接下载放入./data，生成问答对语料的命令如下：
-```shell
-export CUDA_VISIBLE_DEVICES=0
-python -u run_qa_pairs_generation.py \
-    --source_file_path=./data/source_file.txt \
-    --target_file_path=./data/qa_pairs/target_file.json \
-    --answer_generation_model_path=.log/filtration/checkpoints/model_best \
-    --question_generation_model_path=.log/filtration/checkpoints/model_best \
-    --filtration_model_path=.log/filtration/checkpoints/model_best \
-    --batch_size=8 \
-    --a_max_answer_candidates=10 \
-    --a_prompt='答案,短答案' \
-    --a_position_prob=0.01  \
-    --q_num_return_sequences=3 \
-    --q_max_question_length=50 \
-    --q_decode_strategy=sampling \
-    --q_top_k=5 \
-    --q_top_p=1 \
-    --do_filtration \
-    --f_filtration_position_prob=0.01 \
-    --do_debug
-```
-关键参数释义如下：
-- `source_file_path` 源文件路径，源文件中每一行代表一条待生成问答对的上下文文本。
-- `target_file_path` 目标文件路径，生成的目标文件为json格式。
-- `answer_generation_model_path` 要加载的答案抽取模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
-   | 可选预训练模型        |
-   |---------------------------------|
-   | unimo-text-1.0      |
-   | unimo-text-1.0-large |
-- `question_generation_model_path` 要加载的问题生成模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
-   | 可选预训练模型        |
-   |---------------------------------|
-   | unimo-text-1.0      |
-   | unimo-text-1.0-large |
-- `filtration_model_path` 要加载的过滤模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
-   | 可选预训练模型        |
-   |---------------------------------|
-   | unimo-text-1.0      |
-   | unimo-text-1.0-large |
-- `batch_size` 使用taskflow时的批处理大小，请结合机器情况进行调整，默认为8。
-- `a_max_answer_candidates` 答案抽取阶段，每个输入的最大返回答案候选数，默认为5。
-- `a_prompt` 答案抽取阶段，使用的提示词，以","分隔，默认为"答案"。
-- `a_position_prob` 答案抽取阶段，置信度阈值，默认为0.01。
-- `q_num_return_sequences` 问题生成阶段，返回问题候选数，在使用"beam_search"解码策略时它应该小于`q_num_beams`，默认为3。
-- `q_max_question_length` 问题生成阶段，最大解码长度，默认为50。
-- `q_decode_strategy` 问题生成阶段，解码策略，默认为"sampling"。
-- `q_top_k` 问题生成阶段，使用"sampling"解码策略时的top k值，默认为5。
-- `q_top_p` 问题生成阶段，使用"sampling"解码策略时的top p值，默认为0。
-- `q_num_beams` 问题生成阶段，使用"beam_search"解码策略时的beam大小，默认为6。
-- `do_filtration` 是否进行过滤。
-- `f_filtration_position_prob` 过滤阶段，过滤置信度阈值，默认为0.1。
-- `do_debug` 是否进入调试状态，调试状态下将输出过滤掉的生成问答对。
-
-
-### 语义索引
-#### 语料构建
-执行以下脚本对生成的问答对进行转换，得到语意索引所需要的语料。
-```shell
-python -u run_data_preprocess.py \
-    --source_file_path your_source_file_path \
-    --target_dir_path .data \
-    --do_answer_prompt
-```
-关键参数释义如下：
-- `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见从本地文件创建数据集部分。指示了要转换的问答对json文件路径，生成的目标文件为json格式
-- `target_dir_path` 输出数据的目标文件夹，默认为".data"。
-- `test_sample_num` 表示在构造答案抽取数据时是否添加"答案"提示词。
-- `train_sample_num` 表示在构造答案抽取数据时是否添加长度提示词。
-- `all_sample_num` 表示在构造答案抽取数据时是否添加领域提示词。
-- `domain` 表示添加的领域提示词，在`do_domain_prompt`时有效。
-
-**NOTE:** 预处理后的微调用数据将分别位于answer_extraction、question_generation、filtration三个子文件夹中。
-
-#### 无监督训练
-
-```
-python -u -m paddle.distributed.launch --gpus '0' \
-    train.py \
-    --device gpu \
-    --save_dir ./checkpoints/ \
-    --batch_size 64 \
-    --learning_rate 5E-5 \
-    --epochs 3 \
-    --save_steps 50 \
-    --max_seq_length 64 \
-    --dropout 0.2 \
-    --output_emb_size 256 \
-    --dup_rate 0.3 \
-    --train_set_file "./data/train.csv"
-```
-
-参数含义说明
-
-* `device`: 使用 cpu/gpu 进行训练
-* `save_dir`: 模型存储路径
-* `batch_size`: 训练的batch size的大小
-* `learning_rate`: 训练的学习率的大小
-* `epochs`: 训练的epoch数
-* `save_steps`： 模型存储 checkpoint 的间隔 steps 个数
-* `max_seq_length`: 输入序列的最大长度
-* `dropout`: SimCSE的dropout参数
-* `output_emb_size`: Transformer 顶层输出的文本向量维度
-* `dup_rate` : SimCSE的 Word reptition 策略的重复率
-* `train_set_file`: 训练集文件
-
-也可以使用下面的bash脚本：
-
-```
-sh scripts/train.sh
-```
-#### 评估
-
-效果评估分为 4 个步骤:
-
-a. 获取Doc端Embedding
-
-基于语义索引模型抽取出Doc样本库的文本向量。
-
-b. 采用hnswlib对Doc端Embedding建库
-
-使用 ANN 引擎构建索引库(这里基于 [hnswlib](https://github.com/nmslib/hnswlib) 进行 ANN 索引)
-
-c. 获取question的Embedding并查询相似结果
-
-基于语义索引模型抽取出评估集 *Source Text* 的文本向量，在第 2 步中建立的索引库中进行 ANN 查询，召回 Top10 最相似的 *Target Text*, 产出评估集中 *Source Text* 的召回结果 `recall_result` 文件。
-
-d. 评估
-
-基于评估集 `test.csv` 和召回结果 `recall_result` 计算评估指标 Recall@k，其中k取值1，5，10。
-
-运行如下命令进行 ANN 建库、召回，产出召回结果数据 `recall_result`
-
-```
-python -u -m paddle.distributed.launch --gpus "0" --log_dir "recall_log/" \
-        recall.py \
-        --device gpu \
-        --recall_result_dir "recall_result_dir" \
-        --recall_result_file "recall_result.txt" \
-        --params_path "checkpoints/model_150/model_state.pdparams" \
-        --hnsw_m 100 \
-        --hnsw_ef 100 \
-        --batch_size 64 \
-        --output_emb_size 256\
-        --max_seq_length 64 \
-        --recall_num 10 \
-        --similar_text_pair "data/test_pair.csv" \
-        --corpus_file "data/corpus.csv"
-```
-参数含义说明
-* `device`: 使用 cpu/gpu 进行训练
-* `recall_result_dir`: 召回结果存储目录
-* `recall_result_file`: 召回结果的文件名
-* `params_path`： 待评估模型的参数文件名
-* `hnsw_m`: hnsw 算法相关参数，保持默认即可
-* `hnsw_ef`: hnsw 算法相关参数，保持默认即可
-* `output_emb_size`: Transformer 顶层输出的文本向量维度
-* `recall_num`: 对 1 个文本召回的相似文本数量
-* `similar_text_pair`: 由相似文本对构成的评估集
-* `corpus_file`: 召回库数据 corpus_file
-
-也可以使用下面的bash脚本：
-
-```
-sh scripts/run_build_index.sh
-```
-
-run_build_index.sh还包含cpu和gpu运行的脚本，默认是gpu的脚本
-
-接下来，运行如下命令进行效果评估，产出Recall@1, Recall@5, Recall@10 指标:
-```
-python -u evaluate.py \
-        --similar_text_pair "data/test_pair.csv" \
-        --recall_result_file "./recall_result_dir/recall_result.txt" \
-        --recall_num 10
-```
-也可以使用下面的bash脚本：
-
-```
-sh scripts/evaluate.sh
-```
-输出如下的结果：
-
-```
-recall@1=83.784
-recall@5=94.995
-recall@10=96.997
-```
-
-参数含义说明
-* `similar_text_pair`: 由相似文本对构成的评估集 semantic_similar_pair.tsv
-* `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
-* `recall_num`: 对 1 个文本召回的相似文本数量
-
-#### 模型部署
-模型部署模块首先要把动态图转换成静态图，然后转换成serving的格式。
-##### 动转静导出
-首先把动态图模型转换为静态图：
-
-```
-python export_model.py --params_path checkpoints/model_150/model_state.pdparams --output_path=./output
-```
-也可以运行下面的bash脚本：
-
-```
-sh scripts/export_model.sh
-```
-##### 问答检索引擎
-模型准备结束以后，开始搭建 Milvus 的语义检索引擎，用于语义向量的快速检索，本项目使用[Milvus](https://milvus.io/)开源工具进行向量检索，Milvus 的搭建教程请参考官方教程  [Milvus官方安装教程](https://milvus.io/cn/docs/v1.1.1/milvus_docker-cpu.md)本案例使用的是 Milvus 的1.1.1 CPU版本，建议使用官方的 Docker 安装方式，简单快捷。
-
-
-Milvus 搭建完系统以后就可以插入和检索向量了，首先生成 embedding 向量，每个样本生成256维度的向量：
-
-```
-python feature_extract.py \
-        --model_dir=./output \
-        --corpus_file "data/corpus.csv"
-```
-其中 output 目录下存放的是召回的 Paddle Inference 静态图模型。
-
-然后向搭建好的 Milvus 系统插入向量：
-
-```
-python vector_insert.py
-```
-##### Paddle-Serving部署
-Paddle Serving 的安装可以参考[Paddle Serving 安装文档](https://github.com/PaddlePaddle/Serving#installation)。需要在服务端和客户端安装相关的依赖，安装完依赖后就可以执行下面的步骤。
-
-
-首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下：
-
-```
-python export_to_serving.py \
-    --dirname "output" \
-    --model_filename "inference.get_pooled_embedding.pdmodel" \
-    --params_filename "inference.get_pooled_embedding.pdiparams" \
-    --server_path "./serving_server" \
-    --client_path "./serving_client" \
-    --fetch_alias_names "output_embedding"
-```
-
-参数含义说明
-* `dirname`: 需要转换的模型文件存储路径，Program 结构文件和参数文件均保存在此目录。
-* `model_filename`： 存储需要转换的模型 Inference Program 结构的文件名称。如果设置为 None ，则使用 `__model__` 作为默认的文件名
-* `params_filename`: 存储需要转换的模型所有参数的文件名称。当且仅当所有模型参数被保>存在一个单独的二进制文件中，它才需要被指定。如果模型参数是存储在各自分离的文件中，设置它的值为 None
-* `server_path`: 转换后的模型文件和配置文件的存储路径。默认值为 serving_server
-* `client_path`: 转换后的客户端配置文件存储路径。默认值为 serving_client
-* `fetch_alias_names`: 模型输出的别名设置，比如输入的 input_ids 等，都可以指定成其他名字，默认不指定
-* `feed_alias_names`: 模型输入的别名设置，比如输出 pooled_out 等，都可以重新指定成其他模型，默认不指定
-
-也可以运行下面的 bash 脚本：
-```
-sh scripts/export_to_serving.sh
-```
-
-启动 Pipeline Server:
-
-```
-cd deploy/python/
-python web_service.py
-```
-
-启动客户端调用 Server, 使用 POST的方式：
-
-向服务端发送 POST 请求示例：
-
-```
-curl -X POST -k http://localhost:8090/ernie/prediction -d '{"key": ["0"], "value": ["宁夏针对哪些人员开通工伤保障绿色通道?"]}'
-```
-
-也可以使用 rpc的方式：
-
-首先修改rpc_client.py中需要预测的样本：
-
-```
-list_data = [
-    "湖北省为什么鼓励缴费人通过线上缴费渠道缴费？",
-    "佛山市救助站有多少个救助床位"
-]
-```
-然后运行：
-
-```
-python rpc_client.py
-```
-#### 整体流程
-问答系统使用了Client Server的模式，即抽取向量的模型部署在服务端，然后启动客户端（Client）端去访问。
-
-
-```
-python run_system.py
-```
-代码内置的测试用例为：
-
-```
-list_data = ["嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？"]
-```
-
-会输出如下的结果：
-
-```
-......
-Extract feature time to cost :0.01161503791809082 seconds
-Search milvus time cost is 0.004535675048828125 seconds
-嘉定区南翔镇实行双门长制“门长”要求落实好哪些工作？      拦、查、问、测、记 1.2107588152551751e-12
-上海市黄浦区老西门街道建立的党建责任区包干机制内容是什么？      街道工作人员担任楼宇联络员，分片区对接商务楼宇所属的物业公司，引导楼宇企业共同落实严防严控任务 0.4956303834915161
-上海市街道执行“四个统一”具体指什么？    统一由居委会干部在统一时间（每周三、五下午），递交至统一地点（社区事务受理服务中心专设窗口），街道统一收集至後台 0.6684658527374268
-怀柔区城管委在加强监督检查方面是如何落实的？    严格落实四方责任，保证每周2~3次深入环卫、电、气、热、公共自行车、垃圾处置等单位进行巡查，督促企业做好防疫工作，协调复工复产中存在的问题，确保安全复工复产有效落实。 0.7147952318191528
-华新镇“亮牌分批复工”工作方案具体内容是什么？    所有店铺一律先贴“红牌”禁止经营，经相关部门审批後，再换贴“蓝牌”准许复工。 0.7162970900535583
-.....
-```
-输出的结果包括特征提取和检索的时间，还包含检索出来的问答对。
 
 
 ## References
