@@ -964,7 +964,7 @@ class T5Stack(nn.Layer):
             input_shape = input_ids.shape
             input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
         elif inputs_embeds is not None:
-            input_shape = inputs_embeds.size()[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(

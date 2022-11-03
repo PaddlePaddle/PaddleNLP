@@ -513,7 +513,7 @@ class ModelTesterMixin:
         )
 
         for model_class in self.all_model_classes:
-            model = model_class(config)
+            model = self._make_model_instance(config, model_class)
             model.eval()
 
             inputs = copy.deepcopy(
