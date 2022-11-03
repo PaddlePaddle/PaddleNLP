@@ -30,7 +30,7 @@ from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
 from model import UIE, UIEM
-from utils import reader, MODEL_MAP, map_offset
+from utils import reader, MODEL_MAP, map_offset, convert_example
 
 
 @dataclass
@@ -85,61 +85,6 @@ class ModelArguments:
     multilingual: bool = field(
         default=False,
         metadata={"help": "Whether the model is a multilingual model."})
-
-
-def convert_example(example, tokenizer, max_seq_len, multilingual=False):
-    """
-    example: {
-        title
-        prompt
-        content
-        result_list
-    }
-    """
-    encoded_inputs = tokenizer(text=[example["prompt"]],
-                               text_pair=[example["content"]],
-                               truncation=True,
-                               max_seq_len=max_seq_len,
-                               pad_to_max_seq_len=True,
-                               return_attention_mask=True,
-                               return_position_ids=True,
-                               return_dict=False,
-                               return_offsets_mapping=True)
-    encoded_inputs = encoded_inputs[0]
-    offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
-    bias = 0
-    for index in range(1, len(offset_mapping)):
-        mapping = offset_mapping[index]
-        if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-            bias = offset_mapping[index - 1][1] + 1  # Includes [SEP] token
-        if mapping[0] == 0 and mapping[1] == 0:
-            continue
-        offset_mapping[index][0] += bias
-        offset_mapping[index][1] += bias
-    start_ids = [0.0 for x in range(max_seq_len)]
-    end_ids = [0.0 for x in range(max_seq_len)]
-    for item in example["result_list"]:
-        start = map_offset(item["start"] + bias, offset_mapping)
-        end = map_offset(item["end"] - 1 + bias, offset_mapping)
-        start_ids[start] = 1.0
-        end_ids[end] = 1.0
-    if multilingual:
-        tokenized_output = {
-            "input_ids": encoded_inputs["input_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
-            "start_positions": start_ids,
-            "end_positions": end_ids
-        }
-    else:
-        tokenized_output = {
-            "input_ids": encoded_inputs["input_ids"],
-            "token_type_ids": encoded_inputs["token_type_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
-            "att_mask": encoded_inputs["attention_mask"],
-            "start_positions": start_ids,
-            "end_positions": end_ids
-        }
-    return tokenized_output
 
 
 def main():
