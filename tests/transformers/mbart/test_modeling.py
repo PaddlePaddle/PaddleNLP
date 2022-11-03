@@ -16,6 +16,7 @@
 import copy
 import tempfile
 import unittest
+import gc
 
 from tests.testing_utils import slow
 
@@ -320,6 +321,7 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
 
     @slow
     def test_enro_generate_one(self):
+        gc.collect
         batch = self.tokenizer(
             ["UN Chief Says There Is No Military Solution in Syria"],
             return_tensors="pd",
@@ -332,6 +334,7 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
 
     @slow
     def test_enro_generate_batch(self):
+        gc.collect()
         batch = self.tokenizer(self.src_text,
                                return_tensors="pd",
                                padding=True,
@@ -342,12 +345,8 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
         decoded = self.tokenizer.batch_decode(translated_tokens,
                                               skip_special_tokens=True)
 
-        idx = 0
-        for i in range(len(decoded)):
-            if self.tgt_text[i:i + 1] != decoded[i:i + 1]:
-                idx = i
-                break
-        assert self.tgt_text == decoded, f"{self.tgt_text[idx]}\n{decoded[idx]}"
+        for i in range(len(self.tgt_text)):
+            assert str(self.tgt_text[i]) == str(decoded[i]), f"{i}"
 
     def test_mbart_fast_forward(self):
         config = {
@@ -390,6 +389,7 @@ class MBartCC25IntegrationTest(AbstractSeq2SeqIntegrationTest):
 
     @slow
     def test_fill_mask(self):
+        gc.collect()
         inputs = self.tokenizer(["One of the best <mask> I ever read!"],
                                 return_tensors="pd")
         model = self.model()
