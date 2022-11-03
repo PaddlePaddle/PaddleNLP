@@ -119,7 +119,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 填写项目名称、描述
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199445809-1206f887-2782-459e-9001-fbd790d59a5e.png height=200 hspace='15' />
+    <img src=https://user-images.githubusercontent.com/40840292/199445809-1206f887-2782-459e-9001-fbd790d59a5e.png height=200 width=1200 />
 </div>
 
 选择``Object Detection with Bounding Boxes`
@@ -128,7 +128,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 添加标签
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199450930-4c0cd189-6085-465a-aca0-6ba6f52a0c0d.png height=400 hspace='15' />
+    <img src=https://user-images.githubusercontent.com/40840292/199450930-4c0cd189-6085-465a-aca0-6ba6f52a0c0d.png height=400 width=1200 />
 </div>
 
 
@@ -139,7 +139,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 先从本地或HTTP链接上传图片，然后选择导入本项目。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199452007-2d45f7ba-c631-46b4-b21f-729a2ed652e9.png height=160 hspace='15' />
+    <img src=https://user-images.githubusercontent.com/40840292/199452007-2d45f7ba-c631-46b4-b21f-729a2ed652e9.png height=160 width=1200 />
 </div>
 
 <a name="33"></a>
@@ -149,7 +149,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 - 构建实体标签
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199456432-ce601ab0-7d6c-458f-ac46-8839dbc4d013.png height=350 hspace='15' />
+    <img src=https://user-images.githubusercontent.com/40840292/199456432-ce601ab0-7d6c-458f-ac46-8839dbc4d013.png height=350 width=1200 />
 </div>
 
 
@@ -171,7 +171,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199459737-fab20c95-cb7e-42e2-b4f1-06865d58be95.png height=350 hspace='15' />
+    <img src=https://user-images.githubusercontent.com/40840292/199459737-fab20c95-cb7e-42e2-b4f1-06865d58be95.png height=350 width=1200 />
 </div>
 
 该标注示例对应的schema为：
