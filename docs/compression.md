@@ -1,30 +1,31 @@
 # PaddleNLP 模型压缩 API
 
  **目录**
-   * [模型压缩 API 功能简介](#模型压缩API功能介绍)
-   * [如何启动模型压缩](#如何启动模型压缩)
+   * [模型压缩 API 功能简介](#模型压缩API功简介)
+   * [三大场景快速启动模型压缩示例](#三大场景快速启动模型压缩示例)
+   * [四步启动模型压缩](#四步启动模型压缩)
        * [Step1：获取模型压缩参数 compression_args](#获取模型压缩参数compression_args)
        * [Step2：实例化 Trainer 并调用 compress()](#实例化Trainer并调用compress())
            * [Trainer 实例化参数介绍](#Trainer实例化参数介绍)
        * [Step3：实现自定义评估函数（按需可选）](#实现自定义评估函数（按需可选）)
        * [Step4：传参并运行压缩脚本](#传参并运行压缩脚本)
            * [CompressionArguments 参数介绍](#CompressionArguments参数介绍)
-       * [三大场景模型压缩 API 使用示例](#三大场景模型压缩API使用示例)
    * [模型评估与部署](#模型评估与部署)
    * [FAQ](#FAQ)
    * [参考文献](#References)
 
 
-<a name="模型压缩API功能介绍"></a>
+<a name="模型压缩API功能简介"></a>
 
 ## 模型压缩 API 功能简介
 
-PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的模型进行裁剪、量化，以缩小模型体积、减少内存占用、减少计算、提升推理速度从而减少部署难度。模型压缩 API 效果好，且简洁易用。目前裁剪功能现在支持 DynaBERT 中的宽度自适应裁剪策略；量化现在支持静态离线量化方法（PTQ），即无需训练，只需少量校准数据，即可导出量化模型。
+PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的模型进行裁剪、量化，以缩小模型体积、减少内存占用、减少计算、提升推理速度从而减少部署难度。模型压缩 API 效果好，且简洁易用。目前裁剪功能现在支持 DynaBERT 中的宽度自适应裁剪策略；量化现在支持静态离线量化方法（PTQ）和量化训练（QAT）：前者 PTQ 无需训练，只需少量校准数据，即可导出量化模型，后者 QAT 类似 FP32 模型的训练过程，也基本能够做到精度无损。
 
 - **效果好**：目前已经在分类（包含文本分类、文本匹配、自然语言推理、代词消歧、阅读理解等任务）、序列标注、抽取式阅读理解任务上进行过验证，基本达到精度无损。例如，对于 12L768H 结构的模型，宽度保留比例为 2/3 基本可以达到精度无损，对于 6L768H 模型，宽度保留比例 2/3 基本可以达到精度无损。裁剪后推理速度能够达到原先的 1-2 倍；6L768H 结构的模型量化后推理速度能够达到量化前的 2-3 倍。
 
 - **简洁易用**：只需要简单几步即可开展模型压缩任务
 
+##### ERNIE 3.0 压缩效果
 如下表所示，ERNIE 3.0-Medium (6-layer, 384-hidden, 12-heads) 模型在三类任务（文本分类、序列标注、抽取式阅读理解）经过裁剪 + 量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在 0.5 以内（0.46）。
 
 |                            | TNEWS 性能    | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER 精度 | CMRC2018 性能 | CMRC2018 精度 |
@@ -36,9 +37,62 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 
 (以上数据来自 [ERNIE 3.0 性能测试文档](../model_zoo/ernie-3.0/#性能测试)，文档包含测试环境介绍)
 
-<a name="如何启动模型压缩"></a>
+##### UIE 压缩效果
 
-## 如何启动模型压缩
+以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
+
+| Models         | F1           |
+| -------------  |:------------:|
+| uie-base+微调+FP32   | 91.93        |
+| uie-base+微调+量化+INT8 | 94.12        |
+
+
+<a name="三大场景快速启动模型压缩示例"></a>
+
+### 三大场景快速启动模型压缩示例
+
+本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../model_zoo/ernie-3.0/) 目录下的 [compress_seq_cls.py](../model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
+
+```shell
+# 分类任务
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+python compress_seq_cls.py \
+    --dataset "clue tnews"  \
+    --model_name_or_path best_models/TNEWS  \
+    --output_dir ./
+
+# 序列标注任务
+python compress_token_cls.py \
+    --dataset "msra_ner"  \
+    --model_name_or_path best_models/MSRA_NER \
+    --output_dir ./ \
+    --max_seq_length 128 \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --learning_rate 0.00005 \
+    --remove_unused_columns False \
+    --num_train_epochs 3
+
+# 阅读理解任务
+python compress_qa.py \
+    --dataset "clue cmrc2018" \
+    --model_name_or_path best_models/CMRC2018  \
+    --output_dir ./ \
+    --max_seq_length 512 \
+    --learning_rate 0.00003 \
+    --num_train_epochs 8 \
+    --per_device_train_batch_size 24 \
+    --per_device_eval_batch_size 24 \
+    --max_answer_length 50 \
+
+```
+
+示例代码中压缩使用的是 datasets 内置的数据集，若想要使用自定义数据集压缩，可参考 [datasets 加载自定义数据集文档](https://huggingface.co/docs/datasets/loading)。
+
+
+<a name="四步启动模型压缩"></a>
+
+## 四步启动模型压缩
 
 ### 环境依赖
 
@@ -278,7 +332,7 @@ python compress.py \
 
 **DynaBERT 裁剪参数**
 
-当用户使用了 DynaBERT 裁剪策略时需要传入以下可选参数：
+当用户使用了 DynaBERT 裁剪、PTQ 量化策略（即策略中包含 'dynabert'、'qat' 时需要传入以下可选参数：
 
 - **--width_mult_list** 裁剪宽度保留的搜索列表，对 6 层模型推荐 `3/4` ，对 12 层模型推荐 `2/3`，表示对 `q`、`k`、`v` 以及 `ffn` 权重宽度的保留比例，假设 12 层模型原先有 12 个 attention heads，裁剪后只剩 9 个 attention heads。默认是 `[3/4]`；
 
@@ -332,52 +386,23 @@ python compress.py \
 
 - **--weight_quantize_type** 权重的量化类型，支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'， 这种方法得到的模型通常精度更高；
 
+- **activation_quantize_type** 激活 tensor 的量化类型。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在 'ptq' 策略中，默认是 'range_abs_max'；
+
 - **--round_type** 权重值从 FP32 到 INT8 的转化方法，目前支持 `'round'` 和 '[adaround](https://arxiv.org/abs/2004.10568.)'，默认是 `'round'`；
 
 - **--bias_correction** 如果是 True，表示使用 [bias correction](https://arxiv.org/abs/1810.05723) 功能，默认为 False。
 
+**QAT 量化参数**
 
-<a name="三大场景模型压缩API使用示例"></a>
+当用户使用了 QAT 量化策略时，除了可以设置上面训练相关的参数，还可以传入以下可选参数：
 
-### 三大场景模型压缩 API 使用示例
+- **--weight_quantize_type** 权重的量化类型，支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'， 这种方法得到的模型通常精度更高；
 
-本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../model_zoo/ernie-3.0/) 目录下的 [compress_seq_cls.py](../model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
+- **activation_quantize_type** 激活 tensor 的量化类型。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在'qat'策略中，它默认是 'moving_average_abs_max'；
 
-```shell
-# 分类任务
-# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
-python compress_seq_cls.py \
-    --dataset "clue tnews"  \
-    --model_name_or_path best_models/TNEWS  \
-    --output_dir ./
+- **use_pact** 是否使用 PACT 量化策略，是对普通方法的改进，参考论文[PACT: Parameterized Clipping Activation for Quantized Neural Networks](https://arxiv.org/abs/1805.06085)，打开后精度更高，默认是 True。
 
-# 序列标注任务
-python compress_token_cls.py \
-    --dataset "msra_ner"  \
-    --model_name_or_path best_models/MSRA_NER \
-    --output_dir ./ \
-    --max_seq_length 128 \
-    --per_device_train_batch_size 32 \
-    --per_device_eval_batch_size 32 \
-    --learning_rate 0.00005 \
-    --remove_unused_columns False \
-    --num_train_epochs 3
-
-# 阅读理解任务
-python compress_qa.py \
-    --dataset "clue cmrc2018" \
-    --model_name_or_path best_models/CMRC2018  \
-    --output_dir ./ \
-    --max_seq_length 512 \
-    --learning_rate 0.00003 \
-    --num_train_epochs 8 \
-    --per_device_train_batch_size 24 \
-    --per_device_eval_batch_size 24 \
-    --max_answer_length 50 \
-
-```
-
-示例代码中压缩使用的是 datasets 内置的数据集，若想要使用自定义数据集压缩，可参考 [datasets 加载自定义数据集文档](https://huggingface.co/docs/datasets/loading)。
+- **moving_rate** 'moving_average_abs_max' 量化方法中的衰减系数，默认为 0.9；
 
 <a name="模型评估与部署"></a>
 
@@ -417,11 +442,11 @@ ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署�
 
 **Q：模型压缩需要数据吗？**
 
-A：裁剪过程类似微调，需要使用训练集进行训练，验证集进行评估，量化需要验证集（对样本量要求较低，一般 4-16 个样本就可能可以满足要求）；
+A：DynaBERT 裁剪和量化训练 QAT 需要使用训练集进行训练，验证集进行评估，其过程类似微调；静态离线量化 PTQ 只需要验证集（对样本量要求较低，一般 4-16 个样本就可能可以满足要求）；
 
 **Q：示例代码里是内置的数据集，如何使用我自己的数据呢**
 
-A：可以参考 [datasets 加载自定义数据集文档](https://huggingface.co/docs/datasets/loading)；
+A：可以参考 UIE 的例子，也可以参考 [datasets 加载自定义数据集文档](https://huggingface.co/docs/datasets/loading)；
 
 **Q：模型压缩后的模型还能继续训练吗？**
 
