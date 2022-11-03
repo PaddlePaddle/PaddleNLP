@@ -75,7 +75,7 @@ python setup.py install
 ```bash
 # GPU环境下运行示例
 # 设置1个空闲的GPU卡，此处假设0卡为空闲GPU
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=0
 python examples/unsupervised-question-answering/unsupervised_question_answering_example.py --device gpu --source_file data/source_file.txt --doc_dir data/my_data --index_name faiss_index --retriever_batch_size 16
 ```
 关键参数释义如下：
@@ -108,7 +108,7 @@ python examples/unsupervised-question-answering/unsupervised_question_answering_
 ```bash
 # GPU环境下运行示例
 # 设置1个空闲的GPU卡，此处假设0卡为空闲GPU
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=0
 python examples/unsupervised-question-answering/offline_question_answer_pairs_generation.py --device gpu --source_file data/source_file.txt --doc_dir data/my_data
 ```
 关键参数释义如下：
@@ -212,6 +212,8 @@ sh examples/unsupervised-question-answering/run_unsupervised_question_answering_
 [2]Y. Qu et al., “[RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering](https://arxiv.org/abs/2010.08191),” arXiv:2010.08191 [cs], May 2021, Accessed: Aug. 16, 2021. [Online]. Available: http://arxiv.org/abs/2010.08191
 
 [3]H. Tang, H. Li, J. Liu, Y. Hong, H. Wu, and H. Wang, “[DuReader_robust: A Chinese Dataset Towards Evaluating Robustness and Generalization of Machine Reading Comprehension in Real-World Applications](https://arxiv.org/pdf/2004.11142.pdf).” arXiv, Jul. 21, 2021. Accessed: May 15, 2022. [Online]. Available: http://arxiv.org/abs/2004.11142
+
+[4]Li, Wei, et al. "Unimo: Towards unified-modal understanding and generation via cross-modal contrastive learning." arXiv preprint arXiv:2012.15409 (2020).
 
 ## Acknowledge
 
