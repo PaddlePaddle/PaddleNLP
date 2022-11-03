@@ -22,104 +22,33 @@ from tqdm import tqdm
 from paddlenlp import Taskflow
 
 
+# yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument(
-        '--answer_generation_model_path',
-        type=str,
-        default=None,
-        help='the model path to be loaded for answer extraction')
-    parser.add_argument(
-        '--question_generation_model_path',
-        type=str,
-        default=None,
-        help='the model path to be loaded for question generation')
-    parser.add_argument('--filtration_model_path',
-                        type=str,
-                        default=None,
-                        help='the model path to be loaded for filtration')
-    parser.add_argument('--source_file_path',
-                        type=str,
-                        default=None,
-                        help='the souce file path')
-    parser.add_argument('--target_file_path',
-                        type=str,
-                        default=None,
-                        help='the target json file path')
-    parser.add_argument('--batch_size',
-                        type=int,
-                        default=1,
-                        help='the batch size when using taskflow')
-    parser.add_argument("--do_debug",
-                        action='store_true',
-                        help="Whether to do debug")
-
-    parser.add_argument('--a_prompt',
-                        type=str,
-                        default='答案',
-                        help='the prompt when using taskflow, seperate by ,')
-    parser.add_argument('--a_position_prob',
-                        type=float,
-                        default=0.01,
-                        help='confidence threshold for answer extraction')
-    parser.add_argument(
-        '--a_max_answer_candidates',
-        type=int,
-        default=5,
-        help='the max number of return answer candidate for each input')
-
-    parser.add_argument(
-        '--q_num_return_sequences',
-        type=int,
-        default=3,
-        help=
-        'the number of return sequences for each input sample, it should be less than num_beams'
-    )
-    parser.add_argument('--q_max_question_length',
-                        type=int,
-                        default=50,
-                        help='the max decoding length')
-    parser.add_argument('--q_decode_strategy',
-                        type=str,
-                        default='sampling',
-                        help='the decode strategy')
-    parser.add_argument('--q_num_beams',
-                        type=int,
-                        default=6,
-                        help='the number of beams when using beam search')
-    parser.add_argument(
-        '--q_num_beam_groups',
-        type=int,
-        default=1,
-        help='the number of beam groups when using diverse beam search')
-    parser.add_argument(
-        '--q_diversity_rate',
-        type=float,
-        default=0.0,
-        help='the diversity_rate when using diverse beam search')
-    parser.add_argument('--q_top_k',
-                        type=float,
-                        default=5,
-                        help='the top_k when using sampling decoding strategy')
-    parser.add_argument('--q_top_p',
-                        type=float,
-                        default=1.0,
-                        help='the top_p when using sampling decoding strategy')
-    parser.add_argument(
-        '--q_temperature',
-        type=float,
-        default=1.0,
-        help='the temperature when using sampling decoding strategy')
-
-    parser.add_argument("--do_filtration",
-                        action='store_true',
-                        help="Whether to do filtration")
-    parser.add_argument('--f_filtration_position_prob',
-                        type=float,
-                        default=0.1,
-                        help='confidence threshold for filtration')
+    parser.add_argument('--answer_generation_model_path', type=str, default=None, help='the model path to be loaded for answer extraction')
+    parser.add_argument('--question_generation_model_path', type=str, default=None, help='the model path to be loaded for question generation')
+    parser.add_argument('--filtration_model_path', type=str, default=None, help='the model path to be loaded for filtration')
+    parser.add_argument('--source_file_path', type=str, default=None, help='the souce file path')
+    parser.add_argument('--target_file_path', type=str, default=None, help='the target json file path')
+    parser.add_argument('--batch_size', type=int, default=1, help='the batch size when using taskflow')
+    parser.add_argument("--do_debug", action='store_true', help="Whether to do debug")
+    parser.add_argument('--a_prompt', type=str, default='答案', help='the prompt when using taskflow, seperate by ,')
+    parser.add_argument('--a_position_prob', type=float, default=0.01, help='confidence threshold for answer extraction')
+    parser.add_argument('--a_max_answer_candidates', type=int, default=5, help='the max number of return answer candidate for each input')
+    parser.add_argument('--q_num_return_sequences', type=int, default=3,help='the number of return sequences for each input sample, it should be less than num_beams')
+    parser.add_argument('--q_max_question_length', type=int, default=50, help='the max decoding length')
+    parser.add_argument('--q_decode_strategy', type=str, default='sampling', help='the decode strategy')
+    parser.add_argument('--q_num_beams', type=int, default=6, help='the number of beams when using beam search')
+    parser.add_argument('--q_num_beam_groups', type=int, default=1, help='the number of beam groups when using diverse beam search')
+    parser.add_argument('--q_diversity_rate', type=float, default=0.0, help='the diversity_rate when using diverse beam search')
+    parser.add_argument('--q_top_k', type=float, default=5, help='the top_k when using sampling decoding strategy')
+    parser.add_argument('--q_top_p', type=float, default=1.0, help='the top_p when using sampling decoding strategy')
+    parser.add_argument('--q_temperature', type=float, default=1.0, help='the temperature when using sampling decoding strategy')
+    parser.add_argument("--do_filtration", action='store_true', help="Whether to do filtration")
+    parser.add_argument('--f_filtration_position_prob', type=float, default=0.1, help='confidence threshold for filtration')
     args = parser.parse_args()
     return args
+# yapf: enable
 
 
 def answer_generation_from_paragraphs(paragraphs,
