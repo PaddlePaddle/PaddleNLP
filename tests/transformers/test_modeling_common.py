@@ -67,6 +67,7 @@ class ModelTesterMixin:
     test_resize_position_embeddings = False
     test_mismatched_shapes = True
     test_missing_keys = True
+    use_test_inputs_embeds = False
     is_encoder_decoder = False
     has_attentions = True
     model_split_percents = [0.5, 0.7, 0.9]
@@ -506,6 +507,37 @@ class ModelTesterMixin:
                     break
 
             self.assertTrue(models_equal)
+
+    def test_inputs_embeds(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
+        )
+
+        for model_class in self.all_model_classes:
+            model = model_class(config)
+            model.eval()
+
+            inputs = copy.deepcopy(
+                self._prepare_for_class(inputs_dict, model_class))
+
+            if not self.is_encoder_decoder:
+                input_ids = inputs["input_ids"]
+                del inputs["input_ids"]
+            else:
+                encoder_input_ids = inputs["input_ids"]
+                decoder_input_ids = inputs.get("decoder_input_ids",
+                                               encoder_input_ids)
+                del inputs["input_ids"]
+                inputs.pop("decoder_input_ids", None)
+
+            wte = model.get_input_embeddings()
+            if not self.is_encoder_decoder:
+                inputs["inputs_embeds"] = wte(input_ids)
+            else:
+                inputs["inputs_embeds"] = wte(encoder_input_ids)
+                inputs["decoder_inputs_embeds"] = wte(decoder_input_ids)
+
+            with paddle.no_grad():
+                model(**inputs)[0]
 
     def test_model_name_list(self):
         config = self.model_tester.get_config()
