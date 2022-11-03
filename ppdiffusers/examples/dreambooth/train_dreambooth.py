@@ -276,7 +276,7 @@ class DreamBoothDataset(Dataset):
         self.instance_data_root = Path(instance_data_root)
         if not self.instance_data_root.exists():
             raise ValueError("Instance images root doesn't exists.")
-        ext = ['png', 'jpg', 'jpeg', 'bmp']
+        ext = ['png', 'jpg', 'jpeg', 'bmp', 'PNG', 'JPG', 'JPEG', 'BMP']
         self.instance_images_path = []
         for p in Path(instance_data_root).iterdir():
             if any(suffix in p.name for suffix in ext):
@@ -610,7 +610,9 @@ def main(args):
 
             with text_encoder_ctx_manager:
                 # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+                attention_mask = paddle.ones_like(batch["input_ids"])
+                encoder_hidden_states = text_encoder(
+                    batch["input_ids"], attention_mask=attention_mask)[0]
 
                 with unet_ctx_manager:
                     # Predict the noise residual

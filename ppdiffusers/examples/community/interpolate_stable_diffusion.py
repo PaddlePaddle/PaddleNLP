@@ -277,7 +277,9 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                 )
                 text_input_ids = text_input_ids[:, :self.tokenizer.
                                                 model_max_length]
-            text_embeddings = self.text_encoder(text_input_ids)[0]
+            attention_mask = paddle.ones_like(text_input_ids)
+            text_embeddings = self.text_encoder(
+                text_input_ids, attention_mask=attention_mask)[0]
         else:
             batch_size = text_embeddings.shape[0]
 
@@ -318,7 +320,9 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                 truncation=True,
                 return_tensors="pd",
             )
-            uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
+            attention_mask = paddle.ones_like(uncond_input.input_ids)
+            uncond_embeddings = self.text_encoder(
+                uncond_input.input_ids, attention_mask=attention_mask)[0]
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]

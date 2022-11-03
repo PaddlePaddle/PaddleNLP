@@ -566,7 +566,9 @@ def main():
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
             # Get the text embedding for conditioning
-            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+            attention_mask = paddle.ones_like(batch["input_ids"])
+            encoder_hidden_states = text_encoder(
+                batch["input_ids"], attention_mask=attention_mask)[0]
 
             if num_processes > 1 and (args.gradient_checkpointing or (
                 (step + 1) % args.gradient_accumulation_steps != 0)):
