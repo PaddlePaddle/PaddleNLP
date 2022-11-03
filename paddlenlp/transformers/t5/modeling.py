@@ -948,16 +948,32 @@ class T5Stack(nn.Layer):
                 attention_mask=None,
                 encoder_hidden_states=None,
                 encoder_attention_mask=None,
+                inputs_embeds=None,
                 cache=None,
                 use_cache=False,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
-        assert input_ids is not None, "input_ids can not be None"
-        input_shape = input_ids.shape
-        input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
 
-        inputs_embeds = self.embed_tokens(input_ids)
+        if input_ids is not None and inputs_embeds is not None:
+            err_msg_prefix = "decoder_" if self.is_decoder else ""
+            raise ValueError(
+                f"You cannot specify both {err_msg_prefix}input_ids and {err_msg_prefix}inputs_embeds at the same time"
+            )
+        elif input_ids is not None:
+            input_shape = input_ids.shape
+            input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.size()[:-1]
+        else:
+            err_msg_prefix = "decoder_" if self.is_decoder else ""
+            raise ValueError(
+                f"You have to specify either {err_msg_prefix}input_ids or {err_msg_prefix}inputs_embeds"
+            )
+
+        if inputs_embeds is None:
+            assert self.embed_tokens is not None, "You have to initialize the model with valid token embeddings"
+            inputs_embeds = self.embed_tokens(input_ids)
 
         batch_size, seq_length = input_shape
 
@@ -1308,6 +1324,8 @@ class T5Model(T5PretrainedModel):
                 decoder_attention_mask=None,
                 encoder_output=None,
                 cache=None,
+                inputs_embeds=None,
+                decoder_inputs_embeds=None,
                 use_cache=True,
                 output_attentions=False,
                 output_hidden_states=False,
@@ -1351,6 +1369,20 @@ class T5Model(T5PretrainedModel):
                 The `input_ids` which have their past given to this model should not be 
                 passed as input ids as they have already been computed.
                 Defaults to `None`.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation 
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over 
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix. 
+                Default to None.
+            decoder_inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `decoder_input_ids` you can choose to directly pass an embedded
+                representation  of shape `(batch_size, target_sequence_length, hidden_size)`. If `cache` is used, 
+                optionally only the last `decoder_inputs_embeds` have to be input (see `past_key_values`). 
+                This is useful if you want more control over how to convert `decoder_input_ids` indices 
+                into associated vectors than the model's internal embedding lookup matrix. Default to None.
+
+                If `decoder_input_ids` and `decoder_inputs_embeds` are both unset, `decoder_inputs_embeds` takes the value
+                of `inputs_embeds`.
             use_cache (bool, optional):
                 Whether or not to use cache. If set to `True`, `past_buckets_states` states are returned 
                 and can be used to speed up decoding. 
@@ -1444,6 +1476,7 @@ class T5Model(T5PretrainedModel):
             encoder_output = self.encoder(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict)
@@ -1455,6 +1488,7 @@ class T5Model(T5PretrainedModel):
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
+            inputs_embeds=decoder_inputs_embeds,
             cache=cache,
             encoder_hidden_states=hidden_states,
             encoder_attention_mask=attention_mask,
@@ -1529,6 +1563,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 encoder_output=None,
                 cache=None,
                 labels=None,
+                inputs_embeds=None,
+                decoder_inputs_embeds=None,
                 use_cache=True,
                 output_attentions=False,
                 output_hidden_states=False,
@@ -1554,6 +1590,20 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 selected in `[-100, 0, ..., vocab_size]` All labels set to `-100` are 
                 ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`.
                 Shape is [batch_size, sequence_length] and dtype is int64.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation 
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over 
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
+            decoder_inputs_embeds (Tensor , optional):
+                Optionally, instead of passing `decoder_input_ids` you can choose to directly pass an embedded
+                representation of shape `(batch_size, target_sequence_length, hidden_size)`. If `past_key_values` is used, 
+                optionally only the last `decoder_inputs_embeds` have to be input (see `past_key_values`). This is useful 
+                if you want more control over how to convert `decoder_input_ids` indices into associated vectors 
+                than the model's internal embedding lookup matrix. Default to None.
+
+                If `decoder_input_ids` and `decoder_inputs_embeds` are both unset, `decoder_inputs_embeds` takes the value
+                of `inputs_embeds`.
             use_cache (bool, optional):
                 See :class:`T5Model`.
             output_attentions (bool, optional):
@@ -1629,6 +1679,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_output = self.t5.encoder(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict)
@@ -1640,7 +1691,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
 
         hidden_states = encoder_output[0]
 
-        if labels is not None and decoder_input_ids is None:
+        if labels is not None and decoder_input_ids is None and decoder_inputs_embeds is None:
             # get decoder inputs from shifting lm labels to the right
             decoder_input_ids = self._shift_right(labels)
 
@@ -1657,6 +1708,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         decoder_outputs = self.t5.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
+            inputs_embeds=decoder_inputs_embeds,
             cache=cache,
             encoder_hidden_states=hidden_states,
             encoder_attention_mask=attention_mask,
@@ -1869,6 +1921,7 @@ class T5EncoderModel(T5PretrainedModel):
         encoder_hidden_states: Optional[Tuple[Tensor]] = None,
         encoder_attention_mask: Optional[Tensor] = None,
         cache=None,
+        inputs_embeds: Optional[Tensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
@@ -1877,6 +1930,7 @@ class T5EncoderModel(T5PretrainedModel):
         encoder_outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             cache=cache,
