@@ -433,6 +433,7 @@ class GenerationTesterMixin:
             )
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
+            paddle.seed(128)
             model = model_class(pretrained_model)
             model.eval()
 
@@ -452,6 +453,7 @@ class GenerationTesterMixin:
             )
             pretrained_model = self.all_generative_model_classes[model_class][
                 0](**config)
+            paddle.seed(128)
             model = model_class(pretrained_model)
             model.eval()
 
