@@ -30,7 +30,8 @@ from base_model import SemanticIndexBase
 from model import SemanticIndexBatchNeg
 from data import read_text_pair, convert_example, create_dataloader, gen_id2corpus, gen_text_file, convert_corpus_example
 from data import convert_label_example
-from data import build_index
+from data import build_index, label2ids
+from metric import MetricReport
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -89,7 +90,10 @@ parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt'
                     help="evaluate_result")
 parser.add_argument('--evaluate', default=True, type=eval, choices=[True, False],
                     help='whether evaluate while training')
-parser.add_argument("--model_name_or_path",default='rocketqa-zh-dureader-query-encoder',type=str,help='The pretrained model used for training')
+parser.add_argument("--model_name_or_path",default='rocketqa-zh-dureader-query-encoder',
+                    type=str,help='The pretrained model used for training')
+parser.add_argument("--threshold", default=0.5, type=float,
+                    help="The threshold for selection the labels")
 args = parser.parse_args()
 # yapf: enable
 
@@ -108,7 +112,8 @@ def recall(rs, N=10):
 
 @paddle.no_grad()
 def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
-             text_list, id2corpus):
+             text_list, id2corpus, label2id):
+    metric = MetricReport()
     # Load pretrained semantic model
     inner_model = model._layers
     final_index = build_index(corpus_data_loader,
@@ -134,37 +139,27 @@ def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
         for line in f:
             text_arr = line.rstrip().rsplit("\t")
             text, similar_text = text_arr[0], text_arr[1]
-            text2similar[text] = similar_text
-    rs = []
+            text2similar[text] = np.zeros(len(label2id))
+            # One hot Encoding
+            for label in similar_text.strip().split(','):
+                text2similar[text][label2id[label]] = 1
+    # Convert predicted labels into one hot encoding
+    pred_labels = {}
     with open(recall_result_file, 'r', encoding='utf-8') as f:
-        relevance_labels = []
         for index, line in enumerate(f):
-            if index % args.recall_num == 0 and index != 0:
-                rs.append(relevance_labels)
-                relevance_labels = []
-            text_arr = line.rstrip().rsplit("\t")
-            text, similar_text, cosine_sim = text_arr
-            if text2similar[text] == similar_text:
-                relevance_labels.append(1)
-            else:
-                relevance_labels.append(0)
+            text_arr = line.rstrip().split("\t")
+            text, labels, cosine_sim = text_arr
+            # One hot Encoding
+            if (text not in pred_labels):
+                pred_labels[text] = np.zeros(len(label2id))
+            if (float(cosine_sim) > args.threshold):
+                for label in labels.split(','):
+                    pred_labels[text][label2id[label]] = float(cosine_sim)
 
-    recall_N = []
-    recall_num = [1, 5, 10, 20]
-    for topN in recall_num:
-        R = round(100 * recall(rs, N=topN), 3)
-        recall_N.append(str(R))
-    evaluate_result_file = os.path.join(args.recall_result_dir,
-                                        args.evaluate_result)
-    result = open(evaluate_result_file, 'a')
-    res = []
-    timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
-    res.append(timestamp)
-    for key, val in zip(recall_num, recall_N):
-        print('recall@{}={}'.format(key, val))
-        res.append(str(val))
-    result.write('\t'.join(res) + '\n')
-    return float(recall_N[0])
+        for text, probs in pred_labels.items():
+            metric.update(probs, text2similar[text])
+        micro_f1_score, macro_f1_score = metric.accumulate()
+    return macro_f1_score
 
 
 def do_train():
@@ -216,6 +211,7 @@ def do_train():
                             tokenizer=tokenizer,
                             max_seq_length=args.max_seq_length)
         id2corpus = gen_id2corpus(args.corpus_file)
+        label2id = label2ids(args.corpus_file)
         # conver_example function's input must be dict
         corpus_list = [{idx: text} for idx, text in id2corpus.items()]
         corpus_ds = MapDataset(corpus_list)
@@ -255,7 +251,7 @@ def do_train():
         apply_decay_param_fun=lambda x: x in decay_params,
         grad_clip=nn.ClipGradByNorm(clip_norm=1.0))
     global_step = 0
-    best_recall = 0.0
+    best_score = 0.0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
@@ -287,10 +283,11 @@ def do_train():
                     tokenizer.save_pretrained(save_dir)
         if args.evaluate and rank == 0:
             print("evaluating")
-            recall_5 = evaluate(model, corpus_data_loader, query_data_loader,
-                                recall_result_file, text_list, id2corpus)
-            if recall_5 > best_recall:
-                best_recall = recall_5
+            macro_f1_score = evaluate(model, corpus_data_loader,
+                                      query_data_loader, recall_result_file,
+                                      text_list, id2corpus, label2id)
+            if macro_f1_score > best_score:
+                best_score = macro_f1_score
                 save_dir = os.path.join(args.save_dir, "model_best")
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
@@ -300,8 +297,8 @@ def do_train():
                 with open(os.path.join(save_dir, "train_result.txt"),
                           'a',
                           encoding='utf-8') as fp:
-                    fp.write('epoch=%d, global_step: %d, recall: %s\n' %
-                             (epoch, global_step, recall_5))
+                    fp.write('epoch=%d, global_step: %d, Macro f1: %s\n' %
+                             (epoch, global_step, macro_f1_score))
 
 
 if __name__ == "__main__":

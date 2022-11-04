@@ -244,6 +244,15 @@ def get_latest_ann_data(ann_data_dir):
     return None, -1
 
 
+def label2ids(label_path):
+    label2id = {}
+    with open(label_path) as f:
+        for idx, label in enumerate(f.readlines()):
+            label = label.strip()
+            label2id[label] = idx
+    return label2id
+
+
 def gen_id2corpus(corpus_file):
     id2corpus = {}
     with open(corpus_file, 'r', encoding='utf-8') as f:

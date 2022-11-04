@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# GPU version
-# single_labels 323
 root_dir="checkpoints/inbatch" 
 python -u -m paddle.distributed.launch --gpus "1" --log_dir "recall_log/" \
         recall.py \

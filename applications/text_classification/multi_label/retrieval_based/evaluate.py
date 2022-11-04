@@ -20,6 +20,7 @@ import numpy as np
 from tqdm import tqdm
 from metric import MetricReport
 from paddlenlp.utils.log import logger
+from data import label2ids
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -35,15 +36,6 @@ parser.add_argument("--threshold", default=0.5, type=float,
 
 args = parser.parse_args()
 # yapf: enable
-
-
-def label2ids(label_path):
-    label2id = {}
-    with open(label_path) as f:
-        for idx, label in enumerate(f.readlines()):
-            label = label.strip()
-            label2id[label] = idx
-    return label2id
 
 
 def evaluate(label2id):

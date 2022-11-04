@@ -20,6 +20,7 @@
 
 本方案是基于语义索引模型的分类，语义索引模型的目标是：给定输入文本，模型可以从海量候选召回库中**快速、准确**地召回一批语义相关文本。基于语义索引的多标签分类方法有两种，第一种方法是直接把标签变成召回库，即把输入文本和标签的文本进行匹配，第二种是利用召回的文本带有类别标签，把召回文本的类别标签作为给定输入文本的类别。本方案使用双塔模型，训练阶段引入In-batch Negatives  策略，使用hnswlib建立索引库，并把标签作为召回库，进行召回测试。最后利用召回的结果使用 Accuracy 指标来评估语义索引模型的分类的效果。
 
+**注意** 基于语义索引的文本分类的标签在预测过程中会抽取成向量，所以标签需要文本的形式，不能是ID形式的标签。
 
 <a name="代码结构说明"></a>
 
@@ -152,14 +153,14 @@ label.txt(分类标签文件)记录数据集中所有标签集合，每一行为
 我们使用百科知识问答的数据来构建训练集，开发集。
 
 **训练集（train.txt）** 和 **开发集(dev.txt)** 格式一致，训练集30k条，开发集10k条，每行由文本的标题，内容和类别标签组成，以tab符分割，第一列是问题的标题和问题的描述拼接，剩下的列问题的类别。
-**召回库（label.txt）** 召回库的构建有2种方式，第一种是把所有的类别标签当成召回库，第二种是把训练集当成召回集合，我们以第一种为例。
+**召回库（label.txt）** 类别的数量是323类，召回标签库的构建有2种方式，第一种是把所有的类别标签当成召回库，第二种是把训练集当成召回集合，我们以第一种为例。
 
 数据集选择的是百科问答数据集的一个子集，问答数据集详情请参考[nlp_chinese_corpus](https://github.com/brightmart/nlp_chinese_corpus)
 
-- [baike_qa_category](https://paddlenlp.bj.bcebos.com/applications/baike_qa_category.zip)
+- [baike_qa_category](https://paddlenlp.bj.bcebos.com/applications/baike_qa_multilabel.zip)
 
 ```
-wget https://paddlenlp.bj.bcebos.com/applications/baike_qa_category.zip
+wget https://paddlenlp.bj.bcebos.com/applications/baike_qa_multilabel.zip
 unzip  baike_qa_category.zip
 ```
 
@@ -265,7 +266,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
     --output_emb_size 0 \
     --batch_size 128 \
     --max_seq_length 384 \
-    --text_pair_file "data/dev.txt"
+    --text_pair_file "data/test.txt"
 ```
 
 参数含义说明
@@ -381,7 +382,24 @@ sh scripts/run.sh
 
 ### Paddle Serving部署
 
-Paddle Serving 的详细文档请参考 [Pipeline_Design](https://github.com/PaddlePaddle/Serving/blob/v0.7.0/doc/Python_Pipeline/Pipeline_Design_CN.md)和[Serving_Design](https://github.com/PaddlePaddle/Serving/blob/v0.7.0/doc/Serving_Design_CN.md),首先把静态图模型转换成Serving的格式：
+Paddle Serving 的安装可以参考[Paddle Serving 安装文档](https://github.com/PaddlePaddle/Serving#installation)。需要在服务端和客户端安装相关的依赖，用pip安装Paddle Serving的依赖如下：
+
+```
+pip install paddle-serving-client==0.8.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install paddle-serving-app==0.8.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 如果是CPU部署，只需要安装CPU Server
+pip install paddle-serving-server==0.8.3 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 如果是GPU Server，需要确认环境再选择执行哪一条，推荐使用CUDA 10.2的包
+# CUDA10.2 + Cudnn7 + TensorRT6（推荐）
+pip install paddle-serving-server-gpu==0.8.3.post102 -i https://pypi.tuna.tsinghua.edu.cn/simple
+# CUDA10.1 + TensorRT6
+pip install paddle-serving-server-gpu==0.8.3.post101 -i https://pypi.tuna.tsinghua.edu.cn/simple
+# CUDA11.2 + TensorRT8
+pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+更详细的安装信息请参考[链接](https://github.com/PaddlePaddle/Serving/blob/v0.9.0/doc/Install_Linux_Env_CN.md)，安装完依赖后就可以执行下面的步骤。首先把生成的静态图模型导出为 Paddle Serving的格式，命令如下:
 
 ```
 python export_to_serving.py \
