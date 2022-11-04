@@ -270,7 +270,7 @@ def load_image(image):
             base64_str = pil2base64(image)
         elif os.path.isfile(image):
             image_type = imghdr.what(image)
-            image = Image.open(image)
+            image = Image.open(image).convert("RGB")
             base64_str = pil2base64(image, image_type=image_type)
         else:
             base64_str = image

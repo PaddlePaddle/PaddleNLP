@@ -101,6 +101,16 @@ label-studio start
     <img src=https://user-images.githubusercontent.com/40840292/199725229-f5e998bf-367c-4449-b83a-c799f1e3de00.png height=650 width=1200 />
 </div>
 
+Relation XML模板：
+
+```xml
+  <Relations>
+    <Relation value="单位"/>
+    <Relation value="数量"/>
+    <Relation value="金额"/>
+  </Relations>
+```
+
 - 分类类别标签
 
 <div align="center">
@@ -255,7 +265,7 @@ schema = {
 
 #### 3.3 标签构建
 
-- Span类型抽取
+- Span类型标签
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199456432-ce601ab0-7d6c-458f-ac46-8839dbc4d013.png height=500 width=1200 />
@@ -263,6 +273,21 @@ schema = {
 
 
 - Relation类型标签
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199877621-f60e00c7-81ae-42e1-b498-8ebc5b5bd0fd.png height=650 width=1200 />
+</div>
+
+Relation XML模板：
+
+```xml
+  <Relations>
+    <Relation value="单位"/>
+    <Relation value="数量"/>
+    <Relation value="金额"/>
+  </Relations>
+```
+
 
 - 分类类别标签
 
@@ -288,7 +313,20 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 
 - 关系抽取
 
-- 事件抽取
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199878217-f0b6bdbd-7c50-4deb-a4a2-77128249ea62.png height=400 width=1200 />
+</div>
+
+
+```text
+schema = {
+    '名称及规格': [
+        '金额',
+        '单位',
+        '数量'
+    ]
+}
+```
 
 - 文档分类
 
@@ -301,8 +339,6 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 ```text
 schema = '文档类别[发票，报关单]'
 ```
-
-- 实体/评价维度级分类
 
 
 <a name="35"></a>
