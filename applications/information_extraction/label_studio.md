@@ -52,25 +52,25 @@ label-studio start
 - 填写项目名称、描述
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199661377-d9664165-61aa-4462-927d-225118b8535b.png height=200 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199661377-d9664165-61aa-4462-927d-225118b8535b.png height=230 width=1200 />
 </div>
 
 - **命名实体识别、关系抽取、事件抽取、实体/评价维度级分类**任务选择``Relation Extraction`。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=300 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
 </div>
 
 - **文本分类、句子级情感倾向分类**任务选择``Relation Extraction`。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=300 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
 </div>
 
 - 添加标签(也可跳过后续在Setting/Labeling Interface中配置)
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199662737-ed996a2c-7a24-4077-8a36-239c4bfb0a16.png height=320 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199662737-ed996a2c-7a24-4077-8a36-239c4bfb0a16.png height=380 width=1200 />
 </div>
 
 图中展示了实体类型标签的构建，其他类型标签的构建可参考[2.3标签构建](#23)
@@ -82,7 +82,7 @@ label-studio start
 先从本地上传txt格式文件，选择``List of tasks``，然后选择导入本项目。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199667670-1b8f6755-b41f-41c4-8afc-06bb051690b6.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199667670-1b8f6755-b41f-41c4-8afc-06bb051690b6.png height=210 width=1200 />
 </div>
 
 <a name="23"></a>
@@ -92,13 +92,13 @@ label-studio start
 - Span类型标签
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199667941-04e300c5-3cd7-4b8e-aaf5-561415414891.png height=500 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199667941-04e300c5-3cd7-4b8e-aaf5-561415414891.png height=480 width=1200 />
 </div>
 
 - Relation类型标签
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199725229-f5e998bf-367c-4449-b83a-c799f1e3de00.png height=650 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199725229-f5e998bf-367c-4449-b83a-c799f1e3de00.png height=620 width=1200 />
 </div>
 
 Relation XML模板：
@@ -114,7 +114,7 @@ Relation XML模板：
 - 分类类别标签
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199724082-ee82dceb-dab0-496d-a930-a8ecb284d8b2.png height=400 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199724082-ee82dceb-dab0-496d-a930-a8ecb284d8b2.png height=370 width=1200 />
 </div>
 
 
@@ -127,7 +127,7 @@ Relation XML模板：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879957-aeec9d17-d342-4ea0-a840-457b49f6066e.png height=100 width=600 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879957-aeec9d17-d342-4ea0-a840-457b49f6066e.png height=160 width=1000 />
 </div>
 
 该标注示例对应的schema为：
@@ -144,7 +144,7 @@ schema = [
 - 关系抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879866-03c1ecac-1828-4f35-af70-9ae61701c303.png height=180 width=800 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879866-03c1ecac-1828-4f35-af70-9ae61701c303.png height=240 width=1200 />
 </div>
 
 该标注示例对应的schema为：
@@ -162,7 +162,7 @@ schema = {
 - 事件抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879776-75abbade-9bea-44dc-ac36-322fecdc03e0.png height=150 width=800 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879776-75abbade-9bea-44dc-ac36-322fecdc03e0.png height=230 width=1200 />
 </div>
 
 该标注示例对应的schema为：
@@ -179,7 +179,7 @@ schema = {
 - 句子级分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879672-c3f286fe-a217-4888-950f-d4ee45b19f5a.png height=140 width=600 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879672-c3f286fe-a217-4888-950f-d4ee45b19f5a.png height=200 width=1000 />
 </div>
 
 
@@ -192,7 +192,7 @@ schema = '情感倾向[正向，负向]'
 - 实体/评价维度级分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879586-8c6e4826-a3b0-49e0-9920-98ca062dccff.png height=180 width=800 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879586-8c6e4826-a3b0-49e0-9920-98ca062dccff.png height=240 width=1200 />
 </div>
 
 该标注示例对应的schema为：
@@ -302,7 +302,7 @@ Relation XML模板：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879427-82806ffc-dc60-4ec7-bda5-e16419ee9d15.png height=500 width=600 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879427-82806ffc-dc60-4ec7-bda5-e16419ee9d15.png height=650 width=800 />
 </div>
 
 该标注示例对应的schema为：
@@ -314,7 +314,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 - 关系抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879032-88896a00-85ca-4bb0-a8e8-305a47bbaf78.png height=350 width=800 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879032-88896a00-85ca-4bb0-a8e8-305a47bbaf78.png height=450 width=1000 />
 </div>
 
 
@@ -331,7 +331,7 @@ schema = {
 - 文档分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879238-b8b41d4a-7e77-47cd-8def-2fc8ba89442f.png height=500 width=600 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879238-b8b41d4a-7e77-47cd-8def-2fc8ba89442f.png height=650 width=800 />
 </div>
 
 该标注示例对应的schema为：
