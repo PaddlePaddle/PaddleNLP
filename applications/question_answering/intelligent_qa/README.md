@@ -62,23 +62,33 @@
 **问答对生成**：问答对生成使用的指标是软召回率Recall@K，
 **语义索引**：语义索引使用的指标是Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前K个相关结果的重叠率，衡量的是检索系统的查全率。 -->
 ### 代码结构说明
-以下是本项目主要代码结构及说明：
+以下是本项目主要代码结构：
 
 ```text
-├── deploy # 部署
-│   ├── paddle_inference # PaddleInference高性能推理部署
-│   │   ├── inference_unimo_text.py # 推理部署脚本
-│   │   └── README.md # 说明文档
-│   └── paddle_serving
-│       ├── config.yml # 配置文件
-│       ├── pipeline_client.py # 客户端程序
-│       ├── pipeline_service.py # 服务器程序
-│       └── README.md # 说明文档
-├── export_model.py # 动态图参数导出静态图参数脚本
-├── train.py # 训练脚本
-├── predict.py # 预测评估脚本
-├── utils.py # 工具函数脚本
-└── README.md # 说明文档
+.
+├── finetune
+│   ├── answer_extraction_and_filtration
+│   │   ├── evaluate.py
+│   │   ├── finetune.py
+│   │   ├── model.py
+│   │   ├── scripts
+│   │   ├── span.py
+│   │   └── utils.py
+│   └── question_generation
+│       ├── gen_utils.py
+│       ├── predict.py
+│       └── train.py
+├── README.md
+├── run_corpus_preparation.py
+├── run_data_preprocess.py
+├── run_pipelines_example.py
+├── run_qa_pairs_generation.py
+└── tools
+    ├── create_synthetic_answer.py
+    ├── create_synthetic_question.py
+    ├── dev_qq_pair_creation.py
+    ├── json_format_indent.py
+    └── question_coverage.py
 ```
 
 ## 基于Pipelines快速构建问答系统
