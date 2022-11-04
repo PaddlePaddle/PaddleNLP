@@ -17,7 +17,6 @@ import math
 import unittest
 import numpy as np
 import random
-from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
@@ -151,13 +150,7 @@ class UNIMOModelTester:
 
         config = self.get_config()
 
-        lm_labels = None
-        if self.parent.use_labels:
-            lm_labels = ids_tensor([self.batch_size, self.seq_length],
-                                   self.vocab_size)
-
-        return (config, input_ids, input_mask, token_type_ids, position_ids,
-                lm_labels)
+        return (config, input_ids, input_mask, token_type_ids, position_ids)
 
     def get_config(self):
         return {
@@ -181,10 +174,9 @@ class UNIMOModelTester:
         }
 
     def prepare_config_and_inputs_for_decoder(self):
-        (config, input_ids, input_mask, token_type_ids, position_ids,
-         lm_labels) = self.prepare_config_and_inputs()
-        return (config, input_ids, input_mask, token_type_ids, position_ids,
-                lm_labels)
+        (config, input_ids, input_mask, token_type_ids,
+         position_ids) = self.prepare_config_and_inputs()
+        return (config, input_ids, input_mask, token_type_ids, position_ids)
 
     def create_and_check_unimo_model(self, config, input_ids, input_mask,
                                      token_type_ids, position_ids, *args):
@@ -195,8 +187,7 @@ class UNIMOModelTester:
                               token_type_ids=token_type_ids,
                               position_ids=position_ids,
                               attention_mask=input_mask,
-                              use_cache=True,
-                              return_dict=self.parent.return_dict)[:2]
+                              use_cache=True)
 
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.hidden_size])
@@ -212,24 +203,23 @@ class UNIMOModelTester:
                         token_type_ids=token_type_ids,
                         position_ids=position_ids,
                         attention_mask=input_mask,
-                        use_cache=True,
-                        return_dict=self.parent.return_dict)
-        outputs_use_cache_conf = model(input_ids,
-                                       token_type_ids=token_type_ids,
-                                       position_ids=position_ids,
-                                       attention_mask=input_mask,
-                                       return_dict=self.parent.return_dict)
+                        use_cache=True)
+        outputs_use_cache_conf = model(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=input_mask,
+        )
         outputs_no_past = model(input_ids,
                                 token_type_ids=token_type_ids,
                                 position_ids=position_ids,
                                 attention_mask=input_mask,
-                                use_cache=False,
-                                return_dict=self.parent.return_dict)
+                                use_cache=False)
 
         self.parent.assertTrue(
             len(outputs_no_past) == len(outputs_use_cache_conf))
 
-        output, past = outputs[:2]
+        output, past = outputs
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -256,21 +246,18 @@ class UNIMOModelTester:
                                        value=0)(next_attention_mask)
         next_attention_mask[:, :, -1, -1] = 1
 
-        output_from_no_past, cache = model(
-            next_input_ids,
-            token_type_ids=next_token_type_ids,
-            position_ids=next_position_ids,
-            attention_mask=next_attention_mask,
-            use_cache=True,
-            return_dict=self.parent.return_dict)[:2]
+        output_from_no_past, cache = model(next_input_ids,
+                                           token_type_ids=next_token_type_ids,
+                                           position_ids=next_position_ids,
+                                           attention_mask=next_attention_mask,
+                                           use_cache=True)
         output_from_past = model(next_tokens,
                                  token_type_ids=next_token_types,
                                  position_ids=next_position,
                                  attention_mask=next_attention_mask[:, :,
                                                                     -1:, :],
                                  use_cache=True,
-                                 cache=past,
-                                 return_dict=self.parent.return_dict)[0]
+                                 cache=past)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -300,8 +287,7 @@ class UNIMOModelTester:
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=input_mask,
-                             use_cache=True,
-                             return_dict=self.parent.return_dict)[:2]
+                             use_cache=True)
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -339,10 +325,7 @@ class UNIMOModelTester:
             attention_mask=next_attention_mask,
             position_ids=next_position_ids,
             use_cache=False,
-            return_dict=self.parent.return_dict,
         )
-        output_from_no_past = output_from_no_past[
-            0] if self.parent.return_dict else output_from_no_past
         output_from_past = model(
             next_tokens,
             token_type_ids=next_token_types,
@@ -350,7 +333,6 @@ class UNIMOModelTester:
             position_ids=next_position,
             cache=past,
             use_cache=True,
-            return_dict=self.parent.return_dict,
         )[0]
         self.parent.assertTrue(
             output_from_past.shape[1] == next_tokens.shape[1])
@@ -372,24 +354,15 @@ class UNIMOModelTester:
                             atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask,
-                                       token_type_ids, position_ids, lm_labels,
-                                       *args):
+                                       token_type_ids, position_ids, *args):
         base_model = UNIMOModel(**config)
         model = UNIMOLMHeadModel(base_model)
         model.eval()
 
-        outputs = model(input_ids,
-                        token_type_ids=token_type_ids,
-                        position_ids=position_ids,
-                        attention_mask=input_mask,
-                        labels=lm_labels,
-                        return_dict=self.parent.return_dict)
-
-        if self.parent.use_labels:
-            loss, result = outputs[:2]
-            self.parent.assertIsInstance(loss.item(), float)
-        else:
-            result = outputs[0] if self.parent.return_dict else outputs
+        result = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       position_ids=position_ids,
+                       attention_mask=input_mask)
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
@@ -398,25 +371,20 @@ class UNIMOModelTester:
                                                position_ids, *args):
         base_model = UNIMOModel(**config)
         model = UNIMOLMHeadModel(base_model)
+        model.eval()
 
-        outputs = model(input_ids,
-                        token_type_ids=token_type_ids,
-                        attention_mask=input_mask,
-                        position_ids=position_ids,
-                        labels=input_ids,
-                        return_dict=self.parent.return_dict)
-
-        loss, result = outputs[:2]
-        self.parent.assertIsInstance(loss.item(), float)
+        logits = model(input_ids,
+                       token_type_ids=token_type_ids,
+                       attention_mask=input_mask,
+                       position_ids=position_ids)
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
-        loss.backward()
+            logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
 
-        (config, input_ids, input_mask, token_type_ids, position_ids,
-         lm_labels) = config_and_inputs
+        (config, input_ids, input_mask, token_type_ids,
+         position_ids) = config_and_inputs
 
         inputs_dict = {
             "input_ids": input_ids,
@@ -428,12 +396,6 @@ class UNIMOModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(("return_dict", "use_labels"), [
-    [False, False],
-    [False, True],
-    [True, False],
-    [True, True],
-])
 class UNIMOModelTest(ModelTesterMixin, GenerationTesterMixin,
                      unittest.TestCase):
     base_model_class = UNIMOModel
@@ -441,9 +403,6 @@ class UNIMOModelTest(ModelTesterMixin, GenerationTesterMixin,
     all_model_classes = (UNIMOModel, UNIMOLMHeadModel)
     all_generative_model_classes = {UNIMOLMHeadModel: (UNIMOModel, "unimo")}
     test_missing_keys = False
-
-    use_labels = False
-    return_dict = False
 
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class, return_labels=False):
