@@ -402,9 +402,11 @@ class DiffusionPipeline(ConfigMixin):
                     loading_kwargs["provider"] = provider
                     loading_kwargs["sess_options"] = sess_options
 
-                loaded_sub_model = load_method(
-                    os.path.join(pretrained_model_name_or_path, name),
-                    **loading_kwargs)
+                model_path_dir = os.path.join(
+                    pretrained_model_name_or_path, name) if os.path.isdir(
+                        pretrained_model_name_or_path
+                    ) else pretrained_model_name_or_path + "/" + name
+                loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):
