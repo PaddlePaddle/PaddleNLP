@@ -105,11 +105,6 @@ def set_seed(seed):
     paddle.seed(seed)
 
 
-def recall(rs, N=10):
-    recall_flags = [np.sum(r[0:N]) for r in rs]
-    return np.mean(recall_flags)
-
-
 @paddle.no_grad()
 def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
              text_list, id2corpus, label2id):
