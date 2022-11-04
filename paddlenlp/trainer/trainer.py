@@ -615,15 +615,18 @@ class Trainer:
                         args, self.state, self.control)
 
                 dp_enabled = self.args.dp_degree > 1 if self.sharding else args.local_rank != -1
+                forbidden_no_sync = False
                 if self.sharding and (ShardingOption.SHARD_OP
                                       not in self.args.sharding):
-                    # stage2 and stage3 with no_sync
-                    dp_enabled = False
+                    # stage2 and stage3 should no_sync, because the is no DDP wrapper and  no_sync API
+                    forbidden_no_sync = True
+                availiable_no_sync = dp_enabled and not forbidden_no_sync
 
-                is_no_sync = (
-                    (((step + 1) % args.gradient_accumulation_steps != 0)
-                     and dp_enabled and args._no_sync_in_gradient_accumulation)
-                    or (args.recompute and dp_enabled))
+                is_no_sync = (((
+                    (step + 1) % args.gradient_accumulation_steps != 0)
+                               and availiable_no_sync
+                               and args._no_sync_in_gradient_accumulation)
+                              or (args.recompute and availiable_no_sync))
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
@@ -645,23 +648,24 @@ class Trainer:
                     # Maunally collect gradients
                     # Case 1: Use sharding stage 2/3 with dp
                     # Case 2: Use recompute and dp
-                    # local_rank != -1 don't means no dp in networks.
-                    if self.sharding and self.args.dp_degree > 1 and ShardingOption.SHARD_OP not in self.args.sharding:
-                        fused_allreduce_gradients(
-                            model.parameters(),
-                            fleet.get_hybrid_communicate_group())
-                        if ShardingOption.FULL_SHARD in self.args.sharding:
-                            # Why need sync on parm again ?
-                            # TODO: fix this.
-                            for p in model.parameters():
-                                if hasattr(p, "bw_storage"):
-                                    assert p.grad is None, "This case shouldn't happen."
-                                    p.bw_storage.scale_(1.0 /
-                                                        self.dp_group.nranks)
-                                    paddle.distributed.all_reduce(
-                                        p.bw_storage, group=self.dp_group)
+                    # local_rank != -1 don't means dp in networks.
+                    if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
+                        if self.args.dp_degree > 1:
+                            fused_allreduce_gradients(
+                                model.parameters(),
+                                fleet.get_hybrid_communicate_group())
+                            if ShardingOption.FULL_SHARD in self.args.sharding:
+                                # Why need sync on parm again ?
+                                # TODO: fix this.
+                                for p in model.parameters():
+                                    if hasattr(p, "bw_storage"):
+                                        assert p.grad is None, "This case shouldn't happen."
+                                        p.bw_storage.scale_(
+                                            1.0 / self.dp_group.nranks)
+                                        paddle.distributed.all_reduce(
+                                            p.bw_storage, group=self.dp_group)
 
-                    elif (args.recompute and args.local_rank != -1):
+                    elif (args.recompute and dp_enabled):
                         fused_allreduce_gradients(list(model.parameters()),
                                                   None)
                     # Optimizer step
@@ -797,14 +801,14 @@ class Trainer:
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
+            total_train_batch_size = self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.world_size
+            num_steps = self.state.global_step - self._globalstep_last_logged
             logs.update(
                 speed_metrics(
                     "interval",
                     self._globalstep_last_start_time,
-                    num_samples=self.args.train_batch_size *
-                    self.args.gradient_accumulation_steps,
-                    num_steps=self.state.global_step -
-                    self._globalstep_last_logged,
+                    num_samples=total_train_batch_size * num_steps,
+                    num_steps=num_steps,
                 ))
 
             self._total_loss_scalar += tr_loss_scalar
