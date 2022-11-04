@@ -73,6 +73,9 @@ from .trainer_utils import (
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
     get_scheduler,
+    IterableDatasetShard,
+    has_length,
+    find_batch_size,
 )
 from .trainer_callback import (
     CallbackHandler,
@@ -433,31 +436,44 @@ class Trainer:
 
         train_dataloader = self.get_train_dataloader()
 
-        # args = self.init_num_steps(args, len(self.train_dataset))
-
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+        len_dataloader = None
+        if has_length(train_dataloader):
+            len_dataloader = len(train_dataloader)
+            num_update_steps_per_epoch = len(
+                train_dataloader) // args.gradient_accumulation_steps
+            num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+            num_examples = len(self.train_dataset)
 
-        num_update_steps_per_epoch = len(
-            train_dataloader) // args.gradient_accumulation_steps
-        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+            if args.max_steps > 0:
+                max_steps = args.max_steps
+                num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
+                    args.max_steps % num_update_steps_per_epoch > 0)
+                num_train_samples = args.max_steps * total_train_batch_size
+            else:
+                max_steps = num_update_steps_per_epoch * args.num_train_epochs
+                num_train_epochs = math.ceil(args.num_train_epochs)
+                num_train_samples = len(
+                    self.train_dataset) * args.num_train_epochs
 
-        if args.max_steps > 0:
-            args.num_training_steps = args.max_steps
-            num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
-                args.max_steps % num_update_steps_per_epoch > 0)
+            if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
+                if max_steps // args.eval_steps < args.minimum_eval_times:
+                    exp_step = max_steps / args.minimum_eval_times
+                    exp_step = max(int(exp_step - exp_step % 10), 10)
+                    logger.info("Reset eval step by minimum_eval_times to %d" %
+                                exp_step)
+                    args.eval_steps = exp_step
+        elif args.max_steps > 0:  # Rely on max_steps when dataloader does not have a working size
+            max_steps = args.max_steps
+            # Setting a very large number of epochs so we go as many times as necessary over the iterator.
+            num_train_epochs = sys.maxsize
+            num_update_steps_per_epoch = max_steps
+            num_examples = total_train_batch_size * args.max_steps
             num_train_samples = args.max_steps * total_train_batch_size
         else:
-            args.num_training_steps = num_update_steps_per_epoch * args.num_train_epochs
-            num_train_epochs = math.ceil(args.num_train_epochs)
-            num_train_samples = len(self.train_dataset) * args.num_train_epochs
-
-        if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
-            if args.num_training_steps // args.eval_steps < args.minimum_eval_times:
-                exp_step = args.num_training_steps / args.minimum_eval_times
-                exp_step = max(int(exp_step - exp_step % 10), 10)
-                logger.info("Reset eval step by minimum_eval_times to %d" %
-                            exp_step)
-                args.eval_steps = exp_step
+            raise ValueError(
+                f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
+            )
 
         # delay_optimizer_creation = (
         #     self.sharding is not None
@@ -466,8 +482,7 @@ class Trainer:
         delay_optimizer_creation = self.sharding is None
 
         if not delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(
-                num_training_steps=args.num_training_steps)
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         self.state = TrainerState()
 
@@ -478,13 +493,10 @@ class Trainer:
             self.model_wrapped = model
 
         if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(
-                num_training_steps=args.num_training_steps)
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        num_examples = len(self.train_dataset)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
@@ -498,8 +510,11 @@ class Trainer:
         logger.info(
             f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
         )
-        logger.info(f"  Total optimization steps = {args.num_training_steps}")
+        logger.info(f"  Total optimization steps = {max_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
+        logger.info(
+            f"  Number of trainable parameters = {sum(p.numel().item() for p in model.parameters() if not p.stop_gradient) }"
+        )
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -552,14 +567,16 @@ class Trainer:
                     )
 
         epoch_iterator = train_dataloader
-        steps_in_epoch = len(epoch_iterator)
+        # steps_in_epoch = len(epoch_iterator)
+        steps_in_epoch = (len(epoch_iterator) if len_dataloader is not None else
+                          args.max_steps * args.gradient_accumulation_steps)
 
         self.callback_handler.model = self.model
         self.callback_handler.optimizer = self.optimizer
         self.callback_handler.lr_scheduler = self.lr_scheduler
         self.callback_handler.train_dataloader = train_dataloader
 
-        self.state.max_steps = int(args.num_training_steps)
+        self.state.max_steps = int(max_steps)
         self.state.num_train_epochs = num_train_epochs
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
@@ -847,6 +864,23 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset,
                                                         description="training")
 
+        if isinstance(train_dataset, paddle.io.IterableDataset):
+            if self.args.world_size > 1:
+                train_dataset = IterableDatasetShard(
+                    train_dataset,
+                    batch_size=self.args.per_device_train_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                train_dataset,
+                batch_size=self.args.per_device_eval_batch_size,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
+
         train_sampler = self._get_train_sampler()
 
         return DataLoader(
@@ -860,7 +894,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
-                batch_size=self.args.eval_batch_size,
+                batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
             )
@@ -869,7 +903,7 @@ class Trainer:
                 eval_dataset,
                 num_replicas=self.args.world_size,
                 rank=self.args.process_index,
-                batch_size=self.args.eval_batch_size,
+                batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
             )
@@ -895,6 +929,22 @@ class Trainer:
                                                   datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset,
                                                        description="evaluation")
+        if isinstance(eval_dataset, paddle.io.IterableDataset):
+            if self.args.world_size > 1:
+                eval_dataset = IterableDatasetShard(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                eval_dataset,
+                batch_size=self.args.per_device_eval_batch_size,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
@@ -920,6 +970,24 @@ class Trainer:
                                                   datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset,
                                                        description="test")
+        if isinstance(test_dataset, paddle.io.IterableDataset):
+            if self.args.world_size > 1:
+                test_dataset = IterableDatasetShard(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                test_dataset,
+                batch_size=self.args.per_device_eval_batch_size *
+                self.world_size,
+                collate_fn=self.
+                data_collator,  # _get_collator_with_removed_columns
+                num_workers=self.args.dataloader_num_workers,
+            )
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
@@ -1068,6 +1136,21 @@ class Trainer:
 
         return self.lr_scheduler
 
+    def num_examples(self, dataloader: DataLoader) -> int:
+        """
+        Helper to get number of samples in a [`~paddle.io.DataLoader`] by accessing its dataset. When
+        dataloader.dataset does not exist or has no length, estimates as best it can
+        """
+        try:
+            dataset = dataloader.dataset
+            # Special case for IterableDatasetShard, we need to dig deeper
+            if isinstance(dataset, IterableDatasetShard):
+                return len(dataloader.dataset.dataset)
+            return len(dataloader.dataset)
+        except (NameError, AttributeError, TypeError
+                ):  # no dataset or length, estimate by length of dataloader
+            return len(dataloader) * self.args.per_device_train_batch_size
+
     def _wrap_model(self, model, training=True):
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
@@ -1192,6 +1275,8 @@ class Trainer:
             labels = inputs["generator_labels"]
         else:
             labels = None
+        # TODO: label_names pop
+
         outputs = model(**inputs)
 
         if self.criterion is not None:
@@ -1570,9 +1655,9 @@ class Trainer:
         else:
             raise ValueError("Only support for paddle.io.DataLoader")
 
-        if max_eval_iters <= 0:
-            num_samples = self.num_examples(dataloader)
-        else:
+        num_samples = None
+        if max_eval_iters > 0:
+            # on eval limit steps
             num_samples = batch_size * self.args.world_size * max_eval_iters
             if isinstance(
                     dataloader, paddle.fluid.dataloader.dataloader_iter.
@@ -1580,21 +1665,24 @@ class Trainer:
                         dataloader._batch_sampler, NlpDistributedBatchSampler):
                 consumed_samples = (
                     (self.state.global_step) // args.eval_steps
-                ) * max_eval_iters * args.eval_batch_size * args.world_size
+                ) * max_eval_iters * args.per_device_eval_batch_size * args.world_size
                 dataloader._batch_sampler.set_epoch(
                     consumed_samples=consumed_samples)
 
         logger.info(f"***** Running {description} *****")
-        logger.info(f"  Num examples = {num_samples}")
+        if has_length(dataloader):
+            logger.info(f"  Num examples = {self.num_examples(dataloader)}")
+            logger.info(f"  Total prediction steps = {len(dataloader)}")
+        else:
+            logger.info("  Num examples: Unknown")
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.world_size}")
-        logger.info(f"  Total prediction steps = {len(dataloader)}")
 
         model.eval()
 
         self.callback_handler.eval_dataloader = dataloader
         # Do this before wrapping.
-        # eval_dataset = dataloader.dataset
+        eval_dataset = dataloader.dataset
 
         if args.past_index >= 0:
             self._past = None
@@ -1610,10 +1698,18 @@ class Trainer:
         all_labels = None
         # Will be useful when we have an iterable dataset so don't know its length.
 
+        observed_num_examples = 0
         # Main evaluation loop
         losses = []
         for step, inputs in enumerate(dataloader):
             # Update the observed num examples
+            observed_batch_size = find_batch_size(inputs)
+            if observed_batch_size is not None:
+                observed_num_examples += observed_batch_size
+                # For batch samplers, batch_size is not known by the dataloader in advance.
+                if batch_size is None:
+                    batch_size = observed_batch_size
+
             # Prediction step
             loss, logits, labels = self.prediction_step(model,
                                                         inputs,
@@ -1653,6 +1749,22 @@ class Trainer:
             labels = nested_numpify(labels_host)
             all_labels = labels if all_labels is None else nested_concat(
                 all_labels, labels, padding_index=-100)
+
+        # Number of samples
+        if num_samples is not None:
+            pass
+        elif has_length(eval_dataset):
+            num_samples = len(eval_dataset)
+        # The instance check is weird and does not actually check for the type, but whether the dataset has the right
+        # methods. Therefore we need to make sure it also has the attribute.
+        elif isinstance(eval_dataset, IterableDatasetShard) and hasattr(
+                eval_dataset, "num_examples"):
+            num_samples = eval_dataset.num_examples
+        else:
+            if has_length(dataloader):
+                num_samples = self.num_examples(dataloader)
+            else:  # both len(dataloader.dataset) and len(dataloader) fail
+                num_samples = observed_num_examples
 
         # Number of losses has been rounded to a multiple of batch_size and in a distributed training, the number of
         # samplers has been rounded to a multiple of batch_size, so we truncate.
@@ -1722,7 +1834,7 @@ class Trainer:
                            description="Prediction",
                            ignore_keys=ignore_keys,
                            metric_key_prefix=metric_key_prefix)
-        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        total_batch_size = self.args.per_device_eval_batch_size * self.args.world_size
         output.metrics.update(
             speed_metrics(
                 metric_key_prefix,
