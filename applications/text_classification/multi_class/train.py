@@ -44,7 +44,6 @@ class DataArguments:
 class ModelArguments:
     model_name_or_path: str = field(default="ernie-3.0-base-zh", metadata={"help": "Build-in pretrained model name or the path to local model."})
     export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
-    resume_from_checkpoint: str = field(default=None, metadata={"help": "local path to a saved checkpoint to resume from"})
 # yapf: enable
 
 
@@ -131,12 +130,16 @@ def main():
 
     if training_args.do_train:
         train_result = trainer.train(
-            resume_from_checkpoint=model_args.resume_from_checkpoint)
+            resume_from_checkpoint=training_args.resume_from_checkpoint)
         metrics = train_result.metrics
         trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
+
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate(dev_ds)
+        trainer.log_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
