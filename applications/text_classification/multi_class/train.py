@@ -12,28 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import json
 import functools
-import random
-import time
 import os
-import argparse
 from dataclasses import dataclass, field
 
-import numpy as np
-
 import paddle
-import paddle.nn.functional as F
-from paddle.static import InputSpec
 from paddle.metric import Accuracy
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback, TrainingArguments, Trainer
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer, LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+from paddlenlp.trainer import (
+    EarlyStoppingCallback,
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+)
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+)
 
-from utils import evaluate, preprocess_function, read_local_dataset
+from utils import preprocess_function, read_local_dataset
 
 
 # yapf: disable
@@ -66,28 +64,33 @@ def main():
     # load and preprocess dataset
     label_list = {}
     with open(os.path.join(data_args.data_dir, "label.txt"),
-              'r',
-              encoding='utf-8') as f:
+              "r",
+              encoding="utf-8") as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
 
-    train_ds = load_dataset(read_local_dataset,
-                            path=os.path.join(data_args.data_dir, "train.txt"),
-                            label_list=label_list,
-                            lazy=False)
-    dev_ds = load_dataset(read_local_dataset,
-                          path=os.path.join(data_args.data_dir, "dev.txt"),
-                          label_list=label_list,
-                          lazy=False)
+    train_ds = load_dataset(
+        read_local_dataset,
+        path=os.path.join(data_args.data_dir, "train.txt"),
+        label_list=label_list,
+        lazy=False,
+    )
+    dev_ds = load_dataset(
+        read_local_dataset,
+        path=os.path.join(data_args.data_dir, "dev.txt"),
+        label_list=label_list,
+        lazy=False,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=data_args.max_seq_length)
+    trans_func = functools.partial(
+        preprocess_function,
+        tokenizer=tokenizer,
+        max_seq_length=data_args.max_seq_length,
+    )
     train_ds = train_ds.map(trans_func)
     dev_ds = dev_ds.map(trans_func)
-    collate_fn = DataCollatorWithPadding(tokenizer)
 
     # define model
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -96,30 +99,35 @@ def main():
     # Define the metric function.
     def compute_metrics(eval_preds):
         metric = Accuracy()
-        correct = metric.compute(paddle.to_tensor(eval_preds.predictions),
-                                 paddle.to_tensor(eval_preds.label_ids))
+        correct = metric.compute(
+            paddle.to_tensor(eval_preds.predictions),
+            paddle.to_tensor(eval_preds.label_ids),
+        )
         metric.update(correct)
         acc = metric.accumulate()
-        return {'accuracy': acc}
+        return {"accuracy": acc}
 
     # Deine the early-stopping callback.
     callbacks = [
         EarlyStoppingCallback(early_stopping_patience=4,
-                              early_stopping_threshold=0.)
+                              early_stopping_threshold=0.0)
     ]
 
     # Define loss function
     criterion = paddle.nn.loss.CrossEntropyLoss()
 
     # Define Trainer
-    trainer = Trainer(model=model,
-                      tokenizer=tokenizer,
-                      args=training_args,
-                      criterion=criterion,
-                      train_dataset=train_ds,
-                      eval_dataset=dev_ds,
-                      callbacks=callbacks,
-                      compute_metrics=compute_metrics)
+    trainer = Trainer(
+        model=model,
+        tokenizer=tokenizer,
+        args=training_args,
+        criterion=criterion,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        callbacks=callbacks,
+        data_collator=DataCollatorWithPadding(tokenizer),
+        compute_metrics=compute_metrics,
+    )
 
     if training_args.do_train:
         train_result = trainer.train(
