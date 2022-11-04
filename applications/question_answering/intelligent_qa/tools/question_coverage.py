@@ -25,48 +25,22 @@ from paddlenlp.transformers import BasicTokenizer
 from paddlenlp.metrics import BLEU
 
 
+# yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--true_file_path',
-                        type=str,
-                        default=None,
-                        help='the souce json file path')
-    parser.add_argument('--generate_file_path',
-                        type=str,
-                        default=None,
-                        help='the target json file path')
-    parser.add_argument(
-        '--num_return_sequences',
-        type=int,
-        default=3,
-        help=
-        'the number of return sequences for each input sample, it should be less than num_beams'
-    )
-    parser.add_argument('--all_sample_num',
-                        type=int,
-                        default=None,
-                        help='the number of valid sample')
-    parser.add_argument('--bleu_n_size',
-                        type=int,
-                        default=4,
-                        help='the bleu n size')
-    parser.add_argument('--bleu_threshold',
-                        type=float,
-                        default=0.3,
-                        help='the bleu threshold')
-    parser.add_argument("--do_log_file",
-                        action="store_true",
-                        help="is log analysis file")
+    parser.add_argument('--true_file_path', type=str, default=None, help='the souce json file path')
+    parser.add_argument('--generate_file_path', type=str, default=None, help='the target json file path')
+    parser.add_argument('--num_return_sequences', type=int, default=3, help='the number of return sequences for each input sample, it should be less than num_beams')
+    parser.add_argument('--all_sample_num', type=int, default=None, help='the number of valid sample')
+    parser.add_argument('--bleu_n_size', type=int, default=4, help='the bleu n size')
+    parser.add_argument('--bleu_threshold', type=float, default=0.3, help='the bleu threshold')
+    parser.add_argument("--do_log_file", action="store_true", help="is log analysis file")
     parser.add_argument('--log_dir', type=str, default=None, help='the log dir')
-    parser.add_argument("--do_multiprocessing",
-                        action="store_true",
-                        help="is do multiprocessing")
-    parser.add_argument(
-        "--do_map_async",
-        action="store_true",
-        help="is use map_async or apply_async when do multiprocessing")
+    parser.add_argument("--do_multiprocessing", action="store_true", help="is do multiprocessing")
+    parser.add_argument("--do_map_async", action="store_true", help="is use map_async or apply_async when do multiprocessing")
     args = parser.parse_args()
     return args
+# yapf: enable
 
 
 def calc_bleu_n(preds, targets, n_size=4):

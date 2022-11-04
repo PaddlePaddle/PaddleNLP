@@ -106,7 +106,7 @@ python setup.py install
 # GPU环境下运行示例
 # 设置1个空闲的GPU卡，此处假设0卡为空闲GPU
 export CUDA_VISIBLE_DEVICES=0
-python unsupervised_question_answering_example.py --device gpu --source_file data/pipelines/source_file.txt --doc_dir data/pipelines/my_data --index_name faiss_index --retriever_batch_size 16
+python run_pipelines_example.py --device gpu --source_file data/source_file.txt --doc_dir data/my_data --index_name faiss_index --retriever_batch_size 16
 ```
 关键参数释义如下：
 - `device`: 使用的设备，默认为'gpu'，可选择['cpu', 'gpu']。
@@ -119,7 +119,7 @@ python unsupervised_question_answering_example.py --device gpu --source_file dat
 ```bash
 # CPU环境下运行示例
 unset CUDA_VISIBLE_DEVICES
-python unsupervised_question_answering_example.py --device cpu --source_file data/pipelines/source_file.txt --doc_dir data/pipelines/my_data --index_name faiss_index --retriever_batch_size 16
+python run_pipelines_example.py --device cpu --source_file data/source_file.txt --doc_dir data/my_data --index_name faiss_index --retriever_batch_size 16
 ```
 **【注意】**  关于构建Web可视化问答对自动生成智能检索式问答系统，请参考[Pipelines-无监督智能检索问答系统](../../../pipelines/examples/unsupervised_question_answering/README.md)。
 <div align="center">
@@ -131,7 +131,7 @@ python unsupervised_question_answering_example.py --device cpu --source_file dat
 安装方式：`pip install -r requirements.txt`
 
 ### 数据说明
-我们以提供的纯文本文件[source_file.txt](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/source_file.txt)为例，系统将每一条都视为一个上下文并基于此生成多个问答对，系统将基于此构建索引库，该文件可直接下载放入`data/serving`，开发者也可以使用自己的文件。
+我们以提供的纯文本文件[source_file.txt](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/source_file.txt)为例，系统将每一条都视为一个上下文并基于此生成多个问答对，系统将基于此构建索引库，该文件可直接下载放入`data`，开发者也可以使用自己的文件。
 
 ### 语料构建
 #### 问答对生成
@@ -141,8 +141,8 @@ python unsupervised_question_answering_example.py --device cpu --source_file dat
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python -u run_qa_pairs_generation.py \
-    --source_file_path=data/serving/source_file.txt \
-    --target_file_path=data/serving/target_file.json \
+    --source_file_path=data/source_file.txt \
+    --target_file_path=data/target_file.json \
     --answer_generation_model_path=uie-base-answer-extractor-v1 \
     --question_generation_model_path=unimo-text-1.0-question-generation \
     --filtration_model_path=uie-base-qa-filter-v1 \
@@ -197,12 +197,12 @@ python -u run_qa_pairs_generation.py \
 执行以下脚本对生成的问答对进行转换，得到语义索引所需要的语料train.csv、dev.csv、q_corpus.csv、qa_pair.csv：
 ```shell
 python -u run_corpus_preparation.py \
-    --source_file_path data/serving/target_file.json \
-    --target_dir_path data/serving/my_corpus
+    --source_file_path data/target_file.json \
+    --target_dir_path data/my_corpus
 ```
 关键参数释义如下：
 - `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见从本地文件创建数据集部分。指示了要转换的问答对json文件路径，生成的目标文件为json格式
-- `target_dir_path` 输出数据的目标文件夹，默认为"data/serving/my_corpus"。
+- `target_dir_path` 输出数据的目标文件夹，默认为"data/my_corpus"。
 - `test_sample_num` 构建检索系统时保留的测试样本数目，默认为0。
 - `train_sample_num` 构建检索系统时保留的有监督训练样本数目，默认为0。
 - `all_sample_num` 构建检索系统时保留的总样本数目，默认为None，表示保留除了前`test_sample_num`+`train_sample_num`个样本外的所有样本。
@@ -223,11 +223,9 @@ python -u run_corpus_preparation.py \
 #### 自定义数据
 在许多情况下，我们需要使用本地数据集来微调模型从而得到定制化的能力，让生成的问答对更接近于理想分布，本项目支持使用固定格式本地数据集文件进行微调。
 
-这里我们提供预先标注好的文件样例[train.json]()和[dev.json]()，可直接下载放入./data/finetune。
-
-开发者也可自行构建本地数据集，具体来说，本地数据集目录结构如下：
+这里我们提供预先标注好的文件样例[train.json]()和[dev.json]()，可直接下载放入`data`目录，开发者也可自行构建本地数据集，具体来说，本地数据集主要包含以下文件：
 ```text
-data/finetune/
+data
 ├── train.json # 训练数据集文件
 ├── dev.json # 开发数据集文件
 └── test.json # 可选，待预测数据文件
@@ -257,19 +255,19 @@ train.json/dev.json/test.json文件样例：
 执行以下脚本对数据集进行数据预处理，得到接下来答案抽取、问题生成、过滤模块模型微调所需要的数据，注意这里答案抽取、问题生成、过滤模块的微调数据来源于相同的数据集。
 ```shell
 python -u run_data_preprocess.py \
-    --source_file_path data/finetune/train.json \
-    --target_dir .data \
+    --source_file_path data/train.json \
+    --target_dir data/finetune \
     --do_answer_prompt
 ```
 关键参数释义如下：
 - `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见[自定义数据](#自定义数据)部分。
-- `target_dir` 输出数据的目标文件夹，默认为".data/finetune"。
+- `target_dir` 输出数据的目标文件夹，默认为"data/finetune"。
 - `do_answer_prompt` 表示在构造答案抽取数据时是否添加"答案"提示词。
 - `do_len_prompt` 表示在构造答案抽取数据时是否添加长度提示词。
 - `do_domain_prompt` 表示在构造答案抽取数据时是否添加领域提示词。
 - `domain` 表示添加的领域提示词，在`do_domain_prompt`时有效。
 
-**NOTE:** 预处理后的微调用数据将分别位于answer_extraction、question_generation、filtration三个子文件夹中。
+**NOTE:** 预处理后的微调用数据将分别位于`target_dir`下的answer_extraction、question_generation、filtration三个子文件夹中。
 
 ### 模型微调
 #### 答案抽取
@@ -278,10 +276,10 @@ python -u run_data_preprocess.py \
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extraction finetune/answer_generation/finetune.py \
-    --train_path=.data/answer_extration/train.json \
-    --dev_path=.data/answer_extration/dev.json \
-    --save_dir=.log/answer_extration/checkpoints \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/answer_extraction finetune/answer_extraction_and_filtration/finetune.py \
+    --train_path=data/finetune/answer_extration/train.json \
+    --dev_path=data/finetune/answer_extration/dev.json \
+    --save_dir=log/answer_extration/checkpoints \
     --learning_rate=1e-5 \
     --batch_size=16 \
     --max_seq_len=512 \
@@ -295,7 +293,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extrac
 关键参数释义如下：
 - `train_path`: 训练集文件路径。
 - `dev_path`: 验证集文件路径。
-- `save_dir`: 模型存储路径，默认为`.log/answer_extration/checkpoints`。
+- `save_dir`: 模型存储路径，默认为`log/answer_extration/checkpoints`。
 - `learning_rate`: 学习率，默认为1e-5。
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
@@ -312,9 +310,9 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/answer_extrac
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python answer_generation/evaluate.py \
-    --model_path=.log/answer_extration/checkpoints/model_best \
-    --test_path=.data/answer_extration/dev.json  \
+python finetune/answer_generation/evaluate.py \
+    --model_path=log/answer_extration/checkpoints/model_best \
+    --test_path=data/finetune/answer_extration/dev.json  \
     --batch_size=16 \
     --max_seq_len=512
 ```
@@ -332,11 +330,11 @@ python answer_generation/evaluate.py \
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_generation question_generation/train.py \
-    --train_file=.data/question_generation/train.json \
-    --predict_file=.data/question_generation/dev.json \
-    --save_dir=.log/question_generation/checkpoints \
-    --output_path=.log/question_generation/predict.txt \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/question_generation finetune/question_generation/train.py \
+    --train_file=data/finetune/question_generation/train.json \
+    --predict_file=data/finetune/question_generation/dev.json \
+    --save_dir=log/question_generation/checkpoints \
+    --output_path=log/question_generation/predict.txt \
     --dataset_name=dureader_qg \
     --model_name_or_path="unimo-text-1.0" \
     --logging_steps=100 \
@@ -368,6 +366,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_gene
    |---------------------------------|
    | unimo-text-1.0      |
    | unimo-text-1.0-large |
+   | unimo-text-1.0-question-generation      |
 
 - `save_dir` 表示模型的保存路径。
 - `output_path` 表示预测结果的保存路径。
@@ -390,13 +389,8 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_gene
 
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`save_dir`中。
 
-**NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
+**【注意】** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
 
-微调的baseline模型在dureader_qg验证集上有如下结果(指标为BLEU-4)：
-
-|       model_name        | DuReaderQG |
-| :-----------------------------: | :-----------: |
-|    unimo-text-1.0-dureader_qg-template1    | 41.08 |
 
 #### 过滤模型
 运行如下命令即可在样例训练集上微调过滤模型。
@@ -404,10 +398,10 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/question_gene
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration filtration/finetune.py \
-    --train_path=.data/filtration/train.json \
-    --dev_path=.data/filtration/dev.json \
-    --save_dir=.log/filtration/checkpoints \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration answer_extraction_and_filtration/finetune.py \
+    --train_path=data/finetune/filtration/train.json \
+    --dev_path=data/finetune/filtration/dev.json \
+    --save_dir=log/filtration/checkpoints \
     --learning_rate=1e-5 \
     --batch_size=16 \
     --max_seq_len=512 \
@@ -421,7 +415,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration fi
 关键参数释义如下：
 - `train_path`: 训练集文件路径。
 - `dev_path`: 验证集文件路径。
-- `save_dir`: 模型存储路径，默认为`.log/filtration/checkpoints`。
+- `save_dir`: 模型存储路径，默认为`log/filtration/checkpoints`。
 - `learning_rate`: 学习率，默认为1e-5。
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
@@ -438,8 +432,8 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir .log/filtration fi
 
 ```shell
 python filtration/evaluate.py \
-    --model_path=.log/filtration/checkpoints/model_best \
-    --test_path=.data/filtration/dev.json  \
+    --model_path=log/filtration/checkpoints/model_best \
+    --test_path=data/finetune/filtration/dev.json  \
     --batch_size=16 \
     --max_seq_len=512
 ```

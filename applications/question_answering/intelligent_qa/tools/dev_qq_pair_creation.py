@@ -17,42 +17,18 @@ import json
 import argparse
 
 
+# yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("--do_create_test_qq_pair",
-                        action='store_true',
-                        help="Whether to do create_test_qq_pair")
-    parser.add_argument(
-        '--qq_pair_source_ori_file_path',
-        type=str,
-        default=None,
-        help='the original source file path for qq-pair creating')
-    parser.add_argument(
-        '--qq_pair_source_trans_file_path',
-        type=str,
-        default=None,
-        help='the translated source file path for qq-pair creating')
-    parser.add_argument('--qq_pair_target_file_path',
-                        type=str,
-                        default=None,
-                        help='the target file path for qq-pair creating')
-    parser.add_argument(
-        '--trans_query_answer_path',
-        type=str,
-        default=None,
-        help=
-        'the target query-answer file path for extract_trans_from_fake_question'
-    )
-    parser.add_argument(
-        '--dev_sample_num',
-        type=int,
-        default=None,
-        help=
-        'the test sample number when convert_json_to_data, if None, treat all lines as dev samples'
-    )
-
+    parser.add_argument("--do_create_test_qq_pair", action='store_true', help="Whether to do create_test_qq_pair")
+    parser.add_argument('--qq_pair_source_ori_file_path', type=str, default=None, help='the original source file path for qq-pair creating')
+    parser.add_argument('--qq_pair_source_trans_file_path', type=str, default=None, help='the translated source file path for qq-pair creating')
+    parser.add_argument('--qq_pair_target_file_path', type=str, default=None, help='the target file path for qq-pair creating')
+    parser.add_argument('--trans_query_answer_path', type=str, default=None, help='the target query-answer file path for extract_trans_from_fake_question')
+    parser.add_argument('--dev_sample_num', type=int, default=None,help='the test sample number when convert_json_to_data, if None, treat all lines as dev samples')
     args = parser.parse_args()
     return args
+# yapf: enable
 
 
 def extract_q_from_json_file(json_file,

@@ -19,73 +19,26 @@ from tqdm import tqdm
 import argparse
 
 
+# yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument(
-        '--model_path',
-        type=str,
-        default=None,
-        help='the model path to be loaded for question_generation taskflow')
-    parser.add_argument('--max_length',
-                        type=int,
-                        default=50,
-                        help='the max decoding length')
-    parser.add_argument(
-        '--num_return_sequences',
-        type=int,
-        default=3,
-        help=
-        'the number of return sequences for each input sample, it should be less than num_beams'
-    )
-    parser.add_argument('--source_file_path',
-                        type=str,
-                        default=None,
-                        help='the souce json file path')
-    parser.add_argument('--target_file_path',
-                        type=str,
-                        default=None,
-                        help='the target json file path')
-    parser.add_argument('--all_sample_num',
-                        type=int,
-                        default=None,
-                        help='the test sample number when convert_json_to_data')
-    parser.add_argument('--batch_size',
-                        type=int,
-                        default=1,
-                        help='the batch size when using taskflow')
-    parser.add_argument('--decode_strategy',
-                        type=str,
-                        default=None,
-                        help='the decode strategy')
-    parser.add_argument('--num_beams',
-                        type=int,
-                        default=6,
-                        help='the number of beams when using beam search')
-    parser.add_argument(
-        '--num_beam_groups',
-        type=int,
-        default=1,
-        help='the number of beam groups when using diverse beam search')
-    parser.add_argument(
-        '--diversity_rate',
-        type=float,
-        default=0.0,
-        help='the diversity_rate when using diverse beam search')
-    parser.add_argument('--top_k',
-                        type=float,
-                        default=0,
-                        help='the top_k when using sampling decoding strategy')
-    parser.add_argument('--top_p',
-                        type=float,
-                        default=1.0,
-                        help='the top_p when using sampling decoding strategy')
-    parser.add_argument(
-        '--temperature',
-        type=float,
-        default=1.0,
-        help='the temperature when using sampling decoding strategy')
+    parser.add_argument('--model_path', type=str, default=None, help='the model path to be loaded for question_generation taskflow')
+    parser.add_argument('--max_length', type=int, default=50, help='the max decoding length')
+    parser.add_argument('--num_return_sequences', type=int, default=3, help='the number of return sequences for each input sample, it should be less than num_beams')
+    parser.add_argument('--source_file_path', type=str, default=None, help='the souce json file path')
+    parser.add_argument('--target_file_path', type=str, default=None, help='the target json file path')
+    parser.add_argument('--all_sample_num', type=int, default=None, help='the test sample number when convert_json_to_data')
+    parser.add_argument('--batch_size', type=int, default=1, help='the batch size when using taskflow')
+    parser.add_argument('--decode_strategy', type=str, default=None, help='the decode strategy')
+    parser.add_argument('--num_beams', type=int, default=6, help='the number of beams when using beam search')
+    parser.add_argument('--num_beam_groups', type=int, default=1, help='the number of beam groups when using diverse beam search')
+    parser.add_argument('--diversity_rate', type=float, default=0.0, help='the diversity_rate when using diverse beam search')
+    parser.add_argument('--top_k', type=float, default=0, help='the top_k when using sampling decoding strategy')
+    parser.add_argument('--top_p', type=float, default=1.0, help='the top_p when using sampling decoding strategy')
+    parser.add_argument('--temperature', type=float, default=1.0, help='the temperature when using sampling decoding strategy')
     args = parser.parse_args()
     return args
+# yapf: enable
 
 
 def create_fake_question(json_file,
