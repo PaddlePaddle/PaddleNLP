@@ -105,9 +105,9 @@ Relation XML模板：
 
 ```xml
   <Relations>
-    <Relation value="单位"/>
-    <Relation value="数量"/>
-    <Relation value="金额"/>
+    <Relation value="歌手"/>
+    <Relation value="发行时间"/>
+    <Relation value="所属专辑"/>
   </Relations>
 ```
 
@@ -127,7 +127,7 @@ Relation XML模板：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199669057-3a25b0f2-50ef-4bd2-a278-957eb7b7fee5.png height=250 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879957-aeec9d17-d342-4ea0-a840-457b49f6066e.png height=100 width=600 />
 </div>
 
 该标注示例对应的schema为：
@@ -144,7 +144,7 @@ schema = [
 - 关系抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199692873-0f48be9c-401a-45ce-b75e-8ac9751ce28c.png height=250 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879866-03c1ecac-1828-4f35-af70-9ae61701c303.png height=180 width=800 />
 </div>
 
 该标注示例对应的schema为：
@@ -162,7 +162,7 @@ schema = {
 - 事件抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199721450-5cb5c6e3-78c2-42c9-95cc-73ca159f2b33.png height=220 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879776-75abbade-9bea-44dc-ac36-322fecdc03e0.png height=150 width=800 />
 </div>
 
 该标注示例对应的schema为：
@@ -179,7 +179,7 @@ schema = {
 - 句子级分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199724328-a22fa164-37ce-49e1-8cb9-9011a1017c0b.png height=200 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879672-c3f286fe-a217-4888-950f-d4ee45b19f5a.png height=140 width=600 />
 </div>
 
 
@@ -192,7 +192,7 @@ schema = '情感倾向[正向，负向]'
 - 实体/评价维度级分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199726629-0dc68370-2b0d-48c4-bbd7-8de68d1d9b41.png height=220 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879586-8c6e4826-a3b0-49e0-9920-98ca062dccff.png height=180 width=800 />
 </div>
 
 该标注示例对应的schema为：
@@ -302,7 +302,7 @@ Relation XML模板：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199459737-fab20c95-cb7e-42e2-b4f1-06865d58be95.png height=450 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879427-82806ffc-dc60-4ec7-bda5-e16419ee9d15.png height=500 width=600 />
 </div>
 
 该标注示例对应的schema为：
@@ -314,7 +314,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '�
 - 关系抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199878217-f0b6bdbd-7c50-4deb-a4a2-77128249ea62.png height=400 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879032-88896a00-85ca-4bb0-a8e8-305a47bbaf78.png height=350 width=800 />
 </div>
 
 
@@ -331,7 +331,7 @@ schema = {
 - 文档分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199729280-7d61c93e-dd23-4036-8a13-b7c70bf41b58.png height=450 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879238-b8b41d4a-7e77-47cd-8def-2fc8ba89442f.png height=500 width=600 />
 </div>
 
 该标注示例对应的schema为：
