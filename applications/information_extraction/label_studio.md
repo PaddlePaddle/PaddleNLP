@@ -210,6 +210,11 @@ schema = {
 
 #### 2.5 数据导出
 
+勾选已标注文本ID，选择导出的文件类型为``JSON``，导出数据：
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199891344-023736e2-6f9d-454b-b72a-dec6689f8436.png height=200 width=1200 />
+</div>
 
 <a name="26"></a>
 
@@ -291,7 +296,9 @@ Relation XML模板：
 
 - 分类类别标签
 
-
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199891626-cc995783-18d2-41dc-88de-260b979edc56.png height=500 width=1200 />
+</div>
 
 <a name="34"></a>
 
@@ -345,6 +352,11 @@ schema = '文档类别[发票，报关单]'
 
 #### 3.5 数据导出
 
+勾选已标注图片ID，选择导出的文件类型为``JSON``，导出数据：
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/199890897-b33ede99-97d8-4d44-877a-2518a87f8b67.png height=200 width=1200 />
+</div>
 
 <a name="36"></a>
 
