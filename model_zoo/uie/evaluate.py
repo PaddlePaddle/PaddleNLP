@@ -21,6 +21,7 @@ from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
+from paddlenlp.data import DataCollatorWithPadding
 
 from model import UIE, UIEM
 from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
@@ -40,14 +41,14 @@ def evaluate(model, metric, data_loader, multilingual=False):
     metric.reset()
     for batch in data_loader:
         if multilingual:
-            input_ids, pos_ids, start_ids, end_ids = batch
-            start_prob, end_prob = model(input_ids, pos_ids)
+            start_prob, end_prob = model(batch["input_ids"], batch["pos_ids"])
         else:
-            input_ids, token_type_ids, att_mask, pos_ids, start_ids, end_ids = batch
-            start_prob, end_prob = model(input_ids, token_type_ids, att_mask,
-                                         pos_ids)
-        start_ids = paddle.cast(start_ids, 'float32')
-        end_ids = paddle.cast(end_ids, 'float32')
+            start_prob, end_prob = model(batch["input_ids"],
+                                         batch["token_type_ids"],
+                                         batch["att_mask"], batch["pos_ids"])
+
+        start_ids = paddle.cast(batch["start_positions"], 'float32')
+        end_ids = paddle.cast(batch["end_positions"], 'float32')
         num_correct, num_infer, num_label = metric.compute(
             start_prob, end_prob, start_ids, end_ids)
         metric.update(num_correct, num_infer, num_label)
@@ -95,11 +96,14 @@ def do_eval():
             test_ds = MapDataset(class_dict[key])
         else:
             test_ds = class_dict[key]
+        test_ds = test_ds.map(trans_fn)
+
+        data_collator = DataCollatorWithPadding(tokenizer)
 
         test_data_loader = create_data_loader(test_ds,
                                               mode="test",
                                               batch_size=args.batch_size,
-                                              trans_fn=trans_fn)
+                                              trans_fn=data_collator)
 
         metric = SpanEvaluator()
         precision, recall, f1 = evaluate(model, metric, test_data_loader,
@@ -112,11 +116,11 @@ def do_eval():
     if args.debug and len(relation_type_dict.keys()) != 0:
         for key in relation_type_dict.keys():
             test_ds = MapDataset(relation_type_dict[key])
-
+            test_ds = test_ds.map(trans_fn)
             test_data_loader = create_data_loader(test_ds,
                                                   mode="test",
                                                   batch_size=args.batch_size,
-                                                  trans_fn=trans_fn)
+                                                  trans_fn=data_collator)
 
             metric = SpanEvaluator()
             precision, recall, f1 = evaluate(model, metric, test_data_loader)
