@@ -35,6 +35,7 @@ from paddlenlp.utils.log import logger
 
 from utils import evaluate, preprocess_function, read_local_dataset
 
+
 # yapf: disable
 @dataclass
 class DataArguments:
@@ -47,6 +48,7 @@ class ModelArguments:
     export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
     resume_from_checkpoint: str = field(default=None, metadata={"help": "local path to a saved checkpoint to resume from"})
 # yapf: enable
+
 
 def main():
     """
@@ -71,15 +73,14 @@ def main():
             label_list[l] = i
 
     train_ds = load_dataset(read_local_dataset,
-                            path=os.path.join(data_args.data_dir,
-                                              "train.txt"),
+                            path=os.path.join(data_args.data_dir, "train.txt"),
                             label_list=label_list,
                             lazy=False)
     dev_ds = load_dataset(read_local_dataset,
                           path=os.path.join(data_args.data_dir, "dev.txt"),
                           label_list=label_list,
                           lazy=False)
-    
+
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     trans_func = functools.partial(preprocess_function,
                                    tokenizer=tokenizer,
@@ -107,26 +108,28 @@ def main():
                               early_stopping_threshold=0.)
     ]
 
-    # Define loss function 
+    # Define loss function
     criterion = paddle.nn.loss.CrossEntropyLoss()
 
     # Define Trainer
     trainer = Trainer(model=model,
-                            tokenizer=tokenizer,
-                            args=training_args,
-                            criterion=criterion,
-                            train_dataset=train_ds,
-                            eval_dataset=dev_ds,
-                            callbacks=callbacks,
-                            compute_metrics=compute_metrics)
+                      tokenizer=tokenizer,
+                      args=training_args,
+                      criterion=criterion,
+                      train_dataset=train_ds,
+                      eval_dataset=dev_ds,
+                      callbacks=callbacks,
+                      compute_metrics=compute_metrics)
 
     if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=model_args.resume_from_checkpoint)
+        train_result = trainer.train(
+            resume_from_checkpoint=model_args.resume_from_checkpoint)
         metrics = train_result.metrics
         trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
+
 
 if __name__ == "__main__":
     main()
