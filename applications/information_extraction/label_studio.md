@@ -17,6 +17,7 @@
     - [3.4 任务标注](#34)
     - [3.5 数据导出](#35)
     - [3.6 数据转换](#36)
+- [4. 更多配置](#4)
 
 <a name="1"></a>
 
@@ -24,7 +25,8 @@
 **以下标注示例用到的环境配置：**
 
 - Python 3.8+
-- label-studio 1.6.0
+- label-studio == 1.6.0
+- paddleocr >= 2.6.0.1
 
 在终端(terminal)使用pip安装label-studio：
 
@@ -127,7 +129,7 @@ Relation XML模板：
 标注示例：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879957-aeec9d17-d342-4ea0-a840-457b49f6066e.png height=160 width=1000 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879957-aeec9d17-d342-4ea0-a840-457b49f6066e.png height=140 width=1000 />
 </div>
 
 该标注示例对应的schema为：
@@ -144,7 +146,7 @@ schema = [
 - 关系抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879866-03c1ecac-1828-4f35-af70-9ae61701c303.png height=240 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879866-03c1ecac-1828-4f35-af70-9ae61701c303.png height=230 width=1200 />
 </div>
 
 该标注示例对应的schema为：
@@ -162,7 +164,7 @@ schema = {
 - 事件抽取
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879776-75abbade-9bea-44dc-ac36-322fecdc03e0.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879776-75abbade-9bea-44dc-ac36-322fecdc03e0.png height=220 width=1200 />
 </div>
 
 该标注示例对应的schema为：
@@ -179,7 +181,7 @@ schema = {
 - 句子级分类
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879672-c3f286fe-a217-4888-950f-d4ee45b19f5a.png height=200 width=1000 />
+    <img src=https://user-images.githubusercontent.com/40840292/199879672-c3f286fe-a217-4888-950f-d4ee45b19f5a.png height=210 width=1000 />
 </div>
 
 
@@ -213,12 +215,53 @@ schema = {
 勾选已标注文本ID，选择导出的文件类型为``JSON``，导出数据：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199891344-023736e2-6f9d-454b-b72a-dec6689f8436.png height=200 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199891344-023736e2-6f9d-454b-b72a-dec6689f8436.png height=180 width=1200 />
 </div>
 
 <a name="26"></a>
 
 #### 2.6 数据转换
+
+将导出的文件重命名为``label_studio.json``后，放入``./data``目录下。通过[label_studio.py](./label_studio.py)脚本可转为UIE的数据格式。
+
+- 抽取式任务
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --task_type ext
+```
+
+- 句子级分类任务
+
+在数据转换阶段，我们会自动构造用于模型训练的prompt信息。例如句子级情感分类中，prompt为``情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行配置。
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --task_type cls \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向"
+```
+
+- 实体/评价维度级分类任务
+
+在数据转换阶段，我们会自动构造用于模型训练的prompt信息。例如评价维度级情感分类中，prompt为``XXX的情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --task_type ext \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向" \
+    --separator "##"
+```
 
 <a name="3"></a>
 
@@ -362,6 +405,49 @@ schema = '文档类别[发票，报关单]'
 
 #### 3.6 数据转换
 
+将导出的文件重命名为``label_studio.json``后，放入``./data``目录下，并将对应的标注图片放入``./data/images``目录下（图片的文件名需与上传到label studio时的命名一致）。通过[label_studio.py](./label_studio.py)脚本可转为UIE的数据格式。
+
+- 路径示例
+
+```shell
+data/
+├── images # 图片目录
+│   ├── b0.jpg # 原始图片（文件名需与上传到label studio时的命名一致）
+│   └── b1.jpg
+└── label_studio.json # 从label studio导出的标注文件
+```
+
+- 抽取式任务
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --task_type ext
+```
+
+
+<a name="4"></a>
+
+## 4. 更多配置
+
+- ``label_studio_file``: 从label studio导出的数据标注文件。
+- ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。为了保证评估指标的准确性，验证集和测试集默认构造全负例。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
+- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
+- ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。默认为["正向", "负向"]。
+- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
+- ``seed``: 随机种子，默认为1000.
+- ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+
+备注：
+- 默认情况下 [label_studio.py](./label_studio.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
+- 每次执行 [label_studio.py](./label_studio.py) 脚本，将会覆盖已有的同名数据文件
+- 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
+- 对于从label_studio导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
 
 ## References
