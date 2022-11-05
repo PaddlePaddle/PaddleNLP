@@ -188,13 +188,13 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 #### 2.4.1 预训练模型微调
 
 
-使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
+使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device cpu`：
 ```shell
 python train.py \
-    --model_name_or_path "./checkpoints/" \
+    --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
     --output_dir ./checkpoints/ \
-    --device "gpu" \
+    --device gpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
@@ -210,11 +210,11 @@ python train.py \
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
 ```shell
-python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
-    --model_name_or_path "ernie-3.0-medium-zh" \
+python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
+    --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
     --output_dir ./checkpoints/ \
-    --device "cpu" \
+    --device cpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
@@ -228,15 +228,15 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py
     --save_strategy epoch
 ```
 
-如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况:
+如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus 0,1。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况:
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py \
-    --model_name_or_path "ernie-3.0-medium-zh" \
+python -m paddle.distributed.launch --gpus 0,1 train.py \
+    --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
     --output_dir ./checkpoints/ \
-    --device "cpu" \
+    --device cpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
@@ -250,7 +250,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --save_strategy epoch
 ```
 
-可支持配置的参数：
+主要的配置的参数为：
 - `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-base-zh`。
 - `data_dir`: 训练数据集路径，数据格式要求详见[数据标注](#数据标注)。
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
@@ -259,14 +259,13 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 - `learning_rate`: 预训练语言模型参数基础学习率大小，将与learning rate scheduler产生的值相乘作为当前学习率。
 - `do_train`: 是否进行训练。
 - `do_eval`: 是否进行评估。
-- `eval_steps`: 评估模型的间隔步数。
 - `device`: 使用的设备，默认为`gpu`。
 - `per_device_train_batch_size`: 每次训练每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 - `per_device_eval_batch_size`: 每次评估每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 
-更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
+训练脚本支持所有`TraingArguments`的参数，更多参数介绍可参考[TrainingArguments 参数介绍](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)。
 
-程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `save_dir` 中，保存模型文件结构如下所示：
+程序运行时将会自动进行训练，评估。同时训练过程中会自动保存开发集上最佳模型在指定的 `output_dir` 中，保存模型文件结构如下所示：
 
 ```text
 checkpoint/
