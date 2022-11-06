@@ -12,7 +12,7 @@ FID（Frechet Inception Distance score，FID）是计算真实图像和生成图
 
 ## 快速使用
 
-计算两个图片数据集的FID，
+计算两个图片数据集的FID
 ```
 python fid_score.py path/to/dataset1 path/to/dataset2
 ```
