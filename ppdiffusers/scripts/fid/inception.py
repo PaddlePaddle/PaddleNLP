@@ -300,7 +300,8 @@ class InceptionA(nn.Layer):
                                                  kernel_size=3,
                                                  padding=1,
                                                  activation_layer=nn.ReLU)
-
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
         self.branch_pool = nn.AvgPool2D(kernel_size=3,
                                         stride=1,
                                         padding=1,
@@ -381,7 +382,8 @@ class InceptionC(nn.Layer):
                                                  kernel_size=(1, 7),
                                                  padding=(0, 3),
                                                  activation_layer=nn.ReLU)
-
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
         self.branch_pool = nn.AvgPool2D(kernel_size=3,
                                         stride=1,
                                         padding=1,
@@ -460,6 +462,8 @@ class InceptionE_1(nn.Layer):
                                                   padding=(1, 0),
                                                   activation_layer=nn.ReLU)
 
+        # Patch: Tensorflow's average pool does not use the padded zero's in
+        # its average calculation
         self.branch_pool = nn.AvgPool2D(kernel_size=3,
                                         stride=1,
                                         padding=1,
@@ -519,6 +523,10 @@ class InceptionE_2(InceptionE_1):
         ]
         branch3x3dbl = paddle.concat(branch3x3dbl, axis=1)
 
+        # Patch: The FID Inception model uses max pooling instead of average
+        # pooling. This is likely an error in this specific Inception
+        # implementation, as other Inception models use average pooling here
+        # (which matches the description in the paper).
         branch_pool = F.max_pool2d(x, kernel_size=3, stride=1, padding=1)
         branch_pool = self.branch_pool_conv(branch_pool)
 

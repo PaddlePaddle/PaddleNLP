@@ -253,12 +253,7 @@ def calculate_activation_statistics(files,
     return mu, sigma
 
 
-def compute_statistics_of_path(path,
-                               model,
-                               batch_size,
-                               dims,
-                               device,
-                               num_workers=1):
+def compute_statistics_of_path(path, model, batch_size, dims, num_workers=1):
     if path.endswith('.npz'):
         with np.load(path) as f:
             m, s = f['mu'][:], f['sigma'][:]
