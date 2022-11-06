@@ -22,7 +22,7 @@ from paddle.utils.download import get_weights_path_from_url
 FID_WEIGHTS_URL = (
     'https://paddlenlp.bj.bcebos.com/models/mseitzer/pp_inception-2015-12-05-6726825d.pdparams',
     '8e2ae24c34c5c8b81d45167bb9361f4c')
-WEIGHTS_PATH = 'pt_inception-2015-12-05-6726825d.pth'
+WEIGHTS_PATH = 'pp_inception-2015-12-05-6726825d.pdparams'
 
 
 class ConvNormActivation(nn.Sequential):
