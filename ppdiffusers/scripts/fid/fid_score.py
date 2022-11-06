@@ -49,10 +49,10 @@ import os
 import pathlib
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 import numpy as np
-import paddle.vision.transforms as TF
 from PIL import Image
 from scipy import linalg
 import paddle
+import paddle.vision.transforms as TF
 from paddle.nn.functional import adaptive_avg_pool2d
 
 try:
