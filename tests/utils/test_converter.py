@@ -168,3 +168,12 @@ class TestConverter(unittest.TestCase):
         ]
         num_layer = Converter.get_num_layer(layers)
         self.assertEqual(num_layer, 12)
+
+    def test_remove_unused_fields(self):
+        config = {"transformers_version": "1"}
+        Converter.remove_transformer_unused_fields(config)
+        self.assertNotIn('transformers_version', config)
+
+        # remove un-exist field
+        Converter.remove_transformer_unused_fields(config)
+        self.assertNotIn('transformers_version', config)

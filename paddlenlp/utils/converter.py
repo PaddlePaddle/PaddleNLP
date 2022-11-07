@@ -836,6 +836,15 @@ class Converter(ABC):
             state_dict[key] = state_dict[key].numpy()
         return state_dict
 
+    @staticmethod
+    def remove_transformer_unused_fields(config: dict) -> None:
+        """remove pytorch transformer unused fields
+
+        Args:
+            config (dict): the config of dict
+        """
+        config.pop("transformers_version", None)
+
     def convert(self, input_dir: str, output_dir: str):
         """the entry of converting config and converting model file
 
@@ -872,6 +881,8 @@ class Converter(ABC):
         if model_config_file is not None:
             with open(model_config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
+
+            self.remove_transformer_unused_fields(config)
             config = self.convert_config(config)
 
             # save config file
