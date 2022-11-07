@@ -533,7 +533,7 @@ def quick_gelu(x):
 
 F.quick_gelu = quick_gelu
 
-NEG_INF = float("-inf")  # -1e4 -1e9
+NEG_INF = -1e9  # float("-inf") -1e4 -1e9
 
 
 class VisionTransformer(nn.Layer):

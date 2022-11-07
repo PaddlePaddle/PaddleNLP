@@ -35,7 +35,7 @@ from PIL import Image
 from paddle.vision import transforms
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer, AutoTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 from pathlib import Path
 
 
@@ -276,7 +276,7 @@ class DreamBoothDataset(Dataset):
         self.instance_data_root = Path(instance_data_root)
         if not self.instance_data_root.exists():
             raise ValueError("Instance images root doesn't exists.")
-        ext = ['png', 'jpg', 'jpeg', 'bmp']
+        ext = ['png', 'jpg', 'jpeg', 'bmp', 'PNG', 'JPG', 'JPEG', 'BMP']
         self.instance_images_path = []
         for p in Path(instance_data_root).iterdir():
             if any(suffix in p.name for suffix in ext):
@@ -423,11 +423,11 @@ def main(args):
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
-        tokenizer = CLIPTokenizer.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
 
     # Load models and create wrapper for stable diffusion
-    text_encoder = CLIPTextModel.from_pretrained(
+    text_encoder = AutoModel.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
@@ -503,7 +503,8 @@ def main(args):
         input_ids = tokenizer.pad({
             "input_ids": input_ids
         },
-                                  padding=True,
+                                  padding="max_length",
+                                  max_length=tokenizer.model_max_length,
                                   return_tensors="pd").input_ids
 
         batch = {
@@ -591,52 +592,65 @@ def main(args):
             # (this is the forward diffusion process)
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-            # Get the text embedding for conditioning
-            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
-
             if num_processes > 1 and (args.gradient_checkpointing or (
                 (step + 1) % args.gradient_accumulation_steps != 0)):
                 # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
                 # gradient_checkpointing, no_sync every where
                 # gradient_checkpointing + grad_acc, no_sync every where
-                ctx_manager = unet.no_sync()
-            else:
-                ctx_manager = contextlib.nullcontext() if sys.version_info >= (
-                    3, 7) else contextlib.suppress()
-
-            with ctx_manager:
-                # Predict the noise residual
-                noise_pred = unet(noisy_latents, timesteps,
-                                  encoder_hidden_states).sample
-
-                if args.with_prior_preservation:
-                    # Chunk the noise and noise_pred into two parts and compute the loss on each part separately.
-                    noise_pred, noise_pred_prior = noise_pred.chunk(2, axis=0)
-                    noise, noise_prior = noise.chunk(2, axis=0)
-
-                    # Compute instance loss
-                    loss = F.mse_loss(noise_pred, noise,
-                                      reduction="none").mean([1, 2, 3]).mean()
-
-                    # Compute prior loss
-                    prior_loss = F.mse_loss(noise_pred_prior,
-                                            noise_prior,
-                                            reduction="none").mean([1, 2,
-                                                                    3]).mean()
-
-                    # Add the prior loss to the instance loss.
-                    loss = loss + args.prior_loss_weight * prior_loss
+                unet_ctx_manager = unet.no_sync()
+                if args.train_text_encoder:
+                    text_encoder_ctx_manager = text_encoder.no_sync()
                 else:
-                    loss = F.mse_loss(noise_pred, noise,
-                                      reduction="none").mean([1, 2, 3]).mean()
+                    text_encoder_ctx_manager = contextlib.nullcontext(
+                    ) if sys.version_info >= (3, 7) else contextlib.suppress()
+            else:
+                unet_ctx_manager = contextlib.nullcontext(
+                ) if sys.version_info >= (3, 7) else contextlib.suppress()
+                text_encoder_ctx_manager = contextlib.nullcontext(
+                ) if sys.version_info >= (3, 7) else contextlib.suppress()
 
-                if args.gradient_accumulation_steps > 1:
-                    loss = loss / args.gradient_accumulation_steps
-                loss.backward()
+            with text_encoder_ctx_manager:
+                # Get the text embedding for conditioning
+                attention_mask = paddle.ones_like(batch["input_ids"])
+                encoder_hidden_states = text_encoder(
+                    batch["input_ids"], attention_mask=attention_mask)[0]
+
+                with unet_ctx_manager:
+                    # Predict the noise residual
+                    noise_pred = unet(noisy_latents, timesteps,
+                                      encoder_hidden_states).sample
+
+                    if args.with_prior_preservation:
+                        # Chunk the noise and noise_pred into two parts and compute the loss on each part separately.
+                        noise_pred, noise_pred_prior = noise_pred.chunk(2,
+                                                                        axis=0)
+                        noise, noise_prior = noise.chunk(2, axis=0)
+
+                        # Compute instance loss
+                        loss = F.mse_loss(noise_pred, noise,
+                                          reduction="none").mean([1, 2,
+                                                                  3]).mean()
+
+                        # Compute prior loss
+                        prior_loss = F.mse_loss(noise_pred_prior,
+                                                noise_prior,
+                                                reduction="none").mean(
+                                                    [1, 2, 3]).mean()
+
+                        # Add the prior loss to the instance loss.
+                        loss = loss + args.prior_loss_weight * prior_loss
+                    else:
+                        loss = F.mse_loss(noise_pred, noise,
+                                          reduction="none").mean([1, 2,
+                                                                  3]).mean()
+
+                    if args.gradient_accumulation_steps > 1:
+                        loss = loss / args.gradient_accumulation_steps
+                    loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
-                    fused_allreduce_gradients(unet.parameters(), None)
+                    fused_allreduce_gradients(params_to_optimize, None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
@@ -665,6 +679,7 @@ def main(args):
                             unet=unwrap_model(unet),
                             text_encoder=unwrap_model(text_encoder),
                             safety_checker=None,
+                            tokenizer=tokenizer,
                         )
                         pipeline.save_pretrained(args.output_dir)
 
@@ -679,6 +694,7 @@ def main(args):
             unet=unwrap_model(unet),
             text_encoder=unwrap_model(text_encoder),
             safety_checker=None,
+            tokenizer=tokenizer,
         )
         pipeline.save_pretrained(args.output_dir)
 

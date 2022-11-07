@@ -262,7 +262,10 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}")
             text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
-        text_embeddings = self.text_encoder(text_input_ids)[0]
+
+        attention_mask = paddle.ones_like(text_input_ids)
+        text_embeddings = self.text_encoder(text_input_ids,
+                                            attention_mask=attention_mask)[0]
 
         # duplicate text embeddings for each generation per prompt
         bs_embed, seq_len, _ = text_embeddings.shape
@@ -323,7 +326,9 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
                 truncation=True,
                 return_tensors="pd",
             )
-            uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
+            attention_mask = paddle.ones_like(uncond_input.input_ids)
+            uncond_embeddings = self.text_encoder(
+                uncond_input.input_ids, attention_mask=attention_mask)[0]
 
             # duplicate unconditional embeddings for each generation per prompt
             seq_len = uncond_embeddings.shape[1]

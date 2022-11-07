@@ -410,7 +410,6 @@ class LDMTextToImagePipeline(DiffusionPipeline):
         """
         if isinstance(prompt, str):
             batch_size = 1
-            prompt = [prompt]
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
