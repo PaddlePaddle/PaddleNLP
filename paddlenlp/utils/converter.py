@@ -482,6 +482,10 @@ class Converter(ABC):
     num_layer_regex = "\.\d+\."
 
     num_layer_key: str = "num_hidden_layers"
+
+    # when field-name is same as hf models, so you only need to
+    # change this attribute to map the configuration
+    config_fields_to_be_removed: List[str] = ['transformers_version']
     architectures: Dict[str, Type[PretrainedModel]] = {}
     try_compare_logits: bool = True
 
@@ -836,13 +840,15 @@ class Converter(ABC):
             state_dict[key] = state_dict[key].numpy()
         return state_dict
 
-    def remove_transformer_unused_fields(self, config: dict) -> None:
+    @classmethod
+    def remove_transformer_unused_fields(cls, config: dict) -> None:
         """remove pytorch transformer unused fields
 
         Args:
             config (dict): the config of dict
         """
-        config.pop("transformers_version", None)
+        for field in cls.config_fields_to_be_removed:
+            config.pop(field, None)
 
     def convert(self, input_dir: str, output_dir: str):
         """the entry of converting config and converting model file
