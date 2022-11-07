@@ -21,6 +21,7 @@ import random
 import numpy as np
 import paddle
 import glob
+from pathlib import Path
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.io import Dataset, DataLoader, BatchSampler, DistributedBatchSampler
@@ -42,7 +43,7 @@ else:
 from paddle.vision.transforms import RandomHorizontalFlip
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import AutoModel, AutoTokenizer, BertModel
 
 
 def get_writer(args):
@@ -226,11 +227,26 @@ def parse_args():
                         default="visualdl",
                         choices=["tensorboard", "visualdl"],
                         help="Log writer type.")
+    parser.add_argument("--language",
+                        default="en",
+                        choices=["en", "zh", "zh_en"],
+                        help="Model language.")
 
     args = parser.parse_args()
 
     if args.train_data_dir is None:
         raise ValueError("You must specify a train data directory.")
+
+    if args.language == "en":
+        if "chinese-en" in args.pretrained_model_name_or_path.lower():
+            args.language = "zh_en"
+            logger.info(
+                "Detect Chinese-English Model, we will set language to 'zh_en'. "
+            )
+        elif "chinese" in args.pretrained_model_name_or_path.lower():
+            args.language = "zh"
+            logger.info("Detect Chinese Model, we will set language to 'zh'. ")
+
     args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
     return args
 
@@ -287,6 +303,45 @@ imagenet_style_templates_small = [
     "a large painting in the style of {}",
 ]
 
+zh_imagenet_templates_small = [
+    "一张{}的照片",
+    "{}的渲染",
+    "{}裁剪过的照片",
+    "一张干净的{}的照片",
+    "{}的黑暗照片",
+    "我的{}的照片",
+    "酷的{}的照片",
+    "{}的特写照片",
+    "{}的明亮照片",
+    "{}的裁剪照片",
+    "{}的照片",
+    "{}的好照片",
+    "一张{}的照片",
+    "干净的照片{}",
+    "一张漂亮的{}的照片",
+    "漂亮的照片{}",
+    "一张很酷的照片{}",
+    "一张奇怪的照片{}",
+]
+
+zh_imagenet_style_templates_small = [
+    "一幅{}风格的画",
+    "{}风格的渲染",
+    "{}风格的裁剪画",
+    "{}风格的绘画",
+    "{}风格的一幅干净的画",
+    "{}风格的黑暗画作",
+    "{}风格的图片",
+    "{}风格的一幅很酷的画",
+    "{}风格的特写画",
+    "一幅{}风格的明亮画作",
+    "{}风格的一幅好画",
+    "{}风格的特写画",
+    "{}风格的艺术画",
+    "一幅{}风格的漂亮画",
+    "一幅{}风格的奇怪的画",
+]
+
 
 class TextualInversionDataset(Dataset):
 
@@ -303,6 +358,7 @@ class TextualInversionDataset(Dataset):
         set="train",
         placeholder_token="*",
         center_crop=False,
+        language="en",
     ):
         self.data_root = data_root
         self.tokenizer = tokenizer
@@ -313,7 +369,10 @@ class TextualInversionDataset(Dataset):
         self.center_crop = center_crop
         self.flip_p = flip_p
 
-        ext = ['png', 'jpg', 'jpeg', 'bmp']
+        if not Path(data_root).exists():
+            raise ValueError(f"{data_root} dir doesn't exists.")
+
+        ext = ['png', 'jpg', 'jpeg', 'bmp', 'PNG', 'JPG', 'JPEG', 'BMP']
         self.image_paths = []
         for e in ext:
             self.image_paths.extend(glob.glob(os.path.join(data_root,
@@ -332,7 +391,18 @@ class TextualInversionDataset(Dataset):
             "lanczos": Resampling.LANCZOS,
         }[interpolation]
 
-        self.templates = imagenet_style_templates_small if learnable_property == "style" else imagenet_templates_small
+        self.templates = []
+        if learnable_property == "style":
+            if "en" in language:
+                self.templates.extend(imagenet_style_templates_small)
+            if "zh" in language:
+                self.templates.extend(zh_imagenet_style_templates_small)
+        else:
+            if "en" in language:
+                self.templates.extend(imagenet_templates_small)
+            if "zh" in language:
+                self.templates.extend(zh_imagenet_templates_small)
+
         self.flip_transform = RandomHorizontalFlip(prob=self.flip_p)
 
     def __len__(self):
@@ -396,9 +466,9 @@ def main():
 
     # Load the tokenizer and add the placeholder token as a additional special token
     if args.tokenizer_name:
-        tokenizer = CLIPTokenizer.from_pretrained(args.tokenizer_name)
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
-        tokenizer = CLIPTokenizer.from_pretrained(
+        tokenizer = AutoModel.from_pretrained(
             os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
 
     # Add the placeholder token in tokenizer
@@ -420,7 +490,7 @@ def main():
         args.placeholder_token)
 
     # Load models and create wrapper for stable diffusion
-    text_encoder = CLIPTextModel.from_pretrained(
+    text_encoder = AutoModel.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
@@ -439,12 +509,24 @@ def main():
     # Freeze vae and unet
     freeze_params(vae.parameters())
     freeze_params(unet.parameters())
+
     # Freeze all parameters except for the token embeddings in text encoder
-    params_to_freeze = itertools.chain(
-        text_encoder.text_model.transformer.parameters(),
-        text_encoder.text_model.ln_final.parameters(),
-        text_encoder.text_model.positional_embedding.parameters(),
-    )
+    if isinstance(text_encoder, BertModel):
+        # bert text_encoder
+        params_to_freeze = itertools.chain(
+            text_encoder.encoder.parameters(),
+            text_encoder.pooler.parameters(),
+            text_encoder.embeddings.position_embeddings.parameters(),
+            text_encoder.embeddings.token_type_embeddings.parameters(),
+            text_encoder.embeddings.layer_norm.parameters(),
+        )
+    else:
+        # clip text_encoder
+        params_to_freeze = itertools.chain(
+            text_encoder.text_model.transformer.parameters(),
+            text_encoder.text_model.ln_final.parameters(),
+            text_encoder.text_model.positional_embedding.parameters(),
+        )
     freeze_params(params_to_freeze)
 
     if args.scale_lr:
@@ -490,7 +572,7 @@ def main():
         learnable_property=args.learnable_property,
         center_crop=args.center_crop,
         set="train",
-    )
+        language=args.language)
 
     def collate_fn(examples):
         input_ids = [example["input_ids"] for example in examples]
@@ -499,7 +581,8 @@ def main():
         input_ids = tokenizer.pad({
             "input_ids": input_ids
         },
-                                  padding=True,
+                                  padding="max_length",
+                                  max_length=tokenizer.model_max_length,
                                   return_tensors="pd").input_ids
         batch = {
             "input_ids": input_ids,
@@ -585,7 +668,9 @@ def main():
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
             # Get the text embedding for conditioning
-            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+            attention_mask = paddle.ones_like(batch["input_ids"])
+            encoder_hidden_states = text_encoder(
+                batch["input_ids"], attention_mask=attention_mask)[0]
             # Predict the noise residual
             noise_pred = unet(noisy_latents, timesteps,
                               encoder_hidden_states).sample
