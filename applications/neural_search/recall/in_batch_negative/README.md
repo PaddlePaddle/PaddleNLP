@@ -205,7 +205,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --hnsw_ef 100 \
     --recall_num 50 \
     --similar_text_pair_file "recall/dev.csv" \
-    --corpus_file "recall/corpus.csv"
+    --corpus_file "recall/corpus.csv" \
+    --chunk_numbers
 ```
 
 参数含义说明
@@ -229,6 +230,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 * `recall_num`: 对 1 个文本召回的相似文本数量
 * `similar_text_pair_file`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
+* `use_recompute`: 使用Recompute策略，用于节省显存，是一种以时间换空间的技术
+* `use_gradient_cache`: 使用Gradient Cache策略，用于节省显存，是一种以时间换空间的技术
+* `chunk_numbers`: 使用Gradient Cache策略的参数，表示的是同一个批次的样本分几次执行
 
 也可以使用bash脚本：
 
