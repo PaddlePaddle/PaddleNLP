@@ -12,10 +12,7 @@
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-# 进入ppdiffusers文件夹，安装ppdiffusers
-pip install -e .
-# 安装其他所需的依赖
-pip install "paddlenlp>=2.4.1" ftfy regex Pillow visualdl
+pip install -U ppdiffusers visualdl
 ```
 
 
@@ -67,6 +64,8 @@ bash run_single.sh
 | naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过95k步数训练得到的模型，模型使用了DDIM scheduler。 |
 | naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过115k步数训练得到的模型，模型使用了DDIM scheduler。 |
 | Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         | Hentai模型，模型使用了PNDM scheduler。                |
+| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1         | 中文StableDiffusion模型，模型使用了PNDM scheduler。                |
+| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1         | 中文+英文双语言的StableDiffusion模型，模型使用了PNDM scheduler。                |
 
 `train_textual_inversion.py`代码可传入的参数解释如下：
 > 主要修改的参数
@@ -81,6 +80,7 @@ bash run_single.sh
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，在梯度累积的step中。减少多卡之间梯度的通信，减少更新的次数，扩大训练的batch_size。
 
 > 可以修改的参数
+> * `--language`: 模型的语言，`zh`、`en`或`zh_en`，当我们使用中文模型时候，请设置成`zh`。
 > * `--learning_rate`: 学习率。
 > * `--scale_lr`: 是否根据GPU数量，梯度累积步数，以及批量数对学习率进行缩放。缩放公式：`learning_rate * gradient_accumulation_steps * train_batch_size * num_processes`。
 > * `--lr_scheduler`: 要使用的学习率调度策略。默认为 `constant`。
