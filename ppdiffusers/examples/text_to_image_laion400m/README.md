@@ -16,12 +16,19 @@ pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
 
 #### laion400m_en.filelist文件内部格式如下所示
 自己准备好处理后的数据，并且将文件放置于`/data/laion400m/`目录，其中里面的每个part的前三列为`caption文本描述, 占位符空, base64编码的图片`，`caption, _, img_b64 = vec[:3]`。
+
+注意，当前`laion400m_en.filelist`只存放了10条数据路径，如果想要更多数据的话，请运行`python write_filelist.py`代码，运行后会生成6万条数据路径。
 ```
 /data/laion400m/part-00000.gz
 /data/laion400m/part-00001.gz
 /data/laion400m/part-00002.gz
 /data/laion400m/part-00003.gz
 /data/laion400m/part-00004.gz
+/data/laion400m/part-00005.gz
+/data/laion400m/part-00006.gz
+/data/laion400m/part-00007.gz
+/data/laion400m/part-00008.gz
+/data/laion400m/part-00009.gz
 ```
 #### train.filelist.list训练文件内部格式如下所示
 我们提供了`laion400m_en.filelist`，当然也可以存放其他`filelist`
