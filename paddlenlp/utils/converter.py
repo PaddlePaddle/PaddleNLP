@@ -836,8 +836,7 @@ class Converter(ABC):
             state_dict[key] = state_dict[key].numpy()
         return state_dict
 
-    @staticmethod
-    def remove_transformer_unused_fields(config: dict) -> None:
+    def remove_transformer_unused_fields(self, config: dict) -> None:
         """remove pytorch transformer unused fields
 
         Args:
