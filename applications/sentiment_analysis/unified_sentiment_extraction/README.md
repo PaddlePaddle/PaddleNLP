@@ -129,7 +129,9 @@ python predict/batch_predict.py \
 - batch_size: 批处理大小，请结合机器情况进行调整，默认为 4。
 
 <a name="2.3.3"></a>
+
 #### 2.3.3 情感分析结果可视化
+
 基于以上生成的情感分析结果，可以使用`visual_analysis.py`脚本对情感分析结果进行可视化，命令如下。
 
 ```
