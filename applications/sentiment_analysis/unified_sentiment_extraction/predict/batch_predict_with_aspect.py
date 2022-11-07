@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import sys
+
 sys.path.append(".")
 import argparse
 import math
@@ -77,7 +77,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    
+
     save_dir = os.path.dirname(args.save_path)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -88,7 +88,7 @@ def main():
 
     # define schema for pre-defined aspects, schema and initializing UIEPredictor
     schema = ["观点词", "情感倾向[正向,负向,未提及]"]
-    aspects = ["房间","服务", "环境", "设施", "位置", "隔音", "床", "价格"]
+    aspects = ["房间", "服务", "环境", "设施", "位置", "隔音", "床", "价格"]
     predictor = UIEPredictor(args, model, schema)
 
     # test examples
@@ -97,7 +97,7 @@ def main():
     # predict with uie and save predict result
     outputs = predictor.predict(texts, aspects=aspects)
     write_json_file(outputs, args.save_path)
-    
+
     print("Infer results has been saved to {}".format(args.save_path))
 
 

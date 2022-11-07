@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import json
 import random
@@ -33,11 +32,15 @@ class VisualSentiment(object):
     """
     A tool class for visualing sentiment analysis results. 
     """
+
     def __init__(self, font_path=None):
         self.font_path = font_path
-        self.wc = wordcloud.WordCloud(font_path=font_path, background_color="white", width=800, height=400)
+        self.wc = wordcloud.WordCloud(font_path=font_path,
+                                      background_color="white",
+                                      width=800,
+                                      height=400)
         plt.figure(figsize=(8, 6))
-    
+
     def _plot_wordcloud(self, content_freq, save_path):
         """
         plot wordcloud image.
@@ -56,7 +59,14 @@ class VisualSentiment(object):
         self.wc.generate(text)
         self.wc.to_file(save_path)
 
-    def _plot_histogram(self, content_freq, save_path,  with_line_chart="true", top_n=15, plt_title="", plt_xlabel="", plt_ylabel=""):
+    def _plot_histogram(self,
+                        content_freq,
+                        save_path,
+                        with_line_chart="true",
+                        top_n=15,
+                        plt_title="",
+                        plt_xlabel="",
+                        plt_ylabel=""):
         """
         generate histogram image. one aspect corresponds to one bar. 
 
@@ -71,7 +81,9 @@ class VisualSentiment(object):
         """
 
         content_freq_items = content_freq.items()
-        content_freq_items = sorted(content_freq_items, key=lambda x: x[1], reverse=True)
+        content_freq_items = sorted(content_freq_items,
+                                    key=lambda x: x[1],
+                                    reverse=True)
         content_freq_items = content_freq_items[:top_n]
 
         x_data = [item[0] for item in content_freq_items]
@@ -79,7 +91,7 @@ class VisualSentiment(object):
 
         for i in range(len(x_data)):
             plt.bar(x_data[i], y_data[i])
-        
+
         if with_line_chart:
             plt.plot(x_data, y_data, "-")
         plt.title(plt_title)
@@ -89,7 +101,15 @@ class VisualSentiment(object):
         plt.savefig(save_path)
         plt.close()
 
-    def _plot_content_with_frequency(self, content_freq, save_path, image_type="wordcloud", with_line_chart="true", top_n=15, plt_title="", plt_xlabel="", plt_ylabel=""):
+    def _plot_content_with_frequency(self,
+                                     content_freq,
+                                     save_path,
+                                     image_type="wordcloud",
+                                     with_line_chart="true",
+                                     top_n=15,
+                                     plt_title="",
+                                     plt_xlabel="",
+                                     plt_ylabel=""):
         """
         generate image for specified content, such as aspect, opinion and so on. 
         two types of images are supported: wordcloud and histogram.
@@ -106,15 +126,28 @@ class VisualSentiment(object):
         """
 
         if image_type not in ["wordcloud", "histogram"]:
-            print("Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].")
+            print(
+                "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
+            )
             exit(0)
 
         if image_type == "wordcloud":
             self._plot_wordcloud(content_freq, save_path)
         else:
-            self._plot_histogram(content_freq, save_path,  with_line_chart=with_line_chart, top_n=top_n, plt_title=plt_title, plt_xlabel=plt_xlabel, plt_ylabel=plt_ylabel)
+            self._plot_histogram(content_freq,
+                                 save_path,
+                                 with_line_chart=with_line_chart,
+                                 top_n=top_n,
+                                 plt_title=plt_title,
+                                 plt_xlabel=plt_xlabel,
+                                 plt_ylabel=plt_ylabel)
 
-    def plot_aspect_with_frequency(self, aspect_freq, save_path, image_type="wordcloud", with_line_chart="true", top_n=15):
+    def plot_aspect_with_frequency(self,
+                                   aspect_freq,
+                                   save_path,
+                                   image_type="wordcloud",
+                                   with_line_chart="true",
+                                   top_n=15):
         """
         generate image for aspect, two types of images are supported: wordcloud and histogram.
         this method can help analyze which aspects of the product/service are more important to customers.
@@ -132,20 +165,35 @@ class VisualSentiment(object):
             exit(0)
 
         if image_type not in ["wordcloud", "histogram"]:
-            print("Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].")
+            print(
+                "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
+            )
             exit(0)
-        
+
         if image_type == "wordcloud":
-            self._plot_content_with_frequency(aspect_freq, save_path, image_type=image_type)
+            self._plot_content_with_frequency(aspect_freq,
+                                              save_path,
+                                              image_type=image_type)
         else:
             title = "The histogram of aspect/frequency"
             xlabel = "aspect"
             ylabel = "frequency"
 
-            self._plot_content_with_frequency(aspect_freq, save_path, image_type=image_type, with_line_chart=with_line_chart, top_n=top_n, plt_title=title, plt_xlabel=xlabel, plt_ylabel=ylabel)
-        
-    
-    def plot_opinion_with_frequency(self, opinion_freq, save_path, image_type="wordcloud", with_line_chart="true", top_n=15):
+            self._plot_content_with_frequency(aspect_freq,
+                                              save_path,
+                                              image_type=image_type,
+                                              with_line_chart=with_line_chart,
+                                              top_n=top_n,
+                                              plt_title=title,
+                                              plt_xlabel=xlabel,
+                                              plt_ylabel=ylabel)
+
+    def plot_opinion_with_frequency(self,
+                                    opinion_freq,
+                                    save_path,
+                                    image_type="wordcloud",
+                                    with_line_chart="true",
+                                    top_n=15):
         """
         generate image for opinion, two types of images are supported: wordcloud and histogram.
         this method can help analyze the whole impression of the product/service.
@@ -163,20 +211,36 @@ class VisualSentiment(object):
             exit(0)
 
         if image_type not in ["wordcloud", "histogram"]:
-            print("Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].")
+            print(
+                "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
+            )
             exit(0)
-        
+
         if image_type == "wordcloud":
-            self._plot_content_with_frequency(opinion_freq, save_path, image_type=image_type)
+            self._plot_content_with_frequency(opinion_freq,
+                                              save_path,
+                                              image_type=image_type)
         else:
             title = "The histogram of opinion/frequency"
             xlabel = "opinion"
             ylabel = "frequency"
 
-            self._plot_content_with_frequency(opinion_freq, save_path, image_type=image_type, with_line_chart=with_line_chart, top_n=top_n, plt_title=title, plt_xlabel=xlabel, plt_ylabel=ylabel)
+            self._plot_content_with_frequency(opinion_freq,
+                                              save_path,
+                                              image_type=image_type,
+                                              with_line_chart=with_line_chart,
+                                              top_n=top_n,
+                                              plt_title=title,
+                                              plt_xlabel=xlabel,
+                                              plt_ylabel=ylabel)
 
-
-    def plot_aspect_with_opinion(self, aspect_opinion, save_path, sentiment="all", image_type="wordcloud", with_line_chart="true", top_n=15):
+    def plot_aspect_with_opinion(self,
+                                 aspect_opinion,
+                                 save_path,
+                                 sentiment="all",
+                                 image_type="wordcloud",
+                                 with_line_chart="true",
+                                 top_n=15):
         """
         generate image with aspect and opinion, that is, combining apsect with opinion to display the more specifical opinions of aspect.
         this method can help you at two aspects: 1. mining custom's overall impression of products/services; 2. analyzing the quality of some aspect and improve it futher.
@@ -196,11 +260,15 @@ class VisualSentiment(object):
             exit(0)
 
         if image_type not in ["wordcloud", "histogram"]:
-            print("Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].")
+            print(
+                "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
+            )
             exit(0)
 
         if sentiment not in ["all", "positive", "negative"]:
-            print("Only 'all', 'positive' and 'negative' are received for sentiment, that is, you should set be in [all, positive, negative].")
+            print(
+                "Only 'all', 'positive' and 'negative' are received for sentiment, that is, you should set be in [all, positive, negative]."
+            )
             exit(0)
 
         if sentiment == "all":
@@ -211,21 +279,35 @@ class VisualSentiment(object):
                     key = aspect + opinion
                     new_aspect_opinion[key] = aspect_opinion[aspect][opinion]
             aspect_opinion = new_aspect_opinion
-        
+
         if image_type == "wordcloud":
-            self._plot_content_with_frequency(aspect_opinion, save_path, image_type=image_type)
+            self._plot_content_with_frequency(aspect_opinion,
+                                              save_path,
+                                              image_type=image_type)
         else:
             if sentiment == "all":
                 title = "The histogram of aspect with opinion/frequency"
             else:
-                title = "The histogram of {} aspect with opinion/frequency".format(sentiment)
+                title = "The histogram of {} aspect with opinion/frequency".format(
+                    sentiment)
             xlabel = "aspect with opinion"
             ylabel = "frequency"
 
-            self._plot_content_with_frequency(aspect_opinion, save_path, image_type=image_type, with_line_chart=with_line_chart, top_n=top_n, plt_title=title, plt_xlabel=xlabel, plt_ylabel=ylabel)
+            self._plot_content_with_frequency(aspect_opinion,
+                                              save_path,
+                                              image_type=image_type,
+                                              with_line_chart=with_line_chart,
+                                              top_n=top_n,
+                                              plt_title=title,
+                                              plt_xlabel=xlabel,
+                                              plt_ylabel=ylabel)
 
-
-    def plot_aspect_with_sentiment(self, aspect_sentiment, save_path, image_type="wordcloud", top_n=0, descend_aspects=None):
+    def plot_aspect_with_sentiment(self,
+                                   aspect_sentiment,
+                                   save_path,
+                                   image_type="wordcloud",
+                                   top_n=0,
+                                   descend_aspects=None):
         """
         generate image with aspect and sentiment, that is, combining apsect and sentiment to display the sentiment of aspect.
         This method can help you more intuitively analyze customers' direct impressions of aspects of products/services.
@@ -243,19 +325,24 @@ class VisualSentiment(object):
             exit(0)
 
         if image_type not in ["wordcloud", "histogram"]:
-            print("Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].")
+            print(
+                "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
+            )
             exit(0)
-        
+
         if image_type == "wordcloud":
             new_aspect_opinion = {}
             for aspect in aspect_sentiment:
                 for sentiment in aspect_sentiment[aspect]:
                     key = aspect + sentiment
-                    new_aspect_opinion[key] = aspect_sentiment[aspect][sentiment]
+                    new_aspect_opinion[key] = aspect_sentiment[aspect][
+                        sentiment]
             self._plot_wordcloud(new_aspect_opinion, save_path)
         else:
             if top_n != 0 and descend_aspects is None:
-                print("You should input the param descend_aspects when top_n != 0.")
+                print(
+                    "You should input the param descend_aspects when top_n != 0."
+                )
                 exit(0)
 
             if top_n != 0:
@@ -279,7 +366,9 @@ class VisualSentiment(object):
 
             total_width, n = 0.8, 2
             width = total_width / n
-            x_pos = [item - (total_width - width) / 2 for item in range(len(aspects))]
+            x_pos = [
+                item - (total_width - width) / 2 for item in range(len(aspects))
+            ]
             x_neg = [item + width for item in x_pos]
 
             plt.bar(x_pos, positives, width=width, label="positive")
@@ -291,8 +380,14 @@ class VisualSentiment(object):
             plt.legend()
             plt.savefig(save_path)
             plt.close()
-    
-    def plot_opinion_with_aspect(self, aspect, aspect_opinion, save_path, image_type="wordcloud", with_line_chart=True, top_n=15):
+
+    def plot_opinion_with_aspect(self,
+                                 aspect,
+                                 aspect_opinion,
+                                 save_path,
+                                 image_type="wordcloud",
+                                 with_line_chart=True,
+                                 top_n=15):
         """
         generate opinion image for given aspect. This method can help you analyzing opinions for given aspects.
 
@@ -308,20 +403,24 @@ class VisualSentiment(object):
         if not aspect_opinion:
             print("aspect_opinion is empty, please check it.")
             exit(0)
-        
+
         if aspect not in aspect:
             print("{} not in aspect_opinion, please check it.")
             exit(0)
 
         if image_type not in ["wordcloud", "histogram"]:
-            print("Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].")
+            print(
+                "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
+            )
             exit(0)
 
         opinions = aspect_opinion[aspect]
-        opinion_items = sorted(opinions.items(), key=lambda x: x[1], reverse=True)
+        opinion_items = sorted(opinions.items(),
+                               key=lambda x: x[1],
+                               reverse=True)
         if top_n is not None:
             opinion_items = opinion_items[:top_n]
-        
+
         opinion_freq = {k: v for k, v in opinion_items}
 
         if image_type == "wordcloud":
@@ -330,14 +429,24 @@ class VisualSentiment(object):
             title = "The opinion analysis for aspect [{}] ".format(aspect)
             xlabel = "opinion"
             ylabel = "frequency"
-            self._plot_histogram(opinion_freq, save_path, with_line_chart=with_line_chart, top_n=top_n, plt_title=title, plt_xlabel=xlabel, plt_ylabel=ylabel)
+            self._plot_histogram(opinion_freq,
+                                 save_path,
+                                 with_line_chart=with_line_chart,
+                                 top_n=top_n,
+                                 plt_title=title,
+                                 plt_xlabel=xlabel,
+                                 plt_ylabel=ylabel)
 
 
 class SentimentResult():
     """
     load and analyze result of sentiment analysis.
     """
-    def __init__(self, file_path, sentiment_name="情感倾向[正向,负向,未提及]", opinion_name="观点词"):
+
+    def __init__(self,
+                 file_path,
+                 sentiment_name="情感倾向[正向,负向,未提及]",
+                 opinion_name="观点词"):
         self.file_path = file_path
         self.sentiment_name = sentiment_name
         self.opinion_name = opinion_name
@@ -349,8 +458,8 @@ class SentimentResult():
         opinion_name = self.opinion_name
         aspect_frequency = defaultdict(int)
         opinion_frequency = defaultdict(int)
-        aspect_opinion_positives =  defaultdict(int)
-        aspect_opinion_negatives =  defaultdict(int)
+        aspect_opinion_positives = defaultdict(int)
+        aspect_opinion_negatives = defaultdict(int)
 
         aspect_sentiment = defaultdict(dict)
         aspect_opinion = defaultdict(dict)
@@ -361,7 +470,8 @@ class SentimentResult():
                 aspect_name = aspect["text"]
                 if "relations" not in aspect:
                     continue
-                if sentiment_name not in aspect["relations"] or opinion_name not in aspect["relations"]:
+                if sentiment_name not in aspect[
+                        "relations"] or opinion_name not in aspect["relations"]:
                     continue
                 sentiment = aspect["relations"][sentiment_name][0]
                 if sentiment["text"] == "未提及":
@@ -380,14 +490,16 @@ class SentimentResult():
                         aspect_opinion[aspect_name][opinion_text] = 1
                     else:
                         aspect_opinion[aspect_name][opinion_text] += 1
-                    
+
                     aspect_opinion_text = aspect_name + opinion_text
                     if sentiment["text"] == "正向":
                         aspect_opinion_positives[aspect_opinion_text] += 1
                     else:
                         aspect_opinion_negatives[aspect_opinion_text] += 1
-        
-        aspect_freq_items = sorted(aspect_frequency.items(), key=lambda x: x[1], reverse=True)
+
+        aspect_freq_items = sorted(aspect_frequency.items(),
+                                   key=lambda x: x[1],
+                                   reverse=True)
         descend_aspects = [item[0] for item in aspect_freq_items]
 
         self.aspect_frequency = aspect_frequency
@@ -417,7 +529,8 @@ def parse_args():
         "--sentiment_name",
         default="情感倾向[正向,负向]",
         type=str,
-        help="The prompt for sentiment polarity prediction in the result of sentiment analysis.",
+        help=
+        "The prompt for sentiment polarity prediction in the result of sentiment analysis.",
     )
     parser.add_argument(
         "--save_dir",
@@ -442,34 +555,68 @@ if __name__ == "__main__":
     vs = VisualSentiment(font_path=args.font_path)
 
     save_path = os.path.join(args.save_dir, "aspect_wc.png")
-    vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="wordcloud")
+    vs.plot_aspect_with_frequency(sr.aspect_frequency,
+                                  save_path,
+                                  image_type="wordcloud")
     save_path = os.path.join(args.save_dir, "aspect_hist.png")
-    vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="histogram")
+    vs.plot_aspect_with_frequency(sr.aspect_frequency,
+                                  save_path,
+                                  image_type="histogram")
 
     save_path = os.path.join(args.save_dir, "opinion_wc.png")
-    vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="wordcloud")
+    vs.plot_opinion_with_frequency(sr.opinion_frequency,
+                                   save_path,
+                                   image_type="wordcloud")
     save_path = os.path.join(args.save_dir, "opinion_hist.png")
-    vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="histogram")
-
+    vs.plot_opinion_with_frequency(sr.opinion_frequency,
+                                   save_path,
+                                   image_type="histogram")
 
     save_path = os.path.join(args.save_dir, "aspect_opinion_wc.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="wordcloud", sentiment="all")
+    vs.plot_aspect_with_opinion(sr.aspect_opinion,
+                                save_path,
+                                image_type="wordcloud",
+                                sentiment="all")
     save_path = os.path.join(args.save_dir, "aspect_opinion_hist.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="histogram", sentiment="all", top_n=8)
+    vs.plot_aspect_with_opinion(sr.aspect_opinion,
+                                save_path,
+                                image_type="histogram",
+                                sentiment="all",
+                                top_n=8)
     save_path = os.path.join(args.save_dir, "aspect_opinion_wc_pos.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion_positives, save_path, image_type="wordcloud", sentiment="positive")
+    vs.plot_aspect_with_opinion(sr.aspect_opinion_positives,
+                                save_path,
+                                image_type="wordcloud",
+                                sentiment="positive")
     save_path = os.path.join(args.save_dir, "aspect_opinion_hist_pos.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion_positives, save_path, image_type="histogram", sentiment="positive", top_n=8)
+    vs.plot_aspect_with_opinion(sr.aspect_opinion_positives,
+                                save_path,
+                                image_type="histogram",
+                                sentiment="positive",
+                                top_n=8)
     save_path = os.path.join(args.save_dir, "aspect_opinion_wc_neg.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion_negatives, save_path, image_type="wordcloud", sentiment="negative")
+    vs.plot_aspect_with_opinion(sr.aspect_opinion_negatives,
+                                save_path,
+                                image_type="wordcloud",
+                                sentiment="negative")
     save_path = os.path.join(args.save_dir, "aspect_opinion_hist_neg.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion_negatives, save_path, image_type="histogram", sentiment="negative", top_n=8)
+    vs.plot_aspect_with_opinion(sr.aspect_opinion_negatives,
+                                save_path,
+                                image_type="histogram",
+                                sentiment="negative",
+                                top_n=8)
 
     save_path = os.path.join(args.save_dir, "aspect_sentiment_wc.png")
-    vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="wordcloud")
+    vs.plot_aspect_with_sentiment(sr.aspect_sentiment,
+                                  save_path,
+                                  image_type="wordcloud")
     save_path = os.path.join(args.save_dir, "aspect_sentiment_hist.png")
-    vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="histogram", top_n=15, descend_aspects=sr.descend_aspects)
-    
+    vs.plot_aspect_with_sentiment(sr.aspect_sentiment,
+                                  save_path,
+                                  image_type="histogram",
+                                  top_n=15,
+                                  descend_aspects=sr.descend_aspects)
+
     # aspect = "房间"
     # save_path = os.path.join(args.save_dir, "opinions_for_aspect_wc.png")
     # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="wordcloud")

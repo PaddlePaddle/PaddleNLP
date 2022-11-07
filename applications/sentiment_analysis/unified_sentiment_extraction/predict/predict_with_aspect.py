@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import sys
+
 sys.path.append(".")
 import argparse
 import math
@@ -69,8 +70,8 @@ def main():
 
     # define schema for pre-defined aspects, schema and initializing UIEPredictor
     schema = ["观点词", "情感倾向[正向,负向,未提及]"]
-    aspects = ["房间","服务", "环境", "位置", "隔音", "价格"]
-    
+    aspects = ["房间", "服务", "环境", "位置", "隔音", "价格"]
+
     predictor = UIEPredictor(args, model, schema)
 
     # test examples

@@ -28,7 +28,6 @@ from paddlenlp.transformers import AutoTokenizer
 # from evaluate import evaluate
 # from utils import set_seed, convert_example, reader, MODEL_MAP, create_data_loader
 
-
 # def do_train():
 #     paddle.set_device(args.device)
 #     rank = paddle.distributed.get_rank()
@@ -48,7 +47,7 @@ from paddlenlp.transformers import AutoTokenizer
 #     print(args.model, "---------------------------------")
 #     tokenizer = AutoTokenizer.from_pretrained("uie-base")
 #     print(tokenizer.__class__)
-    
+
 #     model = UIE.from_pretrained(args.model)
 #     exit(0)
 
@@ -144,7 +143,6 @@ from paddlenlp.transformers import AutoTokenizer
 #                     tokenizer.save_pretrained(save_dir)
 #                     logger.enable()
 #                 tic_train = time.time()
-
 
 if __name__ == "__main__":
     # yapf: disable

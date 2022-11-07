@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 import sys
+
 sys.path.append(".")
 import argparse
 import math
@@ -86,16 +86,15 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.ckpt_dir)
     model = UIE.from_pretrained(args.ckpt_dir)
 
-        
     # define schema for sentence classification
     # schema = ['情感倾向[正向，负向]']
-    # define schema for AS Extraction 
+    # define schema for AS Extraction
     # schema = [{'评价维度': ['观点词']}]
-    # define schema for AO Extraction 
+    # define schema for AO Extraction
     # schema = [{'评价维度': ['情感倾向[正向，负向]']}]
-    # define schema for ASO Extraction 
+    # define schema for ASO Extraction
     schema = [{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
-    
+
     # initializing UIEPredictor
     predictor = UIEPredictor(args, model, schema)
 
@@ -105,7 +104,7 @@ def main():
     # predict with uie and save predict result
     outputs = predictor.predict(texts)
     write_json_file(outputs, args.save_path)
-    
+
     print("Infer results has been saved to {}".format(args.save_path))
 
 

@@ -3,19 +3,19 @@
 **目录**
 - [1. 应用简介](#1)
 - [2. 快速开始](#2)
-  - [2.1 运行环境](#2.1) 
-  - [2.2 代码结构](#2.2) 
-  - [2.3 快速开始：从输入数据到分析结果可视化](#2.3) 
+  - [2.1 运行环境](#2.1)
+  - [2.2 代码结构](#2.2)
+  - [2.3 快速开始：从输入数据到分析结果可视化](#2.3)
     - [2.3.1 数据描述](#2.3.1)
     - [2.3.2 批量情感分析](#2.3.2)
     - [2.3.3 情感分析结果可视化](#2.3.3)
   - [2.4 通用情感分析能力](#2.4)
   - [2.5 情感分析可视化使用介绍](#2.5)
-  - [2.6 面向垂域定制情感分析](#2.6) 
-    - [2.6.1 数据标注](#2.6.1) 
-    - [2.6.2 模型训练](#2.6.2) 
+  - [2.6 面向垂域定制情感分析](#2.6)
+    - [2.6.1 数据标注](#2.6.1)
+    - [2.6.2 模型训练](#2.6.2)
   - [2.7 模型部署](#2.7)
-  
+
 <a name="1"></a>
 
 ## 1. 应用简介
@@ -67,7 +67,7 @@ python3 -m pip install wordcloud==1.8.2.2
 
 ### 2.2 代码结构
 ```
-unified_sentiment_extraction/  
+unified_sentiment_extraction/
 ├── predict # 模型预测
 │   └── predictor.py # 模型预测核心脚本
 │   ├── predict.py # 模型预测Demo脚本
@@ -117,7 +117,7 @@ python predict/batch_predict.py \
     --save_path "./outputs/test_hotel.json" \
     --position_prob 0.5 \
     --max_seq_len 512 \
-    --batch_size 8 
+    --batch_size 8
 ````
 
 **参数说明**：
@@ -164,7 +164,7 @@ python visual_analysis.py \
 
 对给定的文本评论，直接进行情感分析。可以在`predict/predict.py`或`predict/batch_predict.py`文件中，通过设置不同的Schema进行相应信息的抽取。其中`predict/predict.py`即时运行情感分析功能，`predict/batch_predict.py`会接收文件，同时将结果保存相应文件中。
 
-**（1）整句情感分析**  
+**（1）整句情感分析**
 整句情感分析功能当前支持二分类：正向和负向。可以设置其schema为：
 
 ```python
@@ -177,7 +177,7 @@ python predict/predict.py \
     --ckpt_dir "./checkpoint/model_best" \
     --position_prob 0.5 \
     --max_seq_len 512 \
-    --batch_size 8 
+    --batch_size 8
 ```
 **参数说明**：
 - ckpt_dir: 用于加载模型的保存目录，可以在上述模型下载后，进行解压，然后传入该模型目录。
@@ -185,7 +185,7 @@ python predict/predict.py \
 - max_seq_len: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
 - batch_size: 批处理大小，请结合机器情况进行调整，默认为 4。、
 
-**（2）属性级情感分析**  
+**（2）属性级情感分析**
 除整句情感分析之外，本项目同时支持属性级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取。
 
 ```python
@@ -220,7 +220,7 @@ python predict/predict_with_aspect.py \
     --ckpt_dir "./checkpoint/model_best" \
     --position_prob 0.5 \
     --max_seq_len 512 \
-    --batch_size 8 
+    --batch_size 8
 ```
 其可配置参数解释同`predict/predict.py`。
 
@@ -231,7 +231,7 @@ python predict/predict_with_aspect.py \
 
 基于情感分析的预测结果，本项目提供了结果可视化功能。默认情况下，可视化功能支持围绕属性、观点、属性+观点、属性+情感、固定属性+观点分析功能。在各项分析中，均支持词云和直方图两类图像展示。以下各项功能介绍中，以酒店场景数据为例进行展示。
 
- **(1) 属性分析**  
+ **(1) 属性分析**
 通过属性信息，可以查看客户对于产品/服务的重点关注方面. 可以通过`plot_aspect_with_frequency`函数对属性进行可视化，当前可通过参数`image_type`分别指定`wordcloud`和'histogram'，通过词云和直方图的形式进行可视化。
 
 ```python
@@ -250,7 +250,7 @@ vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="histog
 </div>
 <br>
 
- **(2) 观点分析**   
+ **(2) 观点分析**
 通过观点信息，可以查看客户对于产品/服务整体的直观印象。可以通过`plot_opinion_with_frequency`函数对观点进行可视化。
 
 ```python
@@ -264,7 +264,7 @@ vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="word
 </div>
 <br>
 
-**(3) 属性+观点分析**  
+**(3) 属性+观点分析**
 结合属性和观点两者信息，可以更加具体的展现客户对于产品/服务的详细观点，分析某个属性的优劣，从而能够帮助商家更有针对性地改善或提高自己的产品/服务质量。可以通过`plot_aspect_with_opinion`函数对属性+观点进行可视化，同时可通过设置参数`sentiment`按照情感倾向展示不同分析结果，以更好进行情感分析，若设置为`all`，则会展示正向和负向所有的属性；若为`positive`，则会仅展示正向的属性；若为`negative`，则会仅展示负向的属性。如果在绘制直方图时，通过设置参数`top_n`，可以展示频率最高的top n个属性。
 
 ```python
@@ -280,7 +280,7 @@ vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="histogram"
 </div>
 
 
- **(4) 属性+情感分析**  
+ **(4) 属性+情感分析**
 挖掘客户对于产品/服务针对属性的情感极性，帮助商家直观地查看客户对于产品/服务的某些属性的印象。可以通过`plot_aspect_with_sentiment`函数对属性+情感进行可视化。如果在绘制直方图时，通过设置参数`top_n`，可以展示频率最高的top n个属性。
 
 ```python
@@ -295,7 +295,7 @@ vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="histog
     <img src="https://user-images.githubusercontent.com/35913314/200213177-0342bec4-5955-4ab9-9e98-5e4ef8e1a35e.png"/>
 </div>
 
-**(5) 对给定属性进行观点分析**  
+**(5) 对给定属性进行观点分析**
 通过指定属性，更加细致查看客户对于产品/服务某个属性的观点。可以帮助商家更加细粒度地分析客户对于产品/服务的某个属性的印象。下面图片示例中，展示了客户对于属性"房间"的观点。可以通过`plot_opinion_with_aspect`函数，对给定的属性进行观点分析。默认情况下，不会自动生成该类图像，需要开发者手动调用`plot_opinion_with_aspect`进行可视化分析。
 
 ```python
@@ -329,5 +329,3 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
 <a name="2.7"></a>
 
 ### 2.7 模型部署
-
-

@@ -38,7 +38,7 @@ class UIEPredictor(object):
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
-                schema = [schema]
+            schema = [schema]
         self._schema_tree = self._build_tree(schema)
 
     @classmethod
@@ -287,14 +287,14 @@ class UIEPredictor(object):
         Returns:
             list: a list of predictions, where the list's length
                 equals to the length of `data`
-        """ 
+        """
 
         if aspects is not None:
             # predict with pre-give aspects
             results = []
             prefixs = []
             relations = []
-            result = {"评价维度": [{"text":aspect} for aspect in aspects]}
+            result = {"评价维度": [{"text": aspect} for aspect in aspects]}
             prefix = [aspect + "的" for aspect in aspects]
             for i in range(len(data)):
                 results.append(copy.deepcopy(result))
@@ -401,7 +401,10 @@ class UIEPredictor(object):
         return results
 
     def _infer(self, input_dict):
-        return self.uie(input_ids=input_dict["input_ids"], token_type_ids=input_dict["token_type_ids"], pos_ids=input_dict["pos_ids"], att_mask=input_dict["att_mask"])
+        return self.uie(input_ids=input_dict["input_ids"],
+                        token_type_ids=input_dict["token_type_ids"],
+                        pos_ids=input_dict["pos_ids"],
+                        att_mask=input_dict["att_mask"])
 
     def predict(self, input_data, aspects=None):
         results = self._multi_stage_predict(input_data, aspects=aspects)
@@ -486,5 +489,3 @@ def get_id_and_prob(span_set, offset_mapping):
         end_id = offset_mapping[end[0]][1]
         sentence_id.append((start_id, end_id))
     return sentence_id, prob
-
-

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import sys
+
 sys.path.append(".")
 import argparse
 import math
@@ -67,24 +68,20 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.ckpt_dir)
     model = UIE.from_pretrained(args.ckpt_dir)
 
-        
     # define schema for sentence classification
     # schema = ['情感倾向[正向，负向]']
-    # define schema for AS Extraction 
+    # define schema for AS Extraction
     # schema = [{'评价维度': ['观点词']}]
-    # define schema for AO Extraction 
+    # define schema for AO Extraction
     # schema = [{'评价维度': ['情感倾向[正向，负向]']}]
-    # define schema for ASO Extraction 
+    # define schema for ASO Extraction
     schema = [{'评价维度': ['观点词', '情感倾向[正向，负向]']}]
-    
+
     # initializing UIEPredictor
     predictor = UIEPredictor(args, model, schema)
 
     # test examples
-    texts = [
-        '环境挺好的，卫生间不错，电视特别好，高清的',
-        '店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队'
-    ]
+    texts = ['环境挺好的，卫生间不错，电视特别好，高清的', '店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队']
 
     # predict with uie and show corresponding result
     print("-----------------------------")

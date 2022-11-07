@@ -117,6 +117,7 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
 
+
 def load_txt(file_path):
     texts = []
     with open(file_path, "r", encoding="utf-8") as f:
@@ -362,9 +363,11 @@ def get_relation_type_dict(relation_data):
     return relation_type_dict
 
 
-def add_cls_negative_example(texts, subject_set, subject_goldens,  prompt_prefix, options, not_mention_label, negative_ratio):
+def add_cls_negative_example(texts, subject_set, subject_goldens, prompt_prefix,
+                             options, not_mention_label, negative_ratio):
     assert len(
-        options) == 3, "you should make sure that options contain three choices: [正向, 负向, 未提及]."
+        options
+    ) == 3, "you should make sure that options contain three choices: [正向, 负向, 未提及]."
     negative_examples = []
 
     with tqdm(total=len(subject_goldens)) as pbar:
@@ -392,8 +395,7 @@ def add_cls_negative_example(texts, subject_set, subject_goldens,  prompt_prefix
                     prompt_prefix + "[" + ",".join(options) + "]"
                 start = prompt.rfind(not_mention_label) - len(prompt) - 1
                 end = start + len(not_mention_label)
-                result = {"text": not_mention_label,
-                          "start": start, "end": end}
+                result = {"text": not_mention_label, "start": start, "end": end}
                 negative_result = {
                     "content": texts[i],
                     "result_list": [result],
@@ -402,6 +404,7 @@ def add_cls_negative_example(texts, subject_set, subject_goldens,  prompt_prefix
                 negative_examples.append(negative_result)
             pbar.update(1)
     return negative_examples
+
 
 def add_entity_negative_example(examples, texts, prompts, label_set,
                                 negative_ratio):
@@ -542,6 +545,7 @@ def convert_ext_examples(raw_examples,
     """
     Convert labeled data export from doccano for extraction and aspect-level classification task.
     """
+
     def _sep_cls_label(label, separator):
         label_list = label.split(separator)
         if len(label_list) == 1:
@@ -721,8 +725,10 @@ def convert_ext_examples(raw_examples,
             pbar.update(1)
 
     logger.info(f"Adding negative samples for first stage prompt...")
-    negative_examples = add_cls_negative_example(
-        texts, subject_set, subject_goldens,  prompt_prefix, options, not_mention_label, negative_ratio)
+    negative_examples = add_cls_negative_example(texts, subject_set,
+                                                 subject_goldens, prompt_prefix,
+                                                 options, not_mention_label,
+                                                 negative_ratio)
     all_cls_examples = entity_cls_examples + negative_examples
     positive_examples, negative_examples = add_entity_negative_example(
         entity_examples, texts, entity_prompts, entity_label_set,
