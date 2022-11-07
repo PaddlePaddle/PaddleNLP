@@ -56,8 +56,8 @@ class CLIPConverter(Converter):
             int: the number of transformer layer
         """
         if isinstance(config_or_num_layers, dict):
-            return config_or_num_layers['vision_layers'], config_or_num_layers[
-                'text_layers']
+            return config_or_num_layers['text_layers'], config_or_num_layers[
+                'vision_layers']
 
         elif isinstance(config_or_num_layers, int):
             num_layer = config_or_num_layers

@@ -596,24 +596,33 @@ class Converter(ABC):
             state_dict = deepcopy(state_dict)
         return state_dict
 
-    def compare_model_state_dicts(self, paddle_model: Layer,
-                                  pytorch_model: Module,
+    def compare_model_state_dicts(self, paddle_model: Union[Layer,
+                                                            Dict[str, ndarray]],
+                                  pytorch_model: Union[Module, Dict[str,
+                                                                    ndarray]],
                                   name_mappings: List[StateDictNameMapping]):
         """compare the pytorch and paddle mdoel state with name mappings
 
         Args:
-            paddle_model (Layer): paddle model instance
-            pytorch_model (Module): pytorch model instance
+            paddle_model (Union[Layer, Dict[str, ndarray]]): paddle model instance
+            pytorch_model (Union[Module, Dict[str, ndarray]]): pytorch model instance
             name_mappings (List[StateDictNameMapping]): the name mappings
         """
-        paddle_state_dict = {
-            key: value.detach().cpu().numpy()
-            for key, value in paddle_model.state_dict().items()
-        }
-        pytorch_state_dict = {
-            key: value.detach().cpu().numpy()
-            for key, value in pytorch_model.state_dict().items()
-        }
+        if not isinstance(paddle_model, dict):
+            paddle_state_dict = {
+                key: value.detach().cpu().numpy()
+                for key, value in paddle_model.state_dict().items()
+            }
+        else:
+            paddle_state_dict = paddle_model
+
+        if not isinstance(pytorch_model, dict):
+            pytorch_state_dict = {
+                key: value.detach().cpu().numpy()
+                for key, value in pytorch_model.state_dict().items()
+            }
+        else:
+            pytorch_state_dict = pytorch_model
 
         model_state_saver = TensorInfoSaver()
         for name_mapping in name_mappings:
@@ -660,6 +669,9 @@ class Converter(ABC):
         paddle_model.eval()
 
         paddle_outputs = paddle_model(*paddle_inputs)
+        # remove paddle_model and free gpu memory
+        paddle_model_state_dict = self.get_model_state_dict(paddle_model)
+        del paddle_model
         paddle_logits = self.resolve_paddle_output_logits(paddle_outputs)
 
         logger.info(
@@ -675,6 +687,10 @@ class Converter(ABC):
         pytorch_model.eval()
         pytorch_inputs = [torch.tensor(input_item) for input_item in inputs]
         torch_outputs = pytorch_model(*pytorch_inputs)
+        # remove paddle_model and free gpu memory
+        pytorch_model_state_dict = self.get_model_state_dict(pytorch_model)
+        del pytorch_model
+
         pytorch_logits = self.resolve_pytorch_output_logits(torch_outputs)
 
         logger.info(
@@ -690,9 +706,9 @@ class Converter(ABC):
                 "============================== compare model state dict =============================="
             )
 
-            self.compare_model_state_dicts(paddle_model, pytorch_model,
+            self.compare_model_state_dicts(paddle_model_state_dict,
+                                           pytorch_model_state_dict,
                                            name_mappings)
-            del paddle_model, pytorch_model
 
             print(
                 "============================== compare model inputs & outputs =============================="
@@ -885,8 +901,13 @@ class Converter(ABC):
                     logger.error(
                         f"the key<{key}> is not set correctly with weight")
 
-        if is_torch_available() and is_transformers_available(
-        ) and self.try_compare_logits:
+        if not self.try_compare_logits:
+            logger.info(
+                '`try_compare_logits`=False, so we dont"t compare the logits ...'
+            )
+            return
+
+        if is_torch_available() and is_transformers_available():
             result = self.compare_logits(paddle_pretrained_dir=output_dir,
                                          pytorch_pretrained_dir=input_dir)
             if result is True:
