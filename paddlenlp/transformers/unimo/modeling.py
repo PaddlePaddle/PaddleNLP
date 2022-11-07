@@ -13,7 +13,6 @@
 # limitations under the License.
 """Modeling classes for UNIMO model."""
 
-from tkinter.messagebox import NO
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
