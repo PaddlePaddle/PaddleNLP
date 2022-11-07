@@ -103,8 +103,8 @@ PaddleNLP情感分析应用基于中文通用信息抽取模型UIE，利用大�
 
 ## 3. 快速开始
 
-- 👉 [通用情感分析抽取](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class#readme)
+- 👉 [通用情感分析抽取](./unified_sentiment_extraction/README)
 
-- 👉 [阶段式属性、观点和情感极性抽取](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label#readme)
+- 👉 [阶段式属性、观点和情感极性抽取](./ASO_analysis/README)
 
 
