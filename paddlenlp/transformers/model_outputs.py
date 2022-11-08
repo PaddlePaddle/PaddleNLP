@@ -344,7 +344,6 @@ def _transformer_encoder_fwd(self,
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd
 paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
-paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd
 paddle.nn.TransformerDecoder.forward = _transformer_decoder_fwd
 
 _encoder_init = paddle.nn.TransformerEncoder.__init__
