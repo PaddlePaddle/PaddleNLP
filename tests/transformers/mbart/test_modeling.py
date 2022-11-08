@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import tempfile
-import unittest
-import gc
 
 from tests.testing_utils import slow, PaddleNLPModelTest
 
