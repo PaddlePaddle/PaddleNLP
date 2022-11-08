@@ -5,6 +5,7 @@
 
 ## 1. News 📢
 
+* 🔥 **2022.11.04 支持 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 和 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 中文权重**
 * 🔥 **2022.10.27 发布 PPDiffusers仓库**
 
 
@@ -39,7 +40,7 @@ python setup.py install
 
 ## 4. 使用PPDiffusers快速体验Stable Diffusion模型!
 
-Stable Diffusion 是一个**文本到图像(text-to-image)**的**潜在扩散模型(latent diffusion model, ldm)**, 该模型是由来自[CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/) 的工程师以及 [RunwayML](https://runwayml.com/)一起开发而完成的。该模型使用了大小为**512x512**的[LAION-5B](https://laion.ai/blog/laion-5b/)数据集子集进行训练。该模型使用了Openai开源的**CLIP ViT-L/14** 文本编码器(text_encoder)来编码提示(prompt)文本，从而作为引导条件（注意该部分权重不进行训练）。该模型使用了Unet模型（860M参数）和text encoder（123M参数），并且可以在具有4GB显存（注：当前paddle版本需要进行优化，无法在4GB的显卡上运行）的GPU进行推理预测。
+Stable Diffusion 是一个**文本到图像(text-to-image)**的**潜在扩散模型(latent diffusion model, ldm)**, 该模型是由来自[CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/) 的工程师以及 [RunwayML](https://runwayml.com/)一起开发而完成的。该模型使用了大小为**512x512**的[LAION-5B](https://laion.ai/blog/laion-5b/)数据集子集进行训练。该模型使用了Openai开源的**CLIP ViT-L/14** 文本编码器(text_encoder)来编码提示(prompt)文本，从而作为引导条件（注意该部分权重不进行训练）。该模型使用了Unet模型（860M参数）和text encoder（123M参数），并且可以在具有4GB显存的GPU上进行推理预测。
 
 ___注意___:
 ___为了方便国内用户下载使用及快速体验Stable Diffusion模型，我们在百度云(BOS)上提供了paddle版本的镜像权重。注意：为了使用该模型与权重，你必须接受该模型所要求的**License**，请访问huggingface的[model card](https://huggingface.co/runwayml/stable-diffusion-v1-5), 仔细阅读里面的**License**，然后签署该协议。___
@@ -61,8 +62,7 @@ image = pipe(prompt).images[0]
 
 image.save("astronaut_rides_horse.png")
 ```
-<center><image src="https://user-images.githubusercontent.com/50394665/197779466-04543823-8b83-41d6-94e8-146a7dac00d7.png" width="600"></center>
-
+<img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/197779466-04543823-8b83-41d6-94e8-146a7dac00d7.png">
 
 ### 4.2 使用Stable Diffusion进行由文本引导的图片-图片的生成
 
@@ -74,10 +74,10 @@ from io import BytesIO
 
 from ppdiffusers import StableDiffusionImg2ImgPipeline
 
-# load the pipeline
+# 加载pipeline
 pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
 
-# let's download an initial image
+# 下载初始图片
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
 response = requests.get(url)
@@ -92,7 +92,7 @@ with paddle.amp.auto_cast(True):
 image.save("fantasy_landscape.png")
 ```
 
-<center><image src="https://user-images.githubusercontent.com/50394665/197780044-34e6f8ca-6864-4c3d-bb99-28e0aadf867b.png" width="600"></center>
+<img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/197780044-34e6f8ca-6864-4c3d-bb99-28e0aadf867b.png">
 
 
 ### 4.3 使用Stable Diffusion根据文本补全图片
@@ -125,7 +125,7 @@ with paddle.amp.auto_cast(True):
 
 image.save("cat_on_bench.png")
 ```
-<center><image src="https://user-images.githubusercontent.com/50394665/197783711-ab3caf2e-5a4d-4099-8d01-d6ca80ca8e78.png" width="600"></center>
+<img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/197783711-ab3caf2e-5a4d-4099-8d01-d6ca80ca8e78.png">
 
 Tips: 下面的使用方法是新版本的代码，也是官方推荐的代码，注意必须配合**runwayml/stable-diffusion-inpainting**才可正常使用。
 ```python
@@ -153,7 +153,7 @@ image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
 
 image.save("cat_on_bench_new.png")
 ```
-<center><image src="https://user-images.githubusercontent.com/50394665/198016801-87cec13b-0d89-41c3-aedb-c89a43d76153.png" width="600"></center>
+<img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/198016801-87cec13b-0d89-41c3-aedb-c89a43d76153.png">
 
 ## 5. Credits
 

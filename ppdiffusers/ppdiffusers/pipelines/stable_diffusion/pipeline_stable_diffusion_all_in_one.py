@@ -215,6 +215,7 @@ def pad_tokens_and_weights(tokens,
                            max_length,
                            bos,
                            eos,
+                           pad,
                            no_boseos_middle=True,
                            chunk_length=77):
     r"""
@@ -223,8 +224,9 @@ def pad_tokens_and_weights(tokens,
     max_embeddings_multiples = (max_length - 2) // (chunk_length - 2)
     weights_length = max_length if no_boseos_middle else max_embeddings_multiples * chunk_length
     for i in range(len(tokens)):
-        tokens[i] = [bos
-                     ] + tokens[i] + [eos] * (max_length - 1 - len(tokens[i]))
+        tokens[i] = [bos] + tokens[i] + [
+            eos
+        ] + [pad] * (max_length - 2 - len(tokens[i]))
         if no_boseos_middle:
             weights[i] = [
                 1.
@@ -266,7 +268,9 @@ def get_unweighted_text_embeddings(pipe: DiffusionPipeline,
             text_input_chunk[:, 0] = text_input[0, 0]
             text_input_chunk[:, -1] = text_input[0, -1]
 
-            text_embedding = pipe.text_encoder(text_input_chunk)[0]
+            attention_mask = paddle.ones_like(text_input_chunk)
+            text_embedding = pipe.text_encoder(text_input_chunk,
+                                               attention_mask=attention_mask)[0]
 
             if no_boseos_middle:
                 if i == 0:
@@ -282,7 +286,9 @@ def get_unweighted_text_embeddings(pipe: DiffusionPipeline,
             text_embeddings.append(text_embedding)
         text_embeddings = paddle.concat(text_embeddings, axis=1)
     else:
-        text_embeddings = pipe.text_encoder(text_input)[0]
+        attention_mask = paddle.ones_like(text_input)
+        text_embeddings = pipe.text_encoder(text_input,
+                                            attention_mask=attention_mask)[0]
     return text_embeddings
 
 
@@ -363,14 +369,17 @@ def get_weighted_text_embeddings(
                   2) * max_embeddings_multiples + 2
 
     # pad the length of tokens and weights
-    bos = pipe.tokenizer.bos_token_id
-    eos = pipe.tokenizer.eos_token_id
+    # support bert tokenizer
+    bos = pipe.tokenizer.bos_token_id if pipe.tokenizer.bos_token_id is not None else pipe.tokenizer.cls_token_id
+    eos = pipe.tokenizer.eos_token_id if pipe.tokenizer.eos_token_id is not None else pipe.tokenizer.sep_token_id
+    pad = pipe.tokenizer.pad_token_id
     prompt_tokens, prompt_weights = pad_tokens_and_weights(
         prompt_tokens,
         prompt_weights,
         max_length,
         bos,
         eos,
+        pad,
         no_boseos_middle=no_boseos_middle,
         chunk_length=pipe.tokenizer.model_max_length)
     prompt_tokens = paddle.to_tensor(prompt_tokens)
@@ -381,6 +390,7 @@ def get_weighted_text_embeddings(
             max_length,
             bos,
             eos,
+            pad,
             no_boseos_middle=no_boseos_middle,
             chunk_length=pipe.tokenizer.model_max_length)
         uncond_tokens = paddle.to_tensor(uncond_tokens)
@@ -507,7 +517,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
+                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
@@ -551,6 +561,12 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         """
         # set slice_size = `None` to disable `attention slicing`
         self.enable_attention_slicing(None)
+
+    def __call__(self, *args, **kwargs):
+        return self.text2image(*args, **kwargs)
+
+    def text2img(self, *args, **kwargs):
+        return self.text2image(*args, **kwargs)
 
     @paddle.no_grad()
     def text2image(
@@ -1195,12 +1211,10 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             self, prompt, negative_prompt, max_embeddings_multiples,
             no_boseos_middle, skip_parsing, skip_weighting)
 
-        # preprocess image
-        if not isinstance(init_image, paddle.Tensor):
+        if isinstance(init_image, PIL.Image.Image):
             init_image = init_image.resize((width, height))
             init_image = preprocess_image(init_image)
 
-        init_image.resize((width, height))
         # encode the init image into latents and scale the latents
         latents_dtype = text_embeddings.dtype
         init_image = init_image.astype(latents_dtype)
@@ -1215,9 +1229,10 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         init_latents_orig = init_latents
 
         # preprocess mask
-        if not isinstance(mask_image, paddle.Tensor):
+        if isinstance(mask_image, PIL.Image.Image):
             mask_image = mask_image.resize((width, height))
             mask_image = preprocess_mask(mask_image)
+
         mask_image = mask_image.astype(latents_dtype)
         mask = paddle.concat([mask_image] * batch_size * num_images_per_prompt)
 
@@ -1236,6 +1251,8 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         ])
 
         # add noise to latents using the timesteps
+        if seed is not None:
+            paddle.seed(seed)
         noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
         init_latents = self.scheduler.add_noise(init_latents, noise, timesteps)
 

@@ -650,6 +650,7 @@ python finetune.py  \
     --per_device_train_batch_size  16 \
     --num_train_epochs 100 \
     --learning_rate 1e-5 \
+    --label_names 'start_positions' 'end_positions' \
     --do_train \
     --do_eval \
     --do_export \
@@ -686,6 +687,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --do_eval \
     --do_export \
     --export_model_dir $finetuned_model \
+    --label_names 'start_positions' 'end_positions' \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
@@ -837,7 +839,7 @@ python evaluate.py \
 
 <a name="模型压缩"></a>
 
-#### 4.7 模型压缩
+#### 4.7 模型压缩(**可选**，GPU设备可以跳过该步骤，CPU机器设备可以看4.8部分看硬件是否支持)
 
 模型压缩功能使用的是 PaddleNLP [模型压缩 API](../../docs/compression.md)，文档可[点此](../../docs/compression.md)查看。模型压缩主要用于有模型部署上线需求的场景，可以进一步压缩模型体积、加快推理速度、减少内存占用。
 
