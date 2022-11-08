@@ -23,11 +23,11 @@ def ppdiffusers_bos_download(pretrained_model_name_or_path,
     cache_dir = pretrained_model_name_or_path if os.path.isdir(
         pretrained_model_name_or_path) else os.path.join(
             PPDIFFUSERS_CACHE, pretrained_model_name_or_path)
-    url = os.path.join(DOWNLOAD_SERVER, pretrained_model_name_or_path)
+    url = DOWNLOAD_SERVER + "/" + pretrained_model_name_or_path
     if subfolder is not None:
-        url = os.path.join(url, subfolder)
+        url = url + "/" + subfolder
         cache_dir = os.path.join(cache_dir, subfolder)
     if filename is not None:
-        url = os.path.join(url, filename)
+        url = url + "/" + filename
     file_path = get_path_from_url(url, cache_dir)
     return file_path

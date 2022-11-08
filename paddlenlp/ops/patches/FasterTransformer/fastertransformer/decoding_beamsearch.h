@@ -275,8 +275,8 @@ public:
     }
 
     size_t lm_head_buffer_size = (prefix_lm)
-                                     ? decoder_normed_result_buffer_size
-                                     : decoder_normed_result_buffer_size * 3;
+                                     ? decoder_normed_result_buffer_size * 3
+                                     : decoder_normed_result_buffer_size;
 
     size_t datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +

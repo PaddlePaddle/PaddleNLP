@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pip import main
+data = []
+for index in range(60000):
+    data.append("/data/laion400m/part-{:05}.gz\n".format(index))
+
+with open("laion400m_en.filelist", "w") as w:
+    w.writelines(data)
