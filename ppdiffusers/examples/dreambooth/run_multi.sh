@@ -21,7 +21,8 @@ python -u train_dreambooth.py \
   --instance_data_dir=$INSTANCE_DIR \
   --output_dir=$OUTPUT_DIR \
   --instance_prompt="a photo of sks dog" \
-  --resolution=512 \
+  --height=512 \
+  --width=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
   --learning_rate=5e-6 \
