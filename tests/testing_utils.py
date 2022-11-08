@@ -27,7 +27,6 @@ class PaddleNLPModelTest(unittest.TestCase):
 
     def tearDown(self):
         gc.collect()
-        return
 
 
 def get_vocab_list(vocab_path):

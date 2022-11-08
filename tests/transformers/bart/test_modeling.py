@@ -443,9 +443,6 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         np.random.seed(128)
         paddle.seed(128)
 
-    def tearDown(self):
-        gc.collect()
-
     def test_decoder_model_past_with_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_decoder_model_past_large_inputs(
