@@ -12,21 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import annotations
 import unittest
 import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    RobertaPretrainedModel,
-    RobertaForCausalLM,
-    RobertaForMaskedLM,
-    RobertaForMultipleChoice,
-    RobertaForQuestionAnswering,
-    RobertaForSequenceClassification,
-    RobertaForTokenClassification,
-    RobertaModel,
-)
+    RobertaPretrainedModel, RobertaForCausalLM, RobertaForMaskedLM,
+    RobertaForMultipleChoice, RobertaForQuestionAnswering,
+    RobertaForSequenceClassification, RobertaForTokenClassification,
+    RobertaModel, RobertaConfig)
 
 from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
@@ -36,8 +31,8 @@ ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
 
 class RobertaModelTester:
 
-    def __init__(self, parent):
-        self.parent = parent
+    def __init__(self, parent: RobertaModelTest):
+        self.parent: RobertaModelTest = parent
         self.batch_size = 13
         self.seq_length = 7
         self.is_training = True
@@ -61,6 +56,7 @@ class RobertaModelTester:
         self.cls_token_id = 101
         self.num_labels = 3
         self.num_choices = 4
+        self.dropout = 0.56
         self.scope = None
 
     def prepare_config_and_inputs(self):
@@ -91,22 +87,23 @@ class RobertaModelTester:
         return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "pad_token_id": 0,
-            "layer_norm_eps": 1e-12,
-            "cls_token_id": 101,
-        }
+        return RobertaConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            pad_token_id=0,
+            layer_norm_eps=1e-12,
+            cls_token_id=101,
+            num_labels=self.num_labels,
+        )
 
     def prepare_config_and_inputs_for_decoder(self):
         (
@@ -139,8 +136,10 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaModel(**config)
+
+        model = RobertaModel(config)
         model.eval()
+
         result = model(input_ids,
                        attention_mask=input_mask,
                        token_type_ids=token_type_ids,
@@ -166,7 +165,7 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForCausalLM(RobertaModel(**config))
+        model = RobertaForCausalLM(config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
@@ -192,7 +191,7 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForMaskedLM(RobertaModel(**config))
+        model = RobertaForMaskedLM(config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
@@ -219,9 +218,8 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForTokenClassification(RobertaModel(**config),
-                                              num_classes=self.num_labels,
-                                              dropout=None)
+
+        model = RobertaForTokenClassification(config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
@@ -248,8 +246,7 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForSequenceClassification(RobertaModel(**config),
-                                                 num_classes=self.num_labels)
+        model = RobertaForSequenceClassification(config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
@@ -275,7 +272,8 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForMultipleChoice(RobertaModel(**config))
+
+        model = RobertaForMultipleChoice(config)
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
             [-1, self.num_choices, -1])
@@ -307,7 +305,8 @@ class RobertaModelTester:
         token_labels,
         choice_labels,
     ):
-        model = RobertaForQuestionAnswering(RobertaModel(**config))
+
+        model = RobertaForQuestionAnswering(config)
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,

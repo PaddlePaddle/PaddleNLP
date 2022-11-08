@@ -72,7 +72,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.prophetnet.modeling.ProphetNetEncoder:4
 msgid ""
-"word_embeddings  (:obj:`torch.nn.Embeddings` of shape "
+"word_embeddings  (:obj:`paddle.nn.Embeddings` of shape "
 ":obj:`(config.vocab_size, config.hidden_size)`, `optional`):"
 msgstr ""
 

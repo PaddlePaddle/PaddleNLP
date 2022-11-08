@@ -19,6 +19,11 @@
 
 本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想接入自己训练的模型，可以参考[Neural Search的流程](./Neural_Search.md)。
 
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+</div>
+
+
 ### 2.1 系统特色
 
 + 端到端
