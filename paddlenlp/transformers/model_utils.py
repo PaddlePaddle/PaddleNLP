@@ -576,7 +576,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 dtype = str(v.dtype)[dtype_prefix_len:]
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
-                state_to_load[k] = state_to_load[k].astype(dtype)
+                state_to_load[k] = paddle.cast(state_to_load[k], dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
