@@ -18,7 +18,7 @@ import tempfile
 import unittest
 import gc
 
-from tests.testing_utils import slow
+from tests.testing_utils import slow, PaddleNLPModelTest
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
@@ -224,7 +224,7 @@ class MBartModelTester:
     [True],
 ])
 class MBartModelTest(ModelTesterMixin, GenerationTesterMixin,
-                     unittest.TestCase):
+                     PaddleNLPModelTest):
     base_model_class = MBartModel
 
     all_model_classes = (MBartModel, MBartForConditionalGeneration,
@@ -280,7 +280,7 @@ def _long_tensor(tok_lst):
     return paddle.to_tensor(tok_lst, dtype="int64")
 
 
-class AbstractSeq2SeqIntegrationTest(unittest.TestCase):
+class AbstractSeq2SeqIntegrationTest(PaddleNLPModelTest):
     maxDiff = 1000  # longer string compare tracebacks
     checkpoint_name = None
 
@@ -319,7 +319,6 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
 
     @slow
     def test_enro_generate_one(self):
-        gc.collect
         batch = self.tokenizer(
             ["UN Chief Says There Is No Military Solution in Syria"],
             return_tensors="pd",
@@ -332,7 +331,6 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
 
     @slow
     def test_enro_generate_batch(self):
-        gc.collect()
         batch = self.tokenizer(self.src_text,
                                return_tensors="pd",
                                padding=True,
@@ -389,7 +387,6 @@ class MBartCC25IntegrationTest(AbstractSeq2SeqIntegrationTest):
 
     @slow
     def test_fill_mask(self):
-        gc.collect()
         inputs = self.tokenizer(["One of the best <mask> I ever read!"],
                                 return_tensors="pd")
         model = self.model()
@@ -664,7 +661,7 @@ class MBartStandaloneDecoderModelTester:
     [True, True],
 ])
 class MBartStandaloneDecoderModelTest(ModelTesterMixin, GenerationTesterMixin,
-                                      unittest.TestCase):
+                                      PaddleNLPModelTest):
     base_model_class = MBartModel
 
     all_model_classes = ()
