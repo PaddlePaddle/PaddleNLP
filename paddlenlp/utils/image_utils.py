@@ -432,7 +432,6 @@ class DocParser(object):
     def parse_docx(self, docx):
         """
         parse docx
-        Args:
         """
         _docx = self.read_docx(docx)
         from docx.document import Document
@@ -487,40 +486,6 @@ class DocParser(object):
         if buff and file_like:
             return BytesIO(buff)
         return buff
-
-    @classmethod
-    def write_image(self,
-                    image,
-                    save_path=None,
-                    return_pil_image=False,
-                    format=None,
-                    max_size=None):
-        """write image with PIL"""
-        img_show = self.read_image(image, use_cv2=False)
-        w, h = img_show.width, img_show.height
-        if max_size and max(w, h) > max_size:
-            if max(w, h) == h:
-                new_size = (int(w * max_size / h), max_size)
-            else:
-                new_size = (max_size, int(h * max_size / w))
-            img_show = img_show.resize(new_size)
-        if save_path:
-            dir_path = os.path.dirname(save_path)
-            if dir_path and not os.path.isdir(dir_path):
-                os.makedirs(dir_path)
-            img_show.save(save_path)
-            if return_pil_image:
-                return img_show
-        elif return_pil_image:
-            return img_show
-        else:
-            buff = BytesIO()
-            if format is None:
-                format = 'jpeg'
-            if format.lower() == 'jpg':
-                format = 'jpeg'
-            img_show.save(buff, format=format, quality=90)
-            return buff
 
     @classmethod
     def read_image(self, image, use_cv2=True):

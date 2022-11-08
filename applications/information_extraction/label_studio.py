@@ -128,33 +128,32 @@ class Convertor(object):
             return offsets
 
         items = {}
+        img_file = os.path.basename(line['data']['image'])
+        p = img_file.find("-")
+        img_file = img_file[p + 1:]
+        img_path = os.path.join("./data/images", img_file)
+        if not os.path.exists(img_path):
+            logger.warning("Image file %s not existed in %s" %
+                           (img_file, "./data/images"))
+        logger.info("Parsing image file %s ..." % (img_file))
+        doc_parser = DocParser()
+        image = doc_parser.read_image(img_path)
+        img_w, img_h = image.shape[1], image.shape[0]
+        parsed_doc = doc_parser.parse({'image': image})
+        text = ''
+        boxes = []
+        for seg in parsed_doc['layout']:
+            box = doc_parser._normalize_box(seg[0], [img_w, img_h],
+                                            [1000, 1000])
+            text += seg[1]
+            boxes.extend([box] * len(seg[1]))
+        assert len(text) == len(
+            boxes), "len of text is not equal to len of boxes"
+        items['text'] = text
+        items['boxes'] = boxes
+        items['image'] = np2base64(parsed_doc['image'])
+
         if task_type == "ext":
-            img_file = os.path.basename(line['data']['image'])
-            p = img_file.find("-")
-            img_file = img_file[p + 1:]
-            img_path = os.path.join("./data/images", img_file)
-            if not os.path.exists(img_path):
-                logger.warning("Image file %s not existed in %s" %
-                               (img_file, "./data/images"))
-            logger.info("Parsing image file %s ..." % (img_file))
-
-            doc_parser = DocParser()
-            image = doc_parser.read_image(img_path)
-            img_w, img_h = image.shape[1], image.shape[0]
-            parsed_doc = doc_parser.parse({'image': image})
-            text = ''
-            boxes = []
-            for seg in parsed_doc['layout']:
-                box = doc_parser._normalize_box(seg[0], [img_w, img_h],
-                                                [1000, 1000])
-                text += seg[1]
-                boxes.extend([box] * len(seg[1]))
-            assert len(text) == len(
-                boxes), "len of text is not equal to len of boxes"
-
-            items['text'] = text
-            items['boxes'] = boxes
-            items['image'] = np2base64(parsed_doc['image'])
             items['entities'] = []
             items['relations'] = []
 
@@ -199,7 +198,8 @@ class Convertor(object):
                         r['labels'][0]
                     })
         else:
-            pass
+            items['label'] = line['annotations'][0]['result'][0]['value'][
+                'choices']
         return items
 
     def convert_cls_examples(self, raw_examples):
@@ -210,9 +210,19 @@ class Convertor(object):
         logger.info(f"Converting doccano data...")
         with tqdm(total=len(raw_examples)) as pbar:
             for line in raw_examples:
-                items = self.process_text_tag(line, task_type="cls")
+                if self.anno_type == "text":
+                    items = self.process_text_tag(line, task_type="cls")
+                    image, boxes = None, None
+                elif self.anno_type == "image":
+                    items = self.process_image_tag(line, task_type="cls")
+                    image, boxes = items['image'], items['boxes']
+                else:
+                    raise ValueError(
+                        "The type of annotation should be text or image")
                 text, labels = items["text"], items["label"]
-                example = self.generate_cls_example(text, labels)
+                example = self.generate_cls_example(text, labels,
+                                                    self.prompt_prefix,
+                                                    self.options, image, boxes)
                 examples.append(example)
         return examples
 
@@ -265,6 +275,7 @@ class Convertor(object):
 
                 if self.anno_type == "text":
                     items = self.process_text_tag(line, task_type="ext")
+                    image, boxes = None, None
                 elif self.anno_type == "image":
                     items = self.process_image_tag(line, task_type="ext")
                     image, boxes = items['image'], items['boxes']
@@ -304,7 +315,7 @@ class Convertor(object):
                     if entity_cls_label is not None:
                         entity_cls_example = self.generate_cls_example(
                             text, entity_cls_label, entity_cls_prompt_prefix,
-                            self.options)
+                            self.options, image, boxes)
 
                         entity_cls_examples.append(entity_cls_example)
 
@@ -515,7 +526,13 @@ class Convertor(object):
                 ]
         return all_entity_examples + all_relation_examples + entity_cls_examples
 
-    def generate_cls_example(self, text, labels, prompt_prefix, options):
+    def generate_cls_example(self,
+                             text,
+                             labels,
+                             prompt_prefix,
+                             options,
+                             image=None,
+                             boxes=None):
         random.shuffle(self.options)
         cls_options = ",".join(self.options)
         prompt = self.prompt_prefix + "[" + cls_options + "]"
@@ -526,6 +543,9 @@ class Convertor(object):
             "result_list": result_list,
             "prompt": prompt
         }
+        if image and boxes:
+            example['image'] = image
+            example['boxes'] = boxes
         for label in labels:
             start = prompt.rfind(label) - len(prompt) - 1
             end = start + len(label)
