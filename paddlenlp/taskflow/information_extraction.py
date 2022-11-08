@@ -26,8 +26,7 @@ from ..datasets import load_dataset
 from ..transformers import AutoTokenizer, AutoModel
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
 from ..utils.image_utils import (
-    expand_img_to_a4_size,
-    pil2base64,
+    DocParser,
     ResizeImage,
     Permute,
     NormalizeImage,
@@ -109,6 +108,7 @@ norm_func = NormalizeImage(is_channel_first=False,
                            mean=[123.675, 116.280, 103.530],
                            std=[58.395, 57.120, 57.375])
 permute_func = Permute(to_bgr=False)
+doc_parser = DocParser()
 
 
 class UIETask(Task):
@@ -585,7 +585,6 @@ class UIETask(Task):
 
             def _process_bbox(tokens, bbox_lines, offset_mapping, offset_bias):
                 bbox_list = [[0, 0, 0, 0] for x in range(len(tokens))]
-                prev_bbox = [0, 0, 0, 0]
 
                 for index, bbox in enumerate(bbox_lines):
                     index_token = map_offset(index + offset_bias,
@@ -958,7 +957,7 @@ class UIETask(Task):
                     ocr_result = ocr_result[0] if len(
                         ocr_result) == 1 else ocr_result
 
-                    image, offset_x, offset_y = expand_img_to_a4_size(
+                    image, offset_x, offset_y = doc_parser.expand_image_to_a4_size(
                         image, center=True)
 
                     content = u""
@@ -978,26 +977,6 @@ class UIETask(Task):
                         "bboxes": bboxes,
                         "image": d['doc']
                     })
-
-                    # image_path = d['doc']
-                    # ocr_result = self._ocr.ocr(image_path, cls=True)
-                    # ocr_result = ocr_result[0] if len(
-                    #     ocr_result) == 1 else ocr_result
-                    # image_type = imghdr.what(image_path)
-                    # content = u""
-                    # bboxes = []
-                    # image, offset_x, offset_y = expand_img_to_a4_size(image_path, center=True)
-                    # image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-                    # base64_str, image_size = pil2base64(image, image_type=image_type, size=True)
-
-                    # for sub_res in ocr_result:
-                    #     word = sub_res[1][0]
-                    #     source_bbox = sub_res[0]
-                    #     bbox = source_bbox[0] + source_bbox[2]
-                    #     bbox = _normalize_bbox([bbox[0]+offset_x, bbox[1]+offset_y, bbox[2]+offset_x, bbox[3]+offset_y], image_size)
-                    #     bboxes.extend([bbox for word_index in range(len(word))])
-                    #     content+=word
-                    # _inputs.append({"text": content, "bboxes": bboxes, "image": base64_str})
                 else:
                     _inputs.append({
                         "text": d['text'],

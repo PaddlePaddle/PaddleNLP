@@ -57,7 +57,7 @@ label-studio start
     <img src=https://user-images.githubusercontent.com/40840292/199661377-d9664165-61aa-4462-927d-225118b8535b.png height=230 width=1200 />
 </div>
 
-- **命名实体识别、关系抽取、事件抽取、实体/评价维度级分类**任务选择``Relation Extraction`。
+- **命名实体识别、关系抽取、事件抽取、实体/评价维度分类**任务选择``Relation Extraction`。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199661638-48a870eb-a1df-4db5-82b9-bc8e985f5190.png height=350 width=1200 />
@@ -191,7 +191,7 @@ schema = {
 schema = '情感倾向[正向，负向]'
 ```
 
-- 实体/评价维度级分类
+- 实体/评价维度分类
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199879586-8c6e4826-a3b0-49e0-9920-98ca062dccff.png height=240 width=1200 />
@@ -248,9 +248,9 @@ python label_studio.py \
     --options "正向" "负向"
 ```
 
-- 实体/评价维度级分类任务
+- 实体/评价维度分类任务
 
-在数据转换阶段，我们会自动构造用于模型训练的prompt信息。例如评价维度级情感分类中，prompt为``XXX的情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
+在数据转换阶段，我们会自动构造用于模型训练的prompt信息。例如评价维度情感分类中，prompt为``XXX的情感倾向[正向,负向]``，可以通过`prompt_prefix`和`options`参数进行声明。
 
 ```shell
 python label_studio.py \
@@ -279,7 +279,7 @@ python label_studio.py \
     <img src=https://user-images.githubusercontent.com/40840292/199445809-1206f887-2782-459e-9001-fbd790d59a5e.png height=300 width=1200 />
 </div>
 
-- **命名实体识别、关系抽取、事件抽取、实体/评价维度级分类**任务选择``Object Detection with Bounding Boxes`
+- **命名实体识别、关系抽取、事件抽取、实体/评价维度分类**任务选择``Object Detection with Bounding Boxes`
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199660090-d84901dd-001d-4620-bffa-0101a4ecd6e5.png height=400 width=1200 />
@@ -427,6 +427,17 @@ python label_studio.py \
     --task_type ext
 ```
 
+- 文档分类任务
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --task_type cls \
+    --prompt_prefix "文档类别" \
+    --options "发票" "报关单"
+```
 
 <a name="4"></a>
 
@@ -441,7 +452,7 @@ python label_studio.py \
 - ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
-- ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+- ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度分类任务有效。默认为"##"。
 
 备注：
 - 默认情况下 [label_studio.py](./label_studio.py) 脚本会按照比例将数据划分为 train/dev/test 数据集

@@ -31,6 +31,7 @@ from PIL import Image
 from io import BytesIO
 import numpy as np
 import requests
+import cv2
 from .log import logger
 
 
@@ -260,6 +261,436 @@ class PadBatch(BaseOperator):
         return samples
 
 
+class DocParser(object):
+    """DocParser"""
+
+    def __init__(self,
+                 ocr_model_config='PP-OCRv3',
+                 pdf_parser_config=None,
+                 use_gpu=None,
+                 device_id=None):
+        self.ocr_model_config = ocr_model_config
+        self.use_angle_cls = False
+        if isinstance(ocr_model_config, dict):
+            self.use_angle_cls = ocr_model_config.get('use_angle_cls', False)
+        self.pdf_parser_config = pdf_parser_config
+        self.ocr_infer_model = None
+        self.use_gpu = use_gpu
+        self.device_id = device_id
+
+    def parse(self, inputs, keep_whitespace=True, expand_to_a4_size=True):
+        """
+        parse
+        """
+        is_single = False
+        if not isinstance(inputs, list):
+            inputs = [inputs]
+            is_single = True
+        outputs = []
+        for i, d in enumerate(inputs):
+            if not isinstance(d, dict) or 'layout' in d:
+                outputs.append(d)
+                continue
+            if 'image' in d:
+                layout, image = self.ocr(d['image'],
+                                         keep_whitespace=keep_whitespace,
+                                         expand_to_a4_size=expand_to_a4_size,
+                                         return_cv2_image=True)
+                d = {k: v for k, v in d.items() if k != 'image'}
+                d['layout'] = layout
+                d['image'] = image
+                outputs.append(d)
+            elif 'pdf' in d:
+                _id = str(random.randint(0, 1e9)) + str(i)
+                layouts = self.parse_pdf(d['pdf'],
+                                         pages=d.get('pages'),
+                                         password=d.get('password'),
+                                         return_cv2_image=True,
+                                         return_page_num=True)
+                for layout, image, page_num in layouts:
+                    d = {k: v for k, v in d.items() if k != 'pdf'}
+                    d.setdefault('_id', _id)
+                    d['layout'] = layout
+                    d['image'] = image
+                    d['page_num'] = page_num
+                    outputs.append(d)
+            elif 'docx' in d:
+                d = {k: v for k, v in d.items() if k != 'pdf'}
+                d['text'] = self.parse_docx(d['docx'])
+                outputs.append(d)
+        if is_single and len(outputs) == 1:
+            return outputs[0]
+        return outputs
+
+    def __call__(self, *args, **kwargs):
+        """
+        call parse
+        """
+        return self.parse(*args, **kwargs)
+
+    def ocr(self,
+            image,
+            det=True,
+            rec=True,
+            cls=None,
+            keep_whitespace=True,
+            expand_to_a4_size=False,
+            return_cv2_image=False):
+        """
+        call ocr for an image
+        """
+        if self.ocr_infer_model is None:
+            self.init_ocr_inference()
+        _image = self.read_image(image)
+        if expand_to_a4_size:
+            _image, _, _ = self.expand_image_to_a4_size(_image)
+        if cls is None:
+            cls = self.use_angle_cls
+        ocr_res = self.ocr_infer_model.ocr(_image, det, rec, cls)
+        layout = []
+        if not ocr_res:
+            return layout
+        for segment in ocr_res:
+            box = segment[0]
+            box = [
+                min(box[0][0], box[3][0]),  # x1
+                min(box[0][1], box[1][1]),  # y1
+                max(box[1][0], box[2][0]),  # x2
+                max(box[2][1], box[3][1]),  # y2
+            ]
+            text = segment[1][0]
+            if not keep_whitespace:
+                text = text.replace(' ', '')
+            layout.append((box, text, segment[1][1]))
+        layout = self._adjust_layout(layout)
+        if return_cv2_image:
+            return layout, _image
+        return layout
+
+    def parse_pdf(self,
+                  pdf,
+                  pages=None,
+                  password=None,
+                  keep_whitespace=True,
+                  return_cv2_image=False,
+                  return_page_num=False):
+        """
+        call parser for a pdf
+        """
+        pdf_doc = self.read_pdf(pdf, password)
+        pages = pages if pages is not None else list(range(pdf_doc.page_count))
+        if isinstance(pages, int):
+            pages = [pages]
+        layouts = []
+        for i in pages:
+            layout = []
+            if i >= pdf_doc.page_count:
+                continue
+            page = pdf_doc.load_page(i)
+            page_dict = page.get_text('dict', sort=True)
+            w, h = page_dict['width'], page_dict['height']
+            has_fullpage_image = False
+            for block in page_dict['blocks']:
+                if block['type'] == 0:
+                    for line in block['lines']:
+                        spans = []
+                        for span in line['spans']:
+                            text, box = span['text'].rstrip(), span['bbox']
+                            if not keep_whitespace:
+                                text = text.replace(' ', '')
+                            if not text:
+                                continue
+                            if spans and box[0] - spans[-1][0][
+                                    2] < span['size'] / 2:
+                                box = (spans[-1][0][0], spans[-1][0][1], box[2],
+                                       box[3])
+                                text = spans[-1][1] + text
+                                spans.pop()
+                            spans.append((box, text))
+                        layout.extend(spans)
+                else:
+                    box = block['bbox']
+                    if box[2] - box[0] > w * 0.8 and box[3] - box[1] > h * 0.8:
+                        has_fullpage_image = True
+            image = None
+            if not layout and has_fullpage_image:
+                image = self.get_page_image(page, use_cv2=True)
+                layout = self.ocr(image, keep_whitespace)
+            items = [layout]
+            if return_cv2_image:
+                if image is None:
+                    image = self.get_page_image(page, use_cv2=True)
+                items.append(image)
+            if return_page_num:
+                items.append(i)
+            if len(items) > 1:
+                layouts.append(items)
+            else:
+                layouts.append(items[0])
+        return layouts
+
+    def parse_docx(self, docx):
+        """
+        parse docx
+        Args:
+        """
+        _docx = self.read_docx(docx)
+        from docx.document import Document
+        from docx.table import Table, _Cell
+        from docx.text.paragraph import Paragraph
+        from docx.shape import InlineShape, InlineShapes
+        from docx import oxml
+
+        def _iter_blocks(part):
+            import docx
+            element = None
+            if isinstance(part, Document):
+                element = part.element.body
+            elif isinstance(part, _Cell):
+                element = part._tc
+            for child in element.iterchildren():
+                if isinstance(child, oxml.text.paragraph.CT_P):
+                    yield Paragraph(child, part)
+                if isinstance(child, oxml.table.CT_Tbl):
+                    yield Table(child, part)
+                if isinstance(child, oxml.shape.CT_Picture):
+                    yield InlineShape(child)
+
+        text = ''
+        for block in _iter_blocks(_docx):
+            if isinstance(block, Paragraph):
+                block_text = block.text.strip()
+                if block_text:
+                    text += block_text + '\n'
+            elif isinstance(block, Table):
+                # TODO
+                pass
+            elif isinstance(block, InlineShape):
+                # TODO
+                pass
+        return text
+
+    @classmethod
+    def _get_buffer(self, data, file_like=False):
+        buff = None
+        if len(data) < 1024:
+            if os.path.exists(data):
+                buff = open(data, 'rb').read()
+            elif data.startswith('http'):
+                from .utils.downloader import download
+                buff = download(data)
+        if buff is None:
+            try:
+                buff = base64.b64decode(data)
+            except:
+                pass
+        if buff and file_like:
+            return BytesIO(buff)
+        return buff
+
+    @classmethod
+    def write_image(self,
+                    image,
+                    save_path=None,
+                    return_pil_image=False,
+                    format=None,
+                    max_size=None):
+        """write image with PIL"""
+        img_show = self.read_image(image, use_cv2=False)
+        w, h = img_show.width, img_show.height
+        if max_size and max(w, h) > max_size:
+            if max(w, h) == h:
+                new_size = (int(w * max_size / h), max_size)
+            else:
+                new_size = (max_size, int(h * max_size / w))
+            img_show = img_show.resize(new_size)
+        if save_path:
+            dir_path = os.path.dirname(save_path)
+            if dir_path and not os.path.isdir(dir_path):
+                os.makedirs(dir_path)
+            img_show.save(save_path)
+            if return_pil_image:
+                return img_show
+        elif return_pil_image:
+            return img_show
+        else:
+            buff = BytesIO()
+            if format is None:
+                format = 'jpeg'
+            if format.lower() == 'jpg':
+                format = 'jpeg'
+            img_show.save(buff, format=format, quality=90)
+            return buff
+
+    @classmethod
+    def read_image(self, image, use_cv2=True):
+        """
+        read image to cv2 (np.ndarray) or PIL.Image
+        input support:
+            base64
+            filepath
+            url
+            np.ndarray
+            PIL
+        """
+        PIL_Image = None
+        try:
+            from PIL import Image
+            PIL_Image = Image.Image
+        except:
+            logger.warning("Failed to import PIL ...")
+        if isinstance(image, np.ndarray):
+            # cv2 input
+            _image = image
+            if len(image.shape) == 3 and not use_cv2:
+                _image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            return _image
+        elif PIL_Image and isinstance(image, PIL_Image):
+            _image = image
+            if use_cv2:
+                _image = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+            return _image
+        image_buff = self._get_buffer(image)
+        if not image_buff:
+            logger.warning("Failed to read image: %s...", image[:32])
+            return None
+        if use_cv2:
+            _image = cv2.imdecode(np.frombuffer(image_buff, np.uint8),
+                                  cv2.IMREAD_COLOR)
+        else:
+            from PIL import Image
+            _image = Image.open(BytesIO(image_buff))
+        return _image
+
+    @classmethod
+    def read_pdf(self, pdf, password=None):
+        """
+        read pdf
+        """
+        try:
+            import fitz
+        except ImportError:
+            raise RuntimeError(
+                "Need PyMuPDF to process pdf input. "
+                "Please install module by: python3 -m pip install pymupdf")
+        if isinstance(pdf, fitz.Document):
+            return pdf
+        pdf_buff = self._get_buffer(pdf)
+        if not pdf_buff:
+            logger.warning("Failed to read pdf: %s...", pdf[:32])
+            return None
+        pdf_doc = fitz.Document(stream=pdf_buff)
+        if pdf_doc.needs_pass:
+            if pdf_doc.authenticate(password) == 0:
+                raise ValueError("The password of pdf is incorrect.")
+        return pdf_doc
+
+    @classmethod
+    def get_page_image(self, page, use_cv2=False):
+        """
+        get page image
+        """
+        pix = page.get_pixmap()
+        image_buff = pix.pil_tobytes('jpeg', optimize=True)
+        if use_cv2:
+            return cv2.imdecode(np.frombuffer(image_buff, np.uint8),
+                                cv2.IMREAD_COLOR)
+        else:
+            return Image.open(BytesIO(image_buff))
+
+    @classmethod
+    def read_docx(self, docx):
+        """
+        read docx
+        """
+        try:
+            import docx as pydocx
+        except ImportError:
+            raise RuntimeError(
+                "Need python-docx to process docx input. "
+                "Please install module by: python3 -m pip install python-docx")
+        if isinstance(docx, pydocx.document.Document):
+            return docx
+        docx_buff = self._get_buffer(docx, file_like=True)
+        if not docx_buff:
+            logger.warning("failed to read docx: %s...", docx[:32])
+            return None
+        return pydocx.Document(docx_buff)
+
+    def init_ocr_inference(self):
+        """
+        init ocr inference
+        """
+        if self.ocr_infer_model is not None:
+            logger.warning("ocr model has already been initialized")
+            return
+        try:
+            from paddleocr import PaddleOCR
+        except ImportError:
+            raise RuntimeError(
+                "Need paddleocr to process image input. "
+                "Please install module by: python3 -m pip install paddleocr")
+
+        if isinstance(self.ocr_model_config, dict):
+            self.ocr_infer_model = PaddleOCR(**self.ocr_model_config)
+        else:
+            self.ocr_infer_model = PaddleOCR(ocr_version=self.ocr_model_config,
+                                             show_log=False)
+
+    @classmethod
+    def _normalize_box(self, box, old_size, new_size, offset_x=0, offset_y=0):
+        """normalize box"""
+        return [
+            int((box[0] + offset_x) * new_size[0] / old_size[0]),
+            int((box[1] + offset_y) * new_size[1] / old_size[1]),
+            int((box[2] + offset_x) * new_size[0] / old_size[0]),
+            int((box[3] + offset_y) * new_size[1] / old_size[1]),
+        ]
+
+    @classmethod
+    def expand_image_to_a4_size(self, image, center=False):
+        """expand cv2 image to a4 size"""
+        h, w = image.shape[:2]
+        offset_x, offset_y = 0, 0
+        if h * 1.0 / w >= 1.42:
+            exp_w = int(h / 1.414 - w)
+            if center:
+                offset_x = int(exp_w / 2)
+                exp_img = np.zeros((h, offset_x, 3), dtype='uint8')
+                exp_img.fill(255)
+                image = np.hstack([exp_img, image, exp_img])
+            else:
+                exp_img = np.zeros((h, exp_w, 3), dtype='uint8')
+                exp_img.fill(255)
+                image = np.hstack([image, exp_img])
+        elif h * 1.0 / w <= 1.40:
+            exp_h = int(w * 1.414 - h)
+            if center:
+                offset_y = int(exp_h / 2)
+                exp_img = np.zeros((offset_y, w, 3), dtype='uint8')
+                exp_img.fill(255)
+                image = np.vstack([exp_img, image, exp_img])
+            else:
+                exp_img = np.zeros((exp_h, w, 3), dtype='uint8')
+                exp_img.fill(255)
+                image = np.vstack([image, exp_img])
+        return image, offset_x, offset_y
+
+    @classmethod
+    def _adjust_layout(self, layout):
+        """adjust layout"""
+        adj_layout = []
+        for i in range(len(layout)):
+            xi1, yi1, xi2, yi2 = layout[i][0]
+            j = -1
+            for j in range(len(adj_layout) - 1, -1, -1):
+                xj1, yj1, xj2, yj2 = layout[j][0]
+                if xi2 > xj1 or yi1 > yj1 + (yj2 - yj1) * 0.6:
+                    break
+            adj_layout.insert(j + 1, layout[i])
+        return adj_layout
+
+
 def load_image(image):
     """
     Convert path/url input to base64
@@ -297,6 +728,12 @@ def img2base64(img_path):
     return base64_str
 
 
+def np2base64(image_np):
+    img = Image.fromarray(image_np)
+    base64_str = pil2base64(img)
+    return base64_str
+
+
 def pil2base64(image, image_type=None, size=False):
     if not image_type:
         image_type = "JPEG"
@@ -312,69 +749,6 @@ def pil2base64(image, image_type=None, size=False):
         return base64_string, image.size
     else:
         return base64_string
-
-
-# def expand_img_to_a4_size(image, center=False):
-#     """expand image to a4 size"""
-#     import cv2
-#     image = cv2.imread(image)
-
-#     # image = np.array(Image.open(image).convert("RGB"))
-
-#     h, w = image.shape[:2]
-#     offset_x, offset_y = 0, 0
-#     if h * 1.0 / w >= 1.42:
-#         exp_w = int(h / 1.414 - w)
-#         if center:
-#             offset_x = int(exp_w / 2)
-#             exp_img = np.zeros((h, offset_x, 3), dtype='uint8')
-#             exp_img.fill(255)
-#             image = np.hstack([exp_img, image, exp_img])
-#         else:
-#             exp_img = np.zeros((h, exp_w, 3), dtype='uint8')
-#             exp_img.fill(255)
-#             image = np.hstack([image, exp_img])
-#     elif h * 1.0 / w <= 1.40:
-#         exp_h = int(w * 1.414 - h)
-#         if center:
-#             offset_y = int(exp_h / 2)
-#             exp_img = np.zeros((offset_y, w, 3), dtype='uint8')
-#             exp_img.fill(255)
-#             image = np.vstack([exp_img, image, exp_img])
-#         else:
-#             exp_img = np.zeros((exp_h, w, 3), dtype='uint8')
-#             exp_img.fill(255)
-#             image = np.vstack([image, exp_img])
-#     return image, offset_x, offset_y
-
-
-def expand_img_to_a4_size(image, center=False):
-    """expand image to a4 size"""
-    h, w = image.shape[:2]
-    offset_x, offset_y = 0, 0
-    if h * 1.0 / w >= 1.42:
-        exp_w = int(h / 1.414 - w)
-        if center:
-            offset_x = int(exp_w / 2)
-            exp_img = np.zeros((h, offset_x, 3), dtype='uint8')
-            exp_img.fill(255)
-            image = np.hstack([exp_img, image, exp_img])
-        else:
-            exp_img = np.zeros((h, exp_w, 3), dtype='uint8')
-            exp_img.fill(255)
-            image = np.hstack([image, exp_img])
-    elif h * 1.0 / w <= 1.40:
-        exp_h = int(w * 1.414 - h)
-        if center:
-            offset_y = int(exp_h / 2)
-            exp_img = np.zeros((offset_y, w, 3), dtype='uint8')
-            exp_img.fill(255)
-            image = np.vstack([exp_img, image, exp_img])
-        else:
-            exp_img = np.zeros((exp_h, w, 3), dtype='uint8')
-            exp_img.fill(255)
-            image = np.vstack([image, exp_img])
-    return image, offset_x, offset_y
 
 
 class Bbox(object):
