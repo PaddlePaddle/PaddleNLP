@@ -173,7 +173,8 @@ class NormalizeImage(BaseOperator):
     def __init__(self,
                  mean=[0.485, 0.456, 0.406],
                  std=[1, 1, 1],
-                 is_channel_first=True):
+                 is_channel_first=True,
+                 is_scale=False):
         """
         Args:
             mean (list): the pixel mean
@@ -184,6 +185,7 @@ class NormalizeImage(BaseOperator):
         self.mean = mean
         self.std = std
         self.is_channel_first = is_channel_first
+        self.is_scale = is_scale
         from functools import reduce
         if reduce(lambda x, y: x * y, self.std) == 0:
             raise ValueError('{}: std is invalid!'.format(self))
@@ -210,6 +212,8 @@ class NormalizeImage(BaseOperator):
                     else:
                         mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
                         std = np.array(self.std)[np.newaxis, np.newaxis, :]
+                    if self.is_scale:
+                        im = im / 255.0
                     im -= mean
                     im /= std
                     sample[k] = im

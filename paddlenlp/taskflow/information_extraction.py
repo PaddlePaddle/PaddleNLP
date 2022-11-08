@@ -105,8 +105,9 @@ usage = r"""
 
 resize_func = ResizeImage(target_size=224, interp=1)
 norm_func = NormalizeImage(is_channel_first=False,
-                           mean=[123.675, 116.280, 103.530],
-                           std=[58.395, 57.120, 57.375])
+                           is_scale=True,
+                           mean=[0.485, 0.456, 0.406],
+                           std=[0.229, 0.224, 0.225])
 permute_func = Permute(to_bgr=False)
 doc_parser = DocParser()
 
