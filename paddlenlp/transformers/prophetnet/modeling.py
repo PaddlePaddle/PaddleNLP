@@ -332,7 +332,7 @@ class ProphetNetAttention(Layer):
                                        batch_size)
 
         if is_cross_attention:
-            # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
+            # if cross_attention save Tuple(paddle.Tensor, paddle.Tensor) of all cross attention key/value_states.
             # Further calls to cross_attention layer can then reuse all cross-attention
             # key/value_states (first "if" case)
             # if encoder bi-directional self-attention `past_key_value` is always `None`
@@ -886,7 +886,7 @@ class ProphetNetDecoderLayer(Layer):
 
 class ProphetNetEncoder(ProphetNetPretrainedModel):
     r"""
-    word_embeddings  (:obj:`torch.nn.Embeddings` of shape :obj:`(config.vocab_size, config.hidden_size)`, `optional`):
+    word_embeddings  (:obj:`paddle.nn.Embeddings` of shape :obj:`(config.vocab_size, config.hidden_size)`, `optional`):
         The word embedding parameters. This can be used to initialize :class:`~transformers.ProphetNetEncoder` with
         pre-defined word embeddings instead of randomly initialized word embeddings.
     """

@@ -60,6 +60,7 @@ class PreProcessor(BasePreProcessor):
         split_by: str = "word",
         split_length: int = 200,
         split_overlap: int = 0,
+        split_answers: bool = False,
         split_respect_sentence_boundary: bool = True,
         language: str = "en",
     ):
@@ -93,6 +94,7 @@ class PreProcessor(BasePreProcessor):
             split_by=split_by,
             split_length=split_length,
             split_overlap=split_overlap,
+            split_answers=split_answers,
             split_respect_sentence_boundary=split_respect_sentence_boundary,
         )
 
@@ -110,6 +112,7 @@ class PreProcessor(BasePreProcessor):
         self.split_respect_sentence_boundary = split_respect_sentence_boundary
         self.language = iso639_to_nltk.get(language, language)
         self.print_log: Set[str] = set()
+        self.split_answers = split_answers
 
     def process(
         self,
@@ -160,6 +163,7 @@ class PreProcessor(BasePreProcessor):
         split_by: Optional[str] = None,
         split_length: Optional[int] = None,
         split_overlap: Optional[int] = None,
+        split_answers: Optional[int] = None,
         split_respect_sentence_boundary: Optional[bool] = None,
     ) -> List[dict]:
 
@@ -177,6 +181,8 @@ class PreProcessor(BasePreProcessor):
             split_overlap = self.split_overlap
         if split_respect_sentence_boundary is None:
             split_respect_sentence_boundary = self.split_respect_sentence_boundary
+        if (split_answers is None):
+            split_answers = self.split_answers
 
         cleaned_document = self.clean(
             document=document,
@@ -189,6 +195,7 @@ class PreProcessor(BasePreProcessor):
             split_by=split_by,
             split_length=split_length,
             split_overlap=split_overlap,
+            split_answers=split_answers,
             split_respect_sentence_boundary=split_respect_sentence_boundary,
         )
         return split_documents
@@ -240,6 +247,7 @@ class PreProcessor(BasePreProcessor):
         split_by: str,
         split_length: int,
         split_overlap: int,
+        split_answers: bool,
         split_respect_sentence_boundary: bool,
     ) -> List[dict]:
         """Perform document splitting on a single document. This method can split on different units, at different lengths,
@@ -303,7 +311,10 @@ class PreProcessor(BasePreProcessor):
                     text_splits.append(txt)
         else:
             # create individual "elements" of passage, sentence, or word
-            if split_by == "passage":
+            # Faq text need to split text by '\n' of a passage
+            if split_answers and split_by == "passage":
+                text_splits = text.split("\n")
+            elif split_by == "passage":
                 elements = text.split("\n\n")
             elif split_by == "sentence":
                 elements = nltk.tokenize.sent_tokenize(text,
@@ -316,25 +327,41 @@ class PreProcessor(BasePreProcessor):
                 )
 
             # concatenate individual elements based on split_length & split_stride
-            if split_overlap:
+            # FAQ text process don't need split text into fix lengths
+            if (not split_answers):
                 segments = windowed(elements,
                                     n=split_length,
                                     step=split_length - split_overlap)
-            else:
-                segments = windowed(elements, n=split_length, step=split_length)
-            text_splits = []
-            for seg in segments:
-                txt = " ".join([t for t in seg if t is not None])
-                if len(txt) > 0:
-                    text_splits.append(txt)
 
+                text_splits = []
+                for seg in segments:
+                    txt = " ".join([t for t in seg if t is not None])
+                    if len(txt) > 0:
+                        text_splits.append(txt)
         # create new document dicts for each text split
         documents = []
         for i, txt in enumerate(text_splits):
             doc = deepcopy(document)
             doc["content"] = txt
+
             if "meta" not in doc.keys() or doc["meta"] is None:
                 doc["meta"] = {}
+            if (split_answers):
+                text_arr = doc["content"].split('\t')
+                if (len(text_arr) > 2):
+                    raise Exception(
+                        "Each line text must be two columns and separated by \t"
+                    )
+                # Maybe empty lines
+                if (len(text_arr) == 1):
+                    logger.info(
+                        'Some lines in your text cannot parse into question and text, maybe empty lines'
+                    )
+                    continue
+                else:
+                    query, answer = text_arr
+                doc["content"] = query
+                doc["meta"]["answer"] = answer
             doc["meta"]["_split_id"] = i
             documents.append(doc)
 
