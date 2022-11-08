@@ -441,9 +441,8 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                                            token_type_ids,
                                            position_ids,
                                            role_ids=role_ids)
-        if use_cache:
-            if cache is None:
-                cache = self.encoder.gen_cache(embedding_output)
+        if use_cache and cache is None:
+            cache = self.encoder.gen_cache(embedding_output)
 
         sequence_output = self.encoder(
             embedding_output,
