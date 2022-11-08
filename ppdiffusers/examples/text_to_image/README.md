@@ -13,10 +13,7 @@ ___该训练代码是实验性质的。由于这里的代码微调了整个`UNet
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
 ```bash
-# 进入ppdiffusers文件夹，安装ppdiffusers
-pip install -e .
-# 安装其他所需的依赖
-pip install "paddlenlp>=2.4.1" ftfy regex Pillow visualdl
+pip install -U ppdiffusers visualdl
 ```
 
 ### 1.2 Pokemon训练教程
@@ -55,13 +52,14 @@ bash run_single.sh
 | ppdiffusers支持的模型名称    | huggingface对应的模型地址                           | Tips备注                                                     |
 | ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
 | CompVis/stable-diffusion-v1-4            | https://huggingface.co/CompVis/stable-diffusion-v1-4       | 原版SD模型，模型使用PNDM scheduler。                 |
-| runwayml/stable-diffusion-v1-5            | https://huggingface.co/runwayml/stable-diffusion-v1-5       | SD v1-5模型，模型使用PNDM scheduler。                 |
 | hakurei/waifu-diffusion                  | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-2的模型，模型使用了DDIM scheduler。         |
-| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-3的模型，模型使用了LMSDiscrete scheduler。         |
+| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             | Waifu v1-3的模型，模型使用了PNDM scheduler。         |
 | naclbit/trinart_stable_diffusion_v2_60k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过60k步数训练得到的模型，模型使用了DDIM scheduler。 |
 | naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过95k步数训练得到的模型，模型使用了DDIM scheduler。 |
 | naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 | trinart 经过115k步数训练得到的模型，模型使用了DDIM scheduler。 |
 | Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         | Hentai模型，模型使用了PNDM scheduler。                |
+| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1         | 中文StableDiffusion模型，模型使用了PNDM scheduler。                |
+| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1              | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1         | 中文+英文双语言的StableDiffusion模型，模型使用了PNDM scheduler。                |
 
 
 `train_text_to_image.py`代码可传入的参数解释如下：
