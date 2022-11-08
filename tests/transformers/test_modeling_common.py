@@ -509,6 +509,9 @@ class ModelTesterMixin:
             self.assertTrue(models_equal)
 
     def test_inputs_embeds(self):
+        if not self.use_test_inputs_embeds:
+            return
+
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
         )
 
