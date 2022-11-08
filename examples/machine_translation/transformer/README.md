@@ -81,15 +81,15 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --config .
 
 本示例这里略去自定义数据下载、处理的步骤，如果需要，可以参考前页文档 [使用自定义翻译数据集](../README.md)。
 
-本示例以处理好的 iwslt14 数据为例。
+本示例以处理好的 WMT14 数据为例。
 
 ``` bash
-DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
 
 python train.py \
     --config configs/transformer.base.yaml \
-    --train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en \
-    --dev_file ${DATA_DEST_DIR}/dev.de-en.de ${DATA_DEST_DIR}/dev.de-en.en \
+    --train_file ${DATA_DEST_DIR}/train.de-en.en ${DATA_DEST_DIR}/train.de-en.de \
+    --dev_file ${DATA_DEST_DIR}/dev.de-en.en ${DATA_DEST_DIR}/dev.de-en.de \
     --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
     --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
@@ -123,12 +123,12 @@ python train.py \
 单机多卡的执行方式与单机打卡差别不大，需要额外加上单机多卡的启动命令，如下所示：
 
 ``` bash
-DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
 
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py \
     --config configs/transformer.base.yaml \
-    --train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en \
-    --dev_file ${DATA_DEST_DIR}/dev.de-en.de ${DATA_DEST_DIR}/dev.de-en.en \
+    --train_file ${DATA_DEST_DIR}/train.de-en.en ${DATA_DEST_DIR}/train.de-en.de \
+    --dev_file ${DATA_DEST_DIR}/dev.de-en.en ${DATA_DEST_DIR}/dev.de-en.de \
     --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
     --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
@@ -161,13 +161,13 @@ python predict.py --config ./configs/transformer.base.yaml
 本示例同样支持自定义数据集进行预测。可以参照以下文档。
 
 ``` bash
-DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
 
 python predict.py \
     --config configs/transformer.base.yaml \
-    --test_file ${DATA_DEST_DIR}/test.de-en.de \
-    --src_vocab ${DATA_DEST_DIR}/dev.de-en.de \
-    --trg_vocab ${DATA_DEST_DIR}/dev.de-en.en \
+    --test_file ${DATA_DEST_DIR}/test.de-en.en \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
     --eos_token "</s>" \
     --unk_token "<unk>"
@@ -206,7 +206,7 @@ python export_model.py --config ./configs/transformer.base.yaml
 同样，因为模型导出会用到模型的词表等信息，所以如果是**自定义数据集**，仍需要传入所使用的词表。
 
 ``` bash
-DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
 
 python export_model.py \
     --config ./configs/transformer.base.yaml \
@@ -282,17 +282,17 @@ python -m paddle.distributed.launch --gpus="0,1,2,3,4,5,6,7" train.py --config .
 
 本示例这里略去自定义数据下载、处理的步骤，如果需要，可以参考前页文档 [使用自定义翻译数据集](../README.md)。
 
-本示例以处理好的 iwslt14 数据为例。
+本示例以处理好的 WMT14 数据为例。
 
 ``` bash
 cd static/
 export CUDA_VISIBLE_DEVICES=0
 
-DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
 
 python train.py \
     --config configs/transformer.base.yaml \
-    --train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en \
+    --train_file ${DATA_DEST_DIR}/train.de-en.en ${DATA_DEST_DIR}/train.de-en.de \
     --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
     --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
@@ -377,12 +377,12 @@ python predict.py --config ../configs/transformer.base.yaml
 cd static/
 export CUDA_VISIBLE_DEVICES=0
 
-DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
 python predict.py \
     --config configs/transformer.base.yaml \
-    --test_file ${DATA_DEST_DIR}/test.de-en.de \
-    --src_vocab ${DATA_DEST_DIR}/dev.de-en.de \
-    --trg_vocab ${DATA_DEST_DIR}/dev.de-en.en \
+    --test_file ${DATA_DEST_DIR}/test.de-en.en \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
     --bos_token "<s>" \
     --eos_token "</s>" \
     --unk_token "<unk>"

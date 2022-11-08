@@ -38,24 +38,28 @@ datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
 
 ``` bash
 # 数据下载、处理，包括 bpe 的训练
-bash preprocessor/prepare-iwslt14.sh
+bash preprocessor/prepare-wmt14en2de.sh --icml17
 
 # 数据预处理
-DATA_DIR=preprocessor/iwslt14.tokenized.de-en/
+DATA_DIR=examples/translation/wmt14_en_de
+
 python preprocessor/preprocessor.py \
-    --src_lang de \
-    --trg_lang en \
+    --source_lang en \
+    --target_lang de \
     --train_pref $DATA_DIR/train \
     --dev_pref $DATA_DIR/dev \
     --test_pref $DATA_DIR/test \
-    --dest_dir data/iwslt14.tokenized.de-en/
+    --dest_dir data/wmt17_en_de \
+    --thresholdtgt 0 \
+    --thresholdsrc 0 \
+    --joined_dictionary
 ```
 
 `preprocessor/preprocessor.py` 支持了在机器翻译中常见的数据预处理方式，具体的参数说明如下：
 
 * `--src_lang`(`-s`): 指明数据处理对应的源语言类型，比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。
 * `--trg_lang`(`-t`): 指明数据处理对应的目标语言的类型，比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。
-* `--train_pref`: 指明前序步骤中，下载的训练数据的路径，以及对应的文件名前缀，比如 `preprocessor/iwslt14.tokenized.de-en/train` 结合 `--src_lang de` 和 `--trg_lang en`，表示在 `preprocessor/iwslt14.tokenized.de-en/` 路径下，源语言是 `preprocessor/iwslt14.tokenized.de-en/train.de`，目标语言是 `preprocessor/iwslt14.tokenized.de-en/train.en`。
+* `--train_pref`: 指明前序步骤中，下载的训练数据的路径，以及对应的文件名前缀，比如 `preprocessor/wmt14_en_de/train` 结合 `--src_lang de` 和 `--trg_lang en`，表示在 `preprocessor/wmt14_en_de/` 路径下，源语言是 `preprocessor/wmt14_en_de/train.en`，目标语言是 `preprocessor/wmt14_en_de/train.de`。
 * `--dev_pref`: 指明前序步骤中，下载的验证数据的路径，以及对应的文件名前缀。在验证集语料中，如果有的 token 在训练集中从未出现过，那么将会被 `<unk>` 替换。
 * `--test_pref`: 指明前序步骤中，下载的测试数据的路径，以及对应的文件名前缀。在测试集语料中，如果有的 token 在训练集中从未出现过，那么将会被 `<unk>` 替换。
 * `--dest_dir`: 完成数据处理之后，保存处理完成数据以及词表的路径。
@@ -76,33 +80,14 @@ python preprocessor/preprocessor.py \
 * `--apply_bpe`: 是否需要对数据作 bpe 分词。若指定则会在 preprocessor.py 脚本开始执行 bpe 分词。如果是使用提供的 shell 脚本完成的数据下载，则无需设置，在 shell 脚本中会作 bpe 分词处理。
 * `--bpe_code`: 若指明 `--apply_bpe` 使用 bpe 分词，则需同时提供训练好的 bpe code 文件。
 
-除了 iwslt14 德英翻译数据集外，我们也提供了其他的 shell 脚本完成数据下载处理，其中包括了 WMT14 英德翻译数据和 WMT14 英法翻译数据。
+除了 WMT14 德英翻译数据集外，我们也提供了其他的 shell 脚本完成数据下载处理，比如 WMT14 英法翻译数据。
 
 ``` bash
-# WMT14 英德翻译的数据下载、处理
-bash prepare-wmt14en2de.sh
 # WMT14 英法翻译的数据下载、处理
 bash prepare-wmt14en2fr.sh
 ```
 
-完成数据处理之后，同样也可以采用上文提到的预处理方式获取词表，完成预处理。以下再以 WMT14 EN-DE 翻译数据集预处理为例：
-
-``` bash
-# 数据下载、处理，包括 bpe 的训练
-DATA_DIR=examples/translation/wmt14_en_de
-
-# 数据预处理
-python preprocessor/preprocessor.py \
-    --source_lang en \
-    --target_lang de \
-    --train_pref $DATA_DIR/train \
-    --dev_pref $DATA_DIR/dev \
-    --test_pref $DATA_DIR/test \
-    --dest_dir data/wmt17_en_de \
-    --thresholdtgt 0 \
-    --thresholdsrc 0 \
-    --joined_dictionary
-```
+完成数据处理之后，同样也可以采用上文提到的预处理方式获取词表，完成预处理。
 
 如果有或者需要使用其他的平行语料，可以自行完成下载和简单的处理。
 
