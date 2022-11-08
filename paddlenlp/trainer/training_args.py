@@ -766,8 +766,8 @@ class TrainingArguments:
                         "pp_degree": 1,
                         "sharding_degree": self.sharding_degree
                     }
-                    self.strategy = strategy
                     fleet.init(is_collective=True, strategy=strategy)
+                    logger.info(strategy)
                 else:
                     paddle.distributed.init_parallel_env()
 

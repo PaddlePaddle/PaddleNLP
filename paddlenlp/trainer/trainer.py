@@ -379,8 +379,9 @@ class Trainer:
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            state_dict = paddle.load(os.path.join(resume_from_checkpoint,
+                                                  WEIGHTS_NAME),
+                                     return_numpy=True)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
 
@@ -426,8 +427,9 @@ class Trainer:
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            state_dict = paddle.load(os.path.join(resume_from_checkpoint,
+                                                  WEIGHTS_NAME),
+                                     return_numpy=True)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
 
@@ -749,7 +751,7 @@ class Trainer:
                                            WEIGHTS_NAME)
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path)
+                state_dict = paddle.load(best_model_path, return_numpy=True)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
@@ -1031,7 +1033,7 @@ class Trainer:
                 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
                 self.optimizer = DygraphShardingOptimizer(
                     hcg=fleet.get_hybrid_communicate_group(),
-                    user_defined_strategy=self.args.strategy,
+                    user_defined_strategy=None,
                     params=self.model.parameters(),
                     inner_optimizer_class=optimizer_cls,
                     learning_rate=self.lr_scheduler
@@ -1525,10 +1527,10 @@ class Trainer:
             # Load in optimizer and scheduler states
             if self.sharding is not None:
                 self.optimizer.set_state_dict(
-                    paddle.load(
-                        os.path.join(
-                            checkpoint, OPTIMIZER_NAME +
-                            f"_shard{self.sharding_group.rank}")))
+                    paddle.load(os.path.join(
+                        checkpoint,
+                        OPTIMIZER_NAME + f"_shard{self.sharding_group.rank}"),
+                                return_numpy=True))
                 empty_dict = paddle.load(os.path.join(checkpoint,
                                                       OPTIMIZER_NAME),
                                          return_numpy=True)
@@ -1537,7 +1539,8 @@ class Trainer:
                 ) == 0, "Optimizer file of sharding, should be empty!"
             else:
                 self.optimizer.set_state_dict(
-                    paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME)))
+                    paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME),
+                                return_numpy=True))
             self.lr_scheduler.set_state_dict(
                 paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(
