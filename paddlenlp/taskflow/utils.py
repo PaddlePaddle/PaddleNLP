@@ -2013,6 +2013,7 @@ class ImageReader(object):
         """
         examples = []
         doc_boxes = []
+        ori_boxes = []
         boxes = [x[1] for x in ocr_res]
         im_w_box = max([b[2] for b in boxes]) + 20
         im_h_box = max([b[3] for b in boxes]) + 20
@@ -2028,6 +2029,7 @@ class ImageReader(object):
                 raise ValueError("Invalid bbox format")
             w = max(x1, x2) - min(x1, x2)
             h = max(y1, y2) - min(y1, y2)
+            ori_boxes.append([Bbox(*[x1, y1, w, h])])
             w = int(min(w * scale_x, self.image_size - 1))
             h = int(min(h * scale_y, self.image_size - 1))
             x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
@@ -2051,6 +2053,7 @@ class ImageReader(object):
                 text='',
                 qas_id=str(qas_id),
                 model_type=None,
+                ori_boxes=ori_boxes,
                 boxes=doc_boxes,
                 segment_ids=doc_segment_ids,
                 symbol_ids=None,
