@@ -20,7 +20,6 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 import paddle
-from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer, UIE, UIEM, export_model
 from paddlenlp.data import DataCollatorWithPadding
@@ -29,7 +28,7 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments, CompressionAr
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
-from utils import reader, MODEL_MAP, map_offset
+from utils import reader, map_offset
 
 
 @dataclass
@@ -178,15 +177,6 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
-    if model_args.model_name_or_path in MODEL_MAP:
-        resource_file_urls = MODEL_MAP[
-            model_args.model_name_or_path]['resource_file_urls']
-
-        logger.info("Downloading resource files...")
-        for key, val in resource_file_urls.items():
-            file_path = os.path.join(model_args.model_name_or_path, key)
-            if not os.path.exists(file_path):
-                get_path_from_url(val, model_args.model_name_or_path)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if model_args.multilingual:

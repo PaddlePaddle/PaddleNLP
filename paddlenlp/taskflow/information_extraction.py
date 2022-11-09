@@ -591,7 +591,6 @@ class UIETask(Task):
                                              offset_mapping)
                     if 0 <= index_token < len(bbox_list):
                         bbox_list[index_token] = bbox
-                    prev_bbox = bbox
                 return bbox_list
 
             def _pad_image_data(image_data):
