@@ -164,7 +164,7 @@ def evaluate(model, data_loader, loss_fct):
     model = model._layers if isinstance(model, paddle.DataParallel) else model
     for batch in data_loader:
         labels = batch.pop("labels")
-        logits, _ = model(**batch)
+        logits = model(**batch)[0]
         loss = loss_fct(logits[:, :-1, :], labels[:, 1:])
         correct = metric.compute(paddle.max(logits[:, :-1, :], axis=-1),
                                  labels[:, 1:])
@@ -318,7 +318,7 @@ def do_train(args):
             with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu"]):
-                logits, _ = model(**batch)
+                logits = model(**batch)[0]
                 loss = loss_fct(logits[:, :-1, :], labels[:, 1:])
             if args.use_amp:
                 scaled_loss = scaler.scale(loss)
