@@ -34,6 +34,10 @@
     <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
 </div>
 
+#### UIE-X 🧾
+
+**全新升级UIE-X，新增文档抽取功能**，欢迎体验 👉 [信息抽取应用](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/#readme)
+
 #### UIE的优势
 
 - **使用简单**：用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**。
