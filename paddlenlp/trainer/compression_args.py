@@ -92,6 +92,13 @@ class CompressionArguments(TrainingArguments):
         "In strategy 'ptq', it defaults to 'range_abs_max' and in strategy " \
         "'qat', it defaults to 'moving_average_abs_max'."
     }, )
+    onnx_format: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help":
+            "Whether to export onnx format quantized model, and it defaults to True."
+        },
+    )
     # ptq:
     algo_list: Optional[List[str]] = field(
         default=None,
@@ -176,7 +183,7 @@ class CompressionArguments(TrainingArguments):
             'round_type', 'algo_list', 'batch_size_list', 'strategy',
             'weight_quantize_type', 'activation_quantize_type',
             'input_infer_model_path', 'activation_preprocess_type',
-            'weight_preprocess_type', 'moving_rate'
+            'weight_preprocess_type', 'moving_rate', 'use_pact', 'onnx_format'
         ]
         default_arg_dict = {
             "width_mult_list": ['3/4'],
