@@ -42,6 +42,10 @@ class CompressionArguments(TrainingArguments):
         strategy (`str`):
             Compression strategy. It supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
     """
+
+    do_compress: bool = field(
+        default=False,
+        metadata={"help": "Whether to run compression after training."})
     strategy: Optional[str] = field(
         default="dynabert+ptq",
         metadata={
@@ -88,6 +92,13 @@ class CompressionArguments(TrainingArguments):
         "In strategy 'ptq', it defaults to 'range_abs_max' and in strategy " \
         "'qat', it defaults to 'moving_average_abs_max'."
     }, )
+    onnx_format: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help":
+            "Whether to export onnx format quantized model, and it defaults to True."
+        },
+    )
     # ptq:
     algo_list: Optional[List[str]] = field(
         default=None,
@@ -147,24 +158,12 @@ class CompressionArguments(TrainingArguments):
         },
     )
     # qat
-    activation_preprocess_type: Optional[str] = field(
-        default=None,
+    use_pact: Optional[bool] = field(
+        default=True,
         metadata={
             "help":
-            "Method of preprocessing the activation value of the quantitative " \
-            "model. Currently, PACT method is supported. If necessary, it can be " \
-            "set to 'PACT'. The default value is None, which means that no " \
-            "preprocessing is performed on the active value."
-        },
-    )
-    weight_preprocess_type: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Method of preprocessing the weight parameters of the quantitative " \
-            "model. Currently, method 'PACT' is supported. If necessary, it can " \
-            "be set to 'PACT'. The default value is None, which means that " \
-            "no preprocessing is performed on weights."
+            "Whether to use PACT(Parameterized Clipping Activation for Quantized Neural Networks) "\
+            "method in quantization aware training."
         },
     )
     moving_rate: Optional[float] = field(
@@ -184,7 +183,7 @@ class CompressionArguments(TrainingArguments):
             'round_type', 'algo_list', 'batch_size_list', 'strategy',
             'weight_quantize_type', 'activation_quantize_type',
             'input_infer_model_path', 'activation_preprocess_type',
-            'weight_preprocess_type', 'moving_rate'
+            'weight_preprocess_type', 'moving_rate', 'use_pact', 'onnx_format'
         ]
         default_arg_dict = {
             "width_mult_list": ['3/4'],

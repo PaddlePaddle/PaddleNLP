@@ -27,7 +27,7 @@ import pipelines
 from pipelines.pipelines.base import Pipeline
 from rest_api.config import PIPELINE_YAML_PATH, QUERY_PIPELINE_NAME
 from rest_api.config import LOG_LEVEL, CONCURRENT_REQUEST_PER_WORKER
-from rest_api.schema import QueryRequest, QueryResponse
+from rest_api.schema import QueryRequest, QueryResponse, DocumentRequest, DocumentResponse, QueryImageResponse
 from rest_api.controller.utils import RequestLimiter
 
 logging.getLogger("pipelines").setLevel(LOG_LEVEL)
@@ -79,6 +79,43 @@ def query(request: QueryRequest):
     with concurrency_limiter.run():
         result = _process_request(PIPELINE, request)
         return result
+
+
+@router.post("/query_text_to_images",
+             response_model=QueryImageResponse,
+             response_model_exclude_none=True)
+def query_images(request: QueryRequest):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    result = {}
+    result['query'] = request.query
+    params = request.params or {}
+    res = PIPELINE.run(query=request.query, params=params, debug=request.debug)
+    # Ensure answers and documents exist, even if they're empty lists
+    result['answers'] = res['results']
+    if not "documents" in result:
+        result["documents"] = []
+    if not "answers" in result:
+        result["answers"] = []
+    return result
+
+
+@router.post("/query_documents",
+             response_model=DocumentResponse,
+             response_model_exclude_none=True)
+def query_documents(request: DocumentRequest):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    result = {}
+    result['meta'] = request.meta
+    params = request.params or {}
+    res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
+    result['results'] = res['results']
+    return result
 
 
 def _process_request(pipeline, request) -> Dict[str, Any]:
