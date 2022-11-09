@@ -68,6 +68,7 @@ class ModelTesterMixin:
     test_mismatched_shapes = True
     test_missing_keys = True
     use_test_inputs_embeds = False
+    use_test_model_name_list = True
     is_encoder_decoder = False
     has_attentions = True
     model_split_percents = [0.5, 0.7, 0.9]
@@ -549,6 +550,8 @@ class ModelTesterMixin:
             assert paddle.allclose(ids_output, embeds_output)
 
     def test_model_name_list(self):
+        if not self.use_test_model_name_list:
+            return
         config = self.model_tester.get_config()
         if isinstance(config, PretrainedConfig):
             model = self.base_model_class(config)
