@@ -23,7 +23,7 @@ from PIL import Image
 import numpy as np
 import paddle
 from ..datasets import load_dataset
-from ..transformers import AutoTokenizer, UIE, UIEM, UIEX
+from ..transformers import AutoTokenizer, AutoModel, UIE, UIEM, UIEX
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
 from ..utils.image_utils import (
     DocParser,

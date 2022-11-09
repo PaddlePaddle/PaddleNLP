@@ -453,7 +453,6 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
   | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
   | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
-  | `uie-x-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
 
 
 - `uie-nano`调用示例：
