@@ -24,7 +24,7 @@ from paddlenlp import __version__
 from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.downloader import is_url
-from paddlenlp.cli.converter import convert_from_local_file, convert_from_local_dir, convert_from_online_model
+from paddlenlp.cli.converter import convert_from_local_file, convert_from_local_dir, convert_from_online_model, convert_stable_diffusion
 from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
 from paddlenlp.transformers.utils import find_transformer_model_type
 from paddlenlp.cli.download import load_community_models
@@ -150,9 +150,13 @@ def search(query=typer.Argument(..., help='the query of searching model'),
 
 
 @app.command(help="convert pytorch models to paddle model")
-def convert(input: Optional[str] = None, output: Optional[str] = None):
+def convert(input: Optional[str] = None,
+            model: Optional[str] = None,
+            output: Optional[str] = None):
     logger.info("starting to convert models ...")
-    if os.path.isdir(input):
+    if model == 'stable-diffusion':
+        convert_stable_diffusion(input, output)
+    elif os.path.isdir(input):
         convert_from_local_dir(pretrained_dir=input, output=output)
     else:
         # TODO(wj-Mcat): should complete the online converting

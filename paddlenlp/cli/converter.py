@@ -21,6 +21,13 @@ from paddlenlp.utils.converter import Converter, load_all_converters
 from paddlenlp.transformers.bert.converter import BertConverter
 
 
+def convert_stable_diffusion(pretrained_dir: str, output: str):
+    from paddlenlp.cli.converters.ppdiffusers import StableDiffusionConverter
+
+    converter = StableDiffusionConverter()
+    converter.convert(pretrained_dir, output_dir=output)
+
+
 def convert_from_local_dir(pretrained_dir: str, output: str):
     """convert weight from local dir
 
@@ -28,6 +35,7 @@ def convert_from_local_dir(pretrained_dir: str, output: str):
         pretrained_dir (str): the pretrained dir
         output (str): the output dir
     """
+
     # 1. checking the related files
     files = os.listdir(pretrained_dir)
     assert 'pytorch_model.bin' in files, f"`pytorch_model.bin` file must exist in dir<{pretrained_dir}>"
