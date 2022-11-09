@@ -44,8 +44,6 @@ config_common_kwargs = {
     "return_dict": False,
     "output_hidden_states": True,
     "output_attentions": True,
-    "torchscript": True,
-    "torch_dtype": "float16",
     "use_bfloat16": True,
     "tf_legacy_loss": True,
     "pruned_heads": {

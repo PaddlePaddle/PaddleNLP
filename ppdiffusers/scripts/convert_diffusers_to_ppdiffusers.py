@@ -89,7 +89,7 @@ def convert_hf_clip_to_paddlenlp(clip, dtype="float32"):
         # pytorch的是0d的tensor，paddle的是1d tensor所以要reshape。这要注意。
         if k == "logit_scale": v = v.reshape((1, ))
         if "vision_model" in k: k = "clip." + k
-        if "text_model" in k: k = "clip." + k
+        # if "text_model" in k: k = "clip." + k
         new_model_state[k] = v.numpy().astype(dtype)
         print(f"Convert {oldk} -> {k} | {v.shape}, is_transpose {is_transpose}")
     return new_model_state
