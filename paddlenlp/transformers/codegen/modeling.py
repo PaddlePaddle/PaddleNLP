@@ -479,7 +479,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
             Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=None`, 
-            returns a tensor representing the output of :class:`UnifiedTransformerModel`.
+            returns a tensor representing the output of :class:`CodeGenModel`.
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
         Example:
             .. code-block::
