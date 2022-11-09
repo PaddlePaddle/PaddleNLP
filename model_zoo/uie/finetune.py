@@ -22,14 +22,13 @@ from dataclasses import dataclass, field
 import paddle
 from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, export_model
+from paddlenlp.transformers import AutoTokenizer, UIE, UIEM, export_model
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, CompressionArguments, Trainer
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
-from model import UIE, UIEM
 from utils import reader, MODEL_MAP, map_offset
 
 
@@ -126,7 +125,7 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
     if multilingual:
         tokenized_output = {
             "input_ids": encoded_inputs["input_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
+            "position_ids": encoded_inputs["position_ids"],
             "start_positions": start_ids,
             "end_positions": end_ids
         }
@@ -134,8 +133,8 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
         tokenized_output = {
             "input_ids": encoded_inputs["input_ids"],
             "token_type_ids": encoded_inputs["token_type_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
-            "att_mask": encoded_inputs["attention_mask"],
+            "position_ids": encoded_inputs["position_ids"],
+            "attention_mask": encoded_inputs["attention_mask"],
             "start_positions": start_ids,
             "end_positions": end_ids
         }
@@ -146,6 +145,9 @@ def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
+        model_args.multilingual = True
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -284,7 +286,7 @@ def main():
                                         name='input_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='pos_ids'),
+                                        name='position_ids'),
             ]
         else:
             input_spec = [
@@ -296,10 +298,10 @@ def main():
                                         name='token_type_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='pos_ids'),
+                                        name='position_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='att_mask'),
+                                        name='attention_mask'),
             ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir,
@@ -317,12 +319,12 @@ def main():
             for batch in data_loader:
                 if model_args.multilingual:
                     logits = model(input_ids=batch['input_ids'],
-                                   pos_ids=batch["pos_ids"])
+                                   position_ids=batch["position_ids"])
                 else:
                     logits = model(input_ids=batch['input_ids'],
                                    token_type_ids=batch['token_type_ids'],
-                                   pos_ids=batch["pos_ids"],
-                                   att_mask=batch["att_mask"])
+                                   position_ids=batch["position_ids"],
+                                   attention_mask=batch["attention_mask"])
                 start_prob, end_prob = logits
                 start_ids, end_ids = batch["start_positions"], batch[
                     "end_positions"]

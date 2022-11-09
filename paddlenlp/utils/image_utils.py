@@ -31,7 +31,6 @@ from PIL import Image
 from io import BytesIO
 import numpy as np
 import requests
-import cv2
 from .log import logger
 
 
@@ -128,8 +127,7 @@ class ResizeImage(BaseOperator):
         resize_w = selected_size
         resize_h = selected_size
 
-        im = im.astype('uint8')
-        im = Image.fromarray(im)
+        im = Image.fromarray(im.astype('uint8'))
         im = im.resize((int(resize_w), int(resize_h)), self.interp)
         sample['image'] = np.array(im)
         return sample
@@ -299,7 +297,7 @@ class DocParser(object):
                 layout, image = self.ocr(d['image'],
                                          keep_whitespace=keep_whitespace,
                                          expand_to_a4_size=expand_to_a4_size,
-                                         return_cv2_image=True)
+                                         return_image=True)
                 d = {k: v for k, v in d.items() if k != 'image'}
                 d['layout'] = layout
                 d['image'] = image
@@ -309,7 +307,7 @@ class DocParser(object):
                 layouts = self.parse_pdf(d['pdf'],
                                          pages=d.get('pages'),
                                          password=d.get('password'),
-                                         return_cv2_image=True,
+                                         return_image=True,
                                          return_page_num=True)
                 for layout, image, page_num in layouts:
                     d = {k: v for k, v in d.items() if k != 'pdf'}
@@ -339,13 +337,13 @@ class DocParser(object):
             cls=None,
             keep_whitespace=True,
             expand_to_a4_size=False,
-            return_cv2_image=False):
+            return_image=False):
         """
         call ocr for an image
         """
         if self.ocr_infer_model is None:
             self.init_ocr_inference()
-        _image = self.read_image(image)
+        _image = image
         if expand_to_a4_size:
             _image, _, _ = self.expand_image_to_a4_size(_image)
         if cls is None:
@@ -367,7 +365,7 @@ class DocParser(object):
                 text = text.replace(' ', '')
             layout.append((box, text, segment[1][1]))
         layout = self._adjust_layout(layout)
-        if return_cv2_image:
+        if return_image:
             return layout, _image
         return layout
 
@@ -376,7 +374,7 @@ class DocParser(object):
                   pages=None,
                   password=None,
                   keep_whitespace=True,
-                  return_cv2_image=False,
+                  return_image=False,
                   return_page_num=False):
         """
         call parser for a pdf
@@ -418,12 +416,12 @@ class DocParser(object):
                         has_fullpage_image = True
             image = None
             if not layout and has_fullpage_image:
-                image = self.get_page_image(page, use_cv2=True)
+                image = self.get_page_image(page)
                 layout = self.ocr(image, keep_whitespace)
             items = [layout]
-            if return_cv2_image:
+            if return_image:
                 if image is None:
-                    image = self.get_page_image(page, use_cv2=True)
+                    image = self.get_page_image(page)
                 items.append(image)
             if return_page_num:
                 items.append(i)
@@ -483,52 +481,19 @@ class DocParser(object):
                 from .utils.downloader import download
                 buff = download(data)
         if buff is None:
-            try:
-                buff = base64.b64decode(data)
-            except:
-                pass
+            buff = base64.b64decode(data)
         if buff and file_like:
             return BytesIO(buff)
         return buff
 
     @classmethod
-    def read_image(self, image, use_cv2=True):
+    def read_image(self, image):
         """
-        read image to cv2 (np.ndarray) or PIL.Image
-        input support:
-            base64
-            filepath
-            url
-            np.ndarray
-            PIL
+        read image to np.ndarray
         """
-        PIL_Image = None
-        try:
-            from PIL import Image
-            PIL_Image = Image.Image
-        except:
-            logger.warning("Failed to import PIL ...")
-        if isinstance(image, np.ndarray):
-            # cv2 input
-            _image = image
-            if len(image.shape) == 3 and not use_cv2:
-                _image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-            return _image
-        elif PIL_Image and isinstance(image, PIL_Image):
-            _image = image
-            if use_cv2:
-                _image = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
-            return _image
         image_buff = self._get_buffer(image)
-        if not image_buff:
-            logger.warning("Failed to read image: %s...", image[:32])
-            return None
-        if use_cv2:
-            _image = cv2.imdecode(np.frombuffer(image_buff, np.uint8),
-                                  cv2.IMREAD_COLOR)
-        else:
-            from PIL import Image
-            _image = Image.open(BytesIO(image_buff))
+
+        _image = np.array(Image.open(BytesIO(image_buff)))
         return _image
 
     @classmethod
@@ -555,17 +520,13 @@ class DocParser(object):
         return pdf_doc
 
     @classmethod
-    def get_page_image(self, page, use_cv2=False):
+    def get_page_image(self, page):
         """
         get page image
         """
         pix = page.get_pixmap()
         image_buff = pix.pil_tobytes('jpeg', optimize=True)
-        if use_cv2:
-            return cv2.imdecode(np.frombuffer(image_buff, np.uint8),
-                                cv2.IMREAD_COLOR)
-        else:
-            return Image.open(BytesIO(image_buff))
+        return Image.open(BytesIO(image_buff))
 
     @classmethod
     def read_docx(self, docx):
@@ -618,7 +579,7 @@ class DocParser(object):
 
     @classmethod
     def expand_image_to_a4_size(self, image, center=False):
-        """expand cv2 image to a4 size"""
+        """expand image to a4 size"""
         h, w = image.shape[:2]
         offset_x, offset_y = 0, 0
         if h * 1.0 / w >= 1.42:

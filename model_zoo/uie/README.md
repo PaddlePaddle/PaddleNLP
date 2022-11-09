@@ -453,6 +453,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
   | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
   | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
+  | `uie-x-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
 
 
 - `uie-nano`调用示例：
@@ -648,7 +649,7 @@ python finetune.py  \
     --max_seq_length 512  \
     --per_device_eval_batch_size 16 \
     --per_device_train_batch_size  16 \
-    --num_train_epochs 100 \
+    --num_train_epochs 20 \
     --learning_rate 1e-5 \
     --do_train \
     --do_eval \
@@ -658,7 +659,7 @@ python finetune.py  \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
     --load_best_model_at_end  True \
-    --save_total_limit 1 \
+    --save_total_limit 1
 
 ```
 

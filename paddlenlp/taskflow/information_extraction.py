@@ -23,7 +23,7 @@ from PIL import Image
 import numpy as np
 import paddle
 from ..datasets import load_dataset
-from ..transformers import AutoTokenizer, AutoModel
+from ..transformers import AutoTokenizer, UIE, UIEM, UIEX
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
 from ..utils.image_utils import (
     DocParser,
@@ -31,7 +31,6 @@ from ..utils.image_utils import (
     Permute,
     NormalizeImage,
 )
-from .models import UIE, UIEM, UIEX
 from .task import Task
 from .utils import (get_span, get_id_and_prob, get_bool_ids_greater_than,
                     dbc2sbc, gp_decode, map_offset, SchemaTree, DataCollatorGP)
@@ -461,7 +460,7 @@ class UIETask(Task):
                                         name='input_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='pos_ids'),
+                                        name='position_ids'),
             ]
         else:
             self._input_spec = [
@@ -473,10 +472,10 @@ class UIETask(Task):
                                         name='token_type_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='pos_ids'),
+                                        name='position_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='att_mask'),
+                                        name='attention_mask'),
             ]
 
     def _construct_model(self, model):
