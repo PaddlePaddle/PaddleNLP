@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.transformers.utils import find_transformer_model_type, find_transformer_model_class_by_name
 
 COMMUNITY_MODEL_CONFIG_FILE_NAME = "community_models.json"
 
@@ -57,6 +58,6 @@ def load_community_models() -> List[Tuple[str, str]]:
 
     model_names = set()
     for model_name, obj in config.items():
-        model_names.add(("community", model_name, obj.get("type", model_name)))
+        model_names.add((model_name, obj.get("model_type", "")))
     logger.info(f"find {len(model_names)} community models ...")
     return model_names

@@ -26,6 +26,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.downloader import is_url
 from paddlenlp.cli.converter import convert_from_local_file, convert_from_local_dir, convert_from_online_model
 from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
+from paddlenlp.transformers.utils import find_transformer_model_type
 from paddlenlp.cli.download import load_community_models
 
 
@@ -37,7 +38,8 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
     """
     # 1. load official models
     module = importlib.import_module("paddlenlp.transformers")
-    model_names = set()
+    model_names = []
+    model_names_dict = {}
     for attr_name in dir(module):
         if attr_name.startswith("_"):
             continue
@@ -51,16 +53,25 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
         if not obj.__name__.endswith("PretrainedModel"):
             continue
         configurations = obj.pretrained_init_configuration
+        model_type = find_transformer_model_type(obj)
         for model_name in configurations.keys():
-            model_names.add(("official", obj.base_model_prefix, model_name))
+            # get model type with refactoring
+            model_names.append((model_type, model_name))
+            model_names_dict[model_name] = True
+
     logger.info(f"find {len(model_names)} official models ...")
 
     # 2. load & extend community models
     if include_community:
         community_model_names = load_community_models()
         for model_name in community_model_names:
-            model_names.add(model_name)
+            # there are some same model-names between codebase and community models
+            if model_name in model_names_dict:
+                continue
 
+            model_names.append(model_name)
+    # 3. sort result
+    model_names.sort(key=lambda item: item[0] + item[1])
     return model_names
 
 
@@ -128,12 +139,11 @@ def search(query=typer.Argument(..., help='the query of searching model'),
     model_names = load_all_models(include_community)
 
     tables = []
-    for model_category, model_type, model_name in model_names:
+    for model_type, model_name in model_names:
+        # TODO(wj-Mcat): ignore the model_category info
         if not query or query in model_name:
-            tables.append([model_category, model_type, model_name])
-    tabulate(tables,
-             headers=["model source", 'model type', 'model name'],
-             highlight_word=query)
+            tables.append([model_type, model_name])
+    tabulate(tables, headers=['model type', 'model name'], highlight_word=query)
     print_example_code()
 
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
