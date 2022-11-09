@@ -509,18 +509,22 @@ class ModelTesterMixin:
             self.assertTrue(models_equal)
 
     def test_inputs_embeds(self):
+        # pass the test if don't need to test inputs embeddings
         if not self.use_test_inputs_embeds:
             return
-
+        # get config for model and inputs_dict for model forward
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
         )
-
+        # test all model classes
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
 
             inputs = copy.deepcopy(
                 self._prepare_for_class(inputs_dict, model_class))
+
+            with paddle.no_grad():
+                ids_output = model(**inputs)
 
             if not self.is_encoder_decoder:
                 input_ids = inputs["input_ids"]
@@ -540,7 +544,9 @@ class ModelTesterMixin:
                 inputs["decoder_inputs_embeds"] = wte(decoder_input_ids)
 
             with paddle.no_grad():
-                model(**inputs)[0]
+                embeds_output = model(**inputs)
+
+            assert paddle.allclose(ids_output, embeds_output, 1e-4, 1e-4)
 
     def test_model_name_list(self):
         config = self.model_tester.get_config()
