@@ -1223,9 +1223,13 @@ class GPTLMHeadModel(GPTPretrainedModel):
                            cache=cache,
                            output_attentions=output_attentions,
                            output_hidden_states=output_hidden_states,
-                           return_dict=True)
+                           return_dict=return_dict)
+        if isinstance(outputs, type(input_ids)):
+            hidden_states = outputs
+        else:
+            hidden_states = outputs[0]
 
-        logits = self.lm_head(outputs[0])
+        logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
@@ -1239,8 +1243,8 @@ class GPTLMHeadModel(GPTPretrainedModel):
 
         # outputs = [output, all_hidden_states, new_caches, all_self_attentions]
         if not return_dict:
-            if len(outputs) == 1 and loss is None:
-                return logits
+            if isinstance(outputs, type(input_ids)):
+                return (loss, logits) if loss is not None else logits
 
             outputs = (logits, ) + outputs[1:]
             return ((loss, ) + outputs) if loss is not None else outputs
@@ -1414,9 +1418,12 @@ class GPTForTokenClassification(GPTPretrainedModel):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=True,
+            return_dict=return_dict,
         )
-        hidden_states = sequence_output[0]
+        if isinstance(sequence_output, type(input_ids)):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
         hidden_states = self.dropout(hidden_states)
         logits = self.classifier(hidden_states)
 
@@ -1427,8 +1434,8 @@ class GPTForTokenClassification(GPTPretrainedModel):
                             labels.reshape((-1, )))
 
         if not return_dict:
-            if len(sequence_output) == 1 and loss is None:
-                return logits
+            if isinstance(sequence_output, type(input_ids)):
+                return (loss, logits) if loss is not None else logits
 
             outputs = (logits, ) + sequence_output[1:]
             return ((loss, ) + outputs) if loss is not None else outputs
@@ -1530,9 +1537,13 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                                    use_cache=use_cache,
                                    output_attentions=output_attentions,
                                    output_hidden_states=output_hidden_states,
-                                   return_dict=True)
+                                   return_dict=return_dict)
+        if isinstance(sequence_output, type(input_ids)):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
         # logits shape [bs, seq_len, num_class]
-        logits = self.score(sequence_output[0])
+        logits = self.score(hidden_states)
         # padding index maybe 0
         eos_token_id = self.gpt.config.get("eos_token_id", 0)
         # sequence_lengths shape [bs,]
@@ -1557,8 +1568,9 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 loss = loss_fct(pooled_logits, labels)
 
         if not return_dict:
-            if len(sequence_output) == 1 and loss is None:
-                return pooled_logits
+            if isinstance(sequence_output, type(input_ids)):
+                return (loss,
+                        pooled_logits) if loss is not None else pooled_logits
 
             outputs = (pooled_logits, ) + sequence_output[1:]
             return ((loss, ) + outputs) if loss is not None else outputs
