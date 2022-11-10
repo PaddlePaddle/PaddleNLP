@@ -79,9 +79,6 @@ class ConvNormActivation(nn.Sequential):
         super().__init__(*layers)
 
 
-paddle.vision.models.inceptionv3.ConvNormActivation = ConvNormActivation
-
-
 class InceptionV3(nn.Layer):
     """Pretrained InceptionV3 network returning feature maps"""
 
@@ -229,10 +226,17 @@ class InceptionV3(nn.Layer):
         return outp
 
 
+def hack_bn_layer(layer):
+    if isinstance(layer, nn.BatchNorm2D):
+        layer._momentum = 0.1
+        layer._epsilon = 0.001
+
+
 def _inception_v3(*args, **kwargs):
     """Wraps `paddle.vision.models.inception_v3`
     """
-    return paddle.vision.models.inception_v3(*args, **kwargs)
+    return paddle.vision.models.inception_v3(*args,
+                                             **kwargs).apply(hack_bn_layer)
 
 
 def fid_inception_v3():
