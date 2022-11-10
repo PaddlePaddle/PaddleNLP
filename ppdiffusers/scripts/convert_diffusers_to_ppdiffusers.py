@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import paddle
+import argparse
 
 paddle.set_device("cpu")
 from collections import OrderedDict
 import copy
 import torch
-from ppdiffusers import StableDiffusionPipeline as PaddleStableDiffusionPipeline, DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler
+from ppdiffusers import StableDiffusionPipeline as PaddleStableDiffusionPipeline
 # pip install diffusers
 from diffusers import StableDiffusionPipeline as PytorchStableDiffusionPipeline
 
@@ -71,11 +72,9 @@ def convert_hf_clip_to_paddlenlp(clip, dtype="float32"):
     ignore = ["position_ids"]
 
     for k, v in clip.state_dict().items():
-        # 过滤掉ignore
         if any(i in k for i in ignore):
             continue
         oldk = copy.deepcopy(k)
-        # 批量替换名字
         is_transpose = False
         if v.ndim == 2:
             if "embeddings" in oldk or "norm" in oldk or 'concept_embeds' in oldk or 'special_care_embeds' in oldk:
@@ -86,10 +85,8 @@ def convert_hf_clip_to_paddlenlp(clip, dtype="float32"):
         for oldname, newname in old2new.items():
             k = k.replace(oldname, newname).replace(".vision_model.", ".")
 
-        # pytorch的是0d的tensor，paddle的是1d tensor所以要reshape。这要注意。
         if k == "logit_scale": v = v.reshape((1, ))
         if "vision_model" in k: k = "clip." + k
-        # if "text_model" in k: k = "clip." + k
         new_model_state[k] = v.numpy().astype(dtype)
         print(f"Convert {oldk} -> {k} | {v.shape}, is_transpose {is_transpose}")
     return new_model_state
@@ -114,6 +111,21 @@ def convert_model(model_name):
 
 
 if __name__ == "__main__":
-    # model_name为Huggingface.co上diffusers权重地址。
-    paddle_pipe = convert_model(model_name="CompVis/stable-diffusion-v1-4")
-    paddle_pipe.save_pretrained("./stable-diffusion-v1-4-paddle")
+    parser = argparse.ArgumentParser(
+        description="Pytorch model weights to Paddle model weights.")
+    parser.add_argument(
+        "--pretrained_model_name_or_path",
+        type=str,
+        default="runwayml/stable-diffusion-v1-5",
+        help=
+        "Path to pretrained model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default="stable-diffusion-v1-5-ppdiffusers",
+        help="The model output path.",
+    )
+    args = parser.parse_args()
+    paddle_pipe = convert_model(args.pretrained_model_name_or_path)
+    paddle_pipe.save_pretrained(args.output_path)
