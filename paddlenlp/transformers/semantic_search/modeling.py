@@ -128,14 +128,13 @@ class ErnieDualEncoder(nn.Layer):
         assert (is_query and self.query_ernie is not None) or (not is_query and self.title_ernie), \
             "Please check whether your parameter for `is_query` are consistent with DualEncoder initialization."
         if is_query:
-            sequence_output, pool_output = self.query_ernie(
-                input_ids, token_type_ids, position_ids, attention_mask)
+            sequence_output, _ = self.query_ernie(input_ids, token_type_ids,
+                                                  position_ids, attention_mask)
 
         else:
-            sequence_output, pool_output = self.title_ernie(
-                input_ids, token_type_ids, position_ids, attention_mask)
+            sequence_output, _ = self.title_ernie(input_ids, token_type_ids,
+                                                  position_ids, attention_mask)
         return sequence_output[:, 0]
-        # return pool_output
 
     def cosine_sim(self,
                    query_input_ids,
@@ -274,11 +273,10 @@ class ErnieCrossEncoder(nn.Layer):
                  position_ids=None,
                  attention_mask=None,
                  return_prob_distributation=False):
-        sequence_output, pooled_output = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        _, pooled_output = self.ernie(input_ids,
+                                      token_type_ids=token_type_ids,
+                                      position_ids=position_ids,
+                                      attention_mask=attention_mask)
         pooled_output = self.ernie.dropout(pooled_output)
         cls_embedding = self.ernie.classifier(pooled_output)
         probs = F.softmax(cls_embedding, axis=1)
@@ -291,14 +289,13 @@ class ErnieCrossEncoder(nn.Layer):
                     token_type_ids=None,
                     position_ids=None,
                     attention_mask=None):
-        sequence_output, pooled_output = self.ernie(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask)
+        sequence_output, _ = self.ernie(input_ids,
+                                        token_type_ids=token_type_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
         pooled_output = self.ernie.dropout(sequence_output[:, 0])
-        cls_embedding = self.ernie.classifier(pooled_output)
-        return cls_embedding
+        probs = self.ernie.classifier(pooled_output)
+        return probs
 
     def forward(self,
                 input_ids,
