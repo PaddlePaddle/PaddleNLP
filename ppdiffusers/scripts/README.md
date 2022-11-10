@@ -25,6 +25,9 @@ ___Tips: Stable Diffusion是基于以下的License: The CreativeML OpenRAIL M li
 若第一次导出模型，需要先登录HuggingFace客户端。执行以下命令进行登录：
 
 ```shell
+# 安装huggingface_hub
+pip install huggingface_hub
+# 登录huggingface_hub
 huggingface-cli login
 ```
 
@@ -90,15 +93,15 @@ pip install -r requirements.txt
 
 #### Step1 原版ckpt权重转换为Diffusers权重
 在开始之前我们需要准备如下的文件：
-- Huggingface提供的转换脚本，https://github.com/huggingface/diffusers/blob/main/scripts/convert_original_stable_diffusion_to_diffusers.py;
-- 原版的权重文件，https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned.ckpt;
-- yaml配置, https://raw.githubusercontent.com/CompVis/stable-diffusion/main/configs/stable-diffusion/v1-inference.yaml.
+- Huggingface提供的转换脚本, https://github.com/huggingface/diffusers/blob/main/scripts/convert_original_stable_diffusion_to_diffusers.py;
+- 原版的权重文件, https://huggingface.co/runwayml/stable-diffusion-v1-5/blob/main/v1-5-pruned.ckpt;
+- yaml配置文件, https://raw.githubusercontent.com/CompVis/stable-diffusion/main/configs/stable-diffusion/v1-inference.yaml.
 
 所需的文件目录如下所示：
 ```shell
 ├── convert_original_stable_diffusion_to_diffusers.py  # Huggingface的转换脚本
-├── v1-5-pruned.ckpt # v1-5模型权重文件
-├── v1-inference.yaml # vae权重文件夹
+├── v1-5-pruned.ckpt # 原版v1-5模型权重文件
+├── v1-inference.yaml # yaml配置文件
 ```
 
 ```shell
