@@ -28,7 +28,7 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments, CompressionAr
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
-from utils import reader, map_offset
+from utils import reader, map_offset, convert_example
 
 
 @dataclass

@@ -69,9 +69,9 @@ export finetuned_model=./checkpoint/model_best
 
 python finetune.py  \
     --device gpu \
-    --logging_steps 2 \
-    --save_steps 10 \
-    --eval_steps 10 \
+    --logging_steps 5 \
+    --save_steps 50 \
+    --eval_steps 50 \
     --seed 42 \
     --model_name_or_path uie-x-base \
     --output_dir $finetuned_model \
@@ -101,9 +101,9 @@ export finetuned_model=./checkpoint/model_best
 
 python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --device gpu \
-    --logging_steps 2 \
-    --save_steps 10 \
-    --eval_steps 10 \
+    --logging_steps 5 \
+    --save_steps 50 \
+    --eval_steps 50 \
     --seed 42 \
     --model_name_or_path uie-x-base \
     --output_dir $finetuned_model \
