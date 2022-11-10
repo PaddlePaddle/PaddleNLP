@@ -547,7 +547,9 @@ class ModelTesterMixin:
             with paddle.no_grad():
                 embeds_output = model(**inputs)
 
-            assert paddle.allclose(ids_output, embeds_output, 1e-4, 1e-4)
+            self.assertTrue(
+                paddle.allclose(ids_output, embeds_output, rtol=1e-4,
+                                atol=1e-4))
 
     def test_model_name_list(self):
         if not self.use_test_model_name_list:
