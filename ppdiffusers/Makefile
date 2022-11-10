@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := all
 
 .PHONY: all
-all: build deploy-version deploy
+all: deploy-version build deploy
 
 .PHONY: build
 build:

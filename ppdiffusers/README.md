@@ -133,7 +133,7 @@ import PIL
 import requests
 from io import BytesIO
 
-from ppdiffusers import StableDiffusionInpaintPipeline
+from ppdiffusers import StableDiffusionInpaintPipeline, EulerAncestralDiscreteScheduler
 
 def download_image(url):
     response = requests.get(url)
@@ -145,8 +145,8 @@ mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diff
 
 init_image = download_image(img_url).resize((512, 512))
 mask_image = download_image(mask_url).resize((512, 512))
-
-pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting")
+scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", scheduler=scheduler)
 
 prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
 image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
