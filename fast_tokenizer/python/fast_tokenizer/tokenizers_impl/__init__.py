@@ -1,5 +1,4 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# flake8: noqa
-from ...utils import is_paddlenlp_available
-
-if is_paddlenlp_available():
-    from .pipeline_latent_diffusion import LDMBertModel, LDMTextToImagePipeline
-    from .pipeline_latent_diffusion_superresolution import LDMSuperResolutionPipeline
+from .base_tokenizer import BaseFastTokenizer
+from .ernie import ErnieFastTokenizer
+from .sentencepiece_bpe import SentencePieceBPEFastTokenizer
