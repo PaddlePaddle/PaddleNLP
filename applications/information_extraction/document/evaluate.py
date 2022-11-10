@@ -20,13 +20,12 @@ from dataclasses import dataclass, field
 
 import paddle
 from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, UIEX
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
 
-from model import UIEX
 from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, uie_loss_func, compute_metrics
 
 
@@ -119,15 +118,7 @@ def do_eval():
 
         relation_type_dict = get_relation_type_dict(
             relation_data, schema_lang=data_args.schema_lang)
-
     test_ds = test_ds.map(trans_fn)
-
-    batch_sampler = paddle.io.BatchSampler(dataset=test_ds,
-                                           batch_size=1,
-                                           shuffle=False)
-    dev_data_loader = paddle.io.DataLoader(dataset=test_ds,
-                                           batch_sampler=batch_sampler,
-                                           return_list=True)
 
     trainer = Trainer(
         model=model,
@@ -137,14 +128,12 @@ def do_eval():
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
     )
-
     eval_metrics = trainer.evaluate()
     logger.info("-----Evaluate model-------")
     logger.info("Evaluation Precision: %.5f | Recall: %.5f | F1: %.5f" %
                 (eval_metrics['eval_precision'], eval_metrics['eval_recall'],
                  eval_metrics['eval_f1']))
     logger.info("-----------------------------")
-
     if data_args.debug:
         for key in class_dict.keys():
             test_ds = MapDataset(class_dict[key])

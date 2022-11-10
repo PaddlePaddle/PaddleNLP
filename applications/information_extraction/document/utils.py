@@ -28,25 +28,6 @@ norm_func = NormalizeImage(is_channel_first=False,
                            std=[58.395, 57.120, 57.375])
 permute_func = Permute(to_bgr=False)
 
-MODEL_MAP = {
-    "uie-x-base": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v0.1/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
-            "vocab.txt":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/vocab.txt",
-            "special_tokens_map.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/special_tokens_map.json",
-            "tokenizer_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/tokenizer_config.json",
-            "sentencepiece.bpe.model":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/sentencepiece.bpe.model"
-        },
-    }
-}
-
 
 def map_offset(ori_offset, offset_mapping):
     """
@@ -442,35 +423,6 @@ def get_relation_type_dict(relation_data, schema_lang="ch"):
                 relation_type_dict.setdefault(relation_type,
                                               []).append(relation_data[i][1])
     return relation_type_dict
-
-
-def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
-    """
-    Create dataloader.
-    Args:
-        dataset(obj:`paddle.io.Dataset`): Dataset instance.
-        mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
-        batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
-        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
-    Returns:
-        dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
-    """
-    if trans_fn:
-        dataset = dataset.map(trans_fn)
-
-    shuffle = True if mode == 'train' else False
-    if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=shuffle)
-    else:
-        sampler = paddle.io.BatchSampler(dataset=dataset,
-                                         batch_size=batch_size,
-                                         shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      return_list=True)
-    return dataloader
 
 
 def uie_loss_func(outputs, labels):
