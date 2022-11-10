@@ -80,6 +80,7 @@ class ErnieDualEncoder(nn.Layer):
                  title_model_name_or_path=None,
                  share_parameters=False,
                  dropout=None,
+                 reinitialize=False,
                  use_cross_batch=False):
 
         super().__init__()
@@ -95,6 +96,15 @@ class ErnieDualEncoder(nn.Layer):
                 title_model_name_or_path)
         assert (self.query_ernie is not None) or (self.title_ernie is not None), \
             "At least one of query_ernie and title_ernie should not be None"
+
+        # Compatible to rocketv2 initialization
+        if (reinitialize):
+            self.apply(self.init_weights)
+
+    def init_weights(self, layer):
+        """ Initialization hook """
+        if isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-5
 
     def get_semantic_embedding(self, data_loader):
         self.eval()
@@ -118,13 +128,14 @@ class ErnieDualEncoder(nn.Layer):
         assert (is_query and self.query_ernie is not None) or (not is_query and self.title_ernie), \
             "Please check whether your parameter for `is_query` are consistent with DualEncoder initialization."
         if is_query:
-            sequence_output, _ = self.query_ernie(input_ids, token_type_ids,
-                                                  position_ids, attention_mask)
+            sequence_output, pool_output = self.query_ernie(
+                input_ids, token_type_ids, position_ids, attention_mask)
 
         else:
-            sequence_output, _ = self.title_ernie(input_ids, token_type_ids,
-                                                  position_ids, attention_mask)
+            sequence_output, pool_output = self.title_ernie(
+                input_ids, token_type_ids, position_ids, attention_mask)
         return sequence_output[:, 0]
+        # return pool_output
 
     def cosine_sim(self,
                    query_input_ids,
@@ -242,9 +253,20 @@ class ErnieCrossEncoder(nn.Layer):
     def __init__(self,
                  pretrain_model_name_or_path,
                  num_classes=2,
+                 reinitialize=False,
                  dropout=None):
         super().__init__()
-        self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path)
+
+        self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path,
+                                                  num_classes=num_classes)
+        # Compatible to rocketv2 initialization
+        if (reinitialize):
+            self.apply(self.init_weights)
+
+    def init_weights(self, layer):
+        """ Initialization hook """
+        if isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-5
 
     def matching(self,
                  input_ids,
@@ -252,16 +274,31 @@ class ErnieCrossEncoder(nn.Layer):
                  position_ids=None,
                  attention_mask=None,
                  return_prob_distributation=False):
-        _, pooled_output = self.ernie(input_ids,
-                                      token_type_ids=token_type_ids,
-                                      position_ids=position_ids,
-                                      attention_mask=attention_mask)
+        sequence_output, pooled_output = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
         pooled_output = self.ernie.dropout(pooled_output)
         cls_embedding = self.ernie.classifier(pooled_output)
         probs = F.softmax(cls_embedding, axis=1)
         if return_prob_distributation:
             return probs
         return probs[:, 1]
+
+    def matching_v2(self,
+                    input_ids,
+                    token_type_ids=None,
+                    position_ids=None,
+                    attention_mask=None):
+        sequence_output, pooled_output = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        pooled_output = self.ernie.dropout(sequence_output[:, 0])
+        cls_embedding = self.ernie.classifier(pooled_output)
+        return cls_embedding
 
     def forward(self,
                 input_ids,
