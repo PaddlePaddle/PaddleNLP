@@ -42,6 +42,7 @@ class Convertor(object):
                  prompt_prefix="情感倾向",
                  options=["正向", "负向"],
                  separator="##",
+                 layout_analysis=False,
                  schema_lang="ch",
                  anno_type="text"):
         """Init Data Convertor"""
@@ -49,6 +50,7 @@ class Convertor(object):
         self.prompt_prefix = prompt_prefix
         self.options = options
         self.separator = separator
+        self.layout_analysis = layout_analysis
         self.schema_lang = schema_lang
         self.anno_type = anno_type
 
@@ -101,7 +103,10 @@ class Convertor(object):
             global_offset = 0
             for seg in layouts:
                 sbox = seg[0]
-                char_w = (sbox[2] - sbox[0]) * 1.0 / len(seg[1])
+                text_len = len(seg[1])
+                if text_len == 0:
+                    continue
+                char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
                 for i in range(len(seg[1])):
                     cbox = [
                         sbox[0] + i * char_w, sbox[1],
@@ -136,7 +141,7 @@ class Convertor(object):
             logger.warning("Image file %s not existed in %s" %
                            (img_file, "./data/images"))
         logger.info("Parsing image file %s ..." % (img_file))
-        doc_parser = DocParser()
+        doc_parser = DocParser(layout_analysis=self.layout_analysis)
         image = doc_parser.read_image(img_path)
         img_w, img_h = image.shape[1], image.shape[0]
         parsed_doc = doc_parser.parse({'image': image})
@@ -170,6 +175,7 @@ class Convertor(object):
                     (e['value']['x'] + e['value']['width']) * 0.01 * img_w,
                     (e['value']['y'] + e['value']['height']) * 0.01 * img_h
                 ]
+
                 offsets = _find_segment_in_box(parsed_doc['layout'], box)
                 if len(offsets) > 0:
                     items['entities'].append({
@@ -207,7 +213,7 @@ class Convertor(object):
         Convert labeled data for classification task.
         """
         examples = []
-        logger.info(f"Converting doccano data...")
+        logger.info(f"Converting annotation data...")
         with tqdm(total=len(raw_examples)) as pbar:
             for line in raw_examples:
                 if self.anno_type == "text":
@@ -269,7 +275,7 @@ class Convertor(object):
         else:
             images, boxes_list = [], []
 
-        logger.info(f"Converting doccano data...")
+        logger.info(f"Converting annotation data...")
         with tqdm(total=len(raw_examples)) as pbar:
             for line in raw_examples:
 
@@ -729,8 +735,13 @@ def do_convert():
     else:
         anno_type = "text"
 
-    convertor = Convertor(args.negative_ratio, args.prompt_prefix, args.options,
-                          args.separator, args.schema_lang, anno_type)
+    convertor = Convertor(negative_ratio=args.negative_ratio,
+                          prompt_prefix=args.prompt_prefix,
+                          options=args.options,
+                          separator=args.separator,
+                          layout_analysis=args.layout_analysis,
+                          schema_lang=args.schema_lang,
+                          anno_type=anno_type)
 
     if args.task_type == "ext":
         train_examples = convertor.convert_ext_examples(raw_examples[:p1])
@@ -771,6 +782,7 @@ if __name__ == "__main__":
     parser.add_argument("--options", default=["正向", "负向"], type=str, nargs="+", help="Used only for the classification task, the options for classification")
     parser.add_argument("--prompt_prefix", default="情感倾向", type=str, help="Used only for the classification task, the prompt prefix for classification")
     parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
+    parser.add_argument("--layout_analysis", default=False, type=bool, help="Enable layout analysis to optimize the order of OCR result.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--separator", type=str, default='##', help="Used only for entity/aspect-level classification task, separator for entity label and classification label")
     parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")

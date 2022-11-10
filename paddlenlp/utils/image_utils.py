@@ -268,11 +268,13 @@ class DocParser(object):
 
     def __init__(self,
                  ocr_model_config='PP-OCRv3',
+                 layout_analysis=False,
                  pdf_parser_config=None,
                  use_gpu=None,
                  device_id=None):
         self.ocr_model_config = ocr_model_config
         self.use_angle_cls = False
+        self.layout_analysis = layout_analysis
         if isinstance(ocr_model_config, dict):
             self.use_angle_cls = ocr_model_config.get('use_angle_cls', False)
         self.pdf_parser_config = pdf_parser_config
@@ -280,7 +282,7 @@ class DocParser(object):
         self.use_gpu = use_gpu
         self.device_id = device_id
 
-    def parse(self, inputs, keep_whitespace=True, expand_to_a4_size=True):
+    def parse(self, inputs, keep_whitespace=False, expand_to_a4_size=True):
         """
         parse
         """
@@ -341,6 +343,16 @@ class DocParser(object):
         """
         call ocr for an image
         """
+
+        def _get_box(box):
+            box = [
+                min(box[0][0], box[3][0]),  # x1
+                min(box[0][1], box[1][1]),  # y1
+                max(box[1][0], box[2][0]),  # x2
+                max(box[2][1], box[3][1]),  # y2
+            ]
+            return box
+
         if self.ocr_infer_model is None:
             self.init_ocr_inference()
         _image = image
@@ -348,23 +360,28 @@ class DocParser(object):
             _image, _, _ = self.expand_image_to_a4_size(_image)
         if cls is None:
             cls = self.use_angle_cls
-        ocr_res = self.ocr_infer_model.ocr(_image, det, rec, cls)
+
         layout = []
-        if not ocr_res:
-            return layout
-        for segment in ocr_res:
-            box = segment[0]
-            box = [
-                min(box[0][0], box[3][0]),  # x1
-                min(box[0][1], box[1][1]),  # y1
-                max(box[1][0], box[2][0]),  # x2
-                max(box[2][1], box[3][1]),  # y2
-            ]
-            text = segment[1][0]
-            if not keep_whitespace:
-                text = text.replace(' ', '')
-            layout.append((box, text, segment[1][1]))
-        layout = self._adjust_layout(layout)
+        if not self.layout_analysis:
+            ocr_res = self.ocr_infer_model.ocr(_image, det, rec, cls)
+            for segment in ocr_res:
+                box = segment[0]
+                box = _get_box(box)
+                text = segment[1][0]
+                if not keep_whitespace:
+                    text = text.replace(' ', '')
+                layout.append((box, text, segment[1][1]))
+        else:
+            res = self.layout_analysis_engine(_image)
+            for region in res:
+                ocr_res = region['res']
+                for segment in ocr_res:
+                    box = segment['text_region']
+                    box = _get_box(box)
+                    text = segment['text']
+                    if not keep_whitespace:
+                        text = text.replace(' ', '')
+                    layout.append((box, text, segment['confidence']))
         if return_image:
             return layout, _image
         return layout
@@ -554,18 +571,31 @@ class DocParser(object):
         if self.ocr_infer_model is not None:
             logger.warning("ocr model has already been initialized")
             return
-        try:
-            from paddleocr import PaddleOCR
-        except ImportError:
-            raise RuntimeError(
-                "Need paddleocr to process image input. "
-                "Please install module by: python3 -m pip install paddleocr")
 
-        if isinstance(self.ocr_model_config, dict):
-            self.ocr_infer_model = PaddleOCR(**self.ocr_model_config)
+        if not self.layout_analysis:
+            try:
+                from paddleocr import PaddleOCR
+            except ImportError:
+                raise RuntimeError(
+                    "Need paddleocr to process image input. "
+                    "Please install module by: python3 -m pip install paddleocr"
+                )
+            if isinstance(self.ocr_model_config, dict):
+                self.ocr_infer_model = PaddleOCR(**self.ocr_model_config)
+            else:
+                self.ocr_infer_model = PaddleOCR(
+                    ocr_version=self.ocr_model_config, show_log=False)
         else:
-            self.ocr_infer_model = PaddleOCR(ocr_version=self.ocr_model_config,
-                                             show_log=False)
+            try:
+                from paddleocr import PPStructure
+            except ImportError:
+                raise RuntimeError(
+                    "Need paddleocr to process image input. "
+                    "Please install module by: python3 -m pip install paddleocr"
+                )
+            self.layout_analysis_engine = PPStructure(table=False,
+                                                      ocr=True,
+                                                      show_log=False)
 
     @classmethod
     def _normalize_box(self, box, old_size, new_size, offset_x=0, offset_y=0):
@@ -605,20 +635,6 @@ class DocParser(object):
                 exp_img.fill(255)
                 image = np.vstack([image, exp_img])
         return image, offset_x, offset_y
-
-    @classmethod
-    def _adjust_layout(self, layout):
-        """adjust layout"""
-        adj_layout = []
-        for i in range(len(layout)):
-            xi1, yi1, xi2, yi2 = layout[i][0]
-            j = -1
-            for j in range(len(adj_layout) - 1, -1, -1):
-                xj1, yj1, xj2, yj2 = layout[j][0]
-                if xi2 > xj1 or yi1 > yj1 + (yj2 - yj1) * 0.6:
-                    break
-            adj_layout.insert(j + 1, layout[i])
-        return adj_layout
 
 
 def load_image(image):

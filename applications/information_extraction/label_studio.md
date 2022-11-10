@@ -453,6 +453,7 @@ python label_studio.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度分类任务有效。默认为"##"。
+- ``layout_analysis``： 使用PPStructure的布局分析优化OCR结果的排序，该参数只对文档类型标注任务有效。默认为False。
 
 备注：
 - 默认情况下 [label_studio.py](./label_studio.py) 脚本会按照比例将数据划分为 train/dev/test 数据集

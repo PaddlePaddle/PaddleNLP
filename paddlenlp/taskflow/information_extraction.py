@@ -109,6 +109,7 @@ norm_func = NormalizeImage(is_channel_first=False,
                            std=[0.229, 0.224, 0.225])
 permute_func = Permute(to_bgr=False)
 doc_parser = DocParser()
+MODEL_MAP = {"UIE": UIE, "UIEM": UIEM, "UIEX": UIEX}
 
 
 class UIETask(Task):
@@ -389,10 +390,11 @@ class UIETask(Task):
     def __init__(self, task, model, schema, schema_lang="ch", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
-        if model in ['uie-m-base', 'uie-m-large', 'uie-x-base']:
+        with open(os.path.join(self._task_path, "model_config.json")) as f:
+            self._init_class = json.load(f)['init_class']
+
+        if self._init_class in ["UIEX", "UIEM"]:
             self._multilingual = True
-            self.resource_files_names[
-                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
         else:
             self._multilingual = False
             if 'sentencepiece_model_file' in self.resource_files_names.keys():
@@ -401,7 +403,7 @@ class UIETask(Task):
                                         ] or schema_lang == 'en' else False
 
         self._summary_token_num = 3
-        self._multimodal = True if model in ['uie-x-base'] else False
+        self._multimodal = True if self._init_class in ['UIEX'] else False
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
         if self._multimodal:
             self._construct_ocr_engine(lang=self._ocr_lang)
@@ -420,6 +422,7 @@ class UIETask(Task):
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
+        self._layout_analysis = kwargs.get("layout_analysis", False)
         self.use_faster = kwargs.get("use_faster", False)
         self._construct_tokenizer()
 
@@ -482,12 +485,8 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        if self._multimodal:
-            model_instance = UIEX.from_pretrained(self._task_path)
-        elif self._multilingual:
-            model_instance = UIEM.from_pretrained(self._task_path)
-        else:
-            model_instance = UIE.from_pretrained(self._task_path)
+        model_instance = MODEL_MAP[self._init_class].from_pretrained(
+            self._task_path)
         self._model = model_instance
         self._model.eval()
 
@@ -782,7 +781,7 @@ class UIETask(Task):
                 assert len(attention_mask) == self._max_seq_len
                 assert len(bbox_list) == self._max_seq_len
 
-                yield tuple([np.array(x, dtype="int64") for x in input_list])
+                yield tuple([np.array(x) for x in input_list])
 
         reader = doc_reader if self._multimodal else text_reader
         infer_ds = load_dataset(reader,
