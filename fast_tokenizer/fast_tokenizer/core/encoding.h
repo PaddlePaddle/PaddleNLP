@@ -81,7 +81,8 @@ public:
   Range GetSequenceRange(uint32_t seq_id) const;
 
   void ProcessTokenWithOffsets(
-      std::function<void(uint32_t, std::string*, Offset*)> process_token_fn);
+      std::function<void(uint32_t, const std::string&, Offset*)>
+          process_token_fn);
 
   // token_idx: The index of token in the sequence
   std::vector<uint32_t> TokenIdxToSequenceIds(uint32_t token_idx) const;
@@ -122,15 +123,15 @@ private:
 };
 
 bool FASTTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
-                                            Encoding* pair_encoding,
-                                            const TruncMethod& method);
+                                          Encoding* pair_encoding,
+                                          const TruncMethod& method);
 void FASTTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
-                                       const PadMethod& method);
+                                     const PadMethod& method);
 
 int FASTTOKENIZER_DECL GetThreadNum(size_t batch_size);
 
-void FASTTOKENIZER_DECL
-RunMultiThread(std::function<void(size_t, size_t)> func, size_t batch_size);
+void FASTTOKENIZER_DECL RunMultiThread(std::function<void(size_t, size_t)> func,
+                                       size_t batch_size);
 }  // namespace core
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

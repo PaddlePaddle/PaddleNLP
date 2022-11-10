@@ -14,34 +14,33 @@
 
 #pragma once
 
-#include "fast_tokenizer/pretokenizers/pretokenizer.h"
+#include "fast_tokenizer/postprocessors/postprocessor.h"
 #include "fast_tokenizer/utils/utils.h"
 #include "nlohmann/json.hpp"
 
-
 namespace paddlenlp {
 namespace fast_tokenizer {
-namespace pretokenizers {
+namespace postprocessors {
 
-struct FASTTOKENIZER_DECL ByteLevelPreTokenizer : public PreTokenizer {
-  ByteLevelPreTokenizer(bool add_prefix_space = true,
-                        bool use_regex = true,
-                        bool trim_offsets = true);
-  virtual void operator()(PreTokenizedString* pretokenized) const override;
+struct FASTTOKENIZER_DECL ByteLevelPostProcessor : public PostProcessor {
+  ByteLevelPostProcessor(bool add_prefix_space = true,
+                         bool trim_offsets = true,
+                         bool use_regex = true);
+  virtual size_t AddedTokensNum(bool is_pair) const override;
+  virtual void operator()(core::Encoding* encoding,
+                          core::Encoding* pair_encoding,
+                          bool add_special_tokens,
+                          core::Encoding* result_encoding) const override;
+
   friend void to_json(nlohmann::json& j,
-                      const ByteLevelPreTokenizer& byte_pre_tokenizer);
+                      const ByteLevelPostProcessor& byte_level_postprocessor);
   friend void from_json(const nlohmann::json& j,
-                        ByteLevelPreTokenizer& byte_pre_tokenizer);
-
-private:
+                        ByteLevelPostProcessor& byte_level_postprocessor);
   bool add_prefix_space_;
   bool trim_offsets_;
   bool use_regex_;
 };
 
-void FASTTOKENIZER_DECL ProcessOffsets(core::Encoding* encoding,
-                                       bool add_prefix_space);
-
-}  // namespace pretokenizers
+}  // namespace postprocessors
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

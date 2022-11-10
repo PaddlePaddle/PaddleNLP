@@ -134,6 +134,14 @@ std::unordered_map<uint8_t, uint32_t> CreateBytesToChars() {
   return bytes_to_chars;
 }
 
+bool IsWhiteSpace(int ch) {
+  const std::string WHITESPACE = " \n\r\t\f\v";
+  for (int i = 0; i < WHITESPACE.length(); ++i) {
+    if (ch == WHITESPACE[i]) return true;
+  }
+  return u_isspace(ch);
+}
+
 }  // namespace utils
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

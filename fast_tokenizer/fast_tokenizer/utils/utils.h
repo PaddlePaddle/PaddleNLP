@@ -180,6 +180,8 @@ void GetSortedVocab(const std::vector<const char*>& keys,
 
 std::unordered_map<uint8_t, uint32_t> CreateBytesToChars();
 
+bool IsWhiteSpace(int ch);
+
 }  // namespace utils
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp
