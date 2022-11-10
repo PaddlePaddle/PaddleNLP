@@ -77,7 +77,7 @@ python finetune.py  \
     --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
-    --max_seq_length 512  \
+    --max_seq_len 512  \
     --per_device_train_batch_size  8 \
     --per_device_eval_batch_size 8 \
     --num_train_epochs 10 \
@@ -91,7 +91,7 @@ python finetune.py  \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
     --load_best_model_at_end  True \
-    --save_total_limit 1 \
+    --save_total_limit 1
 ```
 
 如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
@@ -99,7 +99,7 @@ python finetune.py  \
 ```shell
 export finetuned_model=./checkpoint/model_best
 
-python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
+python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --device gpu \
     --logging_steps 5 \
     --save_steps 50 \
@@ -109,7 +109,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --output_dir $finetuned_model \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
-    --max_seq_length 512  \
+    --max_seq_len 512  \
     --per_device_train_batch_size  8 \
     --per_device_eval_batch_size 8 \
     --num_train_epochs 10 \
@@ -123,7 +123,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
     --load_best_model_at_end  True \
-    --save_total_limit 1 \
+    --save_total_limit 1
 ```
 
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
@@ -165,9 +165,8 @@ python evaluate.py \
     --test_path ./data/dev.txt \
     --output_dir $finetuned_model \
     --label_names 'start_positions' 'end_positions'\
-    --batch_size 16 \
     --max_seq_len 512 \
-    --per_device_eval_batch_size 16 \
+    --per_device_eval_batch_size 16
 ```
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
 
@@ -179,7 +178,6 @@ python evaluate.py \
     --test_path ./data/dev.txt \
     --output_dir $finetuned_model \
     --label_names 'start_positions' 'end_positions'\
-    --batch_size 16 \
     --max_seq_len 512 \
     --per_device_eval_batch_size 16 \
     --debug True
@@ -211,10 +209,10 @@ my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoin
 我们可以根据设置的`schema`，对指定的`doc_path`文档进行信息抽取：
 ```python
 doc_path = "test.jpg"
-pprint(my_ie ({"doc": doc_path}))
+pprint(my_ie({"doc": doc_path}))
 ```
 也支持根据设置的`schema`，对纯文本`text`进行信息抽取：
 ```python
 text = "地址、电话：深圳市龙华新区民治街道民治大道展滔科技大厦开户行及账号：中国工商银行股份有限公司深圳园岭支行4000024709200172809纳税人识别号：91440101664041243T售地址、电话：广州市黄埔区九龙镇九龙工业园凤凰三横路99号 66215500注方开户行及账号：工行北京路支行3602000919200384952收款人：王梅复核：张雪开票人：陈秋燕销"
-pprint(ie({"text": text}))
+pprint(my_ie({"text": text}))
 ```
