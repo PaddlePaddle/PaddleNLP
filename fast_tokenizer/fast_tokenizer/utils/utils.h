@@ -178,6 +178,8 @@ void GetSortedVocab(const std::vector<const char*>& keys,
                     std::vector<const char*>* sorted_keys,
                     std::vector<int>* sorted_values);
 
+std::unordered_map<uint8_t, uint32_t> CreateBytesToChars();
+
 }  // namespace utils
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

@@ -16,11 +16,11 @@ limitations under the License. */
 
 #include "fast_tokenizer/core/tokenizer.h"
 #include "fast_tokenizer/decoders/decoders.h"
-#include "glog/logging.h"
 #include "fast_tokenizer/models/models.h"
 #include "fast_tokenizer/normalizers/normalizers.h"
 #include "fast_tokenizer/postprocessors/postprocessors.h"
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
+#include "glog/logging.h"
 
 #include <Python.h>
 
@@ -154,6 +154,11 @@ static int TokenizerPropertiesSetPreTokenizer(TokenizerObject* self,
                  py::type::of<pretokenizers::SequencePreTokenizer>())) {
     const auto& pretokenizer =
         py_obj.cast<const pretokenizers::SequencePreTokenizer&>();
+    self->tokenizer.SetPreTokenizer(pretokenizer);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<pretokenizers::ByteLevelPreTokenizer>())) {
+    const auto& pretokenizer =
+        py_obj.cast<const pretokenizers::ByteLevelPreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleasePreTokenizer();

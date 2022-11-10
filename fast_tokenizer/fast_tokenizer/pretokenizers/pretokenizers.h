@@ -15,6 +15,7 @@ limitations under the License. */
 #pragma once
 
 #include "fast_tokenizer/pretokenizers/bert.h"
+#include "fast_tokenizer/pretokenizers/byte_level.h"
 #include "fast_tokenizer/pretokenizers/metaspace.h"
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/pretokenizers/sequence.h"

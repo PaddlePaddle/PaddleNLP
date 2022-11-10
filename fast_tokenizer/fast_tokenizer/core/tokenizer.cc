@@ -591,6 +591,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(pretokenizers::SequencePreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::SequencePreTokenizer*>(
           tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::ByteLevelPreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::ByteLevelPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
     }
   }
 
@@ -705,6 +709,9 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         pretokenizers::SequencePreTokenizer sequence_pretokenizer;
         pretokenizer.get_to(sequence_pretokenizer);
         tokenizer.SetPreTokenizer(sequence_pretokenizer);
+      } else if (pretokenizer.at("type") == "ByteLevelPreTokenizer") {
+        pretokenizers::ByteLevelPreTokenizer byte_pretokenizer;
+        tokenizer.SetPreTokenizer(byte_pretokenizer);
       }
     }
 
@@ -810,6 +817,8 @@ template void Tokenizer::SetPreTokenizer(
     const pretokenizers::MetaSpacePreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::SequencePreTokenizer&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::ByteLevelPreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);

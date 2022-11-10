@@ -16,6 +16,7 @@ limitations under the License. */
 
 #include <functional>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 #include "fast_tokenizer/core/base.h"
@@ -78,6 +79,8 @@ public:
   StringSplit GetSplit(int idx) const;
   const std::string& GetOriginStr() const;
   void SetOriginalStr(const std::string& original);
+  std::vector<std::tuple<std::string, core::Offset, std::vector<core::Token>>>
+  GetSplits(bool is_original, const core::OffsetType& offset_type) const;
 
 private:
   std::string original_;

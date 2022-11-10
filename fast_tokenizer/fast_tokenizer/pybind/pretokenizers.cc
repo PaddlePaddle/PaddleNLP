@@ -73,6 +73,16 @@ public:
   }
 };
 
+class PyByteLevelPreTokenizer : public pretokenizers::ByteLevelPreTokenizer {
+public:
+  using ByteLevelPreTokenizer::ByteLevelPreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, ByteLevelPreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
 void BindPreTokenizers(pybind11::module* m) {
   auto sub_module =
       m->def_submodule("pretokenizers", "The pretokenizers module");
@@ -96,6 +106,22 @@ void BindPreTokenizers(pybind11::module* m) {
            &pretokenizers::PreTokenizedString::GetSplitsSize)
       .def("get_original_text",
            &pretokenizers::PreTokenizedString::GetOriginStr)
+      .def("get_splits",
+           [](const pretokenizers::PreTokenizedString& self,
+              const std::string& offset_referential,
+              const std::string& offset_type) {
+             bool is_original = true;
+             if (offset_referential != "original") {
+               is_original = false;
+             }
+             core::OffsetType type = core::OffsetType::CHAR;
+             if (offset_type != "char") {
+               type = core::OffsetType::BYTE;
+             }
+             return self.GetSplits(is_original, type);
+           },
+           py::arg("offset_referential") = "original",
+           py::arg("offset_type") = "char")
       .def("to_encoding",
            [](const pretokenizers::PreTokenizedString& self,
               const std::vector<uint32_t>& word_idx,
@@ -164,6 +190,12 @@ void BindPreTokenizers(pybind11::module* m) {
            }),
            py::arg("pretokenizers"))
       .def("__call__", &pretokenizers::SequencePreTokenizer::operator());
+  py::class_<pretokenizers::ByteLevelPreTokenizer, PyByteLevelPreTokenizer>(
+      sub_module, "ByteLevelPreTokenizer")
+      .def(py::init<bool, bool>(),
+           py::arg("add_prefix_space") = true,
+           py::arg("use_regex") = true)
+      .def("__call__", &pretokenizers::ByteLevelPreTokenizer::operator());
 }
 
 }  // namespace pybind
