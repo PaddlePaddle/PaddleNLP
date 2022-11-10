@@ -60,7 +60,7 @@ using InputString = paddlenlp::variant<std::string, std::vector<std::string>>;
 using EncodeInput =
     paddlenlp::variant<InputString, std::pair<InputString, InputString>>;
 
-class FASTERTOKENIZER_DECL Tokenizer {
+class FASTTOKENIZER_DECL Tokenizer {
 public:
   Tokenizer()
       : model_(nullptr),

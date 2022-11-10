@@ -22,7 +22,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace postprocessors {
 
-struct FASTERTOKENIZER_DECL BertPostProcessor : public PostProcessor {
+struct FASTTOKENIZER_DECL BertPostProcessor : public PostProcessor {
   BertPostProcessor(const std::pair<std::string, uint32_t>& sep,
                     const std::pair<std::string, uint32_t>& cls);
   BertPostProcessor();

@@ -28,7 +28,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
 
-enum FASTERTOKENIZER_DECL SplitMode {
+enum FASTTOKENIZER_DECL SplitMode {
   REMOVED,
   ISOLATED,
   MERGED_WITH_PREVIOUS,
@@ -36,12 +36,12 @@ enum FASTERTOKENIZER_DECL SplitMode {
   CONTIGUOUS
 };
 
-struct FASTERTOKENIZER_DECL OffsetMapping {
+struct FASTTOKENIZER_DECL OffsetMapping {
   std::u32string u32normalized;
   std::vector<int> changes;  // Same size as normalized
 };
 
-class FASTERTOKENIZER_DECL NormalizedString {
+class FASTTOKENIZER_DECL NormalizedString {
 public:
   NormalizedString(const std::string& original);
   NormalizedString(NormalizedString&& other);
@@ -201,7 +201,7 @@ private:
                     std::vector<std::pair<core::Range, bool>>* matches) const;
 };
 
-struct FASTERTOKENIZER_DECL Normalizer {
+struct FASTTOKENIZER_DECL Normalizer {
   virtual void operator()(NormalizedString* mut_str) const = 0;
 };
 

@@ -20,7 +20,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
-struct FASTERTOKENIZER_DECL ByteLevelPreTokenizer : public PreTokenizer {
+struct FASTTOKENIZER_DECL ByteLevelPreTokenizer : public PreTokenizer {
   ByteLevelPreTokenizer(bool add_prefix_space = true,
                         bool use_regex = true,
                         bool trim_offsets = true);
@@ -35,6 +35,8 @@ private:
   bool trim_offsets_;
   bool use_regex_;
 };
+
+
 
 }  // namespace pretokenizers
 }  // namespace fast_tokenizer
