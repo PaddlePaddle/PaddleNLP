@@ -101,7 +101,7 @@ def dense_faq_pipeline():
 
 def qa_generation_pipeline():
     answer_extractor = AnswerExtractor(
-        model='uie-base-answer-extractor-v1',
+        model='uie-base-answer-extractor',
         device=args.device,
         schema=['答案'],
         max_answer_candidates=3,
@@ -115,7 +115,7 @@ def qa_generation_pipeline():
     )
 
     qa_filter = QAFilter(
-        model='uie-base-qa-filter-v1',
+        model='uie-base-qa-filter',
         device=args.device,
         schema=['答案'],
         position_prob=0.1,

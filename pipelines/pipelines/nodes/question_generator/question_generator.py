@@ -41,7 +41,7 @@ class QuestionGenerator(BaseComponent):
     }
 
     resource_files_urls = {
-        "unimo-text-1.0-question-generator-v1": {
+        "unimo-text-1.0-question-generator": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/question_generator/unimo-text-1.0-question-generator-v1/model_state.pdparams",
                 "856a2980f83dc227a8fed4ecd730696d"
@@ -103,11 +103,11 @@ class QuestionGenerator(BaseComponent):
                 self._task_path = None
                 self._from_taskflow = True
             else:
-                self.model = "unimo-text-1.0"
                 self._task_path = os.path.join(
                     PPNLP_HOME, "pipelines", "unsupervised_question_answering",
                     self.model)
                 self._check_task_files()
+                self.model = "unimo-text-1.0"
         self.num_return_sequences = num_return_sequences
         self.batch_size = batch_size
         if self._from_taskflow:

@@ -29,6 +29,10 @@ components:    # define all the building-blocks for Pipeline
     type: PDFToTextConverter
   - name: DocxFileConverter
     type: DocxToTextConverter
+  - name: AnswerExtractorPreprocessor
+    type: AnswerExtractorPreprocessor
+  - name: QAFilterPostprocessor
+    type: QAFilterPostprocessor 
   - name: Preprocessor
     type: PreProcessor
     params:
@@ -62,5 +66,33 @@ pipelines:
         inputs: [PDFFileConverter, TextFileConverter, DocxFileConverter, ImageFileConverter]
       - name: Retriever
         inputs: [Preprocessor]
+      - name: DocumentStore
+        inputs: [Retriever]
+        
+  - name: indexing_qa_generating
+    type: Indexing_qa_generating
+    nodes:
+      - name: FileTypeClassifier
+        inputs: [File]
+      - name: TextFileConverter
+        inputs: [FileTypeClassifier.output_1]
+      - name: PDFFileConverter
+        inputs: [FileTypeClassifier.output_2]
+      - name: DocxFileConverter
+        inputs: [FileTypeClassifier.output_4]
+      - name: ImageFileConverter
+        inputs: [FileTypeClassifier.output_6]
+      - name: AnswerExtractorPreprocessor
+        inputs: [PDFFileConverter, TextFileConverter, DocxFileConverter, ImageFileConverter]
+      - name: AnswerExtractor
+        inputs: [AnswerExtractorPreprocessor]
+      - name: QuestionGenerator
+        inputs: [AnswerExtractor]
+      - name: QAFilter
+        inputs: [QuestionGenerator]
+      - name: QAFilterPostprocessor
+        inputs: [QAFilter]
+      - name: Retriever
+        inputs: [QAFilterPostprocessor]
       - name: DocumentStore
         inputs: [Retriever]

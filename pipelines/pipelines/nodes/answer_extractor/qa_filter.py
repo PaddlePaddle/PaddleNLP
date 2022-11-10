@@ -40,7 +40,7 @@ class QAFilter(BaseComponent):
     }
 
     resource_files_urls = {
-        "uie-base-qa-filter-v1": {
+        "uie-base-qa-filter": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/qa_filter/uie-base-qa-filter-v1/model_state.pdparams",
                 "feb2d076fa2f78a0d3c3e3d20e9d5dc5"

@@ -40,7 +40,7 @@ class AnswerExtractor(BaseComponent):
     }
 
     resource_files_urls = {
-        "uie-base-answer-extractor-v1": {
+        "uie-base-answer-extractor": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/answer_generator/uie-base-answer-extractor/uie-base-answer-extractor-v1/model_state.pdparams",
                 "c8619f631a0c20434199840d34bb8b8c"
@@ -188,6 +188,5 @@ class AnswerExtractor(BaseComponent):
             max_answer_candidates=self.max_answer_candidates,
             schema=self.schema,
             wf=None)
-        print('create synthetic answers successfully!')
         results = {"ca_pairs": synthetic_context_answer_pairs}
         return results, "output_1"

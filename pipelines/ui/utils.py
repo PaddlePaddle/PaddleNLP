@@ -39,6 +39,7 @@ DOC_UPLOAD = "file-upload"
 DOC_PARSE = 'files'
 IMAGE_REQUEST = 'query_text_to_images'
 QA_PAIR_REQUEST = 'query_qa_pairs'
+FILE_UPLOAD_QA_GENERATE = 'file-upload-qa-generate'
 
 
 def pipelines_is_ready():
@@ -269,6 +270,13 @@ def send_feedback(query, answer_obj, is_correct_answer, is_correct_document,
 
 def upload_doc(file):
     url = f"{API_ENDPOINT}/{DOC_UPLOAD}"
+    files = [("files", file)]
+    response = requests.post(url, files=files).json()
+    return response
+
+
+def file_upload_qa_generate(file):
+    url = f"{API_ENDPOINT}/{FILE_UPLOAD_QA_GENERATE}"
     files = [("files", file)]
     response = requests.post(url, files=files).json()
     return response

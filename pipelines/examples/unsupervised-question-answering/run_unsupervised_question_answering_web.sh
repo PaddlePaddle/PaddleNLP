@@ -14,7 +14,7 @@
 
 # 环境变量设置
 unset http_proxy && unset https_proxy
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8896

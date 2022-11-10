@@ -23,7 +23,7 @@ import streamlit as st
 from annotated_text import annotation
 from markdown import markdown
 
-from ui.utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink, text_to_qa_pair_search, offline_ann
+from ui.utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, file_upload_qa_generate, pipelines_version, get_backlink, text_to_qa_pair_search, offline_ann
 
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 # DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP", "如何办理企业养老保险?")
@@ -65,6 +65,21 @@ def on_change_text_qag():
     st.session_state.qag_raw_json = None
 
 
+def upload():
+    data_files = st.session_state.upload_files['files']
+    for data_file in data_files:
+        # Upload file
+        if data_file and data_file.name not in st.session_state.upload_files[
+                'uploaded_files']:
+            # raw_json = upload_doc(data_file)
+            raw_json = file_upload_qa_generate(data_file)
+            st.session_state.upload_files['uploaded_files'].append(
+                data_file.name)
+    # Save the uploaded files
+    st.session_state.upload_files['uploaded_files'] = list(
+        set(st.session_state.upload_files['uploaded_files']))
+
+
 def main():
 
     st.set_page_config(page_title="PaddleNLP无监督智能检索问答", page_icon='🐮')
@@ -78,13 +93,17 @@ def main():
     set_state_if_absent("raw_json", None)
     set_state_if_absent("qag_raw_json", None)
     set_state_if_absent("random_question_requested", False)
+    set_state_if_absent("upload_files", {'uploaded_files': [], 'files': []})
 
     # Small callback to reset the interface in case the text of the question changes
     def reset_results(*args):
         st.session_state.answer = None
         st.session_state.results = None
-        st.session_state.qag_results = None
         st.session_state.raw_json = None
+
+    def reset_results_qag(*args):
+        st.session_state.answer = None
+        st.session_state.qag_results = None
         st.session_state.qag_raw_json = None
 
     # Title
@@ -92,7 +111,11 @@ def main():
     # Sidebar
     st.sidebar.header("选项")
     st.sidebar.write("### 问答对生成:")
-    is_filter = st.sidebar.selectbox("是否进行自动过滤", ('是', '否'))
+    is_filter = st.sidebar.selectbox(
+        "是否进行自动过滤",
+        ('是', '否'),
+        on_change=reset_results,
+    )
     st.sidebar.write("### 问答检索:")
     top_k_reader = st.sidebar.slider(
         "返回答案数量",
@@ -116,13 +139,13 @@ def main():
         data_files = st.sidebar.file_uploader(
             "",
             type=["pdf", "txt", "docx", "png"],
-            help="文件上传",
+            help="选择多个文件",
             accept_multiple_files=True)
-        for data_file in data_files:
-            # Upload file
-            if data_file:
-                raw_json = upload_doc(data_file)
-                st.sidebar.write(str(data_file.name) + " &nbsp;&nbsp; ✅ ")
+        st.session_state.upload_files['files'] = data_files
+        st.sidebar.button("文件上传并自动生成载入问答对", on_click=upload)
+        for data_file in st.session_state.upload_files['uploaded_files']:
+            st.sidebar.write(str(data_file) + " &nbsp;&nbsp; ✅ ")
+
     hs_version = ""
     try:
         hs_version = f" <small>(v{pipelines_version()})</small>"
@@ -163,21 +186,22 @@ def main():
                 wf.write(synthetic_question.strip() + '\t' +
                          synthetic_answer.strip() + '\n')
         offline_ann('my_data', CORPUS_DIR)
-        reset_results()
+        reset_results_qag()
 
-    st.session_state.random_question_requested = False
+    # st.session_state.random_question_requested = False
     qag_run_query = (qag_run_pressed or context != st.session_state.qag_question
                      ) and not st.session_state.random_question_requested
+    # qag_run_query = qag_run_pressed
 
     # Check the connection
     with st.spinner("⌛️ &nbsp;&nbsp; pipelines is starting..."):
         if not pipelines_is_ready():
             st.error("🚫 &nbsp;&nbsp; Connection Error. Is pipelines running?")
             run_query = False
-            reset_results()
+            reset_results_qag()
     # Get results for query
     if (qag_run_query or st.session_state.qag_results is None) and context:
-        reset_results()
+        reset_results_qag()
         st.session_state.qag_question = context
         with st.spinner(
                 "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
@@ -217,11 +241,11 @@ def main():
                 unsafe_allow_html=True,
             )
             st.write(
-                markdown('问题：' + synthetic_question),
+                markdown('**问题：**' + synthetic_question),
                 unsafe_allow_html=True,
             )
             st.write(
-                markdown('答案：' + synthetic_answer),
+                markdown('**答案：**' + synthetic_answer),
                 unsafe_allow_html=True,
             )
 
