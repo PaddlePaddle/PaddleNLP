@@ -89,7 +89,7 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
+                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
@@ -253,7 +253,9 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}")
             text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
-        text_embeddings = self.text_encoder(text_input_ids)[0]
+        attention_mask = paddle.ones_like(text_input_ids)
+        text_embeddings = self.text_encoder(text_input_ids,
+                                            attention_mask=attention_mask)[0]
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         # bs_embed, seq_len, _ = text_embeddings.shape
@@ -318,7 +320,9 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
                     truncation=True,
                     return_tensors="pd",
                 )
-                uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
+                attention_mask = paddle.ones_like(uncond_input.input_ids)
+                uncond_embeddings = self.text_encoder(
+                    uncond_input.input_ids, attention_mask=attention_mask)[0]
 
                 # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
                 # seq_len = uncond_embeddings.shape[1]

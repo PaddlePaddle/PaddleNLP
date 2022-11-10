@@ -31,7 +31,7 @@ from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPToke
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
+from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler, EulerAncestralDiscreteScheduler
 from ...utils import deprecate, logging
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
@@ -94,7 +94,8 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
+                         EulerAncestralDiscreteScheduler],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
     ):
@@ -120,7 +121,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
+                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
@@ -277,7 +278,9 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}")
             text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
-        text_embeddings = self.text_encoder(text_input_ids)[0]
+        attention_mask = paddle.ones_like(text_input_ids)
+        text_embeddings = self.text_encoder(text_input_ids,
+                                            attention_mask=attention_mask)[0]
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
@@ -316,7 +319,9 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                 truncation=True,
                 return_tensors="pd",
             )
-            uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
+            attention_mask = paddle.ones_like(uncond_input.input_ids)
+            uncond_embeddings = self.text_encoder(
+                uncond_input.input_ids, attention_mask=attention_mask)[0]
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
