@@ -25,15 +25,18 @@ from ...schedulers import (
     DDIMScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
-    # EulerAncestralDiscreteScheduler,
-    # EulerDiscreteScheduler,
 )
+from paddlenlp.utils.tools import compare_version
+if compare_version(PIL.__version__, "9.1.0") >= 0:
+    Resampling = PIL.Image.Resampling
+else:
+    Resampling = PIL.Image
 
 
 def preprocess(image):
     w, h = image.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    image = image.resize((w, h), resample=PIL.Image.LANCZOS)
+    image = image.resize((w, h), resample=Resampling.LANCZOS)
     image = np.array(image).astype(np.float32) / 255.0
     image = image[None].transpose(0, 3, 1, 2)
     image = paddle.to_tensor(image)
@@ -42,7 +45,8 @@ def preprocess(image):
 
 class LDMSuperResolutionPipeline(DiffusionPipeline):
     r"""
-    This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
+    A pipeline for image super-resolution using Latent
+    This class inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     Parameters:
@@ -51,18 +55,14 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
         unet ([`UNet2DModel`]): U-Net architecture to denoise the encoded image.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`EulerDiscreteScheduler`],
-            [`EulerAncestralDiscreteScheduler`], or [`PNDMScheduler`].
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`],[`PNDMScheduler`].
     """
 
     def __init__(
         self,
         vqvae: VQModel,
         unet: UNet2DModel,
-        scheduler: Union[
-            DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
-            # EulerDiscreteScheduler, EulerAncestralDiscreteScheduler
-        ],
+        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler, ],
     ):
         super().__init__()
         self.register_modules(vqvae=vqvae, unet=unet, scheduler=scheduler)
