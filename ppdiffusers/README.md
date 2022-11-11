@@ -157,7 +157,7 @@ image.save("cat_on_bench_new.png")
 
 ## 5. 模型部署
 
-StableDiffusion模型除了支持动态图运行，还支持将模型导出并使用推理引擎运行。我们提供在[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的StableDiffusion模型文生图任务的部署示例，用户可以按照我们提供[StableDiffusion模型导出教程](./scripts/export/export.md)将模型导出，并参考[FastDeploy Diffusion模型高性能部署
+StableDiffusion模型除了支持动态图运行，还支持将模型导出并使用推理引擎运行。我们提供在[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的StableDiffusion模型文生图任务的部署示例，用户可以按照我们提供[StableDiffusion模型导出教程](./scripts/export/README.md)将模型导出，并参考[FastDeploy Diffusion模型高性能部署
 ](https://github.com/PaddlePaddle/FastDeploy/tree/develop/examples/multimodal/stable_diffusion#%E5%BF%AB%E9%80%9F%E4%BD%93%E9%AA%8C)完成部署。
 
 
