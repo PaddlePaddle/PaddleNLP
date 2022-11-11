@@ -19,30 +19,34 @@ from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
 from tests.testing_utils import get_tests_dir
 
 
-import unittest
-
-
 class TestAutoTrainerForTextClassification(unittest.TestCase):
-
     def setUp(self):
         self.fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
 
     def test_multiclass_classification(self):
         train_ds, dev_ds = load_dataset(
-            "clue", "tnews",
+            "clue",
+            "tnews",
             data_files=[
                 os.path.join(self.fixture_path, "tnews", "train.json"),
-                os.path.join(self.fixture_path, "tnews", "dev.json")],
-            lazy=False
+                os.path.join(self.fixture_path, "tnews", "dev.json"),
+            ],
+            lazy=False,
         )
         num_models = 2
         auto_trainer = AutoTrainerForTextClassification(
-            label_column="label_desc",
-            text_column="sentence",
-            preset="test"
-            )
-        auto_trainer.train(train_ds, dev_ds, num_cpus=1, num_gpus=0, max_concurrent_trials=1, num_models=num_models)
+            label_column="label_desc", text_column="sentence", preset="test"
+        )
+        auto_trainer.train(
+            train_ds,
+            dev_ds,
+            num_cpus=1,
+            num_gpus=0,
+            max_concurrent_trials=1,
+            num_models=num_models,
+        )
         self.assertEqual(len(auto_trainer.training_results), num_models)
-    
+
+
 if __name__ == "__main__":
     unittest.main()

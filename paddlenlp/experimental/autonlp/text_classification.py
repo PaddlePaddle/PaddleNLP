@@ -1,27 +1,46 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import functools
-from paddlenlp.transformers import PretrainedFasterTokenizer, PretrainedTokenizer
-from paddlenlp.trainer.trainer_utils import EvalPrediction
-from ray import tune
-from typing import Callable, Dict, Any
+from typing import Any, Callable, Dict, Union
+
 import paddle
-from  paddle.metric import Accuracy
+from paddle.metric import Accuracy
+from ray import tune
+
+from paddle.io import Dataset
 from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.trainer import CompressionArguments, Trainer, TrainingArguments
+from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
+    PretrainedFasterTokenizer,
+    PretrainedTokenizer,
 )
-
-from paddlenlp.trainer import Trainer, TrainingArguments, CompressionArguments
 
 from .auto_trainer_base import AutoTrainerBase
 
+
 class AutoTrainerForTextClassification(AutoTrainerBase):
-    def __init__(self,
+    def __init__(
+        self,
         text_column: str,
         label_column: str,
         # TODO: support problem_type
         **kwargs
-        ):
+    ):
         super(AutoTrainerForTextClassification, self).__init__(**kwargs)
         self.text_column = text_column
         self.label_column = label_column
@@ -38,21 +57,21 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             metric_for_best_model="accuracy",
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
-            save_strategy="epoch")
+            save_strategy="epoch",
+        )
 
     @property
     def _default_compress_argument(self) -> CompressionArguments:
         return CompressionArguments(
-            width_mult_list=['3/4'],
+            width_mult_list=["3/4"],
             per_device_train_batch_size=8,
             per_device_eval_batch_size=8,
             num_train_epochs=1,
-            output_dir="pruned_model"
-            )
-
+            output_dir="pruned_model",
+        )
 
     @property
-    def _model_candidates(self) -> Dict[str, Any]: 
+    def _model_candidates(self) -> Dict[str, Any]:
         return {
             "test": {
                 "PreprocessArguments.max_seq_length": 128,
@@ -60,18 +79,20 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.per_device_eval_batch_size": 2,
                 "TrainingArguments.max_steps": 5,
                 "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                "TrainingArguments.learning_rate": tune.choice([5e-5, 1e-5])
+                "TrainingArguments.learning_rate": tune.choice([5e-5, 1e-5]),
             },
         }
-    
+
     def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
         # TODO: support label ids that is already encoded
         train_labels = {i[self.label_column] for i in train_dataset}
         dev_labels = {i[self.label_column] for i in eval_dataset}
         self.id2label = list(train_labels.union(dev_labels))
-        self.label2id = { label: i for i, label in enumerate(self.id2label) }
-        
-    def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
+        self.label2id = {label: i for i, label in enumerate(self.id2label)}
+
+    def _construct_trainable(
+        self, train_dataset: Dataset, eval_dataset: Dataset
+    ) -> Callable:
         def trainable(config):
             model_path = config["TrainingArguments.model_name_or_path"]
             max_seq_length = config["PreprocessArguments.max_seq_length"]
@@ -86,8 +107,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
             # define model
             model = AutoModelForSequenceClassification.from_pretrained(
-                model_path,
-                num_classes=len(self.id2label))
+                model_path, num_classes=len(self.id2label)
+            )
             training_args = self._override_training_arguments(config)
             trainer = Trainer(
                 model=model,
@@ -103,9 +124,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             trainer.save_model()
             eval_metrics = trainer.evaluate(eval_dataset)
             return eval_metrics
+
         return trainable
 
-    
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         metric = Accuracy()
         correct = metric.compute(
@@ -116,11 +137,16 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         acc = metric.accumulate()
         return {"accuracy": acc}
 
-    
-    def _preprocess_fn(self, example: Dict[str, Any],
-        tokenizer: Union[PretrainedTokenizer, PretrainedFasterTokenizer], max_seq_length: int, is_test: bool = False):
+    def _preprocess_fn(
+        self,
+        example: Dict[str, Any],
+        tokenizer: Union[PretrainedTokenizer, PretrainedFasterTokenizer],
+        max_seq_length: int,
+        is_test: bool = False,
+    ):
         result = tokenizer(text=example[self.text_column], max_seq_len=max_seq_length)
         if not is_test:
-            result["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype='int64')
+            result["labels"] = paddle.to_tensor(
+                [self.label2id[example[self.label_column]]], dtype="int64"
+            )
         return result
-
