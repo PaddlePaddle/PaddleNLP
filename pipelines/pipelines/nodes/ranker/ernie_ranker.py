@@ -187,8 +187,7 @@ class ErnieRanker(BaseRanker):
             right_idx = 0
             for number in number_of_docs:
                 right_idx = left_idx + number
-                grouped_predictions.append(
-                    similarity_scores[left_idx:right_idx])
+                grouped_predictions.append(preds[left_idx:right_idx])
                 left_idx = right_idx
             result = []
             for pred_group, doc_group in zip(grouped_predictions, documents):
@@ -202,7 +201,6 @@ class ErnieRanker(BaseRanker):
                     doc for _, doc in sorted_scores_and_documents
                 ]
                 result.append(sorted_documents[:top_k])
-
             return result
 
     def _preprocess_batch_queries_and_docs(
