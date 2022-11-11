@@ -291,7 +291,7 @@ seed = 1024
 generator = torch.Generator("cuda").manual_seed(seed)
 image = pipe(prompt=prompt, image=init_image, mask_image=mask_image, generator=generator).images[0]
 
-image.save("ppdiffusers_cat_on_bench_new.png")
+image.save("diffusers_cat_on_bench.png")
 ```
 ![diffusers_cat_on_bench](https://user-images.githubusercontent.com/50394665/201277724-76145ee6-a3ef-49e7-a1e9-8ccd3c9eb39e.png)
 
@@ -321,6 +321,6 @@ seed = 1024
 paddle.seed(seed)
 image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
 
-image.save("ppdiffusers_cat_on_bench_new.png")
+image.save("ppdiffusers_cat_on_bench.png")
 ```
 ![ppdiffusers_cat_on_bench](https://user-images.githubusercontent.com/50394665/201277712-2e10c188-e1ca-44f5-b963-657e9d51cc95.png)
