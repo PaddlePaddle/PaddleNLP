@@ -1,4 +1,6 @@
 import functools
+from paddlenlp.transformers import PretrainedFasterTokenizer, PretrainedTokenizer
+from paddlenlp.trainer.trainer_utils import EvalPrediction
 from ray import tune
 from typing import Callable, Dict, Any
 import paddle
@@ -15,8 +17,8 @@ from .auto_trainer_base import AutoTrainerBase
 
 class AutoTrainerForTextClassification(AutoTrainerBase):
     def __init__(self,
-        text_column,
-        label_column,
+        text_column: str,
+        label_column: str,
         # TODO: support problem_type
         **kwargs
         ):
@@ -62,14 +64,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             },
         }
     
-    def _data_checks_and_inference(self, train_dataset, eval_dataset):
+    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
         # TODO: support label ids that is already encoded
         train_labels = {i[self.label_column] for i in train_dataset}
         dev_labels = {i[self.label_column] for i in eval_dataset}
         self.id2label = list(train_labels.union(dev_labels))
         self.label2id = { label: i for i, label in enumerate(self.id2label) }
         
-    def _construct_trainable(self, train_dataset, eval_dataset) -> Callable:
+    def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
         def trainable(config):
             model_path = config["TrainingArguments.model_name_or_path"]
             max_seq_length = config["PreprocessArguments.max_seq_length"]
@@ -104,7 +106,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return trainable
 
     
-    def _compute_metrics(self, eval_preds) -> Dict[str, float]:
+    def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         metric = Accuracy()
         correct = metric.compute(
             paddle.to_tensor(eval_preds.predictions),
@@ -115,7 +117,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return {"accuracy": acc}
 
     
-    def _preprocess_fn(self, example, tokenizer, max_seq_length, is_test=False):
+    def _preprocess_fn(self, example: Dict[str, Any],
+        tokenizer: Union[PretrainedTokenizer, PretrainedFasterTokenizer], max_seq_length: int, is_test: bool = False):
         result = tokenizer(text=example[self.text_column], max_seq_len=max_seq_length)
         if not is_test:
             result["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype='int64')
