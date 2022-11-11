@@ -179,3 +179,148 @@ python convert_diffusers_stable_diffusion_to_ppdiffusers.py --pretrained_model_n
         ├── special_tokens_map.json
         ├── vocab.json
 ```
+
+
+
+
+
+## 3 转换后的权重效果对比
+
+### 3.1 Text-to-Image效果对比
+```python
+import torch
+from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipeline
+pipe = DiffusersStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+pipe = pipe.to("cuda")
+seed = 1024
+generator = torch.Generator("cuda").manual_seed(seed)
+prompt = "a photo of an astronaut riding a horse on mars"
+image = pipe(prompt, generator=generator).images[0]
+image.save("diffusers_astronaut_rides_horse.png")
+```
+![diffusers_astronaut_rides_horse](https://user-images.githubusercontent.com/50394665/201277740-c9b37d59-4ec0-4b3d-8118-bd7f0dfaf352.png)
+
+```python
+import paddle
+from ppdiffusers import StableDiffusionPipeline as PPDiffusersStableDiffusionPipeline
+pipe = PPDiffusersStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+prompt = "a photo of an astronaut riding a horse on mars"
+seed = 1024
+paddle.seed(seed)
+image = pipe(prompt).images[0]
+image.save("ppdiffusers_astronaut_rides_horse.png")
+```
+![ppdiffusers_astronaut_rides_horse](https://user-images.githubusercontent.com/50394665/201277735-fafa458a-9409-4795-887a-897a2851753d.png)
+
+### 3.2 Image-to-Image text-guided generation效果对比
+```python
+import requests
+import torch
+from PIL import Image
+from io import BytesIO
+
+from diffusers import StableDiffusionImg2ImgPipeline as DiffusersStableDiffusionImg2ImgPipeline
+
+pipe = DiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+pipe = pipe.to("cuda")
+
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
+
+response = requests.get(url)
+init_image = Image.open(BytesIO(response.content)).convert("RGB")
+init_image = init_image.resize((768, 512))
+
+prompt = "A fantasy landscape, trending on artstation"
+seed = 1024
+generator = torch.Generator("cuda").manual_seed(seed)
+image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5, generator=generator).images[0]
+
+image.save("diffusers_fantasy_landscape.png")
+```
+![diffusers_fantasy_landscape](https://user-images.githubusercontent.com/50394665/201277726-2c2f2fc8-dbfe-4b38-9940-9000bb6c8333.png)
+
+```python
+import requests
+import paddle
+from PIL import Image
+from io import BytesIO
+
+from ppdiffusers import StableDiffusionImg2ImgPipeline as PPDiffusersStableDiffusionImg2ImgPipeline
+
+pipe = PPDiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
+
+response = requests.get(url)
+init_image = Image.open(BytesIO(response.content)).convert("RGB")
+init_image = init_image.resize((768, 512))
+
+prompt = "A fantasy landscape, trending on artstation"
+seed = 1024
+paddle.seed(seed)
+image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
+
+image.save("ppdiffusers_fantasy_landscape.png")
+```
+![ppdiffusers_fantasy_landscape](https://user-images.githubusercontent.com/50394665/201277718-f01e8f8d-b560-442f-bf93-c026285c337e.png)
+### 3.3 In-painting效果对比
+```python
+import torch
+import PIL
+import requests
+from io import BytesIO
+
+from diffusers import StableDiffusionInpaintPipeline as DiffusersStableDiffusionInpaintPipeline, EulerAncestralDiscreteScheduler as DiffusersEulerAncestralDiscreteScheduler
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+
+img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
+
+init_image = download_image(img_url).resize((512, 512))
+mask_image = download_image(mask_url).resize((512, 512))
+scheduler = DiffusersEulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+pipe = DiffusersStableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", scheduler=scheduler)
+pipe.to("cuda")
+
+prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
+seed = 1024
+generator = torch.Generator("cuda").manual_seed(seed)
+image = pipe(prompt=prompt, image=init_image, mask_image=mask_image, generator=generator).images[0]
+
+image.save("diffusers_cat_on_bench.png")
+```
+![diffusers_cat_on_bench](https://user-images.githubusercontent.com/50394665/201277724-76145ee6-a3ef-49e7-a1e9-8ccd3c9eb39e.png)
+
+```python
+import paddle
+import PIL
+import requests
+from io import BytesIO
+
+from ppdiffusers import StableDiffusionInpaintPipeline as PPDiffusersStableDiffusionInpaintPipeline, EulerAncestralDiscreteScheduler as PPDiffusersEulerAncestralDiscreteScheduler
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+
+img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
+
+init_image = download_image(img_url).resize((512, 512))
+mask_image = download_image(mask_url).resize((512, 512))
+scheduler = PPDiffusersEulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
+pipe = PPDiffusersStableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", scheduler=scheduler)
+
+prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
+seed = 1024
+paddle.seed(seed)
+image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
+
+image.save("ppdiffusers_cat_on_bench.png")
+```
+![ppdiffusers_cat_on_bench](https://user-images.githubusercontent.com/50394665/201277712-2e10c188-e1ca-44f5-b963-657e9d51cc95.png)
