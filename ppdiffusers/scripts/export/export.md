@@ -42,3 +42,8 @@ stable-diffusion-v1-4/
 |----------|--------------|
 |<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型名称以及用户自行训练的模型目录。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](../examples/textual_inversion)。|
 |--output_path | 导出的模型目录。 |
+
+
+#### 推理部署
+
+完成模型导出后，可以加载导出后的模型，完成StableDiffusion的模型部署。我们提供在[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的StableDiffusion模型文生图任务的部署示例，可参考[FastDeploy Diffusion模型高性能部署](https://github.com/PaddlePaddle/FastDeploy/tree/develop/examples/multimodal/stable_diffusion#%E5%BF%AB%E9%80%9F%E4%BD%93%E9%AA%8C)完成部署。
