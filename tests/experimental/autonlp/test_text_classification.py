@@ -15,18 +15,17 @@ import os
 import unittest
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.experimental.autonlp import AutoTrainerForSequenceClassification
+from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
 from tests.testing_utils import get_tests_dir
 
 
 import unittest
 
 
-class TestAutoTrainerForSequenceClassification(unittest.TestCase):
+class TestAutoTrainerForTextClassification(unittest.TestCase):
 
     def setUp(self):
         self.fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
-
 
     def test_multiclass_classification(self):
         train_ds, dev_ds = load_dataset(
@@ -37,7 +36,7 @@ class TestAutoTrainerForSequenceClassification(unittest.TestCase):
             lazy=False
         )
         num_models = 2
-        auto_trainer = AutoTrainerForSequenceClassification(
+        auto_trainer = AutoTrainerForTextClassification(
             label_column="label_desc",
             text_column="sentence",
             preset="test"
@@ -45,24 +44,5 @@ class TestAutoTrainerForSequenceClassification(unittest.TestCase):
         auto_trainer.train(train_ds, dev_ds, num_cpus=1, num_gpus=0, max_concurrent_trials=1, num_models=num_models)
         self.assertEqual(len(auto_trainer.training_results), num_models)
     
-    def test_pair_classification(self):
-        train_ds, dev_ds = load_dataset(
-            "clue", "afqmc",
-            data_files=[
-                os.path.join(self.fixture_path, "afqmc", "train.json"),
-                os.path.join(self.fixture_path, "afqmc", "dev.json")],
-            lazy=False
-        )
-        num_models = 2
-        auto_trainer = AutoTrainerForSequenceClassification(
-            label_column="label",
-            text_column="sentence1",
-            text_pair_column="sentence2",
-            preset="test"
-            )
-        auto_trainer.train(train_ds, dev_ds, num_cpus=1, num_gpus=0, max_concurrent_trials=1, num_models=num_models)
-        self.assertEqual(len(auto_trainer.training_results), num_models)
-        
-
 if __name__ == "__main__":
     unittest.main()

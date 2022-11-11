@@ -1,7 +1,6 @@
 import functools
 from ray import tune
 from typing import Callable, Dict, Any
-import numpy as np
 import paddle
 from  paddle.metric import Accuracy
 from paddlenlp.data import DataCollatorWithPadding
@@ -14,19 +13,15 @@ from paddlenlp.trainer import Trainer, TrainingArguments, CompressionArguments
 
 from .auto_trainer_base import AutoTrainerBase
 
-class AutoTrainerForSequenceClassification(AutoTrainerBase):
+class AutoTrainerForTextClassification(AutoTrainerBase):
     def __init__(self,
         text_column,
         label_column,
-        text_pair_column=None,
-        preset=None,
-        metric_for_best_model="eval_accuracy"
+        # TODO: support problem_type
+        **kwargs
         ):
-        self.preset = preset
-        self.metric_for_best_model = metric_for_best_model
-        # self.problem_type="single_label_classification" if multi_label else "single_label_classification"
+        super(AutoTrainerForTextClassification, self).__init__(**kwargs)
         self.text_column = text_column
-        self.text_pair_column = text_pair_column
         self.label_column = label_column
 
     @property
@@ -58,7 +53,7 @@ class AutoTrainerForSequenceClassification(AutoTrainerBase):
     def _model_candidates(self) -> Dict[str, Any]: 
         return {
             "test": {
-                "trainer_type": "Trainer",
+                "PreprocessArguments.max_seq_length": 128,
                 "TrainingArguments.per_device_train_batch_size": 2,
                 "TrainingArguments.per_device_eval_batch_size": 2,
                 "TrainingArguments.max_steps": 5,
@@ -68,6 +63,7 @@ class AutoTrainerForSequenceClassification(AutoTrainerBase):
         }
     
     def _data_checks_and_inference(self, train_dataset, eval_dataset):
+        # TODO: support label ids that is already encoded
         train_labels = {i[self.label_column] for i in train_dataset}
         dev_labels = {i[self.label_column] for i in eval_dataset}
         self.id2label = list(train_labels.union(dev_labels))
@@ -76,12 +72,12 @@ class AutoTrainerForSequenceClassification(AutoTrainerBase):
     def _construct_trainable(self, train_dataset, eval_dataset) -> Callable:
         def trainable(config):
             model_path = config["TrainingArguments.model_name_or_path"]
-
+            max_seq_length = config["PreprocessArguments.max_seq_length"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
             trans_func = functools.partial(
                 self._preprocess_fn,
                 tokenizer=tokenizer,
-                max_seq_length=128,
+                max_seq_length=max_seq_length,
             )
             processed_train_dataset = train_dataset.map(trans_func, lazy=False)
             processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
@@ -90,7 +86,6 @@ class AutoTrainerForSequenceClassification(AutoTrainerBase):
             model = AutoModelForSequenceClassification.from_pretrained(
                 model_path,
                 num_classes=len(self.id2label))
-                # problem_type=self.problem_type)
             training_args = self._override_training_arguments(config)
             trainer = Trainer(
                 model=model,
@@ -121,14 +116,8 @@ class AutoTrainerForSequenceClassification(AutoTrainerBase):
 
     
     def _preprocess_fn(self, example, tokenizer, max_seq_length, is_test=False):
-        if self.text_pair_column:
-            result = tokenizer(
-                text=example[self.text_column], 
-                text_pair=example[self.text_pair_column],
-                max_seq_len=max_seq_length)
-        else:
-            result = tokenizer(text=example[self.text_column], max_seq_len=max_seq_length)
+        result = tokenizer(text=example[self.text_column], max_seq_len=max_seq_length)
         if not is_test:
-            result["labels"] = np.array([self.label2id[example[self.label_column]]], dtype='int64')
+            result["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype='int64')
         return result
 

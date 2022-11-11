@@ -1,1 +1,1 @@
-from .sequence_classification import *
+from .text_classification import *

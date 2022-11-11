@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from pickle import NONE
 from ray import tune
 from typing import Callable, Dict, Any
 import copy
@@ -9,9 +10,10 @@ from paddlenlp.trainer import TrainingArguments, CompressionArguments
 
 class AutoTrainerBase(metaclass=ABCMeta):
     
-    # def __init__(self, metric_for_best_model, preset):
-    #     self.metric_for_best_model = metric_for_best_model
-    #     self.preset = preset
+    def __init__(self, metric_for_best_model=None, preset=None, language="Chinese", **kwargs):
+        self.metric_for_best_model = metric_for_best_model
+        self.preset = preset
+        self.language = language
 
     @property
     @abstractmethod
