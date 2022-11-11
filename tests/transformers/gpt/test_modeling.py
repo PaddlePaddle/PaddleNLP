@@ -15,11 +15,10 @@
 
 import datetime
 import math
-import unittest
 import numpy as np
 import random
 
-from tests.testing_utils import slow
+from tests.testing_utils import slow, PaddleNLPModelTest
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
@@ -482,7 +481,7 @@ class GPTModelTester:
     [True, False],
     [True, True],
 ])
-class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
+class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     base_model_class = GPTModel
     use_labels = False
     return_dict = False
@@ -613,7 +612,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
             self.assertIsNotNone(model)
 
 
-class GPTModelLanguageGenerationTest(unittest.TestCase):
+class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
 
     def _test_lm_generate_gpt_helper(
         self,
