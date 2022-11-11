@@ -301,7 +301,7 @@ import PIL
 import requests
 from io import BytesIO
 
-from ppdiffusers import StableDiffusionInpaintPipeline as PPDiffusersStableDiffusionInpaintPipeline, PPDiffusersEulerAncestralDiscreteScheduler
+from ppdiffusers import StableDiffusionInpaintPipeline as PPDiffusersStableDiffusionInpaintPipeline, EulerAncestralDiscreteScheduler as PPDiffusersEulerAncestralDiscreteScheduler
 
 def download_image(url):
     response = requests.get(url)
