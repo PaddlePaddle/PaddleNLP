@@ -28,9 +28,9 @@ from paddlenlp.transformers import PretrainedFasterTokenizer, PretrainedTokenize
 class AutoTrainerBase(metaclass=ABCMeta):
     def __init__(
         self,
-        metric_for_best_model: str = None,
-        preset: str = None,
-        language="Chinese",
+        metric_for_best_model: Optional[str] = None,
+        preset: Optional[str] = None,
+        language: Optional[str] = "Chinese",
         **kwargs
     ):
         self.metric_for_best_model = metric_for_best_model

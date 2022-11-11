@@ -20,19 +20,15 @@ import contextlib
 import json
 import math
 import os
+import types
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-import types
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import paddle
 
 from ..utils.log import logger
-from .trainer_utils import (
-    SchedulerType,
-    IntervalStrategy,
-    OptimizerNames,
-)
+from .trainer_utils import IntervalStrategy, OptimizerNames, SchedulerType
 
 __all__ = [
     "default_logdir",
@@ -173,7 +169,7 @@ class TrainingArguments:
         fp16 (`bool`, *optional*, defaults to `False`):
             Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
-            For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at 
+            For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at
             https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
@@ -192,7 +188,7 @@ class TrainingArguments:
             Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
             main process.
         past_index (`int`, *optional*, defaults to -1):
-            Some models like TransformerXL or XLNet can make use of the past hidden states for their predictions. 
+            Some models like TransformerXL or XLNet can make use of the past hidden states for their predictions.
             If this argument is set to a positive int, the `Trainer` will use the corresponding output (usually index 2) as
             the past state and feed it to the model at the next training step under the keyword argument `mems`.
         run_name (`str`, *optional*):
@@ -249,253 +245,253 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
     """
 
-    output_dir: str = field(metadata={
-        "help":
-        "The output directory where the model predictions and checkpoints will be written."
-    }, )
+    output_dir: str = field(
+        metadata={
+            "help": "The output directory where the model predictions and checkpoints will be written."
+        },
+    )
     overwrite_output_dir: bool = field(
         default=False,
         metadata={
-            "help":
-            ("Overwrite the content of the output directory. "
-             "Use this to continue training if output_dir points to a checkpoint directory."
-             )
+            "help": (
+                "Overwrite the content of the output directory. "
+                "Use this to continue training if output_dir points to a checkpoint directory."
+            )
         },
     )
 
-    do_train: bool = field(default=False,
-                           metadata={"help": "Whether to run training."})
+    do_train: bool = field(default=False, metadata={"help": "Whether to run training."})
     do_eval: bool = field(
-        default=False, metadata={"help": "Whether to run eval on the dev set."})
+        default=False, metadata={"help": "Whether to run eval on the dev set."}
+    )
     do_predict: bool = field(
-        default=False,
-        metadata={"help": "Whether to run predictions on the test set."})
+        default=False, metadata={"help": "Whether to run predictions on the test set."}
+    )
     do_export: bool = field(
-        default=False, metadata={"help": "Whether to export infernece model."})
-    evaluation_strategy: IntervalStrategy = field(
+        default=False, metadata={"help": "Whether to export infernece model."}
+    )
+    evaluation_strategy: Union[str, IntervalStrategy] = field(
         default="no",
         metadata={"help": "The evaluation strategy to use."},
     )
     prediction_loss_only: bool = field(
         default=False,
         metadata={
-            "help":
-            "When performing evaluation and predictions, only returns the loss."
+            "help": "When performing evaluation and predictions, only returns the loss."
         },
     )
 
     per_device_train_batch_size: int = field(
-        default=8,
-        metadata={"help": "Batch size per GPU core/CPU for training."})
+        default=8, metadata={"help": "Batch size per GPU core/CPU for training."}
+    )
     per_device_eval_batch_size: int = field(
-        default=8,
-        metadata={"help": "Batch size per GPU core/CPU for evaluation."})
+        default=8, metadata={"help": "Batch size per GPU core/CPU for evaluation."}
+    )
 
     gradient_accumulation_steps: int = field(
         default=1,
         metadata={
-            "help":
-            "Number of updates steps to accumulate before performing a backward/update pass."
+            "help": "Number of updates steps to accumulate before performing a backward/update pass."
         },
     )
 
     learning_rate: float = field(
-        default=5e-5, metadata={"help": "The initial learning rate for AdamW."})
+        default=5e-5, metadata={"help": "The initial learning rate for AdamW."}
+    )
     weight_decay: float = field(
-        default=0.0,
-        metadata={"help": "Weight decay for AdamW if we apply some."})
-    adam_beta1: float = field(default=0.9,
-                              metadata={"help": "Beta1 for AdamW optimizer"})
-    adam_beta2: float = field(default=0.999,
-                              metadata={"help": "Beta2 for AdamW optimizer"})
+        default=0.0, metadata={"help": "Weight decay for AdamW if we apply some."}
+    )
+    adam_beta1: float = field(
+        default=0.9, metadata={"help": "Beta1 for AdamW optimizer"}
+    )
+    adam_beta2: float = field(
+        default=0.999, metadata={"help": "Beta2 for AdamW optimizer"}
+    )
     adam_epsilon: float = field(
-        default=1e-8, metadata={"help": "Epsilon for AdamW optimizer."})
-    max_grad_norm: float = field(default=1.0,
-                                 metadata={"help": "Max gradient norm."})
+        default=1e-8, metadata={"help": "Epsilon for AdamW optimizer."}
+    )
+    max_grad_norm: float = field(default=1.0, metadata={"help": "Max gradient norm."})
 
     num_train_epochs: float = field(
-        default=3.0,
-        metadata={"help": "Total number of training epochs to perform."})
+        default=3.0, metadata={"help": "Total number of training epochs to perform."}
+    )
     max_steps: int = field(
         default=-1,
         metadata={
-            "help":
-            "If > 0: set total number of training steps to perform. Override num_train_epochs."
+            "help": "If > 0: set total number of training steps to perform. Override num_train_epochs."
         },
     )
     lr_scheduler_type: str = field(
         default="linear",
         metadata={
-            "help":
-            "The scheduler type to use. suppor linear, cosine, constant, constant_with_warmup"
+            "help": "The scheduler type to use. suppor linear, cosine, constant, constant_with_warmup"
         },
     )
     warmup_ratio: float = field(
         default=0.0,
-        metadata={
-            "help": "Linear warmup over warmup_ratio fraction of total steps."
-        })
+        metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."},
+    )
     warmup_steps: int = field(
-        default=0, metadata={"help": "Linear warmup over warmup_steps."})
+        default=0, metadata={"help": "Linear warmup over warmup_steps."}
+    )
 
     log_on_each_node: bool = field(
         default=True,
         metadata={
-            "help":
-            "When doing a multinode distributed training, whether to log once per node or just once on the main node."
+            "help": "When doing a multinode distributed training, whether to log once per node or just once on the main node."
         },
     )
-    logging_dir: Optional[str] = field(default=None,
-                                       metadata={"help": "VisualDL log dir."})
-    logging_strategy: IntervalStrategy = field(
+    logging_dir: Optional[str] = field(
+        default=None, metadata={"help": "VisualDL log dir."}
+    )
+    logging_strategy: Union[str, IntervalStrategy] = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
     )
     logging_first_step: bool = field(
-        default=False, metadata={"help": "Log the first global_step"})
-    logging_steps: int = field(default=500,
-                               metadata={"help": "Log every X updates steps."})
+        default=False, metadata={"help": "Log the first global_step"}
+    )
+    logging_steps: int = field(
+        default=500, metadata={"help": "Log every X updates steps."}
+    )
 
-    save_strategy: IntervalStrategy = field(
+    save_strategy: Union[str, IntervalStrategy] = field(
         default="steps",
         metadata={"help": "The checkpoint save strategy to use."},
     )
     save_steps: int = field(
-        default=500,
-        metadata={"help": "Save checkpoint every X updates steps."})
+        default=500, metadata={"help": "Save checkpoint every X updates steps."}
+    )
     save_total_limit: Optional[int] = field(
         default=None,
         metadata={
-            "help":
-            ("Limit the total amount of checkpoints. "
-             "Deletes the older checkpoints in the output_dir. Default is unlimited checkpoints"
-             )
+            "help": (
+                "Limit the total amount of checkpoints. "
+                "Deletes the older checkpoints in the output_dir. Default is unlimited checkpoints"
+            )
         },
     )
     save_on_each_node: bool = field(
         default=False,
         metadata={
-            "help":
-            "When doing multi-node distributed training, whether to save models and checkpoints on each node, or only on the main one"
+            "help": "When doing multi-node distributed training, whether to save models and checkpoints on each node, or only on the main one"
         },
     )
     no_cuda: bool = field(
-        default=False,
-        metadata={"help": "Do not use CUDA even when it is available"})
+        default=False, metadata={"help": "Do not use CUDA even when it is available"}
+    )
     seed: int = field(
         default=42,
-        metadata={
-            "help": "Random seed that will be set at the beginning of training."
-        })
+        metadata={"help": "Random seed that will be set at the beginning of training."},
+    )
 
     fp16: bool = field(
         default=False,
-        metadata={
-            "help": "Whether to use fp16 (mixed) precision instead of 32-bit"
-        },
+        metadata={"help": "Whether to use fp16 (mixed) precision instead of 32-bit"},
     )
     fp16_opt_level: str = field(
         default="O1",
         metadata={
-            "help":
-            ("For fp16: AMP optimization level selected in ['O0', 'O1', and 'O2']. "
-             "See details at https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html"
-             )
+            "help": (
+                "For fp16: AMP optimization level selected in ['O0', 'O1', and 'O2']. "
+                "See details at https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html"
+            )
         },
     )
 
     recompute: bool = field(
         default=False,
         metadata={
-            "help":
-            "Recompute the forward pass to calculate gradients. Used for saving memory. "
+            "help": "Recompute the forward pass to calculate gradients. Used for saving memory. "
             "Only support for networks with transformer blocks."
         },
     )
 
     scale_loss: float = field(
-        default=2**15,
-        metadata={"help": "The value of initial scale_loss for fp16."})
+        default=2**15, metadata={"help": "The value of initial scale_loss for fp16."}
+    )
 
     minimum_eval_times: int = field(
         default=None,
         metadata={
-            "help":
-            "If under eval_steps, the valid time is less then minimum_eval_times, the config of override eval_steps."
-        })
+            "help": "If under eval_steps, the valid time is less then minimum_eval_times, the config of override eval_steps."
+        },
+    )
 
     local_rank: int = field(
-        default=-1, metadata={"help": "For distributed training: local_rank"})
+        default=-1, metadata={"help": "For distributed training: local_rank"}
+    )
 
     dataloader_drop_last: bool = field(
         default=False,
         metadata={
-            "help":
-            "Drop the last incomplete batch if it is not divisible by the batch size."
-        })
+            "help": "Drop the last incomplete batch if it is not divisible by the batch size."
+        },
+    )
     eval_steps: int = field(
-        default=None, metadata={"help": "Run an evaluation every X steps."})
+        default=None, metadata={"help": "Run an evaluation every X steps."}
+    )
     dataloader_num_workers: int = field(
         default=0,
         metadata={
-            "help":
-            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
+            "help": "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
         },
     )
 
     past_index: int = field(
         default=-1,
         metadata={
-            "help":
-            "If >=0, uses the corresponding part of the output as the past state for next step."
+            "help": "If >=0, uses the corresponding part of the output as the past state for next step."
         },
     )
 
     run_name: Optional[str] = field(
-        default=None, metadata={"help": "An optional descriptor for the run."})
+        default=None, metadata={"help": "An optional descriptor for the run."}
+    )
 
     device: Optional[str] = field(
-        default="gpu", metadata={"help": "select cpu, gpu, xpu devices."})
+        default="gpu", metadata={"help": "select cpu, gpu, xpu devices."}
+    )
 
     disable_tqdm: Optional[bool] = field(
         default=None,
-        metadata={"help": "Whether or not to disable the tqdm progress bars."})
+        metadata={"help": "Whether or not to disable the tqdm progress bars."},
+    )
 
     remove_unused_columns: Optional[bool] = field(
         default=True,
         metadata={
-            "help":
-            "Remove columns not required by the model when using an nlp.Dataset."
-        })
+            "help": "Remove columns not required by the model when using an nlp.Dataset."
+        },
+    )
 
     label_names: Optional[List[str]] = field(
         default=None,
         metadata={
-            "help":
-            "The list of keys in your dictionary of inputs that correspond to the labels."
-        })
+            "help": "The list of keys in your dictionary of inputs that correspond to the labels."
+        },
+    )
 
     load_best_model_at_end: Optional[bool] = field(
         default=False,
         metadata={
-            "help":
-            "Whether or not to load the best model found during training at the end of training."
+            "help": "Whether or not to load the best model found during training at the end of training."
         },
     )
     metric_for_best_model: Optional[str] = field(
         default=None,
-        metadata={"help": "The metric to use to compare two different models."})
+        metadata={"help": "The metric to use to compare two different models."},
+    )
     greater_is_better: Optional[bool] = field(
         default=None,
         metadata={
-            "help":
-            "Whether the `metric_for_best_model` should be maximized or not."
-        })
+            "help": "Whether the `metric_for_best_model` should be maximized or not."
+        },
+    )
     ignore_data_skip: bool = field(
         default=False,
         metadata={
-            "help":
-            "When resuming training, whether or not to skip the first epochs and batches to get to the same training data."
+            "help": "When resuming training, whether or not to skip the first epochs and batches to get to the same training data."
         },
     )
     optim: str = field(
@@ -505,21 +501,23 @@ class TrainingArguments:
     report_to: Optional[List[str]] = field(
         default=None,
         metadata={
-            "help":
-            "The list of integrations to report the results and logs to."
-        })
+            "help": "The list of integrations to report the results and logs to."
+        },
+    )
     resume_from_checkpoint: Optional[str] = field(
         default=None,
         metadata={
-            "help":
-            "The path to a folder with a valid checkpoint for your model."
+            "help": "The path to a folder with a valid checkpoint for your model."
         },
     )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
-        if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size(
-        ) > 1:
+        if (
+            env_local_rank != -1
+            and env_local_rank != self.local_rank
+            and paddle.distributed.get_world_size() > 1
+        ):
             self.local_rank = env_local_rank
 
         # convert to int
@@ -554,7 +552,8 @@ class TrainingArguments:
 
         # eval_steps has to be defined and non-zero, fallbacks to logging_steps if the latter is non-zero
         if self.evaluation_strategy == IntervalStrategy.STEPS and (
-                self.eval_steps is None or self.eval_steps == 0):
+            self.eval_steps is None or self.eval_steps == 0
+        ):
             if self.logging_steps > 0:
                 logger.info(
                     f"using `logging_steps` to initialize `eval_steps` to {self.logging_steps}"
@@ -578,7 +577,10 @@ class TrainingArguments:
                     "--load_best_model_at_end requires the save and eval strategy to match, but found\n- Evaluation "
                     f"strategy: {self.evaluation_strategy}\n- Save strategy: {self.save_strategy}"
                 )
-            if self.evaluation_strategy == IntervalStrategy.STEPS and self.save_steps % self.eval_steps != 0:
+            if (
+                self.evaluation_strategy == IntervalStrategy.STEPS
+                and self.save_steps % self.eval_steps != 0
+            ):
                 raise ValueError(
                     "--load_best_model_at_end requires the saving steps to be a round multiple of the evaluation "
                     f"steps, but found {self.save_steps}, which is not a round multiple of {self.eval_steps}."
@@ -588,7 +590,8 @@ class TrainingArguments:
             self.metric_for_best_model = "loss"
         if self.greater_is_better is None and self.metric_for_best_model is not None:
             self.greater_is_better = self.metric_for_best_model not in [
-                "loss", "eval_loss"
+                "loss",
+                "eval_loss",
             ]
         if self.run_name is None:
             self.run_name = self.output_dir
@@ -759,8 +762,11 @@ class TrainingArguments:
         """
         Get number of steps used for a linear warmup.
         """
-        warmup_steps = (self.warmup_steps if self.warmup_steps > 0 else
-                        math.ceil(num_training_steps * self.warmup_ratio))
+        warmup_steps = (
+            self.warmup_steps
+            if self.warmup_steps > 0
+            else math.ceil(num_training_steps * self.warmup_ratio)
+        )
         return warmup_steps
 
     def to_dict(self):
@@ -793,17 +799,14 @@ class TrainingArguments:
             **d,
             **{
                 "train_batch_size": self.train_batch_size,
-                "eval_batch_size": self.eval_batch_size
-            }
+                "eval_batch_size": self.eval_batch_size,
+            },
         }
 
         valid_types = [bool, int, float, str]
         valid_types.append(paddle.Tensor)
 
-        return {
-            k: v if type(v) in valid_types else str(v)
-            for k, v in d.items()
-        }
+        return {k: v if type(v) in valid_types else str(v) for k, v in d.items()}
 
     def print_config(self, args=None, key=""):
         """
@@ -814,14 +817,13 @@ class TrainingArguments:
             args = self
             key = "Training"
 
-        logger.info('{:^40}'.format("{} Configuration Arguments".format(key)))
-        logger.info('{:30}:{}'.format("paddle commit id",
-                                      paddle.version.commit))
+        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.info("{:30}:{}".format("paddle commit id", paddle.version.commit))
 
         for a in dir(args):
-            if a[:2] != "__":  #don't print double underscore methods
+            if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info('{:30}:{}'.format(a, v))
+                    logger.info("{:30}:{}".format(a, v))
 
         logger.info("")
