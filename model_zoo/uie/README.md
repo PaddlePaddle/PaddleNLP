@@ -20,8 +20,7 @@
   - [4.4 模型评估](#模型评估)
   - [4.5 定制模型一键预测](#定制模型一键预测)
   - [4.6 实验指标](#实验指标)
-  - [4.7 模型压缩](#模型压缩)
-  - [4.8 模型部署](#模型部署)
+  - [4.7 模型部署](#模型部署)
 - [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
@@ -837,65 +836,10 @@ python evaluate.py \
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
 
-<a name="模型压缩"></a>
-
-#### 4.7 模型压缩(**可选**，GPU设备可以跳过该步骤，CPU机器设备可以看4.8部分看硬件是否支持)
-
-模型压缩功能使用的是 PaddleNLP [模型压缩 API](../../docs/compression.md)，文档可[点此](../../docs/compression.md)查看。模型压缩主要用于有模型部署上线需求的场景，可以进一步压缩模型体积、加快推理速度、减少内存占用。
-
-如果需要使用 **模型压缩** 功能需要安装最新版本的 `paddleslim`：
-
-```shell
-pip install paddleslim -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-压缩与微调共用了一个脚本，压缩时开启了 `--do_compress`，并取消设置 `--do_train` 和 `--do_eval`。使用下面的命令，使用上面微调好的模型 `$finetuned_model` 进行压缩：
-
-```shell
-python finetune.py  \
-    --device gpu \
-    --logging_steps 10 \
-    --save_steps 100 \
-    --eval_steps 100 \
-    --seed 42 \
-    --model_name_or_path  $finetuned_model \
-    --output_dir $finetuned_model \
-    --train_path data/train.txt \
-    --dev_path data/dev.txt  \
-    --max_seq_length 512  \
-    --per_device_eval_batch_size 16 \
-    --per_device_train_batch_size  16 \
-    --num_train_epochs 200 \
-    --learning_rate 1e-5 \
-    --do_compress \
-    --overwrite_output_dir \
-    --disable_tqdm True \
-    --metric_for_best_model eval_f1 \
-    --save_total_limit 1 \
-    --strategy 'qat' \
-```
-
-**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual`。
-
-可配置的压缩相关的参数：
-* `strategy`：压缩策略，在 UIE 中目前推荐使用 `'qat'`，即量化训练（QAT）。由于有训练过程，因此训练相关的参数也可以重新调整。例如上面微调时已介绍过的`per_device_train_batch_size`、`per_device_eval_batch_size`、`learning_rate`、`num_train_epochs`。
-* `activation_quantize_type`：激活 tensor 的量化类型，使用默认值即可。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在'qat'策略中，它默认是 'moving_average_abs_max'。
-* `weight_quantize_type`：权重的量化类型，使用默认值即可。支持 `'abs_max'` 和 `'channel_wise_abs_max'` 两种方式。通常使用 'channel_wise_abs_max'，这种方法得到的模型通常精度更高；
-- `use_pact`： 是否使用 PACT 量化策略，是对普通方法的改进，参考论文 [PACT: Parameterized Clipping Activation for Quantized Neural Networks](https://arxiv.org/abs/1805.06085)，打开后可能精度更高，默认是 True。
-* `do_compress`：是否进行压缩，该参数需要与脚本配合；默认是 False。
-
-同样，模型压缩后得到的最佳模型保存在指定的路径 `output_dir` 中。所保存模型是静态图模型，可直接用于服务端和移动端的推理部署，不需要再后面再调用 `finetune.py` 脚本来导出模型了。
-
-以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
-
-|         Models         |        F1         |
-| ---------------------  |:-----------------:|
-| uie-base+微调，FP32     |       91.93       |
-| uie-base+微调+量化，INT8 |       94.12       |
 
 <a name="模型部署"></a>
 
-#### 4.8 模型部署
+#### 4.7 模型部署
 
 以下是 UIE Python 端的部署流程，包括环境准备、模型导出和使用示例。
 
@@ -910,15 +854,8 @@ python finetune.py  \
     ```shell
     pip install -r deploy/python/requirements_cpu.txt
     ```
-    如果有模型推理加速、内存显存占用优化的需求，可以尝试使用 INT8 部署。INT8 部署需要用户机器支持完整的 AVX-512 指令集。用户在命令行输入 `lscpu` 可查看本机支持指令，可参考 [支持 AVX-512 指令集扩展的处理器](https://www.intel.cn/content/www/cn/zh/support/articles/000058341/processors/intel-xeon-processors.html)
 
     ```text
-    在支持 AVX512_VNNI 的 CPU 服务器上，如：Casecade Lake,  Model name: Intel(R) Xeon(R) Gold X2XX，INT8 精度和性能最高，INT8 性能提升为 FP32 模型的 3 ~ 3.7 倍。
-
-    在支持 AVX-512 但是不支持 AVX512_VNNI 的 CPU 服务器上，如：SkyLake, Model name：Intel(R) Xeon(R) Gold X1XX，INT8 性能为 FP32 性能的 1.5 倍左右。
-    ```
-
-    如果用户使用 INT8 部署，部署之前的模型需要进行量化（参考 4.7 节的内容）。
 
   - GPU端
 
@@ -928,11 +865,7 @@ python finetune.py  \
     pip install -r deploy/python/requirements_gpu.txt
     ```
 
-    如果有模型推理加速、内存显存占用优化的需求，并且 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，可以尝试使用 FP16 或者 INT8 部署：
-
-    - 如果 GPU 设备的 CUDA 计算能力大于等于 7.2，例如 T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，可以使用 INT8 部署，部署之前模型需要进行量化（参考 4.7 节的内容）。要注意的是，V100 卡可以进行 INT8 推理，但是加速不充分。
-
-    - 如果 GPU 设备的 CUDA 计算能力大于等于 7.0，但达不到上方 INT8 模型推理的要求，比如 V100 等，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
+    如果有模型推理加速、内存显存占用优化的需求，并且 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，例如 V100、T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
 
     如果 GPU 设备的 CUDA 计算能力较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
 

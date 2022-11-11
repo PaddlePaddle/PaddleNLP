@@ -46,12 +46,14 @@
 
 ## 社区交流
 
-- **💥 直播回放：10.25-10.28**，PaddleNLP研发团队详解PaddleNLP v2.4新发功能，并带来前沿技术分享，以及企业落地实践。微信扫描下方二维码，关注公众号并填写问卷后进入官方交流群，获取直播回放与10G重磅NLP学习大礼包。
+- 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
+
+  - 与众多社区开发者以及官方团队深度交流。
+  - 10G重磅NLP学习大礼包！
 
   <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/197535273-75db1fb3-3a34-4bd2-bac3-bcacb1b986a8.jpg" width="150" height="150" />
-  </div>
-
+  <img src="https://user-images.githubusercontent.com/11793384/200770385-a2c02093-0e1d-4189-b324-8b0251cba316.jpg" width="150" height="150" />
+</div>
 ## 特性
 
 #### <a href=#开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>
@@ -232,7 +234,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 ### 高性能分布式训练与推理
 
-#### ⚡ FasterTokenizer：高性能文本处理库
+#### ⚡ FastTokenizer：高性能文本处理库
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -242,7 +244,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FasterTokenizer文档](./faster_tokenizer)。
+为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FastTokenizer文档](./fast_tokenizer)。
 
 #### ⚡️ FasterGeneration：高性能生成加速库
 

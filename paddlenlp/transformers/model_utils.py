@@ -576,7 +576,15 @@ class PretrainedModel(Layer, GenerationMixin):
                 dtype = str(v.dtype)[dtype_prefix_len:]
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
-                state_to_load[k] = state_to_load[k].astype(dtype)
+                if paddle.in_dynamic_mode():
+                    state_to_load[k] = paddle.cast(state_to_load[k], dtype)
+                else:
+                    # there are some latent error when case dtype in static-mode, so let's:
+                    # 1. convert fluid.*.Tensor -> numpy.ndarray
+                    # 2. cast the dtype with numpy tools
+                    # 3. paddle works well with ndarray state-dict
+                    state_to_load[k] = np.array(state_to_load[k])
+                    state_to_load[k] = state_to_load[k].astype(dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
