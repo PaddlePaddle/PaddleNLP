@@ -1,6 +1,5 @@
 # PPDiffusers: Diffusers toolbox implemented based on PaddlePaddle
 
-
 **PPDiffusers**是一款支持**跨模态**（如图像与语音）训练和推理的**扩散模型**（Diffusion Model）工具箱，我们借鉴了🤗 Huggingface团队的[**Diffusers**](https://github.com/huggingface/diffusers)的优秀设计，并且依托[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理库，打造了一款国产化的工具箱。
 
 ## 1. News 📢
