@@ -23,10 +23,10 @@ from paddle.io import Dataset
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import CompressionArguments, Trainer, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
+from paddlenlp.transformers.tokenizer_utils_faster import PretrainedFasterTokenizer
 from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
-    PretrainedFasterTokenizer,
     PretrainedTokenizer,
 )
 
