@@ -163,7 +163,7 @@ void RobertaPostProcessor::operator()(core::Encoding* encoding,
     std::vector<uint32_t> attention_mask(ids.size(), 1);
     // sequence_ranges
     std::unordered_map<uint32_t, core::Range> sequence_ranges;
-    sequence_ranges[0] = {1, ids.size() - 1};
+    sequence_ranges[1] = {1, ids.size() - 1};
     // overflowing
     auto& overflowings = pair_encoding->GetMutableOverflowing();
     for (auto& overflow_pair_encoding : overflowings) {

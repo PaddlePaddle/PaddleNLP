@@ -14,9 +14,9 @@ limitations under the License. */
 
 #include <string>
 #include <vector>
+#include "fast_tokenizer/pretokenizers/bert.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
-#include "pretokenizers/bert.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {

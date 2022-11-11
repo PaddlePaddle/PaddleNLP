@@ -110,6 +110,7 @@ public:
                         bool growing_offsets);
   std::string DebugString() const;
   void SetTypeIds(const std::vector<uint32_t>& type_ids);
+  bool operator==(const Encoding& other) const;
 
 private:
   std::vector<uint32_t> ids_;

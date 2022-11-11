@@ -15,7 +15,7 @@ limitations under the License. */
 #include "fast_tokenizer/core/encoding.h"
 #include <algorithm>
 #include <cassert>
-#include <climits>
+#include <limits>
 #include <sstream>
 #include "glog/logging.h"
 
@@ -77,7 +77,7 @@ Encoding::Encoding(uint32_t capacity) {
 
 Encoding::Encoding(const std::vector<Token>& tokens, uint32_t type_id)
     : type_ids_(tokens.size(), type_id),
-      words_idx_(tokens.size()),
+      words_idx_(tokens.size(), std::numeric_limits<uint32_t>::max()),
       attention_mask_(tokens.size(), 1),
       special_tokens_mask_(tokens.size(), 0) {
   auto length = tokens.size();
@@ -216,7 +216,7 @@ std::vector<Range> Encoding::WordIdxToTokensIdx(uint32_t word_idx,
   for (uint32_t i = seq_range.first; i < seq_range.second; ++i) {
     // -1 is the word index of special token
     if (words_idx_[i] > word_idx &&
-        words_idx_[i] != static_cast<uint32_t>(-1)) {
+        words_idx_[i] != std::numeric_limits<uint32_t>::max()) {
       break;
     }
     if (words_idx_[i] == word_idx) {
@@ -435,7 +435,8 @@ void Encoding::Pad(uint32_t target_length,
       ids_.insert(ids_.begin(), pad_len, pad_id);
       type_ids_.insert(type_ids_.begin(), pad_len, pad_type_id);
       tokens_.insert(tokens_.begin(), pad_len, pad_token);
-      words_idx_.insert(words_idx_.begin(), pad_len, UINT_MAX);
+      words_idx_.insert(
+          words_idx_.begin(), pad_len, std::numeric_limits<uint32_t>::max());
       attention_mask_.insert(attention_mask_.begin(), pad_len, 0);
       special_tokens_mask_.insert(special_tokens_mask_.begin(), pad_len, 1);
       offsets_.insert(offsets_.begin(), pad_len, {0, 0});
@@ -443,7 +444,8 @@ void Encoding::Pad(uint32_t target_length,
       ids_.insert(ids_.end(), pad_len, pad_id);
       type_ids_.insert(type_ids_.end(), pad_len, pad_type_id);
       tokens_.insert(tokens_.end(), pad_len, pad_token);
-      words_idx_.insert(words_idx_.end(), pad_len, UINT_MAX);
+      words_idx_.insert(
+          words_idx_.end(), pad_len, std::numeric_limits<uint32_t>::max());
       attention_mask_.insert(attention_mask_.end(), pad_len, 0);
       special_tokens_mask_.insert(special_tokens_mask_.end(), pad_len, 1);
       offsets_.insert(offsets_.end(), pad_len, {0, 0});
@@ -465,6 +467,22 @@ void Encoding::SetTypeIds(const std::vector<uint32_t>& type_ids) {
   type_ids_ = type_ids;
 }
 
+bool Encoding::operator==(const Encoding& other) const {
+  if (overflowing_.size() != other.overflowing_.size()) {
+    return false;
+  }
+  for (int i = 0; i < overflowing_.size(); ++i) {
+    if (!(overflowing_[i] == other.overflowing_[i])) {
+      return false;
+    }
+  }
+  return ids_ == other.ids_ && type_ids_ == other.type_ids_ &&
+         tokens_ == other.tokens_ && words_idx_ == other.words_idx_ &&
+         offsets_ == other.offsets_ &&
+         special_tokens_mask_ == other.special_tokens_mask_ &&
+         attention_mask_ == other.attention_mask_ &&
+         sequence_ranges_ == other.sequence_ranges_;
+}
 
 std::string Encoding::DebugString() const {
   std::ostringstream oss;
@@ -530,6 +548,14 @@ std::string Encoding::DebugString() const {
         << iter->second.second << ") }, ";
   }
   oss << "\n";
+
+  oss << "words_idx:";
+  for (int i = 0; i < words_idx_.size(); ++i) {
+    oss << words_idx_[i];
+    if (i < words_idx_.size() - 1) {
+      oss << ", ";
+    }
+  }
   return oss.str();
 }
 
