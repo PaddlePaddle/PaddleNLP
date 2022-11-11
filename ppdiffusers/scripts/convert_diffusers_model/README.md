@@ -245,9 +245,9 @@ import paddle
 from PIL import Image
 from io import BytesIO
 
-from ppdiffusers import StableDiffusionImg2ImgPipeline as DiffusersStableDiffusionImg2ImgPipeline
+from ppdiffusers import StableDiffusionImg2ImgPipeline as PPDiffusersStableDiffusionImg2ImgPipeline
 
-pipe = DiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+pipe = PPDiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
