@@ -20,6 +20,7 @@ from tests.testing_utils import get_tests_dir
 
 
 class TestAutoTrainerForTextClassification(unittest.TestCase):
+
     def setUp(self):
         self.fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
 
@@ -35,8 +36,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
         )
         num_models = 2
         auto_trainer = AutoTrainerForTextClassification(
-            label_column="label_desc", text_column="sentence", preset="test"
-        )
+            label_column="label_desc", text_column="sentence", preset="test")
         auto_trainer.train(
             train_ds,
             dev_ds,

@@ -34,13 +34,13 @@ from .auto_trainer_base import AutoTrainerBase
 
 
 class AutoTrainerForTextClassification(AutoTrainerBase):
+
     def __init__(
-        self,
-        text_column: str,
-        label_column: str,
-        # TODO: support problem_type
-        **kwargs
-    ):
+            self,
+            text_column: str,
+            label_column: str,
+            # TODO: support problem_type
+            **kwargs):
         super(AutoTrainerForTextClassification, self).__init__(**kwargs)
         self.text_column = text_column
         self.label_column = label_column
@@ -83,16 +83,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             },
         }
 
-    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+    def _data_checks_and_inference(self, train_dataset: Dataset,
+                                   eval_dataset: Dataset):
         # TODO: support label ids that is already encoded
         train_labels = {i[self.label_column] for i in train_dataset}
         dev_labels = {i[self.label_column] for i in eval_dataset}
         self.id2label = list(train_labels.union(dev_labels))
         self.label2id = {label: i for i, label in enumerate(self.id2label)}
 
-    def _construct_trainable(
-        self, train_dataset: Dataset, eval_dataset: Dataset
-    ) -> Callable:
+    def _construct_trainable(self, train_dataset: Dataset,
+                             eval_dataset: Dataset) -> Callable:
+
         def trainable(config):
             model_path = config["TrainingArguments.model_name_or_path"]
             max_seq_length = config["PreprocessArguments.max_seq_length"]
@@ -107,8 +108,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
             # define model
             model = AutoModelForSequenceClassification.from_pretrained(
-                model_path, num_classes=len(self.id2label)
-            )
+                model_path, num_classes=len(self.id2label))
             training_args = self._override_training_arguments(config)
             trainer = Trainer(
                 model=model,
@@ -144,9 +144,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         max_seq_length: int,
         is_test: bool = False,
     ):
-        result = tokenizer(text=example[self.text_column], max_seq_len=max_seq_length)
+        result = tokenizer(text=example[self.text_column],
+                           max_seq_len=max_seq_length)
         if not is_test:
             result["labels"] = paddle.to_tensor(
-                [self.label2id[example[self.label_column]]], dtype="int64"
-            )
+                [self.label2id[example[self.label_column]]], dtype="int64")
         return result

@@ -26,13 +26,12 @@ from paddlenlp.transformers import PretrainedFasterTokenizer, PretrainedTokenize
 
 
 class AutoTrainerBase(metaclass=ABCMeta):
-    def __init__(
-        self,
-        metric_for_best_model: Optional[str] = None,
-        preset: Optional[str] = None,
-        language: Optional[str] = "Chinese",
-        **kwargs
-    ):
+
+    def __init__(self,
+                 metric_for_best_model: Optional[str] = None,
+                 preset: Optional[str] = None,
+                 language: Optional[str] = "Chinese",
+                 **kwargs):
         self.metric_for_best_model = metric_for_best_model
         self.preset = preset
         self.language = language
@@ -53,13 +52,13 @@ class AutoTrainerBase(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+    def _data_checks_and_inference(self, train_dataset: Dataset,
+                                   eval_dataset: Dataset):
         pass
 
     @abstractmethod
-    def _construct_trainable(
-        self, train_dataset: Dataset, eval_dataset: Dataset
-    ) -> Callable:
+    def _construct_trainable(self, train_dataset: Dataset,
+                             eval_dataset: Dataset) -> Callable:
         pass
 
     @abstractmethod
@@ -76,9 +75,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
     ) -> Dataset:
         pass
 
-    def _override_arguments(
-        self, config: Dict[str, Any], default_arguments: TrainingArguments
-    ) -> Any:
+    def _override_arguments(self, config: Dict[str, Any],
+                            default_arguments: TrainingArguments) -> Any:
         new_arguments = copy.deepcopy(default_arguments)
         for key, value in config.items():
             if key.startswith(default_arguments.__class__.__name__):
@@ -86,12 +84,12 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 setattr(new_arguments, hp_key, value)
         return new_arguments
 
-    def _override_training_arguments(self, config: Dict[str, Any]) -> TrainingArguments:
+    def _override_training_arguments(
+            self, config: Dict[str, Any]) -> TrainingArguments:
         return self._override_arguments(config, self._default_training_argument)
 
     def _override_compression_arguments(
-        self, config: Dict[str, Any]
-    ) -> CompressionArguments:
+            self, config: Dict[str, Any]) -> CompressionArguments:
         return self._override_arguments(config, self._default_compress_argument)
 
     def train(
