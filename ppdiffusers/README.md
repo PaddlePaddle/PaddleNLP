@@ -155,7 +155,13 @@ image.save("cat_on_bench_new.png")
 ```
 <img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/198016801-87cec13b-0d89-41c3-aedb-c89a43d76153.png">
 
-## 5. Credits
+## 5. 模型部署
+
+StableDiffusion模型除了支持动态图运行，还支持将模型导出并使用推理引擎运行。我们提供在[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的StableDiffusion模型文生图任务的部署示例，用户可以按照我们提供[StableDiffusion模型导出教程](./scripts/export/export.md)将模型导出，并参考[FastDeploy Diffusion模型高性能部署
+](https://github.com/PaddlePaddle/FastDeploy/tree/develop/examples/multimodal/stable_diffusion#%E5%BF%AB%E9%80%9F%E4%BD%93%E9%AA%8C)完成部署。
+
+
+## 6. Credits
 
 This library concretizes previous work by many different authors and would not have been possible without their great research and implementations. We'd like to thank, in particular, the following implementations which have helped us in our development and without which the API could not have been as polished today:
 - @huggingface' diffusers library, available [here](https://github.com/huggingface/diffusers)
@@ -166,7 +172,7 @@ This library concretizes previous work by many different authors and would not h
 
 We also want to thank @heejkoo for the very helpful overview of papers, code and resources on diffusion models, available [here](https://github.com/heejkoo/Awesome-Diffusion-Models) as well as @crowsonkb and @rromb for useful discussions and insights.
 
-## 6. Citation
+## 7. Citation
 
 ```bibtex
 @misc{von-platen-etal-2022-diffusers,
@@ -179,6 +185,6 @@ We also want to thank @heejkoo for the very helpful overview of papers, code and
 }
 ```
 
-## 7. License
+## 8. License
 
 PPDiffusers遵循[Apache-2.0开源协议](./LICENSE)。
