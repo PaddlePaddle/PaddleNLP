@@ -578,10 +578,10 @@ class PretrainedModel(Layer, GenerationMixin):
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 if paddle.in_dynamic_mode():
-                    if isinstance(v, np.ndarray):
-                        state_to_load[k] = v.astype(dtype)
+                    if isinstance(state_to_load[k], np.ndarray):
+                        state_to_load[k] = state_to_load[k].astype(dtype)
                     else:
-                        state_to_load[k] = paddle.cast(v, dtype)
+                        state_to_load[k] = paddle.cast(state_to_load[k], dtype)
                 else:
                     # there are some latent error when case dtype in static-mode, so let's:
                     # 1. convert fluid.*.Tensor -> numpy.ndarray
