@@ -40,5 +40,5 @@ stable-diffusion-v1-4/
 
 | 参数 |参数说明 |
 |----------|--------------|
-|<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](../examples/textual_inversion)。|
+|<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型名称以及用户自行训练的模型目录。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](../examples/textual_inversion)。|
 |--output_path | 导出的模型目录。 |
