@@ -461,6 +461,11 @@ Encoding Encoding::Merge(const std::vector<Encoding>& encodings,
   return merged_encoding;
 }
 
+void Encoding::SetTypeIds(const std::vector<uint32_t>& type_ids) {
+  type_ids_ = type_ids;
+}
+
+
 std::string Encoding::DebugString() const {
   std::ostringstream oss;
   oss << "The Encoding content: \n";

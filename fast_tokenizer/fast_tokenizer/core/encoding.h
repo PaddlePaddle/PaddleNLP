@@ -109,6 +109,7 @@ public:
   static Encoding Merge(const std::vector<Encoding>& encodings,
                         bool growing_offsets);
   std::string DebugString() const;
+  void SetTypeIds(const std::vector<uint32_t>& type_ids);
 
 private:
   std::vector<uint32_t> ids_;
