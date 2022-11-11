@@ -1,6 +1,6 @@
 # Stable Diffusion模型转换教程（Pytorch -> Paddle）
 
-本项目支持将Huggingface的[Diffusers](https://github.com/huggingface/diffusers)版本的权重转换成[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)版本的权重。
+本教程支持将Huggingface的[Diffusers](https://github.com/huggingface/diffusers)版本的Stable Diffusion权重转换成[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)版本的Stable Diffusion权重。
 
 Tips：
 如果我们想要将原版的权重转换为[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)的权重，我们可以首先使用
@@ -10,7 +10,7 @@ Huggingface提供的转换脚本[convert_original_stable_diffusion_to_diffusers.
 
 ### 1.1 依赖安装
 
-模型导出需要依赖`torch`, `diffusers`, `transformers`, `paddlepaddle`, `paddlenlp`以及`ppdiffusers`，我可使用`pip`执行下面的命令进行快速安装。
+模型权重转换需要依赖`torch`, `diffusers`, `transformers`, `paddlepaddle`, `paddlenlp`以及`ppdiffusers`，我可使用`pip`执行下面的命令进行快速安装。
 
 ```shell
 pip install -r requirements.txt
@@ -18,11 +18,11 @@ pip install -r requirements.txt
 
 ### 1.2 模型权重转换
 
-___注意：模型导出过程中，需要下载Stable Diffusion模型。为了使用该模型与权重，你必须接受该模型所要求的License，并且获取HF Hub授予的Token。请访问HuggingFace的[model card](https://huggingface.co/runwayml/stable-diffusion-v1-5), 仔细阅读里面的License，然后签署该协议。___
+___注意：模型权重转换过程中，需要下载Stable Diffusion模型。为了使用该模型与权重，你必须接受该模型所要求的License，并且获取HF Hub授予的Token。请访问HuggingFace的[model card](https://huggingface.co/runwayml/stable-diffusion-v1-5), 仔细阅读里面的License，然后签署该协议。___
 
 ___Tips: Stable Diffusion是基于以下的License: The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the work that BigScience and the RAIL Initiative are jointly carrying in the area of responsible AI licensing. See also the article about the BLOOM Open RAIL license on which this license is based.___
 
-若第一次导出模型，需要先登录HuggingFace客户端。执行以下命令进行登录：
+若第一次权重转换模型，需要先登录HuggingFace客户端。执行以下命令进行登录：
 
 ```shell
 # 安装huggingface_hub
@@ -31,10 +31,10 @@ pip install huggingface_hub
 huggingface-cli login
 ```
 
-可执行以下命令行完成模型导出。
+登录成功后，可执行以下命令行完成模型权重转换。
 
 ```shell
-python convert_diffusers_to_ppdiffusers.py --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 --output_path stable-diffusion-v1-5-ppdiffusers
+python convert_diffusers_stable_diffusion_to_ppdiffusers.py --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 --output_path stable-diffusion-v1-5-ppdiffusers
 ```
 
 输出的模型目录结构如下：
@@ -61,18 +61,17 @@ python convert_diffusers_to_ppdiffusers.py --pretrained_model_name_or_path runwa
         ├── tokenizer_config.json
         ├── merges.txt
         ├── special_tokens_map.json
-        ├── added_tokens.json
         ├── vocab.json
 ```
 
 #### 1.3 参数说明
 
-`convert_diffusers_to_ppdiffusers.py` 各命令行参数的说明。
+`convert_diffusers_stable_diffusion_to_ppdiffusers.py` 各命令行参数的说明。
 
 | 参数 |参数说明 |
 |----------|--------------|
 |<div style="width: 230pt">--pretrained_model_name_or_path </div> | Huggingface上提供的diffuers版本的diffusion预训练模型。默认为："runwayml/stable-diffusion-v1-5"。更多diffusion预训练模型可参考[CompVis模型列表](https://huggingface.co/CompVis)及[runwayml模型列表](https://huggingface.co/runwayml)，目前仅支持SD版模型。|
-|--output_path | 导出的模型目录。 |
+|--output_path | 转换后的模型目录。 |
 
 
 ## 2 原版Stable Diffusion模型权重转换为PPDiffusers权重
@@ -83,7 +82,7 @@ python convert_diffusers_to_ppdiffusers.py --pretrained_model_name_or_path runwa
 
 ### 2.1 依赖安装
 
-模型导出需要依赖`omegaconf`, `torch`, `diffusers`, `transformers`, `paddlepaddle`, `paddlenlp`以及`ppdiffusers`，我可使用`pip`执行下面的命令进行快速安装。
+模型权重转换需要依赖`omegaconf`, `torch`, `diffusers`, `transformers`, `paddlepaddle`, `paddlenlp`以及`ppdiffusers`，我可使用`pip`执行下面的命令进行快速安装。
 
 ```shell
 pip install -r requirements.txt
@@ -143,15 +142,15 @@ python convert_original_stable_diffusion_to_diffusers.py --checkpoint_path v1-5-
 |----------|--------------|
 |<div style="width: 230pt">--checkpoint_path </div> | 原版Stable Diffusion模型ckpt后缀的权重文件。默认为："v1-5-pruned.ckpt"。更多原版的预训练模型可在[HuggingFace上搜索](https://huggingface.co/)。|
 |--original_config_file | 该权重文件所使用的配置文件，默认为"v1-inference.yaml"。 |
-|--dump_path | 导出的Diffusers版本模型目录。 |
+|--dump_path | 转换后的Diffusers版本模型目录。 |
 
 #### Step2 Diffusers权重转换为PPDiffusers权重
 由于我们已经得到了Huggingface的[Diffusers](https://github.com/huggingface/diffusers)版本的权重，因此我们可以参考第1部分进行权重转换。
 
-我们仅需要运行下面的代码即可成功导出[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)版本的权重。
+我们仅需要运行下面的代码即可成功转换[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)版本的权重。
 
 ```shell
-python convert_diffusers_to_ppdiffusers.py --pretrained_model_name_or_path stable-diffusion-v1-5-diffusers --output_path stable-diffusion-v1-5-ppdiffusers
+python convert_diffusers_stable_diffusion_to_ppdiffusers.py --pretrained_model_name_or_path stable-diffusion-v1-5-diffusers --output_path stable-diffusion-v1-5-ppdiffusers
 ```
 
 脚本运行完成后，输出的模型目录结构如下：
@@ -178,6 +177,5 @@ python convert_diffusers_to_ppdiffusers.py --pretrained_model_name_or_path stabl
         ├── tokenizer_config.json
         ├── merges.txt
         ├── special_tokens_map.json
-        ├── added_tokens.json
         ├── vocab.json
 ```
