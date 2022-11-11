@@ -17,8 +17,6 @@ import paddle
 paddle.set_device("cpu")
 import argparse
 import torch
-import diffusers
-import ppdiffusers
 from collections import OrderedDict
 from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipeline
 from ppdiffusers.configuration_utils import FrozenDict
@@ -27,32 +25,18 @@ from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 from paddlenlp.transformers import CLIPTextModel, CLIPVisionModel, CLIPTokenizer, CLIPFeatureExtractor
 
 
-def convert_vae_to_ppdiffusers(vae, dtype="float32"):
+def convert_to_ppdiffusers(vae_or_unet, dtype="float32"):
     need_transpose = []
-    for k, v in vae.named_modules():
+    for k, v in vae_or_unet.named_modules():
         if isinstance(v, torch.nn.Linear):
             need_transpose.append(k + ".weight")
-    new_vae = OrderedDict()
-    for k, v in vae.state_dict().items():
+    new_vae_or_unet = OrderedDict()
+    for k, v in vae_or_unet.state_dict().items():
         if k not in need_transpose:
-            new_vae[k] = v.numpy().astype(dtype)
+            new_vae_or_unet[k] = v.cpu().numpy().astype(dtype)
         else:
-            new_vae[k] = v.t().numpy().astype(dtype)
-    return new_vae
-
-
-def convert_unet_to_ppdiffusers(unet, dtype="float32"):
-    need_transpose = []
-    for k, v in unet.named_modules():
-        if isinstance(v, torch.nn.Linear):
-            need_transpose.append(k + ".weight")
-    new_unet = OrderedDict()
-    for k, v in unet.state_dict().items():
-        if k not in need_transpose:
-            new_unet[k] = v.numpy().astype(dtype)
-        else:
-            new_unet[k] = v.t().numpy().astype(dtype)
-    return new_unet
+            new_vae_or_unet[k] = v.t().cpu().numpy().astype(dtype)
+    return new_vae_or_unet
 
 
 def convert_hf_clip_to_ppnlp_clip(clip, dtype="float32", is_text_encoder=True):
@@ -74,7 +58,7 @@ def convert_hf_clip_to_ppnlp_clip(clip, dtype="float32", is_text_encoder=True):
         ".vision_model.": "."
     }
     ignore_value = ["position_ids"]
-    donot_transpose_ignore_value = [
+    donot_transpose = [
         "embeddings", "norm", "concept_embeds", "special_care_embeds"
     ]
 
@@ -83,8 +67,7 @@ def convert_hf_clip_to_ppnlp_clip(clip, dtype="float32", is_text_encoder=True):
         if any(i in name for i in ignore_value):
             continue
         # step2: transpose nn.Linear weight
-        if value.ndim == 2 and not any(i in name
-                                       for i in donot_transpose_ignore_value):
+        if value.ndim == 2 and not any(i in name for i in donot_transpose):
             value = value.t()
         # step3: hf_name -> ppnlp_name mapping
         for hf_name, ppnlp_name in transformers2ppnlp.items():
@@ -135,8 +118,8 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
     # 0. load diffusers pipe and convert to ppdiffusers weights format
     diffusers_pipe = DiffusersStableDiffusionPipeline.from_pretrained(
         pretrained_model_name_or_path, use_auth_token=True)
-    vae_state_dict = convert_vae_to_ppdiffusers(diffusers_pipe.vae)
-    unet_state_dict = convert_unet_to_ppdiffusers(diffusers_pipe.unet)
+    vae_state_dict = convert_to_ppdiffusers(diffusers_pipe.vae)
+    unet_state_dict = convert_to_ppdiffusers(diffusers_pipe.unet)
     text_encoder_state_dict, text_encoder_config = convert_hf_clip_to_ppnlp_clip(
         diffusers_pipe.text_encoder, is_text_encoder=True)
     safety_checker_state_dict, safety_checker_config = convert_hf_clip_to_ppnlp_clip(
