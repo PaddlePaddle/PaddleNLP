@@ -1,0 +1,7 @@
+ppdiffusers
+paddlenlp
+paddlepaddle-gpu
+torch
+diffusers
+transformers
+omegaconf
