@@ -748,6 +748,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         postprocessors::TemplatePostProcessor template_postprocessor;
         post_processor.get_to(template_postprocessor);
         tokenizer.SetPostProcessor(template_postprocessor);
+      } else if (post_processor.at("type") == "RobertaPostProcessor") {
+        postprocessors::RobertaPostProcessor roberta_postprocessor;
+        post_processor.get_to(roberta_postprocessor);
+        tokenizer.SetPostProcessor(roberta_postprocessor);
       }
     }
 
@@ -835,6 +839,8 @@ template void Tokenizer::SetPostProcessor(
     const postprocessors::BertPostProcessor&);
 template void Tokenizer::SetPostProcessor(
     const postprocessors::TemplatePostProcessor&);
+template void Tokenizer::SetPostProcessor(
+    const postprocessors::RobertaPostProcessor&);
 
 // Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);

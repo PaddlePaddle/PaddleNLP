@@ -83,10 +83,11 @@ public:
   void Split(const PatternType&
                  pattern, /* re2::RE2 or std::function<bool(char32_t)> */
              SplitMode mode,
-             std::vector<NormalizedString>* normalizes) const {
+             std::vector<NormalizedString>* normalizes,
+             bool invert = false) const {
     // Vec<(Offsets, should_remove)>
     std::vector<std::pair<core::Range, bool>> matches;
-    auto normalizes_size = GetMatch(normalized_, pattern, &matches);
+    auto normalizes_size = GetMatch(normalized_, pattern, &matches, invert);
     // Convert matches
     switch (mode) {
       case REMOVED:
@@ -194,11 +195,13 @@ private:
 
   uint32_t GetMatch(const std::string& normalized,
                     const re2::RE2& pattern,
-                    std::vector<std::pair<core::Range, bool>>* matches) const;
+                    std::vector<std::pair<core::Range, bool>>* matches,
+                    bool invert = false) const;
 
   uint32_t GetMatch(const std::string& normalized,
                     const std::function<bool(char32_t)>& pattern_func,
-                    std::vector<std::pair<core::Range, bool>>* matches) const;
+                    std::vector<std::pair<core::Range, bool>>* matches,
+                    bool invert = false) const;
 };
 
 struct FASTTOKENIZER_DECL Normalizer {
