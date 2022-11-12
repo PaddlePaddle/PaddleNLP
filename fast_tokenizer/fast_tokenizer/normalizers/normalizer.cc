@@ -642,12 +642,12 @@ uint32_t NormalizedString::GetMatch(
 }
 
 template void NormalizedString::Split(const re2::RE2& pattern,
-                                      SplitMode mode,
+                                      core::SplitMode mode,
                                       std::vector<NormalizedString>* normalizes,
                                       bool invert) const;
 template void NormalizedString::Split(
     const std::function<bool(char32_t)>& pattern_func,
-    SplitMode mode,
+    core::SplitMode mode,
     std::vector<NormalizedString>* normalizes,
     bool invert) const;
 

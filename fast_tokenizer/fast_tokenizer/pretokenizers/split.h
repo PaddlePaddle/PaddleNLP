@@ -28,7 +28,7 @@ namespace pretokenizers {
 struct FASTTOKENIZER_DECL SplitPreTokenizer : public PreTokenizer {
   SplitPreTokenizer() = default;
   SplitPreTokenizer(const std::string& pattern,
-                    normalizers::SplitMode split_mode,
+                    core::SplitMode split_mode,
                     bool invert);
   SplitPreTokenizer(const SplitPreTokenizer& split_pretokenizer);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
@@ -39,7 +39,7 @@ struct FASTTOKENIZER_DECL SplitPreTokenizer : public PreTokenizer {
 
 private:
   bool invert_;
-  normalizers::SplitMode split_mode_;
+  core::SplitMode split_mode_;
   std::unique_ptr<re2::RE2> pattern_;
 };
 

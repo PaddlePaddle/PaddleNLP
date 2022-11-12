@@ -26,52 +26,52 @@ namespace tests {
 TEST(pretokenizers, split_basic) {
   std::string input = "How are you doing?";
   // All tokens' id are set to 0.
-  std::vector<std::pair<normalizers::SplitMode, std::vector<core::Token>>>
-      test_cases = {{
-                        normalizers::REMOVED,
-                        std::vector<core::Token>{{0, "How", {0, 3}},
-                                                 {0, "are", {4, 7}},
-                                                 {0, "you", {8, 11}},
-                                                 {0, "doing", {12, 17}},
-                                                 {0, "?", {17, 18}}},
-                    },
-                    {
-                        normalizers::ISOLATED,
-                        std::vector<core::Token>{{0, "How", {0, 3}},
-                                                 {0, " ", {3, 4}},
-                                                 {0, "are", {4, 7}},
-                                                 {0, " ", {7, 8}},
-                                                 {0, "you", {8, 11}},
-                                                 {0, " ", {11, 12}},
-                                                 {0, "doing", {12, 17}},
-                                                 {0, "?", {17, 18}}},
-                    },
-                    {
-                        normalizers::MERGED_WITH_PREVIOUS,
-                        std::vector<core::Token>{{0, "How ", {0, 4}},
-                                                 {0, "are ", {4, 8}},
-                                                 {0, "you ", {8, 12}},
-                                                 {0, "doing", {12, 17}},
-                                                 {0, "?", {17, 18}}},
-                    },
-                    {
-                        normalizers::MERGED_WITH_NEXT,
-                        std::vector<core::Token>{{0, "How", {0, 3}},
-                                                 {0, " are", {3, 7}},
-                                                 {0, " you", {7, 11}},
-                                                 {0, " doing", {11, 17}},
-                                                 {0, "?", {17, 18}}},
-                    },
-                    {
-                        normalizers::CONTIGUOUS,
-                        std::vector<core::Token>{{0, "How", {0, 3}},
-                                                 {0, " ", {3, 4}},
-                                                 {0, "are", {4, 7}},
-                                                 {0, " ", {7, 8}},
-                                                 {0, "you", {8, 11}},
-                                                 {0, " ", {11, 12}},
-                                                 {0, "doing?", {12, 18}}},
-                    }};
+  std::vector<std::pair<core::SplitMode, std::vector<core::Token>>> test_cases =
+      {{
+           core::SplitMode::REMOVED,
+           std::vector<core::Token>{{0, "How", {0, 3}},
+                                    {0, "are", {4, 7}},
+                                    {0, "you", {8, 11}},
+                                    {0, "doing", {12, 17}},
+                                    {0, "?", {17, 18}}},
+       },
+       {
+           core::SplitMode::ISOLATED,
+           std::vector<core::Token>{{0, "How", {0, 3}},
+                                    {0, " ", {3, 4}},
+                                    {0, "are", {4, 7}},
+                                    {0, " ", {7, 8}},
+                                    {0, "you", {8, 11}},
+                                    {0, " ", {11, 12}},
+                                    {0, "doing", {12, 17}},
+                                    {0, "?", {17, 18}}},
+       },
+       {
+           core::SplitMode::MERGED_WITH_PREVIOUS,
+           std::vector<core::Token>{{0, "How ", {0, 4}},
+                                    {0, "are ", {4, 8}},
+                                    {0, "you ", {8, 12}},
+                                    {0, "doing", {12, 17}},
+                                    {0, "?", {17, 18}}},
+       },
+       {
+           core::SplitMode::MERGED_WITH_NEXT,
+           std::vector<core::Token>{{0, "How", {0, 3}},
+                                    {0, " are", {3, 7}},
+                                    {0, " you", {7, 11}},
+                                    {0, " doing", {11, 17}},
+                                    {0, "?", {17, 18}}},
+       },
+       {
+           core::SplitMode::CONTIGUOUS,
+           std::vector<core::Token>{{0, "How", {0, 3}},
+                                    {0, " ", {3, 4}},
+                                    {0, "are", {4, 7}},
+                                    {0, " ", {7, 8}},
+                                    {0, "you", {8, 11}},
+                                    {0, " ", {11, 12}},
+                                    {0, "doing?", {12, 18}}},
+       }};
   std::string pattern = R"(\w+|[^\w\s]+)";
   for (auto&& test : test_cases) {
     pretokenizers::PreTokenizedString pretokenized(input);
@@ -91,9 +91,9 @@ TEST(pretokenizers, split_invert) {
   std::string input = "Hello Hello Hello";
   pretokenizers::PreTokenizedString pretok_str(input),
       pretok_str_for_invert(input);
-  pretokenizers::SplitPreTokenizer pretok(" ", normalizers::REMOVED, false);
+  pretokenizers::SplitPreTokenizer pretok(" ", core::SplitMode::REMOVED, false);
   pretokenizers::SplitPreTokenizer pretok_invert(
-      "Hello", normalizers::REMOVED, true);
+      "Hello", core::SplitMode::REMOVED, true);
 
   pretok(&pretok_str);
   pretok_invert(&pretok_str_for_invert);

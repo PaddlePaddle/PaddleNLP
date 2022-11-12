@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/bert.h"
+#include "fast_tokenizer/utils/utils.h"
 #include "glog/logging.h"
 #include "re2/re2.h"
 #include "unicode/uchar.h"
-#include "fast_tokenizer/utils/utils.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
@@ -35,7 +35,7 @@ void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
       std::vector<StringSplit>* string_splits) {
     // Use single character match instead of regex to improve performance
     normalized->Split([](char32_t ch) -> bool { return u_isUWhiteSpace(ch); },
-                      normalizers::REMOVED,
+                      core::SplitMode::REMOVED,
                       &normalized_splits);
     for (auto&& normalize : normalized_splits) {
       if (!normalize.IsEmpty()) {
@@ -44,20 +44,20 @@ void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
     }
   });
   normalized_splits.clear();
-  pretokenized->Split(
-      [&normalized_splits](int idx,
-                           normalizers::NormalizedString* normalized,
-                           std::vector<StringSplit>* string_splits) {
-        // Use single character match instead of regex to improve performance
-        normalized->Split(
-            utils::IsPunctuation, normalizers::ISOLATED, &normalized_splits);
-        for (auto&& normalize : normalized_splits) {
-          if (!normalize.IsEmpty()) {
-            VLOG(6) << "After pretokenized: " << normalize.GetStr();
-            string_splits->emplace_back(std::move(normalize));
-          }
-        }
-      });
+  pretokenized->Split([&normalized_splits](
+      int idx,
+      normalizers::NormalizedString* normalized,
+      std::vector<StringSplit>* string_splits) {
+    // Use single character match instead of regex to improve performance
+    normalized->Split(
+        utils::IsPunctuation, core::SplitMode::ISOLATED, &normalized_splits);
+    for (auto&& normalize : normalized_splits) {
+      if (!normalize.IsEmpty()) {
+        VLOG(6) << "After pretokenized: " << normalize.GetStr();
+        string_splits->emplace_back(std::move(normalize));
+      }
+    }
+  });
 }
 
 void to_json(nlohmann::json& j, const BertPreTokenizer& bert_pre_tokenizer) {

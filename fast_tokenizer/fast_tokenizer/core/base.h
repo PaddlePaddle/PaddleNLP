@@ -21,8 +21,8 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 
-#include "nlohmann/json.hpp"
 #include "fast_tokenizer/utils/utils.h"
+#include "nlohmann/json.hpp"
 
 namespace std {
 template <>
@@ -47,6 +47,14 @@ enum FASTTOKENIZER_DECL TruncStrategy {
   ONLY_SECOND
 };
 enum FASTTOKENIZER_DECL PadStrategy { BATCH_LONGEST, FIXED_SIZE };
+
+enum FASTTOKENIZER_DECL SplitMode {
+  REMOVED,
+  ISOLATED,
+  MERGED_WITH_PREVIOUS,
+  MERGED_WITH_NEXT,
+  CONTIGUOUS
+};
 
 NLOHMANN_JSON_SERIALIZE_ENUM(OffsetType,
                              {

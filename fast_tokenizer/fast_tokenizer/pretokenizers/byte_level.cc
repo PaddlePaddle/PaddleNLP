@@ -43,24 +43,24 @@ ByteLevelPreTokenizer::ByteLevelPreTokenizer(bool add_prefix_space,
 
 void ByteLevelPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
   std::vector<normalizers::NormalizedString> normalized_splits;
-  pretokenized->Split(
-      [&normalized_splits, this](int idx,
-                                 normalizers::NormalizedString* normalized,
-                                 std::vector<StringSplit>* string_splits) {
-        if (this->add_prefix_space_ && normalized->GetStr().find(' ') != 0) {
-          normalized->Prepend(" ");
+  pretokenized->Split([&normalized_splits, this](
+      int idx,
+      normalizers::NormalizedString* normalized,
+      std::vector<StringSplit>* string_splits) {
+    if (this->add_prefix_space_ && normalized->GetStr().find(' ') != 0) {
+      normalized->Prepend(" ");
+    }
+    if (this->use_regex_) {
+      normalized->Split(pattern, core::SplitMode::ISOLATED, &normalized_splits);
+      for (auto&& normalize : normalized_splits) {
+        if (!normalize.IsEmpty()) {
+          string_splits->emplace_back(std::move(normalize));
         }
-        if (this->use_regex_) {
-          normalized->Split(pattern, normalizers::ISOLATED, &normalized_splits);
-          for (auto&& normalize : normalized_splits) {
-            if (!normalize.IsEmpty()) {
-              string_splits->emplace_back(std::move(normalize));
-            }
-          }
-        } else {
-          string_splits->emplace_back(*normalized);
-        }
-      });
+      }
+    } else {
+      string_splits->emplace_back(*normalized);
+    }
+  });
   pretokenized->Normalize([](normalizers::NormalizedString* normalized) {
     const std::string& str = normalized->GetStr();
     std::u32string u32normalized;

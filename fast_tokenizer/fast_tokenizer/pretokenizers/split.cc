@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/split.h"
+#include "fast_tokenizer/core/base.h"
 #include "fast_tokenizer/normalizers/normalizer.h"
 #include "fast_tokenizer/utils/unique_ptr.h"
 #include "re2/re2.h"
@@ -29,7 +30,7 @@ SplitPreTokenizer::SplitPreTokenizer(
 }
 
 SplitPreTokenizer::SplitPreTokenizer(const std::string& pattern,
-                                     normalizers::SplitMode split_mode,
+                                     core::SplitMode split_mode,
                                      bool invert)
     : invert_(invert), split_mode_(split_mode) {
   pattern_ = utils::make_unique<re2::RE2>(pattern);
