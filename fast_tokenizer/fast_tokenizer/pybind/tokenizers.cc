@@ -160,6 +160,11 @@ static int TokenizerPropertiesSetPreTokenizer(TokenizerObject* self,
     const auto& pretokenizer =
         py_obj.cast<const pretokenizers::ByteLevelPreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<pretokenizers::SplitPreTokenizer>())) {
+    const auto& pretokenizer =
+        py_obj.cast<const pretokenizers::SplitPreTokenizer&>();
+    self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleasePreTokenizer();
   } else {
@@ -226,6 +231,16 @@ static int TokenizerPropertiesSetPostProcessor(TokenizerObject* self,
                  py::type::of<postprocessors::TemplatePostProcessor>())) {
     const auto& processor =
         py_obj.cast<const postprocessors::TemplatePostProcessor&>();
+    self->tokenizer.SetPostProcessor(processor);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<postprocessors::RobertaPostProcessor>())) {
+    const auto& processor =
+        py_obj.cast<const postprocessors::RobertaPostProcessor&>();
+    self->tokenizer.SetPostProcessor(processor);
+  } else if (pybind11::type::of(py_obj).is(
+                 py::type::of<postprocessors::ByteLevelPostProcessor>())) {
+    const auto& processor =
+        py_obj.cast<const postprocessors::ByteLevelPostProcessor&>();
     self->tokenizer.SetPostProcessor(processor);
   } else if (py_obj.is(py::none())) {
     self->tokenizer.ReleasePostProcessor();

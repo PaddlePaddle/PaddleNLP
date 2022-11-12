@@ -26,9 +26,11 @@ namespace fast_tokenizer {
 namespace pretokenizers {
 
 struct FASTTOKENIZER_DECL SplitPreTokenizer : public PreTokenizer {
+  SplitPreTokenizer() = default;
   SplitPreTokenizer(const std::string& pattern,
                     normalizers::SplitMode split_mode,
                     bool invert);
+  SplitPreTokenizer(const SplitPreTokenizer& split_pretokenizer);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   friend void to_json(nlohmann::json& j,
                       const SplitPreTokenizer& split_pretokenizer);

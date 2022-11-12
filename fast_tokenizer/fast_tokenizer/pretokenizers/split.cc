@@ -21,6 +21,13 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
+SplitPreTokenizer::SplitPreTokenizer(
+    const SplitPreTokenizer& split_pretokenizer)
+    : pattern_(new re2::RE2(split_pretokenizer.pattern_->pattern())) {
+  split_mode_ = split_pretokenizer.split_mode_;
+  invert_ = split_pretokenizer.invert_;
+}
+
 SplitPreTokenizer::SplitPreTokenizer(const std::string& pattern,
                                      normalizers::SplitMode split_mode,
                                      bool invert)

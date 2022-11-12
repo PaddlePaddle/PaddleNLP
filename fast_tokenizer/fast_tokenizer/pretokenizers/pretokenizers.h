@@ -19,4 +19,5 @@ limitations under the License. */
 #include "fast_tokenizer/pretokenizers/metaspace.h"
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/pretokenizers/sequence.h"
+#include "fast_tokenizer/pretokenizers/split.h"
 #include "fast_tokenizer/pretokenizers/whitespace.h"

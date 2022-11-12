@@ -595,6 +595,10 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(pretokenizers::ByteLevelPreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::ByteLevelPreTokenizer*>(
           tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::SplitPreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::SplitPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
     }
   }
 
@@ -623,6 +627,15 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(postprocessors::TemplatePostProcessor)) {
       j["postprocessor"] =
           *dynamic_cast<postprocessors::TemplatePostProcessor*>(
+              tokenizer.post_processor_.get());
+    } else if (typeid(*tokenizer.post_processor_.get()) ==
+               typeid(postprocessors::RobertaPostProcessor)) {
+      j["postprocessor"] = *dynamic_cast<postprocessors::RobertaPostProcessor*>(
+          tokenizer.post_processor_.get());
+    } else if (typeid(*tokenizer.post_processor_.get()) ==
+               typeid(postprocessors::ByteLevelPostProcessor)) {
+      j["postprocessor"] =
+          *dynamic_cast<postprocessors::ByteLevelPostProcessor*>(
               tokenizer.post_processor_.get());
     }
   }
@@ -711,7 +724,12 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         tokenizer.SetPreTokenizer(sequence_pretokenizer);
       } else if (pretokenizer.at("type") == "ByteLevelPreTokenizer") {
         pretokenizers::ByteLevelPreTokenizer byte_pretokenizer;
+        pretokenizer.get_to(byte_pretokenizer);
         tokenizer.SetPreTokenizer(byte_pretokenizer);
+      } else if (pretokenizer.at("type") == "SplitPreTokenizer") {
+        pretokenizers::SplitPreTokenizer split_pretokenizer;
+        pretokenizer.get_to(split_pretokenizer);
+        tokenizer.SetPreTokenizer(split_pretokenizer);
       }
     }
 
@@ -752,6 +770,10 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         postprocessors::RobertaPostProcessor roberta_postprocessor;
         post_processor.get_to(roberta_postprocessor);
         tokenizer.SetPostProcessor(roberta_postprocessor);
+      } else if (post_processor.at("type") == "ByteLevelPostProcessor") {
+        postprocessors::ByteLevelPostProcessor byte_level_postprocessor;
+        post_processor.get_to(byte_level_postprocessor);
+        tokenizer.SetPostProcessor(byte_level_postprocessor);
       }
     }
 
@@ -823,6 +845,8 @@ template void Tokenizer::SetPreTokenizer(
     const pretokenizers::SequencePreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::ByteLevelPreTokenizer&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::SplitPreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
@@ -841,6 +865,8 @@ template void Tokenizer::SetPostProcessor(
     const postprocessors::TemplatePostProcessor&);
 template void Tokenizer::SetPostProcessor(
     const postprocessors::RobertaPostProcessor&);
+template void Tokenizer::SetPostProcessor(
+    const postprocessors::ByteLevelPostProcessor&);
 
 // Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);

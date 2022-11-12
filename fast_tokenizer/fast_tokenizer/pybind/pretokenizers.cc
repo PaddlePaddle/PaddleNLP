@@ -178,11 +178,17 @@ void BindPreTokenizers(pybind11::module* m) {
                  pretokenizer_ptr =
                      py_pretokenizer
                          .cast<pretokenizers::WhitespacePreTokenizer*>();
+               } else if (pybind11::type::of(py_pretokenizer)
+                              .is(py::type::of<
+                                  pretokenizers::ByteLevelPreTokenizer>())) {
+                 pretokenizer_ptr =
+                     py_pretokenizer
+                         .cast<pretokenizers::ByteLevelPreTokenizer*>();
                } else {
                  throw py::value_error(
                      "Type of normalizers should be one of `BertPreTokenizer`,"
                      " `MetaSpacePreTokenizer`, `SequencePreTokenizer`,"
-                     " `WhitespacePreTokenizer`");
+                     " `WhitespacePreTokenizer`, `ByteLevelPreTokenizer`");
                }
                pretokenizers.push_back(pretokenizer_ptr);
              }
