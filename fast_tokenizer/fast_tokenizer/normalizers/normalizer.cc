@@ -633,7 +633,7 @@ uint32_t NormalizedString::GetMatch(
     utf8_len += chwidth;
   }
   if (start < normalized.length()) {
-    matches->emplace_back(core::Range{start, normalized.length()}, !invert);
+    matches->emplace_back(core::Range{start, normalized.length()}, invert);
     if (!invert) {
       ++reserved_num;
     }

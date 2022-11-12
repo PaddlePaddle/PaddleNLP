@@ -11,6 +11,7 @@ cc_test(test_utils SRCS test_utils.cc DEPS normalizers)
 # Test PreTokenizers modules
 cc_test(test_whitespace SRCS test_whitespace.cc DEPS pretokenizers)
 cc_test(test_bert_pretokenizer SRCS test_bert_pretokenizer.cc DEPS pretokenizers)
+cc_test(test_split_pretokenizer SRCS test_split_pretokenizer.cc DEPS pretokenizers)
 
 # Test Model
 cc_test(test_wordpiece SRCS test_wordpiece.cc DEPS models)

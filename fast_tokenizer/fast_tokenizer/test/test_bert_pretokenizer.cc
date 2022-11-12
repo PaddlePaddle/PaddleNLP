@@ -21,7 +21,7 @@ limitations under the License. */
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace tests {
-TEST(pretokenizers, whitespace) {
+TEST(pretokenizers, bert) {
   std::string input =
       "I \t am good\r   at \nsport. I like\tfootball especially!!!";
   std::vector<std::string> expected_outputs = {"I",
