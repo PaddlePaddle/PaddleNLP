@@ -16,6 +16,7 @@ limitations under the License. */
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
 #include <Python.h>
 #include "fast_tokenizer/pybind/pretokenizers.h"
+#include "re2/re2.h"
 
 namespace py = pybind11;
 
@@ -80,6 +81,16 @@ public:
       pretokenizers::PreTokenizedString* pretokenized) const override {
     PYBIND11_OVERLOAD_NAME(
         void, ByteLevelPreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
+class PySplitPreTokenizer : public pretokenizers::SplitPreTokenizer {
+public:
+  using SplitPreTokenizer::SplitPreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, SplitPreTokenizer, "__call__", operator(), pretokenized);
   }
 };
 
@@ -202,6 +213,13 @@ void BindPreTokenizers(pybind11::module* m) {
            py::arg("add_prefix_space") = true,
            py::arg("use_regex") = true)
       .def("__call__", &pretokenizers::ByteLevelPreTokenizer::operator());
+  py::class_<pretokenizers::SplitPreTokenizer, PySplitPreTokenizer>(
+      sub_module, "SplitPreTokenizer")
+      .def(py::init<const std::string&, core::SplitMode, bool>(),
+           py::arg("pattern"),
+           py::arg("split_mode"),
+           py::arg("invert"))
+      .def("__call__", &pretokenizers::SplitPreTokenizer::operator());
 }
 
 }  // namespace pybind
