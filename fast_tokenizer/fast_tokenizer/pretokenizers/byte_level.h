@@ -24,9 +24,7 @@ namespace fast_tokenizer {
 namespace pretokenizers {
 
 struct FASTTOKENIZER_DECL ByteLevelPreTokenizer : public PreTokenizer {
-  ByteLevelPreTokenizer(bool add_prefix_space = true,
-                        bool use_regex = true,
-                        bool trim_offsets = true);
+  ByteLevelPreTokenizer(bool add_prefix_space = true, bool use_regex = true);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   friend void to_json(nlohmann::json& j,
                       const ByteLevelPreTokenizer& byte_pre_tokenizer);
@@ -35,7 +33,6 @@ struct FASTTOKENIZER_DECL ByteLevelPreTokenizer : public PreTokenizer {
 
 private:
   bool add_prefix_space_;
-  bool trim_offsets_;
   bool use_regex_;
 };
 

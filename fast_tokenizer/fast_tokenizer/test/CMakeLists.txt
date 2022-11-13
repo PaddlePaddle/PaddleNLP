@@ -34,6 +34,7 @@ cc_test(test_roberta_postprocessor SRCS test_roberta_postprocessor.cc DEPS norma
 
 if(NOT WITH_PYTHON)
 cc_test(test_ernie_fast_tokenizer SRCS test_ernie_fast_tokenizer.cc DEPS normalizers pretokenizers models postprocessors tokenizer core_tokenizers)
+cc_test(test_clip_fast_tokenizer SRCS test_clip_fast_tokenizer.cc DEPS normalizers pretokenizers models postprocessors tokenizer core_tokenizers)
 endif()
 
 endif()
