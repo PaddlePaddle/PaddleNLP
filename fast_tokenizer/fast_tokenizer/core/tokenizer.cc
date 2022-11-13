@@ -272,11 +272,7 @@ void Tokenizer::EncodeBatchStrings(
   encodings->resize(batch_size);
 
 #ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
-// tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the
-// workload estimation.
-#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
+#pragma omp parallel for num_threads(GetFastTokenizerThreadNum())
   for (int i = 0; i < batch_size; ++i) {
     EncodePairStrings(
         batch_encode_input[i], &(*encodings)[i], add_special_tokens);
@@ -340,11 +336,7 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
   auto batch_size = batch_encode_input.size();
   encodings->resize(batch_size);
 #ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
-// tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the
-// workload estimation.
-#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
+#pragma omp parallel for num_threads(GetFastTokenizerThreadNum())
   for (int i = 0; i < batch_size; ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(
@@ -480,12 +472,7 @@ void Tokenizer::DecodeBatch(
   auto batch_size = batch_token_ids.size();
   results->resize(batch_size);
 #ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
-// tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the
-// workload estimation.
-#pragma omp parallel for if (batch_token_ids.size() >= 4 && \
-                                                  omp_get_num_threads() > 1)
+#pragma omp parallel for num_threads(GetFastTokenizerThreadNum())
   for (int i = 0; i < batch_token_ids.size(); ++i) {
     Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
   }

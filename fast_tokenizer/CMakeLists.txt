@@ -4,7 +4,7 @@ project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
 option(WITH_TESTING     "Compile PaddleNLP fast_tokenizer with unit testing"        OFF)
 option(WITH_PYTHON      "Compile PaddleNLP fast_tokenizer with python interpreter"   ON)
-add_definitions(-DFASTERTOKENIZER_LIB)
+add_definitions(-DFASTTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set (PUBLIC_DEPEND_LIBS "")

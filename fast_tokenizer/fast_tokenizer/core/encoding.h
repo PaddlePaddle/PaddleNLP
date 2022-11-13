@@ -130,10 +130,6 @@ bool FASTTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
 void FASTTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
                                      const PadMethod& method);
 
-int FASTTOKENIZER_DECL GetThreadNum(size_t batch_size);
-
-void FASTTOKENIZER_DECL RunMultiThread(std::function<void(size_t, size_t)> func,
-                                       size_t batch_size);
 }  // namespace core
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

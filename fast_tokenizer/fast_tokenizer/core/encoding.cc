@@ -688,41 +688,6 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
 #endif
 }
 
-int GetThreadNum(size_t batch_size) {
-  char* env_var = std::getenv("OMP_NUM_THREADS");
-  int thread_num = std::atoi(env_var);
-  if (batch_size <= 0) {
-    thread_num = 1;
-    VLOG(3) << "batch_size <=0, we set OMP_NUM_THREADS = 1";
-  } else {
-    int best_num = ceil(batch_size / 4.0);
-    if (thread_num > best_num) {
-      thread_num = best_num;
-      VLOG(3) << "OMP_NUM_THREADS > batch_size/4, we set OMP_NUM_THREADS = "
-                 "batch_size/4";
-    } else if (thread_num == 0) {
-      thread_num = best_num;
-      VLOG(3) << "OMP_NUM_THREADS == 0, we set OMP_NUM_THREADS = batch_size/4";
-    }
-  }
-  return thread_num;
-}
-
-void RunMultiThread(std::function<void(size_t, size_t)> func,
-                    size_t batch_size) {
-  int thread_num = GetThreadNum(batch_size);
-  std::vector<std::thread> vectorOfThread;
-  size_t start_index = 0;
-  size_t step_index = ceil(batch_size / float(thread_num));
-
-  for (size_t thread_index = 0; thread_index < thread_num; thread_index++) {
-    vectorOfThread.emplace_back(std::thread(func, start_index, step_index));
-    start_index = start_index + step_index;
-  }
-  for (size_t thread_index = 0; thread_index < thread_num; thread_index++) {
-    vectorOfThread[thread_index].join();
-  }
-}
 
 }  // namespace core
 }  // namespace fast_tokenizer
