@@ -569,7 +569,8 @@ bool NormalizedString::Slice(core::Range range,
 uint32_t NormalizedString::GetMatch(
     const std::string& normalized,
     const re2::RE2& pattern,
-    std::vector<std::pair<core::Range, bool>>* matches) const {
+    std::vector<std::pair<core::Range, bool>>* matches,
+    bool invert) const {
   size_t start = 0;
   size_t end = normalized.length();
   // Construct the matches whose mode is REMOVED.
@@ -579,15 +580,22 @@ uint32_t NormalizedString::GetMatch(
     size_t curr_start = result.data() - normalized.data();
     size_t curr_end = curr_start + result.length();
     if (start != curr_start) {
-      matches->push_back({{start, curr_start}, false});
+      matches->push_back({{start, curr_start}, invert});
+      if (!invert) {
+        ++reserved_num;
+      }
+    }
+    matches->push_back({{curr_start, curr_end}, !invert});
+    if (invert) {
       ++reserved_num;
     }
-    matches->push_back({{curr_start, curr_end}, true});
     start = curr_end;
   }
   if (start < end) {
-    matches->push_back({{start, end}, false});
-    ++reserved_num;
+    matches->push_back({{start, end}, invert});
+    if (!invert) {
+      ++reserved_num;
+    }
   }
   return reserved_num;
 }
@@ -595,7 +603,8 @@ uint32_t NormalizedString::GetMatch(
 uint32_t NormalizedString::GetMatch(
     const std::string& normalized,
     const std::function<bool(char32_t)>& pattern_func,
-    std::vector<std::pair<core::Range, bool>>* matches) const {
+    std::vector<std::pair<core::Range, bool>>* matches,
+    bool invert) const {
   size_t utf8_len = 0;
   size_t start = 0;
   size_t curr_start = 0;
@@ -610,29 +619,37 @@ uint32_t NormalizedString::GetMatch(
       curr_start = utf8_len;
       curr_end = curr_start + chwidth;
       if (curr_start != start) {
-        matches->emplace_back(core::Range{start, curr_start}, false);
+        matches->emplace_back(core::Range{start, curr_start}, invert);
+        if (!invert) {
+          ++reserved_num;
+        }
+      }
+      matches->emplace_back(core::Range{curr_start, curr_end}, !invert);
+      if (invert) {
         ++reserved_num;
       }
-      matches->emplace_back(core::Range{curr_start, curr_end}, true);
       start = curr_end;
     }
     utf8_len += chwidth;
   }
   if (start < normalized.length()) {
-    matches->emplace_back(core::Range{start, normalized.length()}, false);
-    ++reserved_num;
+    matches->emplace_back(core::Range{start, normalized.length()}, invert);
+    if (!invert) {
+      ++reserved_num;
+    }
   }
   return reserved_num;
 }
 
-template void NormalizedString::Split(
-    const re2::RE2& pattern,
-    SplitMode mode,
-    std::vector<NormalizedString>* normalizes) const;
+template void NormalizedString::Split(const re2::RE2& pattern,
+                                      core::SplitMode mode,
+                                      std::vector<NormalizedString>* normalizes,
+                                      bool invert) const;
 template void NormalizedString::Split(
     const std::function<bool(char32_t)>& pattern_func,
-    SplitMode mode,
-    std::vector<NormalizedString>* normalizes) const;
+    core::SplitMode mode,
+    std::vector<NormalizedString>* normalizes,
+    bool invert) const;
 
 }  // namespace normalizers
 }  // namespace fast_tokenizer

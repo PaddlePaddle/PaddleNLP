@@ -24,7 +24,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 
 namespace normalizers {
-struct FASTERTOKENIZER_DECL PrecompiledNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL PrecompiledNormalizer : public Normalizer {
   PrecompiledNormalizer() = default;
   explicit PrecompiledNormalizer(const std::string& precompiled_charsmap);
   PrecompiledNormalizer(const PrecompiledNormalizer& precompiled_normalizer);
