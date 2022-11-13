@@ -37,12 +37,12 @@ limitations under the License. */
 
 #if defined(_WIN32)
 #ifdef FASTERTOKENIZER_LIB
-#define FASTERTOKENIZER_DECL __declspec(dllexport)
+#define FASTTOKENIZER_DECL __declspec(dllexport)
 #else
-#define FASTERTOKENIZER_DECL __declspec(dllimport)
+#define FASTTOKENIZER_DECL __declspec(dllimport)
 #endif  // FASTERTOKENIZER_LIB
 #else
-#define FASTERTOKENIZER_DECL __attribute__((visibility("default")))
+#define FASTTOKENIZER_DECL __attribute__((visibility("default")))
 #endif  // _WIN32
 
 namespace paddlenlp {
@@ -177,6 +177,10 @@ void GetSortedVocab(const std::vector<const char*>& keys,
                     const std::vector<int>& values,
                     std::vector<const char*>* sorted_keys,
                     std::vector<int>* sorted_values);
+
+std::unordered_map<uint8_t, uint32_t> CreateBytesToChars();
+
+bool IsWhiteSpace(int ch);
 
 }  // namespace utils
 }  // namespace fast_tokenizer

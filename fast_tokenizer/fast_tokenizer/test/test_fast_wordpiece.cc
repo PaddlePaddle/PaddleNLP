@@ -15,9 +15,9 @@ limitations under the License. */
 #include <array>
 #include <string>
 #include <vector>
+#include "fast_tokenizer/models/fast_wordpiece.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
-#include "models/fast_wordpiece.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {

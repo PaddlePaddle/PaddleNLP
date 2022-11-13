@@ -26,7 +26,7 @@ void PostProcessor::DefaultProcess(core::Encoding* encoding,
     *result_encoding = *encoding;
   } else {
     encoding->SetSequenceIds(0);
-    pair_encoding->SetSequenceIds(0);
+    pair_encoding->SetSequenceIds(1);
     encoding->MergeWith(*pair_encoding, false);
     *result_encoding = *encoding;
   }

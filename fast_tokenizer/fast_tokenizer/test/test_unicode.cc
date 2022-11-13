@@ -13,12 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <string>
+#include "fast_tokenizer/normalizers/bert.h"
+#include "fast_tokenizer/normalizers/replace.h"
+#include "fast_tokenizer/normalizers/strip.h"
+#include "fast_tokenizer/normalizers/unicode.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
-#include "normalizers/bert.h"
-#include "normalizers/replace.h"
-#include "normalizers/strip.h"
-#include "normalizers/unicode.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
