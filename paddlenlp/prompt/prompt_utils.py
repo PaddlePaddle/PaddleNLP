@@ -82,7 +82,13 @@ class PromptDataCollatorWithPadding:
         for key in features[0]:
             if key not in self.default_model_input_names:
                 values = [b[key] for b in features]
-                if key != "labels":
+                if key == "masked_positions":
+                    new_values = []
+                    for index, value in enumerate(values):
+                        value = np.array(value) + index * max_length
+                        new_values.extend(value.tolist())
+                    values = new_values
+                elif key != "labels":
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_length - len(value))
                 batch[key] = self._convert_to_tensors(values)

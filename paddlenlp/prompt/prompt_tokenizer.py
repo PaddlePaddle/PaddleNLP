@@ -88,10 +88,14 @@ class MLMPromptTokenizer(object):
         encoded_inputs.pop("do_truncate")
         encoded_inputs = self.join(encoded_inputs)
         encoded_inputs = self.add_special_tokens(encoded_inputs)
-        encoded_inputs["attention_mask"] = self._create_attention_mask(
+        attention_mask = self._create_attention_mask(
             encoded_inputs["input_ids"], option_length)
-        if encoded_inputs["attention_mask"] is None:
-            encoded_inputs.pop("attention_mask")
+        if attention_mask is not None:
+            encoded_inputs["attention_mask"] = attention_mask
+        masked_positions = self._create_masked_positions(
+            encoded_inputs["input_ids"], encoded_inputs["soft_token_ids"])
+        if masked_positions is not None:
+            encoded_inputs["masked_positions"] = masked_positions
         return encoded_inputs
 
     def _create_position_ids_from_part(self, input_ids: List[int],
@@ -157,17 +161,28 @@ class MLMPromptTokenizer(object):
         if option_length is None:
             return None
         omask_id = self.tokenizer.convert_tokens_to_ids(self.omask_token)
+        input_ids = np.array(input_ids)
         attention_mask = np.zeros([len(input_ids), len(input_ids)])
         pad_index = np.where(input_ids == self.tokenizer.pad_token_id)[0]
         attention_mask[:, pad_index] = 1
         attention_mask[pad_index, :] = 1
-        omask_index = np.where(np.array(input_ids) == omask_id)[0].tolist()
+        omask_index = np.where(input_ids == omask_id)[0].tolist()
         opt_begin, opt_end = omask_index[0], omask_index[0] + option_length
         attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 1
         omask_index.append(opt_end)
         for opt_begin, opt_end in zip(omask_index[:-1], omask_index[1:]):
             attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 0
         return attention_mask
+
+    def _create_masked_positions(self, input_ids: List[int],
+                                 soft_token_ids: List[int]):
+        non_soft_ids = np.array(input_ids) * (np.array(soft_token_ids) == 0)
+        mask_id = self.tokenizer.mask_token_id
+
+        masked_positions = np.where(non_soft_ids == mask_id)[0]
+        if masked_positions.shape[0] == 0:
+            return None
+        return masked_positions.tolist()
 
     def add_special_tokens(self, input_dict: Dict[str, Any]):
         for key in input_dict:

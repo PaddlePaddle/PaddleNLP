@@ -22,13 +22,13 @@ import paddle.nn.functional as F
 from ..datasets import MapDataset
 from ..utils.log import logger
 from ..trainer import Trainer, TrainerCallback
-from ..trainer.trainer_utils import EvalPrediction
+from ..trainer.trainer_utils import EvalPrediction, get_scheduler
 from ..data import DataCollator
 from ..losses import RDropLoss
 from ..transformers import PretrainedTokenizer, export_model
 
 from .template import AutoTemplate
-from .verbalizer import SoftVerbalizer, MaskedLMVerbalizer
+from .verbalizer import SoftVerbalizer
 from .prompt_utils import signature, PromptDataCollatorWithPadding
 from .prompt_args import PromptTuningArguments
 
@@ -173,7 +173,8 @@ class PromptTrainer(Trainer):
             ppt_parameters = []
             if self.template is not None:
                 ppt_parameters.extend([
-                    x for x in self.template.parameters() if not x.stop_gradient
+                    x for n, x in self.template.named_parameters()
+                    if not x.stop_gradient
                 ])
             if self.verbalizer is not None:
                 if isinstance(self.verbalizer, SoftVerbalizer):
@@ -241,25 +242,12 @@ class PromptTrainer(Trainer):
             raise ValueError(
                 "Fail to compute loss as `labels` not in {}.".format(inputs))
         labels = inputs["labels"]
-        if "masked_positions" not in inputs:
-            inputs["masked_positions"] = (
-                inputs["input_ids"] == self.template.tokenizer.mask_token_id)
 
-        input_dict = {
-            "input_ids": inputs["input_ids"],
-            "token_type_ids": inputs.get("token_type_ids", None),
-            "position_ids": inputs.get("position_ids", None),
-            "masked_positions": inputs["masked_positions"],
-            "soft_token_ids": inputs.get("soft_token_ids", None),
-            "attention_mask": inputs.get("attention_mask", None),
-            "return_hidden_states": True
-        }
+        input_dict = inputs.copy()
+        input_dict["return_hidden_states"] = True
         outputs, hidden_states = model(**input_dict)
 
         if self.criterion is not None:
-            if self.verbalizer is not None and isinstance(
-                    self.verbalizer, MaskedLMVerbalizer):
-                labels = self.verbalizer.token_ids[labels].squeeze(axis=-1)
             if labels.ndim == outputs.ndim:
                 loss = 0
                 for idx in range(labels.shape[-1]):
@@ -288,10 +276,6 @@ class PromptTrainer(Trainer):
     def _compute_rdrop_loss(self, model, input_dict, outputs, loss):
         re_outputs = model(input_dict)
         labels = inputs["labels"]
-        if self.verbalizer is not None and isinstance(self.verbalizer,
-                                                      MaskedLMVerbalizer):
-            labels = self.verbalizer.token_ids[labels].squeeze(axis=-1).reshape(
-                re_outputs.shape[:2])
         ce_loss = (self.criterion(re_outputs, labels) + loss) * 0.5
         kl_loss = self.rdrop_criterion(outputs, re_outputs)
         loss = ce_loss + self.args.alpha_rdrop * kl_loss
@@ -375,26 +359,27 @@ class PromptModelForSequenceClassification(nn.Layer):
                 masked_positions=None,
                 soft_token_ids=None,
                 attention_mask=None,
+                encoder_ids=None,
                 **kwargs):
-        if masked_positions is None:
-            masked_positions = input_ids == self._mask_token_id
         input_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
             "position_ids": position_ids,
             "masked_positions": masked_positions,
             "soft_token_ids": soft_token_ids,
-            "attention_mask": attention_mask
+            "attention_mask": attention_mask,
+            "encoder_ids": encoder_ids
         }
         input_dict = self.template.process_batch(input_dict)
         model_inputs = {
             k: input_dict[k]
             for k in input_dict if k in self.forward_keys
         }
+        model_inputs["masked_positions"] = None
         outputs = self.plm(**model_inputs)
         if self.verbalizer is not None:
             label_outputs = self.verbalizer.process_outputs(
-                outputs, masked_positions=masked_positions)
+                outputs, input_dict["masked_positions"])
         else:
             label_outputs = outputs
 

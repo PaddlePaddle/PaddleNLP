@@ -27,9 +27,7 @@ from paddle import Tensor
 from paddlenlp.transformers import PretrainedTokenizer, PretrainedModel
 from paddlenlp.utils.log import logger
 
-__all__ = [
-    "Verbalizer", "ManualVerbalizer", "SoftVerbalizer", "MaskedLMVerbalizer"
-]
+__all__ = ["Verbalizer", "ManualVerbalizer", "SoftVerbalizer"]
 
 # Verbalizer used to be saved in a file.
 VERBALIZER_CONFIG_FILE = "verbalizer_config.json"
@@ -55,6 +53,7 @@ class Verbalizer(nn.Layer):
         self.tokenizer = tokenizer
         self.token_aggregate_type = kwargs.get("token_aggregate_type", "mean")
         self.word_aggregate_type = kwargs.get("word_aggregate_type", "mean")
+        self.mask_aggregate_type = kwargs.get("mask_aggregate_type", "product")
         self.post_log_softmax = kwargs.get("post_log_sigmoid", True)
         self.label_token_weight = kwargs.get("label_token_weight", None)
         if self.label_token_weight is not None:
@@ -84,7 +83,7 @@ class Verbalizer(nn.Layer):
         if label_words is None:
             return None
         self.labels = list(label_words.keys())
-        self._labels_to_ids = {
+        self.labels_to_ids = {
             label: idx
             for idx, label in enumerate(self._labels)
         }
@@ -145,7 +144,7 @@ class Verbalizer(nn.Layer):
 
     def convert_labels_to_ids(self, label: str):
         assert isinstance(label, str)
-        return self._labels_to_ids[label]
+        return self.labels_to_ids[label]
 
     def convert_ids_to_labels(self, index: int):
         assert isinstance(index, int)
@@ -157,20 +156,25 @@ class Verbalizer(nn.Layer):
         """
         token_ids = self.token_ids.reshape([-1])
         label_token_outputs = outputs.index_select(index=token_ids, axis=-1)
-        label_shape = [*output.shape[:-1], *self.token_ids.shape]
-        label_token_outputs = label_outputs.reshape(label_shape)
+        label_shape = [*outputs.shape[:-1], *self.token_ids.shape]
+        label_token_outputs = label_token_outputs.reshape(label_shape)
         label_word_outputs = self.aggregate(label_token_outputs,
                                             self.token_mask,
                                             self.token_aggregate_type)
         label_word_outputs -= 1e4 * (1 - self.word_mask)
         return label_word_outputs
 
-    @abstractmethod
-    def process_outputs(self, outputs):
+    def process_outputs(self, outputs, masked_positions: Tensor = None):
         """
         Process outputs of `PretrainedModelForMaskedLM` over vocabulary.
         """
-        raise NotImplementedError
+        if masked_positions is None:
+            return outputs
+        batch_size, _, num_pred = outputs.shape
+        outputs = outputs.reshape([-1, num_pred])
+        outputs = paddle.gather(outputs, masked_positions)
+        outputs = outputs.reshape([batch_size, -1, num_pred])
+        return outputs
 
     def aggregate(self, outputs: Tensor, mask: Tensor, atype: str):
         """
@@ -196,8 +200,8 @@ class Verbalizer(nn.Layer):
         Normalize the outputs over the whole vocabulary.
         """
         batch_size = outputs.shape[0]
-        outputs = F.softmax(outputs.reshape(batch_size, -1),
-                            axis=-1).reshape(*outputs.shape)
+        outputs = F.softmax(outputs.reshape([batch_size, -1]),
+                            axis=-1).reshape(outputs.shape)
         return outputs
 
     def calibrate(self, label_word_outputs: Tensor):
@@ -215,7 +219,7 @@ class Verbalizer(nn.Layer):
         label_word_outputs /= (self.label_token_weight + 1e-15)
         batch_size = label_word_outputs.shape0[0]
         label_word_outputs = paddle.mean(
-            label_word_outputs.reshape([batch_size, -1])).reshape(*output_shape)
+            label_word_outputs.reshape([batch_size, -1])).reshape(output_shape)
 
         return label_word_outputs
 
@@ -224,7 +228,7 @@ class Verbalizer(nn.Layer):
             os.makedirs(save_path, exist_ok=True)
         verb_config_file = os.path.join(save_path, VERBALIZER_CONFIG_FILE)
         with open(verb_config_file, "w", encoding="utf-8") as fp:
-            json.dump(self.label_words, fp)
+            json.dump(self.label_words, fp, ensure_ascii=False)
         verb_params_file = os.path.join(save_path, VERBALIZER_PARAMETER_FILE)
         verb_state_dict = self.state_dict()
         if len(verb_state_dict) > 0:
@@ -265,7 +269,32 @@ class ManualVerbalizer(Verbalizer):
     def create_parameters(self):
         return None
 
-    def process_outputs(self, outputs: Tensor, **kwargs):
+    def aggregate_multiple_mask(self, outputs: Tensor, atype: str = None):
+        if atype is None:
+            return outputs
+        assert outputs.ndim == 3
+        if atype == "mean":
+            outputs = outputs.sum(axis=1)
+        elif atype == "max":
+            outputs = outputs.max(axis=1)
+        elif atype == "first":
+            index = paddle.to_tensor([0])
+            outputs = paddle.index_select(outputs, index, axis=1)
+        elif atype == "product":
+            new_outputs = outputs[:, 0, :]
+            for index in range(1, outputs.shape[1]):
+                new_outputs *= outputs[:, index, :]
+            outputs = new_outputs
+        else:
+            raise ValueError(
+                "Strategy {} is not supported to aggregate multiple "
+                "tokens.".format(atype))
+        return outputs
+
+    def process_outputs(self,
+                        outputs: Tensor,
+                        masked_positions: Tensor = None,
+                        **kwargs):
         """
         Process outputs over the vocabulary, including the following steps:
 
@@ -286,7 +315,7 @@ class ManualVerbalizer(Verbalizer):
         Returns:
             The prediction outputs over labels (`Tensor`).
         """
-
+        outputs = super().process_outputs(outputs, masked_positions)
         label_word_outputs = self.project(outputs)
 
         if self.post_log_softmax:
@@ -299,7 +328,8 @@ class ManualVerbalizer(Verbalizer):
 
         label_outputs = self.aggregate(label_word_outputs, self.word_mask,
                                        self.word_aggregate_type)
-
+        label_outputs = self.aggregate_multiple_mask(label_outputs,
+                                                     self.mask_aggregate_type)
         return label_outputs
 
 
@@ -353,11 +383,7 @@ class SoftVerbalizer(Verbalizer):
         self._extract_head(self.model)
 
     def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
-        masked_positions = masked_positions.unsqueeze(2)
-        original_length = outputs.shape[1]
-        masked_positions = masked_positions[:, -original_length:]
-        outputs = (outputs *
-                   masked_positions).sum(axis=1) / masked_positions.sum(axis=1)
+        outputs = super().process_outputs(outputs, masked_positions)
         return self.head(outputs)
 
     def head_parameters(self):
@@ -443,32 +469,3 @@ class SoftVerbalizer(Verbalizer):
                                          axis=1).reshape(word_shape)
             weight = self.aggregate(weight, token_mask, aggr_type)
             return weight
-
-
-class MaskedLMVerbalizer(ManualVerbalizer):
-
-    def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer):
-        super().__init__(label_words=label_words, tokenizer=tokenizer)
-
-    def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
-        batch_size, max_length, vocab_size = outputs.shape
-        batch_index, word_index = paddle.where(masked_positions == 1)
-        masked_index = batch_index * max_length + word_index
-        outputs = outputs.reshape([-1, vocab_size])[masked_index]
-        outputs = outputs.reshape([batch_size, -1, vocab_size])
-        return outputs
-
-    def aggregate_multi_mask(self, outputs: Tensor):
-        label_preds = []
-        for label_id, words in enumerate(self.token_ids):
-            word_preds = []
-            for word_id, tokens in enumerate(words):
-                if self.word_mask[label_id][word_id] == 0:
-                    break
-                word_pred = outputs[:, 0, tokens[0]]
-                token_mask = self.token_mask[label_id][word_id]
-                for index in range(1, token_mask.sum()):
-                    word_pred *= outputs[:, index, tokens[index]]
-                word_preds.append(word_pred)
-            label_preds.append(word_preds)
-        return label_preds

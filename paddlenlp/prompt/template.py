@@ -436,6 +436,16 @@ class SoftTemplate(Template):
                          word_embeddings=word_embeddings,
                          soft_embeddings=soft_embeddings)
 
+    def named_parameters(self):
+        named_params = [(n, p)
+                        for n, p in self.soft_embeddings.named_parameters()]
+        named_params.extend([(n, p)
+                             for n, p in self.encoder_list.named_parameters()])
+        return named_params
+
+    def parameters(self):
+        return [p for n, p in self.named_parameters()]
+
     def create_prompt_parameters(self):
         self._prompt, soft_token_config = self.parse_soft_prompt()
         self.embed_size = self.word_embeddings.weight.shape[1]
@@ -445,22 +455,39 @@ class SoftTemplate(Template):
 
     def process_batch(self, input_dict: Dict[str, Tensor]) -> Dict[str, Tensor]:
         """
-        Convert input_ids to input_embeds.
+        Convert input_ids to inputs_embeds.
 
         Soft tokens are encoded soft_embeddings with predefined encoders.
         For other tokens, use word embeddings in pretrained model.
         """
         word_embeds = self.word_embeddings(input_dict["input_ids"])
+        if "attention_mask" not in input_dict or input_dict[
+                "attention_mask"] is None:
+            pad_token_id = self.tokenizer.pad_token_id
+            attention_mask = paddle.unsqueeze(
+                (input_dict["input_ids"] == pad_token_id).astype("float32") *
+                -1e4,
+                axis=[1, 2])
+            input_dict["attention_mask"] = attention_mask
         input_dict["input_ids"] = None
-        soft_embeds = self.soft_embeddings[input_dict["soft_token_ids"]]
+        # TODO (Huijuan): Optimize calculation.
+        soft_embeds = self.soft_embeddings(input_dict["soft_token_ids"])
+        soft_shape = soft_embeds.shape
+        soft_embeds = soft_embeds.reshape([-1, soft_shape[-1]])
         for encoder_id in range(1, len(self.encoder_list)):
             to_encode = paddle.where(input_dict["encoder_ids"] == encoder_id)
-            encoded = self.encoder_list[encoder_id](to_encode)
-            soft_embeds = paddle.where(input_dict["encoder_ids"] == encoder_id,
-                                       encoded, soft_embeds)
-        input_dict["input_embeds"] = paddle.where(
-            input_dict["soft_token_ids"] > 0, soft_embeds, word_embeds)
-        input_dict.pop("encoder_ids")
+            to_encode = to_encode[0] * soft_shape[1] + to_encode[1]
+            to_encode = to_encode.squeeze(1)
+            to_encode_embeds = soft_embeds[to_encode]
+            to_encode_embeds = to_encode_embeds.reshape(
+                [soft_shape[0], -1, soft_shape[-1]])
+            encoded = self.encoder_list[encoder_id](to_encode_embeds)
+            encoded = encoded.reshape([-1, soft_shape[-1]])
+            soft_embeds[to_encode] = encoded
+        soft_embeds = soft_embeds.reshape([soft_shape[0], -1, soft_shape[-1]])
+        soft_token_ids = input_dict["soft_token_ids"].unsqueeze(2)
+        input_dict["inputs_embeds"] = paddle.where(soft_token_ids > 0,
+                                                   soft_embeds, word_embeds)
         return input_dict
 
     def parse_soft_prompt(self):
@@ -715,6 +742,14 @@ class PrefixTemplate(SoftTemplate):
 
     def process_batch(self, input_dict: Dict[str, Tensor]) -> Dict[str, Tensor]:
         word_embeds = self.word_embeddings(input_dict["input_ids"])
+        if "attention_mask" not in input_dict or input_dict[
+                "attention_mask"] is None:
+            pad_token_id = self.tokenizer.pad_token_id
+            attention_mask = paddle.unsqueeze(
+                (input_dict["input_ids"] == pad_token_id).astype("float32") *
+                -1e4,
+                axis=[1, 2])
+            input_dict["attention_mask"] = attention_mask
         input_dict["input_ids"] = None
 
         batch_size, _ = input_dict["soft_token_ids"].shape
@@ -723,9 +758,9 @@ class PrefixTemplate(SoftTemplate):
         soft_token_ids = soft_token_ids.reshape([batch_size, -1])
         _, soft_len = soft_token_ids.shape
 
-        input_dict["input_embeds"] = word_embeds[:, soft_len:, :]
+        input_dict["inputs_embeds"] = word_embeds[:, soft_len:, :]
 
-        soft_embeds = self.soft_embeddings[soft_token_ids]
+        soft_embeds = self.soft_embeddings(soft_token_ids)
         for encoder_id in range(1, len(self.encoder_list)):
             to_encode = paddle.where(input_dict["encoder_ids"] == encoder_id)
             encoded = self.encoder_list[encoder_id](to_encode)
