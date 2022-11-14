@@ -244,6 +244,36 @@ void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
   }
 }
 
+void Tokenizer::EncodePairStrings(const std::string& text,
+                                  const std::string& text_pair,
+                                  Encoding* encodings,
+                                  bool add_special_tokens) const {
+  Encoding encoding, pair_encoding;
+  EncodeSingleString(text, 0, OffsetType::CHAR, &encoding);
+  EncodeSingleString(text_pair, 1, OffsetType::CHAR, &pair_encoding);
+  PostProcess(&encoding, &pair_encoding, add_special_tokens, encodings);
+}
+
+void Tokenizer::MultiThreadEncodeBatchStrings(
+    const std::vector<std::string>& texts,
+    const std::vector<std::string>& text_pairs,
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+  if (texts.size() != text_pairs.size()) {
+    throw std::runtime_error(
+        "The size of text must equal to the size of text_pair");
+  }
+  auto batch_size = texts.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    EncodePairStrings(
+        texts[i], text_pairs[i], &(*encodings)[i], add_special_tokens);
+  }
+}
+
 void Tokenizer::MultiThreadEncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
@@ -265,14 +295,34 @@ void Tokenizer::EncodeBatchStrings(
     bool add_special_tokens) const {
   auto batch_size = batch_encode_input.size();
   encodings->resize(batch_size);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadEncodeBatchStrings(batch_encode_input,
+                                  encodings,
+                                  add_special_tokens,
+                                  start_index,
+                                  step_index);
+  };
+  RunMultiThread(func, batch_size);
 
-  auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStrings,
-                        this,
-                        std::ref(batch_encode_input),
-                        encodings,
-                        add_special_tokens,
-                        std::placeholders::_1,
-                        std::placeholders::_2);
+  if (use_padding_) {
+    PadEncodings(encodings, pad_method_);
+  }
+}
+
+void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
+                                   const std::vector<std::string>& text_pairs,
+                                   std::vector<Encoding>* encodings,
+                                   bool add_special_tokens) const {
+  auto batch_size = texts.size();
+  encodings->resize(batch_size);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadEncodeBatchStrings(texts,
+                                  text_pairs,
+                                  encodings,
+                                  add_special_tokens,
+                                  start_index,
+                                  step_index);
+  };
   RunMultiThread(func, batch_size);
 
   if (use_padding_) {
@@ -311,15 +361,6 @@ Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint32_t>& word_idx,
   DoTokenize(&pretokenized, type_id, word_idx, offset_type, &encoding);
   return encoding;
 }
-
-void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
-                                   std::vector<Encoding>* encodings,
-                                   bool add_special_tokens) const {}
-
-void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
-                                   const std::vector<std::string>& text_pairs,
-                                   std::vector<Encoding>* encodings,
-                                   bool add_special_tokens) const {}
 
 const AddedVocabulary& Tokenizer::GetAddedVocabulary() const {
   return added_vocabulary_;
@@ -402,13 +443,10 @@ void Tokenizer::DecodeBatch(
     bool skip_special_tokens) const {
   auto batch_size = batch_token_ids.size();
   results->resize(batch_size);
-  auto func = std::bind(&Tokenizer::MultiThreadDecodeBatch,
-                        this,
-                        std::ref(batch_token_ids),
-                        results,
-                        skip_special_tokens,
-                        std::placeholders::_1,
-                        std::placeholders::_2);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadDecodeBatch(
+        batch_token_ids, results, skip_special_tokens, start_index, step_index);
+  };
   RunMultiThread(func, batch_size);
 }
 
