@@ -272,17 +272,17 @@ class DocPipeline(BaseStandardPipeline):
     Pipeline for document intelligence.
     """
 
-    def __init__(self, preprocessor: BaseComponent, modelrunner: BaseComponent):
+    def __init__(self, preprocessor: BaseComponent, docreader: BaseComponent):
         """
         :param preprocessor: file/image preprocessor instance
-        :param modelrunner: document model runner instance
+        :param docreader: document model runner instance
         """
         self.pipeline = Pipeline()
         self.pipeline.add_node(component=preprocessor,
                                name="PreProcessor",
                                inputs=["Query"])
-        self.pipeline.add_node(component=modelrunner,
-                               name="Runner",
+        self.pipeline.add_node(component=docreader,
+                               name="Reader",
                                inputs=["PreProcessor"])
 
     def run(self,
