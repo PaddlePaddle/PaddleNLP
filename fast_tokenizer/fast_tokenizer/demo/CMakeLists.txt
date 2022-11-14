@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(cpp_fast_tokenizer_demo CXX C)
 
-option(FASTER_TOKENIZER_INSTALL_DIR "Path of downloaded fast_tokenizer sdk.")
+option(FAST_TOKENIZER_INSTALL_DIR "Path of downloaded fast_tokenizer sdk.")
 
 # Download ernie vocab for demo
 set(ERNIE_VOCAB_PATH ${CMAKE_CURRENT_BINARY_DIR}/ernie_vocab.txt)
@@ -30,11 +30,11 @@ else()
   message("Already download the merges.txt of clip to ${CMAKE_CURRENT_BINARY_DIR} for test.")
 endif()
 
-include(${FASTER_TOKENIZER_INSTALL_DIR}/FastTokenizer.cmake)
+include(${FAST_TOKENIZER_INSTALL_DIR}/FastTokenizer.cmake)
 
-include_directories(${FASTER_TOKENIZER_INCS})
+include_directories(${FAST_TOKENIZER_INCS})
 
 add_executable(ernie_fast_tokenizer_demo ${PROJECT_SOURCE_DIR}/ernie_fast_tokenizer_demo.cc)
 add_executable(clip_fast_tokenizer_demo ${PROJECT_SOURCE_DIR}/clip_fast_tokenizer_demo.cc)
-target_link_libraries(ernie_fast_tokenizer_demo ${FASTER_TOKENIZER_LIBS})
-target_link_libraries(clip_fast_tokenizer_demo ${FASTER_TOKENIZER_LIBS})
+target_link_libraries(ernie_fast_tokenizer_demo ${FAST_TOKENIZER_LIBS})
+target_link_libraries(clip_fast_tokenizer_demo ${FAST_TOKENIZER_LIBS})
