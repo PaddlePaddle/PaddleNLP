@@ -1,18 +1,29 @@
 # PPDiffusers: Diffusers toolbox implemented based on PaddlePaddle
 
-
 **PPDiffusers**是一款支持**跨模态**（如图像与语音）训练和推理的**扩散模型**（Diffusion Model）工具箱，我们借鉴了🤗 Huggingface团队的[**Diffusers**](https://github.com/huggingface/diffusers)的优秀设计，并且依托[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理库，打造了一款国产化的工具箱。
 
 ## 1. News 📢
-
-* 🔥 **2022.11.04 支持 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 和 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 中文权重**
-* 🔥 **2022.10.27 发布 PPDiffusers仓库**
+* 🔥 **2022.11.11 发布 0.6.2 版本，支持[StableDiffusion模型导出](./scripts/export/README.md)及[FastDeploy Diffusion模型高性能部署
+](https://github.com/PaddlePaddle/FastDeploy/tree/develop/examples/multimodal/stable_diffusion#%E5%BF%AB%E9%80%9F%E4%BD%93%E9%AA%8C)、支持[Diffusers或原版模型->PPDiffusers权重转换](./scripts/convert_diffusers_model/README.md)、支持EulerAncestralDiscreteScheduler、支持[图片超分Pipeline](https://github.com/PaddlePaddle/PaddleNLP/pull/3710)；**
+* 🔥 **2022.11.04 支持 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 和 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 中文权重**；
+* 🔥 **2022.10.27 发布 PPDiffusers仓库**。
 
 
 ## 2. 安装
+
+**环境依赖**
+- paddlepaddle-gpu>=2.4.0
+- paddlenlp>=2.4.1
+- ftfy
+- regex
+- Pillow
+
+**Tips:** 为了能够复现Pytorch的结果，请使用大于**2.4.0**的**paddlepaddle**。
+
 **使用 `pip` 安装**
 
 ```bash
+# 请使用最新版的ppdiffusers
 pip install --upgrade ppdiffusers
 ```
 
@@ -155,7 +166,13 @@ image.save("cat_on_bench_new.png")
 ```
 <img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/198016801-87cec13b-0d89-41c3-aedb-c89a43d76153.png">
 
-## 5. Credits
+## 5. 模型部署
+
+StableDiffusion模型除了支持动态图运行，还支持将模型导出并使用推理引擎运行。我们提供在[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的StableDiffusion模型文生图任务的部署示例，用户可以按照我们提供[StableDiffusion模型导出教程](./scripts/export/README.md)将模型导出，并参考[FastDeploy Diffusion模型高性能部署
+](https://github.com/PaddlePaddle/FastDeploy/tree/develop/examples/multimodal/stable_diffusion#%E5%BF%AB%E9%80%9F%E4%BD%93%E9%AA%8C)完成部署。
+
+
+## 6. Credits
 
 This library concretizes previous work by many different authors and would not have been possible without their great research and implementations. We'd like to thank, in particular, the following implementations which have helped us in our development and without which the API could not have been as polished today:
 - @huggingface' diffusers library, available [here](https://github.com/huggingface/diffusers)
@@ -166,7 +183,7 @@ This library concretizes previous work by many different authors and would not h
 
 We also want to thank @heejkoo for the very helpful overview of papers, code and resources on diffusion models, available [here](https://github.com/heejkoo/Awesome-Diffusion-Models) as well as @crowsonkb and @rromb for useful discussions and insights.
 
-## 6. Citation
+## 7. Citation
 
 ```bibtex
 @misc{von-platen-etal-2022-diffusers,
@@ -179,6 +196,6 @@ We also want to thank @heejkoo for the very helpful overview of papers, code and
 }
 ```
 
-## 7. License
+## 8. License
 
 PPDiffusers遵循[Apache-2.0开源协议](./LICENSE)。
