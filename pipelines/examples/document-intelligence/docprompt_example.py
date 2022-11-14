@@ -34,7 +34,7 @@ def docprompt_pipeline():
 
     preprocessor = DocOCRProcessor(use_gpu=use_gpu)
     docprompter = DocPrompter(use_gpu=use_gpu, batch_size=args.batch_size)
-    pipe = DocPipeline(preprocessor=preprocessor, modelrunner=docprompter)
+    pipe = DocPipeline(preprocessor=preprocessor, docreader=docprompter)
     # image link input
     meta = {
         "doc":
