@@ -289,6 +289,20 @@ void Tokenizer::MultiThreadEncodeBatchStrings(
   }
 }
 
+void Tokenizer::MultiThreadEncodeBatchStrings(
+    const std::vector<std::string>& texts,
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+  auto batch_size = texts.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    EncodePairStrings(texts[i], &(*encodings)[i], add_special_tokens);
+  }
+}
+
 void Tokenizer::EncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
@@ -301,6 +315,22 @@ void Tokenizer::EncodeBatchStrings(
                                   add_special_tokens,
                                   start_index,
                                   step_index);
+  };
+  RunMultiThread(func, batch_size);
+
+  if (use_padding_) {
+    PadEncodings(encodings, pad_method_);
+  }
+}
+
+void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
+                                   std::vector<Encoding>* encodings,
+                                   bool add_special_tokens) const {
+  auto batch_size = texts.size();
+  encodings->resize(batch_size);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadEncodeBatchStrings(
+        texts, encodings, add_special_tokens, start_index, step_index);
   };
   RunMultiThread(func, batch_size);
 

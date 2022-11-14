@@ -17,4 +17,50 @@ limitations under the License. */
 #include <vector>
 using namespace paddlenlp;
 
-int main() { return 0; }
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T> vec) {
+  os << "[";
+  for (int i = 0; i < vec.size(); ++i) {
+    if (i == 0) {
+      os << vec[i];
+    } else {
+      os << ", " << vec[i];
+    }
+  }
+  os << "]";
+  return os;
+}
+
+fast_tokenizer::tokenizers_impl::ClipFastTokenizer CreateClipFastTokenizer(
+    const std::string& vocab_path,
+    const std::string& merge_path,
+    uint32_t max_length,
+    bool pad = true) {
+  fast_tokenizer::tokenizers_impl::ClipFastTokenizer tokenizer(
+      vocab_path, merge_path, max_length);
+  if (pad) {
+    tokenizer.EnablePadMethod(fast_tokenizer::core::RIGHT,
+                              tokenizer.GetPadTokenId(),
+                              0,
+                              tokenizer.GetPadToken(),
+                              &max_length,
+                              nullptr);
+  }
+  return tokenizer;
+}
+
+int main() {
+  // 1. Define a clip fast tokenizer
+  auto tokenizer =
+      CreateClipFastTokenizer("clip_vocab.json", "clip_merges.txt", 77, true);
+  // 2. Tokenize the input strings
+  std::vector<fast_tokenizer::core::Encoding> encodings;
+  std::vector<std::string> texts = {
+      "a photo of an astronaut riding a horse on mars"};
+  tokenizer.EncodeBatchStrings(texts, &encodings);
+  for (auto&& encoding : encodings) {
+    auto ids = encoding.GetIds();
+    std::cout << ids << std::endl;
+  }
+  return 0;
+}

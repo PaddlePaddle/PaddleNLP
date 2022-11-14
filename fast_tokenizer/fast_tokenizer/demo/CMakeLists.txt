@@ -30,6 +30,7 @@ else()
   message("Already download the merges.txt of clip to ${CMAKE_CURRENT_BINARY_DIR} for test.")
 endif()
 
+# Get FAST_TOKENIZER_INCS and FAST_TOKENIZER_LIBS
 include(${FAST_TOKENIZER_INSTALL_DIR}/FastTokenizer.cmake)
 
 include_directories(${FAST_TOKENIZER_INCS})

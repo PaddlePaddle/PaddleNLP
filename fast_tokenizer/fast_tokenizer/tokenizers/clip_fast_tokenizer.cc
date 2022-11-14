@@ -55,18 +55,25 @@ ClipFastTokenizer::ClipFastTokenizer(
 
   // Set added tokens
   std::vector<core::AddedToken> added_tokens;
-  uint32_t id, eos_id, bos_id;
-  if (!this->TokenToId(unk_token, &id)) {
+  uint32_t id;
+  unk_token_ = unk_token;
+  if (this->TokenToId(unk_token, &id)) {
     added_tokens.emplace_back(unk_token, true);
   }
-  if (!this->TokenToId(pad_token, &id)) {
+  pad_token_ = pad_token;
+  if (this->TokenToId(pad_token, &id)) {
     added_tokens.emplace_back(pad_token, true);
+    pad_token_id_ = id;
   }
-  if (!this->TokenToId(bos_token, &bos_id)) {
+  bos_token_ = bos_token;
+  if (this->TokenToId(bos_token, &id)) {
     added_tokens.emplace_back(bos_token, true);
+    bos_token_id_ = id;
   }
-  if (!this->TokenToId(eos_token, &eos_id)) {
+  eos_token_ = eos_token;
+  if (this->TokenToId(eos_token, &id)) {
     added_tokens.emplace_back(eos_token, true);
+    eos_token_id_ = id;
   }
   this->AddSpecialTokens(added_tokens);
 
@@ -94,8 +101,8 @@ ClipFastTokenizer::ClipFastTokenizer(
 
   // Set postprocessors
   postprocessors::RobertaPostProcessor roberta_postprocessor(
-      {eos_token, eos_id},
-      {bos_token, bos_id},
+      {eos_token, eos_token_id_},
+      {bos_token, bos_token_id_},
       /* trim_offsets= */ false,
       add_prefix_space);
   this->SetPostProcessor(roberta_postprocessor);
@@ -109,6 +116,22 @@ ClipFastTokenizer::ClipFastTokenizer(
                             core::TruncStrategy::LONGEST_FIRST);
   }
 }
+
+std::string ClipFastTokenizer::GetPadToken() const { return pad_token_; }
+
+uint32_t ClipFastTokenizer::GetPadTokenId() const { return pad_token_id_; }
+
+std::string ClipFastTokenizer::GetUNKToken() const { return unk_token_; }
+
+uint32_t ClipFastTokenizer::GetUNKTokenId() const { return unk_token_id_; }
+
+std::string ClipFastTokenizer::GetBOSToken() const { return bos_token_; }
+
+uint32_t ClipFastTokenizer::GetBOSTokenId() const { return bos_token_id_; }
+
+std::string ClipFastTokenizer::GetEOSToken() const { return eos_token_; }
+
+uint32_t ClipFastTokenizer::GetEOSTokenId() const { return eos_token_id_; }
 
 }  // namespace tokenizers_impl
 }  // namespace fast_tokenizer

@@ -162,6 +162,11 @@ public:
                          bool add_special_tokens = true) const;
 
   void MultiThreadEncodeBatchStrings(const std::vector<std::string>& texts,
+                                     std::vector<Encoding>* encodings,
+                                     bool add_special_tokens,
+                                     size_t start_index,
+                                     size_t step_index) const;
+  void MultiThreadEncodeBatchStrings(const std::vector<std::string>& texts,
                                      const std::vector<std::string>& text_pairs,
                                      std::vector<Encoding>* encodings,
                                      bool add_special_tokens,
@@ -177,7 +182,9 @@ public:
   void EncodeBatchStrings(const std::vector<EncodeInput>& batch_encode_input,
                           std::vector<Encoding>* encodings,
                           bool add_special_tokens = true) const;
-
+  void EncodeBatchStrings(const std::vector<std::string>& texts,
+                          std::vector<Encoding>* encodings,
+                          bool add_special_tokens = true) const;
   void EncodeBatchStrings(const std::vector<std::string>& texts,
                           const std::vector<std::string>& text_pairs,
                           std::vector<Encoding>* encodings,

@@ -16,6 +16,7 @@ limitations under the License. */
 
 #include <string>
 #include <unordered_map>
+#include "fast_tokenizer/core/encoding.h"
 #include "fast_tokenizer/core/tokenizer.h"
 #include "fast_tokenizer/utils/utils.h"
 
@@ -35,6 +36,24 @@ struct FASTTOKENIZER_DECL ClipFastTokenizer : public core::Tokenizer {
                     const std::string& continuing_subword_prefix = "",
                     const std::string& end_of_word_suffix = "</w>",
                     bool trim_offsets = false);
+  std::string GetPadToken() const;
+  uint32_t GetPadTokenId() const;
+  std::string GetUNKToken() const;
+  uint32_t GetUNKTokenId() const;
+  std::string GetBOSToken() const;
+  uint32_t GetBOSTokenId() const;
+  std::string GetEOSToken() const;
+  uint32_t GetEOSTokenId() const;
+
+private:
+  std::string pad_token_;
+  uint32_t pad_token_id_;
+  std::string unk_token_;
+  uint32_t unk_token_id_;
+  std::string bos_token_;
+  uint32_t bos_token_id_;
+  std::string eos_token_;
+  uint32_t eos_token_id_;
 };
 
 }  // namespace fast_tokenizer_impl
