@@ -49,6 +49,21 @@ class OnnxStableDiffusionInpaintPipeline(metaclass=DummyObject):
         requires_backends(cls, ["paddle", "paddlenlp", "onnx"])
 
 
+class OnnxStableDiffusionInpaintPipelineLegacy(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp", "onnx"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp", "onnx"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "onnx"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "onnx"])
+
+
 class OnnxStableDiffusionPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp", "onnx"]
 

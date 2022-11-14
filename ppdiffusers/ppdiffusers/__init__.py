@@ -77,6 +77,7 @@ if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
     from .pipelines import (
         OnnxStableDiffusionImg2ImgPipeline,
         OnnxStableDiffusionInpaintPipeline,
+        OnnxStableDiffusionInpaintPipelineLegacy,
         OnnxStableDiffusionPipeline,
     )
 else:

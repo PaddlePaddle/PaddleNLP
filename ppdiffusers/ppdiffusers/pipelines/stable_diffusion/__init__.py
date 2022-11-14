@@ -54,3 +54,4 @@ if is_paddlenlp_available() and is_onnx_available():
     from .pipeline_onnx_stable_diffusion import OnnxStableDiffusionPipeline
     from .pipeline_onnx_stable_diffusion_img2img import OnnxStableDiffusionImg2ImgPipeline
     from .pipeline_onnx_stable_diffusion_inpaint import OnnxStableDiffusionInpaintPipeline
+    from .pipeline_onnx_stable_diffusion_inpaint_legacy import OnnxStableDiffusionInpaintPipelineLegacy
