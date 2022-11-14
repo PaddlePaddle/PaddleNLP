@@ -46,6 +46,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             max_concurrent_trials=1,
             num_models=num_models,
         )
+        self.assertEqual(len(auto_trainer.training_results.errors), 0)
         self.assertEqual(len(auto_trainer.training_results), num_models)
 
 

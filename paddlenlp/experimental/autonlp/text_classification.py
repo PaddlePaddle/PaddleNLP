@@ -16,7 +16,10 @@ import functools
 from typing import Any, Callable, Dict, List
 
 import paddle
-from hyperopt import hp
+from paddle.utils import try_import
+
+hp = try_import("hyperopt.hp")
+# from hyperopt import hp
 from paddle.io import Dataset
 from paddle.metric import Accuracy
 
@@ -34,8 +37,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     AutoTrainer for Text Classification problems
 
     Args:
-        text_column (string, optional): Name of the column that contains the input text.
-        label_column (string, optional): Name of the column that contains the target variable to predict.
+        text_column (string, required): Name of the column that contains the input text.
+        label_column (string, required): Name of the column that contains the target variable to predict.
+        metric_for_best_model (string, optional): the name of the metrc for selecting the best model
         kwargs (dict, optional): Additional keyword arguments passed along to underlying meta class. 
     """
 
@@ -43,12 +47,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             self,
             text_column: str,
             label_column: str,
+            metric_for_best_model: str = "eval_accuracy",
             # TODO: support problem_type
             **kwargs):
 
         super(AutoTrainerForTextClassification, self).__init__(**kwargs)
         self.text_column = text_column
         self.label_column = label_column
+        self.metric_for_best_model = metric_for_best_model
 
     @property
     def _default_training_argument(self) -> TrainingArguments:

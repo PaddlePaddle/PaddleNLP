@@ -18,7 +18,6 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 from hyperopt import hp
 from paddle.io import Dataset
-from paddle.utils import try_import
 from ray import tune
 from ray.tune.result_grid import ResultGrid
 from ray.tune.search import ConcurrencyLimiter
@@ -36,15 +35,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     Args:
         language (string, optional): language of the text
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self,
-                 language: Optional[str] = "Chinese",
-                 metric_for_best_model: Optional[str] = None,
-                 **kwargs):
-        self.metric_for_best_model = metric_for_best_model
+    def __init__(self, language: Optional[str] = "Chinese", **kwargs):
         self.language = language
 
     @property
