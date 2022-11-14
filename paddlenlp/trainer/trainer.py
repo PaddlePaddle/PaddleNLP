@@ -76,6 +76,7 @@ from .trainer_utils import (
     IterableDatasetShard,
     has_length,
     find_batch_size,
+    RemoveColumnsCollator,
 )
 from .trainer_callback import (
     CallbackHandler,
@@ -781,7 +782,7 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
-        if not isinstance(self.train_dataset, collections.abc.Sized):
+        if self.train_dataset is None or not has_length(self.train_dataset):
             return None
 
         if self.args.world_size <= 1:
@@ -867,7 +868,7 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset,
                                                         description="training")
 
-        if isinstance(train_dataset, paddle.io.IterableDataset):
+        if self._is_iterable_dataset(train_dataset):
             if self.args.world_size > 1:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
@@ -932,7 +933,8 @@ class Trainer:
                                                   datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset,
                                                        description="evaluation")
-        if isinstance(eval_dataset, paddle.io.IterableDataset):
+
+        if self._is_iterable_dataset(eval_dataset):
             if self.args.world_size > 1:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
@@ -973,7 +975,8 @@ class Trainer:
                                                   datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset,
                                                        description="test")
-        if isinstance(test_dataset, paddle.io.IterableDataset):
+
+        if self._is_iterable_dataset(test_dataset):
             if self.args.world_size > 1:
                 test_dataset = IterableDatasetShard(
                     test_dataset,
@@ -2008,6 +2011,15 @@ class Trainer:
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
 
+    def _set_signature_columns_if_needed(self):
+        if self._signature_columns is None:
+            # Inspect model forward signature to keep only the arguments it accepts.
+            signature = inspect.signature(self.model.forward)
+            self._signature_columns = list(signature.parameters.keys())
+            # Labels may be named label or label_ids, the default data collator handles that.
+            self._signature_columns += list(
+                set(["label", "label_ids"] + self.label_names))
+
     def _remove_unused_columns(self,
                                dataset: "datasets.Dataset",
                                description: Optional[str] = None):
@@ -2044,6 +2056,30 @@ class Trainer:
             return dataset
         else:
             return dataset.remove_columns(ignored_columns)
+
+    def _get_collator_with_removed_columns(
+            self,
+            data_collator: Callable,
+            description: Optional[str] = None) -> Callable:
+        """Wrap the data collator in a callable removing unused columns."""
+        if not self.args.remove_unused_columns:
+            return data_collator
+        self._set_signature_columns_if_needed()
+        signature_columns = self._signature_columns
+
+        remove_columns_collator = RemoveColumnsCollator(
+            data_collator=data_collator,
+            signature_columns=signature_columns,
+            logger=logger,
+            description=description,
+            model_name=self.model.__class__.__name__,
+        )
+        return remove_columns_collator
+
+    def _is_iterable_dataset(self, dataset):
+        return isinstance(dataset, paddle.io.IterableDataset) or (
+            isinstance(dataset, datasets.iterable_dataset.IterableDataset)
+            if is_datasets_available() else False)
 
     def print_config(self, args=None, key=""):
         """
