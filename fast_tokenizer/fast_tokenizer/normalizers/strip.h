@@ -23,7 +23,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
 
-struct FASTERTOKENIZER_DECL StripNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL StripNormalizer : public Normalizer {
   StripNormalizer(bool left = true, bool right = true);
   virtual void operator()(NormalizedString* input) const override;
   StripNormalizer(StripNormalizer&&) = default;
@@ -38,7 +38,7 @@ private:
                         StripNormalizer& strip_normalizer);
 };
 
-struct FASTERTOKENIZER_DECL StripAccentsNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL StripAccentsNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j,
                       const StripAccentsNormalizer& strip_normalizer);

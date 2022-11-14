@@ -14,17 +14,17 @@ limitations under the License. */
 #include <array>
 #include <string>
 #include <vector>
-#include "core/added_vocabulary.h"
-#include "core/base.h"
-#include "core/encoding.h"
-#include "core/tokenizer.h"
-#include "glog/logging.h"
-#include "gtest/gtest.h"
-#include "models/wordpiece.h"
-#include "normalizers/bert.h"
-#include "postprocessors/bert.h"
-#include "pretokenizers/bert.h"
-#include "tokenizers/ernie_fast_tokenizer.h"
+#include "fast_tokenizer/core/added_vocabulary.h"
+#include "fast_tokenizer/core/base.h"
+#include "fast_tokenizer/core/encoding.h"
+#include "fast_tokenizer/core/tokenizer.h"
+#include "fast_tokenizer/glog/logging.h"
+#include "fast_tokenizer/gtest/gtest.h"
+#include "fast_tokenizer/models/wordpiece.h"
+#include "fast_tokenizer/normalizers/bert.h"
+#include "fast_tokenizer/postprocessors/bert.h"
+#include "fast_tokenizer/pretokenizers/bert.h"
+#include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {

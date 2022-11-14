@@ -16,9 +16,10 @@ limitations under the License. */
 #include <exception>
 #include <locale>
 
-#include "glog/logging.h"
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
+#include "fast_tokenizer/utils/unique_ptr.h"
 #include "fast_tokenizer/utils/utf8.h"
+#include "glog/logging.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
@@ -130,7 +131,7 @@ void PreTokenizedString::Split(
 void PreTokenizedString::Normalize(
     std::function<void(normalizers::NormalizedString*)> normalize_fn) {
   for (auto& split : splits_) {
-    if (!split.tokens_.empty()) {
+    if (split.tokens_.empty()) {
       normalize_fn(&split.normalized_);
     }
   }
@@ -239,6 +240,35 @@ void PreTokenizedString::SetOriginalStr(const std::string& original) {
   original_ = original;
   splits_.clear();
   splits_.emplace_back(original_);
+}
+
+std::vector<std::tuple<std::string, core::Offset, std::vector<core::Token>>>
+PreTokenizedString::GetSplits(bool is_original,
+                              const core::OffsetType& offset_type) const {
+  std::unique_ptr<OffsetConverter> converter;
+  if (offset_type == core::OffsetType::BYTE) {
+    converter = utils::make_unique<OffsetConverter>(original_);
+  } else {
+    converter = utils::make_unique<BytesToCharOffsetConverter>(original_);
+  }
+  std::vector<std::tuple<std::string, core::Offset, std::vector<core::Token>>>
+      result;
+  uint32_t offset = 0;
+  for (auto&& split : splits_) {
+    core::Offset curr_offset, split_offset;
+    if (is_original) {
+      split_offset = split.normalized_.GetOrginalOffset();
+    } else {
+      auto len = split.normalized_.GetLen();
+      offset += len;
+      split_offset = {offset - len, offset};
+    }
+
+    // Convert to char offsets if relevant
+    converter->convert(split_offset, &curr_offset);
+    result.emplace_back(split.normalized_.GetStr(), curr_offset, split.tokens_);
+  }
+  return result;
 }
 
 }  // namespace pretokenizers

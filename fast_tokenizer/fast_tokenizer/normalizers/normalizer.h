@@ -28,20 +28,12 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
 
-enum FASTERTOKENIZER_DECL SplitMode {
-  REMOVED,
-  ISOLATED,
-  MERGED_WITH_PREVIOUS,
-  MERGED_WITH_NEXT,
-  CONTIGUOUS
-};
-
-struct FASTERTOKENIZER_DECL OffsetMapping {
+struct FASTTOKENIZER_DECL OffsetMapping {
   std::u32string u32normalized;
   std::vector<int> changes;  // Same size as normalized
 };
 
-class FASTERTOKENIZER_DECL NormalizedString {
+class FASTTOKENIZER_DECL NormalizedString {
 public:
   NormalizedString(const std::string& original);
   NormalizedString(NormalizedString&& other);
@@ -82,23 +74,24 @@ public:
   template <typename PatternType>
   void Split(const PatternType&
                  pattern, /* re2::RE2 or std::function<bool(char32_t)> */
-             SplitMode mode,
-             std::vector<NormalizedString>* normalizes) const {
+             core::SplitMode mode,
+             std::vector<NormalizedString>* normalizes,
+             bool invert = false) const {
     // Vec<(Offsets, should_remove)>
     std::vector<std::pair<core::Range, bool>> matches;
-    auto normalizes_size = GetMatch(normalized_, pattern, &matches);
+    auto normalizes_size = GetMatch(normalized_, pattern, &matches, invert);
     // Convert matches
     switch (mode) {
-      case REMOVED:
+      case core::SplitMode::REMOVED:
         break;
-      case ISOLATED: {
+      case core::SplitMode::ISOLATED: {
         for (auto& match : matches) {
           match.second = false;
         }
         normalizes_size = matches.size();
         break;
       }
-      case MERGED_WITH_PREVIOUS: {
+      case core::SplitMode::MERGED_WITH_PREVIOUS: {
         bool previous_match = false;
         std::vector<std::pair<core::Range, bool>> new_matches;
         for (const auto& match : matches) {
@@ -119,7 +112,7 @@ public:
         normalizes_size = matches.size();
         break;
       }
-      case MERGED_WITH_NEXT: {
+      case core::SplitMode::MERGED_WITH_NEXT: {
         bool previous_match = false;
         std::vector<std::pair<core::Range, bool>> new_matches;
         for (auto it = matches.crbegin(); it != matches.crend(); ++it) {
@@ -142,7 +135,7 @@ public:
         std::reverse(matches.begin(), matches.end());
         break;
       }
-      case CONTIGUOUS: {
+      case core::SplitMode::CONTIGUOUS: {
         bool previous_match = false;
         std::vector<std::pair<core::Range, bool>> new_matches;
         for (const auto& match : matches) {
@@ -194,14 +187,16 @@ private:
 
   uint32_t GetMatch(const std::string& normalized,
                     const re2::RE2& pattern,
-                    std::vector<std::pair<core::Range, bool>>* matches) const;
+                    std::vector<std::pair<core::Range, bool>>* matches,
+                    bool invert = false) const;
 
   uint32_t GetMatch(const std::string& normalized,
                     const std::function<bool(char32_t)>& pattern_func,
-                    std::vector<std::pair<core::Range, bool>>* matches) const;
+                    std::vector<std::pair<core::Range, bool>>* matches,
+                    bool invert = false) const;
 };
 
-struct FASTERTOKENIZER_DECL Normalizer {
+struct FASTTOKENIZER_DECL Normalizer {
   virtual void operator()(NormalizedString* mut_str) const = 0;
 };
 
