@@ -209,10 +209,10 @@ def _transformer_decoder_fwd(self,
     for i, mod in enumerate(self.layers):
         if cache is None:
             if self.enable_recompute:
-                output = recompute(mod, tgt, memory, tgt_mask, memory_mask,
-                                   None, output_attentions)
+                outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask,
+                                    None, output_attentions)
             else:
-                output = mod(
+                outputs = mod(
                     tgt,
                     memory,
                     tgt_mask=tgt_mask,
