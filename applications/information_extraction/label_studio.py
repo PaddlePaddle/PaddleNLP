@@ -136,10 +136,15 @@ class Convertor(object):
         img_file = os.path.basename(line['data']['image'])
         p = img_file.find("-")
         img_file = img_file[p + 1:]
-        img_path = os.path.join("./data/images", img_file)
+
+        img_path = os.path.join(
+            "/".join(args.label_studio_file.split('/')[:-1]), "images",
+            img_file)
         if not os.path.exists(img_path):
-            logger.warning("Image file %s not existed in %s" %
-                           (img_file, "./data/images"))
+            logger.warning(
+                "Image file %s not existed in %s" %
+                (img_file,
+                 "/".join(args.label_studio_file.split('/')[:-1]) + "images"))
         logger.info("Parsing image file %s ..." % (img_file))
         doc_parser = DocParser(layout_analysis=self.layout_analysis)
         image = doc_parser.read_image(img_path)

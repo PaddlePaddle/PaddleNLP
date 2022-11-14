@@ -28,14 +28,7 @@
 
 ## 2. 快速开始
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用定制功能（标注少量数据进行模型微调）以进一步提升效果。下面通过`增值税发票数据集`的例子展示如何使用UIE-X模型微调。
-
-```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/tax.tar.gz
-tar -zxvf tax.tar.gz
-mv tax data
-rm tax.tar.gz
-```
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用定制功能（标注少量数据进行模型微调）以进一步提升效果。
 
 <a name="代码结构"></a>
 
@@ -54,6 +47,37 @@ rm tax.tar.gz
 ### 2.2 数据标注
 我们推荐使用 [Label Studio](https://labelstud.io/) 进行文档信息抽取数据标注，本项目打通了从数据标注到训练的通道，也即Label Studio导出数据可以通过 [label_studio.py](../label_studio.py) 脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考 [Label Studio数据标注指南](../label_studio.md)。
 
+这里我们提供预先标注好的`增值税发票数据集`的文件，可以运行下面的命令行下载数据集，我们将展示如何使用数据转化脚本生成训练/验证/测试集文件，并使用UIE-X模型进行微调。
+
+下载增值税发票数据集：
+```shell
+wget https://paddlenlp.bj.bcebos.com/datasets/tax.tar.gz
+tar -zxvf tax.tar.gz
+mv tax data
+rm tax.tar.gz
+```
+
+生成训练/验证集文件：
+```shell
+python ../label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --save_dir ./data \
+    --splits 0.8 0.2 0\
+    --task_type ext
+```
+
+生成训练/验证集文件，可以使用PPStructure的布局分析优化OCR结果的排序：
+```shell
+python ../label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --save_dir ./data \
+    --splits 0.8 0.2 0\
+    --task_type ext \
+    --layout_analysis True
+```
+
+更多不同类型任务（含实体抽取、关系抽取、文档分类等）的标注规则及参数说明，请参考[Label Studio数据标注指南](../label_studio.md)。
+
 <a name="模型微调"></a>
 
 #### 2.3 模型微调
@@ -70,8 +94,8 @@ export finetuned_model=./checkpoint/model_best
 python finetune.py  \
     --device gpu \
     --logging_steps 5 \
-    --save_steps 50 \
-    --eval_steps 50 \
+    --save_steps 25 \
+    --eval_steps 25 \
     --seed 42 \
     --model_name_or_path uie-x-base \
     --output_dir $finetuned_model \
@@ -102,8 +126,8 @@ export finetuned_model=./checkpoint/model_best
 python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --device gpu \
     --logging_steps 5 \
-    --save_steps 50 \
-    --eval_steps 50 \
+    --save_steps 25 \
+    --eval_steps 25 \
     --seed 42 \
     --model_name_or_path uie-x-base \
     --output_dir $finetuned_model \
@@ -171,10 +195,11 @@ python evaluate.py \
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
 
 可开启`debug`模式对每个正例类别分别进行评估，该模式仅用于模型调试：
+
 ```shell
 python evaluate.py \
     --device "gpu" \
-    --model_path ./checkpoint/model_best \
+    --model_path ./checkpoint/model_best_new \
     --test_path ./data/dev.txt \
     --output_dir $finetuned_model \
     --label_names 'start_positions' 'end_positions'\
@@ -183,6 +208,37 @@ python evaluate.py \
     --debug True
 ```
 
+输出结果：
+```text
+[2022-11-14 09:41:18,424] [    INFO] - ***** Running Evaluation *****
+[2022-11-14 09:41:18,424] [    INFO] -   Num examples = 160
+[2022-11-14 09:41:18,424] [    INFO] -   Pre device batch size = 4
+[2022-11-14 09:41:18,424] [    INFO] -   Total Batch size = 4
+[2022-11-14 09:41:18,424] [    INFO] -   Total prediction steps = 40
+[2022-11-14 09:41:26,451] [    INFO] - -----Evaluate model-------
+[2022-11-14 09:41:26,451] [    INFO] - Class Name: ALL CLASSES
+[2022-11-14 09:41:26,451] [    INFO] - Evaluation Precision: 0.94521 | Recall: 0.88462 | F1: 0.91391
+[2022-11-14 09:41:26,451] [    INFO] - -----------------------------
+[2022-11-14 09:41:26,452] [    INFO] - ***** Running Evaluation *****
+[2022-11-14 09:41:26,452] [    INFO] -   Num examples = 8
+[2022-11-14 09:41:26,452] [    INFO] -   Pre device batch size = 4
+[2022-11-14 09:41:26,452] [    INFO] -   Total Batch size = 4
+[2022-11-14 09:41:26,452] [    INFO] -   Total prediction steps = 2
+[2022-11-14 09:41:26,692] [    INFO] - Class Name: 开票日期
+[2022-11-14 09:41:26,692] [    INFO] - Evaluation Precision: 1.00000 | Recall: 1.00000 | F1: 1.00000
+[2022-11-14 09:41:26,692] [    INFO] - -----------------------------
+[2022-11-14 09:41:26,693] [    INFO] - ***** Running Evaluation *****
+[2022-11-14 09:41:26,693] [    INFO] -   Num examples = 8
+[2022-11-14 09:41:26,693] [    INFO] -   Pre device batch size = 4
+[2022-11-14 09:41:26,693] [    INFO] -   Total Batch size = 4
+[2022-11-14 09:41:26,693] [    INFO] -   Total prediction steps = 2
+[2022-11-14 09:41:26,952] [    INFO] - Class Name: 名称
+[2022-11-14 09:41:26,952] [    INFO] - Evaluation Precision: 0.87500 | Recall: 0.87500 | F1: 0.87500
+[2022-11-14 09:41:26,952] [    INFO] - -----------------------------
+...
+```
+
+可配置参数：
 * `device`: 评估设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 评估。
 * `model_path`: 进行评估的模型文件夹路径，路径下需包含模型权重文件`model_state.pdparams`及配置文件`model_config.json`。
 * `test_path`: 进行评估的测试集文件。
@@ -202,17 +258,13 @@ python evaluate.py \
 ```python
 from pprint import pprint
 from paddlenlp import Taskflow
-schema = ['No', '开票日期', '名称', '纳税人识别号', '地址、电话', '开户行及账号', '金额', '税率', '税颜', '价税合计', '税额', '税领', '全领', '开票日期：', '名称：', '纳税人识别号：']
+schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', '金额', '价税合计', 'No', '税率', '地址、电话', '税额']
 my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best')
 ```
 
 我们可以根据设置的`schema`，对指定的`doc_path`文档进行信息抽取：
+
 ```python
-doc_path = "test.jpg"
+doc_path = "./data/images/b201.jpg"
 pprint(my_ie({"doc": doc_path}))
-```
-也支持根据设置的`schema`，对纯文本`text`进行信息抽取：
-```python
-text = "地址、电话：深圳市龙华新区民治街道民治大道展滔科技大厦开户行及账号：中国工商银行股份有限公司深圳园岭支行4000024709200172809纳税人识别号：91440101664041243T售地址、电话：广州市黄埔区九龙镇九龙工业园凤凰三横路99号 66215500注方开户行及账号：工行北京路支行3602000919200384952收款人：王梅复核：张雪开票人：陈秋燕销"
-pprint(my_ie({"text": text}))
 ```

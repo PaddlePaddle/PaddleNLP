@@ -405,12 +405,12 @@ schema = '文档类别[发票，报关单]'
 
 #### 3.6 数据转换
 
-将导出的文件重命名为``label_studio.json``后，放入``./data``目录下，并将对应的标注图片放入``./data/images``目录下（图片的文件名需与上传到label studio时的命名一致）。通过[label_studio.py](./label_studio.py)脚本可转为UIE的数据格式。
+将导出的文件重命名为``label_studio.json``后，放入``./document/data``目录下，并将对应的标注图片放入``./document/data/images``目录下（图片的文件名需与上传到label studio时的命名一致）。通过[label_studio.py](./label_studio.py)脚本可转为UIE的数据格式。
 
 - 路径示例
 
 ```shell
-data/
+./document/data/
 ├── images # 图片目录
 │   ├── b0.jpg # 原始图片（文件名需与上传到label studio时的命名一致）
 │   └── b1.jpg
@@ -421,9 +421,9 @@ data/
 
 ```shell
 python label_studio.py \
-    --label_studio_file ./data/label_studio.json \
-    --save_dir ./data \
-    --splits 0.8 0.1 0.1 \
+    --label_studio_file ./document/data/label_studio.json \
+    --save_dir ./document/data \
+    --splits 0.8 0.1 0.1\
     --task_type ext
 ```
 
@@ -431,8 +431,8 @@ python label_studio.py \
 
 ```shell
 python label_studio.py \
-    --label_studio_file ./data/label_studio.json \
-    --save_dir ./data \
+    --label_studio_file ./document/data/label_studio.json \
+    --save_dir ./document/data \
     --splits 0.8 0.1 0.1 \
     --task_type cls \
     --prompt_prefix "文档类别" \
