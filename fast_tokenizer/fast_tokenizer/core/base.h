@@ -21,8 +21,8 @@ limitations under the License. */
 #include <unordered_map>
 #include <vector>
 
-#include "nlohmann/json.hpp"
 #include "fast_tokenizer/utils/utils.h"
+#include "nlohmann/json.hpp"
 
 namespace std {
 template <>
@@ -39,14 +39,22 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace core {
 
-enum FASTERTOKENIZER_DECL OffsetType { CHAR, BYTE };
-enum FASTERTOKENIZER_DECL Direction { LEFT, RIGHT };
-enum FASTERTOKENIZER_DECL TruncStrategy {
+enum FASTTOKENIZER_DECL OffsetType { CHAR, BYTE };
+enum FASTTOKENIZER_DECL Direction { LEFT, RIGHT };
+enum FASTTOKENIZER_DECL TruncStrategy {
   LONGEST_FIRST,
   ONLY_FIRST,
   ONLY_SECOND
 };
-enum FASTERTOKENIZER_DECL PadStrategy { BATCH_LONGEST, FIXED_SIZE };
+enum FASTTOKENIZER_DECL PadStrategy { BATCH_LONGEST, FIXED_SIZE };
+
+enum FASTTOKENIZER_DECL SplitMode {
+  REMOVED,
+  ISOLATED,
+  MERGED_WITH_PREVIOUS,
+  MERGED_WITH_NEXT,
+  CONTIGUOUS
+};
 
 NLOHMANN_JSON_SERIALIZE_ENUM(OffsetType,
                              {
@@ -72,7 +80,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(PadStrategy,
                                  {FIXED_SIZE, "FIXED_SIZE"},
                              });
 
-struct FASTERTOKENIZER_DECL TruncMethod {
+struct FASTTOKENIZER_DECL TruncMethod {
   Direction direction_;
   size_t max_len_;
   TruncStrategy strategy_;
@@ -84,7 +92,7 @@ struct FASTERTOKENIZER_DECL TruncMethod {
         direction_(RIGHT) {}
 };
 
-struct FASTERTOKENIZER_DECL PadMethod {
+struct FASTTOKENIZER_DECL PadMethod {
   PadStrategy strategy_;
   Direction direction_;
   uint32_t pad_id_;
@@ -160,7 +168,7 @@ inline void to_json(nlohmann::json& j,
   }
 }
 
-struct FASTERTOKENIZER_DECL Token {
+struct FASTTOKENIZER_DECL Token {
   uint32_t id_;
   std::string value_;
   Offset offset_;
@@ -169,7 +177,7 @@ struct FASTERTOKENIZER_DECL Token {
       : id_(id), value_(value), offset_(offset) {}
 };
 
-struct FASTERTOKENIZER_DECL Merge {
+struct FASTTOKENIZER_DECL Merge {
   size_t pos_;
   uint32_t rank_;
   uint32_t new_id_;
@@ -188,7 +196,7 @@ struct FASTERTOKENIZER_DECL Merge {
   }
 };
 
-struct FASTERTOKENIZER_DECL Symbol {
+struct FASTTOKENIZER_DECL Symbol {
   uint32_t ch_;  // symbol id
   int prev_;
   int next_;
@@ -208,7 +216,7 @@ struct FASTERTOKENIZER_DECL Symbol {
   }
 };
 
-struct FASTERTOKENIZER_DECL BPEWord {
+struct FASTTOKENIZER_DECL BPEWord {
   BPEWord() = default;
   BPEWord(size_t capacity) { Reserve(capacity); }
   void Reserve(size_t capacity) { symbols_.reserve(capacity); }

@@ -11,6 +11,7 @@ cc_test(test_utils SRCS test_utils.cc DEPS normalizers)
 # Test PreTokenizers modules
 cc_test(test_whitespace SRCS test_whitespace.cc DEPS pretokenizers)
 cc_test(test_bert_pretokenizer SRCS test_bert_pretokenizer.cc DEPS pretokenizers)
+cc_test(test_split_pretokenizer SRCS test_split_pretokenizer.cc DEPS pretokenizers)
 
 # Test Model
 cc_test(test_wordpiece SRCS test_wordpiece.cc DEPS models)
@@ -27,6 +28,9 @@ endif()
 
 # Test Tokenizer
 cc_test(test_bert_tokenizer SRCS test_bert_tokenizer.cc DEPS normalizers pretokenizers models postprocessors tokenizer)
+
+# Test PostProcessor
+cc_test(test_roberta_postprocessor SRCS test_roberta_postprocessor.cc DEPS normalizers pretokenizers models postprocessors tokenizer)
 
 if(NOT WITH_PYTHON)
 cc_test(test_ernie_fast_tokenizer SRCS test_ernie_fast_tokenizer.cc DEPS normalizers pretokenizers models postprocessors tokenizer core_tokenizers)
