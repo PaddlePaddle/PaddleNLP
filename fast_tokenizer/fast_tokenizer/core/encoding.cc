@@ -543,15 +543,6 @@ std::string Encoding::DebugString() const {
     oss << "{" << iter->first << " : (" << iter->second.first << ", "
         << iter->second.second << ") }, ";
   }
-  oss << "\n";
-
-  oss << "words_idx:";
-  for (int i = 0; i < words_idx_.size(); ++i) {
-    oss << words_idx_[i];
-    if (i < words_idx_.size() - 1) {
-      oss << ", ";
-    }
-  }
   return oss.str();
 }
 
