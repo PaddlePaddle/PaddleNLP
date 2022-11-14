@@ -571,13 +571,17 @@ class PretrainedModel(Layer, GenerationMixin):
         # Allow the float16 model to load float32 weights, which decreases memory
         # usage in model loading stage and is useful to big models.
         dtype_prefix_len = len("paddle.")  # paddle.float16
+
         for k, v in model_to_load.state_dict().items():
             if not isinstance(v, np.ndarray):
                 dtype = str(v.dtype)[dtype_prefix_len:]
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
                 if paddle.in_dynamic_mode():
-                    state_to_load[k] = paddle.cast(state_to_load[k], dtype)
+                    if isinstance(state_to_load[k], np.ndarray):
+                        state_to_load[k] = state_to_load[k].astype(dtype)
+                    else:
+                        state_to_load[k] = paddle.cast(state_to_load[k], dtype)
                 else:
                     # there are some latent error when case dtype in static-mode, so let's:
                     # 1. convert fluid.*.Tensor -> numpy.ndarray
