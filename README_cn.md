@@ -30,6 +30,7 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
+
 * 🔥 **2022.11.12 PaddleNLP新增AutoPrompt自动化提示功能，登顶FewCLUE小样本学习榜单!**
   * 🥇 PaddleNLP 团队开源了 **AutoPrompt** 方案，基于开源的文心 ERNIE 预训练语言模型 ，结合了领域预训练和自动化提示学习技术，以291M 参数量的模型在小样本权威学习榜单 FewCLUE 排名第一，[详见](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
