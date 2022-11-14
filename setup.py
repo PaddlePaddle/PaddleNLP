@@ -26,7 +26,8 @@ extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
 extras["tests"] = read_requirements_file("tests/requirements.txt")
 extras["docs"] = read_requirements_file("docs/requirements.txt")
-extras["autonlp"] = read_requirements_file("paddlenlp/experimental/autonlp/requirements.txt")
+extras["autonlp"] = read_requirements_file(
+    "paddlenlp/experimental/autonlp/requirements.txt")
 extras["dev"] = extras["tests"] + extras["docs"]
 
 
