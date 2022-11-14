@@ -18,6 +18,7 @@ This module provide prompt definition methods.
 
 import os
 import re
+import json
 import traceback
 from abc import abstractmethod
 from typing import Any, Dict, List, Tuple, Optional, Union
@@ -37,17 +38,17 @@ __all__ = [
     "AutoTemplate"
 ]
 
-# Template used to be saved in a file
+# Template used to be saved in a file.
 TEMPLATE_CONFIG_FILE = "template_config.json"
 TEMPLATE_PARAMETER_FILE = "template_state.pdparams"
 
-# Default values for some template attributes
+# Default values for some template attributes.
 DEFAULT_MAX_OPTIONS = 10
 
 
 class Template(nn.Layer):
     """
-    Base Class for [`Template`].
+    Base class for [`Template`].
 
     Args:
         prompt (`str`): 
@@ -121,8 +122,8 @@ class Template(nn.Layer):
     def _check_example_name(self, name: str, example: Dict[str, Any]):
         if name not in example:
             raise ValueError(
-                "Wrong key found in template: defined as {} but get data {}".
-                format(part["text"], example))
+                "Unexpected value in template. Can not find keyword {} in example: {}"
+                .format(name, example))
         return True
 
     def _check_omask_token(self):
@@ -251,8 +252,6 @@ class Template(nn.Layer):
         for value in list(zip(*input_values)):
             inputs.append(dict(zip(input_names, value)))
 
-        print(inputs)
-
         input_dict = self.prompt_tokenizer(inputs)
         unused_example = {
             k: v
@@ -274,6 +273,10 @@ class Template(nn.Layer):
         template_config_file = os.path.join(save_path, TEMPLATE_CONFIG_FILE)
         with open(template_config_file, "w", encoding="utf-8") as fp:
             fp.write(json.dumps(self._prompt, ensure_ascii=False))
+        template_param_file = os.path.join(save_path, TEMPLATE_PARAMETER_FILE)
+        template_state_dict = self.state_dict()
+        if len(template_state_dict) > 0:
+            paddle.save(template_state_dict, template_param_file)
 
     @staticmethod
     def parse_template_string(prompt: str,
@@ -287,6 +290,7 @@ class Template(nn.Layer):
 
         Returns:
             A list of dictionaries corresponding to the input string.
+            
             For example, if we define `prompt` as 
 
             "{'text': 'hypothesis'}基于这一假设{'mask'}推断出{'options'}",
@@ -592,7 +596,6 @@ class SoftTemplate(Template):
                 encoder_ids.append(0)
             else:
                 if part["encoder"] not in encoder2id:
-                    print('\n', part["encoder"], '\n')
                     encoder2id[part["encoder"]] = len(encoder_list)
                     encoder_ids.append(len(encoder_list))
                     if "hidden_size" in part:
@@ -783,7 +786,6 @@ class AutoTemplate(object):
 
         # Choose Template according to template keywords.
         if "prefix" in template_keywords:
-            print(prompt)
             return PrefixTemplate(prompt=prompt,
                                   tokenizer=tokenizer,
                                   max_length=max_length,

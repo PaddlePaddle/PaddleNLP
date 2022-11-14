@@ -90,6 +90,8 @@ class MLMPromptTokenizer(object):
         encoded_inputs = self.add_special_tokens(encoded_inputs)
         encoded_inputs["attention_mask"] = self._create_attention_mask(
             encoded_inputs["input_ids"], option_length)
+        if encoded_inputs["attention_mask"] is None:
+            encoded_inputs.pop("attention_mask")
         return encoded_inputs
 
     def _create_position_ids_from_part(self, input_ids: List[int],
@@ -183,7 +185,6 @@ class MLMPromptTokenizer(object):
 
     @staticmethod
     def join(input_dict):
-        print(input_dict)
         for key in input_dict:
             input_dict[key] = list(itertools.chain(*input_dict[key]))
         return input_dict

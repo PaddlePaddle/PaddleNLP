@@ -17,10 +17,14 @@ This module defines the itermediate data structure of inputs.
 """
 
 import inspect
-from typing import Dict, List
+from typing import Any, Dict, List, Union, Optional
+from dataclasses import dataclass
 
-# from paddlenlp.data import DataCollatorWithPadding
-# collate_fn = DataCollatorWithPadding(tokenizer=token, return_tensors='pd')
+import numpy as np
+import paddle
+
+from ..transformers.tokenizer_utils_base import (PretrainedTokenizerBase,
+                                                 PaddingStrategy)
 
 
 def signature(function):
@@ -33,3 +37,53 @@ def signature(function):
         if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
     ]
     return args
+
+
+@dataclass
+class PromptDataCollatorWithPadding:
+    """
+    Data collator that will group inputs by keywords and dynamically 
+    pad the inputs to the longest sequence in the batch.
+
+    Args:
+        tokenizer (`paddlennlp.transformers.PretrainedTokenizer`):
+            The tokenizer used for encoding the data from PromptTokenizer.
+    """
+
+    tokenizer: PretrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+    return_tensors: str = "pd"
+    return_attention_mask: Optional[bool] = None
+    default_model_input_names: List = ("input_ids", "token_type_ids",
+                                       "special_tokens_mask", "offset_mapping",
+                                       "position_ids", "attention_mask")
+
+    def _convert_to_tensors(self, data):
+        if self.return_tensors == "np":
+            return np.array(data)
+        else:
+            return paddle.to_tensor(data)
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        batch = {}
+        for key in features[0]:
+            if key in self.default_model_input_names:
+                batch[key] = [b[key] for b in features]
+        batch = self.tokenizer.pad(
+            batch,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors=self.return_tensors,
+            return_attention_mask=self.return_attention_mask)
+        max_length = batch["input_ids"].shape[1]
+        for key in features[0]:
+            if key not in self.default_model_input_names:
+                values = [b[key] for b in features]
+                if key != "labels":
+                    for index, value in enumerate(values):
+                        values[index] = value + [0] * (max_length - len(value))
+                batch[key] = self._convert_to_tensors(values)
+        return batch
