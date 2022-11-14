@@ -11,6 +11,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
+
 #include <array>
 #include <string>
 #include <vector>
@@ -18,26 +19,19 @@ limitations under the License. */
 #include "fast_tokenizer/core/base.h"
 #include "fast_tokenizer/core/encoding.h"
 #include "fast_tokenizer/core/tokenizer.h"
-#include "fast_tokenizer/glog/logging.h"
-#include "fast_tokenizer/gtest/gtest.h"
 #include "fast_tokenizer/models/wordpiece.h"
 #include "fast_tokenizer/normalizers/bert.h"
 #include "fast_tokenizer/postprocessors/bert.h"
 #include "fast_tokenizer/pretokenizers/bert.h"
+#include "fast_tokenizer/test/utils.h"
 #include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
+
+#include "glog/logging.h"
+#include "gtest/gtest.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace tests {
-
-template <typename T>
-void CheckVectorEqual(const std::vector<T>& a, const std::vector<T>& b) {
-  ASSERT_EQ(a.size(), b.size());
-  auto size = a.size();
-  for (int i = 0; i < size; ++i) {
-    ASSERT_EQ(a[i], b[i]);
-  }
-}
 
 TEST(tokenizer, ernie_fast_tokenizer) {
   std::string vocab_file = "ernie_vocab.txt";

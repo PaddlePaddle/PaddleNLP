@@ -34,11 +34,8 @@ static re2::RE2 pattern(
 static std::unordered_map<uint8_t, uint32_t> BYTES_TO_CHARS =
     utils::CreateBytesToChars();
 ByteLevelPreTokenizer::ByteLevelPreTokenizer(bool add_prefix_space,
-                                             bool use_regex,
-                                             bool trim_offsets)
-    : add_prefix_space_(add_prefix_space),
-      trim_offsets_(trim_offsets),
-      use_regex_(use_regex) {}
+                                             bool use_regex)
+    : add_prefix_space_(add_prefix_space), use_regex_(use_regex) {}
 
 
 void ByteLevelPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
@@ -91,7 +88,6 @@ void to_json(nlohmann::json& j,
   j = {
       {"type", "ByteLevelPreTokenizer"},
       {"add_prefix_space", byte_pre_tokenizer.add_prefix_space_},
-      {"trim_offsets", byte_pre_tokenizer.trim_offsets_},
       {"use_regex", byte_pre_tokenizer.use_regex_},
   };
 }
@@ -100,7 +96,6 @@ void to_json(nlohmann::json& j,
 void from_json(const nlohmann::json& j,
                ByteLevelPreTokenizer& byte_pre_tokenizer) {
   j.at("add_prefix_space").get_to(byte_pre_tokenizer.add_prefix_space_);
-  j.at("trim_offsets").get_to(byte_pre_tokenizer.trim_offsets_);
   j.at("use_regex").get_to(byte_pre_tokenizer.add_prefix_space_);
 }
 
