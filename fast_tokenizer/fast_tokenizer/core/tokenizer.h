@@ -149,16 +149,17 @@ public:
                           uint32_t type_id,
                           OffsetType offset_type,
                           Encoding* encodings) const;
-  void EncodePairStrings(const EncodeInput& encode_input,
-                         Encoding* encodings,
-                         bool add_special_tokens = true) const;
-  void EncodePairStringsCharOffsets(const EncodeInput& encode_input,
-                                    Encoding* encodings,
-                                    bool add_special_tokens = true) const;
   void PostProcess(Encoding* encoding,
                    Encoding* pair_encoding,
                    bool add_special_tokens,
                    Encoding* result_encoding) const;
+  void EncodePairStrings(const EncodeInput& encode_input,
+                         Encoding* encodings,
+                         bool add_special_tokens = true) const;
+  void EncodePairStrings(const std::string& text,
+                         const std::string& text_pair,
+                         Encoding* encodings,
+                         bool add_special_tokens = true) const;
 
   void MultiThreadEncodeBatchStrings(
       const std::vector<EncodeInput>& batch_encode_input,
@@ -166,22 +167,30 @@ public:
       bool add_special_tokens,
       size_t start_index,
       size_t step_index) const;
+  // Tokenize the unpretokenized text.
+  void MultiThreadEncodeBatchStrings(const std::vector<std::string>& texts,
+                                     std::vector<Encoding>* encodings,
+                                     bool add_special_tokens,
+                                     size_t start_index,
+                                     size_t step_index) const;
+  void MultiThreadEncodeBatchStrings(const std::vector<std::string>& texts,
+                                     const std::vector<std::string>& text_pairs,
+                                     std::vector<Encoding>* encodings,
+                                     bool add_special_tokens,
+                                     size_t start_index,
+                                     size_t step_index) const;
 
   void EncodeBatchStrings(const std::vector<EncodeInput>& batch_encode_input,
                           std::vector<Encoding>* encodings,
                           bool add_special_tokens = true) const;
-
-  void MultiThreadEncodeBatchStringsCharOffsets(
-      const std::vector<EncodeInput>& batch_encode_input,
-      std::vector<Encoding>* encodings,
-      bool add_special_tokens,
-      size_t start_index,
-      size_t step_index) const;
-
-  void EncodeBatchStringsCharOffsets(
-      const std::vector<EncodeInput>& batch_encode_input,
-      std::vector<Encoding>* encodings,
-      bool add_special_tokens = true) const;
+  // Tokenize the unpretokenized text.
+  void EncodeBatchStrings(const std::vector<std::string>& texts,
+                          std::vector<Encoding>* encodings,
+                          bool add_special_tokens = true) const;
+  void EncodeBatchStrings(const std::vector<std::string>& texts,
+                          const std::vector<std::string>& text_pairs,
+                          std::vector<Encoding>* encodings,
+                          bool add_special_tokens = true) const;
 
   // Encode single text which is already pretokenized.
   void EncodeSingleText(const std::vector<std::string>& pretokenized_texts,
