@@ -47,7 +47,7 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 然而，在推理过程中，我们希望能够轻松地加载所有组件并在推理中使用它们，即使某个组件来自不同的库（例如来自于[Transformers](https://github.com/huggingface/transformers)的CLIP的文本编码器）. 为此，所有管道都提供以下功能：
 
 
-- `from_pretrained` 该方法接收PaddleNLP模型库id（例如[runwayml/stable-diffusion-v1-5](https://huggingface.co/runwayml/stable-diffusion-v1-5)）或本地目录路径。为了能够准确加载相应的模型和组件，相应目录下必须提供`model_index.json`文件。
+- `from_pretrained` 该方法接收PaddleNLP模型库id（例如`runwayml/stable-diffusion-v1-5`）或本地目录路径。为了能够准确加载相应的模型和组件，相应目录下必须提供`model_index.json`文件。
 
 - `save_pretrained` 该方法接受一个本地目录路径，Pipelines的所有模型或组件都将被保存到该目录下。对于每个模型或组件，都会在给定目录下创建一个子文件夹。同时`model_index.json`文件将会创建在本地目录路径的根目录下，以便可以再次从本地路径实例化整个Pipelines。
 
