@@ -21,15 +21,13 @@ namespace core {
 
 static int fast_tokenizer_thread_num = 1;
 
-void SetFastTokenizerThreadNum(int thread_num) {
-  fast_tokenizer_thread_num = thread_num;
-}
+void SetThreadNum(int thread_num) { fast_tokenizer_thread_num = thread_num; }
 
-int GetFastTokenizerThreadNum() { return fast_tokenizer_thread_num; }
+int GetThreadNum() { return fast_tokenizer_thread_num; }
 
 void RunMultiThread(std::function<void(size_t, size_t)> func,
                     size_t batch_size) {
-  int thread_num = GetFastTokenizerThreadNum();
+  int thread_num = GetThreadNum();
   std::vector<std::thread> vectorOfThread;
   size_t start_index = 0;
   size_t step_index = ceil(batch_size / float(thread_num));

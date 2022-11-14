@@ -278,6 +278,9 @@ void BindCore(pybind11::module* m) {
       .def_property_readonly("lstrip", &core::AddedToken::GetUseLStrip)
       .def_property_readonly("rstrip", &core::AddedToken::GetUseRStrip)
       .def_property_readonly("single_word", &core::AddedToken::GetIsSingleWord);
+
+  m->def("set_thread_num", &core::SetThreadNum);
+  m->def("get_thread_num", &core::GetThreadNum);
 }
 
 }  // namespace pybind

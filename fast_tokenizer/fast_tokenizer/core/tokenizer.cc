@@ -272,7 +272,7 @@ void Tokenizer::EncodeBatchStrings(
   encodings->resize(batch_size);
 
 #ifdef WITH_OMP
-#pragma omp parallel for num_threads(GetFastTokenizerThreadNum())
+#pragma omp parallel for num_threads(GetThreadNum())
   for (int i = 0; i < batch_size; ++i) {
     EncodePairStrings(
         batch_encode_input[i], &(*encodings)[i], add_special_tokens);
@@ -336,7 +336,7 @@ void Tokenizer::EncodeBatchStringsCharOffsets(
   auto batch_size = batch_encode_input.size();
   encodings->resize(batch_size);
 #ifdef WITH_OMP
-#pragma omp parallel for num_threads(GetFastTokenizerThreadNum())
+#pragma omp parallel for num_threads(GetThreadNum())
   for (int i = 0; i < batch_size; ++i) {
     Encoding encoding;
     EncodePairStringsCharOffsets(
@@ -472,7 +472,7 @@ void Tokenizer::DecodeBatch(
   auto batch_size = batch_token_ids.size();
   results->resize(batch_size);
 #ifdef WITH_OMP
-#pragma omp parallel for num_threads(GetFastTokenizerThreadNum())
+#pragma omp parallel for num_threads(GetThreadNum())
   for (int i = 0; i < batch_token_ids.size(); ++i) {
     Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
   }
