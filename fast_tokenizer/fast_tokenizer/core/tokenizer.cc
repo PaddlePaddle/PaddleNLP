@@ -26,11 +26,6 @@ limitations under the License. */
 #include "fast_tokenizer/postprocessors/postprocessors.h"
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
 
-
-#ifdef WITH_OMP
-#include <omp.h>
-#endif
-
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace core {
@@ -271,13 +266,6 @@ void Tokenizer::EncodeBatchStrings(
   auto batch_size = batch_encode_input.size();
   encodings->resize(batch_size);
 
-#ifdef WITH_OMP
-#pragma omp parallel for num_threads(GetThreadNum())
-  for (int i = 0; i < batch_size; ++i) {
-    EncodePairStrings(
-        batch_encode_input[i], &(*encodings)[i], add_special_tokens);
-  }
-#else
   auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStrings,
                         this,
                         std::ref(batch_encode_input),
@@ -286,73 +274,6 @@ void Tokenizer::EncodeBatchStrings(
                         std::placeholders::_1,
                         std::placeholders::_2);
   RunMultiThread(func, batch_size);
-#endif
-
-  if (use_padding_) {
-    PadEncodings(encodings, pad_method_);
-  }
-}
-
-void Tokenizer::EncodePairStringsCharOffsets(const EncodeInput& encode_input,
-                                             Encoding* encodings,
-                                             bool add_special_tokens) const {
-  const auto& input_string = paddlenlp::get_if<InputString>(&encode_input);
-  const auto& input_string_pair =
-      paddlenlp::get_if<std::pair<InputString, InputString>>(&encode_input);
-  Encoding encoding;
-  Encoding pair_encoding;
-  if (input_string != nullptr) {
-    EncodeSingleString(*input_string, 0, OffsetType::CHAR, &encoding);
-  } else {
-    EncodeSingleString(
-        input_string_pair->first, 0, OffsetType::CHAR, &encoding);
-    EncodeSingleString(
-        input_string_pair->second, 1, OffsetType::CHAR, &pair_encoding);
-  }
-  PostProcess(&encoding, &pair_encoding, add_special_tokens, encodings);
-}
-
-void Tokenizer::MultiThreadEncodeBatchStringsCharOffsets(
-    const std::vector<EncodeInput>& batch_encode_input,
-    std::vector<Encoding>* encodings,
-    bool add_special_tokens,
-    size_t start_index,
-    size_t step_index) const {
-  auto batch_size = batch_encode_input.size();
-  size_t end_index = start_index + step_index;
-  if (end_index > batch_size) end_index = batch_size;
-  for (size_t i = start_index; i < end_index; ++i) {
-    Encoding encoding;
-    EncodePairStringsCharOffsets(
-        batch_encode_input[i], &encoding, add_special_tokens);
-    (*encodings)[i] = std::move(encoding);
-  }
-}
-
-void Tokenizer::EncodeBatchStringsCharOffsets(
-    const std::vector<EncodeInput>& batch_encode_input,
-    std::vector<Encoding>* encodings,
-    bool add_special_tokens) const {
-  auto batch_size = batch_encode_input.size();
-  encodings->resize(batch_size);
-#ifdef WITH_OMP
-#pragma omp parallel for num_threads(GetThreadNum())
-  for (int i = 0; i < batch_size; ++i) {
-    Encoding encoding;
-    EncodePairStringsCharOffsets(
-        batch_encode_input[i], &encoding, add_special_tokens);
-    (*encodings)[i] = std::move(encoding);
-  }
-#else
-  auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStringsCharOffsets,
-                        this,
-                        std::ref(batch_encode_input),
-                        encodings,
-                        add_special_tokens,
-                        std::placeholders::_1,
-                        std::placeholders::_2);
-  RunMultiThread(func, batch_size);
-#endif
 
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
@@ -390,6 +311,16 @@ Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint32_t>& word_idx,
   DoTokenize(&pretokenized, type_id, word_idx, offset_type, &encoding);
   return encoding;
 }
+
+void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
+                                   std::vector<Encoding>* encodings,
+                                   bool add_special_tokens) const {}
+
+void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
+                                   const std::vector<std::string>& text_pairs,
+                                   std::vector<Encoding>* encodings,
+                                   bool add_special_tokens) const {}
+
 const AddedVocabulary& Tokenizer::GetAddedVocabulary() const {
   return added_vocabulary_;
 }
@@ -471,12 +402,6 @@ void Tokenizer::DecodeBatch(
     bool skip_special_tokens) const {
   auto batch_size = batch_token_ids.size();
   results->resize(batch_size);
-#ifdef WITH_OMP
-#pragma omp parallel for num_threads(GetThreadNum())
-  for (int i = 0; i < batch_token_ids.size(); ++i) {
-    Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
-  }
-#else
   auto func = std::bind(&Tokenizer::MultiThreadDecodeBatch,
                         this,
                         std::ref(batch_token_ids),
@@ -485,7 +410,6 @@ void Tokenizer::DecodeBatch(
                         std::placeholders::_1,
                         std::placeholders::_2);
   RunMultiThread(func, batch_size);
-#endif
 }
 
 bool Tokenizer::GetUseTruncation() const { return use_truncation_; }

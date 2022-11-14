@@ -108,17 +108,6 @@ ELSE(WIN32)
     set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
-# For OpenMP
-# openmp not support well for now on windows
-if (NOT APPLE AND NOT WIN32) # Linux
-    find_package(OpenMP)
-    if (OPENMP_FOUND)
-        add_definitions(-DWITH_OMP)
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-    endif()
-endif()
-
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 set(TOKENIZERS_INSTALL_INCLUDE_DIR ${PROJECT_SOURCE_DIR})
 

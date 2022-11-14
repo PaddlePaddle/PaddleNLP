@@ -19,10 +19,6 @@ limitations under the License. */
 #include <sstream>
 #include "glog/logging.h"
 
-#ifdef WITH_OMP
-#include <omp.h>
-#endif
-
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace core {
@@ -667,17 +663,6 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
     pad_length += pad_length - pad_length % method.pad_to_multiple_of_;
   }
   auto batch_size = encodings->size();
-#ifdef WITH_OMP
-#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-  for (int i = 0; i < batch_size; ++i) {
-    auto& encoding = (*encodings)[i];
-    encoding.Pad(pad_length,
-                 method.pad_id_,
-                 method.pad_token_type_id_,
-                 method.pad_token_,
-                 method.direction_);
-  }
-#else
   auto func = std::bind(&MultiThreadPadEncodings,
                         encodings,
                         std::ref(method),
@@ -685,7 +670,6 @@ void PadEncodings(std::vector<Encoding>* encodings, const PadMethod& method) {
                         std::placeholders::_1,
                         std::placeholders::_2);
   RunMultiThread(func, batch_size);
-#endif
 }
 
 
