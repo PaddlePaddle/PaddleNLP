@@ -18,11 +18,13 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 from paddle.io import Dataset
 from ray import tune
+from hyperopt import hp
 from ray.tune.result_grid import ResultGrid
+from ray.tune.search.hyperopt import HyperOptSearch
+from ray.tune.search import ConcurrencyLimiter
 
 from paddlenlp.trainer import CompressionArguments, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
-from paddlenlp.transformers.tokenizer_utils_faster import PretrainedFasterTokenizer
 from paddlenlp.transformers import PretrainedTokenizer
 
 
@@ -60,18 +62,25 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def _model_candidates(self) -> Dict[str, Dict[str, Any]]:
+    def _model_candidates(self) -> List[Dict[str, Any]]:
         """
         Model Candidates stored as Ray hyperparameter search space, organized by
         self.language and preset
         """
 
-    @property
-    @abstractmethod
-    def list_presets(self) -> List[str]:
+    def _filter_model_candidates(self, language=None, preset=None) -> List[Dict[str, Any]]:
         """
-        Returns the supported presets that decide the properties of the returned models
+        Model Candidates stored as Ray hyperparameter search space, organized by
+        self.language and preset
         """
+        model_candidates = self._model_candidates
+        if language is not None:
+            model_candidates = filter(lambda x: x["language"] == language, model_candidates)
+        if preset is not None:
+            model_candidates = filter(lambda x: x["preset"] == preset, model_candidates)
+        hyperopt_search_space = {"config": hp.choice("config", list(model_candidates))}
+        return hyperopt_search_space
+
 
     @abstractmethod
     def _data_checks_and_inference(self, train_dataset: Dataset,
@@ -98,7 +107,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     def _preprocess_fn(
         self,
         example: Dict[str, Any],
-        tokenizer: Union[PretrainedTokenizer, PretrainedFasterTokenizer],
+        tokenizer: PretrainedTokenizer,
         max_seq_length: int,
         is_test: bool = False,
     ) -> Dict[str, Any]:
@@ -162,6 +171,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         self._data_checks_and_inference(train_dataset, eval_dataset)
         trainable = self._construct_trainable(train_dataset, eval_dataset)
+        model_search_space = self._filter_model_candidates(language=self.language, preset=preset)
+        algo = HyperOptSearch(space=model_search_space, metric="eval_accuracy", mode="max")
+        algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}
             if num_gpus:
@@ -172,11 +184,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         tune_config = tune.tune_config.TuneConfig(
             num_samples=num_models,
             time_budget_s=time_budget_s,
-            max_concurrent_trials=max_concurrent_trials,
+            search_alg=algo
         )
         tuner = tune.Tuner(
             trainable,
-            param_space=self._model_candidates[preset],
             tune_config=tune_config,
         )
         self.training_results = tuner.fit()

@@ -13,17 +13,18 @@
 # limitations under the License.
 
 import functools
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable, Dict, List
 
 import paddle
 from paddle.metric import Accuracy
 from ray import tune
+# from paddle.utils import try_import
 
 from paddle.io import Dataset
+from hyperopt import hp
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import CompressionArguments, Trainer, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
-from paddlenlp.transformers.tokenizer_utils_faster import PretrainedFasterTokenizer
 from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -34,6 +35,15 @@ from .auto_trainer_base import AutoTrainerBase
 
 
 class AutoTrainerForTextClassification(AutoTrainerBase):
+    """
+    The meta classs of AutoTrainer, which contains the common properies and methods of AutoNLP.
+    Task-specific AutoTrainers need to inherit from the meta class. 
+
+    Args:
+        language (string, optional): language of the text
+        metric_for_best_model (string, optional): the name of the metrc for selecting the best model
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+    """
 
     def __init__(
             self,
@@ -41,6 +51,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             label_column: str,
             # TODO: support problem_type
             **kwargs):
+            
         super(AutoTrainerForTextClassification, self).__init__(**kwargs)
         self.text_column = text_column
         self.label_column = label_column
@@ -71,17 +82,19 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
 
     @property
-    def _model_candidates(self) -> Dict[str, Any]:
-        return {
-            "test": {
+    def _model_candidates(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "preset": "test",
+                "language": "Chinese",
                 "PreprocessArguments.max_seq_length": 128,
                 "TrainingArguments.per_device_train_batch_size": 2,
                 "TrainingArguments.per_device_eval_batch_size": 2,
                 "TrainingArguments.max_steps": 5,
                 "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                "TrainingArguments.learning_rate": tune.choice([5e-5, 1e-5]),
-            },
-        }
+                "TrainingArguments.learning_rate": hp.choice("TrainingArguments.learning_rate", [5e-5, 1e-5]),
+            }
+        ]
 
     def _data_checks_and_inference(self, train_dataset: Dataset,
                                    eval_dataset: Dataset):
@@ -93,8 +106,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _construct_trainable(self, train_dataset: Dataset,
                              eval_dataset: Dataset) -> Callable:
-
         def trainable(config):
+            config = config["config"]
             model_path = config["TrainingArguments.model_name_or_path"]
             max_seq_length = config["PreprocessArguments.max_seq_length"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -128,6 +141,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return trainable
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
+        """
+        function used by the Trainer to compute metrics during training
+        See :class:`~paddlenlp.trainer.trainer_base.Trainer` for more details.
+        """
         metric = Accuracy()
         correct = metric.compute(
             paddle.to_tensor(eval_preds.predictions),
@@ -140,10 +157,13 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     def _preprocess_fn(
         self,
         example: Dict[str, Any],
-        tokenizer: Union[PretrainedTokenizer, PretrainedFasterTokenizer],
+        tokenizer: PretrainedTokenizer,
         max_seq_length: int,
         is_test: bool = False,
     ):
+        """
+        preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
+        """
         result = tokenizer(text=example[self.text_column],
                            max_seq_len=max_seq_length)
         if not is_test:

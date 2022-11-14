@@ -36,10 +36,11 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
         )
         num_models = 2
         auto_trainer = AutoTrainerForTextClassification(
-            label_column="label_desc", text_column="sentence", preset="test")
+            label_column="label_desc", text_column="sentence")
         auto_trainer.train(
             train_ds,
             dev_ds,
+            preset="test",
             num_cpus=1,
             num_gpus=0,
             max_concurrent_trials=1,
