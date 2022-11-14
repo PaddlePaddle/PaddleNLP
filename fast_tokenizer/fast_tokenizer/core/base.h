@@ -366,6 +366,13 @@ struct FASTTOKENIZER_DECL BPEWord {
   std::vector<Symbol> symbols_;
 };
 
+FASTTOKENIZER_DECL void SetThreadNum(int thread_num);
+
+FASTTOKENIZER_DECL int GetThreadNum();
+
+FASTTOKENIZER_DECL void RunMultiThread(std::function<void(size_t, size_t)> func,
+                                       size_t batch_size);
+
 }  // namespace core
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

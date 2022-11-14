@@ -33,7 +33,7 @@ endif()
 else(WITH_PYTHON)
 # add_subdirectory(tokenizers)
 cc_library(core_tokenizers SHARED
-           SRCS tokenizers/ernie_fast_tokenizer.cc
+           SRCS tokenizers/ernie_fast_tokenizer.cc tokenizers/clip_fast_tokenizer.cc
            DEPS normalizers pretokenizers models decoders
                 postprocessors core added_vocabulary tokenizer json)
 

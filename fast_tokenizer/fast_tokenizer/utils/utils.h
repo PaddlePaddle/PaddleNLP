@@ -36,11 +36,11 @@ limitations under the License. */
 #endif
 
 #if defined(_WIN32)
-#ifdef FASTERTOKENIZER_LIB
+#ifdef FASTTOKENIZER_LIB
 #define FASTTOKENIZER_DECL __declspec(dllexport)
 #else
 #define FASTTOKENIZER_DECL __declspec(dllimport)
-#endif  // FASTERTOKENIZER_LIB
+#endif  // FASTTOKENIZER_LIB
 #else
 #define FASTTOKENIZER_DECL __attribute__((visibility("default")))
 #endif  // _WIN32
