@@ -16,12 +16,13 @@ import datetime
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from paddle.io import Dataset
-from ray import tune
 from hyperopt import hp
+from paddle.io import Dataset
+from paddle.utils import try_import
+from ray import tune
 from ray.tune.result_grid import ResultGrid
-from ray.tune.search.hyperopt import HyperOptSearch
 from ray.tune.search import ConcurrencyLimiter
+from ray.tune.search.hyperopt import HyperOptSearch
 
 from paddlenlp.trainer import CompressionArguments, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
@@ -68,19 +69,24 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.language and preset
         """
 
-    def _filter_model_candidates(self, language=None, preset=None) -> List[Dict[str, Any]]:
+    def _filter_model_candidates(self,
+                                 language=None,
+                                 preset=None) -> List[Dict[str, Any]]:
         """
         Model Candidates stored as Ray hyperparameter search space, organized by
         self.language and preset
         """
         model_candidates = self._model_candidates
         if language is not None:
-            model_candidates = filter(lambda x: x["language"] == language, model_candidates)
+            model_candidates = filter(lambda x: x["language"] == language,
+                                      model_candidates)
         if preset is not None:
-            model_candidates = filter(lambda x: x["preset"] == preset, model_candidates)
-        hyperopt_search_space = {"config": hp.choice("config", list(model_candidates))}
+            model_candidates = filter(lambda x: x["preset"] == preset,
+                                      model_candidates)
+        hyperopt_search_space = {
+            "config": hp.choice("config", list(model_candidates))
+        }
         return hyperopt_search_space
-
 
     @abstractmethod
     def _data_checks_and_inference(self, train_dataset: Dataset,
@@ -165,14 +171,16 @@ class AutoTrainerBase(metaclass=ABCMeta):
             max_concurrent_trials (int, optional): maximum number of trials to run concurrently. Must be non-negative. If None or 0, no limit will be applied.
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
 
-        Return:
-            short_input_texts (List[str]): the short input texts for model inference.
-            input_mapping (dict): mapping between raw text and short input texts.
+        Returns:
+            A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
         self._data_checks_and_inference(train_dataset, eval_dataset)
         trainable = self._construct_trainable(train_dataset, eval_dataset)
-        model_search_space = self._filter_model_candidates(language=self.language, preset=preset)
-        algo = HyperOptSearch(space=model_search_space, metric="eval_accuracy", mode="max")
+        model_search_space = self._filter_model_candidates(
+            language=self.language, preset=preset)
+        algo = HyperOptSearch(space=model_search_space,
+                              metric=self.metric_for_best_model,
+                              mode="max")
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}
@@ -181,11 +189,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
             if num_cpus:
                 hardware_resources["cpu"] = num_cpus
             trainable = tune.with_resources(trainable, hardware_resources)
-        tune_config = tune.tune_config.TuneConfig(
-            num_samples=num_models,
-            time_budget_s=time_budget_s,
-            search_alg=algo
-        )
+        tune_config = tune.tune_config.TuneConfig(num_samples=num_models,
+                                                  time_budget_s=time_budget_s,
+                                                  search_alg=algo)
         tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,

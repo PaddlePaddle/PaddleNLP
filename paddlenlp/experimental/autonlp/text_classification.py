@@ -16,33 +16,27 @@ import functools
 from typing import Any, Callable, Dict, List
 
 import paddle
-from paddle.metric import Accuracy
-from ray import tune
-# from paddle.utils import try_import
-
-from paddle.io import Dataset
 from hyperopt import hp
+from paddle.io import Dataset
+from paddle.metric import Accuracy
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import CompressionArguments, Trainer, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
-from paddlenlp.transformers import (
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
-    PretrainedTokenizer,
-)
+from paddlenlp.transformers import (AutoModelForSequenceClassification,
+                                    AutoTokenizer, PretrainedTokenizer)
 
 from .auto_trainer_base import AutoTrainerBase
 
 
 class AutoTrainerForTextClassification(AutoTrainerBase):
     """
-    The meta classs of AutoTrainer, which contains the common properies and methods of AutoNLP.
-    Task-specific AutoTrainers need to inherit from the meta class. 
+    AutoTrainer for Text Classification problems
 
     Args:
-        language (string, optional): language of the text
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        text_column (string, optional): Name of the column that contains the input text.
+        label_column (string, optional): Name of the column that contains the target variable to predict.
+        kwargs (dict, optional): Additional keyword arguments passed along to underlying meta class. 
     """
 
     def __init__(
@@ -51,7 +45,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             label_column: str,
             # TODO: support problem_type
             **kwargs):
-            
+
         super(AutoTrainerForTextClassification, self).__init__(**kwargs)
         self.text_column = text_column
         self.label_column = label_column
@@ -83,18 +77,24 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
-        return [
-            {
-                "preset": "test",
-                "language": "Chinese",
-                "PreprocessArguments.max_seq_length": 128,
-                "TrainingArguments.per_device_train_batch_size": 2,
-                "TrainingArguments.per_device_eval_batch_size": 2,
-                "TrainingArguments.max_steps": 5,
-                "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                "TrainingArguments.learning_rate": hp.choice("TrainingArguments.learning_rate", [5e-5, 1e-5]),
-            }
-        ]
+        return [{
+            "preset":
+            "test",
+            "language":
+            "Chinese",
+            "PreprocessArguments.max_seq_length":
+            128,
+            "TrainingArguments.per_device_train_batch_size":
+            2,
+            "TrainingArguments.per_device_eval_batch_size":
+            2,
+            "TrainingArguments.max_steps":
+            5,
+            "TrainingArguments.model_name_or_path":
+            "ernie-3.0-nano-zh",
+            "TrainingArguments.learning_rate":
+            hp.choice("TrainingArguments.learning_rate", [5e-5, 1e-5]),
+        }]
 
     def _data_checks_and_inference(self, train_dataset: Dataset,
                                    eval_dataset: Dataset):
@@ -106,6 +106,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _construct_trainable(self, train_dataset: Dataset,
                              eval_dataset: Dataset) -> Callable:
+
         def trainable(config):
             config = config["config"]
             model_path = config["TrainingArguments.model_name_or_path"]
