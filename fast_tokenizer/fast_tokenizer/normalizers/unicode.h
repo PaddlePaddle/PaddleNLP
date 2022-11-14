@@ -22,31 +22,31 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
 
-struct FASTERTOKENIZER_DECL NFCNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL NFCNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFCNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFCNormalizer& normalizer);
 };
 
-struct FASTERTOKENIZER_DECL NFDNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL NFDNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFDNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFDNormalizer& normalizer);
 };
 
-struct FASTERTOKENIZER_DECL NFKCNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL NFKCNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFKCNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFKCNormalizer& normalizer);
 };
 
-struct FASTERTOKENIZER_DECL NFKDNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL NFKDNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NFKDNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NFKDNormalizer& normalizer);
 };
 
-struct FASTERTOKENIZER_DECL NmtNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL NmtNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const NmtNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j, NmtNormalizer& normalizer);

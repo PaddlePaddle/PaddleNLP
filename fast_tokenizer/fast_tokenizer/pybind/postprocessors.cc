@@ -15,9 +15,9 @@ limitations under the License. */
 #include "fast_tokenizer/postprocessors/postprocessors.h"
 #include <Python.h>
 #include "fast_tokenizer/core/encoding.h"
-#include "glog/logging.h"
 #include "fast_tokenizer/pybind/postprocessors.h"
 #include "fast_tokenizer/pybind/utils.h"
+#include "glog/logging.h"
 
 namespace py = pybind11;
 
@@ -100,6 +100,55 @@ public:
   }
 };
 
+class PyRobertaPostProcessor : public postprocessors::RobertaPostProcessor {
+public:
+  using RobertaPostProcessor::RobertaPostProcessor;
+  virtual void operator()(core::Encoding* encoding,
+                          core::Encoding* pair_encoding,
+                          bool add_special_tokens,
+                          core::Encoding* result_encoding) const override {
+    PYBIND11_OVERLOAD_NAME(void,
+                           RobertaPostProcessor,
+                           "__call__",
+                           operator(),
+                           encoding,
+                           pair_encoding,
+                           add_special_tokens,
+                           result_encoding);
+  }
+  virtual size_t AddedTokensNum(bool is_pair) const override {
+    PYBIND11_OVERLOAD_NAME(size_t,
+                           RobertaPostProcessor,
+                           "num_special_tokens_to_add",
+                           AddedTokensNum,
+                           is_pair);
+  }
+};
+
+class PyByteLevelPostProcessor : public postprocessors::ByteLevelPostProcessor {
+public:
+  using ByteLevelPostProcessor::ByteLevelPostProcessor;
+  virtual void operator()(core::Encoding* encoding,
+                          core::Encoding* pair_encoding,
+                          bool add_special_tokens,
+                          core::Encoding* result_encoding) const override {
+    PYBIND11_OVERLOAD_NAME(void,
+                           ByteLevelPostProcessor,
+                           "__call__",
+                           operator(),
+                           encoding,
+                           pair_encoding,
+                           add_special_tokens,
+                           result_encoding);
+  }
+  virtual size_t AddedTokensNum(bool is_pair) const override {
+    PYBIND11_OVERLOAD_NAME(size_t,
+                           ByteLevelPostProcessor,
+                           "num_special_tokens_to_add",
+                           AddedTokensNum,
+                           is_pair);
+  }
+};
 
 void BindPostProcessors(pybind11::module* m) {
   auto submodule =
@@ -309,6 +358,59 @@ void BindPostProcessors(pybind11::module* m) {
            py::arg("encoding"),
            py::arg("pair_encoding"),
            py::arg("add_special_tokens"));
+
+  py::class_<postprocessors::RobertaPostProcessor, PyRobertaPostProcessor>(
+      submodule, "RobertaPostProcessor")
+      .def(py::init<>())
+      .def(py::init<const std::pair<std::string, uint32_t>&,
+                    const std::pair<std::string, uint32_t>&,
+                    bool,
+                    bool>(),
+           py::arg("sep"),
+           py::arg("cls"),
+           py::arg("trim_offsets") = true,
+           py::arg("add_prefix_space") = true)
+      .def("num_special_tokens_to_add",
+           &postprocessors::RobertaPostProcessor::AddedTokensNum,
+           py::arg("is_pair"))
+      .def("__call__",
+           [](const postprocessors::RobertaPostProcessor& self,
+              core::Encoding* encoding,
+              core::Encoding* pair_encoding,
+              bool add_special_tokens) {
+             core::Encoding result_encoding;
+             self(
+                 encoding, pair_encoding, add_special_tokens, &result_encoding);
+             return result_encoding;
+           },
+           py::arg("encoding"),
+           py::arg("pair_encoding"),
+           py::arg("add_special_tokens"));
+  py::class_<postprocessors::ByteLevelPostProcessor, PyByteLevelPostProcessor>(
+      submodule, "ByteLevelPostProcessor")
+      .def(py::init<bool,
+                    bool,
+                    bool>(),
+           py::arg("add_prefix_space") = true,
+           py::arg("trim_offsets") = true,
+           py::arg("use_regex") = true)
+      .def("num_special_tokens_to_add",
+           &postprocessors::ByteLevelPostProcessor::AddedTokensNum,
+           py::arg("is_pair"))
+      .def("__call__",
+           [](const postprocessors::ByteLevelPostProcessor& self,
+              core::Encoding* encoding,
+              core::Encoding* pair_encoding,
+              bool add_special_tokens) {
+             core::Encoding result_encoding;
+             self(
+                 encoding, pair_encoding, add_special_tokens, &result_encoding);
+             return result_encoding;
+           },
+           py::arg("encoding"),
+           py::arg("pair_encoding"),
+           py::arg("add_special_tokens"));
+
 }
 
 }  // namespace pybind

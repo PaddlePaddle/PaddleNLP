@@ -27,7 +27,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace postprocessors {
 
-enum FASTERTOKENIZER_DECL SequenceType { SEQ_A, SEQ_B };
+enum FASTTOKENIZER_DECL SequenceType { SEQ_A, SEQ_B };
 NLOHMANN_JSON_SERIALIZE_ENUM(SequenceType,
                              {
                                  {SEQ_A, "A"}, {SEQ_B, "B"},
@@ -47,7 +47,7 @@ void SetTypeId(uint32_t type_id, TemplatePiece* template_piece);
 void GetTemplatePieceFromString(const std::string& template_string,
                                 TemplatePiece* template_piece);
 
-struct FASTERTOKENIZER_DECL SpecialToken {
+struct FASTTOKENIZER_DECL SpecialToken {
   std::string id_;
   std::vector<uint32_t> ids_;
   std::vector<std::string> tokens_;
@@ -65,7 +65,7 @@ struct FASTERTOKENIZER_DECL SpecialToken {
   friend void from_json(const nlohmann::json& j, SpecialToken& special_token);
 };
 
-struct FASTERTOKENIZER_DECL Template {
+struct FASTTOKENIZER_DECL Template {
   std::vector<TemplatePiece> pieces_;
   Template() = default;
   explicit Template(const std::string& template_str) {
@@ -131,7 +131,7 @@ private:
   friend void from_json(const nlohmann::json& j, Template& template_);
 };
 
-struct FASTERTOKENIZER_DECL SpecialTokensMap {
+struct FASTTOKENIZER_DECL SpecialTokensMap {
   std::unordered_map<std::string, SpecialToken> tokens_map_;
   SpecialTokensMap() = default;
   explicit SpecialTokensMap(const std::vector<SpecialToken>& special_tokens) {
@@ -147,7 +147,7 @@ struct FASTERTOKENIZER_DECL SpecialTokensMap {
   friend void from_json(const nlohmann::json& j, SpecialTokensMap& tokens_map);
 };
 
-struct FASTERTOKENIZER_DECL TemplatePostProcessor : public PostProcessor {
+struct FASTTOKENIZER_DECL TemplatePostProcessor : public PostProcessor {
   TemplatePostProcessor();
   TemplatePostProcessor(const Template&,
                         const Template&,

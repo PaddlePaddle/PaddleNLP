@@ -25,13 +25,12 @@ limitations under the License. */
 #include <stdlib.h>
 #include <functional>
 #include <thread>
-using namespace std;
 
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace core {
 
-class FASTERTOKENIZER_DECL Encoding {
+class FASTTOKENIZER_DECL Encoding {
 public:
   Encoding() = default;
   Encoding(const std::vector<uint32_t>& ids,
@@ -82,7 +81,8 @@ public:
   Range GetSequenceRange(uint32_t seq_id) const;
 
   void ProcessTokenWithOffsets(
-      std::function<void(uint32_t, std::string*, Offset*)> process_token_fn);
+      std::function<void(uint32_t, const std::string&, Offset*)>
+          process_token_fn);
 
   // token_idx: The index of token in the sequence
   std::vector<uint32_t> TokenIdxToSequenceIds(uint32_t token_idx) const;
@@ -109,6 +109,8 @@ public:
   static Encoding Merge(const std::vector<Encoding>& encodings,
                         bool growing_offsets);
   std::string DebugString() const;
+  void SetTypeIds(const std::vector<uint32_t>& type_ids);
+  bool operator==(const Encoding& other) const;
 
 private:
   std::vector<uint32_t> ids_;
@@ -122,16 +124,16 @@ private:
   std::unordered_map<uint32_t, Range> sequence_ranges_;
 };
 
-bool FASTERTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
-                                            Encoding* pair_encoding,
-                                            const TruncMethod& method);
-void FASTERTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
-                                       const PadMethod& method);
+bool FASTTOKENIZER_DECL TruncateEncodings(Encoding* encoding,
+                                          Encoding* pair_encoding,
+                                          const TruncMethod& method);
+void FASTTOKENIZER_DECL PadEncodings(std::vector<Encoding>* encoding,
+                                     const PadMethod& method);
 
-int FASTERTOKENIZER_DECL GetThreadNum(size_t batch_size);
+int FASTTOKENIZER_DECL GetThreadNum(size_t batch_size);
 
-void FASTERTOKENIZER_DECL
-RunMultiThread(std::function<void(size_t, size_t)> func, size_t batch_size);
+void FASTTOKENIZER_DECL RunMultiThread(std::function<void(size_t, size_t)> func,
+                                       size_t batch_size);
 }  // namespace core
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

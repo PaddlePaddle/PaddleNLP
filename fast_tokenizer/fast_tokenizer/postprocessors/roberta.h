@@ -22,10 +22,12 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace postprocessors {
 
-struct FASTTOKENIZER_DECL BertPostProcessor : public PostProcessor {
-  BertPostProcessor(const std::pair<std::string, uint32_t>& sep,
-                    const std::pair<std::string, uint32_t>& cls);
-  BertPostProcessor();
+struct FASTTOKENIZER_DECL RobertaPostProcessor : public PostProcessor {
+  RobertaPostProcessor(const std::pair<std::string, uint32_t>& sep = {"</s>",
+                                                                      2},
+                       const std::pair<std::string, uint32_t>& cls = {"<s>", 0},
+                       bool trim_offsets = true,
+                       bool add_prefix_space = true);
   virtual size_t AddedTokensNum(bool is_pair) const override;
   virtual void operator()(core::Encoding* encoding,
                           core::Encoding* pair_encoding,
@@ -33,10 +35,12 @@ struct FASTTOKENIZER_DECL BertPostProcessor : public PostProcessor {
                           core::Encoding* result_encoding) const override;
   std::pair<std::string, uint32_t> sep_;
   std::pair<std::string, uint32_t> cls_;
+  bool trim_offsets_;
+  bool add_prefix_space_;
   friend void to_json(nlohmann::json& j,
-                      const BertPostProcessor& bert_postprocessor);
+                      const RobertaPostProcessor& roberta_postprocessor);
   friend void from_json(const nlohmann::json& j,
-                        BertPostProcessor& bert_postprocessor);
+                        RobertaPostProcessor& roberta_postprocessor);
 };
 }  // namespace postprocessors
 }  // namespace fast_tokenizer

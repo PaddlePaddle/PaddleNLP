@@ -134,9 +134,8 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
     with tempfile.TemporaryDirectory() as tmpdirname:
         # 5. tokenizer
         diffusers_pipe.tokenizer.save_pretrained(tmpdirname)
-        pp_tokenizer = BertTokenizer.from_pretrained(
-            tmpdirname,
-            model_max_length=diffusers_pipe.tokenizer.model_max_length)
+        pp_tokenizer = BertTokenizer.from_pretrained(tmpdirname,
+                                                     model_max_length=77)
 
         # 6. create ppdiffusers pipe
         paddle_pipe = PPDiffusersLDMTextToImagePipeline(vqvae=pp_vqvae,

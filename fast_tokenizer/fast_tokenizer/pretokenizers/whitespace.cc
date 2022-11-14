@@ -27,7 +27,7 @@ void WhitespacePreTokenizer::operator()(
                           normalizers::NormalizedString* normalized,
                           std::vector<StringSplit>* string_splits) {
     std::vector<normalizers::NormalizedString> normalized_splits;
-    normalized->Split(pattern, normalizers::REMOVED, &normalized_splits);
+    normalized->Split(pattern, core::SplitMode::REMOVED, &normalized_splits);
     for (auto& normalize : normalized_splits) {
       string_splits->push_back(StringSplit(normalize));
     }

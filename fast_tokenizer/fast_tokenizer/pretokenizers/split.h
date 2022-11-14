@@ -13,29 +13,34 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #pragma once
-#include <memory>
 
-#include "nlohmann/json.hpp"
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/utils/utils.h"
+
+namespace re2 {
+class RE2;
+}  // namespace re2
 
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
-struct FASTTOKENIZER_DECL SequencePreTokenizer : public PreTokenizer {
-  SequencePreTokenizer() = default;
-  SequencePreTokenizer(const SequencePreTokenizer&) = default;
-  SequencePreTokenizer(const std::vector<PreTokenizer*>& pretokenizers);
+struct FASTTOKENIZER_DECL SplitPreTokenizer : public PreTokenizer {
+  SplitPreTokenizer() = default;
+  SplitPreTokenizer(const std::string& pattern,
+                    core::SplitMode split_mode,
+                    bool invert);
+  SplitPreTokenizer(const SplitPreTokenizer& split_pretokenizer);
   virtual void operator()(PreTokenizedString* pretokenized) const override;
-  void AppendPreTokenizer(PreTokenizer* pretokenizer);
+  friend void to_json(nlohmann::json& j,
+                      const SplitPreTokenizer& split_pretokenizer);
+  friend void from_json(const nlohmann::json& j,
+                        SplitPreTokenizer& split_pretokenizer);
 
 private:
-  std::vector<std::shared_ptr<PreTokenizer>> pretokenzer_ptrs_;
-  friend void to_json(nlohmann::json& j,
-                      const SequencePreTokenizer& sequence_pretokenizer);
-  friend void from_json(const nlohmann::json& j,
-                        SequencePreTokenizer& sequence_pretokenizer);
+  bool invert_;
+  core::SplitMode split_mode_;
+  std::unique_ptr<re2::RE2> pattern_;
 };
 
 }  // namespace pretokenizers
