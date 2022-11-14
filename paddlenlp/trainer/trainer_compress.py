@@ -603,7 +603,7 @@ def _post_training_quantization_grid_search(self, model_dir):
             if args.activation_quantize_type is None else
             args.activation_quantize_type,
             weight_quantize_type=args.weight_quantize_type,
-            onnx_format=True,
+            onnx_format=args.onnx_format,
             optimize_model=False)
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
@@ -658,7 +658,7 @@ def _quant_aware_training_dynamic(self, input_dir):
         'moving_rate':
         args.moving_rate,
         'onnx_format':
-        True
+        args.onnx_format
     }
 
     if not os.path.exists(args.output_dir):
@@ -672,7 +672,7 @@ def _quant_aware_training_dynamic(self, input_dir):
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
         args.num_training_steps = args.max_steps
-        args.num_train_epochs = math.ceil(num_training_steps /
+        args.num_train_epochs = math.ceil(args.num_training_steps /
                                           len(train_dataloader))
     else:
         args.num_training_steps = len(train_dataloader) * args.num_train_epochs
