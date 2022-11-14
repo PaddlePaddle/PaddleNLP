@@ -45,7 +45,7 @@ def evaluate(model, metric, data_loader, multilingual=False):
         else:
             start_prob, end_prob = model(batch["input_ids"],
                                          batch["token_type_ids"],
-                                         batch["att_mask"], batch["pos_ids"])
+                                         batch["pos_ids"], batch["att_mask"])
 
         start_ids = paddle.cast(batch["start_positions"], 'float32')
         end_ids = paddle.cast(batch["end_positions"], 'float32')
