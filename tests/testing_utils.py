@@ -18,8 +18,15 @@ import os
 import inspect
 from distutils.util import strtobool
 from collections.abc import Mapping
+import gc
 
 __all__ = ['get_vocab_list', 'stable_softmax', 'cross_entropy']
+
+
+class PaddleNLPModelTest(unittest.TestCase):
+
+    def tearDown(self):
+        gc.collect()
 
 
 def get_vocab_list(vocab_path):
