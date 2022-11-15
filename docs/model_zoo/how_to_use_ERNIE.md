@@ -254,10 +254,10 @@
                         ERNIE-M
                   </a> </span>
             </td>
-            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">API</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
                   <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
