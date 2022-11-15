@@ -32,14 +32,21 @@ from paddlenlp.transformers import PretrainedTokenizer
 class AutoTrainerBase(metaclass=ABCMeta):
     """
     The meta classs of AutoTrainer, which contains the common properies and methods of AutoNLP.
-    Task-specific AutoTrainers need to inherit from the meta class. 
+    Task-specific AutoTrainers need to inherit from the meta class.
 
     Args:
         language (string, optional): language of the text
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
-    def __init__(self, metric_for_best_model: str, greater_is_better: bool, language: str, output_dir: str = None, **kwargs):
+    def __init__(
+        self,
+        metric_for_best_model: str,
+        greater_is_better: bool,
+        language: str,
+        output_dir: str = None,
+        **kwargs,
+    ):
         if not metric_for_best_model.startswith("eval_"):
             self.metric_for_best_model = f"eval_{metric_for_best_model}"
         else:
@@ -47,7 +54,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         self.greater_is_better = greater_is_better
         self.language = language
         self.output_dir = output_dir
- 
+
     @property
     @abstractmethod
     def _default_training_argument(self) -> TrainingArguments:
@@ -102,11 +109,11 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
-    
+
     @abstractmethod
     def predict(self, test_dataset, trial_id=None) -> Dataset:
         pass
-    
+
     @abstractmethod
     def export(self, export_path, trial_id=None):
         pass
@@ -162,18 +169,27 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 for result in self.training_results:
                     if result.metrics["trial_id"] == trial_id:
                         return result
-                raise LookupError(f"Trial_id '{trial_id}' is not found in 'training_results'. Did you enter the correct 'trial_id'?")
+                raise LookupError(
+                    f"Trial_id '{trial_id}' is not found in 'training_results'. Did you enter the correct 'trial_id'?"
+                )
             else:
-                result = self.training_results.get_best_result(metric=self.metric_for_best_model, mode="max" if self.greater_is_better else "min")
+                result = self.training_results.get_best_result(
+                    metric=self.metric_for_best_model,
+                    mode="max" if self.greater_is_better else "min",
+                )
                 return result
         else:
-            raise AttributeError("'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?")
+            raise AttributeError(
+                "'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?"
+            )
 
     def show_training_results(self):
         if hasattr(self, "training_results"):
             return self.training_results.get_dataframe()
         else:
-            raise AttributeError("'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?")
+            raise AttributeError(
+                "'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?"
+            )
 
     def train(
         self,
@@ -223,7 +239,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
-            run_config = RunConfig(local_dir=self.output_dir) if self.output_dir else None
+            run_config=RunConfig(
+                local_dir=self.output_dir) if self.output_dir else None,
         )
         self.training_results = tuner.fit()
         return self.training_results

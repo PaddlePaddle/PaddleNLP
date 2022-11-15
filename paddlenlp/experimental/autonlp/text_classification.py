@@ -44,15 +44,17 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         kwargs (dict, optional): Additional keyword arguments passed along to underlying meta class. 
     """
 
-    def __init__(
-            self,
-            text_column: str,
-            label_column: str,
-            metric_for_best_model: str = "eval_accuracy",
-            greater_is_better: bool = True,
-            **kwargs):
+    def __init__(self,
+                 text_column: str,
+                 label_column: str,
+                 metric_for_best_model: str = "eval_accuracy",
+                 greater_is_better: bool = True,
+                 **kwargs):
 
-        super(AutoTrainerForTextClassification, self).__init__(metric_for_best_model=metric_for_best_model, greater_is_better=greater_is_better, **kwargs)
+        super(AutoTrainerForTextClassification,
+              self).__init__(metric_for_best_model=metric_for_best_model,
+                             greater_is_better=greater_is_better,
+                             **kwargs)
         self.text_column = text_column
         self.label_column = label_column
 
@@ -85,22 +87,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
         return [{
-            "preset":
-            "test",
-            "language":
-            "Chinese",
-            "PreprocessArguments.max_length":
-            128,
-            "TrainingArguments.per_device_train_batch_size":
-            2,
-            "TrainingArguments.per_device_eval_batch_size":
-            2,
-            "TrainingArguments.max_steps":
-            5,
-            "TrainingArguments.model_name_or_path":
-            "ernie-3.0-nano-zh",
+            "preset": "test",
+            "language": "Chinese",
+            "PreprocessArguments.max_length": 128,
+            "TrainingArguments.per_device_train_batch_size": 2,
+            "TrainingArguments.per_device_eval_batch_size": 2,
+            "TrainingArguments.max_steps": 5,
+            "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
             "TrainingArguments.learning_rate": 1e-5,
-            # hp.choice("TrainingArguments.learning_rate", [5e-5, 1e-5]),
         }]
 
     def _data_checks_and_inference(self, train_dataset: Dataset,
@@ -112,7 +106,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         self.label2id = {label: i for i, label in enumerate(self.id2label)}
 
     # def _construct_trainer(self)
-    
+
     def _construct_trainable(self, train_dataset: Dataset,
                              eval_dataset: Dataset) -> Callable:
 
@@ -182,19 +176,19 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             result["labels"] = paddle.to_tensor(
                 [self.label2id[example[self.label_column]]], dtype="int64")
         return result
-    
+
     def predict(self, test_dataset, trial_id=None) -> Dataset:
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["config"]
         saved_model_path = os.path.join(model_result.log_dir, "trained_model")
         tokenizer = AutoTokenizer.from_pretrained(saved_model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(saved_model_path, num_classes=len(self.id2label))
+        model = AutoModelForSequenceClassification.from_pretrained(
+            saved_model_path, num_classes=len(self.id2label))
         trans_func = functools.partial(
-                self._preprocess_fn,
-                tokenizer=tokenizer,
-                max_length=model_config["PreprocessArguments.max_length"],
-                is_test=True
-        )
+            self._preprocess_fn,
+            tokenizer=tokenizer,
+            max_length=model_config["PreprocessArguments.max_length"],
+            is_test=True)
         # since dataset.map modifies the underlying dataset in-place, create a deepcopy
         local_test_dataset = copy.deepcopy(test_dataset)
         processed_test_dataset = local_test_dataset.map(trans_func, lazy=False)
@@ -210,11 +204,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         test_results = trainer.predict(processed_test_dataset)
         return test_results
         # return paddle.nn.functional.softmax(test_results.predictions, axis=-1)
-    
+
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
         saved_model_path = os.path.join(model_result.log_dir, "trained_model")
         tokenizer = AutoTokenizer.from_pretrained(saved_model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(saved_model_path, num_classes=len(self.id2label))
+        model = AutoModelForSequenceClassification.from_pretrained(
+            saved_model_path, num_classes=len(self.id2label))
         tokenizer.save_pretrained(export_path)
         model.save_pretrained(export_path)
