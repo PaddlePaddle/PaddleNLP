@@ -1,4 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2021 deepset GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
+from pipelines.nodes.base import BaseComponent
+import paddle
 
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    ExtractiveQAPipeline,
-    SemanticSearchPipeline,
-    DocPipeline,
-    TextToImagePipeline,
-    QAGenerationPipeline,
-)
+
+class AnswerExtractorPreprocessor(BaseComponent):
+    """
+    Answer Extractor Preprocessor used to preprocess the result of textconvert. 
+    """
+    return_no_answers: bool
+    outgoing_edges = 1
+    query_count = 0
+    query_time = 0
+
+    def __init__(self, device="gpu"):
+        paddle.set_device(device)
+
+    def run(self, documents):
+        results = {"meta": [document['content'] for document in documents]}
+        return results, "output_1"
