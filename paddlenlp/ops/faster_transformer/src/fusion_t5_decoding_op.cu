@@ -87,16 +87,16 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
                      decoding_strategy == "beam_search_v3")
                         ? beam_size
                         : 1;
-  int candidate_num_ = (decoding_strategy == "topk_sampling" ||
-                        decoding_strategy == "topp_sampling" ||
-                        decoding_strategy == "sampling")
-                           ? topk
-                           : 1;
-  float probability_threshold_ = (decoding_strategy == "topk_sampling" ||
-                                  decoding_strategy == "topp_sampling" ||
-                                  decoding_strategy == "sampling")
-                                     ? topp
-                                     : 0.0;
+  int candidate_num_ =
+      (decoding_strategy == "topk_sampling" ||
+       decoding_strategy == "topp_sampling" || decoding_strategy == "sampling")
+          ? topk
+          : 1;
+  float probability_threshold_ =
+      (decoding_strategy == "topk_sampling" ||
+       decoding_strategy == "topp_sampling" || decoding_strategy == "sampling")
+          ? topp
+          : 0.0;
 
   auto input_dims = input.shape();
   int batch_size_ = (decoding_strategy == "beam_search" ||
@@ -140,7 +140,6 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
   bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
 
   for (int i = 0; i < num_layer_; i++) {
-
     params[i].stream = stream;
     params[i].cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
     params[i].cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
@@ -160,12 +159,12 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
     // self attn
     params[i].self_layernorm.gamma = reinterpret_cast<const DataType_*>(
         self_layernorm_weight[i].data<data_t_>());
-    
+
     if (self_layernorm_bias[i].shape()[0] != 1) {
-        params[i].self_layernorm.beta = reinterpret_cast<const DataType_*>(
-            self_layernorm_bias[i].data<data_t_>());
+      params[i].self_layernorm.beta = reinterpret_cast<const DataType_*>(
+          self_layernorm_bias[i].data<data_t_>());
     } else {
-        params[i].self_layernorm.beta = nullptr;
+      params[i].self_layernorm.beta = nullptr;
     }
 
     // query
@@ -201,10 +200,10 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
     params[i].cross_layernorm.gamma = reinterpret_cast<const DataType_*>(
         cross_layernorm_weight[i].data<data_t_>());
     if (cross_layernorm_bias[i].shape()[0] != 1) {
-        params[i].cross_layernorm.beta = reinterpret_cast<const DataType_*>(
-            cross_layernorm_bias[i].data<data_t_>());
+      params[i].cross_layernorm.beta = reinterpret_cast<const DataType_*>(
+          cross_layernorm_bias[i].data<data_t_>());
     } else {
-        params[i].cross_layernorm.beta = nullptr;
+      params[i].cross_layernorm.beta = nullptr;
     }
     // query
     params[i].cross_attention.query_weight.kernel =
@@ -239,10 +238,10 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
     params[i].ffn_layernorm.gamma = reinterpret_cast<const DataType_*>(
         ffn_layernorm_weight[i].data<data_t_>());
     if (ffn_layernorm_bias[i].shape()[0] != 1) {
-        params[i].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
-            ffn_layernorm_bias[i].data<data_t_>());
+      params[i].ffn_layernorm.beta = reinterpret_cast<const DataType_*>(
+          ffn_layernorm_bias[i].data<data_t_>());
     } else {
-        params[i].ffn_layernorm.beta = nullptr;
+      params[i].ffn_layernorm.beta = nullptr;
     }
     // intermediate proj
     params[i].ffn.intermediate_weight.kernel =
@@ -259,8 +258,8 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
 
   // relative bias
   decoding_params.self_relative_attention_bias_weight =
-    reinterpret_cast<const DataType_*>(
-      self_relative_attention_bias_weight.data<data_t_>());
+      reinterpret_cast<const DataType_*>(
+          self_relative_attention_bias_weight.data<data_t_>());
 
   decoding_params.layernorm.gamma = reinterpret_cast<const DataType_*>(
       decoder_layernorm_weight.data<data_t_>());

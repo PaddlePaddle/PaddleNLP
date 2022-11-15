@@ -22,6 +22,7 @@
 
 #include <cuda_runtime.h>
 #include <stdlib.h>
+
 #include "fastertransformer/utils/common.h"
 #include "fastertransformer/utils/common_structure.h"
 #include "fastertransformer/utils/nccl_utils.h"
@@ -56,14 +57,14 @@ public:
   const T *type_table = nullptr;
 
   // For PLATO embedding.
-  const int* latent_id = nullptr;
-  const T* latent_embedding_table = nullptr;
-  const int* role_id = nullptr;
-  const int* decoder_role_id = nullptr;
-  const T* role_embedding_table = nullptr;
+  const int *latent_id = nullptr;
+  const T *latent_embedding_table = nullptr;
+  const int *role_id = nullptr;
+  const int *decoder_role_id = nullptr;
+  const T *role_embedding_table = nullptr;
   // Custom position.
-  const int* position_ids = nullptr;
-  const int* decoder_position_ids = nullptr;
+  const int *position_ids = nullptr;
+  const int *decoder_position_ids = nullptr;
 
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
@@ -74,14 +75,14 @@ public:
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;
-  float* output_scores = nullptr;
+  float *output_scores = nullptr;
 
   cublasHandle_t cublas_handle;
   cublasLtHandle_t cublaslt_handle;
   cudaStream_t stream;
 
   // T5
-  const T* self_relative_attention_bias_weight = nullptr;
+  const T *self_relative_attention_bias_weight = nullptr;
 
   // For GPT model
   int request_batch_size = 0;

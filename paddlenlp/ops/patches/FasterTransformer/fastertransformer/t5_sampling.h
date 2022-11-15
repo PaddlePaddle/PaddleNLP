@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/open_decoder.h"
 #include "fastertransformer/utils/allocator.h"
@@ -83,34 +84,34 @@ private:
 
 public:
   T5DecodingSampling(const IAllocator &allocator,
-                   const int batch_size,
-                   const int seq_len,
-                   const int head_num,
-                   const int size_per_head,
-                   const int vocab_size,
-                   const int decoder_layers,
-                   const int memory_hidden_units,
-                   const int memory_max_seq_len,
-                   const int start_id,
-                   const int end_id,
-                   const int candidate_num = 0,
-                   const float probability_threshold = 0.0,
-                   const int is_fuse_qkv = false,
-                   const bool normalization_before = true,
-                   const int pos_offset = 0,
-                   const ActivationType act = ActivationType::RELU,
-                   const bool pos_bias = false,
-                   const float temperature = 1.0,
-                   const float repeat_penalty = 1.0,
-                   const bool prefix_lm = false,
-                   const bool is_mbart = false,
-                   const int min_length = 0,
-                   const int inner_coeff = 4,
-                   const int seed = -1,
-                   const int tensor_para_size = 1,
-                   const int layer_para_size = 1,
-                   const int num_bucket = -1,
-                   const int max_distance = 128)
+                     const int batch_size,
+                     const int seq_len,
+                     const int head_num,
+                     const int size_per_head,
+                     const int vocab_size,
+                     const int decoder_layers,
+                     const int memory_hidden_units,
+                     const int memory_max_seq_len,
+                     const int start_id,
+                     const int end_id,
+                     const int candidate_num = 0,
+                     const float probability_threshold = 0.0,
+                     const int is_fuse_qkv = false,
+                     const bool normalization_before = true,
+                     const int pos_offset = 0,
+                     const ActivationType act = ActivationType::RELU,
+                     const bool pos_bias = false,
+                     const float temperature = 1.0,
+                     const float repeat_penalty = 1.0,
+                     const bool prefix_lm = false,
+                     const bool is_mbart = false,
+                     const int min_length = 0,
+                     const int inner_coeff = 4,
+                     const int seed = -1,
+                     const int tensor_para_size = 1,
+                     const int layer_para_size = 1,
+                     const int num_bucket = -1,
+                     const int max_distance = 128)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -143,7 +144,7 @@ public:
 
     // For models without parallel
     if (l_parallel_param_.layers_per_group == 0) {
-        l_parallel_param_.layers_per_group = decoder_layers;
+      l_parallel_param_.layers_per_group = decoder_layers;
     }
 
     if (std::is_same<DataType_, float>::value)
@@ -193,16 +194,17 @@ public:
                                args_.hidden_units_)
                             : (args_.batch_size_ * args_.seq_len_ *
                                args_.hidden_units_);  // type T
-    size_t mem_cache_size =
-        (prefix_lm) ? 0 : (args_.batch_size_ * memory_max_seq_len *
-                           args_.hidden_units_);  // type T
-    if (tensor_para_size != 1) { // tensor parallel
+    size_t mem_cache_size = (prefix_lm)
+                                ? 0
+                                : (args_.batch_size_ * memory_max_seq_len *
+                                   args_.hidden_units_);  // type T
+    if (tensor_para_size != 1) {                          // tensor parallel
       cache_size /= tensor_para_size;
       mem_cache_size /= tensor_para_size;
     }
 
-    int relative_attention_bias_size = (args_.seq_len_ + 1) * (args_.seq_len_ + 1) *
-        head_num;
+    int relative_attention_bias_size =
+        (args_.seq_len_ + 1) * (args_.seq_len_ + 1) * head_num;
 
     size_t logits_buf_size =
         args_.batch_size_ * args_.vocab_size_padded_;  // type T
@@ -326,9 +328,11 @@ public:
     finished_buf_ = (bool *)(word_ids_buf_ + word_ids_buf_size);
     finished_count_buf_ = (int *)(finished_buf_ + finished_buf_size);
 
-    relative_attention_bias_ = (DataType_ *)(finished_count_buf_ + finished_count_size);
+    relative_attention_bias_ =
+        (DataType_ *)(finished_count_buf_ + finished_count_size);
 
-    topp_id_vals_buf_ = (int *)(relative_attention_bias_ + relative_attention_bias_size);
+    topp_id_vals_buf_ =
+        (int *)(relative_attention_bias_ + relative_attention_bias_size);
     begin_topp_offset_buf_ = (int *)(topp_id_vals_buf_ + topp_id_vals_buf_size);
     topp_offset_buf_ =
         (int *)(begin_topp_offset_buf_ + begin_topp_offset_buf_size);
@@ -420,7 +424,7 @@ public:
       word_ids: start_id_
     */
     if (decoding_params.output_scores) {
-   	  cudaMemsetAsync(decoding_params.output_scores, 0, sizeof(float) * m);
+      cudaMemsetAsync(decoding_params.output_scores, 0, sizeof(float) * m);
     }
     if (args_.candidate_num_ != 0) {
       sampling_init_kernelLauncher(finished_buf_,
@@ -447,14 +451,15 @@ public:
     check_cuda_error(cudaGetLastError());
 #endif
 
-    build_relative_attention_bias_launcher(relative_attention_bias_,
-                                           decoding_params.self_relative_attention_bias_weight,
-                                           args_.head_num_,
-                                           (args_.seq_len_ + 1),
-                                           args_.num_bucket_,
-                                           false,
-                                           args_.max_distance_,
-                                           decoding_params.stream);
+    build_relative_attention_bias_launcher(
+        relative_attention_bias_,
+        decoding_params.self_relative_attention_bias_weight,
+        args_.head_num_,
+        (args_.seq_len_ + 1),
+        args_.num_bucket_,
+        false,
+        args_.max_distance_,
+        decoding_params.stream);
 
     if (std::is_same<DataType_, float>::value ||
         (std::is_same<DataType_, half>::value &&
@@ -543,20 +548,19 @@ public:
           check_cuda_error(cudaGetLastError());
 #endif
 
-        decoder_->forward(
-            from_tensor_[from_id],
-            decoding_params.memory_tensor,
-            K_cache_[kv_cache_id] + layer * cache_size,
-            V_cache_[kv_cache_id] + layer * cache_size,
-            K_mem_cache_[layer],
-            V_mem_cache_[layer],
-            decoding_params.memory_sequence_length,
-            from_tensor_[out_id],
-            step,
-            args_.seq_len_,
-            true, /* is_cross_attention */
-            finished_buf_,
-            relative_attention_bias_);
+          decoder_->forward(from_tensor_[from_id],
+                            decoding_params.memory_tensor,
+                            K_cache_[kv_cache_id] + layer * cache_size,
+                            V_cache_[kv_cache_id] + layer * cache_size,
+                            K_mem_cache_[layer],
+                            V_mem_cache_[layer],
+                            decoding_params.memory_sequence_length,
+                            from_tensor_[out_id],
+                            step,
+                            args_.seq_len_,
+                            true, /* is_cross_attention */
+                            finished_buf_,
+                            relative_attention_bias_);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -570,16 +574,16 @@ public:
         DataType_ beta = (DataType_)0.0f;
 
         t5_layer_norm(from_tensor_[out_id],
-                    decoding_params.layernorm.gamma,
-                    decoding_params.layernorm.beta,
-                    decoder_normed_result_buf_,
-                    m,
-                    k,
-                    decoding_params.stream);
+                      decoding_params.layernorm.gamma,
+                      decoding_params.layernorm.beta,
+                      decoder_normed_result_buf_,
+                      m,
+                      k,
+                      decoding_params.stream);
 
 #ifndef NDEBUG
-            cudaDeviceSynchronize();
-            check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
@@ -604,17 +608,19 @@ public:
                                             cublasAlgoMap_,
                                             cublas_workspace_);
 
-        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
-          apply_logits_mask_kernelLauncher(logits_buf_,
-                                           finished_buf_,
-                                           args_.batch_size_,
-                                           1,
-                                           args_.vocab_size_padded_,
-                                           args_.vocab_size_,
-                                           decoding_params.stream,
-                                           decoding_params.logits_mask,
-                                           (args_.min_length_ != 0 && step <= args_.min_length_),
-                                           args_.end_id_);
+        if (decoding_params.logits_mask ||
+            (args_.min_length_ != 0 && step <= args_.min_length_)) {
+          apply_logits_mask_kernelLauncher(
+              logits_buf_,
+              finished_buf_,
+              args_.batch_size_,
+              1,
+              args_.vocab_size_padded_,
+              args_.vocab_size_,
+              decoding_params.stream,
+              decoding_params.logits_mask,
+              (args_.min_length_ != 0 && step <= args_.min_length_),
+              args_.end_id_);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -640,13 +646,13 @@ public:
           // top k sampling
           if (decoding_params.output_scores) {
             softmax_kernelLauncher(logits_buf_,
-                                  embedding_bias_ptr,
-                                  args_.end_id_,
-                                  finished_buf_,
-                                  m,
-                                  n,
-                                  n,
-                                  decoding_params.stream);
+                                   embedding_bias_ptr,
+                                   args_.end_id_,
+                                   finished_buf_,
+                                   m,
+                                   n,
+                                   n,
+                                   decoding_params.stream);
 
             // Return Score.
             topK_sampling_kernel_kernelLauncher_v3(

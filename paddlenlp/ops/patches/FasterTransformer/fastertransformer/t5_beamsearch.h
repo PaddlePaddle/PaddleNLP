@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/open_decoder.h"
 #include "fastertransformer/utils/allocator.h"
@@ -87,34 +88,34 @@ private:
 
 public:
   T5DecodingBeamsearch(const IAllocator &allocator,
-                     const int batch_size,
-                     const int beam_width,
-                     const int seq_len,
-                     const int head_num,
-                     const int size_per_head,
-                     const int vocab_size,
-                     const int decoder_layers,
-                     const int memory_hidden_units,
-                     const int memory_max_seq_len,
-                     const int start_id,
-                     const int end_id,
-                     const float beam_search_diversity_rate = -0.0f,
-                     const bool is_fuse_topk_softMax = false,
-                     const bool is_fuse_qkv = false,
-                     const bool keep_alive_beam = false,
-                     const float alpha = 0.6,
-                     const bool normalization_before = true,
-                     const int pos_offset = 0,
-                     const ActivationType act = ActivationType::RELU,
-                     const bool pos_bias = false,
-                     const bool prefix_lm = false,
-                     const int finished_candidate_num = -1,
-                     const bool early_stopping = false,
-                     const bool is_mbart = false,
-                     const int min_length = 0,
-                     const int inner_coeff = 4,
-                     const int num_bucket = -1,
-                     const int max_distance = 128)
+                       const int batch_size,
+                       const int beam_width,
+                       const int seq_len,
+                       const int head_num,
+                       const int size_per_head,
+                       const int vocab_size,
+                       const int decoder_layers,
+                       const int memory_hidden_units,
+                       const int memory_max_seq_len,
+                       const int start_id,
+                       const int end_id,
+                       const float beam_search_diversity_rate = -0.0f,
+                       const bool is_fuse_topk_softMax = false,
+                       const bool is_fuse_qkv = false,
+                       const bool keep_alive_beam = false,
+                       const float alpha = 0.6,
+                       const bool normalization_before = true,
+                       const int pos_offset = 0,
+                       const ActivationType act = ActivationType::RELU,
+                       const bool pos_bias = false,
+                       const bool prefix_lm = false,
+                       const int finished_candidate_num = -1,
+                       const bool early_stopping = false,
+                       const bool is_mbart = false,
+                       const int min_length = 0,
+                       const int inner_coeff = 4,
+                       const int num_bucket = -1,
+                       const int max_distance = 128)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -186,8 +187,9 @@ public:
                             : (args_.batch_size_ * args_.beam_width_ *
                                args_.seq_len_ * args_.hidden_units_);  // type T
     size_t mem_cache_size =
-        (prefix_lm) ? 0 : (args_.batch_size_ * args_.beam_width_ *
-                           memory_max_seq_len * args_.hidden_units_);  // type T
+        (prefix_lm) ? 0
+                    : (args_.batch_size_ * args_.beam_width_ *
+                       memory_max_seq_len * args_.hidden_units_);  // type T
 
     size_t logits_buf_size = args_.batch_size_ * args_.beam_width_ *
                              args_.vocab_size_padded_;  // type float
@@ -207,12 +209,14 @@ public:
         SMALL_TOP_K_SOFTMAX_MAX_VOC_PARTS * (2 * MAX_K + 2);
     args_.temp_storage_size_ = args_.batch_size_ * args_.beam_width_ *
                                storage_size_per_beam;  // type float
-    args_.temp_storage_size_ = (size_t)(
-        ceil(args_.batch_size_ * args_.beam_width_ * args_.beam_width_ / 4.) *
-            4 * 2 +
-        ceil(args_.batch_size_ * args_.beam_width_ *
-             SMALL_TOP_K_SOFTMAX_MAX_VOC_PARTS * (2 * MAX_K + 2) / 4.) *
-            4);
+    args_.temp_storage_size_ =
+        (size_t)(ceil(args_.batch_size_ * args_.beam_width_ *
+                      args_.beam_width_ / 4.) *
+                     4 * 2 +
+                 ceil(args_.batch_size_ * args_.beam_width_ *
+                      SMALL_TOP_K_SOFTMAX_MAX_VOC_PARTS * (2 * MAX_K + 2) /
+                      4.) *
+                     4);
     size_t padded_embedding_kernel_size =
         args_.hidden_units_ * args_.vocab_size_padded_;
     size_t padded_embedding_bias_size = args_.vocab_size_padded_;
@@ -244,8 +248,8 @@ public:
 #endif
     }
 
-    int relative_attention_bias_size = (args_.seq_len_ + 1) * (args_.seq_len_ + 1) *
-        head_num;
+    int relative_attention_bias_size =
+        (args_.seq_len_ + 1) * (args_.seq_len_ + 1) * head_num;
 
     // prevent memory misalinged address
     logits_buf_size = (size_t)(ceil(logits_buf_size / 4.)) * 4;
@@ -371,9 +375,11 @@ public:
     temp_storage_ = (float *)(alive_finished_buf_ + alive_finished_buf_size);
     finished_count_buf_ = (int *)(temp_storage_ + args_.temp_storage_size_);
 
-    relative_attention_bias_ = (DataType_ *)(finished_count_buf_ + finished_count_size);
+    relative_attention_bias_ =
+        (DataType_ *)(finished_count_buf_ + finished_count_size);
 
-    topK_kernel_workspace = (void *)(relative_attention_bias_ + relative_attention_bias_size);
+    topK_kernel_workspace =
+        (void *)(relative_attention_bias_ + relative_attention_bias_size);
     padded_embedding_kernel =
         (DataType_ *)((char *)topK_kernel_workspace + topk_workspace_size_);
     padded_embedding_bias =
@@ -499,14 +505,15 @@ public:
 //                   decoding_params.stream);
 #endif
 
-    build_relative_attention_bias_launcher(relative_attention_bias_,
-                                           decoding_params.self_relative_attention_bias_weight,
-                                           args_.head_num_,
-                                           (args_.seq_len_ + 1),
-                                           args_.num_bucket_,
-                                           false,
-                                           args_.max_distance_,
-                                           decoding_params.stream);
+    build_relative_attention_bias_launcher(
+        relative_attention_bias_,
+        decoding_params.self_relative_attention_bias_weight,
+        args_.head_num_,
+        (args_.seq_len_ + 1),
+        args_.num_bucket_,
+        false,
+        args_.max_distance_,
+        decoding_params.stream);
 
     if (std::is_same<DataType_, float>::value ||
         (std::is_same<DataType_, half>::value &&
@@ -653,7 +660,8 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
+        if (decoding_params.logits_mask ||
+            (args_.min_length_ != 0 && step <= args_.min_length_)) {
           apply_logits_mask_kernelLauncher(
               tmp_logits_buf_,
               keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
@@ -823,7 +831,6 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
-
       }
 
       if (step <= max_trg_len) {
@@ -910,10 +917,13 @@ public:
     }  // end for decoding step for llop
 
     if (decoding_params.output_scores) {
-      cudaMemcpyAsync(decoding_params.output_scores, cum_log_buf_, 
-                      sizeof(float) * args_.batch_size_ * args_.beam_width_, cudaMemcpyDeviceToDevice, decoding_params.stream);
+      cudaMemcpyAsync(decoding_params.output_scores,
+                      cum_log_buf_,
+                      sizeof(float) * args_.batch_size_ * args_.beam_width_,
+                      cudaMemcpyDeviceToDevice,
+                      decoding_params.stream);
     }
-  }    // end of forward
+  }  // end of forward
 
   virtual ~T5DecodingBeamsearch() {
     delete[] K_cache_;

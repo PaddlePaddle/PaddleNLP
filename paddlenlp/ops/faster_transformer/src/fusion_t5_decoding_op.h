@@ -17,10 +17,9 @@ limitations under the License. */
 #include <vector>
 
 #include "cublas_handle.h"
-
+#include "fastertransformer/open_decoder.h"
 #include "fastertransformer/t5_beamsearch.h"
 #include "fastertransformer/t5_sampling.h"
-#include "fastertransformer/open_decoder.h"
 #include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
