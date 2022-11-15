@@ -17,10 +17,10 @@ import functools
 from typing import Any, Callable, Dict, List
 
 import paddle
-from paddle.utils import try_import
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-hp = try_import("hyperopt.hp")
-# from hyperopt import hp
+from hyperopt import hp
 from paddle.io import Dataset
 from paddle.metric import Accuracy
 
@@ -139,26 +139,25 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             )
             trainer.train()
             trainer.save_model()
-            # model.save_pretrained(training_args.output_dir)
-            # tokenizer.save_pretrained(training_args.output_dir)
             eval_metrics = trainer.evaluate(eval_dataset)
             return eval_metrics
 
         return trainable
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
-        """
-        function used by the Trainer to compute metrics during training
-        See :class:`~paddlenlp.trainer.trainer_base.Trainer` for more details.
-        """
-        metric = Accuracy()
-        correct = metric.compute(
-            paddle.to_tensor(eval_preds.predictions),
-            paddle.to_tensor(eval_preds.label_ids),
-        )
-        metric.update(correct)
-        acc = metric.accumulate()
-        return {"accuracy": acc}
+        pred_ids = np.argmax(eval_preds.predictions, axis=-1)
+        metrics = {}
+        metrics["accuracy"] = accuracy_score(y_true=eval_preds.label_ids,
+                y_pred=pred_ids)
+        for average in ['micro', 'macro']:
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                y_true=eval_preds.label_ids,
+                y_pred=pred_ids,
+                average=average)
+            metrics[f"{average}_precision"] = precision
+            metrics[f"{average}_recall"] = recall
+            metrics[f"{average}_f1"] = f1
+        return metrics
 
     def _preprocess_fn(
         self,
@@ -203,7 +202,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
         test_results = trainer.predict(processed_test_dataset)
         return test_results
-        # return paddle.nn.functional.softmax(test_results.predictions, axis=-1)
 
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
