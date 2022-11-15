@@ -87,14 +87,14 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("PegasusChineseTokenizer", 'pegasus'),
 ])
 
-FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
-    ("BertFasterTokenizer", "bert"), ("ErnieFasterTokenizer", "ernie"),
-    ("TinyBertFasterTokenizer", "tinybert"),
-    ("ErnieMFasterTokenizer", "ernie_m")
-])
-# For FasterTokenizer
+FAST_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFastTokenizer", "bert"),
+                                            ("ErnieFastTokenizer", "ernie"),
+                                            ("TinyBertFastTokenizer",
+                                             "tinybert"),
+                                            ("ErnieMFastTokenizer", "ernie_m")])
+# For FastTokenizer
 if is_fast_tokenizer_available():
-    TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)
+    TOKENIZER_MAPPING_NAMES.update(FAST_TOKENIZER_MAPPING_NAMES)
 
 
 def get_configurations():
@@ -107,7 +107,7 @@ def get_configurations():
             f"paddlenlp.transformers.{class_name}.{faster_name}tokenizer")
         tokenizer_name = getattr(import_class, key)
         name = tuple(tokenizer_name.pretrained_init_configuration.keys())
-        # FasterTokenizer will share the same config with python tokenizer
+        # FastTokenizer will share the same config with python tokenizer
         # So same config would map more than one tokenizer
         if MAPPING_NAMES.get(name, None) is None:
             MAPPING_NAMES[name] = []
@@ -126,7 +126,7 @@ class AutoTokenizer():
     MAPPING_NAMES = get_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
-    _faster_name_mapping = FASTER_TOKENIZER_MAPPING_NAMES
+    _faster_name_mapping = FAST_TOKENIZER_MAPPING_NAMES
     tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
@@ -210,7 +210,7 @@ class AutoTokenizer():
                                 if not is_support_fast_tokenizer:
                                     logger.warning(
                                         f"The tokenizer {actual_tokenizer_class} doesn't have the faster version."
-                                        " Please check the map `paddlenlp.transformers.auto.tokenizer.FASTER_TOKENIZER_MAPPING_NAMES`"
+                                        " Please check the map `paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES`"
                                         " to see which faster tokenizers are currently supported."
                                     )
                             else:

@@ -146,3 +146,4 @@ if is_fast_tokenizer_available():
     from .bert.fast_tokenizer import *
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *
+    from .ernie_m.fast_tokenizer import *

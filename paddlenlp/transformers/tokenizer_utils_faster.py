@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import six
 
 from fast_tokenizer import Encoding as FastEncoding
-from fast_tokenizer import Tokenizer as FasterTokenizer
+from fast_tokenizer import Tokenizer as FastTokenizer
 
 from .utils import InitTrackerMeta, fn_args_to_dict
 from .convert_slow_tokenizer import convert_slow_tokenizer
@@ -48,7 +48,7 @@ ADDED_TOKENS_FILE = "added_tokens.json"
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 
 
-class PretrainedFasterTokenizer(PretrainedTokenizerBase):
+class PretrainedFastTokenizer(PretrainedTokenizerBase):
     resource_files_names = VOCAB_FILES_NAMES
     slow_tokenizer_class: PretrainedTokenizer = None
     can_save_slow_tokenizer: bool = True
@@ -63,7 +63,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         elif fast_tokenizer_file is not None and not from_slow:
             # We have a serialization from tokenizers which let us directly build the backend
             # From json file
-            fast_tokenizer = FasterTokenizer.from_file(fast_tokenizer_file)
+            fast_tokenizer = FastTokenizer.from_file(fast_tokenizer_file)
         elif slow_tokenizer is not None:
             # We need to convert a slow tokenizer to build the backend
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
@@ -126,7 +126,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         return self._tokenizer.get_vocab_size(with_added_tokens=True)
 
     @property
-    def backend_tokenizer(self) -> FasterTokenizer:
+    def backend_tokenizer(self) -> FastTokenizer:
         return self._tokenizer
 
     def _convert_encoding(
@@ -142,7 +142,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         verbose: bool = True,
     ) -> Tuple[Dict[str, Any], List[FastEncoding]]:
         """
-        Convert the encoding representation (from low-level PaddleNLP FasterTokenizer output) to a python Dict and a list
+        Convert the encoding representation (from low-level PaddleNLP FastTokenizer output) to a python Dict and a list
         of encodings, take care of building a batch from overflowing tokens.
 
         Overflowing tokens are converted to additional examples (like batches) so the output values of the dict are
