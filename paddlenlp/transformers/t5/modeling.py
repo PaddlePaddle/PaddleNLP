@@ -1673,7 +1673,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 logits = output[1]
 
         """
-
+        input_type = type(
+            decoder_input_ids) if decoder_input_ids is not None else type(
+                decoder_inputs_embeds)
         # Encode if needed (training, first prediction pass)
         if encoder_output is None:
             # Convert encoder inputs in embeddings if needed
@@ -1685,7 +1687,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict)
         else:
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output, )
             if return_dict and not isinstance(encoder_output, BaseModelOutput):
                 encoder_output = convert_encoder_output(encoder_output)
