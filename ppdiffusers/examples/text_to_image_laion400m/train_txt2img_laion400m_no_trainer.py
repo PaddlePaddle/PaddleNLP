@@ -197,7 +197,7 @@ def main():
                                              dataformats="NHWC")
                     tic_train = time.time()
 
-                    if global_steps % training_args.save_steps == 0:
+                    if rank == 0 and global_steps % training_args.save_steps == 0:
                         os.makedirs(os.path.join(
                             training_args.output_dir,
                             f"global-steps-{global_steps}"),
