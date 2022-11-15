@@ -286,5 +286,6 @@
 <br />
        
 ### 附：
-       [如何将文心大模型 API 服务接入 Pipelines](https://aistudio.baidu.com/aistudio/projectdetail/5011119)
-       参考：[ERNIE-ViLG 接入 Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/pipelines/nodes/text_to_image_generator)
+[如何将文心大模型 API 服务接入 Pipelines](https://aistudio.baidu.com/aistudio/projectdetail/5011119)
+       
+参考：[ERNIE-ViLG 接入 Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/pipelines/nodes/text_to_image_generator)
