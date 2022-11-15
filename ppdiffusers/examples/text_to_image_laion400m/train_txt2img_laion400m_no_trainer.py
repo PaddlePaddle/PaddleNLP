@@ -158,17 +158,17 @@ def main():
                 unwrap_model(model).on_train_batch_end()
 
                 # train log
-
                 if global_steps % training_args.logging_steps == 0:
-                    # add scalar
                     logs = {
                         "train/loss":
                         loss.item() * training_args.gradient_accumulation_steps,
                         "train/lr_abs": lr_scheduler.get_lr(),
                         "train/global_steps": global_steps
                     }
-                    for name, val in logs.items():
-                        writer.add_scalar(name, val, step=global_steps)
+                    if rank == 0:
+                        # add scalar
+                        for name, val in logs.items():
+                            writer.add_scalar(name, val, step=global_steps)
                     log_str = 'Train: global_steps {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, train_loss: {4:.10f}, lr_abs: {5:.10f}, speed: {6:.2f} s/it.'.format(
                         global_steps, training_args.max_steps, epoch, step + 1,
                         logs["train/loss"], logs["train/lr_abs"],
@@ -182,18 +182,19 @@ def main():
                             input_ids=batch["input_ids"], guidance_scale=1.0)
                         ddim_75_img = unwrap_model(model).log_image(
                             input_ids=batch["input_ids"], guidance_scale=7.5)
-                        writer.add_image("reconstruction",
-                                         reconstruction_img,
-                                         global_steps,
-                                         dataformats="NHWC")
-                        writer.add_image("ddim-samples-1.0",
-                                         ddim_10_img,
-                                         global_steps,
-                                         dataformats="NHWC")
-                        writer.add_image("ddim-samples-7.5",
-                                         ddim_75_img,
-                                         global_steps,
-                                         dataformats="NHWC")
+                        if rank == 0:
+                            writer.add_image("reconstruction",
+                                             reconstruction_img,
+                                             global_steps,
+                                             dataformats="NHWC")
+                            writer.add_image("ddim-samples-1.0",
+                                             ddim_10_img,
+                                             global_steps,
+                                             dataformats="NHWC")
+                            writer.add_image("ddim-samples-7.5",
+                                             ddim_75_img,
+                                             global_steps,
+                                             dataformats="NHWC")
                     tic_train = time.time()
 
                     if global_steps % training_args.save_steps == 0:
