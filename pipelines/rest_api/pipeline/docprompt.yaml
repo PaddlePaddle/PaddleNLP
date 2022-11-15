@@ -6,7 +6,7 @@ components:
           use_gpu: True
           lang: ch
     type: DocOCRProcessor
-  - name: Runner
+  - name: Reader
     params:
           topn: 1
           use_gpu: True
@@ -23,7 +23,7 @@ pipelines:
     nodes:
       - name: PreProcessor
         inputs: [Query]
-      - name: Runner
+      - name: Reader
         inputs: [PreProcessor]
 
 

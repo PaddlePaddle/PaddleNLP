@@ -13,12 +13,12 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include <string>
+#include "fast_tokenizer/normalizers/bert.h"
+#include "fast_tokenizer/normalizers/replace.h"
+#include "fast_tokenizer/normalizers/strip.h"
+#include "fast_tokenizer/normalizers/unicode.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
-#include "normalizers/bert.h"
-#include "normalizers/replace.h"
-#include "normalizers/strip.h"
-#include "normalizers/unicode.h"
 #include "re2/re2.h"
 
 namespace paddlenlp {
@@ -30,8 +30,7 @@ TEST(normalizers, split) {
   std::string input = "The-final--countdown";
   normalizers::NormalizedString split_input(input);
   auto test_split = [&pattern, &split_input](
-      normalizers::SplitMode mode,
-      const std::vector<std::string> expected_strings) {
+      core::SplitMode mode, const std::vector<std::string> expected_strings) {
     std::vector<normalizers::NormalizedString> normalizes;
     split_input.Split(pattern, mode, &normalizes);
     ASSERT_EQ(expected_strings.size(), normalizes.size());
@@ -40,13 +39,14 @@ TEST(normalizers, split) {
     }
   };
 
-  test_split(normalizers::REMOVED, {"The", "final", "countdown"});
-  test_split(normalizers::ISOLATED,
+  test_split(core::SplitMode::REMOVED, {"The", "final", "countdown"});
+  test_split(core::SplitMode::ISOLATED,
              {"The", "-", "final", "-", "-", "countdown"});
-  test_split(normalizers::CONTIGUOUS, {"The", "-", "final", "--", "countdown"});
-  test_split(normalizers::MERGED_WITH_PREVIOUS,
+  test_split(core::SplitMode::CONTIGUOUS,
+             {"The", "-", "final", "--", "countdown"});
+  test_split(core::SplitMode::MERGED_WITH_PREVIOUS,
              {"The-", "final-", "-", "countdown"});
-  test_split(normalizers::MERGED_WITH_NEXT,
+  test_split(core::SplitMode::MERGED_WITH_NEXT,
              {"The", "-final", "-", "-countdown"});
 }
 

@@ -22,7 +22,7 @@ limitations under the License. */
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
-struct FASTERTOKENIZER_DECL BertNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL BertNormalizer : public Normalizer {
   BertNormalizer(bool clean_text = true,
                  bool handle_chinese_chars = true,
                  bool strip_accents = true,

@@ -30,6 +30,8 @@
 
 ## News 📢
 
+* 🔥 **2022.11.12 PaddleNLP added AutoPrompt and won the first place in FewCLUE!**
+  * 🥇 The PaddleNLP team has open-sourced the **AutoPrompt** solution, which is based on the open-source Wenxin ERNIE pre-training language model, combined with domain pre-training and automated prompt learning technology, and ranked first in FewCLUE (a authoritative few-sample learning contest) with a model with 291M parameters. [see details](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA).
 * 🔥 **2022.10.27 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2) Released!**
   * NLG Upgrade: 📄 Release [**Solution of Text Summarization**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus) based on Pegasus;❓ Release [**Solution of Problem Generation**](./examples/question_generation), providing **general problem generation pre-trained model** based on Baidu's UNIMO Text and large-scale multi domain problem generation dataset。Supporting high-performance inference ability based on FasterGeneration , and covering the whole process of training , inference and deployment.
 * 🔥 **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**

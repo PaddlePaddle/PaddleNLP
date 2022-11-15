@@ -4,7 +4,7 @@ project(tokenizers LANGUAGES CXX C VERSION 1.0)
 
 option(WITH_TESTING     "Compile PaddleNLP fast_tokenizer with unit testing"        OFF)
 option(WITH_PYTHON      "Compile PaddleNLP fast_tokenizer with python interpreter"   ON)
-add_definitions(-DFASTERTOKENIZER_LIB)
+add_definitions(-DFASTTOKENIZER_LIB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set (PUBLIC_DEPEND_LIBS "")
@@ -107,17 +107,6 @@ ELSE(WIN32)
     ENDIF()
     set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
-
-# For OpenMP
-# openmp not support well for now on windows
-if (NOT APPLE AND NOT WIN32) # Linux
-    find_package(OpenMP)
-    if (OPENMP_FOUND)
-        add_definitions(-DWITH_OMP)
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-    endif()
-endif()
 
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 set(TOKENIZERS_INSTALL_INCLUDE_DIR ${PROJECT_SOURCE_DIR})

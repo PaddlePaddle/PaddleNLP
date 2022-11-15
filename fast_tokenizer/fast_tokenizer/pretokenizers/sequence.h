@@ -23,7 +23,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
-struct FASTERTOKENIZER_DECL SequencePreTokenizer : public PreTokenizer {
+struct FASTTOKENIZER_DECL SequencePreTokenizer : public PreTokenizer {
   SequencePreTokenizer() = default;
   SequencePreTokenizer(const SequencePreTokenizer&) = default;
   SequencePreTokenizer(const std::vector<PreTokenizer*>& pretokenizers);

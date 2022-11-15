@@ -23,7 +23,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace models {
 
-struct FASTERTOKENIZER_DECL Model {
+struct FASTTOKENIZER_DECL Model {
   virtual std::vector<core::Token> Tokenize(const std::string& tokens) = 0;
   virtual bool TokenToId(const std::string& token, uint32_t* id) const = 0;
   virtual bool IdToToken(uint32_t id, std::string* token) const = 0;
