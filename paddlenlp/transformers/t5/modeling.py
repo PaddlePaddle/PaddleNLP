@@ -386,6 +386,7 @@ class T5Attention(nn.Layer):
 
         attn_output = unshape(paddle.matmul(
             attn_weights, value_states))  # (batch_size, seq_length, dim)
+
         attn_output = self.o(attn_output)
 
         present_key_value_state = ((key_states, value_states) if
@@ -429,6 +430,7 @@ class T5LayerSelfAttention(nn.Layer):
                 use_cache=False,
                 output_attentions=False):
         normed_hidden_states = self.layer_norm(hidden_states)
+
         attention_output = self.SelfAttention(
             normed_hidden_states,
             mask=attention_mask,
@@ -470,6 +472,7 @@ class T5LayerCrossAttention(nn.Layer):
         output_attentions=False,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
+
         attention_output = self.EncDecAttention(
             normed_hidden_states,
             mask=attention_mask,
@@ -952,7 +955,8 @@ class T5Stack(nn.Layer):
                 use_cache=False,
                 output_attentions=False,
                 output_hidden_states=False,
-                return_dict=False):
+                return_dict=False,
+                **model_kwargs):
         assert input_ids is not None, "input_ids can not be None"
         input_shape = input_ids.shape
         input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
@@ -968,7 +972,7 @@ class T5Stack(nn.Layer):
         if use_cache is True:
             assert (
                 self.is_decoder
-            ), f"`use_cache` can only be set to `True` if {self} is used as a decoder"
+            ), f"`use_cache` can only be set to `True` if {self.__class__} is used as a decoder"
 
         if attention_mask is None:
             attention_mask = paddle.ones(shape=[batch_size, mask_seq_length])
@@ -1699,6 +1703,29 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_hidden_states=encoder_output.hidden_states,
             encoder_attentions=encoder_output.attentions,
         )
+
+    def prepare_faster_entry(self, kwargs):
+        from paddlenlp.ops import FasterT5
+        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
+        decode_strategy = kwargs.get('decode_strategy')
+        if decode_strategy == 'sampling' and kwargs.get(
+                'top_k') != 0 and kwargs.get('top_p') != 1:
+            raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. " \
+                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
+        if kwargs['repetition_penalty'] != 1.0:
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError(
+                "'repetition_penalty != 1' is not supported yet in the faster version"
+            )
+        if kwargs['forced_bos_token_id'] is not None:
+            # not support for min_length yet in the faster version
+            raise AttributeError(
+                "'forced_bos_token_id != None' is not supported yet in the faster version"
+            )
+        self._faster_entry = FasterT5(
+            self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._faster_entry
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):

@@ -80,14 +80,17 @@ public:
   cublasLtHandle_t cublaslt_handle;
   cudaStream_t stream;
 
+  // T5
+  const T* self_relative_attention_bias_weight = nullptr;
+
   // For GPT model
-  int request_batch_size;
-  int request_input_len;
+  int request_batch_size = 0;
+  int request_input_len = 0;
   int request_output_len = 0;
-  int max_input_len;
-  int *d_start_ids;
-  const int *d_start_lengths;
-  const T *d_attn_mask;
+  int max_input_len = 0;
+  int *d_start_ids = nullptr;
+  const int *d_start_lengths = nullptr;
+  const T *d_attn_mask = nullptr;
 
   virtual ~DecodingInitParam() {}
 };
@@ -143,6 +146,16 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   int finished_candidate_num_{-1};
   bool early_stopping_{false};
   bool is_mbart_{false};
+};
+
+struct T5SamplingArguments : public DecodingSamplingArguments {
+  int num_bucket_{-1};
+  int max_distance_{128};
+};
+
+struct T5BeamsearchArguments : public DecodingBeamsearchArguments {
+  int num_bucket_{-1};
+  int max_distance_{128};
 };
 
 struct GptArguments : public DecodingSamplingArguments {
