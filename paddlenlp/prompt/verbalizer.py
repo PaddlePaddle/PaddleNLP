@@ -387,7 +387,7 @@ class SoftVerbalizer(Verbalizer):
     def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
         outputs = super(SoftVerbalizer,
                         self).process_outputs(outputs, masked_positions)
-        return self.head(outputs)
+        return self.head(outputs).squeeze(1)
 
     def head_parameters(self):
         if isinstance(self.head, nn.Linear):

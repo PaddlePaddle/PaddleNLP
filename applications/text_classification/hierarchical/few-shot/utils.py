@@ -15,7 +15,6 @@
 import os
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.prompt import InputExample
 
 
 def load_local_dataset(data_path, splits, label_list):
@@ -39,14 +38,14 @@ def load_local_dataset(data_path, splits, label_list):
             for idx, line in enumerate(fp):
                 data = line.strip().split("\t")
                 if len(data) == 1:
-                    yield InputExample(text_a=data[0])
+                    yield {"text_a": data[0]}
                 else:
                     text, label = data
                     label = label.strip().split(",")
                     label = [
                         float(1) if x in label else float(0) for x in label_list
                     ]
-                    yield InputExample(text_a=text, labels=label)
+                    yield {"text_a": text, "labels": label}
 
     split_map = {"train": "train.txt", "dev": "dev.txt", "test": "test.txt"}
     datasets = []

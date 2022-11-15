@@ -249,8 +249,6 @@ class PromptTrainer(Trainer):
         outputs, hidden_states = model(**input_dict)
 
         if self.criterion is not None:
-            labels = labels.reshape(outputs.shape[:-1])
-            input_dict["labels"] = labels
             loss = self.criterion(outputs, labels)
 
             if self.args.use_rdrop:
