@@ -264,10 +264,27 @@
                         范例地址
                   </a> </span>
             </td>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/text_to_image">
+                        ERNIE-ViLG
+                  </a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
+                        范例地址
+                  </a> </span>
+            </td>
     <tbody>
 </table>
 <br />
        
 ### 附：
-       [如何将文心大模型 API 服务接入 Pipelines]()
-       参考：
+       [如何将文心大模型 API 服务接入 Pipelines](https://aistudio.baidu.com/aistudio/projectdetail/5011119)
+       参考：[ERNIE-ViLG 接入 Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/pipelines/nodes/text_to_image_generator)
