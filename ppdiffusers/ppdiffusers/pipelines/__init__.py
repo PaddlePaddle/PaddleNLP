@@ -26,7 +26,7 @@ else:
     from ..utils.dummy_paddle_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel
+    from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
     from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
                                    StableDiffusionInpaintPipeline,
                                    StableDiffusionPipeline,
