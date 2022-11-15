@@ -461,11 +461,11 @@ class SoftTemplate(Template):
                  max_length: int,
                  word_embeddings: Tensor,
                  soft_embeddings: Tensor = None):
-        super(SoftTemplate).__init__(prompt,
-                                     tokenizer,
-                                     max_length,
-                                     word_embeddings=word_embeddings,
-                                     soft_embeddings=soft_embeddings)
+        super(SoftTemplate, self).__init__(prompt,
+                                           tokenizer,
+                                           max_length,
+                                           word_embeddings=word_embeddings,
+                                           soft_embeddings=soft_embeddings)
 
     def named_parameters(self):
         named_params = [(n, p)
