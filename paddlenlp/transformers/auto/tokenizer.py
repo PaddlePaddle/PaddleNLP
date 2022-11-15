@@ -100,11 +100,11 @@ if is_fast_tokenizer_available():
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
     for key, class_name in TOKENIZER_MAPPING_NAMES.items():
-        faster_name = ""
-        if "Faster" in key:
-            faster_name = "faster_"
+        fast_name = ""
+        if "Fast" in key:
+            fast_name = "fast_"
         import_class = importlib.import_module(
-            f"paddlenlp.transformers.{class_name}.{faster_name}tokenizer")
+            f"paddlenlp.transformers.{class_name}.{fast_name}tokenizer")
         tokenizer_name = getattr(import_class, key)
         name = tuple(tokenizer_name.pretrained_init_configuration.keys())
         # FastTokenizer will share the same config with python tokenizer
@@ -112,7 +112,7 @@ def get_configurations():
         if MAPPING_NAMES.get(name, None) is None:
             MAPPING_NAMES[name] = []
         # (tokenizer_name, is_faster)
-        MAPPING_NAMES[name].append((tokenizer_name, faster_name != ""))
+        MAPPING_NAMES[name].append((tokenizer_name, fast_name != ""))
     return MAPPING_NAMES
 
 
