@@ -1,8 +1,15 @@
 # 在 PaddleNLP 中如何使用文心大模型
 
+* [模型介绍（PaddleNLP中接入的文心大模型）](#模型介绍)
+    * [开源开放的文心大模型](#开源开放的文心大模型)
+    * [基于文心大模型的API服务](#基于文心大模型的API服务)
+* [如何使用](#如何使用)
+    * [开源开放的文心大模型](#开源开放的文心大模型)
+    * 
+
 产业级知识增强大模型——文心大模型，目前已成为千行百业AI开发的首选基座大模型。作为自然语言处理模型库，PaddleNLP 持续开源了众多效果领先的文心大模型，覆盖各任务通用的预训练模型，以及面向特定任务的预训练模型，你可以直接调用此类模型，也可以进行模型二次开发与调优；除了开源开放的模型之外，为满足开发者需求，[PaddleNLP Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines) 中也接入了基于文心大模型的 API 服务，作为 Pipelines 基础组件，供开发者灵活插拔，像搭积木一样组建自己的NLP产线系统。
 
-## 模型介绍（PaddleNLP中接入的文心大模型）
+## 模型介绍
 
 ### 开源开放的文心大模型
 
@@ -129,8 +136,10 @@
 </table>
 <br />
 
+        
 ### 基于文心大模型的API服务
 
+        
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
     <tbody>
         <tr>
@@ -154,7 +163,7 @@
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
                   <a href="">
-                        后续补充更多
+                        ... ... 
                   </a> </span>
             </td>
             <td style="text-align:center">
