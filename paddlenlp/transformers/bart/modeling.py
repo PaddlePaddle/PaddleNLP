@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.nn import Layer, Embedding
+from ...utils.log import logger
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -194,6 +195,7 @@ class BartEncoder(BartPretrainedModel):
     def forward(self,
                 input_ids=None,
                 attention_mask=None,
+                inputs_embeds=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False,
@@ -205,6 +207,8 @@ class BartEncoder(BartPretrainedModel):
             input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
             output_attentions (bool, optional):
                 See :class:`BartModel`.
@@ -223,15 +227,28 @@ class BartEncoder(BartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
-        if input_ids is None:
-            raise ValueError("Input_ids cannot be None.")
-        inputs_embeds = self.embed_tokens(input_ids)
-        inputs_embed_pos = self.encoder_embed_positions(paddle.shape(input_ids))
+        if input_ids is None and inputs_embeds is None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time"
+            )
+        elif input_ids is not None:
+            inputs_shape = input_ids.shape
+            input_ids = input_ids.reshape((-1, inputs_shape[-1]))
+        elif inputs_embeds is not None:
+            inputs_shape = inputs_embeds.shape[:-1]
+        else:
+            raise ValueError(
+                "You have to specify either input_ids or inputs_embeds")
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        inputs_embed_pos = self.encoder_embed_positions(inputs_shape)
         hidden_states = inputs_embeds + inputs_embed_pos
         hidden_states = self.encoder_layernorm_embedding(hidden_states)
         encoder_input = self.encoder_dropout(hidden_states)
 
-        if attention_mask is None:
+        if attention_mask is None and input_ids is not None:
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
@@ -297,6 +314,7 @@ class BartDecoder(BartPretrainedModel):
                 decoder_attention_mask=None,
                 encoder_output=None,
                 memory_mask=None,
+                decoder_inputs_embeds=None,
                 cache=None,
                 output_attentions=False,
                 output_hidden_states=False,
@@ -312,6 +330,8 @@ class BartDecoder(BartPretrainedModel):
             encoder_output (Tensor, optional):
                 See :class:`BartModel`.
             memory_mask (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
             cache (Tensor, optional):
                 See :class:`BartModel`.
@@ -332,17 +352,36 @@ class BartDecoder(BartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
+        # retrieve input_ids and inputs_embeds
+        if decoder_input_ids is not None and decoder_inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
+            )
+        elif decoder_input_ids is not None:
+            inputs_shape = decoder_input_ids.shape
+            decoder_input_ids = decoder_input_ids.reshape(
+                (-1, inputs_shape[-1]))
+        elif decoder_inputs_embeds is not None:
+            inputs_shape = decoder_inputs_embeds.shape[:-1]
+        else:
+            raise ValueError(
+                "You have to specify either decoder_input_ids or decoder_inputs_embeds"
+            )
+
         if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_length = inputs_shape[-1]
             decoder_attention_mask = paddle.tensor.triu((paddle.full(
                 (decoder_length, decoder_length),
                 -np.inf,
                 dtype=paddle.get_default_dtype())), 1)
-        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
+
+        if decoder_inputs_embeds is None:
+            decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
+
         past_key_values_length = paddle.shape(
             cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
-            paddle.shape(decoder_input_ids), past_key_values_length)
+            inputs_shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
@@ -483,11 +522,13 @@ class BartModel(BartPretrainedModel):
         self.shared = value
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                inputs_embeds=None,
+                decoder_inputs_embeds=None,
                 use_cache=False,
                 cache=None,
                 output_attentions=False,
@@ -527,6 +568,19 @@ class BartModel(BartPretrainedModel):
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
                 `attentions` is attentions of all layers of in the Transformer encoder. The length of `attentions` is `num_hidden_layers`.
                 For all element in the tuple, its data type should be float32 and its shape is [`batch_size, num_attention_heads, sequence_length, sequence_length`].
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation 
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over 
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix. 
+                Default to None.
+            decoder_inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `decoder_input_ids` you can choose to directly pass an embedded
+                representation  of shape `(batch_size, target_sequence_length, hidden_size)`. If `cache` is used, 
+                optionally only the last `decoder_inputs_embeds` have to be input (see `past_key_values`). 
+                This is useful if you want more control over how to convert `decoder_input_ids` indices 
+                into associated vectors than the model's internal embedding lookup matrix. Default to None.
+                If `decoder_input_ids` and `decoder_inputs_embeds` are both unset, `decoder_inputs_embeds` takes the value
+                of `inputs_embeds`.
             use_cache (bool, optional):
                  Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                  can be used to speed up decoding.
@@ -568,40 +622,51 @@ class BartModel(BartPretrainedModel):
         '''
         # different to other models, Bart automatically creates decoder_input_ids from
         # inputBartForSequenceClassification_ids if no decoder_input_ids are provided
-        if input_ids is None and encoder_output is None:
+        if input_ids is None and inputs_embeds is None and encoder_output is None:
             raise ValueError(
                 "You have to specify either input_ids or encoder_output")
-        if decoder_input_ids is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating decoder_input_ids"
+
+        if decoder_input_ids is None and decoder_inputs_embeds is None:
+            if input_ids is None:
+                raise ValueError(
+                    "If no `decoder_input_ids` or `decoder_inputs_embeds` are "
+                    "passed, `input_ids` cannot be `None`. Please pass either "
+                    "`input_ids` or `decoder_input_ids` or `decoder_inputs_embeds`."
+                )
             decoder_input_ids = shift_tokens_right(input_ids,
                                                    self.decoder_start_token_id)
-        if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating attention_mask"
+        if attention_mask is None and input_ids is not None:
+            # only generate attention_mask when input_ids is specified
             attention_mask = paddle.cast(
                 input_ids == self.pad_token_id,
                 dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        if inputs_embeds is not None and input_ids is None and attention_mask is None:
+            logger.warning("provided inputs_embeds without attention_mask")
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
+
+        input_type = type(
+            decoder_input_ids) if decoder_input_ids is not None else type(
+                decoder_inputs_embeds)
         if encoder_output is None:
             encoder_output = self.encoder(
                 input_ids,
                 attention_mask,
+                inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
         # If the user passed a tuple for encoder_outputs, we wrap it in a BaseModelOutput when return_dict=True
         elif return_dict and not isinstance(encoder_output, ModelOutput):
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output, )
             encoder_output = convert_encoder_output(encoder_output)
-        if isinstance(encoder_output, type(decoder_input_ids)):
+        if isinstance(encoder_output, input_type):
             encoder_last_hidden_state = encoder_output
         else:
             encoder_last_hidden_state = encoder_output[0]
@@ -611,18 +676,20 @@ class BartModel(BartPretrainedModel):
                     encoder_last_hidden_state)
         else:
             cache = None
-        decoder_output = self.decoder(decoder_input_ids,
-                                      decoder_attention_mask,
-                                      encoder_last_hidden_state,
-                                      attention_mask,
-                                      cache,
-                                      output_attentions=output_attentions,
-                                      output_hidden_states=output_hidden_states,
-                                      return_dict=return_dict)
+        decoder_output = self.decoder(
+            decoder_input_ids,
+            decoder_attention_mask,
+            encoder_last_hidden_state,
+            attention_mask,
+            cache=cache,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
         if not return_dict:
-            if isinstance(decoder_output, type(decoder_input_ids)):
+            if isinstance(decoder_output, input_type):
                 decoder_output = (decoder_output, )
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output, )
             return decoder_output + encoder_output
 
@@ -690,11 +757,13 @@ class BartForSequenceClassification(BartPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                inputs_embeds=None,
+                decoder_inputs_embeds=None,
                 use_cache=False,
                 cache=None,
                 labels=None,
@@ -715,8 +784,12 @@ class BartForSequenceClassification(BartPretrainedModel):
                 See :class:`BartModel`.
             encoder_output (Tensor, optonal):
                 See :class:`BartModel`.
-            use_cache (bool, optional):
+            inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
+                See :class:`BartModel`.
+            use_cache (bool, optional):
+                See :class:`BartModel`. Forcely set to `False` when `labels` is provided that can save memory during training.
             cache (Tensor, optional):
                 See :class:`BartModel`.
             labels (Tensor, optional):
@@ -753,30 +826,47 @@ class BartForSequenceClassification(BartPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
+        if labels is not None:
+            logger.warning(
+                "The `use_cache` argument is changed to `False` since `labels` is provided."
+            )
+            use_cache = False
+
+        if input_ids is None and inputs_embeds is not None:
+            logger.warning(
+                f"{self.__class__.__name__} will not detect eos tokens in `inputs_embeds`. Results may be "
+                "unexpected if using eos tokens in conjunction with `inputs_embeds.`"
+            )
+
         outputs = self.bart(
             input_ids,
             attention_mask,
             decoder_input_ids,
             decoder_attention_mask,
             encoder_output,
-            use_cache,
-            cache,
+            inputs_embeds=inputs_embeds,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            cache=cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
         output = outputs[0]
-        eos_mask = paddle.cast(input_ids == self.bart.config['eos_token_id'],
-                               dtype='int64')
-        if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
-            raise ValueError(
-                'All examples must have the same number of <eos> tokens.')
-
         output_shape = paddle.shape(output)
-        # TODO(gongenlei): support bool tensor index
-        output = output.masked_select(
-            eos_mask.unsqueeze(-1).astype('bool').tile([1, 1,
-                                                        output_shape[-1]]))
+
+        if input_ids is not None:
+            eos_mask = paddle.cast(
+                input_ids == self.bart.config['eos_token_id'], dtype='int64')
+            if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
+                raise ValueError(
+                    'All examples must have the same number of <eos> tokens.')
+
+            # TODO(gongenlei): support bool tensor index
+            output = output.masked_select(
+                eos_mask.unsqueeze(-1).astype('bool').tile(
+                    [1, 1, output_shape[-1]]))
+
         sentence_representation = output.reshape(
             [output_shape[0], -1, output_shape[-1]])[:, -1, :]
         logits = self.classifier(sentence_representation)
@@ -830,11 +920,13 @@ class BartForQuestionAnswering(BartPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                inputs_embeds=None,
+                decoder_inputs_embeds=None,
                 use_cache=False,
                 cache=None,
                 start_positions=None,
@@ -856,8 +948,12 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 See :class:`BartModel`.
             encoder_output (Tensor, optonal):
                 See :class:`BartModel`.
-            use_cache (bool, optional):
+            inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
+                See :class:`BartModel`.
+            use_cache (bool, optional):
+                See :class:`BartModel`. Forcely set to `False` when `start_positions` and `end_positions` are provided that can save memory during training.
             cache (Tensor, optional):
                 See :class:`BartModel`.
             start_positions (Tensor, optional):
@@ -910,13 +1006,21 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 start_logits = outputs[0]
                 end_logits  =outputs[1]
         """
+        if start_positions is not None and end_positions is not None:
+            logger.warning(
+                "The `use_cache` argument is changed to `False` since `start_positions` and `end_positions` are provided."
+            )
+            use_cache = False
+
         outputs = self.bart(input_ids,
                             attention_mask,
                             decoder_input_ids,
                             decoder_attention_mask,
                             encoder_output,
-                            use_cache,
-                            cache,
+                            inputs_embeds=inputs_embeds,
+                            decoder_inputs_embeds=decoder_inputs_embeds,
+                            use_cache=use_cache,
+                            cache=cache,
                             output_attentions=output_attentions,
                             output_hidden_states=output_hidden_states,
                             return_dict=return_dict)
@@ -1019,11 +1123,13 @@ class BartForConditionalGeneration(BartPretrainedModel):
         return self._faster_entry
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 attention_mask=None,
                 decoder_input_ids=None,
                 decoder_attention_mask=None,
                 encoder_output=None,
+                inputs_embeds=None,
+                decoder_inputs_embeds=None,
                 use_cache=False,
                 cache=None,
                 labels=None,
@@ -1043,6 +1149,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
             decoder_attention_mask (Tensor, optional):
                 See :class:`BartModel`.
             encoder_output (Tensor, optonal):
+                See :class:`BartModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
             use_cache (bool, optional):
                 See :class:`BartModel`.
@@ -1088,13 +1198,22 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 outputs = model(**inputs)
 
         """
+        if labels is not None:
+            if use_cache:
+                logger.warning(
+                    "The `use_cache` argument is changed to `False` since `labels` is provided."
+                )
+            use_cache = False
+
         outputs = self.bart(input_ids,
                             attention_mask,
                             decoder_input_ids,
                             decoder_attention_mask,
                             encoder_output,
-                            use_cache,
-                            cache,
+                            inputs_embeds=inputs_embeds,
+                            decoder_inputs_embeds=decoder_inputs_embeds,
+                            use_cache=use_cache,
+                            cache=cache,
                             output_attentions=output_attentions,
                             output_hidden_states=output_hidden_states,
                             return_dict=return_dict)
