@@ -23,8 +23,10 @@ from paddle import Tensor
 
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 
 from ..model_utils import PretrainedModel, register_base_model
+from ...utils.log import logger
 from ..nezha.modeling import ACT2FN
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -44,6 +46,8 @@ T5_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "t5-small",
     "t5-base",
     "t5-large",
+    "t5-3b",
+    "t5-11b",
 ]
 
 
@@ -191,6 +195,7 @@ class T5Attention(nn.Layer):
         self.n_heads = num_heads
         self.dropout = dropout_rate
         self.inner_dim = self.n_heads * self.key_value_proj_dim
+        self.enable_recompute = False
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
         self.q = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
@@ -365,6 +370,8 @@ class T5Attention(nn.Layer):
                     shape=(1, self.n_heads, real_seq_length, key_length),
                     dtype=scores.dtype,
                 )
+                if self.training and self.enable_recompute:
+                    position_bias.stop_gradient = False
             else:
                 position_bias = self.compute_bias(real_seq_length, key_length)
 
@@ -733,6 +740,42 @@ class T5PretrainedModel(PretrainedModel):
             "initializer_factor": 1.0,
             "feed_forward_proj": "gated-gelu",
         },
+        "t5-3b": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 1024,
+            "d_kv": 128,
+            "d_ff": 16384,
+            "num_layers": 24,
+            "num_decoder_layers": 24,
+            "num_heads": 32,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu"
+        },
+        "t5-11b": {
+            "tie_word_embeddings": True,
+            "pad_token_id": 0,
+            "bos_token_id": 0,
+            "eos_token_id": 1,
+            "vocab_size": 32128,
+            "d_model": 1024,
+            "d_kv": 128,
+            "d_ff": 65536,
+            "num_layers": 24,
+            "num_decoder_layers": 24,
+            "num_heads": 128,
+            "relative_attention_num_buckets": 32,
+            "dropout_rate": 0.1,
+            "layer_norm_epsilon": 1e-06,
+            "initializer_factor": 1.0,
+            "feed_forward_proj": "relu"
+        },
     }
     pretrained_resource_files_map = {
         "model_state": {
@@ -742,6 +785,10 @@ class T5PretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/model_state.pdparams",
             "t5-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/model_state.pdparams",
+            "t5-3b":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/model_state.pdparams",
+            "t5-11b":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/model_state.pdparams",
             "t5-v1_1-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/model_state.pdparams",
             "t5-v1_1-large":
@@ -914,7 +961,8 @@ class T5Stack(nn.Layer):
                  feed_forward_proj,
                  d_ff,
                  embed_tokens=None,
-                 is_decoder=False):
+                 is_decoder=False,
+                 enable_recompute=False):
         super().__init__()
         self.is_decoder = is_decoder
         self.embed_tokens = embed_tokens
@@ -933,6 +981,7 @@ class T5Stack(nn.Layer):
         ])
         self.final_layer_norm = T5LayerNorm(d_model, eps=layer_norm_epsilon)
         self.dropout = nn.Dropout(dropout_rate)
+        self.enable_recompute = enable_recompute
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1032,17 +1081,39 @@ class T5Stack(nn.Layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states, )
 
-            layer_outputs = layer_module(
-                hidden_states,
-                attention_mask=extended_attention_mask,
-                position_bias=position_bias,
-                encoder_hidden_states=encoder_hidden_states,
-                encoder_attention_mask=encoder_extended_attention_mask,
-                encoder_decoder_position_bias=encoder_decoder_position_bias,
-                cache=past_key_value,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-            )
+            if self.enable_recompute and self.training:
+                if use_cache:
+                    logger.warning(
+                        "`use_cache=True` is incompatible with `config.enable_recompute=True`. Setting "
+                        "`use_cache=False`...")
+                    use_cache = False
+
+                def create_custom_forward(module):
+
+                    def custom_forward(*inputs):
+                        return tuple(
+                            module(*inputs, use_cache, output_attentions))
+
+                    return custom_forward
+
+                layer_outputs = recompute(create_custom_forward(layer_module),
+                                          hidden_states,
+                                          extended_attention_mask,
+                                          position_bias, encoder_hidden_states,
+                                          encoder_extended_attention_mask,
+                                          encoder_decoder_position_bias, None)
+            else:
+                layer_outputs = layer_module(
+                    hidden_states,
+                    attention_mask=extended_attention_mask,
+                    position_bias=position_bias,
+                    encoder_hidden_states=encoder_hidden_states,
+                    encoder_attention_mask=encoder_extended_attention_mask,
+                    encoder_decoder_position_bias=encoder_decoder_position_bias,
+                    cache=past_key_value,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                )
 
             # layer_outputs is a tuple with:
             # hidden-states, key-value-states, (self-attention position bias), (self-attention weights), (cross-attention position bias), (cross-attention weights)
@@ -1181,11 +1252,14 @@ class T5Stack(nn.Layer):
                 1.0 - encoder_extended_attention_mask) * -1e4
         elif self.dtype == paddle.float32:
             encoder_extended_attention_mask = (
-                1.0 - encoder_extended_attention_mask) * -1e9
+                1.0 - encoder_extended_attention_mask) * -1e4
         else:
-            raise ValueError(
-                f"{self.dtype} not recognized. `dtype` should be set to either `paddle.float32` or `paddle.float16`"
-            )
+            encoder_extended_attention_mask = (
+                1.0 - encoder_extended_attention_mask) * -1e4
+
+            # raise ValueError(
+            #     f"{self.dtype} not recognized. `dtype` should be set to either `paddle.float32` or `paddle.float16`"
+            # )
 
         return encoder_extended_attention_mask
 
@@ -1243,23 +1317,26 @@ class T5Model(T5PretrainedModel):
 
     """
 
-    def __init__(self,
-                 tie_word_embeddings=True,
-                 pad_token_id=0,
-                 bos_token_id=0,
-                 eos_token_id=1,
-                 initializer_factor=1.0,
-                 vocab_size=32128,
-                 d_model=768,
-                 d_kv=64,
-                 d_ff=3072,
-                 num_layers=12,
-                 num_decoder_layers=12,
-                 num_heads=12,
-                 relative_attention_num_buckets=32,
-                 dropout_rate=0.1,
-                 layer_norm_epsilon=1e-06,
-                 feed_forward_proj="relu"):
+    def __init__(
+        self,
+        tie_word_embeddings=True,
+        pad_token_id=0,
+        bos_token_id=0,
+        eos_token_id=1,
+        initializer_factor=1.0,
+        vocab_size=32128,
+        d_model=768,
+        d_kv=64,
+        d_ff=3072,
+        num_layers=12,
+        num_decoder_layers=12,
+        num_heads=12,
+        relative_attention_num_buckets=32,
+        dropout_rate=0.1,
+        layer_norm_epsilon=1e-06,
+        feed_forward_proj="relu",
+        enable_recompute=False,
+    ):
         super().__init__()
         self.tie_word_embeddings = tie_word_embeddings
         self.pad_token_id = pad_token_id
@@ -1289,7 +1366,8 @@ class T5Model(T5PretrainedModel):
                                feed_forward_proj,
                                d_ff,
                                self.shared,
-                               is_decoder=False)
+                               is_decoder=False,
+                               enable_recompute=enable_recompute)
         self.decoder = T5Stack(d_model,
                                num_decoder_layers,
                                layer_norm_epsilon,
@@ -1300,7 +1378,8 @@ class T5Model(T5PretrainedModel):
                                feed_forward_proj,
                                d_ff,
                                self.shared,
-                               is_decoder=True)
+                               is_decoder=True,
+                               enable_recompute=enable_recompute)
 
         self.init_weights()
 
@@ -1566,7 +1645,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 labels=None,
                 inputs_embeds=None,
                 decoder_inputs_embeds=None,
-                use_cache=True,
+                use_cache=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -1674,6 +1753,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
 
         """
 
+        use_cache = use_cache if use_cache is not None else False
         # Encode if needed (training, first prediction pass)
         if encoder_output is None:
             # Convert encoder inputs in embeddings if needed
@@ -1734,8 +1814,10 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
-            loss = loss_fct(lm_logits.reshape(shape=[-1, lm_logits.shape[-1]]),
-                            labels.flatten())
+            loss = loss_fct(
+                lm_logits.reshape(
+                    shape=[-1, lm_logits.shape[-1]]).astype("float32"),
+                labels.flatten())
 
         if not return_dict:
             output = (lm_logits, ) + decoder_outputs[1:] + encoder_output

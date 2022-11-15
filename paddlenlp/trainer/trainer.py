@@ -38,7 +38,11 @@ import paddle
 import paddle.nn as nn
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
+from paddle.distributed.sharding import group_sharded_parallel
+from paddle.fluid.dygraph.parallel import sync_params_buffers
+
 from paddle.io import (
     Dataset,
     DataLoader,
@@ -65,9 +69,14 @@ from .trainer_utils import (
     EvalLoopOutput,
     speed_metrics,
     OptimizerNames,
+    ShardingOption,
     PREFIX_CHECKPOINT_DIR,
     get_last_checkpoint,
     get_scheduler,
+    IterableDatasetShard,
+    has_length,
+    find_batch_size,
+    RemoveColumnsCollator,
 )
 from .trainer_callback import (
     CallbackHandler,
@@ -179,10 +188,6 @@ class Trainer:
         optimizers: Tuple[paddle.optimizer.Optimizer,
                           paddle.optimizer.lr.LRScheduler] = (None, None),
     ):
-        if paddle.distributed.get_world_size() > 1:
-            if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized(
-            ):
-                paddle.distributed.init_parallel_env()
 
         if args is None:
             output_dir = "tmp_trainer"
@@ -193,7 +198,7 @@ class Trainer:
 
         self.args = args
         self.is_in_train = False
-        self.do_grad_scaling = args.fp16
+        # self.do_grad_scaling = args.fp16
 
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
@@ -203,6 +208,20 @@ class Trainer:
 
         if self.args.should_save:
             os.makedirs(self.args.output_dir, exist_ok=True)
+
+        self.sharding = None
+        if len(args.sharding) > 0:
+            if args.local_rank == -1:
+                raise ValueError(
+                    "Using sharding only works in distributed training.")
+            self.sharding = True
+
+        # init parallel env
+        if paddle.distributed.get_world_size() > 1:
+            if self.sharding:
+                self.hcg = fleet.get_hybrid_communicate_group()
+                self.dp_group = self.hcg.get_data_parallel_group()
+                self.sharding_group = self.hcg.get_sharding_parallel_group()
 
         default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(
             tokenizer)
@@ -222,6 +241,13 @@ class Trainer:
         self.state = TrainerState()
         self.control = TrainerControl()
         self._signature_columns = None
+
+        if (self.sharding is not None) and (self.optimizer is not None
+                                            or self.lr_scheduler is not None):
+            raise RuntimeError(
+                "Passing `optimizers` is not allowed if sharding is enabled."
+                "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
+            )
 
         default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(
             self.args.report_to)
@@ -243,16 +269,41 @@ class Trainer:
                 "train_dataset does not implement __len__, max_steps has to be specified"
             )
 
-        if args.fp16:
-            self.scaler = paddle.amp.GradScaler(
-                init_loss_scaling=self.args.scale_loss)
+        self.do_grad_scaling = False
+        if (args.fp16 or args.bf16):
             logger.info("Using half precision")
+            self.do_grad_scaling = True
+            self.amp_dtype = "float16" if args.fp16 else "bfloat16"
+
+            if self.sharding is not None:
+                self.scaler = paddle.amp.GradScaler(
+                    init_loss_scaling=self.args.scale_loss)
+                if self.amp_dtype == "float16":
+                    if ShardingOption.SHARD_OP in self.args.sharding:
+                        self.scaler = fleet.distributed_scaler(self.scaler)
+                    else:
+                        # scaler for stage2 and stage3
+                        if paddle.framework.in_dygraph_mode():
+                            from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
+                            self.scaler = GroupShardedScaler(self.scaler)
+                        else:
+                            from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
+                            self.scaler = ShardingScaler(self.scaler)
+                else:
+                    self.do_grad_scaling = False
+                    self.use_cuda_amp = False
+                    self.amp_dtype = None
+
+            else:
+                self.scaler = paddle.amp.GradScaler(
+                    init_loss_scaling=self.args.scale_loss)
 
         if args.recompute:
 
             def fn(layer):
-                if type(layer) == paddle.nn.TransformerEncoder or type(
-                        layer) == paddle.nn.TransformerDecoder:
+                if hasattr(
+                        layer,
+                        "enable_recompute") and layer.enable_recompute is False:
                     layer.enable_recompute = True
 
             model.apply(fn)
@@ -330,37 +381,14 @@ class Trainer:
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            state_dict = paddle.load(os.path.join(resume_from_checkpoint,
+                                                  WEIGHTS_NAME),
+                                     return_numpy=True)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
 
             # release memory
             del state_dict
-
-    @staticmethod
-    def init_num_steps(args, num_samples_per_epoch):
-        args.total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
-
-        num_update_steps_per_epoch = num_samples_per_epoch // args.train_batch_size + int(
-            num_samples_per_epoch % args.train_batch_size > 0)
-        num_update_steps_per_epoch //= args.gradient_accumulation_steps
-        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-        args.num_update_steps_per_epoch = num_update_steps_per_epoch
-
-        if args.max_steps > 0:
-            args.num_training_steps = args.max_steps
-            args.num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
-                args.max_steps % num_update_steps_per_epoch > 0)
-            args.num_train_samples = args.max_steps * args.total_train_batch_size
-        else:
-            args.num_training_steps = num_update_steps_per_epoch * args.num_train_epochs
-            args.num_train_epochs = math.ceil(args.num_train_epochs)
-            args.num_train_samples = num_samples_per_epoch * args.num_train_epochs
-
-        if args.warmup_steps <= 0:
-            args.warmup_steps = int(args.warmup_ratio * args.num_training_steps)
-        return args
 
     def train(
         self,
@@ -401,8 +429,9 @@ class Trainer:
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            state_dict = paddle.load(os.path.join(resume_from_checkpoint,
+                                                  WEIGHTS_NAME),
+                                     return_numpy=True)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
 
@@ -410,42 +439,86 @@ class Trainer:
             del state_dict
 
         train_dataloader = self.get_train_dataloader()
-        model = self._wrap_model(self.model_wrapped)
+
+        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+        len_dataloader = None
+        if has_length(train_dataloader):
+            len_dataloader = len(train_dataloader)
+            num_update_steps_per_epoch = len(
+                train_dataloader) // args.gradient_accumulation_steps
+            num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+            num_examples = len(self.train_dataset)
+
+            if args.max_steps > 0:
+                max_steps = args.max_steps
+                num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
+                    args.max_steps % num_update_steps_per_epoch > 0)
+                num_train_samples = args.max_steps * total_train_batch_size
+            else:
+                max_steps = num_update_steps_per_epoch * args.num_train_epochs
+                num_train_epochs = math.ceil(args.num_train_epochs)
+                num_train_samples = len(
+                    self.train_dataset) * args.num_train_epochs
+
+            if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
+                if max_steps // args.eval_steps < args.minimum_eval_times:
+                    exp_step = max_steps / args.minimum_eval_times
+                    exp_step = max(int(exp_step - exp_step % 10), 10)
+                    logger.info("Reset eval step by minimum_eval_times to %d" %
+                                exp_step)
+                    args.eval_steps = exp_step
+        elif args.max_steps > 0:  # Rely on max_steps when dataloader does not have a working size
+            max_steps = args.max_steps
+            # Setting a very large number of epochs so we go as many times as necessary over the iterator.
+            num_train_epochs = sys.maxsize
+            num_update_steps_per_epoch = max_steps
+            num_examples = total_train_batch_size * args.max_steps
+            num_train_samples = args.max_steps * total_train_batch_size
+        else:
+            raise ValueError(
+                f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
+            )
+
+        # delay_optimizer_creation = (
+        #     self.sharding is not None
+        #     and ShardingOption.SHARD_OP not in self.args.sharding
+        # )
+        delay_optimizer_creation = self.sharding is None
+
+        if not delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         self.state = TrainerState()
 
-        args = self.init_num_steps(args, len(self.train_dataset))
+        model = self._wrap_model(self.model_wrapped)
 
-        if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
-            if args.num_training_steps // args.eval_steps < args.minimum_eval_times:
-                exp_step = args.num_training_steps / args.minimum_eval_times
-                exp_step = max(int(exp_step - exp_step % 10), 10)
-                logger.info("Reset eval step by minimum_eval_times to %d" %
-                            exp_step)
-                args.eval_steps = exp_step
+        # for the rest of this function `model` is the outside model, whether it was wrapped or not
+        if model is not self.model:
+            self.model_wrapped = model
 
-        self.create_optimizer_and_scheduler(
-            num_training_steps=args.num_training_steps)
+        if delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
-        num_examples = len(self.train_dataset)
-
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
-        logger.info(f"  Num Epochs = {args.num_train_epochs}")
+        logger.info(f"  Num Epochs = {num_train_epochs}")
         logger.info(
             f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
         )
         logger.info(
-            f"  Total train batch size (w. parallel, distributed & accumulation) = {args.total_train_batch_size}"
+            f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}"
         )
         logger.info(
             f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
         )
-        logger.info(f"  Total optimization steps = {args.num_training_steps}")
-        logger.info(f"  Total num train samples = {args.num_train_samples}")
+        logger.info(f"  Total optimization steps = {max_steps}")
+        logger.info(f"  Total num train samples = {num_train_samples}")
+        logger.info(
+            f"  Number of trainable parameters = {sum(p.numel().item() for p in model.parameters() if not p.stop_gradient) }"
+        )
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -498,15 +571,17 @@ class Trainer:
                     )
 
         epoch_iterator = train_dataloader
-        steps_in_epoch = len(epoch_iterator)
+        # steps_in_epoch = len(epoch_iterator)
+        steps_in_epoch = (len(epoch_iterator) if len_dataloader is not None else
+                          args.max_steps * args.gradient_accumulation_steps)
 
         self.callback_handler.model = self.model
         self.callback_handler.optimizer = self.optimizer
         self.callback_handler.lr_scheduler = self.lr_scheduler
         self.callback_handler.train_dataloader = train_dataloader
 
-        self.state.max_steps = int(args.num_training_steps)
-        self.state.num_train_epochs = args.num_train_epochs
+        self.state.max_steps = int(max_steps)
+        self.state.num_train_epochs = num_train_epochs
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
@@ -517,7 +592,7 @@ class Trainer:
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
-        for epoch in range(epochs_trained, args.num_train_epochs):
+        for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader,
                           paddle.io.DataLoader) and isinstance(
                               train_dataloader.batch_sampler,
@@ -560,11 +635,22 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control)
 
+                dp_enabled = self.args.dp_degree > 1 if self.sharding else args.local_rank != -1
+                forbidden_no_sync = False
+                if self.sharding and (ShardingOption.SHARD_OP
+                                      not in self.args.sharding):
+                    # stage2 and stage3 should no_sync, because the is no DDP wrapper and  no_sync API
+                    forbidden_no_sync = True
+                availiable_no_sync = dp_enabled and not forbidden_no_sync
+
                 is_no_sync = (((
                     (step + 1) % args.gradient_accumulation_steps != 0)
-                               and args.local_rank != -1
+                               and availiable_no_sync
                                and args._no_sync_in_gradient_accumulation)
-                              or (args.recompute and args.local_rank != -1))
+                              or (args.recompute and availiable_no_sync))
+                # sharding
+                # stage1. the same as ddp
+                # stage2. manualy collect gradient on dp group
 
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
@@ -580,16 +666,43 @@ class Trainer:
                         steps_in_epoch <= args.gradient_accumulation_steps and
                     (step + 1) == steps_in_epoch):
 
-                    if (args.recompute and args.local_rank != -1):
+                    # Maunally collect gradients
+                    # Case 1: Use sharding stage 2/3 with dp
+                    # Case 2: Use recompute and dp
+                    # local_rank != -1 don't means dp in networks.
+                    if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
+                        if self.args.dp_degree > 1:
+                            fused_allreduce_gradients(
+                                model.parameters(),
+                                fleet.get_hybrid_communicate_group())
+                            if ShardingOption.FULL_SHARD in self.args.sharding:
+                                # Why need sync on parm again ?
+                                # TODO: fix this.
+                                for p in model.parameters():
+                                    if hasattr(p, "bw_storage"):
+                                        assert p.grad is None, "This case shouldn't happen."
+                                        p.bw_storage.scale_(
+                                            1.0 / self.dp_group.nranks)
+                                        paddle.distributed.all_reduce(
+                                            p.bw_storage, group=self.dp_group)
+
+                    elif (args.recompute and dp_enabled):
                         fused_allreduce_gradients(list(model.parameters()),
                                                   None)
-
+                    # Optimizer step
+                    optimizer_was_run = True
                     if self.do_grad_scaling:
-                        self.scaler.minimize(self.optimizer, tr_loss)
+                        scale_before = self.scaler._scale.numpy()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        scale_after = self.scaler._scale.numpy()
+                        optimizer_was_run = scale_before <= scale_after
                     else:
                         self.optimizer.step()
 
-                    self.lr_scheduler.step()
+                    if optimizer_was_run:
+                        self.lr_scheduler.step()
+
                     self.optimizer.clear_grad()
 
                     self.state.global_step += 1
@@ -640,7 +753,7 @@ class Trainer:
                                            WEIGHTS_NAME)
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path)
+                state_dict = paddle.load(best_model_path, return_numpy=True)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
@@ -654,7 +767,7 @@ class Trainer:
 
         metrics = speed_metrics("train",
                                 start_time,
-                                num_samples=args.num_train_samples,
+                                num_samples=num_train_samples,
                                 num_steps=self.state.max_steps)
 
         metrics["train_loss"] = train_loss
@@ -669,7 +782,7 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
-        if not isinstance(self.train_dataset, collections.abc.Sized):
+        if self.train_dataset is None or not has_length(self.train_dataset):
             return None
 
         if self.args.world_size <= 1:
@@ -709,14 +822,14 @@ class Trainer:
             logs["learning_rate"] = self._get_learning_rate()
             logs["global_step"] = int(self.state.global_step)
 
+            total_train_batch_size = self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.world_size
+            num_steps = self.state.global_step - self._globalstep_last_logged
             logs.update(
                 speed_metrics(
                     "interval",
                     self._globalstep_last_start_time,
-                    num_samples=self.args.train_batch_size *
-                    self.args.gradient_accumulation_steps,
-                    num_steps=self.state.global_step -
-                    self._globalstep_last_logged,
+                    num_samples=total_train_batch_size * num_steps,
+                    num_steps=num_steps,
                 ))
 
             self._total_loss_scalar += tr_loss_scalar
@@ -755,6 +868,23 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset,
                                                         description="training")
 
+        if self._is_iterable_dataset(train_dataset):
+            if self.args.world_size > 1:
+                train_dataset = IterableDatasetShard(
+                    train_dataset,
+                    batch_size=self.args.per_device_train_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                train_dataset,
+                batch_size=self.args.per_device_eval_batch_size,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
+
         train_sampler = self._get_train_sampler()
 
         return DataLoader(
@@ -768,7 +898,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
-                batch_size=self.args.eval_batch_size,
+                batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
             )
@@ -777,7 +907,7 @@ class Trainer:
                 eval_dataset,
                 num_replicas=self.args.world_size,
                 rank=self.args.process_index,
-                batch_size=self.args.eval_batch_size,
+                batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
                 drop_last=False,
             )
@@ -804,6 +934,23 @@ class Trainer:
             eval_dataset = self._remove_unused_columns(eval_dataset,
                                                        description="evaluation")
 
+        if self._is_iterable_dataset(eval_dataset):
+            if self.args.world_size > 1:
+                eval_dataset = IterableDatasetShard(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                eval_dataset,
+                batch_size=self.args.per_device_eval_batch_size,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
+
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
         return DataLoader(
@@ -828,6 +975,25 @@ class Trainer:
                                                   datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset,
                                                        description="test")
+
+        if self._is_iterable_dataset(test_dataset):
+            if self.args.world_size > 1:
+                test_dataset = IterableDatasetShard(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    drop_last=self.args.dataloader_drop_last,
+                    num_processes=self.args.world_size,
+                    process_index=self.args.process_index,
+                )
+
+            return DataLoader(
+                test_dataset,
+                batch_size=self.args.per_device_eval_batch_size *
+                self.world_size,
+                collate_fn=self.
+                data_collator,  # _get_collator_with_removed_columns
+                num_workers=self.args.dataloader_num_workers,
+            )
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
@@ -867,14 +1033,28 @@ class Trainer:
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
                 self.args)
 
-            self.optimizer = optimizer_cls(
-                learning_rate=self.lr_scheduler
-                if lr_scheduler is None else lr_scheduler,
-                apply_decay_param_fun=apply_decay_param_fun,
-                parameters=self.model.parameters(),
-                weight_decay=self.args.weight_decay,
-                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
-                **optimizer_kwargs)
+            if ShardingOption.SHARD_OP in self.args.sharding:
+                from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import DygraphShardingOptimizer
+                self.optimizer = DygraphShardingOptimizer(
+                    hcg=fleet.get_hybrid_communicate_group(),
+                    user_defined_strategy=None,
+                    params=self.model.parameters(),
+                    inner_optimizer_class=optimizer_cls,
+                    learning_rate=self.lr_scheduler
+                    if lr_scheduler is None else lr_scheduler,
+                    apply_decay_param_fun=apply_decay_param_fun,
+                    weight_decay=self.args.weight_decay,
+                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
+                    **optimizer_kwargs)
+            else:
+                self.optimizer = optimizer_cls(
+                    learning_rate=self.lr_scheduler
+                    if lr_scheduler is None else lr_scheduler,
+                    apply_decay_param_fun=apply_decay_param_fun,
+                    parameters=self.model.parameters(),
+                    weight_decay=self.args.weight_decay,
+                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
+                    **optimizer_kwargs)
 
         return self.optimizer
 
@@ -962,9 +1142,22 @@ class Trainer:
 
         return self.lr_scheduler
 
+    def num_examples(self, dataloader: DataLoader) -> int:
+        """
+        Helper to get number of samples in a [`~paddle.io.DataLoader`] by accessing its dataset. When
+        dataloader.dataset does not exist or has no length, estimates as best it can
+        """
+        try:
+            dataset = dataloader.dataset
+            # Special case for IterableDatasetShard, we need to dig deeper
+            if isinstance(dataset, IterableDatasetShard):
+                return len(dataloader.dataset.dataset)
+            return len(dataloader.dataset)
+        except (NameError, AttributeError, TypeError
+                ):  # no dataset or length, estimate by length of dataloader
+            return len(dataloader) * self.args.per_device_train_batch_size
+
     def _wrap_model(self, model, training=True):
-        if self.args.world_size > 1:
-            model = paddle.DataParallel(model)
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
@@ -974,6 +1167,53 @@ class Trainer:
         # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
         if not training:
             return model
+
+        # Mixed precision training
+        if training and self.do_grad_scaling:  # self.args.fp16_opt_level=="O2":
+            # model, self.optimizer
+            decorated = paddle.amp.decorate(models=model,
+                                            optimizers=self.optimizer,
+                                            level=self.args.fp16_opt_level,
+                                            dtype=self.amp_dtype)
+            if self.optimizer is None:
+                model = decorated
+            else:
+                model, self.optimizer = decorated
+
+        # Multi-gpu training
+        if self.args.world_size > 1 and self.sharding is None:
+            model = paddle.DataParallel(model)
+            # Distributed training (should be after fp16 initialization)
+        if self.sharding is not None:
+            # Sharded DDP!
+            if ShardingOption.SHARD_OP in self.args.sharding:
+                model = fleet.distributed_model(model)
+                self.optimizer = fleet.distributed_optimizer(self.optimizer)
+            else:
+                # sync params (broadcast) buffers in dp group
+                if self.args.dp_degree > 1:
+                    hcg = fleet.get_hybrid_communicate_group()
+                    dp_group = hcg.get_data_parallel_group()
+                    sync_params_buffers(model,
+                                        comm_group=dp_group,
+                                        src_rank=dp_group.ranks[0])
+
+                cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
+                assert self.optimizer is not None, "optimizer is empty!"
+                level = None
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                    level = "os_g"
+                if ShardingOption.FULL_SHARD in self.args.sharding:
+                    level = "p_g_os"
+
+                model, optimizer, _ = group_sharded_parallel(
+                    model,
+                    self.optimizer,
+                    level=level,
+                    scaler=None,
+                    group=self.sharding_group,
+                    offload=cpu_offload)
+                self.optimizer = optimizer
 
         return model
 
@@ -1018,9 +1258,9 @@ class Trainer:
                                    custom_black_list=[
                                        "reduce_sum",
                                        "c_softmax_with_cross_entropy",
-                                       "elementwise_div",
                                    ],
-                                   level=self.args.fp16_opt_level)
+                                   level=self.args.fp16_opt_level,
+                                   dtype=self.amp_dtype)
         else:
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                 3, 7) else contextlib.suppress()
@@ -1041,6 +1281,8 @@ class Trainer:
             labels = inputs["generator_labels"]
         else:
             labels = None
+        # TODO: label_names pop
+
         outputs = model(**inputs)
 
         if self.criterion is not None:
@@ -1118,11 +1360,25 @@ class Trainer:
 
         self.save_model(output_dir)
 
+        if self.sharding is not None:
+            if self.dp_group.rank == 0:
+                paddle.save(
+                    self.optimizer.state_dict(),
+                    os.path.join(
+                        output_dir,
+                        OPTIMIZER_NAME + f"_shard{self.sharding_group.rank}"))
+
         if self.args.should_save:
-            paddle.save(self.optimizer.state_dict(),
-                        os.path.join(output_dir, OPTIMIZER_NAME))
+            if self.sharding is not None:
+                # alias for opitimizer state, should be merge on different shard!
+                paddle.save({}, os.path.join(output_dir, OPTIMIZER_NAME))
+            else:
+                paddle.save(self.optimizer.state_dict(),
+                            os.path.join(output_dir, OPTIMIZER_NAME))
+
             paddle.save(self.lr_scheduler.state_dict(),
                         os.path.join(output_dir, SCHEDULER_NAME))
+
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(),
                             os.path.join(output_dir, SCALER_NAME))
@@ -1273,8 +1529,22 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME)) and os.path.isfile(
                     os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(
-                paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME)))
+            if self.sharding is not None:
+                self.optimizer.set_state_dict(
+                    paddle.load(os.path.join(
+                        checkpoint,
+                        OPTIMIZER_NAME + f"_shard{self.sharding_group.rank}"),
+                                return_numpy=True))
+                empty_dict = paddle.load(os.path.join(checkpoint,
+                                                      OPTIMIZER_NAME),
+                                         return_numpy=True)
+                assert len(
+                    empty_dict
+                ) == 0, "Optimizer file of sharding, should be empty!"
+            else:
+                self.optimizer.set_state_dict(
+                    paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME),
+                                return_numpy=True))
             self.lr_scheduler.set_state_dict(
                 paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(
@@ -1392,9 +1662,9 @@ class Trainer:
         else:
             raise ValueError("Only support for paddle.io.DataLoader")
 
-        if max_eval_iters <= 0:
-            num_samples = self.num_examples(dataloader)
-        else:
+        num_samples = None
+        if max_eval_iters > 0:
+            # on eval limit steps
             num_samples = batch_size * self.args.world_size * max_eval_iters
             if isinstance(
                     dataloader, paddle.fluid.dataloader.dataloader_iter.
@@ -1402,21 +1672,24 @@ class Trainer:
                         dataloader._batch_sampler, NlpDistributedBatchSampler):
                 consumed_samples = (
                     (self.state.global_step) // args.eval_steps
-                ) * max_eval_iters * args.eval_batch_size * args.world_size
+                ) * max_eval_iters * args.per_device_eval_batch_size * args.world_size
                 dataloader._batch_sampler.set_epoch(
                     consumed_samples=consumed_samples)
 
         logger.info(f"***** Running {description} *****")
-        logger.info(f"  Num examples = {num_samples}")
+        if has_length(dataloader):
+            logger.info(f"  Num examples = {self.num_examples(dataloader)}")
+            logger.info(f"  Total prediction steps = {len(dataloader)}")
+        else:
+            logger.info("  Num examples: Unknown")
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.world_size}")
-        logger.info(f"  Total prediction steps = {len(dataloader)}")
 
         model.eval()
 
         self.callback_handler.eval_dataloader = dataloader
         # Do this before wrapping.
-        # eval_dataset = dataloader.dataset
+        eval_dataset = dataloader.dataset
 
         if args.past_index >= 0:
             self._past = None
@@ -1432,10 +1705,18 @@ class Trainer:
         all_labels = None
         # Will be useful when we have an iterable dataset so don't know its length.
 
+        observed_num_examples = 0
         # Main evaluation loop
         losses = []
         for step, inputs in enumerate(dataloader):
             # Update the observed num examples
+            observed_batch_size = find_batch_size(inputs)
+            if observed_batch_size is not None:
+                observed_num_examples += observed_batch_size
+                # For batch samplers, batch_size is not known by the dataloader in advance.
+                if batch_size is None:
+                    batch_size = observed_batch_size
+
             # Prediction step
             loss, logits, labels = self.prediction_step(model,
                                                         inputs,
@@ -1475,6 +1756,22 @@ class Trainer:
             labels = nested_numpify(labels_host)
             all_labels = labels if all_labels is None else nested_concat(
                 all_labels, labels, padding_index=-100)
+
+        # Number of samples
+        if num_samples is not None:
+            pass
+        elif has_length(eval_dataset):
+            num_samples = len(eval_dataset)
+        # The instance check is weird and does not actually check for the type, but whether the dataset has the right
+        # methods. Therefore we need to make sure it also has the attribute.
+        elif isinstance(eval_dataset, IterableDatasetShard) and hasattr(
+                eval_dataset, "num_examples"):
+            num_samples = eval_dataset.num_examples
+        else:
+            if has_length(dataloader):
+                num_samples = self.num_examples(dataloader)
+            else:  # both len(dataloader.dataset) and len(dataloader) fail
+                num_samples = observed_num_examples
 
         # Number of losses has been rounded to a multiple of batch_size and in a distributed training, the number of
         # samplers has been rounded to a multiple of batch_size, so we truncate.
@@ -1544,7 +1841,7 @@ class Trainer:
                            description="Prediction",
                            ignore_keys=ignore_keys,
                            metric_key_prefix=metric_key_prefix)
-        total_batch_size = self.args.eval_batch_size * self.args.world_size
+        total_batch_size = self.args.per_device_eval_batch_size * self.args.world_size
         output.metrics.update(
             speed_metrics(
                 metric_key_prefix,
@@ -1714,6 +2011,15 @@ class Trainer:
         new_tensor[:, :old_size[1]] = tensor
         return new_tensor
 
+    def _set_signature_columns_if_needed(self):
+        if self._signature_columns is None:
+            # Inspect model forward signature to keep only the arguments it accepts.
+            signature = inspect.signature(self.model.forward)
+            self._signature_columns = list(signature.parameters.keys())
+            # Labels may be named label or label_ids, the default data collator handles that.
+            self._signature_columns += list(
+                set(["label", "label_ids"] + self.label_names))
+
     def _remove_unused_columns(self,
                                dataset: "datasets.Dataset",
                                description: Optional[str] = None):
@@ -1750,6 +2056,30 @@ class Trainer:
             return dataset
         else:
             return dataset.remove_columns(ignored_columns)
+
+    def _get_collator_with_removed_columns(
+            self,
+            data_collator: Callable,
+            description: Optional[str] = None) -> Callable:
+        """Wrap the data collator in a callable removing unused columns."""
+        if not self.args.remove_unused_columns:
+            return data_collator
+        self._set_signature_columns_if_needed()
+        signature_columns = self._signature_columns
+
+        remove_columns_collator = RemoveColumnsCollator(
+            data_collator=data_collator,
+            signature_columns=signature_columns,
+            logger=logger,
+            description=description,
+            model_name=self.model.__class__.__name__,
+        )
+        return remove_columns_collator
+
+    def _is_iterable_dataset(self, dataset):
+        return isinstance(dataset, paddle.io.IterableDataset) or (
+            isinstance(dataset, datasets.iterable_dataset.IterableDataset)
+            if is_datasets_available() else False)
 
     def print_config(self, args=None, key=""):
         """
