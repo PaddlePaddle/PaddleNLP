@@ -363,8 +363,9 @@ class DocParser(object):
 
         layout = []
         if not self.layout_analysis:
-            ocr_res = self.ocr_infer_model.ocr(_image, det, rec, cls)
-            for segment in ocr_res:
+            ocr_result = self.ocr_infer_model.ocr(_image, det, rec, cls)
+            ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result
+            for segment in ocr_result:
                 box = segment[0]
                 box = _get_box(box)
                 text = segment[1][0]
@@ -374,8 +375,8 @@ class DocParser(object):
         else:
             res = self.layout_analysis_engine(_image)
             for region in res:
-                ocr_res = region['res']
-                for segment in ocr_res:
+                ocr_result = region['res']
+                for segment in ocr_result:
                     box = segment['text_region']
                     box = _get_box(box)
                     text = segment['text']

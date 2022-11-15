@@ -25,12 +25,8 @@ import paddle
 from ..datasets import load_dataset
 from ..transformers import AutoTokenizer, AutoModel, UIE, UIEM, UIEX
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from ..utils.image_utils import (
-    DocParser,
-    ResizeImage,
-    Permute,
-    NormalizeImage,
-)
+from ..utils.image_utils import (DocParser, ResizeImage, Permute,
+                                 NormalizeImage, load_image)
 from .task import Task
 from .utils import (get_span, get_id_and_prob, get_bool_ids_greater_than,
                     dbc2sbc, gp_decode, map_offset, SchemaTree, DataCollatorGP)
@@ -366,7 +362,7 @@ class UIETask(Task):
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
-                "c0588ac92ec6a8468f6dd2c2a896bbc5"
+                "50be05e78aec34d37596513870fa050e"
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/vocab.txt",
@@ -390,40 +386,44 @@ class UIETask(Task):
     def __init__(self, task, model, schema, schema_lang="ch", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
-        with open(os.path.join(self._task_path, "model_config.json")) as f:
-            self._init_class = json.load(f)['init_class']
-
-        if self._init_class in ["UIEX", "UIEM"]:
-            self._multilingual = True
-        else:
-            self._multilingual = False
-            if 'sentencepiece_model_file' in self.resource_files_names.keys():
-                del self.resource_files_names['sentencepiece_model_file']
-        self._is_en = True if model in ['uie-base-en'
-                                        ] or schema_lang == 'en' else False
-
-        self._summary_token_num = 3
-        self._multimodal = True if self._init_class in ['UIEX'] else False
-        self._ocr_lang = kwargs.get("ocr_lang", "ch")
-        if self._multimodal:
-            self._construct_ocr_engine(lang=self._ocr_lang)
-            self._summary_token_num = 4  # [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
-
-        self._schema_tree = None
-        self.set_schema(schema)
-        self._check_task_files()
-        self._check_predictor_type()
-        self._get_inference_model()
-        self._usage = usage
-
         self._max_seq_len = kwargs.get("max_seq_len", 512)
         self._batch_size = kwargs.get("batch_size", 64)
         self._split_sentence = kwargs.get("split_sentence", False)
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
-        self._layout_analysis = kwargs.get("layout_analysis", False)
         self.use_faster = kwargs.get("use_faster", False)
+        self._layout_analysis = kwargs.get("layout_analysis", False)
+        self._ocr_lang = kwargs.get("ocr_lang", "ch")
+
+        if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
+            self.resource_files_names[
+                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
+        self._check_task_files()
+        with open(os.path.join(self._task_path, "model_config.json")) as f:
+            self._init_class = json.load(f)['init_class']
+
+        if self._init_class not in ["UIEX", "UIEM"]:
+            if 'sentencepiece_model_file' in self.resource_files_names.keys():
+                del self.resource_files_names['sentencepiece_model_file']
+        self._is_en = True if model in ['uie-base-en'
+                                        ] or schema_lang == 'en' else False
+
+        self._summary_token_num = 3
+        self._ocr_loaded = False
+        if self._init_class in ["UIEX"]:
+            self._summary_token_num = 4  # [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
+            if not self._layout_analysis:
+                self._construct_ocr_engine(lang=self._ocr_lang)
+            else:
+                self._construce_layout_analysis_engine()
+            self._ocr_loaded = True
+
+        self._schema_tree = None
+        self.set_schema(schema)
+        self._check_predictor_type()
+        self._get_inference_model()
+        self._usage = usage
         self._construct_tokenizer()
 
     def set_schema(self, schema):
@@ -435,7 +435,7 @@ class UIETask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        if self._multimodal:
+        if self._init_class in ["UIEX"]:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
@@ -456,7 +456,7 @@ class UIETask(Task):
                                         dtype="int64",
                                         name='image'),
             ]
-        elif self._multilingual:
+        elif self._init_class in ["UIEM"]:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
@@ -503,13 +503,51 @@ class UIETask(Task):
            1) Transform the raw text to token ids.
            2) Generate the other model inputs from the raw text and token ids.
         """
-        if self._multimodal:
-            inputs = self._check_input_doc(inputs)
-        else:
-            inputs = self._check_input_text(inputs)
+        inputs = self._check_input_text(inputs)
         outputs = {}
         outputs['text'] = inputs
         return outputs
+
+    def _check_input_text(self, inputs):
+        """
+        Check whether the input meet the requirement.
+        """
+        inputs = inputs[0]
+        if isinstance(inputs, dict) or isinstance(inputs, str):
+            inputs = [inputs]
+        if isinstance(inputs, list):
+            input_list = []
+            for example in inputs:
+                data = {}
+                if isinstance(example, dict):
+                    if "doc" in example.keys():
+                        data["doc"] = load_image(example["doc"])
+                        if not self._ocr_loaded:
+                            if not self._layout_analysis:
+                                self._construct_ocr_engine(lang=self._ocr_lang)
+                            else:
+                                self._construce_layout_analysis_engine()
+                            self._ocr_loaded = True
+                    elif "text" in example.keys():
+                        if not isinstance(example["text"], str):
+                            raise TypeError(
+                                "Invalid inputs, the input text should be string. but type of {} found!"
+                                .format(type(example["text"])))
+                        data["text"] = example["text"]
+                    else:
+                        raise ValueError(
+                            "Invalid inputs, the input should contain a doc or a text."
+                        )
+                    input_list.append(data)
+                elif isinstance(example, str):
+                    input_list.append(example)
+                else:
+                    raise TypeError(
+                        "Invalid inputs, the input should be dict or list of dict, but type of {} found!"
+                        .format(type(example)))
+        else:
+            raise TypeError("Invalid input format!")
+        return input_list
 
     def _single_stage_predict(self, inputs):
         input_texts = [d["text"] for d in inputs]
@@ -519,7 +557,7 @@ class UIETask(Task):
         max_predict_len = self._max_seq_len - len(
             max(prompts)) - self._summary_token_num
 
-        if self._multimodal:
+        if self._init_class in ["UIEX"]:
             bboxes_list = [d["bboxes"] for d in inputs]
             short_input_texts, short_bboxes_list, input_mapping = self._auto_splitter(
                 input_texts,
@@ -535,7 +573,7 @@ class UIETask(Task):
         short_texts_prompts = []
         for k, v in input_mapping.items():
             short_texts_prompts.extend([prompts[k] for _ in range(len(v))])
-        if self._multimodal:
+        if self._init_class in ["UIEX"]:
             image_list = []
             for k, v in input_mapping.items():
                 image_list.extend([inputs[k]["image"] for _ in range(len(v))])
@@ -561,7 +599,7 @@ class UIETask(Task):
                                                  return_attention_mask=True,
                                                  return_position_ids=True,
                                                  return_offsets_mapping=True)
-                if self._multilingual:
+                if self._init_class in ["UIEM"]:
                     tokenized_output = [
                         encoded_inputs["input_ids"][0],
                         encoded_inputs["position_ids"][0],
@@ -775,15 +813,23 @@ class UIETask(Task):
                     bbox_list, padded_image, offset_mapping
                 ]
 
+                input_list = [
+                    inputs_ids, token_type_ids, position_ids, attention_mask,
+                    bbox_list
+                ]
+                return_list = [np.array(x, dtype="int64") for x in input_list]
+                return_list.append(np.array(padded_image, dtype="float32"))
+                return_list.append(np.array(offset_mapping, dtype="int64"))
+
                 assert len(inputs_ids) == self._max_seq_len
                 assert len(token_type_ids) == self._max_seq_len
                 assert len(position_ids) == self._max_seq_len
                 assert len(attention_mask) == self._max_seq_len
                 assert len(bbox_list) == self._max_seq_len
 
-                yield tuple([np.array(x) for x in input_list])
+                yield tuple(return_list)
 
-        reader = doc_reader if self._multimodal else text_reader
+        reader = doc_reader if self._init_class in ["UIEX"] else text_reader
         infer_ds = load_dataset(reader,
                                 inputs=short_inputs,
                                 lazy=self._lazy_load)
@@ -799,21 +845,21 @@ class UIETask(Task):
         sentence_ids = []
         probs = []
         for batch in infer_data_loader:
-            if self._multimodal:
+            if self._init_class in ["UIEX"]:
                 input_ids, token_type_ids, pos_ids, att_mask, bbox, image, offset_maps = batch
-            elif self._multilingual:
+            elif self._init_class in ["UIEM"]:
                 input_ids, pos_ids, offset_maps = batch
             else:
                 input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
             if self._predictor_type == "paddle-inference":
-                if self._multimodal:
+                if self._init_class in ["UIEX"]:
                     self.input_handles[0].copy_from_cpu(input_ids.numpy())
                     self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
                     self.input_handles[2].copy_from_cpu(pos_ids.numpy())
                     self.input_handles[3].copy_from_cpu(att_mask.numpy())
                     self.input_handles[4].copy_from_cpu(bbox.numpy())
                     self.input_handles[5].copy_from_cpu(image.numpy())
-                elif self._multilingual:
+                elif self._init_class in ["UIEM"]:
                     self.input_handles[0].copy_from_cpu(input_ids.numpy())
                     self.input_handles[1].copy_from_cpu(pos_ids.numpy())
                 else:
@@ -825,7 +871,7 @@ class UIETask(Task):
                 start_prob = self.output_handle[0].copy_to_cpu().tolist()
                 end_prob = self.output_handle[1].copy_to_cpu().tolist()
             else:
-                if self._multimodal:
+                if self._init_class in ["UIEX"]:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
                         "token_type_ids": token_type_ids.numpy(),
@@ -834,7 +880,7 @@ class UIETask(Task):
                         "bbox": bbox.numpy(),
                         "image": image.numpy()
                     }
-                elif self._multilingual:
+                elif self._init_class in ["UIEM"]:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
                         "pos_ids": pos_ids.numpy(),
@@ -945,31 +991,45 @@ class UIETask(Task):
         _inputs = []
         for d in inputs:
             if isinstance(d, dict):
-                if self._multimodal and 'doc' in d.keys():
-
+                if 'doc' in d.keys():
                     image_buff = base64.b64decode(d['doc'])
                     image = np.array(Image.open(BytesIO(image_buff)))
                     image_size = (image.shape[1], image.shape[0])
-
-                    ocr_result = self._ocr.ocr(image, cls=True)
-                    ocr_result = ocr_result[0] if len(
-                        ocr_result) == 1 else ocr_result
 
                     image, offset_x, offset_y = doc_parser.expand_image_to_a4_size(
                         image, center=True)
 
                     content = u""
                     bboxes = []
-                    for sub_res in ocr_result:
-                        word = sub_res[1][0]
-                        source_bbox = sub_res[0]
-                        bbox = source_bbox[0] + source_bbox[2]
-                        bbox = _normalize_bbox([
-                            bbox[0] + offset_x, bbox[1] + offset_y,
-                            bbox[2] + offset_x, bbox[3] + offset_y
-                        ], image_size)
-                        bboxes.extend([bbox for word_index in range(len(word))])
-                        content += word
+                    if not self._layout_analysis:
+                        ocr_result = self._ocr.ocr(image)
+                        ocr_result = ocr_result[0] if len(
+                            ocr_result) == 1 else ocr_result
+                        for segment in ocr_result:
+                            text = segment[1][0]
+                            source_bbox = segment[0]
+                            bbox = source_bbox[0] + source_bbox[2]
+                            bbox = _normalize_bbox([
+                                bbox[0] + offset_x, bbox[1] + offset_y,
+                                bbox[2] + offset_x, bbox[3] + offset_y
+                            ], image_size)
+                            bboxes.extend([bbox for _ in range(len(text))])
+                            content += text
+                    else:
+                        res = self._layout_analysis_engine(image)
+                        for region in res:
+                            ocr_result = region['res']
+                            for segment in ocr_result:
+                                text = segment['text']
+                                source_bbox = segment['text_region']
+                                bbox = source_bbox[0] + source_bbox[2]
+                                bbox = _normalize_bbox([
+                                    bbox[0] + offset_x, bbox[1] + offset_y,
+                                    bbox[2] + offset_x, bbox[3] + offset_y
+                                ], image_size)
+                                bboxes.extend([bbox for _ in range(len(text))])
+                                content += text
+
                     _inputs.append({
                         "text": content,
                         "bboxes": bboxes,

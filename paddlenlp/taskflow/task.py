@@ -24,7 +24,6 @@ from paddle.dataset.common import md5file
 
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
-from ..utils.image_utils import load_image
 from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file, cut_chinese_sent
 
 
@@ -163,13 +162,25 @@ class Task(metaclass=abc.ABCMeta):
             from paddleocr import PaddleOCR
         except:
             raise ImportError(
-                "Please install the dependencies first, pip install paddleocr --upgrade"
-            )
+                "Please install the dependencies first, pip install paddleocr")
         use_gpu = False if paddle.get_device() == 'cpu' else True
         self._ocr = PaddleOCR(use_angle_cls=use_angle_cls,
                               show_log=False,
                               use_gpu=use_gpu,
                               lang=lang)
+
+    def _construce_layout_analysis_engine(self):
+        """
+        Construct the layout analysis engine
+        """
+        try:
+            from paddleocr import PPStructure
+        except:
+            raise ImportError(
+                "Please install the dependencies first, pip install paddleocr")
+        self._layout_analysis_engine = PPStructure(table=False,
+                                                   ocr=True,
+                                                   show_log=False)
 
     def _prepare_static_mode(self):
         """
@@ -306,41 +317,6 @@ class Task(metaclass=abc.ABCMeta):
                 "Invalid inputs, input text should be str or list of str, but type of {} found!"
                 .format(type(inputs)))
         return inputs
-
-    def _check_input_doc(self, inputs):
-        """
-        Check whether the input doc meet the requirement.
-        """
-        inputs = inputs[0]
-        if isinstance(inputs, dict):
-            inputs = [inputs]
-        if isinstance(inputs, list):
-            input_list = []
-            for example in inputs:
-                data = {}
-                if isinstance(example, dict):
-                    if "doc" in example.keys():
-                        data["doc"] = load_image(example["doc"])
-                    elif "text" in example.keys():
-                        if not isinstance(example["text"], str):
-                            raise TypeError(
-                                "Invalid inputs, the input text should be string. but type of {} found!"
-                                .format(type(example["text"])))
-                        data["text"] = example["text"]
-                    else:
-                        raise ValueError(
-                            "Invalid inputs, the input should contain a doc or a text."
-                        )
-                    input_list.append(data)
-                else:
-                    raise TypeError(
-                        "Invalid inputs, the input should be dict or list of dict, but type of {} found!"
-                        .format(type(example)))
-        else:
-            raise TypeError(
-                "Invalid inputs, the input should be dict or list of dict, but type of {} found!"
-                .format(type(inputs)))
-        return input_list
 
     def _auto_splitter(self,
                        input_texts,
