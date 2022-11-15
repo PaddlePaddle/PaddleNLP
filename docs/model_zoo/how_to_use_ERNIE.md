@@ -185,10 +185,10 @@
                 <span style="font-size:18px;">开源/ API？</span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">支持 Taskflow 一键预测</span>
+                <span style="font-size:18px;">支持二次开发</span>
             </td>
            <td style="text-align:center">
-                <span style="font-size:18px;">支持二次开发</span>
+                <span style="font-size:18px;">支持 Taskflow 一键预测</span>
             </td>
            <td style="text-align:center">
                 <span style="font-size:18px;">是否接入 Pipelines </span>
@@ -204,31 +204,30 @@
                   </a> </span>
             </td>
             <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
-                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
-                        范例地址
-                  </a> </span>
+                  <a href="https://aistudio.baidu.com/aistudio/projectdetail/3996601">【快速上手ERNIE 3.0】法律文本多标签分类实战</a> </span><br />
+                  <a href="https://aistudio.baidu.com/aistudio/projectdetail/3986803">【快速上手ERNIE 3.0】中文语义匹配实战</a> </span><br />
+                  <a href="https://aistudio.baidu.com/aistudio/projectdetail/2017202">【快速上手ERNIE 3.0】对话意图识别</a> </span><br />
+                  <a href="https://aistudio.baidu.com/aistudio/projectdetail/3955163">【快速上手ERNIE 3.0】中文情感分析</a> </span><br />
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
                   <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
-                        UIE
+                        ERNIE-UIE
                   </a> </span>
             </td>
             <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">接入中</span></td>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
-                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
-                        范例地址
-                  </a> </span>
+                  <a href="https://aistudio.baidu.com/aistudio/projectdetail/4038499">5条标注数据搞定快递单信息抽取 </a> </span>
             </td>
          <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -243,8 +242,8 @@
             <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
-                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
-                        范例地址
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/document-intelligence">
+                        从零搭建端到端开放文档抽取问答系统
                   </a> </span>
             </td>
           <tr>
@@ -254,31 +253,105 @@
                         ERNIE-M
                   </a> </span>
             </td>
-            <td style="text-align:center"> <span style="font-size:18px;">API</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
-                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
-                        范例地址
+                  <a href="">
+                        建设中
                   </a> </span>
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
-                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/text_to_image">
-                        ERNIE-ViLG
-                  </a> </span>
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health">ERNIE-Health</a> </span>
             </td>
             <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
-            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
-                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
-                        范例地址
+                  <a href="">
+                        建设中
+                  </a> </span>
+            </td>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-gen">ERNIE-Gen</a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="">
+                        建设中
+                  </a> </span>
+            </td>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-doc">ERNIE-Doc</a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="">
+                        建设中
+                  </a> </span>
+            </td>
+       <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/ernie_vil">ERNIE-ViL</a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="">
+                        建设中
+                  </a> </span>
+            </td>
+          
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-doc">ERNIE-Doc</a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="">
+                        建设中
+                  </a> </span>
+            </td>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/plato-xl">PLATO-XL</a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="">
+                        建设中
                   </a> </span>
             </td>
     <tbody>
