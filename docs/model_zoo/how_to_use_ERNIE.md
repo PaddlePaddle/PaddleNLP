@@ -345,6 +345,8 @@
        
 ## 如何接入
 
+如果你希望使用 Pipelines 构建自己的NLP流水线系统，希望用到更多文心大模型 API，可以参考如下方式接入进来：
+
 - [如何将文心大模型 API 服务接入 Pipelines](https://aistudio.baidu.com/aistudio/projectdetail/5011119)
        
 - 参考：[ERNIE-ViLG 接入 Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/pipelines/nodes/text_to_image_generator)
