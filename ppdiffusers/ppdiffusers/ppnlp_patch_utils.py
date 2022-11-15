@@ -55,6 +55,10 @@ def patch_to(cls, as_prop=False, cls_method=False):
 if is_paddle_available() and is_paddlenlp_available():
     import paddle
     from paddlenlp.transformers import PretrainedModel
+    # NEG_INF = float("-inf")
+    # use -1e4 as NEG_INF
+    import paddlenlp.transformers.clip.modeling
+    paddlenlp.transformers.clip.modeling.NEG_INF = -1e4
 
     @patch_to(PretrainedModel, as_prop=True)
     def dtype(self):

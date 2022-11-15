@@ -186,6 +186,7 @@ class PretrainedModel(Layer, GenerationMixin):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
+    main_input_name = "input_ids"
     config_class = None
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
@@ -399,13 +400,15 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                              pretrained_model_name_or_path,
-                                              file_name)
+                full_file_name = "/".join([
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                    file_name
+                ])
                 resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = os.path.join(
+            resource_files["model_config_file"] = "/".join([
                 COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                cls.model_config_file)
+                cls.model_config_file
+            ])
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
@@ -569,12 +572,24 @@ class PretrainedModel(Layer, GenerationMixin):
         # Allow the float16 model to load float32 weights, which decreases memory
         # usage in model loading stage and is useful to big models.
         dtype_prefix_len = len("paddle.")  # paddle.float16
+
         for k, v in model_to_load.state_dict().items():
             if not isinstance(v, np.ndarray):
                 dtype = str(v.dtype)[dtype_prefix_len:]
             # TODO(guosheng): add warnings for unmatched dtypes
             if k in state_to_load:
-                state_to_load[k] = state_to_load[k].astype(dtype)
+                if paddle.in_dynamic_mode():
+                    if isinstance(state_to_load[k], np.ndarray):
+                        state_to_load[k] = state_to_load[k].astype(dtype)
+                    else:
+                        state_to_load[k] = paddle.cast(state_to_load[k], dtype)
+                else:
+                    # there are some latent error when case dtype in static-mode, so let's:
+                    # 1. convert fluid.*.Tensor -> numpy.ndarray
+                    # 2. cast the dtype with numpy tools
+                    # 3. paddle works well with ndarray state-dict
+                    state_to_load[k] = np.array(state_to_load[k])
+                    state_to_load[k] = state_to_load[k].astype(dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
@@ -1194,7 +1209,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 1. retrieve the model related config
 
-        # save the string version of dtype to the config, e.g. convert torch.float32 => "float32"
+        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
         model_to_save = unwrap_model(self)
         dtype = get_parameter_dtype(model_to_save)

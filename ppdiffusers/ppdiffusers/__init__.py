@@ -23,8 +23,9 @@ from .utils import (
     is_paddlenlp_available,
     is_unidecode_available,
 )
+from .version import VERSION
 
-__version__ = "0.6.0"
+__version__ = VERSION
 
 from .configuration_utils import ConfigMixin
 from .onnx_utils import OnnxRuntimeModel
@@ -43,8 +44,9 @@ if is_paddle_available():
         get_scheduler,
     )
     from .pipeline_utils import DiffusionPipeline
-    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, PNDMPipeline, ScoreSdeVePipeline
+    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, LDMSuperResolutionPipeline, PNDMPipeline, ScoreSdeVePipeline
     from .schedulers import (
+        EulerAncestralDiscreteScheduler,
         DDIMScheduler,
         DDPMScheduler,
         KarrasVeScheduler,
