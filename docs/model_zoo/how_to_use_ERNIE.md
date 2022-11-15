@@ -4,8 +4,6 @@
     * [开源开放的文心大模型](#开源开放的文心大模型)
     * [基于文心大模型的API服务](#基于文心大模型的API服务)
 * [如何使用（及如何接入）](#如何使用)
-    * [开源开放的文心大模型](#开源开放的文心大模型)
-    * 
 
 产业级知识增强大模型——文心大模型，目前已成为千行百业AI开发的首选基座大模型。作为自然语言处理模型库，PaddleNLP 持续开源了众多效果领先的文心大模型，覆盖各任务通用的预训练模型，以及面向特定任务的预训练模型，你可以直接调用此类模型，也可以进行模型二次开发与调优；除了开源开放的模型之外，为满足开发者需求，[PaddleNLP Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines) 中也接入了基于文心大模型的 API 服务，作为 Pipelines 基础组件，供开发者灵活插拔，像搭积木一样组建自己的NLP产线系统。
 
@@ -174,5 +172,68 @@
 <br />
 
 ## 如何使用
-（1）模型完全开源：通过AutoModel 调用；配套Taskflow一键预测；Fine-tune流程；产业范例
-（2）大模型API ：通过Pipelines接入
+       
+对于开源的预训练模型，你可以直接调用，也可以进行模型二次开发与调优。对于基于文心大模型的 API 服务，可使用 [PaddleNLP Pipelines](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines) 进行调用，API 服务作为 Pipelines 基础组件，供开发者灵活插拔，像搭积木一样组建自己的NLP产线系统。
+       
+<table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
+    <tbody>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;">模型名称</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;">开源/ API？</span>
+            </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;">支持 Taskflow 一键预测</span>
+            </td>
+           <td style="text-align:center">
+                <span style="font-size:18px;">支持二次开发</span>
+            </td>
+           <td style="text-align:center">
+                <span style="font-size:18px;">是否接入 Pipelines </span>
+            </td>
+           <td style="text-align:center">
+                <span style="font-size:18px;">产业实践范例</span>
+            </td>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
+                        ERNIE 3.0
+                  </a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
+                        范例地址
+                  </a> </span>
+            </td>
+        <tr>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
+                        ERNIE 3.0
+                  </a> </span>
+            </td>
+            <td style="text-align:center"> <span style="font-size:18px;">开源</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">否</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center"> <span style="font-size:18px;">是</span></td>
+            <td style="text-align:center;vertical-align:middle">
+                <span style="font-size:18px;"> 
+                  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-3.0">
+                        范例地址
+                  </a> </span>
+            </td>
+    <tbody>
+</table>
+<br />
+       
+### 附：
+       [如何将文心大模型 API 服务接入 Pipelines]()
+       参考：
