@@ -12,7 +12,7 @@
 
 如果基于GPU部署，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
 ```shell
-python -m pip install onnxruntime-gpu onnx onnxconverter-common
+python -m pip install onnxruntime-gpu onnx onnxconverter-common==1.9.0
 ```
 
 如果基于CPU部署，请使用如下命令安装所需依赖:

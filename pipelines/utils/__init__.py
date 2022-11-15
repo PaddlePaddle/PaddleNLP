@@ -11,14 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from pipelines.pipelines.base import Pipeline, RootNode
-
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    ExtractiveQAPipeline,
-    SemanticSearchPipeline,
-    DocPipeline,
-    TextToImagePipeline,
-    QAGenerationPipeline,
-)
