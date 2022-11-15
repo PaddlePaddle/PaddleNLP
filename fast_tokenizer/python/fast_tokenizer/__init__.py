@@ -14,7 +14,7 @@
 
 __version__ = "1.0.0"
 
-from typing import Tuple, Union, Tuple, List
+from typing import Tuple, Union, Tuple, List, Dict
 import sys
 import os
 import platform
@@ -67,11 +67,346 @@ InputSequence = Union[TextInputSequence, PreTokenizedInputSequence]
 
 EncodeInput = Union[TextEncodeInput, PreTokenizedEncodeInput]
 
-from .core_tokenizers import (Tokenizer, Encoding, AddedToken, Token, PadMethod,
-                              TruncMethod, OffsetType, Direction, TruncStrategy,
-                              PadStrategy)
+from . import core_tokenizers as C
+
 from .core_tokenizers import models, normalizers, pretokenizers, postprocessors, decoders
 
+from .models import *
+from .normalizers import *
+from .pretokenizers import *
+from .postprocessors import *
+from .decoders import *
 from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer
 
-from .core_tokenizers import (get_thread_num, set_thread_num)
+
+class OffsetType:
+    CHAR = C.OffsetType.CHAR
+    BYTE = C.OffsetType.BYTE
+
+
+class Direction:
+    LEFT = C.Direction.LEFT
+    RIGHT = C.Direction.RIGHT
+
+
+class TruncStrategy:
+    LONGEST_FIRST = C.TruncStrategy.LONGEST_FIRST
+    ONLY_FIRST = C.TruncStrategy.ONLY_FIRST
+    ONLY_SECOND = C.TruncStrategy.ONLY_SECOND
+
+
+class PadStrategy:
+    BATCH_LONGEST = C.PadStrategy.BATCH_LONGEST
+    FIXED_SIZE = C.PadStrategy.FIXED_SIZE
+
+
+class SplitMode:
+    REMOVED = C.SplitMode.REMOVED
+    ISOLATED = C.SplitMode.ISOLATED
+    MERGED_WITH_NEXT = C.SplitMode.MERGED_WITH_NEXT
+    MERGED_WITH_PREVIOUS = C.SplitMode.MERGED_WITH_PREVIOUS
+    CONTIGUOUS = C.SplitMode.CONTIGUOUS
+
+
+class Token:
+
+    def __init__(self):
+        self._token = C.Token()
+
+    @property
+    def id(self):
+        return self._token.id
+
+    @id.setter
+    def id(self, id: int):
+        self._token.id = id
+
+    @property
+    def value(self):
+        return self._token.value
+
+    @value.setter
+    def value(self, value: str):
+        self._token.value = value
+
+    @property
+    def offset(self):
+        return self._token.offset
+
+    @offset.setter
+    def offset(self, offset: Tuple[int, int]):
+        self._token.offset = offset
+
+    def __repr__(self):
+        return self._token.__repr__()
+
+
+class PadMethod:
+
+    def __init__(self):
+        self._pad_method = C.PadMethod()
+
+    @property
+    def strategy(self):
+        return self._pad_method.strategy
+
+    @strategy.setter
+    def strategy(self, strategy: str):
+        """ Set the strategy of PadMethod.
+        :param strategy: (str) The strategy of PadMethod, 'batch_longest' and 'fixed_size' are valid
+        :return None
+        """
+        self._pad_method.strategy = getattr(PadStrategy, strategy.upper())
+
+    @property
+    def direction(self):
+        return self._pad_method.direction
+
+    @direction.setter
+    def direction(self, direction: str):
+        """ Set the direction of PadMethod.
+        :param strategy: (str) The direction of PadMethod, 'left' and 'right' are valid
+        :return None
+        """
+        self._pad_method.direction = getattr(Direction, direction.upper())
+
+    @property
+    def pad_id(self):
+        return self._pad_method.pad_id
+
+    @pad_id.setter
+    def pad_id(self, pad_id: int):
+        self._pad_method.pad_id = pad_id
+
+    @property
+    def pad_token_type_id(self):
+        return self._pad_method.pad_token_type_id
+
+    @pad_token_type_id.setter
+    def pad_token_type_id(self, pad_token_type_id: int):
+        self._pad_method.pad_token_type_id = pad_token_type_id
+
+    @property
+    def pad_token(self):
+        return self._pad_method.pad_token
+
+    @pad_token.setter
+    def pad_token(self, pad_token: str):
+        self._pad_method.pad_token = pad_token
+
+    @property
+    def pad_len(self):
+        return self._pad_method.pad_len
+
+    @pad_len.setter
+    def pad_len(self, pad_len: int):
+        self._pad_method.pad_len = pad_len
+
+    @property
+    def pad_to_multiple_of(self):
+        return self._pad_method.pad_to_multiple_of
+
+    @pad_to_multiple_of.setter
+    def pad_to_multiple_of(self, pad_to_multiple_of):
+        self._pad_method.pad_to_multiple_of = pad_to_multiple_of
+
+
+class TruncMethod:
+
+    def __init__(self):
+        self._trunc_method = C.TruncMethod()
+
+    @property
+    def max_len(self):
+        return self._trunc_method.max_len
+
+    @max_len.setter
+    def max_len(self, max_len: int):
+        self._trunc_method.max_len = max_len
+
+    @property
+    def strategy(self):
+        return self._trunc_method.strategy
+
+    @strategy.setter
+    def strategy(self, strategy: str):
+        """ Set the strategy of TruncMethod.
+        :param strategy: (str) The strategy of PadMethod, 'longest_first', 'only_first' and 'only_second' are valid
+        :return None
+        """
+        self._trunc_method.strategy = getattr(TruncStrategy, strategy.upper())
+
+    @property
+    def direction(self):
+        return self._trunc_method.direction
+
+    @direction.setter
+    def direction(self, direction: str):
+        """ Set the direction of TruncMethod.
+        :param strategy: (str) The direction of TruncMethod, 'left' and 'right' are valid
+        :return None
+        """
+        self._trunc_method.direction = getattr(Direction, direction.upper())
+
+    @property
+    def stride(self):
+        return self._trunc_method.stride
+
+    @stride.setter
+    def stride(self, stride: int):
+        self._trunc_method.stride = stride
+
+
+class AddedToken:
+
+    def __init__(self,
+                 content="",
+                 single_word=False,
+                 lstrip=False,
+                 rstrip=False,
+                 normalized=True):
+        self._added_token = C.AddedToken(content, single_word, lstrip, rstrip,
+                                         normalized)
+
+    @property
+    def content(self):
+        return self._added_token.content
+
+    @property
+    def get_is_special(self):
+        return self._added_token.get_is_special
+
+    @property
+    def normalized(self):
+        return self._added_token.normalized
+
+    @property
+    def lstrip(self):
+        return self._added_token.lstrip
+
+    @property
+    def rstrip(self):
+        return self._added_token.rstrip
+
+    @property
+    def single_word(self):
+        return self._added_token.single_word
+
+    def __eq__(self, other):
+        return self._added_token == other._added_token
+
+
+class Encoding:
+
+    def __init__(self, ids: List[int], type_ids: List[int], tokens: List[str],
+                 words_idx: List[int], offsets: List[Tuple[int, int]],
+                 special_tokens_mask: List[int], attention_mask: List[int],
+                 overflowing: List[Encoding],
+                 sequence_ranges: Dict[str, Tuple[int, int]]):
+        self._encoding = C.Encoding(ids, type_ids, tokens, words_idx, offsets,
+                                    special_tokens_mask, attention_mask,
+                                    overflowing, sequence_ranges)
+
+    def __str__(self):
+        return str(self._encoding)
+
+    def __repr__(self):
+        return self._encoding.__repr__()
+
+    def __len__(self):
+        return len(self._encoding)
+
+    @property
+    def n_sequences(self):
+        return self._encoding.n_sequences
+
+    @property
+    def tokens(self):
+        return self._encoding.tokens
+
+    @property
+    def word_ids(self):
+        return self._encoding.word_ids
+
+    @property
+    def sequence_ids(self):
+        return self._encoding.sequence_ids
+
+    @property
+    def ids(self):
+        return self._encoding.ids
+
+    @property
+    def type_ids(self):
+        return self._encoding.type_ids
+
+    @property
+    def offsets(self):
+        return self._encoding.offsets
+
+    @property
+    def special_tokens_mask(self):
+        return self._encoding.special_tokens_mask
+
+    @property
+    def attention_mask(self):
+        return self._encoding.attention_mask
+
+    @property
+    def overflowing(self):
+        return self._encoding.overflowing
+
+    def set_sequence_ids(self, sequence_id: int):
+        return self._encoding.set_sequence_ids(sequence_id)
+
+    def char_to_token(self, char_pos, sequence_index: int = 0):
+        return self._encoding.char_to_token(char_pos, sequence_index)
+
+    @staticmethod
+    def merge(encodings: List[Encoding], growing_offsets: bool = True):
+        return C.Encoding.merge(encodings, growing_offsets)
+
+    def token_to_chars(self, token_index: int):
+        return self._encoding.token_to_chars(token_index)
+
+    def token_to_sequence(self, token_index: int):
+        return self._encoding.token_to_sequence(token_index)
+
+    def token_to_word(self, token_index: int):
+        return self._encoding.token_to_word(token_index)
+
+    def word_to_chars(self, word_index: int, sequence_index: int = 0):
+        return self._encoding.word_to_chars(word_index, sequence_index)
+
+    def word_to_tokens(self, word_index: int, sequence_index: int = 0):
+        return self._encoding.word_to_tokens(word_index, sequence_index)
+
+    def truncate(self,
+                 max_length: int,
+                 stride: int = 0,
+                 direction: str = "right"):
+        return self._encoding.truncate(max_length, stride, direction)
+
+    def pad(self,
+            length: int,
+            direction: str = "right",
+            pad_id: int = 0,
+            pad_type_id: int = 0,
+            pad_token: str = "[PAD]"):
+        return self._encoding.pad(length, direction, pad_id, pad_type_id,
+                                  pad_token)
+
+
+def set_thread_num(thread_num):
+    """ Set the number of threads for accelerating batch tokenization
+    :param thread_num: (int) The number of threads
+    :return None
+    """
+    C.set_thread_num(thread_num)
+
+
+def get_thread_num():
+    """ Get the number of tokenization threads
+    :return int
+    """
+    return C.get_thread_num()
