@@ -40,7 +40,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     Args:
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model
+        metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
+        greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         kwargs (dict, optional): Additional keyword arguments passed along to underlying meta class. 
     """
 
@@ -148,12 +149,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         pred_ids = np.argmax(eval_preds.predictions, axis=-1)
         metrics = {}
         metrics["accuracy"] = accuracy_score(y_true=eval_preds.label_ids,
-                y_pred=pred_ids)
+                                             y_pred=pred_ids)
         for average in ['micro', 'macro']:
             precision, recall, f1, _ = precision_recall_fscore_support(
-                y_true=eval_preds.label_ids,
-                y_pred=pred_ids,
-                average=average)
+                y_true=eval_preds.label_ids, y_pred=pred_ids, average=average)
             metrics[f"{average}_precision"] = precision
             metrics[f"{average}_recall"] = recall
             metrics[f"{average}_f1"] = f1
