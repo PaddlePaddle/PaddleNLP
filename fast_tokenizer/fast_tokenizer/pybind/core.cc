@@ -88,6 +88,14 @@ void BindCore(pybind11::module* m) {
       .value("FIXED_SIZE", core::PadStrategy::FIXED_SIZE)
       .export_values();
 
+  py::enum_<core::SplitMode>(*m, "SplitMode")
+      .value("REMOVED", core::SplitMode::REMOVED)
+      .value("ISOLATED", core::SplitMode::ISOLATED)
+      .value("MERGED_WITH_PREVIOUS", core::SplitMode::MERGED_WITH_PREVIOUS)
+      .value("MERGED_WITH_NEXT", core::SplitMode::MERGED_WITH_NEXT)
+      .value("CONTIGUOUS", core::SplitMode::CONTIGUOUS)
+      .export_values();
+
   py::class_<core::Encoding>(*m, "Encoding")
       .def(py::init<const std::vector<uint32_t>&,
                     const std::vector<uint32_t>&,
@@ -270,6 +278,9 @@ void BindCore(pybind11::module* m) {
       .def_property_readonly("lstrip", &core::AddedToken::GetUseLStrip)
       .def_property_readonly("rstrip", &core::AddedToken::GetUseRStrip)
       .def_property_readonly("single_word", &core::AddedToken::GetIsSingleWord);
+
+  m->def("set_thread_num", &core::SetThreadNum);
+  m->def("get_thread_num", &core::GetThreadNum);
 }
 
 }  // namespace pybind

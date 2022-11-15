@@ -22,7 +22,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace decoders {
 
-struct FASTERTOKENIZER_DECL WordPiece : public Decoder {
+struct FASTTOKENIZER_DECL WordPiece : public Decoder {
   virtual void operator()(const std::vector<std::string> tokens,
                           std::string* result) const;
 

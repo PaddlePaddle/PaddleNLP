@@ -13,8 +13,12 @@
 # limitations under the License.
 
 from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (BaseStandardPipeline,
-                                                    ExtractiveQAPipeline,
-                                                    SemanticSearchPipeline,
-                                                    DocPipeline,
-                                                    TextToImagePipeline)
+
+from pipelines.pipelines.standard_pipelines import (
+    BaseStandardPipeline,
+    ExtractiveQAPipeline,
+    SemanticSearchPipeline,
+    DocPipeline,
+    TextToImagePipeline,
+    QAGenerationPipeline,
+)

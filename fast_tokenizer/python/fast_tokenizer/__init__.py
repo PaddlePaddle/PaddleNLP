@@ -73,3 +73,5 @@ from .core_tokenizers import (Tokenizer, Encoding, AddedToken, Token, PadMethod,
 from .core_tokenizers import models, normalizers, pretokenizers, postprocessors, decoders
 
 from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer
+
+from .core_tokenizers import (get_thread_num, set_thread_num)

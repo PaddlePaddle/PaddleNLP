@@ -25,7 +25,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
 
-struct FASTERTOKENIZER_DECL ReplaceNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL ReplaceNormalizer : public Normalizer {
   ReplaceNormalizer() = default;
   ReplaceNormalizer(const std::string& pattern, const std::string& content);
   ReplaceNormalizer(const ReplaceNormalizer& replace_normalizer);

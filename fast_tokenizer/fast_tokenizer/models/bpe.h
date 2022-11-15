@@ -23,7 +23,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace models {
 
-struct FASTERTOKENIZER_DECL BPE : public Model {
+struct FASTTOKENIZER_DECL BPE : public Model {
   BPE();
   BPE(const core::Vocab& vocab,
       const core::Merges& merges,

@@ -24,12 +24,17 @@ import os
 import random
 import re
 import time
+import math
 from enum import Enum
-from typing import Dict, NamedTuple, Optional, Tuple, Union
+from typing import Dict, NamedTuple, Optional, Tuple, Union, List
 
 import numpy as np
+import paddle
+from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
+
 from ..utils.log import logger
+from ..transformers.tokenizer_utils_base import BatchEncoding
 
 __all__ = [
     "TrainOutput",
@@ -132,6 +137,21 @@ class OptimizerNames(ExplicitEnum):
 
     ADAMW = "adamw"
     ADAFACTOR = "adafactor"
+
+
+class ShardingOption(ExplicitEnum):
+    """
+    Sharding Option
+    OP for sharding optimizer state
+    GRAD for sharding gradients
+    FULL_SHARD for sharding optimizer gradient and parameter
+    OFFLOAD means offload to cpu.
+    """
+    SHARD_OP = "stage1"
+    SHARD_GRAD_OP = "stage2"
+    FULL_SHARD = "stage3"
+    # NO_SHARD = "no"
+    OFFLOAD = "offload"
 
 
 def is_main_process(local_rank):
@@ -452,7 +472,7 @@ def has_length(dataset):
     """
     try:
         return len(dataset) is not None
-    except TypeError:
+    except (TypeError, ValueError, RuntimeError):
         # TypeError: len() of unsized object
         return False
 
@@ -469,3 +489,159 @@ def get_last_checkpoint(folder):
         folder,
         max(checkpoints,
             key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+
+
+class IterableDatasetShard(IterableDataset):
+    """
+    Wraps a Paddle `IterableDataset` to generate samples for one of the processes only. Instances of this class will
+    always yield a number of samples that is a round multiple of the actual batch size (which is `batch_size x
+    num_processes`). Depending on the value of the `drop_last` attribute, it will either stop the iteration at the
+    first batch that would be too small or loop with indices from the beginning.
+    On two processes with an iterable dataset yielding of `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]` with a batch size of
+    2:
+    - the shard on process 0 will yield `[0, 1, 4, 5, 8, 9]` so will see batches `[0, 1]`, `[4, 5]`, `[8, 9]`
+    - the shard on process 1 will yield `[2, 3, 6, 7, 10, 11]` so will see batches `[2, 3]`, `[6, 7]`, `[10, 11]`
+    Args:
+        dataset (`paddle.io.IterableDataset`):
+            The batch sampler to split in several shards.
+        batch_size (`int`, *optional*, defaults to 1):
+            The size of the batches per shard.
+        drop_last (`bool`, *optional*, defaults to `False`):
+            Whether or not to drop the last incomplete batch or complete the last batches by using the samples from the
+            beginning.
+        num_processes (`int`, *optional*, defaults to 1):
+            The number of processes running concurrently.
+        process_index (`int`, *optional*, defaults to 0):
+            The index of the current process.
+        seed (`int`, *optional*, defaults to 0):
+            A random seed that will be used for the random number generation in
+            [`~trainer_utils.IterableDatasetShard.set_epoch`].
+    """
+
+    def __init__(
+        self,
+        dataset: IterableDataset,
+        batch_size: int = 1,
+        drop_last: bool = False,
+        num_processes: int = 1,
+        process_index: int = 0,
+        seed: int = 0,
+    ):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.drop_last = drop_last
+        self.num_processes = num_processes
+        self.process_index = process_index
+        self.seed = seed
+        self.epoch = 0
+        self.num_examples = 0
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+        if hasattr(self.dataset, "set_epoch"):
+            self.dataset.set_epoch(epoch)
+
+    def __iter__(self):
+        self.num_examples = 0
+        # TODO: support generator seed in sampling.
+        #
+        # if (
+        #     not hasattr(self.dataset, "set_epoch")
+        #     and hasattr(self.dataset, "generator")
+        #     and isinstance(self.dataset.generator, paddle.fluid.Generator)
+        # ):
+        #     self.dataset.generator.manual_seed(self.seed + self.epoch)
+        real_batch_size = self.batch_size * self.num_processes
+        process_slice = range(self.process_index * self.batch_size,
+                              (self.process_index + 1) * self.batch_size)
+
+        first_batch = None
+        current_batch = []
+        for element in self.dataset:
+            self.num_examples += 1
+            current_batch.append(element)
+            # Wait to have a full batch before yielding elements.
+            if len(current_batch) == real_batch_size:
+                for i in process_slice:
+                    yield current_batch[i]
+                if first_batch is None:
+                    first_batch = current_batch.copy()
+                current_batch = []
+
+        # Finished if drop_last is True, otherwise complete the last batch with elements from the beginning.
+        if not self.drop_last and len(current_batch) > 0:
+            if first_batch is None:
+                first_batch = current_batch.copy()
+            while len(current_batch) < real_batch_size:
+                current_batch += first_batch
+            for i in process_slice:
+                yield current_batch[i]
+
+    def __len__(self):
+        # Will raise an error if the underlying dataset is not sized.
+        if self.drop_last:
+            return (len(self.dataset) //
+                    (self.batch_size * self.num_processes)) * self.batch_size
+        else:
+            return math.ceil(
+                len(self.dataset) /
+                (self.batch_size * self.num_processes)) * self.batch_size
+
+
+def find_batch_size(tensors):
+    """
+    Find the first dimension of a tensor in a nested list/tuple/dict of tensors.
+    """
+    if isinstance(tensors, (list, tuple)):
+        for t in tensors:
+            result = find_batch_size(t)
+            if result is not None:
+                return result
+    elif isinstance(tensors, (dict, BatchEncoding)):
+        for key, value in tensors.items():
+            result = find_batch_size(value)
+            if result is not None:
+                return result
+    elif isinstance(tensors, paddle.Tensor):
+        return tensors.shape[0] if len(tensors.shape) >= 1 else None
+    elif isinstance(tensors, np.ndarray):
+        return tensors.shape[0] if len(tensors.shape) >= 1 else None
+
+
+class RemoveColumnsCollator:
+    """Wrap the data collator to remove unused columns before they are passed to the collator."""
+
+    def __init__(
+        self,
+        data_collator,
+        signature_columns,
+        logger=None,
+        model_name: Optional[str] = None,
+        description: Optional[str] = None,
+    ):
+        self.data_collator = data_collator
+        self.signature_columns = signature_columns
+        self.logger = logger
+        self.description = description
+        self.model_name = model_name
+        self.message_logged = False
+
+    def _remove_columns(self, feature: dict) -> dict:
+        if not isinstance(feature, dict):
+            return feature
+        if not self.message_logged and self.logger and self.model_name:
+            ignored_columns = list(
+                set(feature.keys()) - set(self.signature_columns))
+            if len(ignored_columns) > 0:
+                dset_description = "" if self.description is None else f"in the {self.description} set"
+                self.logger.info(
+                    f"The following columns {dset_description} don't have a corresponding argument in "
+                    f"`{self.model_name}.forward` and have been ignored: {', '.join(ignored_columns)}."
+                    f" If {', '.join(ignored_columns)} are not expected by `{self.model_name}.forward`, "
+                    " you can safely ignore this message.")
+                self.message_logged = True
+        return {k: v for k, v in feature.items() if k in self.signature_columns}
+
+    def __call__(self, features: List[dict]):
+        features = [self._remove_columns(feature) for feature in features]
+        return self.data_collator(features)

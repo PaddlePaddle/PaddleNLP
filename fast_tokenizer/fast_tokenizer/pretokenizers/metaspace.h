@@ -22,7 +22,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
-struct FASTERTOKENIZER_DECL MetaSpacePreTokenizer : public PreTokenizer {
+struct FASTTOKENIZER_DECL MetaSpacePreTokenizer : public PreTokenizer {
   // Replaces white space with U+2581 (LOWER ONE EIGHT BLOCK)
   MetaSpacePreTokenizer(const std::string& replacement = "\xe2\x96\x81",
                         bool add_prefix_space = true);

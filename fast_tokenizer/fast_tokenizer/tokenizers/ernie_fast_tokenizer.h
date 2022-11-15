@@ -23,7 +23,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace tokenizers_impl {
 
-struct FASTERTOKENIZER_DECL ErnieFastTokenizer : public core::Tokenizer {
+struct FASTTOKENIZER_DECL ErnieFastTokenizer : public core::Tokenizer {
   ErnieFastTokenizer(const std::string& vocab_path,
                        const std::string& unk_token = "[UNK]",
                        const std::string& sep_token = "[SEP]",

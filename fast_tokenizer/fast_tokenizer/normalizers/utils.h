@@ -24,7 +24,7 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace normalizers {
 
-struct FASTERTOKENIZER_DECL SequenceNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL SequenceNormalizer : public Normalizer {
   SequenceNormalizer() = default;
   SequenceNormalizer(const SequenceNormalizer&) = default;
   SequenceNormalizer(const std::vector<Normalizer*>& normalizers);
@@ -38,7 +38,7 @@ private:
                         SequenceNormalizer& normalizer);
 };
 
-struct FASTERTOKENIZER_DECL LowercaseNormalizer : public Normalizer {
+struct FASTTOKENIZER_DECL LowercaseNormalizer : public Normalizer {
   virtual void operator()(NormalizedString* input) const override;
   friend void to_json(nlohmann::json& j, const LowercaseNormalizer& normalizer);
   friend void from_json(const nlohmann::json& j,
