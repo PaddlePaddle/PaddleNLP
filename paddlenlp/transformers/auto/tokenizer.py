@@ -180,8 +180,13 @@ class AutoTokenizer():
                  print(type(tokenizer))
                  # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
          """
-        # default not to use faster tokenizer
-        use_faster = kwargs.pop("use_faster", False)
+        # Default not to use faster tokenizer
+        use_fast = kwargs.pop("use_fast", False)
+        if "use_faster" in kwargs:
+            use_fast = kwargs.pop("use_faster", False)
+            logger.warning(
+                "The keyword argument `use_faster` is deprecated in future, please use `use_fast` instead"
+            )
 
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():
@@ -198,7 +203,7 @@ class AutoTokenizer():
                             if not tokenizer_class[1]:
                                 actual_tokenizer_class = tokenizer_class[0]
                                 break
-                        if use_faster:
+                        if use_fast:
                             if is_fast_tokenizer_available():
                                 is_support_fast_tokenizer = False
                                 for tokenizer_class in tokenizer_classes:
@@ -211,7 +216,7 @@ class AutoTokenizer():
                                     logger.warning(
                                         f"The tokenizer {actual_tokenizer_class} doesn't have the faster version."
                                         " Please check the map `paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES`"
-                                        " to see which faster tokenizers are currently supported."
+                                        " to see which fast tokenizers are currently supported."
                                     )
                             else:
                                 logger.warning(
@@ -243,7 +248,7 @@ class AutoTokenizer():
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
-                    if use_faster:
+                    if use_fast:
                         for fast_tokenizer_class, name in cls._faster_name_mapping.items(
                         ):
                             if name == class_name:

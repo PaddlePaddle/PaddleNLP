@@ -1564,7 +1564,7 @@ FastTokenizer 是飞桨提供的速度领先的文本处理算子库，集成了
     </tr>
 </table>
 
-使用 FastTokenizer 的方式非常简单，在安装 fast_tokenizer 包之后，仅需在 tokenizer 实例化时直接传入 `use_faster=True` 即可。目前已在 Linux 系统下支持 BERT、ERNIE、TinyBERT 等模型。
+使用 FastTokenizer 的方式非常简单，在安装 fast_tokenizer 包之后，仅需在 tokenizer 实例化时直接传入 `use_fast=True` 即可。目前已在 Linux 系统下支持 BERT、ERNIE、TinyBERT 等模型。
 
 安装 fast_tokenizer 包的命令：
 
@@ -1579,11 +1579,11 @@ pip install fast_tokenizer
 export OMP_NUM_THREADS=4
 ```
 
-调用 `from_pretrained` 时只需轻松传入一个参数 `use_faster=True`：
+调用 `from_pretrained` 时只需轻松传入一个参数 `use_fast=True`：
 
 ```python
 from paddlenlp.transformers import AutoTokenizer
-AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 ```
 
 <a name="部署"></a>
