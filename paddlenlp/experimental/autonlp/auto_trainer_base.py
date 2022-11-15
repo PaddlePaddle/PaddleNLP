@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from hyperopt import hp
 from paddle.io import Dataset
 from ray import tune
+from ray.air import RunConfig
 from ray.tune.result_grid import ResultGrid
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.hyperopt import HyperOptSearch
@@ -38,9 +39,15 @@ class AutoTrainerBase(metaclass=ABCMeta):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
     """
 
-    def __init__(self, language: Optional[str] = "Chinese", **kwargs):
+    def __init__(self, metric_for_best_model: str, greater_is_better: bool, language: str, output_dir: str = None, **kwargs):
+        if not metric_for_best_model.startswith("eval_"):
+            self.metric_for_best_model = f"eval_{metric_for_best_model}"
+        else:
+            self.metric_for_best_model = metric_for_best_model
+        self.greater_is_better = greater_is_better
         self.language = language
-
+        self.output_dir = output_dir
+ 
     @property
     @abstractmethod
     def _default_training_argument(self) -> TrainingArguments:
@@ -62,25 +69,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         Model Candidates stored as Ray hyperparameter search space, organized by
         self.language and preset
         """
-
-    def _filter_model_candidates(self,
-                                 language=None,
-                                 preset=None) -> List[Dict[str, Any]]:
-        """
-        Model Candidates stored as Ray hyperparameter search space, organized by
-        self.language and preset
-        """
-        model_candidates = self._model_candidates
-        if language is not None:
-            model_candidates = filter(lambda x: x["language"] == language,
-                                      model_candidates)
-        if preset is not None:
-            model_candidates = filter(lambda x: x["preset"] == preset,
-                                      model_candidates)
-        hyperopt_search_space = {
-            "config": hp.choice("config", list(model_candidates))
-        }
-        return hyperopt_search_space
 
     @abstractmethod
     def _data_checks_and_inference(self, train_dataset: Dataset,
@@ -114,6 +102,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
+    
+    @abstractmethod
+    def predict(self, test_dataset, trial_id=None) -> Dataset:
+        pass
+    
+    @abstractmethod
+    def export(self, export_path, trial_id=None):
+        pass
 
     def _override_arguments(self, config: Dict[str, Any],
                             default_arguments: TrainingArguments) -> Any:
@@ -140,6 +136,44 @@ class AutoTrainerBase(metaclass=ABCMeta):
         Overrides the default CompressionArguments with the provided hyperparameter config
         """
         return self._override_arguments(config, self._default_compress_argument)
+
+    def _filter_model_candidates(self,
+                                 language=None,
+                                 preset=None) -> List[Dict[str, Any]]:
+        """
+        Model Candidates stored as Ray hyperparameter search space, organized by
+        self.language and preset
+        """
+        model_candidates = self._model_candidates
+        if language is not None:
+            model_candidates = filter(lambda x: x["language"] == language,
+                                      model_candidates)
+        if preset is not None:
+            model_candidates = filter(lambda x: x["preset"] == preset,
+                                      model_candidates)
+        hyperopt_search_space = {
+            "config": hp.choice("config", list(model_candidates))
+        }
+        return hyperopt_search_space
+
+    def _get_model_result(self, trial_id=None):
+        if hasattr(self, "training_results"):
+            if trial_id is not None:
+                for result in self.training_results:
+                    if result.metrics["trial_id"] == trial_id:
+                        return result
+                raise LookupError(f"Trial_id '{trial_id}' is not found in 'training_results'. Did you enter the correct 'trial_id'?")
+            else:
+                result = self.training_results.get_best_result(metric=self.metric_for_best_model, mode="max" if self.greater_is_better else "min")
+                return result
+        else:
+            raise AttributeError("'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?")
+
+    def show_training_results(self):
+        if hasattr(self, "training_results"):
+            return self.training_results.get_dataframe()
+        else:
+            raise AttributeError("'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?")
 
     def train(
         self,
@@ -189,6 +223,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
+            run_config = RunConfig(local_dir=self.output_dir) if self.output_dir else None
         )
         self.training_results = tuner.fit()
         return self.training_results
