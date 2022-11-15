@@ -359,7 +359,7 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
-    /*
+
     T5DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
     decoding_sampling_ = new T5DecodingSampling<DecodingTraits_::OpType>(
         allocator_,
@@ -385,12 +385,14 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         false,                 // prefix_lm
         false,                 // is_mbart
         0,                     // min_length
-        inner_coeff);
+        inner_coeff
+        num_buckets,
+        max_distance);
 
     decoding_sampling_->forward(params, decoding_params);
 
     delete decoding_sampling_;
-    */
+
   } else {
     PD_THROW(
         "Only beam_search, topk_sampling and topp_sampling are supported for "
