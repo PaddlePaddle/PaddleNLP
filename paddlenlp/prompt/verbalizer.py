@@ -285,7 +285,7 @@ class ManualVerbalizer(Verbalizer):
             new_outputs = outputs[:, 0, :]
             for index in range(1, outputs.shape[1]):
                 new_outputs *= outputs[:, index, :]
-            outputs = new_outputs.squeeze(1)
+            outputs = new_outputs
         else:
             raise ValueError(
                 "Strategy {} is not supported to aggregate multiple "
