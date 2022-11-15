@@ -1,4 +1,4 @@
-# Ppdiffusers Pipelines
+# PPDiffusers Pipelines
 
 Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理的简单方式。
 大多数扩散模型系统由多个独立训练的模型和高度自适应的调度器(scheduler)组成，通过pipeline我们可以很方便的对这些扩散模型系统进行端到端的推理。
