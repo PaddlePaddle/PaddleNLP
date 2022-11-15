@@ -149,8 +149,9 @@ class LatentDiffusionTrainer(Trainer):
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, WEIGHTS_NAME))
+            state_dict = paddle.load(os.path.join(resume_from_checkpoint,
+                                                  WEIGHTS_NAME),
+                                     return_numpy=True)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
 
@@ -312,8 +313,6 @@ class LatentDiffusionTrainer(Trainer):
                     self.control = self.callback_handler.on_step_begin(
                         args, self.state, self.control)
 
-                # TODO junnyu
-                # is_no_sync = False
                 is_no_sync = (((
                     (step + 1) % args.gradient_accumulation_steps != 0)
                                and args.local_rank != -1
@@ -345,6 +344,8 @@ class LatentDiffusionTrainer(Trainer):
 
                     self.lr_scheduler.step()
                     self.optimizer.clear_grad()
+                    # TODO junnyu do ema
+                    self.model.on_train_batch_end()
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -395,7 +396,7 @@ class LatentDiffusionTrainer(Trainer):
                                            WEIGHTS_NAME)
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path)
+                state_dict = paddle.load(best_model_path, return_numpy=True)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
@@ -422,6 +423,27 @@ class LatentDiffusionTrainer(Trainer):
             args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+
+    def _load_optimizer_and_scheduler(self, checkpoint):
+        """If optimizer and scheduler states exist, load them."""
+        if checkpoint is None:
+            return
+
+        if os.path.isfile(os.path.join(
+                checkpoint, OPTIMIZER_NAME)) and os.path.isfile(
+                    os.path.join(checkpoint, SCHEDULER_NAME)):
+            # Load in optimizer and scheduler states
+            self.optimizer.set_state_dict(
+                paddle.load(os.path.join(checkpoint, OPTIMIZER_NAME),
+                            return_numpy=True))
+            self.lr_scheduler.set_state_dict(
+                paddle.load(os.path.join(checkpoint, SCHEDULER_NAME),
+                            return_numpy=True))
+            if self.do_grad_scaling and os.path.isfile(
+                    os.path.join(checkpoint, SCALER_NAME)):
+                self.scaler.load_state_dict(
+                    paddle.load(os.path.join(checkpoint, SCALER_NAME),
+                                return_numpy=True))
 
     def _maybe_log_save_evaluate(self, inputs, tr_loss, model, epoch,
                                  ignore_keys_for_eval):
@@ -486,19 +508,17 @@ class LatentDiffusionTrainer(Trainer):
                 self.args)
 
             # TODO junnyu
-            if self.args.freeze_text_encoder:
-                params_to_train = self.model.unet.parameters()
-            else:
-                params_to_train = itertools.chain(
-                    self.model.text_encoder.parameters(),
-                    self.model.unet.parameters())
+            params_to_train = itertools.chain(
+                self.model.text_encoder.parameters(),
+                self.model.unet.parameters())
             self.optimizer = optimizer_cls(
                 learning_rate=self.lr_scheduler
                 if lr_scheduler is None else lr_scheduler,
                 parameters=params_to_train,
                 weight_decay=self.args.weight_decay,
                 grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                if self.args.max_grad_norm is not None else None,
+                if self.args.max_grad_norm is not None
+                and self.args.max_grad_norm > 0 else None,
                 **optimizer_kwargs)
 
         return self.optimizer
