@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -144,8 +144,10 @@ if __name__ == '__main__':
                   (epoch, step, avg_loss))
         evaluate(model, metric, dev_loader)
 
-        paddle.save(model.state_dict(),
-                    os.path.join(args.save_dir, 'model_%d' % step))
+        paddle.save(
+            model.state_dict(),
+            os.path.join(args.save_dir, 'model_%d' % step,
+                         'model_state.pdparams'))
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "ernie_crf_results.txt"

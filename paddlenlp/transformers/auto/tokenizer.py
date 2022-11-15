@@ -84,6 +84,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("CLIPTokenizer", "clip"),
     ("ArtistTokenizer", "artist"),
     ("ErnieViLTokenizer", "ernie_vil"),
+    ("PegasusChineseTokenizer", 'pegasus'),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
@@ -278,9 +279,10 @@ class AutoTokenizer():
                                 **kwargs)
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                                 pretrained_model_name_or_path,
-                                                 cls.tokenizer_config_file)
+            community_config_path = "/".join([
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                cls.tokenizer_config_file
+            ])
 
             default_root = os.path.join(MODEL_HOME,
                                         pretrained_model_name_or_path)
