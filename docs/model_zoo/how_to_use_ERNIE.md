@@ -28,7 +28,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">各类 NLP 任务通用的预训练模型，在文心大模型 ERNIE 3.0 基础上通过在线蒸馏技术得到的一系列轻量级模型</span>
+                <span style="font-size:18px;">各类 NLP 任务通用的预训练模型，在文心大模型 ERNIE 3.0 基础上通过在线蒸馏技术得到的一系列轻量级模型。</span>
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -38,7 +38,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">通用信息抽取模型，实体抽取、关系抽取、事件抽取、情感分析等多任务统一建模，零样本与小样本能力突出</span>
+                <span style="font-size:18px;">通用信息抽取模型，实体抽取、关系抽取、事件抽取、情感分析等多任务统一建模，零样本与小样本能力突出。</span>
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -78,7 +78,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">面向生成任务的预训练-微调框架</span>
+                <span style="font-size:18px;">面向生成任务的预训练-微调框架。</span>
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -88,7 +88,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">各类 NLP 任务通用，针对长文本的预训练模型。在循环Transformer机制之上，创新性地提出两阶段重复学习以及增强的循环机制，以此提高模型感受野，加强模型对长文本的理解能力</span>
+                <span style="font-size:18px;">各类 NLP 任务通用，针对长文本的预训练模型。在循环Transformer机制之上，创新性地提出两阶段重复学习以及增强的循环机制，以此提高模型感受野，加强模型对长文本的理解能力。</span>
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -108,7 +108,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">面向检索任务、效果领先的预训练模型，预训练阶段使用由细粒度交互向粗粒度交互蒸馏的策略，节省了传统方法中训练教师模型的开销，提高了模型效率（开源中）</span>
+                <span style="font-size:18px;">面向检索任务、效果领先的预训练模型，预训练阶段使用由细粒度交互向粗粒度交互蒸馏的策略，节省了传统方法中训练教师模型的开销，提高了模型效率（开源中）。</span>
             </td>
        <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -118,7 +118,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">面向检索任务、效果领先的预训练模型（开源中）</span>
+                <span style="font-size:18px;">面向检索任务、效果领先的预训练模型（开源中）。</span>
             </td>
        <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -128,7 +128,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">面向对话任务，业界首个开源的百亿超大规模开放域对话预训练模型，模型参数量达11B量级，经过十亿级样本对话数据的预训练，并引入role embedding区分多方对话中的对话角色，效果领先</span>
+                <span style="font-size:18px;">面向对话任务，业界首个开源的百亿超大规模开放域对话预训练模型，模型参数量达11B量级，经过十亿级样本对话数据的预训练，并引入role embedding区分多方对话中的对话角色，效果领先。</span>
             </td>
     <tbody>
 </table>
@@ -155,7 +155,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">跨模态双向生成模型，通过自回归生成模式对图像生成和文本生成任务进行统一建模，图文双向生成效果领先</span>
+                <span style="font-size:18px;">跨模态双向生成模型，通过自回归生成模式对图像生成和文本生成任务进行统一建模，图文双向生成效果领先。</span>
             </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
@@ -165,7 +165,7 @@
                   </a> </span>
             </td>
             <td style="text-align:center">
-                <span style="font-size:18px;">后续补充更多</span>
+                <span style="font-size:18px;">后续补充更多。</span>
             </td>
      <tbody>
 </table>
