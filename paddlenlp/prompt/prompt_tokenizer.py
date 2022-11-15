@@ -112,7 +112,7 @@ class MLMPromptTokenizer(object):
             omask_index = [
                 x for x in range(part_length) if input_ids[x] == omask_id
             ]
-            omask_index = [0] + omask_index + [last_position + part_length]
+            omask_index = [0] + omask_index
             position_ids = []
             max_index = 0
             for start_id, end_id in zip(omask_index[:-1], omask_index[1:]):
@@ -120,6 +120,11 @@ class MLMPromptTokenizer(object):
                     list(range(last_position,
                                last_position + end_id - start_id)))
                 max_index = max(end_id - start_id, max_index)
+            if len(position_ids) < part_length:
+                difference = part_length - len(position_ids)
+                position_ids.extend(
+                    range(last_position, last_position + difference))
+                max_index = max(difference, max_index)
             last_position += max_index
         else:
             position_ids = list(

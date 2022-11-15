@@ -47,7 +47,7 @@ class Verbalizer(nn.Layer):
 
     def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer,
                  **kwargs):
-        super().__init__()
+        super(Verbalizer, self).__init__()
         for key, value in kwargs.items():
             setattr(self, key, value)
         self.tokenizer = tokenizer
@@ -70,7 +70,7 @@ class Verbalizer(nn.Layer):
     @labels.setter
     def labels(self, labels):
         if labels is not None:
-            self._labels = labels
+            self._labels = sorted(labels)
 
     @property
     def label_words(self):
@@ -264,7 +264,8 @@ class ManualVerbalizer(Verbalizer):
     """
 
     def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer):
-        super().__init__(label_words=label_words, tokenizer=tokenizer)
+        super(ManualVerbalizer, self).__init__(label_words=label_words,
+                                               tokenizer=tokenizer)
 
     def create_parameters(self):
         return None
@@ -284,7 +285,7 @@ class ManualVerbalizer(Verbalizer):
             new_outputs = outputs[:, 0, :]
             for index in range(1, outputs.shape[1]):
                 new_outputs *= outputs[:, index, :]
-            outputs = new_outputs
+            outputs = new_outputs.squeeze(1)
         else:
             raise ValueError(
                 "Strategy {} is not supported to aggregate multiple "
@@ -315,7 +316,8 @@ class ManualVerbalizer(Verbalizer):
         Returns:
             The prediction outputs over labels (`Tensor`).
         """
-        outputs = super().process_outputs(outputs, masked_positions)
+        outputs = super(ManualVerbalizer,
+                        self).process_outputs(outputs, masked_positions)
         label_word_outputs = self.project(outputs)
 
         if self.post_log_softmax:
@@ -340,7 +342,7 @@ class MaskedLMIdentity(nn.Layer):
     """
 
     def __init__(self):
-        super().__init__()
+        super(MaskedLMIdentity, self).__init__()
 
     def forward(self, sequence_output, masked_positions=None):
         return sequence_output
@@ -363,9 +365,9 @@ class SoftVerbalizer(Verbalizer):
 
     def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer,
                  model: PretrainedModel):
-        super().__init__(label_words=label_words,
-                         tokenizer=tokenizer,
-                         model=model)
+        super(SoftVerbalizer, self).__init__(label_words=label_words,
+                                             tokenizer=tokenizer,
+                                             model=model)
         del self.model
         setattr(model, self.head_name[0], MaskedLMIdentity())
 
@@ -383,7 +385,8 @@ class SoftVerbalizer(Verbalizer):
         self._extract_head(self.model)
 
     def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
-        outputs = super().process_outputs(outputs, masked_positions)
+        outputs = super(SoftVerbalizer,
+                        self).process_outputs(outputs, masked_positions)
         return self.head(outputs)
 
     def head_parameters(self):

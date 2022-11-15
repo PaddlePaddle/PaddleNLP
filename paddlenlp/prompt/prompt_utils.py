@@ -58,7 +58,7 @@ class PromptDataCollatorWithPadding:
     return_attention_mask: Optional[bool] = None
     default_model_input_names: List = ("input_ids", "token_type_ids",
                                        "special_tokens_mask", "offset_mapping",
-                                       "position_ids", "attention_mask")
+                                       "position_ids")
 
     def _convert_to_tensors(self, data):
         if self.return_tensors == "np":
@@ -71,6 +71,7 @@ class PromptDataCollatorWithPadding:
         for key in features[0]:
             if key in self.default_model_input_names:
                 batch[key] = [b[key] for b in features]
+
         batch = self.tokenizer.pad(
             batch,
             padding=self.padding,
@@ -87,6 +88,13 @@ class PromptDataCollatorWithPadding:
                     for index, value in enumerate(values):
                         value = np.array(value) + index * max_length
                         new_values.extend(value.tolist())
+                    values = new_values
+                elif key == "attention_mask":
+                    new_values = np.zeros(
+                        [len(values), 1, max_length, max_length])
+                    for index, value in enumerate(values):
+                        length = len(value)
+                        new_values[index][0, :length, :length] = value
                     values = new_values
                 elif key != "labels":
                     for index, value in enumerate(values):

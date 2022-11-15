@@ -26,7 +26,7 @@ from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
 from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback
 from paddlenlp.prompt import (
     AutoTemplate,
-    SoftVerbalizer,
+    ManualVerbalizer,
     PromptTuningArguments,
     PromptTrainer,
     PromptModelForSequenceClassification,
@@ -77,7 +77,7 @@ def main():
             data = line.strip().split("==")
             word = data[1] if len(data) > 1 else data[0].split("##")[-1]
             label_words[data[0]].append(word)
-    verbalizer = SoftVerbalizer(label_words, tokenizer, model)
+    verbalizer = ManualVerbalizer(label_words, tokenizer)
 
     # Load the few-shot datasets.
     train_ds, dev_ds, test_ds = load_local_dataset(
@@ -137,15 +137,22 @@ def main():
 
     # Export static model.
     if training_args.do_export:
+        template_keywords = template.extract_template_keywords(template.prompt)
         input_spec = [
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
             InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
             InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # masked_positions
-            InputSpec(shape=[None, None], dtype="int64"),  # soft_token_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            InputSpec(shape=[None, None], dtype="int64"),  # encoder_ids
+            InputSpec(shape=[None, None, None], dtype="int64")  # attention_mask
         ]
+        if "mask" in template_keywords:
+            input_spec.append(InputSpec(shape=[None],
+                                        dtype="int64"))  # masked_positions
+        if "soft" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None],
+                                        dtype="int64"))  # soft_token_ids
+        if "encoder" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None],
+                                        dtype="int64"))  # encoder_ids
         export_path = os.path.join(training_args.output_dir, 'export')
         trainer.export_model(export_path,
                              input_spec=input_spec,

@@ -68,16 +68,16 @@ class PromptTrainer(Trainer):
                                                           padding=True,
                                                           return_tensors='pd')
 
-        super().__init__(model=model,
-                         criterion=criterion,
-                         args=args,
-                         data_collator=data_collator,
-                         train_dataset=train_dataset,
-                         eval_dataset=eval_dataset,
-                         tokenizer=tokenizer,
-                         compute_metrics=compute_metrics,
-                         callbacks=callbacks,
-                         optimizers=optimizers)
+        super(PromptTrainer, self).__init__(model=model,
+                                            criterion=criterion,
+                                            args=args,
+                                            data_collator=data_collator,
+                                            train_dataset=train_dataset,
+                                            eval_dataset=eval_dataset,
+                                            tokenizer=tokenizer,
+                                            compute_metrics=compute_metrics,
+                                            callbacks=callbacks,
+                                            optimizers=optimizers)
 
         self.load_state_dict_from_checkpoint(args.resume_from_checkpoint)
 
@@ -135,7 +135,7 @@ class PromptTrainer(Trainer):
     def _save(self,
               output_dir: Optional[str] = None,
               state_dict: Dict[str, Any] = None):
-        super()._save(output_dir, state_dict)
+        super(PromptTrainer, self)._save(output_dir, state_dict)
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         if self.template:
             self.template.save(output_dir)
@@ -149,11 +149,12 @@ class PromptTrainer(Trainer):
                                                    self.tokenizer,
                                                    self.args.max_seq_length,
                                                    self._get_model())
-        super().load_state_dict_from_checkpoint(resume_from_checkpoint)
+        super(PromptTrainer,
+              self).load_state_dict_from_checkpoint(resume_from_checkpoint)
 
     def get_test_dataloader(self, test_dataset):
         test_dataset = self._map_dataset(test_dataset)
-        return super().get_test_dataloader(test_dataset)
+        return super(PromptTrainer, self).get_test_dataloader(test_dataset)
 
     def create_optimizer(self, lr_scheduler=None):
         """
@@ -248,17 +249,9 @@ class PromptTrainer(Trainer):
         outputs, hidden_states = model(**input_dict)
 
         if self.criterion is not None:
-            if labels.ndim == outputs.ndim:
-                loss = 0
-                for idx in range(labels.shape[-1]):
-                    loss += self.criterion(
-                        outputs,
-                        paddle.index_select(labels,
-                                            paddle.to_tensor(idx),
-                                            axis=1).reshape(outputs.shape[:-1]))
-            else:
-                labels = labels.reshape(outputs.shape[:-1])
-                loss = self.criterion(outputs, labels)
+            labels = labels.reshape(outputs.shape[:-1])
+            input_dict["labels"] = labels
+            loss = self.criterion(outputs, labels)
 
             if self.args.use_rdrop:
                 loss = self._compute_rdrop_loss(model, input_dict, outputs,
@@ -274,8 +267,8 @@ class PromptTrainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
     def _compute_rdrop_loss(self, model, input_dict, outputs, loss):
-        re_outputs = model(input_dict)
-        labels = inputs["labels"]
+        re_outputs, _ = model(**input_dict)
+        labels = input_dict["labels"]
         ce_loss = (self.criterion(re_outputs, labels) + loss) * 0.5
         kl_loss = self.rdrop_criterion(outputs, re_outputs)
         loss = ce_loss + self.args.alpha_rdrop * kl_loss
@@ -337,7 +330,7 @@ class PromptModelForSequenceClassification(nn.Layer):
                  verbalizer=None,
                  freeze_plm: bool = False,
                  freeze_dropout: bool = False):
-        super().__init__()
+        super(PromptModelForSequenceClassification, self).__init__()
         self.plm = model
         self.template = template
         self.verbalizer = verbalizer
@@ -356,9 +349,9 @@ class PromptModelForSequenceClassification(nn.Layer):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
+                attention_mask=None,
                 masked_positions=None,
                 soft_token_ids=None,
-                attention_mask=None,
                 encoder_ids=None,
                 **kwargs):
         input_dict = {

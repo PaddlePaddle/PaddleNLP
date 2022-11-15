@@ -72,7 +72,7 @@ class Template(nn.Layer):
 
     def __init__(self, prompt: str, tokenizer: PretrainedTokenizer,
                  max_length: int, **kwargs):
-        super().__init__()
+        super(Template, self).__init__()
         for key, value in kwargs.items():
             setattr(self, key, value)
         self.tokenizer = tokenizer
@@ -138,6 +138,9 @@ class Template(nn.Layer):
         model.resize_token_embeddings(len(tokenizer))
         ```"""
         if self.omask_token not in self.tokenizer.additional_special_tokens:
+            self.tokenizer.add_special_tokens(
+                {"additional_special_tokens": [self.omask_token]})
+            return True
             raise ValueError(
                 "'{}' not found in tokenizer.".format(self.omask_token) +
                 omask_example)
@@ -237,8 +240,8 @@ class Template(nn.Layer):
         for part in self._prompt:
             if "text" in part:
                 example_keys.add(part["text"])
-            if "options" in part and not os.path.isfile(part["options"]):
-                example_keys.add(part["options"])
+            if "options" in part and isinstance(part["options"], list):
+                example_keys.update(set(part["options"]))
         return example_keys
 
     def encode(self, example: Dict[str, Any]):
@@ -277,6 +280,13 @@ class Template(nn.Layer):
         template_state_dict = self.state_dict()
         if len(template_state_dict) > 0:
             paddle.save(template_state_dict, template_param_file)
+
+    @staticmethod
+    def extract_template_keywords(prompt: List[Dict[str, Any]]):
+        keywords = set()
+        for part in prompt:
+            keywords.update(part.keys())
+        return keywords
 
     @staticmethod
     def parse_template_string(prompt: str,
@@ -389,13 +399,34 @@ class ManualTemplate(Template):
 
     def __init__(self, prompt: str, tokenizer: PretrainedTokenizer,
                  max_length: int):
-        super().__init__(prompt, tokenizer, max_length)
+        super(ManualTemplate, self).__init__(prompt, tokenizer, max_length)
 
     def create_prompt_parameters(self):
         return None
 
     def process_batch(self, input_dict):
         return input_dict
+
+
+class SoftLSTM(nn.Layer):
+    """
+    LSTM encoder for soft token embeddings.
+    """
+
+    def __init__(self, input_size, hidden_size, output_size, activation):
+        super(SoftLSTM, self).__init__()
+        self.lstm = nn.LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=2,
+                            direction='bidirect',
+                            time_major=False)
+        self.mlp = nn.Sequential(nn.Linear(2 * hidden_size,
+                                           hidden_size), activation,
+                                 nn.Linear(hidden_size, output_size))
+
+    def forward(self, embeds):
+        hidden_states, _ = self.lstm(embeds)
+        return self.mlp(hidden_states)
 
 
 class SoftTemplate(Template):
@@ -430,11 +461,11 @@ class SoftTemplate(Template):
                  max_length: int,
                  word_embeddings: Tensor,
                  soft_embeddings: Tensor = None):
-        super().__init__(prompt,
-                         tokenizer,
-                         max_length,
-                         word_embeddings=word_embeddings,
-                         soft_embeddings=soft_embeddings)
+        super(SoftTemplate).__init__(prompt,
+                                     tokenizer,
+                                     max_length,
+                                     word_embeddings=word_embeddings,
+                                     soft_embeddings=soft_embeddings)
 
     def named_parameters(self):
         named_params = [(n, p)
@@ -470,7 +501,6 @@ class SoftTemplate(Template):
                 axis=[1, 2])
             input_dict["attention_mask"] = attention_mask
         input_dict["input_ids"] = None
-        # TODO (Huijuan): Optimize calculation.
         soft_embeds = self.soft_embeddings(input_dict["soft_token_ids"])
         soft_shape = soft_embeds.shape
         soft_embeds = soft_embeds.reshape([-1, soft_shape[-1]])
@@ -481,9 +511,10 @@ class SoftTemplate(Template):
             to_encode_embeds = soft_embeds[to_encode]
             to_encode_embeds = to_encode_embeds.reshape(
                 [soft_shape[0], -1, soft_shape[-1]])
-            encoded = self.encoder_list[encoder_id](to_encode_embeds)
+            encoder = self.encoder_list[encoder_id]
+            encoded = encoder(to_encode_embeds)
             encoded = encoded.reshape([-1, soft_shape[-1]])
-            soft_embeds[to_encode] = encoded
+            soft_embeds = paddle.scatter(soft_embeds, to_encode, encoded)
         soft_embeds = soft_embeds.reshape([soft_shape[0], -1, soft_shape[-1]])
         soft_token_ids = input_dict["soft_token_ids"].unsqueeze(2)
         input_dict["inputs_embeds"] = paddle.where(soft_token_ids > 0,
@@ -631,15 +662,8 @@ class SoftTemplate(Template):
                         hidden_size = self.embed_size
                     if part["encoder"] == "lstm":
                         encoder_list.append(
-                            nn.Sequential(
-                                nn.LSTM(input_size=self.embed_size,
-                                        hidden_size=hidden_size,
-                                        num_layers=2,
-                                        direction='bidirect',
-                                        time_major=False)[0],
-                                nn.Linear(2 * hidden_size,
-                                          hidden_size), activation,
-                                nn.Linear(hidden_size, output_size)))
+                            SoftLSTM(self.embed_size, hidden_size, output_size,
+                                     activation))
                     elif part["encoder"] == "mlp":
                         encoder_list.append(
                             nn.Sequential(
@@ -658,14 +682,15 @@ class SoftTemplate(Template):
             self,
             example: Dict[str, Any],
             prompt: Optional[List[Dict[str, Any]]] = None) -> List[str]:
-        inputs = super().build_inputs_with_prompt(example, prompt)
+        inputs = super(SoftTemplate,
+                       self).build_inputs_with_prompt(example, prompt)
         for index, part in enumerate(inputs):
             if isinstance(part, dict) and "soft" in part:
                 inputs[index] = part["soft"]
         return inputs
 
     def save(self, save_path):
-        super().save(save_path)
+        super(SoftTemplate, self).save(save_path)
         template_param_file = os.path.join(save_path, TEMPLATE_PARAMETER_FILE)
         paddle.save(self.state_dict(), template_param_file)
 
@@ -699,8 +724,8 @@ class PrefixTemplate(SoftTemplate):
                  model: PretrainedModel,
                  prefix_dropout: float = 0.1):
         self.n_layer, self.n_heads = self._get_config(model)
-        super().__init__(prompt, tokenizer, max_length,
-                         model.get_input_embeddings())
+        super(PrefixTemplate).__init__(prompt, tokenizer, max_length,
+                                       model.get_input_embeddings())
         self.dropout = nn.Dropout(p=prefix_dropout)
 
     @staticmethod
@@ -738,7 +763,7 @@ class PrefixTemplate(SoftTemplate):
             prompt[index] = part
 
         self._prompt = prompt
-        return super().parse_soft_prompt()
+        return super(PrefixTemplate, self).parse_soft_prompt()
 
     def process_batch(self, input_dict: Dict[str, Tensor]) -> Dict[str, Tensor]:
         word_embeds = self.word_embeddings(input_dict["input_ids"])
@@ -782,7 +807,8 @@ class PrefixTemplate(SoftTemplate):
     def _create_soft_encoders(self):
         output_size = self.embed_size * self.n_layer * 2
         activation = nn.Tanh()
-        return super()._create_soft_encoders(output_size, activation)
+        return super(PrefixTemplate,
+                     self)._create_soft_encoders(output_size, activation)
 
 
 class AutoTemplate(object):
@@ -811,7 +837,7 @@ class AutoTemplate(object):
 
         if isinstance(prompt, str):
             prompt = Template.parse_template_string(prompt)
-        template_keywords = cls._extract_template_keywords(prompt)
+        template_keywords = Template.extract_template_keywords(prompt)
 
         # Complement simplified template as ManualTemplate-style in form.
         if "text" not in template_keywords:
@@ -857,10 +883,3 @@ class AutoTemplate(object):
         if os.path.isfile(template_param_file):
             template.load_state_dict(paddle.load(template_param_file))
         return template
-
-    @classmethod
-    def _extract_template_keywords(cls, prompt: List[Dict[str, Any]]):
-        keywords = set()
-        for part in prompt:
-            keywords.update(part.keys())
-        return keywords
