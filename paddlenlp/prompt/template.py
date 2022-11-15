@@ -881,5 +881,5 @@ class AutoTemplate(object):
                                    model=model)
         template_param_file = os.path.join(data_path, TEMPLATE_PARAMETER_FILE)
         if os.path.isfile(template_param_file):
-            template.load_state_dict(paddle.load(template_param_file))
+            template.set_state_dict(paddle.load(template_param_file))
         return template
