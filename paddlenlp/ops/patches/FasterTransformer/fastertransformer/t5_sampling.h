@@ -550,8 +550,8 @@ public:
 
           decoder_->forward(from_tensor_[from_id],
                             decoding_params.memory_tensor,
-                            K_cache_[kv_cache_id] + layer * cache_size,
-                            V_cache_[kv_cache_id] + layer * cache_size,
+                            K_cache_[0] + layer * cache_size,
+                            V_cache_[0] + layer * cache_size,
                             K_mem_cache_[layer],
                             V_mem_cache_[layer],
                             decoding_params.memory_sequence_length,

@@ -385,7 +385,7 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         false,                 // prefix_lm
         false,                 // is_mbart
         0,                     // min_length
-        inner_coeff
+        inner_coeff,
         num_buckets,
         max_distance);
 

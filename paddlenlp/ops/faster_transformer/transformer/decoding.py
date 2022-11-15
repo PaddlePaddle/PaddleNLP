@@ -3379,7 +3379,6 @@ class InferPegasusDecoding(nn.Layer):
 class InferT5Decoding(InferBase):
 
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        decoding_lib = "/paddle/fast_transformer/t5/PaddleNLP/paddlenlp/ops/build/lib/libdecoding_op.so"
 
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
