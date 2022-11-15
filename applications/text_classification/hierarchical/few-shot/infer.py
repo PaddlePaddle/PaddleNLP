@@ -188,7 +188,6 @@ class HierachicalPredictor(object):
                 if key == "attention_mask":
                     if value.ndim == 2:
                         value = value[:, np.newaxis, np.newaxis, :] * -1e4
-                        print("attention_mask", value.shape)
                     elif value.ndim != 4:
                         raise ValueError(
                             "Expect attention mask with ndim=2 or 4, but get ndim={}"

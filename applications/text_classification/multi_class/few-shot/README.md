@@ -65,9 +65,9 @@
 
    内存: 630 GB
 
-3. PaddlePaddle 版本：2.3.1
+3. PaddlePaddle 版本：2.4rc
 
-4. PaddleNLP 版本：2.3.5 (develop)
+4. PaddleNLP 版本：2.4.2 (develop)
 
 5. 评估设置
 
@@ -82,7 +82,7 @@ python train.py --dataset_dir "./data/" --save_dir "./checkpoints" --max_seq_len
 - 提示学习
 
 ```
-python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条新闻写的是" --model_name_or_path ernie-3.0-base-zh --max_seq_length 128  --learning_rate 3e-5 --ppt_learning_rate 3e-4 --do_train --do_eval --num_train_epochs 100 --logging_steps 5 --per_device_eval_batch_size 32 --per_device_train_batch_size 8 --do_predict --metric_for_best_model accuracy --load_best_model_at_end --evaluation_strategy epoch --save_strategy epoch
+python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条新闻写的是" --model_name_or_path ernie-3.0-base-zh --max_seq_length 128  --learning_rate 3e-5 --ppt_learning_rate 3e-4 --do_train --do_eval --num_train_epochs 100 --logging_steps 5 --per_device_eval_batch_size 32 --per_device_train_batch_size 8 --do_predict --metric_for_best_model accuracy --load_best_model_at_end --evaluation_strategy epoch --save_strategy epoch --save_total_limit 1
 ```
 
 6. 精度评价指标：Accuracy
