@@ -8,6 +8,7 @@
   - [2.3 模型微调](#模型微调)
   - [2.4 模型评估](#模型评估)
   - [2.5 定制模型一键预测](#定制模型一键预测)
+  - [2.6 实验指标](#实验指标)
 
 <a name="1"></a>
 
@@ -80,7 +81,7 @@ python ../label_studio.py \
 
 <a name="模型微调"></a>
 
-#### 2.3 模型微调
+### 2.3 模型微调
 
 推荐使用 [Trainer API ](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
@@ -180,7 +181,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
 
 <a name="模型评估"></a>
 
-#### 2.4 模型评估
+### 2.4 模型评估
 
 ```shell
 python evaluate.py \
@@ -199,7 +200,7 @@ python evaluate.py \
 ```shell
 python evaluate.py \
     --device "gpu" \
-    --model_path ./checkpoint/model_best_new \
+    --model_path ./checkpoint/model_best \
     --test_path ./data/dev.txt \
     --output_dir $finetuned_model \
     --label_names 'start_positions' 'end_positions'\
@@ -251,7 +252,7 @@ python evaluate.py \
 
 <a name="定制模型一键预测"></a>
 
-#### 2.5 定制模型一键预测
+### 2.5 定制模型一键预测
 
 `paddlenlp.Taskflow`装载定制模型，通过`task_path`指定模型权重文件的路径，路径下需要包含训练好的模型权重文件`model_state.pdparams`。
 
@@ -268,3 +269,21 @@ my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoin
 doc_path = "./data/images/b201.jpg"
 pprint(my_ie({"doc": doc_path}))
 ```
+
+<a name="实验指标"></a>
+
+### 2.6 实验指标
+
+我们在自标注的增值税数据集上进行实验：
+
+
+  |  |  Precision  | Recall | F1 Score |
+  | :---: | :--------: | :--------: | :--------: |
+  | 5-shot| 0.83117 | 0.82051 | 0.82051 |
+  | 10-shot| 0.83750 | 0.85897 | 0.84810 |
+  | 20-shot| 0.88158 | 0.85897 | 0.87013 |
+  | 30-shot| 0.94521 | 0.88462 | 0.91391 |
+  | 30-shot+PPStructure| 0.93750  | 0.93750 | 0.93750 |
+
+
+n-shot表示训练集包含n张标注图片数据进行模型微调，实验表明UIE-X可以通过少量数据（few-shot）和PPStructure的布局分析进一步提升结果。
