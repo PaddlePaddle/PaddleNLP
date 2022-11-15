@@ -21,7 +21,7 @@ from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.import_utils import is_faster_tokenizer_available
+from paddlenlp.utils.import_utils import is_fast_tokenizer_available
 
 __all__ = [
     "AutoTokenizer",
@@ -93,7 +93,7 @@ FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ErnieMFasterTokenizer", "ernie_m")
 ])
 # For FasterTokenizer
-if is_faster_tokenizer_available():
+if is_fast_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FASTER_TOKENIZER_MAPPING_NAMES)
 
 
@@ -199,15 +199,15 @@ class AutoTokenizer():
                                 actual_tokenizer_class = tokenizer_class[0]
                                 break
                         if use_faster:
-                            if is_faster_tokenizer_available():
-                                is_support_faster_tokenizer = False
+                            if is_fast_tokenizer_available():
+                                is_support_fast_tokenizer = False
                                 for tokenizer_class in tokenizer_classes:
                                     if tokenizer_class[1]:
                                         actual_tokenizer_class = tokenizer_class[
                                             0]
-                                        is_support_faster_tokenizer = True
+                                        is_support_fast_tokenizer = True
                                         break
-                                if not is_support_faster_tokenizer:
+                                if not is_support_fast_tokenizer:
                                     logger.warning(
                                         f"The tokenizer {actual_tokenizer_class} doesn't have the faster version."
                                         " Please check the map `paddlenlp.transformers.auto.tokenizer.FASTER_TOKENIZER_MAPPING_NAMES`"
@@ -215,9 +215,9 @@ class AutoTokenizer():
                                     )
                             else:
                                 logger.warning(
-                                    "Can't find the faster_tokenizer package, "
-                                    "please ensure install faster_tokenizer correctly. "
-                                    "You can install faster_tokenizer by `pip install faster_tokenizer`."
+                                    "Can't find the fast_tokenizer package, "
+                                    "please ensure install fast_tokenizer correctly. "
+                                    "You can install fast_tokenizer by `pip install fast_tokenizer`."
                                 )
 
                         logger.info("We are using %s to load '%s'." %
@@ -244,14 +244,14 @@ class AutoTokenizer():
                         f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
                     if use_faster:
-                        for faster_tokenizer_class, name in cls._faster_name_mapping.items(
+                        for fast_tokenizer_class, name in cls._faster_name_mapping.items(
                         ):
                             if name == class_name:
                                 import_class = importlib.import_module(
-                                    f"paddlenlp.transformers.{class_name}.faster_tokenizer"
+                                    f"paddlenlp.transformers.{class_name}.fast_tokenizer"
                                 )
                                 tokenizer_class = getattr(
-                                    import_class, faster_tokenizer_class)
+                                    import_class, fast_tokenizer_class)
                                 break
                     logger.info(
                         "We are using %s to load '%s'." %

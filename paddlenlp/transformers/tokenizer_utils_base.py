@@ -55,7 +55,7 @@ class AddedToken:
 
 
 @dataclass
-class FasterEncoding:
+class FastEncoding:
     """This is dummy class reserved for fast tokenizer"""
 
     pass
@@ -197,15 +197,14 @@ class BatchEncoding(UserDict):
     def __init__(
         self,
         data: Optional[Dict[str, Any]] = None,
-        encoding: Optional[Union[FasterEncoding,
-                                 Sequence[FasterEncoding]]] = None,
+        encoding: Optional[Union[FastEncoding, Sequence[FastEncoding]]] = None,
         tensor_type: Union[None, str] = None,
         prepend_batch_axis: bool = False,
         n_sequences: Optional[int] = None,
     ):
         super().__init__(data)
 
-        if isinstance(encoding, FasterEncoding):
+        if isinstance(encoding, FastEncoding):
             encoding = [encoding]
 
         self._encodings = encoding
@@ -235,7 +234,7 @@ class BatchEncoding(UserDict):
         """
         return self._encodings is not None
 
-    def __getitem__(self, item: Union[int, str]) -> Union[Any, FasterEncoding]:
+    def __getitem__(self, item: Union[int, str]) -> Union[Any, FastEncoding]:
         """
         If the key is a string, returns the value of the dict associated to `key` ('input_ids', 'attention_mask',
         etc.).
@@ -282,9 +281,9 @@ class BatchEncoding(UserDict):
     # not yet supported
 
     @property
-    def encodings(self) -> Optional[List[FasterEncoding]]:
+    def encodings(self) -> Optional[List[FastEncoding]]:
         """
-        `Optional[List[FasterEncoding]]`: The list all encodings from the tokenization process. Returns `None` if
+        `Optional[List[FastEncoding]]`: The list all encodings from the tokenization process. Returns `None` if
         the input was tokenized through Python (i.e., not a fast) tokenizer.
         """
         return self._encodings
@@ -546,8 +545,8 @@ class BatchEncoding(UserDict):
         else:
             batch_index = 0
             token_index = batch_or_token_index
-        return CharSpan(
-            *(self._encodings[batch_index].token_to_chars(token_index)))
+        return CharSpan(*(
+            self._encodings[batch_index].token_to_chars(token_index)))
 
     def char_to_token(self,
                       batch_or_char_index: int,

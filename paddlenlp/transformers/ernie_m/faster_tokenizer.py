@@ -18,7 +18,7 @@ import json
 from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 from shutil import copyfile
 
-from faster_tokenizer import normalizers
+from fast_tokenizer import normalizers
 from ..tokenizer_utils_faster import PretrainedFasterTokenizer
 from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .tokenizer import ErnieMTokenizer
