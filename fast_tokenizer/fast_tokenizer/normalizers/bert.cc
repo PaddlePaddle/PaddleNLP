@@ -16,12 +16,12 @@ limitations under the License. */
 #include <algorithm>
 #include <codecvt>
 #include <locale>
-#include "glog/logging.h"
 #include "fast_tokenizer/normalizers/strip.h"
 #include "fast_tokenizer/normalizers/utils.h"
+#include "fast_tokenizer/utils/utils.h"
+#include "glog/logging.h"
 #include "unicode/uchar.h"
 #include "unicode/unistr.h"
-#include "fast_tokenizer/utils/utils.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
@@ -35,14 +35,6 @@ BertNormalizer::BertNormalizer(bool clean_text,
       strip_accents_(strip_accents),
       lowercase_(lowercase) {}
 
-static bool IsWhiteSpace(int ch) {
-  const std::string WHITESPACE = " \n\r\t\f\v";
-  for (int i = 0; i < WHITESPACE.length(); ++i) {
-    if (ch == WHITESPACE[i]) return true;
-  }
-  return u_isspace(ch);
-}
-
 static bool IsControl(int ch) {
   if (ch == '\t' || ch == '\n' || ch == '\r') return false;
   // It means (general category "C").
@@ -55,7 +47,7 @@ void BertNormalizer::DoCleanText(NormalizedString* input) const {
         return !(ch == 0 || ch == 0xfffd || IsControl(ch));
       })
       .MapChar([](char32_t ch) -> char32_t {
-        if (IsWhiteSpace(ch)) {
+        if (utils::IsWhiteSpace(ch)) {
           return ' ';
         }
         return ch;

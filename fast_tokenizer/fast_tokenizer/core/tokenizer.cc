@@ -26,11 +26,6 @@ limitations under the License. */
 #include "fast_tokenizer/postprocessors/postprocessors.h"
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
 
-
-#ifdef WITH_OMP
-#include <omp.h>
-#endif
-
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace core {
@@ -249,6 +244,36 @@ void Tokenizer::EncodePairStrings(const EncodeInput& encode_input,
   }
 }
 
+void Tokenizer::EncodePairStrings(const std::string& text,
+                                  const std::string& text_pair,
+                                  Encoding* encodings,
+                                  bool add_special_tokens) const {
+  Encoding encoding, pair_encoding;
+  EncodeSingleString(text, 0, OffsetType::CHAR, &encoding);
+  EncodeSingleString(text_pair, 1, OffsetType::CHAR, &pair_encoding);
+  PostProcess(&encoding, &pair_encoding, add_special_tokens, encodings);
+}
+
+void Tokenizer::MultiThreadEncodeBatchStrings(
+    const std::vector<std::string>& texts,
+    const std::vector<std::string>& text_pairs,
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+  if (texts.size() != text_pairs.size()) {
+    throw std::runtime_error(
+        "The size of text must equal to the size of text_pair");
+  }
+  auto batch_size = texts.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    EncodePairStrings(
+        texts[i], text_pairs[i], &(*encodings)[i], add_special_tokens);
+  }
+}
+
 void Tokenizer::MultiThreadEncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
@@ -264,103 +289,71 @@ void Tokenizer::MultiThreadEncodeBatchStrings(
   }
 }
 
+void Tokenizer::MultiThreadEncodeBatchStrings(
+    const std::vector<std::string>& texts,
+    std::vector<Encoding>* encodings,
+    bool add_special_tokens,
+    size_t start_index,
+    size_t step_index) const {
+  auto batch_size = texts.size();
+  size_t end_index = start_index + step_index;
+  if (end_index > batch_size) end_index = batch_size;
+  for (size_t i = start_index; i < end_index; ++i) {
+    EncodePairStrings(texts[i], &(*encodings)[i], add_special_tokens);
+  }
+}
+
 void Tokenizer::EncodeBatchStrings(
     const std::vector<EncodeInput>& batch_encode_input,
     std::vector<Encoding>* encodings,
     bool add_special_tokens) const {
   auto batch_size = batch_encode_input.size();
   encodings->resize(batch_size);
-
-#ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
-// tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the
-// workload estimation.
-#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-  for (int i = 0; i < batch_size; ++i) {
-    EncodePairStrings(
-        batch_encode_input[i], &(*encodings)[i], add_special_tokens);
-  }
-#else
-  auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStrings,
-                        this,
-                        std::ref(batch_encode_input),
-                        encodings,
-                        add_special_tokens,
-                        std::placeholders::_1,
-                        std::placeholders::_2);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadEncodeBatchStrings(batch_encode_input,
+                                  encodings,
+                                  add_special_tokens,
+                                  start_index,
+                                  step_index);
+  };
   RunMultiThread(func, batch_size);
-#endif
 
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
   }
 }
 
-void Tokenizer::EncodePairStringsCharOffsets(const EncodeInput& encode_input,
-                                             Encoding* encodings,
-                                             bool add_special_tokens) const {
-  const auto& input_string = paddlenlp::get_if<InputString>(&encode_input);
-  const auto& input_string_pair =
-      paddlenlp::get_if<std::pair<InputString, InputString>>(&encode_input);
-  Encoding encoding;
-  Encoding pair_encoding;
-  if (input_string != nullptr) {
-    EncodeSingleString(*input_string, 0, OffsetType::CHAR, &encoding);
-  } else {
-    EncodeSingleString(
-        input_string_pair->first, 0, OffsetType::CHAR, &encoding);
-    EncodeSingleString(
-        input_string_pair->second, 1, OffsetType::CHAR, &pair_encoding);
-  }
-  PostProcess(&encoding, &pair_encoding, add_special_tokens, encodings);
-}
-
-void Tokenizer::MultiThreadEncodeBatchStringsCharOffsets(
-    const std::vector<EncodeInput>& batch_encode_input,
-    std::vector<Encoding>* encodings,
-    bool add_special_tokens,
-    size_t start_index,
-    size_t step_index) const {
-  auto batch_size = batch_encode_input.size();
-  size_t end_index = start_index + step_index;
-  if (end_index > batch_size) end_index = batch_size;
-  for (size_t i = start_index; i < end_index; ++i) {
-    Encoding encoding;
-    EncodePairStringsCharOffsets(
-        batch_encode_input[i], &encoding, add_special_tokens);
-    (*encodings)[i] = std::move(encoding);
-  }
-}
-
-void Tokenizer::EncodeBatchStringsCharOffsets(
-    const std::vector<EncodeInput>& batch_encode_input,
-    std::vector<Encoding>* encodings,
-    bool add_special_tokens) const {
-  auto batch_size = batch_encode_input.size();
+void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
+                                   std::vector<Encoding>* encodings,
+                                   bool add_special_tokens) const {
+  auto batch_size = texts.size();
   encodings->resize(batch_size);
-#ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
-// tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the
-// workload estimation.
-#pragma omp parallel for if (batch_size >= 4 && omp_get_max_threads() > 1)
-  for (int i = 0; i < batch_size; ++i) {
-    Encoding encoding;
-    EncodePairStringsCharOffsets(
-        batch_encode_input[i], &encoding, add_special_tokens);
-    (*encodings)[i] = std::move(encoding);
-  }
-#else
-  auto func = std::bind(&Tokenizer::MultiThreadEncodeBatchStringsCharOffsets,
-                        this,
-                        std::ref(batch_encode_input),
-                        encodings,
-                        add_special_tokens,
-                        std::placeholders::_1,
-                        std::placeholders::_2);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadEncodeBatchStrings(
+        texts, encodings, add_special_tokens, start_index, step_index);
+  };
   RunMultiThread(func, batch_size);
-#endif
+
+  if (use_padding_) {
+    PadEncodings(encodings, pad_method_);
+  }
+}
+
+void Tokenizer::EncodeBatchStrings(const std::vector<std::string>& texts,
+                                   const std::vector<std::string>& text_pairs,
+                                   std::vector<Encoding>* encodings,
+                                   bool add_special_tokens) const {
+  auto batch_size = texts.size();
+  encodings->resize(batch_size);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadEncodeBatchStrings(texts,
+                                  text_pairs,
+                                  encodings,
+                                  add_special_tokens,
+                                  start_index,
+                                  step_index);
+  };
+  RunMultiThread(func, batch_size);
 
   if (use_padding_) {
     PadEncodings(encodings, pad_method_);
@@ -398,6 +391,7 @@ Encoding Tokenizer::EncodeTextToEncoding(const std::vector<uint32_t>& word_idx,
   DoTokenize(&pretokenized, type_id, word_idx, offset_type, &encoding);
   return encoding;
 }
+
 const AddedVocabulary& Tokenizer::GetAddedVocabulary() const {
   return added_vocabulary_;
 }
@@ -479,26 +473,11 @@ void Tokenizer::DecodeBatch(
     bool skip_special_tokens) const {
   auto batch_size = batch_token_ids.size();
   results->resize(batch_size);
-#ifdef WITH_OMP
-// (TODO:zhoushunjie): Simply use the batch size to estimate the workload of
-// tokenization.
-// Use workload to determine whether create omp threads. Need to optimize the
-// workload estimation.
-#pragma omp parallel for if (batch_token_ids.size() >= 4 && \
-                                                  omp_get_num_threads() > 1)
-  for (int i = 0; i < batch_token_ids.size(); ++i) {
-    Decode(batch_token_ids[i], &(*results)[i], skip_special_tokens);
-  }
-#else
-  auto func = std::bind(&Tokenizer::MultiThreadDecodeBatch,
-                        this,
-                        std::ref(batch_token_ids),
-                        results,
-                        skip_special_tokens,
-                        std::placeholders::_1,
-                        std::placeholders::_2);
+  auto func = [&](size_t start_index, size_t step_index) {
+    MultiThreadDecodeBatch(
+        batch_token_ids, results, skip_special_tokens, start_index, step_index);
+  };
   RunMultiThread(func, batch_size);
-#endif
 }
 
 bool Tokenizer::GetUseTruncation() const { return use_truncation_; }
@@ -591,6 +570,14 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(pretokenizers::SequencePreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::SequencePreTokenizer*>(
           tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::ByteLevelPreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::ByteLevelPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::SplitPreTokenizer)) {
+      j["pretokenizer"] = *dynamic_cast<pretokenizers::SplitPreTokenizer*>(
+          tokenizer.pretokenizer_.get());
     }
   }
 
@@ -619,6 +606,15 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
                typeid(postprocessors::TemplatePostProcessor)) {
       j["postprocessor"] =
           *dynamic_cast<postprocessors::TemplatePostProcessor*>(
+              tokenizer.post_processor_.get());
+    } else if (typeid(*tokenizer.post_processor_.get()) ==
+               typeid(postprocessors::RobertaPostProcessor)) {
+      j["postprocessor"] = *dynamic_cast<postprocessors::RobertaPostProcessor*>(
+          tokenizer.post_processor_.get());
+    } else if (typeid(*tokenizer.post_processor_.get()) ==
+               typeid(postprocessors::ByteLevelPostProcessor)) {
+      j["postprocessor"] =
+          *dynamic_cast<postprocessors::ByteLevelPostProcessor*>(
               tokenizer.post_processor_.get());
     }
   }
@@ -705,6 +701,14 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         pretokenizers::SequencePreTokenizer sequence_pretokenizer;
         pretokenizer.get_to(sequence_pretokenizer);
         tokenizer.SetPreTokenizer(sequence_pretokenizer);
+      } else if (pretokenizer.at("type") == "ByteLevelPreTokenizer") {
+        pretokenizers::ByteLevelPreTokenizer byte_pretokenizer;
+        pretokenizer.get_to(byte_pretokenizer);
+        tokenizer.SetPreTokenizer(byte_pretokenizer);
+      } else if (pretokenizer.at("type") == "SplitPreTokenizer") {
+        pretokenizers::SplitPreTokenizer split_pretokenizer;
+        pretokenizer.get_to(split_pretokenizer);
+        tokenizer.SetPreTokenizer(split_pretokenizer);
       }
     }
 
@@ -741,6 +745,14 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
         postprocessors::TemplatePostProcessor template_postprocessor;
         post_processor.get_to(template_postprocessor);
         tokenizer.SetPostProcessor(template_postprocessor);
+      } else if (post_processor.at("type") == "RobertaPostProcessor") {
+        postprocessors::RobertaPostProcessor roberta_postprocessor;
+        post_processor.get_to(roberta_postprocessor);
+        tokenizer.SetPostProcessor(roberta_postprocessor);
+      } else if (post_processor.at("type") == "ByteLevelPostProcessor") {
+        postprocessors::ByteLevelPostProcessor byte_level_postprocessor;
+        post_processor.get_to(byte_level_postprocessor);
+        tokenizer.SetPostProcessor(byte_level_postprocessor);
       }
     }
 
@@ -810,6 +822,10 @@ template void Tokenizer::SetPreTokenizer(
     const pretokenizers::MetaSpacePreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::SequencePreTokenizer&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::ByteLevelPreTokenizer&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::SplitPreTokenizer&);
 
 // Instantiate models
 template Tokenizer::Tokenizer(const models::WordPiece&);
@@ -826,6 +842,10 @@ template void Tokenizer::SetPostProcessor(
     const postprocessors::BertPostProcessor&);
 template void Tokenizer::SetPostProcessor(
     const postprocessors::TemplatePostProcessor&);
+template void Tokenizer::SetPostProcessor(
+    const postprocessors::RobertaPostProcessor&);
+template void Tokenizer::SetPostProcessor(
+    const postprocessors::ByteLevelPostProcessor&);
 
 // Instantiate Decoder
 template void Tokenizer::SetDecoder(const decoders::WordPiece& decoder);

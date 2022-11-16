@@ -14,14 +14,14 @@ limitations under the License. */
 
 #include <string>
 #include <vector>
+#include "fast_tokenizer/pretokenizers/bert.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
-#include "pretokenizers/bert.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace tests {
-TEST(pretokenizers, whitespace) {
+TEST(pretokenizers, bert) {
   std::string input =
       "I \t am good\r   at \nsport. I like\tfootball especially!!!";
   std::vector<std::string> expected_outputs = {"I",

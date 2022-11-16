@@ -36,7 +36,7 @@ from ..transformers.ofa_utils import *
 from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 from ..metrics import ChunkEvaluator
 from ..metrics.squad import squad_evaluate, compute_prediction
-from .trainer_base import Trainer
+from .trainer import Trainer
 
 
 def global_try_import_slim():

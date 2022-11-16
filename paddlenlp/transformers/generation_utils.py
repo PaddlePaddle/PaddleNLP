@@ -971,7 +971,8 @@ class GenerationMixin(object):
             probs = F.softmax(logits)
             probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs, next_tokens)
+            next_scores = paddle.index_sample(probs.astype("float32"),
+                                              next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(
