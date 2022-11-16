@@ -21,6 +21,9 @@
             <td style="text-align:center">
                 <span style="font-size:18px;">描述</span>
             </td>
+            <td style="text-align:center">
+                <span style="font-size:18px;">参数量</span>
+            </td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
@@ -31,6 +34,12 @@
             <td style="text-align:center">
                 <span style="font-size:18px;">各类 NLP 任务通用的预训练模型，在文心大模型 ERNIE 3.0 基础上通过在线蒸馏技术得到的一系列轻量级模型。</span>
             </td>
+            <td style="text-align:center"><details><summary>size</summary><div>
+                ERNIE 3.0-Base: 117.9 M</br>
+                ERNIE 3.0-Medium: 75.4 M</br>
+                ERNIE 3.0-Mini: 26.9 M	<br />
+                ERNIE 3.0-Micro: 23.4 M<br />
+                ERNIE 3.0-Nano: 17.9 M <br /> </div></details></td>
         <tr>
             <td style="text-align:center;vertical-align:middle">
                 <span style="font-size:18px;"> 
