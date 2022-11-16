@@ -16,8 +16,8 @@
 import json
 from typing import List, Optional, Tuple
 
-from faster_tokenizer import normalizers
-from ..tokenizer_utils_faster import PretrainedFasterTokenizer
+from fast_tokenizer import normalizers
+from ..tokenizer_utils_faster import PretrainedFastTokenizer
 from .tokenizer import TinyBertTokenizer
 
 VOCAB_FILES_NAMES = {
@@ -26,7 +26,7 @@ VOCAB_FILES_NAMES = {
 }
 
 
-class TinyBertFasterTokenizer(PretrainedFasterTokenizer):
+class TinyBertFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = TinyBertTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

@@ -77,7 +77,7 @@ setup(
         "fast_tokenizer", "fast_tokenizer.tokenizers_impl",
         "fast_tokenizer.normalizers", "fast_tokenizer.pretokenizers",
         "fast_tokenizer.models", "fast_tokenizer.postprocessors",
-        "fast_tokenizer.libs"
+        "fast_tokenizer.libs", "fast_tokenizer.decoders"
     ],
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},

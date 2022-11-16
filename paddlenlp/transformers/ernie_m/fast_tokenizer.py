@@ -18,8 +18,8 @@ import json
 from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 from shutil import copyfile
 
-from faster_tokenizer import normalizers
-from ..tokenizer_utils_faster import PretrainedFasterTokenizer
+from fast_tokenizer import normalizers
+from ..tokenizer_utils_faster import PretrainedFastTokenizer
 from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .tokenizer import ErnieMTokenizer
 from ...utils.log import logger
@@ -33,7 +33,7 @@ VOCAB_FILES_NAMES = {
 SPIECE_UNDERLINE = "▁"
 
 
-class ErnieMFasterTokenizer(PretrainedFasterTokenizer):
+class ErnieMFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ErnieMTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
@@ -111,7 +111,7 @@ class ErnieMFasterTokenizer(PretrainedFasterTokenizer):
                  return_tensors: Optional[Union[str, TensorType]] = None,
                  verbose: bool = True,
                  **kwargs):
-        return super(ErnieMFasterTokenizer, self).__call__(
+        return super(ErnieMFastTokenizer, self).__call__(
             text=text,
             text_pair=text_pair,
             max_length=max_length,

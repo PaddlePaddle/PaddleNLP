@@ -51,10 +51,10 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 - 默认开启国内清华镜像源来加速下载，如果您使用 HTTP 代理可以关闭(-i https://pypi.tuna.tsinghua.edu.cn/simple)
 - 更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 
-### 安装FasterTokenizer文本处理加速库（可选）
-推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
+### 安装FastTokenizer文本处理加速库（可选）
+推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 ```shell
-pip install faster_tokenizer
+pip install fast_tokenizer
 ```
 
 
@@ -142,7 +142,7 @@ I0625 16:44:36.563802 40218 analysis_predictor.cc:1007] ======= optimize end ===
 I0625 16:44:36.571702 40218 naive_executor.cc:102] ---  skip [feed], feed -> token_type_ids
 I0625 16:44:36.571728 40218 naive_executor.cc:102] ---  skip [feed], feed -> input_ids
 I0625 16:44:36.574352 40218 naive_executor.cc:102] ---  skip [linear_147.tmp_1], fetch -> fetch
-[2022-06-25 16:44:37,545] [ WARNING] - Can't find the faster_tokenizers package, please ensure install faster_tokenizers correctly. You can install faster_tokenizers by `pip install faster_tokenizers`(Currently only work for linux platform).
+[2022-06-25 16:44:37,545] [ WARNING] - Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. You can install fast_tokenizer by `pip install fast_tokenizer`.
 [2022-06-25 16:44:37,546] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer'> to load 'ernie-3.0-medium-zh'.
 [2022-06-25 16:44:37,546] [    INFO] - Already cached /root/.paddlenlp/models/ernie-3.0-medium-zh/ernie_3.0_base_zh_vocab.txt
 [OP Object] init success
