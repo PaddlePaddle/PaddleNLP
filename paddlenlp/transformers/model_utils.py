@@ -14,30 +14,32 @@
 from __future__ import annotations
 
 import copy
-import re
+import inspect
 import io
 import json
 import os
-import six
-import inspect
-from huggingface_hub import hf_hub_download
-from typing import Optional, Type, Dict, List, Tuple, Union, Any
+import re
 import shutil
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
-import paddle
-from paddle import Tensor
 import numpy as np
+import paddle
 import paddle.nn as nn
-from paddle.nn import Layer, Embedding
+import six
+from huggingface_hub import hf_hub_download
+from paddle import Tensor
+from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import get_path_from_url, is_url
-from paddlenlp.utils.downloader import download_check, COMMUNITY_MODEL_PREFIX
+
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, download_check
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
-from .generation_utils import GenerationMixin
-from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, resolve_cache_dir
 from .configuration_utils import PretrainedConfig
+from .generation_utils import GenerationMixin
+from .utils import (InitTrackerMeta, adapt_stale_fwd_patch, fn_args_to_dict,
+                    resolve_cache_dir)
 
 __all__ = [
     'PretrainedModel',

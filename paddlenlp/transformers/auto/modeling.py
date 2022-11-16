@@ -12,14 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import io
 import importlib
+import io
 import json
+import os
 from collections import OrderedDict
-from paddlenlp.transformers import *
+
 from huggingface_hub import hf_hub_download
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+
+from paddlenlp.transformers import *
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
+                                        get_path_from_url)
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 

@@ -16,22 +16,25 @@
 # limitations under the License.
 
 import copy
+import io
 import json
 import os
-import io
 import re
 import warnings
 from collections import OrderedDict, UserDict
-from shutil import copyfile
 from dataclasses import dataclass, field
-from huggingface_hub import hf_hub_download
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.env import MODEL_HOME
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
-import paddle
 from enum import Enum
+from shutil import copyfile
+from typing import (TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional,
+                    Sequence, Tuple, Union)
 
 import numpy as np
+import paddle
+from huggingface_hub import hf_hub_download
+
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
+                                        get_path_from_url)
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 
