@@ -18,6 +18,7 @@ import tempfile
 import unittest
 import numpy as np
 import random
+from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
@@ -90,7 +91,6 @@ class BartModelTester:
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -168,15 +168,18 @@ class BartModelTester:
         decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1],
                                               dtype=paddle.get_default_dtype())
 
-        encoder_output = encoder(input_ids, attention_mask)
+        encoder_output = encoder(input_ids,
+                                 attention_mask,
+                                 return_dict=self.parent.return_dict)
         origin_cache = decoder.decoder.gen_cache(encoder_output)
         outputs = decoder(decoder_input_ids,
                           decoder_attention_mask,
                           encoder_output,
                           attention_mask,
-                          cache=origin_cache)
+                          cache=origin_cache,
+                          return_dict=self.parent.return_dict)
 
-        output, cache = outputs
+        output, cache = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -191,16 +194,19 @@ class BartModelTester:
         next_attention_mask = paddle.concat(
             [decoder_attention_mask, next_attn_mask], axis=-1)
 
-        output_from_no_past, _ = decoder(next_input_ids,
-                                         next_attention_mask,
-                                         encoder_output,
-                                         attention_mask,
-                                         cache=origin_cache)
+        output_from_no_past = decoder(next_input_ids,
+                                      next_attention_mask,
+                                      encoder_output,
+                                      attention_mask,
+                                      return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past, _ = decoder(next_tokens,
                                       next_attention_mask,
                                       encoder_output,
                                       attention_mask,
-                                      cache=cache)
+                                      cache=cache,
+                                      return_dict=self.parent.return_dict)[:2]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -222,8 +228,16 @@ class BartModelTester:
                             atol=1e-3))
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class BartHeadTests(unittest.TestCase):
     vocab_size = 99
+    use_labels = False
+    return_dict = False
 
     def _get_config_and_data(self):
         input_ids = paddle.to_tensor(
@@ -266,27 +280,57 @@ class BartHeadTests(unittest.TestCase):
         config, input_ids, batch_size = self._get_config_and_data()
         bart_model = BartModel(**config)
         num_labels = 2
+        labels = _long_tensor([1] * batch_size) if self.use_labels else None
         model = BartForSequenceClassification(bart_model, num_labels=num_labels)
-        outputs = model(input_ids=input_ids, decoder_input_ids=input_ids)
+        outputs = model(input_ids=input_ids,
+                        decoder_input_ids=input_ids,
+                        labels=labels,
+                        return_dict=self.return_dict)
         expected_shape = [batch_size, num_labels]
-        self.assertEqual(outputs.shape, expected_shape)
+        if self.use_labels:
+            self.assertIsInstance(outputs[0].item(), float)  # test loss
+            self.assertEqual(outputs[1].shape, expected_shape)  # test logits
+        elif isinstance(outputs, paddle.Tensor):
+            self.assertEqual(outputs.shape, expected_shape)
+        else:
+            self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_question_answering_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
+        sequence_labels = ids_tensor([batch_size],
+                                     2) if self.use_labels else None
         bart_model = BartModel(**config)
         model = BartForQuestionAnswering(bart_model)
-        start_logits, end_logits = model(input_ids=input_ids)
+        outputs = model(input_ids=input_ids,
+                        start_positions=sequence_labels,
+                        end_positions=sequence_labels,
+                        return_dict=self.return_dict)
 
+        if self.use_labels:
+            loss, start_logits, end_logits = outputs[:3]
+            self.assertIsInstance(loss.item(), float)
+        else:
+            start_logits, end_logits = outputs[:2]
         self.assertEqual(start_logits.shape, input_ids.shape)
         self.assertEqual(end_logits.shape, input_ids.shape)
 
     def test_lm_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
         bart_model = BartModel(**config)
+        lm_labels = ids_tensor([batch_size, input_ids.shape[1]],
+                               self.vocab_size) if self.use_labels else None
         lm_model = BartForConditionalGeneration(bart_model)
-        outputs = lm_model(input_ids=input_ids)
+        outputs = lm_model(input_ids=input_ids,
+                           labels=lm_labels,
+                           return_dict=self.return_dict)
         expected_shape = [batch_size, input_ids.shape[1], config["vocab_size"]]
-        self.assertEqual(outputs.shape, expected_shape)
+        if self.use_labels:
+            self.assertIsInstance(outputs[0].item(), float)
+            self.assertEqual(outputs[1].shape, expected_shape)
+        elif isinstance(outputs, paddle.Tensor):
+            self.assertEqual(outputs.shape, expected_shape)
+        else:
+            self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_lm_uneven_forward(self):
         config = {
@@ -307,10 +351,18 @@ class BartHeadTests(unittest.TestCase):
             dtype="int64")
         summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]],
                                    dtype="int64")
-        outputs = lm_model(input_ids=context, decoder_input_ids=summary)
+        outputs = lm_model(input_ids=context,
+                           decoder_input_ids=summary,
+                           labels=summary if self.use_labels else None,
+                           return_dict=self.return_dict)
         expected_shape = summary.shape
         expected_shape.append(config["vocab_size"])
-        self.assertEqual(outputs.shape, expected_shape)
+        if self.use_labels:
+            self.assertIsInstance(outputs[0].item(), float)
+        elif isinstance(outputs, paddle.Tensor):
+            self.assertEqual(outputs.shape, expected_shape)
+        else:
+            self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_generate_beam_search(self):
         input_ids = paddle.to_tensor([[71, 82, 2], [68, 34, 2]], dtype="int64")
@@ -374,6 +426,7 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     all_model_classes = (BartModel, BartForConditionalGeneration,
                          BartForSequenceClassification,
                          BartForQuestionAnswering)
+
     all_generative_model_classes = {
         BartForConditionalGeneration: (BartModel, "bart")
     }
@@ -381,6 +434,8 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     fx_compatible = True
     test_pruning = False
     test_missing_keys = False
+    use_labels = False
+    return_dict = False
 
     def setUp(self):
         self.model_tester = BartModelTester(self)
@@ -403,7 +458,7 @@ def assert_tensors_close(a, b, atol=1e-12, prefix=""):
             return True
         raise
     except Exception:
-        pct_different = (paddle.gt((a - b).abs(), atol)).float().mean().item()
+        pct_different = ((a - b).abs() > atol).astype("float").mean().item()
         if a.numel() > 100:
             msg = f"tensor values are {pct_different:.1%} percent different."
         else:
@@ -480,11 +535,10 @@ class FastIntegrationTests(unittest.TestCase):
                                           decode_strategy="beam_search",
                                           max_length=1024)
         result = tok.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        assert EXPECTED == result
+        assert EXPECTED == result, f"{EXPECTED}\n{result}"
 
     def test_xsum_1_1_batch_generation(self):
         # test batch
-
         batch = self.tok()(
             [
                 "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
@@ -639,7 +693,7 @@ class BartModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids=input_ids, attention_mask=attention_mask)
         expected_shape = [1, 11, 1024]
-        self.assertEqual(output.shape, expected_shape)
+        self.assertEqual(output[0].shape, expected_shape)
 
     @slow
     def test_cnn_summarization_same_as_fairseq(self):

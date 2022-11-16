@@ -855,8 +855,6 @@ python evaluate.py \
     pip install -r deploy/python/requirements_cpu.txt
     ```
 
-    ```text
-
   - GPU端
 
     为了在 GPU 上获得最佳的推理性能和稳定性，请先确保机器已正确安装 NVIDIA 相关驱动和基础软件，确保 **CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖

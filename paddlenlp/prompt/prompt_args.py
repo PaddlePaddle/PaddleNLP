@@ -91,7 +91,7 @@ class PromptTuningArguments(TrainingArguments):
         metadata={"help": "Epsilon for the AdamW optimizer of prompt."})
 
     def __post_init__(self):
-        super().__post_init__()
+        super(PromptTuningArguments, self).__post_init__()
         if self.use_rgl and self.alpha_rgl == 0.0:
             logger.warning("Ignore `use_rgl` because `alpha_rgl` = 0. Please "\
                            "set `alpha_rgl` a positive float to use RGL loss.")
