@@ -199,20 +199,26 @@ class UnifiedTransformerEmbeddings(nn.Layer):
                     paddle.arange(end=paddle.shape(inputs_sample)[1],
                                   dtype="int64"), inputs_sample)
             else:
-                # NOTE: If there is a unk_token_id in input_ids, the following logic is wrong.
-                # In that case, the position_ids must be provided.
-                # And this is for left padding input_ids.
-                assert input_ids is not None, "position_ids or pad_token_ids" \
-                    " should be provided when input_embedds is specified"
-                num_pad = paddle.sum(
-                    (input_ids == self.pad_token_id).astype("float32"),
-                    axis=-1,
-                    keepdim=True)
-                position_ids = F.relu(
-                    paddle.expand_as(
+                if input_ids is not None:
+                    # NOTE: If there is a unk_token_id in input_ids, the following logic is wrong.
+                    # In that case, the position_ids must be provided.
+                    # And this is for left padding input_ids.
+                    num_pad = paddle.sum(
+                        (input_ids == self.pad_token_id).astype("float32"),
+                        axis=-1,
+                        keepdim=True)
+                    position_ids = F.relu(
+                        paddle.expand_as(
+                            paddle.arange(end=paddle.shape(inputs_sample)[1],
+                                          dtype="float32"), inputs_sample) -
+                        num_pad).astype("int64")
+                else:
+                    logger.warning(
+                        "position_ids or pad_token_ids should be provided when input_embeds is specified, otherwise an unexpected result may be returned"
+                    )
+                    position_ids = paddle.expand_as(
                         paddle.arange(end=paddle.shape(inputs_sample)[1],
-                                      dtype="float32"), inputs_sample) -
-                    num_pad).astype("int64")
+                                      dtype="int64"), inputs_sample)
             position_ids.stop_gradient = True
 
         position_embeddings = self.position_embeddings(position_ids)

@@ -268,17 +268,23 @@ class UNIMOEmbeddings(nn.Layer):
                     paddle.arange(end=paddle.shape(inputs_sample)[1],
                                   dtype="int64"), inputs_sample)
             else:
-                assert input_ids is not None, "position_ids or pad_token_ids" \
-                    " should be provided when input_embedds is specified"
-                num_pad = paddle.sum(
-                    (input_ids == self.pad_token_id).astype("float32"),
-                    axis=-1,
-                    keepdim=True)
-                position_ids = F.relu(
-                    paddle.expand_as(
+                if input_ids is not None:
+                    num_pad = paddle.sum(
+                        (input_ids == self.pad_token_id).astype("float32"),
+                        axis=-1,
+                        keepdim=True)
+                    position_ids = F.relu(
+                        paddle.expand_as(
+                            paddle.arange(end=paddle.shape(inputs_sample)[1],
+                                          dtype="float32"), inputs_sample) -
+                        num_pad).astype("int64")
+                else:
+                    logger.warning(
+                        "position_ids or pad_token_ids should be provided when input_embeds is specified, otherwise an unexpected result may be returned"
+                    )
+                    position_ids = paddle.expand_as(
                         paddle.arange(end=paddle.shape(inputs_sample)[1],
-                                      dtype="float32"), inputs_sample) -
-                    num_pad).astype("int64")
+                                      dtype="int64"), inputs_sample)
             position_ids.stop_gradient = True
         position_embeddings = self.position_embeddings(position_ids)
 
