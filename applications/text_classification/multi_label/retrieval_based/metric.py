@@ -14,7 +14,6 @@
 
 import numpy as np
 from sklearn.metrics import f1_score, classification_report
-
 from paddle.metric import Metric
 from paddlenlp.utils.log import logger
 

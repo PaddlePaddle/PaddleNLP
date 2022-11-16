@@ -15,6 +15,7 @@
 import argparse
 import os
 import sys
+
 from tqdm import tqdm
 import numpy as np
 from scipy.special import softmax

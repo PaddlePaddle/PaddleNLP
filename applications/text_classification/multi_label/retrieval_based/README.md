@@ -370,6 +370,12 @@ CUDA_VISIBLE_DEVICES=0 python utils/feature_extract.py \
 ```
 其中 output 目录下存放的是召回的 Paddle Inference 静态图模型。
 
+修改 utils/config.py 的配置 ip 和端口，本项目使用的是8530端口，而 Milvus 默认的是19530，需要根据情况进行修改：
+```
+MILVUS_HOST='your milvus ip'
+MILVUS_PORT = 8530
+```
+
 然后向搭建好的 Milvus 系统插入向量：
 
 ```
@@ -427,7 +433,7 @@ python export_to_serving.py \
 sh scripts/export_to_serving.sh
 ```
 
-Paddle Serving的部署有两种方式，第一种方式是Pipeline的方式，第二种是C++的方式，下面分别介绍这两种方式的用法：
+Paddle Serving的部署采用Pipeline的方式，如果用户有对性能有更高的要求，可以采用C++的部署形式，请参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/recall/in_batch_negative#c%E7%9A%84%E6%96%B9%E5%BC%8F)：
 
 #### Pipeline方式
 

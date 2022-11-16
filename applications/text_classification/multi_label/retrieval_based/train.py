@@ -16,16 +16,17 @@ import os
 import random
 import time
 import numpy as np
-import paddle
 from functools import partial
 from collections import Counter
 
+import paddle
 import paddle.nn as nn
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
+
 from base_model import SemanticIndexBase
 from model import SemanticIndexBatchNeg
 from data import read_text_pair, convert_example, create_dataloader, gen_id2corpus, gen_text_file, convert_corpus_example

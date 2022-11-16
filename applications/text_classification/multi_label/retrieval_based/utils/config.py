@@ -15,7 +15,7 @@
 import os
 from milvus import MetricType, IndexType
 
-MILVUS_HOST = '10.21.226.173'
+MILVUS_HOST = 'localhost'
 MILVUS_PORT = 8530
 
 output_emb_size = 0

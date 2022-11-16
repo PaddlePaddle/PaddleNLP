@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import argparse
+
 import paddle_serving_client.io as serving_io
+
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--dirname", type=str, required=True,

@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from paddle_serving_server.pipeline import PipelineClient
+
 from data import gen_id2corpus
 from utils.milvus_util import RecallByMilvus
 from utils.config import collection_name, partition_tag
