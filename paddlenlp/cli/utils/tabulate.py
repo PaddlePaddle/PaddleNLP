@@ -43,7 +43,7 @@ def print_example_code():
     markdown = """
 ## you can download the above model with the following command:
 
-### ***paddlenlp download --cache_dir ./paddle_pretrained_models <model name>***
+### ***paddlenlp download --cache-dir ./paddle_pretrained_models <model name>***
 
 ### ***the <model name> is copied from above table***
     """

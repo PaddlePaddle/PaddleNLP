@@ -16,6 +16,14 @@ from genericpath import isdir
 import os
 import json
 from typing import Type, List, Tuple, Optional
+from paddlenlp.utils.import_utils import is_package_available
+
+# check whether the package is avaliable and give friendly description.
+if not is_package_available("typer"):
+    raise ModuleNotFoundError(
+        f'paddlenlp-cli tools is not installed correctly, you can use the following command'
+        ' to use paddlenlp cli tool: >>> pip install paddlenlp[cli]')
+
 import typer
 from typer import Typer
 import shutil
@@ -24,7 +32,7 @@ from paddlenlp import __version__
 from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.downloader import is_url
-from paddlenlp.cli.converter import convert_from_local_file, convert_from_local_dir, convert_from_online_model
+from paddlenlp.cli.converter import convert_from_local_dir
 from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
 from paddlenlp.transformers.utils import find_transformer_model_type
 from paddlenlp.cli.download import load_community_models
@@ -152,11 +160,16 @@ def search(query=typer.Argument(..., help='the query of searching model'),
 @app.command(help="convert pytorch models to paddle model")
 def convert(input: Optional[str] = None, output: Optional[str] = None):
     logger.info("starting to convert models ...")
-    if os.path.isdir(input):
-        convert_from_local_dir(pretrained_dir=input, output=output)
-    else:
-        # TODO(wj-Mcat): should complete the online converting
-        convert_from_online_model()
+
+    if not os.path.isdir(input):
+        logger.warning(
+            f"receive input<{input}> which is not a local dir, so we can't convert it paddle related file. "
+            "We will support online-converting<AutoModel.from_pretrained('transformer-model-name')> feature "
+            "as soon as possible. Please keep eyes on the latest version of paddlenlp."
+        )
+        os._exit(0)
+
+    convert_from_local_dir(pretrained_dir=input, output=output)
 
 
 def main():

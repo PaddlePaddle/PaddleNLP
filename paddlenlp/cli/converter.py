@@ -16,9 +16,9 @@ import json
 import os
 import shutil
 from typing import Type
-from paddlenlp.utils.log import logger
+
 from paddlenlp.utils.converter import Converter, load_all_converters
-from paddlenlp.transformers.bert.converter import BertConverter
+from paddlenlp.utils.log import logger
 
 
 def convert_from_local_dir(pretrained_dir: str, output: str):
@@ -78,6 +78,8 @@ def convert_from_local_dir(pretrained_dir: str, output: str):
 def convert_from_local_file(weight_file_path: str, output: str):
     """convert from the local weitht file
 
+    TODO(wj-Mcat): no model info for weight file, this method is dangerous.
+
     Args:
         weight_file_path (str): the path of the weight file
         output (str): the output dir
@@ -96,24 +98,19 @@ def convert_from_local_file(weight_file_path: str, output: str):
 def convert_from_online_model(model_name: str, cache_dir: str, output_dir):
     """convert the model which is not maintained in paddlenlp community, eg: vblagoje/bert-english-uncased-finetuned-pos
 
-    TODO(wj-Mcat): to deeply test this method
+    TODO(wj-Mcat): this feature will be done in next version
 
     Args:
         model_name (str): the name of model
         cache_dir (str): the cache_dir to save pytorch model
         output_dir (_type_): the output dir
     """
-    # 1. auto save
-    from transformers import AutoModel
-    model = AutoModel.from_pretrained(model_name)
-    model.save_pretrained(cache_dir)
+    # 1. checke the community models from paddle community server
 
-    # 2. resolve the converter
-    config_file = os.path.join(cache_dir, 'config.json')
-    with open(config_file, 'r', encoding='utf-8') as f:
-        config = json.load(f)
+    # 2. download config file from huggingface website
 
-    architectures = config['architectures']
+    # 3. download the pytorch model file from huggingface server
 
-    converter = BertConverter()
-    converter.convert(input_dir=cache_dir, output_dir=output_dir)
+    # 4. convert the pytorch model file
+
+    # 5. [Optional] forward the paddle/pytorch model and compare the logits
