@@ -444,6 +444,7 @@ class UNIMOModelTest(ModelTesterMixin, GenerationTesterMixin,
 
     use_labels = False
     return_dict = False
+    use_test_inputs_embeds = True
 
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class, return_labels=False):
