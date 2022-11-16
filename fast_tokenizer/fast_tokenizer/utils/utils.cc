@@ -112,6 +112,36 @@ void GetSortedVocab(const std::vector<const char*>& keys,
   }
 }
 
+std::unordered_map<uint8_t, uint32_t> CreateBytesToChars() {
+  std::unordered_map<uint8_t, uint32_t> bytes_to_chars;
+  bool bytes_flag[256] = {false};
+  std::vector<std::pair<uint8_t, uint8_t>> ranges = {
+      {'!', '~'}, {'\xA1', '\xAC'}, {'\xAE', '\xFF'}};
+
+  for (int i = 0; i < ranges.size(); ++i) {
+    for (uint32_t c = ranges[i].first; c <= ranges[i].second; ++c) {
+      bytes_to_chars.insert({c, c});
+      bytes_flag[c] = true;
+    }
+  }
+  uint32_t n = 0;
+  for (uint32_t b = 0; b <= 255; ++b) {
+    if (!bytes_flag[b]) {
+      bytes_to_chars.insert({b, (1 << 8) + n});
+      n += 1;
+    }
+  }
+  return bytes_to_chars;
+}
+
+bool IsWhiteSpace(int ch) {
+  const std::string WHITESPACE = " \n\r\t\f\v";
+  for (int i = 0; i < WHITESPACE.length(); ++i) {
+    if (ch == WHITESPACE[i]) return true;
+  }
+  return u_isspace(ch);
+}
+
 }  // namespace utils
 }  // namespace fast_tokenizer
 }  // namespace paddlenlp

@@ -67,6 +67,7 @@ class ModelTesterMixin:
     test_resize_position_embeddings = False
     test_mismatched_shapes = True
     test_missing_keys = True
+    use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False
     has_attentions = True
@@ -507,6 +508,48 @@ class ModelTesterMixin:
                     break
 
             self.assertTrue(models_equal)
+
+    def test_inputs_embeds(self):
+        # pass the test if don't need to test inputs embeddings
+        if not self.use_test_inputs_embeds:
+            return
+        # get config for model and inputs_dict for model forward
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
+        )
+        # test all model classes
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            inputs = copy.deepcopy(
+                self._prepare_for_class(inputs_dict, model_class))
+
+            with paddle.no_grad():
+                ids_output = model(**inputs)
+
+            if not self.is_encoder_decoder:
+                input_ids = inputs["input_ids"]
+                del inputs["input_ids"]
+            else:
+                encoder_input_ids = inputs["input_ids"]
+                decoder_input_ids = inputs.get("decoder_input_ids",
+                                               encoder_input_ids)
+                del inputs["input_ids"]
+                inputs.pop("decoder_input_ids", None)
+
+            wte = model.get_input_embeddings()
+            if not self.is_encoder_decoder:
+                inputs["inputs_embeds"] = wte(input_ids)
+            else:
+                inputs["inputs_embeds"] = wte(encoder_input_ids)
+                inputs["decoder_inputs_embeds"] = wte(decoder_input_ids)
+
+            with paddle.no_grad():
+                embeds_output = model(**inputs)
+
+            self.assertTrue(
+                paddle.allclose(ids_output, embeds_output, rtol=1e-4,
+                                atol=1e-4))
 
     def test_model_name_list(self):
         if not self.use_test_model_name_list:

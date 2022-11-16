@@ -15,5 +15,7 @@ limitations under the License. */
 #pragma once
 
 #include "fast_tokenizer/postprocessors/bert.h"
+#include "fast_tokenizer/postprocessors/byte_level.h"
 #include "fast_tokenizer/postprocessors/postprocessor.h"
+#include "fast_tokenizer/postprocessors/roberta.h"
 #include "fast_tokenizer/postprocessors/template.h"

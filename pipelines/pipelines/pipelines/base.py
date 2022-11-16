@@ -262,8 +262,9 @@ class BasePipeline:
                                              variable 'MYDOCSTORE_PARAMS_INDEX=documents-2021' can be set. Note that an
                                              `_` sign must be used to specify nested hierarchical properties.
         """
-
         pipeline_config = read_pipeline_config_from_yaml(path)
+        print(pipeline_config)
+        print(pipeline_name)
         if pipeline_config["version"] != __version__:
             logger.warning(
                 f"YAML version ({pipeline_config['version']}) does not match with pipelines version ({__version__}). "
@@ -823,10 +824,13 @@ class Pipeline(BasePipeline):
             overwrite_with_env_variables=overwrite_with_env_variables)
 
         pipeline = cls()
-
+        print(pipeline_definition)
         components: dict = {}  # instances of component objects.
         for node in pipeline_definition["nodes"]:
+            print('node', node)
             name = node["name"]
+            if name == 'QAFilterPostprocessor':
+                print('exit')
             component = cls._load_or_get_component(
                 name=name,
                 definitions=component_definitions,

@@ -26,17 +26,17 @@ namespace fast_tokenizer {
 namespace tokenizers_impl {
 
 ErnieFastTokenizer::ErnieFastTokenizer(const std::string& vocab_path,
-                                           const std::string& unk_token,
-                                           const std::string& sep_token,
-                                           const std::string& cls_token,
-                                           const std::string& pad_token,
-                                           const std::string& mask_token,
-                                           bool clean_text,
-                                           bool handle_chinese_chars,
-                                           bool strip_accents,
-                                           bool lowercase,
-                                           const std::string& wordpieces_prefix,
-                                           uint32_t max_sequence_len) {
+                                       const std::string& unk_token,
+                                       const std::string& sep_token,
+                                       const std::string& cls_token,
+                                       const std::string& pad_token,
+                                       const std::string& mask_token,
+                                       bool clean_text,
+                                       bool handle_chinese_chars,
+                                       bool strip_accents,
+                                       bool lowercase,
+                                       const std::string& wordpieces_prefix,
+                                       uint32_t max_sequence_len) {
   core::Vocab vocab;
   utils::GetVocabFromFiles(vocab_path, &vocab);
   VLOG(6) << "The vocab size of ErnieFastTokenizer is " << vocab.size();
@@ -56,17 +56,17 @@ ErnieFastTokenizer::ErnieFastTokenizer(const std::string& vocab_path,
 
 
 ErnieFastTokenizer::ErnieFastTokenizer(const core::Vocab& vocab,
-                                           const std::string& unk_token,
-                                           const std::string& sep_token,
-                                           const std::string& cls_token,
-                                           const std::string& pad_token,
-                                           const std::string& mask_token,
-                                           bool clean_text,
-                                           bool handle_chinese_chars,
-                                           bool strip_accents,
-                                           bool lowercase,
-                                           const std::string& wordpieces_prefix,
-                                           uint32_t max_sequence_len) {
+                                       const std::string& unk_token,
+                                       const std::string& sep_token,
+                                       const std::string& cls_token,
+                                       const std::string& pad_token,
+                                       const std::string& mask_token,
+                                       bool clean_text,
+                                       bool handle_chinese_chars,
+                                       bool strip_accents,
+                                       bool lowercase,
+                                       const std::string& wordpieces_prefix,
+                                       uint32_t max_sequence_len) {
   Init(vocab,
        unk_token,
        sep_token,
@@ -83,39 +83,39 @@ ErnieFastTokenizer::ErnieFastTokenizer(const core::Vocab& vocab,
 
 
 void ErnieFastTokenizer::Init(const core::Vocab& vocab,
-                                const std::string& unk_token,
-                                const std::string& sep_token,
-                                const std::string& cls_token,
-                                const std::string& pad_token,
-                                const std::string& mask_token,
-                                bool clean_text,
-                                bool handle_chinese_chars,
-                                bool strip_accents,
-                                bool lowercase,
-                                const std::string& wordpieces_prefix,
-                                uint32_t max_sequence_len) {
+                              const std::string& unk_token,
+                              const std::string& sep_token,
+                              const std::string& cls_token,
+                              const std::string& pad_token,
+                              const std::string& mask_token,
+                              bool clean_text,
+                              bool handle_chinese_chars,
+                              bool strip_accents,
+                              bool lowercase,
+                              const std::string& wordpieces_prefix,
+                              uint32_t max_sequence_len) {
   models::FastWordPiece wordpiece(vocab,
-                                    unk_token,
-                                    100 /* max_input_chars_per_word */,
-                                    wordpieces_prefix,
-                                    true);
+                                  unk_token,
+                                  100 /* max_input_chars_per_word */,
+                                  wordpieces_prefix,
+                                  true);
   this->SetModel(wordpiece);
 
   std::vector<core::AddedToken> added_tokens;
   uint32_t id;
-  if (!this->TokenToId(unk_token, &id)) {
+  if (this->TokenToId(unk_token, &id)) {
     added_tokens.emplace_back(unk_token, true);
   }
-  if (!this->TokenToId(sep_token, &id)) {
+  if (this->TokenToId(sep_token, &id)) {
     added_tokens.emplace_back(sep_token, true);
   }
-  if (!this->TokenToId(cls_token, &id)) {
+  if (this->TokenToId(cls_token, &id)) {
     added_tokens.emplace_back(cls_token, true);
   }
-  if (!this->TokenToId(pad_token, &id)) {
+  if (this->TokenToId(pad_token, &id)) {
     added_tokens.emplace_back(pad_token, true);
   }
-  if (!this->TokenToId(mask_token, &id)) {
+  if (this->TokenToId(mask_token, &id)) {
     added_tokens.emplace_back(mask_token, true);
   }
   this->AddSpecialTokens(added_tokens);

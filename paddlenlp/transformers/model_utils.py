@@ -186,6 +186,7 @@ class PretrainedModel(Layer, GenerationMixin):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
+    main_input_name = "input_ids"
     config_class = None
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
