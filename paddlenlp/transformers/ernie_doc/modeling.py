@@ -1052,16 +1052,12 @@ class ErnieDocModel(ErnieDocPretrainedModel):
 
         batch_size = input_embeddings.shape[0]
 
-        # [B, N, T, M + T]
-        n_head_self_attn_mask = attn_mask
-        # n_head_self_attn_mask = self._create_n_head_attn_mask(
-        #     attn_mask, batch_size)
         # memories contains n_layer memory whose shape is [B, M, H]
         outputs = self.encoder(enc_input=input_embeddings,
                                memories=memories,
                                rel_pos=position_embeddings,
                                rel_task=token_embeddings,
-                               attn_mask=n_head_self_attn_mask,
+                               attn_mask=attn_mask,
                                output_attentions=output_attentions,
                                output_hidden_states=output_hidden_states,
                                return_dict=return_dict)
