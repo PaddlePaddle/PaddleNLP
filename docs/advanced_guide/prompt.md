@@ -558,6 +558,8 @@ if training_args.do_train:
 - WARP: Word-level Adversarial ReProgramming. [[PDF]](https://aclanthology.org/2021.acl-long.381/)
 - RGL: A Simple yet Effective Relation Graph Augmented Prompt-based Tuning Approach for Few-Shot Learning. [[PDF]](https://aclanthology.org/2022.findings-naacl.81/)
 - R-Drop: Regularized Dropout for Neural Networks. [[PDF]](https://arxiv.org/abs/2106.14448)
+- Openprompt: An open-source framework for prompt-learning. [[PDF]](https://arxiv.org/abs/2111.01998)
+
 
 ### 附录
 
