@@ -95,7 +95,7 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--logging_steps`: logging日志的步数，默认为`50`步。
 > * `--output_dir`: 模型保存路径。
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
-> * `--dataloader_num_workers`: Dataloader所使用的`dataloader_num_workers`参数。
+> * `--dataloader_num_workers`: Dataloader所使用的`num_workers`参数。
 > * `--file_list`: file_list文件地址。
 > * `--num_inference_steps`: 推理预测时候使用的步数。
 > * `--model_max_length`: `tokenizer`中的`model_max_length`参数，超过该长度将会被截断。

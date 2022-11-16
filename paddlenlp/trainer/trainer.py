@@ -1372,6 +1372,7 @@ class Trainer:
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
         self.save_model(output_dir)
+
         if self.sharding is not None:
             if self.dp_group.rank == 0:
                 paddle.save(
@@ -1387,8 +1388,10 @@ class Trainer:
             else:
                 paddle.save(self.optimizer.state_dict(),
                             os.path.join(output_dir, OPTIMIZER_NAME))
+
             paddle.save(self.lr_scheduler.state_dict(),
                         os.path.join(output_dir, SCHEDULER_NAME))
+
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(),
                             os.path.join(output_dir, SCALER_NAME))
