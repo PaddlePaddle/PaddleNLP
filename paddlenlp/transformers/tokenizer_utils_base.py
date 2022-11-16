@@ -545,8 +545,8 @@ class BatchEncoding(UserDict):
         else:
             batch_index = 0
             token_index = batch_or_token_index
-        return CharSpan(*(
-            self._encodings[batch_index].token_to_chars(token_index)))
+        return CharSpan(
+            *(self._encodings[batch_index].token_to_chars(token_index)))
 
     def char_to_token(self,
                       batch_or_char_index: int,
@@ -1713,7 +1713,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         `tokenizer_config_file` indicating file (thus `tokenizer_config.json`),
         and resources would be saved into `resource_files_names` indicating files
         by using `self.save_resources(save_directory)`.
-        
+
         The `save_directory` can be used in `from_pretrained` as argument value
         of `pretrained_model_name_or_path` to re-load the tokenizer.
 
@@ -2116,7 +2116,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 Decide the format for returned encoded batch inputs. Only works when
                 input is a batch of data.
                 ::
-                    - If True, encoded inputs would be a dictionary like: 
+                    - If True, encoded inputs would be a dictionary like:
                         {'input_ids': [[1, 4444, 4385, 1545, 6712],[1, 4444, 4385]],
                         'token_type_ids': [[0, 0, 0, 0, 0], [0, 0, 0]]}
                     - If False, encoded inputs would be a list like:
@@ -2126,9 +2126,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
                 Defaults to `True`.
             return_offsets_mapping (bool, optional):
-                Whether to include the list of pair preserving the index of start 
+                Whether to include the list of pair preserving the index of start
                 and end char in original input for each token in the returned
-                dictionary. Would be automatically set to `True` when `stride` > 0. 
+                dictionary. Would be automatically set to `True` when `stride` > 0.
                 Defaults to `False`.
             add_special_tokens (bool, optional):
                 Whether to add the special tokens associated with the corresponding model
@@ -2145,7 +2145,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 Defaults to `None`.
             verbose (bool, optional):
                 Whether or not to print more information and warnings. Defaults to True.
-                 
+
         Returns:
             dict or list[dict] (for batch input):
                 The dict has the following optional items:
@@ -2171,7 +2171,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                   Included when `return_special_tokens_mask` is `True`.
                 - **offset_mapping** (list[int], optional): list of pair preserving the
                   index of start and end char in original input for each token.
-                  For a sqecial token, the index pair is `(0, 0)`. Included when 
+                  For a sqecial token, the index pair is `(0, 0)`. Included when
                   `return_overflowing_tokens` is True or `stride` > 0.
                 - **overflow_to_sample** (int or list[int], optional): Index of example from which this
                   feature is generated. Included when `stride` works.
