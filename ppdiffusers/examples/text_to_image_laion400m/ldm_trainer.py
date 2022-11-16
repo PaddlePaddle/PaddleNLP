@@ -352,8 +352,10 @@ class LatentDiffusionTrainer(Trainer):
                     self.control = self.callback_handler.on_step_end(
                         args, self.state, self.control)
                     # TODO junnyu
-                    self._maybe_log_save_evaluate(inputs, tr_loss, model, epoch,
-                                                  ignore_keys_for_eval)
+                    with self.autocast_smart_context_manager():
+                        self._maybe_log_save_evaluate(inputs, tr_loss, model,
+                                                      epoch,
+                                                      ignore_keys_for_eval)
                 else:
                     self.control = self.callback_handler.on_substep_end(
                         args, self.state, self.control)

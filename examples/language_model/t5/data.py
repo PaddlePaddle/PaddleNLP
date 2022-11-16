@@ -50,6 +50,33 @@ GLUE_PROCESSED = collections.OrderedDict([
     ),
 ])
 
+GLUE_1_1_PROCESSED = collections.OrderedDict([
+    ("cola", (["cola sentence: "], ["outrageous", "acceptable"])),
+    ("sst-2", (["sst2 sentence: "], ["negative", "positive"])),
+    (
+        "mrpc",
+        (["mrpc sentence1: ", " sentence2: "], ["nonidentical", "equivalent"]),
+    ),
+    ("sts-b", (["stsb sentence1: ", " sentence2: "], None)),
+    ("qqp", (["qqp question1: ", " question2: "], ["inequable", "duplicate"])),
+    (
+        "mnli",
+        (
+            ["mnli hypothesis: ", " premise: "],
+            ["contradiction", "entailment", "neutral"],
+        ),
+    ),
+    (
+        "qnli",
+        (["qnli question: ", " sentence: "], ["entailment", "contradiction"]),
+    ),
+    (
+        "rte",
+        (["rte sentence1: ",
+          " rte sentence2: "], ["entailment", "contradiction"]),
+    ),
+])
+
 
 def trans_func(example, tokenizer, args):
     task_name = args.task_name
