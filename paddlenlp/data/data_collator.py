@@ -192,6 +192,7 @@ class DataCollatorWithPadding:
     max_length: Optional[int] = None
     pad_to_multiple_of: Optional[int] = None
     return_tensors: str = "pd"
+    return_attention_mask: Optional[bool] = None
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
         batch = self.tokenizer.pad(
@@ -200,7 +201,7 @@ class DataCollatorWithPadding:
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors=self.return_tensors,
-        )
+            return_attention_mask=self.return_attention_mask)
         if "label" in batch:
             batch["labels"] = batch["label"]
             del batch["label"]

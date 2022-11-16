@@ -1,6 +1,7 @@
 # PaddleNLP一键预测功能：Taskflow API
 
 
+
 <p align="left">
     <a href="https://pypi.org/project/paddlenlp/"><img src="https://img.shields.io/pypi/v/paddlenlp.svg?label=pip&logo=PyPI&logoColor=white"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/releases"><img src="https://img.shields.io/github/v/release/PaddlePaddle/PaddleNLP?color=ffa"></a>
@@ -43,7 +44,8 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |            |            | 代码生成大模型 |
 | [文图生成](#文图生成)          | `Taskflow("text_to_image")`        | ✅        | ✅        | ✅        |            |            | 文图生成大模型 |
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
-
+| [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
+| [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
 
 ## QuickStart
 
@@ -1521,7 +1523,7 @@ from paddlenlp import Taskflow
 </div></details>
 
 ### 文本摘要
-<details><summary>&emsp; 通过UNIMO-Text模型来生成摘要 </summary><div>
+<details><summary>&emsp; 通过Pegasus模型来生成摘要 </summary><div>
 
 #### 支持单条、批量预测
 
@@ -1529,20 +1531,143 @@ from paddlenlp import Taskflow
 >>> from paddlenlp import Taskflow
 >>> summarizer = Taskflow("text_summarization")
 # 单条输入
->>> summarizer("雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。")
-# 输出：'雪后的景色可真美丽呀！'
+>>> summarizer('2022年，中国房地产进入转型阵痛期，传统“高杠杆、快周转”的模式难以为继，万科甚至直接喊话，中国房地产进入“黑铁时代”')
+# 输出：['万科喊话中国房地产进入“黑铁时代”']
 
 # 多条输入
 >>> summarizer([
-  "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
-  "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+  '据悉，2022年教育部将围绕“巩固提高、深化落实、创新突破”三个关键词展开工作。要进一步强化学校教育主阵地作用，继续把落实“双减”作为学校工作的重中之重，重点从提高作业设计水平、提高课后服务水平、提高课堂教学水平、提高均衡发展水平四个方面持续巩固提高学校“双减”工作水平。',
+  '党参有降血脂，降血压的作用，可以彻底消除血液中的垃圾，从而对冠心病以及心血管疾病的患者都有一定的稳定预防工作作用，因此平时口服党参能远离三高的危害。另外党参除了益气养血，降低中枢神经作用，调整消化系统功能，健脾补肺的功能。'
   ])
-#输出：['雪后的景色可真美丽呀！', '成品油调价窗口8月23日24时开启']
+#输出：['教育部：将从四个方面持续巩固提高学校“双减”工作水平', '党参能降低三高的危害']
 ```
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`unimo-text-1.0-summary`。
+* `model`：可选模型，默认为`IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+
+</div></details>
+
+### 文档智能
+<details><summary>&emsp; 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 </summary><div>
+
+#### 输入格式
+
+```
+[
+  {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]},
+  {"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}
+]
+```
+
+默认使用PaddleOCR进行OCR识别，同时支持用户通过``word_boxes``传入自己的OCR结果，格式为``List[str, List[float, float, float, float]]``。
+
+```
+[
+  {"doc": doc_path, "prompt": prompt, "word_boxes": word_boxes}
+]
+```
+
+#### 支持单条、批量预测
+
+- 支持本地图片路径输入
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
+</div>
+
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> docprompt = Taskflow("document_intelligence")
+>>> pprint(docprompt([{"doc": "./resume.png", "prompt": ["五百丁本次想要担任的是什么职位?", "五百丁是在哪里上的大学?", "大学学的是什么专业?"]}]))
+[{'prompt': '五百丁本次想要担任的是什么职位?',
+  'result': [{'end': 7, 'prob': 1.0, 'start': 4, 'value': '客户经理'}]},
+{'prompt': '五百丁是在哪里上的大学?',
+  'result': [{'end': 37, 'prob': 1.0, 'start': 31, 'value': '广州五百丁学院'}]},
+{'prompt': '大学学的是什么专业?',
+  'result': [{'end': 44, 'prob': 0.82, 'start': 38, 'value': '金融学(本科）'}]}]
+```
+
+- http图片链接输入
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
+</div>
+
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
+>>> docprompt = Taskflow("document_intelligence")
+>>> pprint(docprompt([{"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}]))
+[{'prompt': '发票号码是多少?',
+  'result': [{'end': 2, 'prob': 0.74, 'start': 2, 'value': 'No44527206'}]},
+{'prompt': '校验码是多少?',
+  'result': [{'end': 233,
+              'prob': 1.0,
+              'start': 231,
+              'value': '01107 555427109891646'}]}]
+```
+
+#### 可配置参数说明
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
+* `topn`: 如果模型识别出多个结果，将返回前n个概率值最高的结果，默认为1。
+
+
+</div></details>
+
+### 问题生成
+<details><summary>&emsp; 基于百度自研中文预训练模型UNIMO-Text和大规模多领域问题生成数据集</summary><div>
+
+#### 支持单条、批量预测
+
+```python
+>>> from paddlenlp import Taskflow
+# 默认模型为 unimo-text-1.0-dureader_qg
+>>> question_generator = Taskflow("question_generation")
+# 单条输入
+>>> question_generator([
+  {"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"}
+  ])
+'''
+  ['黄山最高峰是什么']
+'''
+# 多条输入
+>>> question_generator([
+  {"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"},
+  {"context": "弗朗索瓦·韦达外文名：franciscusvieta国籍：法国出生地：普瓦图出生日期：1540年逝世日期：1603年12月13日职业：数学家主要成就：为近代数学的发展奠定了基础。", "answer": "法国"}
+  ])
+'''
+  ['黄山最高峰是什么',  '弗朗索瓦是哪里人']
+'''
+```
+
+#### 可配置参数说明
+* `model`：可选模型，默认为unimo-text-1.0-dureader_qg，支持的模型有["unimo-text-1.0", "unimo-text-1.0-dureader_qg", "unimo-text-1.0-question-generation", "unimo-text-1.0-question-generation-dureader_qg"]。
+* `device`：运行设备，默认为"gpu"。
+* `template`：模版，可选项有[0, 1, 2, 3]，1表示使用默认模版，0表示不使用模版。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `output_scores`：是否要输出解码得分，默认为False。
+* `is_select_from_num_return_sequences`：是否对多个返回序列挑选最优项输出，当为True时，若num_return_sequences不为1则自动根据解码得分选择得分最高的序列最为最终结果，否则返回num_return_sequences个序列，默认为True。
+* `max_length`：生成代码的最大长度，默认为50。
+* `min_length`：生成代码的最小长度，默认为3。
+* `decode_strategy`：解码策略，支持beam_search和sampling，默认为beam_search。
+* `temperature`：解码参数temperature，默认为1.0。
+* `top_k`：解码参数top_k，默认为0。
+* `top_p`：解码参数top_p，默认为1.0。
+* `num_beams`：解码参数num_beams，表示beam_search解码的beam size，默认为6。
+* `num_beam_groups`：解码参数num_beam_groups，默认为1。
+* `diversity_rate`：解码参数diversity_rate，默认为0.0。
+* `length_penalty`：解码长度控制值，默认为1.2。
+* `num_return_sequences`：解码返回序列数，默认为1。
+* `repetition_penalty`：解码重复惩罚值，默认为1。
+* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为False。
 
 </div></details>
 

@@ -23,7 +23,7 @@ import paddle
 from paddlenlp.utils.log import logger
 
 MODEL_MAP = {
-    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
+    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default Chinese model.
     "uie-base": {
         "resource_file_urls": {
             "model_state.pdparams":
@@ -108,6 +108,52 @@ MODEL_MAP = {
             "tokenizer_config":
             "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json"
         }
+    },
+    "uie-base-en": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/tokenizer_config.json"
+        }
+    },
+    "uie-m-base": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/tokenizer_config.json",
+            "sentencepiece_model_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model"
+        }
+    },
+    "uie-m-large": {
+        "resource_file_urls": {
+            "model_state.pdparams":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
+            "model_config.json":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
+            "vocab_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/vocab.txt",
+            "special_tokens_map":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/special_tokens_map.json",
+            "tokenizer_config":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/tokenizer_config.json",
+            "sentencepiece_model_file":
+            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/sentencepiece.bpe.model"
+        }
     }
 }
 
@@ -118,50 +164,33 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def convert_example(example, tokenizer, max_seq_len):
+def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
     """
-    example: {
-        title
-        prompt
-        content
-        result_list
-    }
+    Create dataloader.
+    Args:
+        dataset(obj:`paddle.io.Dataset`): Dataset instance.
+        mode(obj:`str`, optional, defaults to obj:`train`): If mode is 'train', it will shuffle the dataset randomly.
+        batch_size(obj:`int`, optional, defaults to 1): The sample number of a mini-batch.
+        trans_fn(obj:`callable`, optional, defaults to `None`): function to convert a data sample to input ids, etc.
+    Returns:
+        dataloader(obj:`paddle.io.DataLoader`): The dataloader which generates batches.
     """
-    encoded_inputs = tokenizer(text=[example["prompt"]],
-                               text_pair=[example["content"]],
-                               truncation=True,
-                               max_seq_len=max_seq_len,
-                               pad_to_max_seq_len=True,
-                               return_attention_mask=True,
-                               return_position_ids=True,
-                               return_dict=False,
-                               return_offsets_mapping=True)
-    encoded_inputs = encoded_inputs[0]
-    offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
-    bias = 0
-    for index in range(1, len(offset_mapping)):
-        mapping = offset_mapping[index]
-        if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
-            bias = offset_mapping[index - 1][1] + 1  # Includes [SEP] token
-        if mapping[0] == 0 and mapping[1] == 0:
-            continue
-        offset_mapping[index][0] += bias
-        offset_mapping[index][1] += bias
-    start_ids = [0 for x in range(max_seq_len)]
-    end_ids = [0 for x in range(max_seq_len)]
-    for item in example["result_list"]:
-        start = map_offset(item["start"] + bias, offset_mapping)
-        end = map_offset(item["end"] - 1 + bias, offset_mapping)
-        start_ids[start] = 1.0
-        end_ids[end] = 1.0
+    if trans_fn:
+        dataset = dataset.map(trans_fn)
 
-    tokenized_output = [
-        encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
-        encoded_inputs["position_ids"], encoded_inputs["attention_mask"],
-        start_ids, end_ids
-    ]
-    tokenized_output = [np.array(x, dtype="int64") for x in tokenized_output]
-    return tuple(tokenized_output)
+    shuffle = True if mode == 'train' else False
+    if mode == "train":
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
+                                                    batch_size=batch_size,
+                                                    shuffle=shuffle)
+    else:
+        sampler = paddle.io.BatchSampler(dataset=dataset,
+                                         batch_size=batch_size,
+                                         shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset,
+                                      batch_sampler=sampler,
+                                      return_list=True)
+    return dataloader
 
 
 def map_offset(ori_offset, offset_mapping):
@@ -198,10 +227,14 @@ def reader(data_path, max_seq_len=512):
                 accumulate = 0
                 while True:
                     cur_result_list = []
-
                     for result in result_list:
+                        if result['end'] - result['start'] > max_content_len:
+                            logger.warning(
+                                "result['end'] - result ['start'] exceeds max_content_len, which will result in no valid instance being returned"
+                            )
                         if result['start'] + 1 <= max_content_len < result[
-                                'end']:
+                                'end'] and result['end'] - result[
+                                    'start'] <= max_content_len:
                             max_content_len = result['start']
                             break
 
@@ -265,6 +298,61 @@ def unify_prompt_name(prompt):
         prompt = prompt_prefix + "[" + cls_options + "]"
         return prompt
     return prompt
+
+
+def get_relation_type_dict(relation_data, schema_lang="ch"):
+
+    def compare(a, b, schema_lang="ch"):
+        if schema_lang == "ch":
+            a = a[::-1]
+            b = b[::-1]
+
+        res = ''
+        for i in range(min(len(a), len(b))):
+            if a[i] == b[i]:
+                res += a[i]
+            else:
+                break
+        if res == "":
+            return res
+        if schema_lang == "ch" and res[::-1][0] == "的":
+            return res[::-1][1:]
+        elif schema_lang == "en" and res[-3:] == " of":
+            return res[:-3]
+        return ""
+
+    relation_type_dict = {}
+    added_list = []
+    for i in range(len(relation_data)):
+        added = False
+        if relation_data[i][0] not in added_list:
+            for j in range(i + 1, len(relation_data)):
+                match = compare(relation_data[i][0],
+                                relation_data[j][0],
+                                schema_lang=schema_lang)
+                if match != "":
+                    match = unify_prompt_name(match)
+                    if relation_data[i][0] not in added_list:
+                        added_list.append(relation_data[i][0])
+                        relation_type_dict.setdefault(match, []).append(
+                            relation_data[i][1])
+                    added_list.append(relation_data[j][0])
+                    relation_type_dict.setdefault(match, []).append(
+                        relation_data[j][1])
+                    added = True
+            if not added:
+                added_list.append(relation_data[i][0])
+                if schema_lang == "ch":
+                    suffix = relation_data[i][0].rsplit("的", 1)[1]
+                    suffix = unify_prompt_name(suffix)
+                    relation_type = suffix
+                else:
+                    prefix = relation_data[i][0].split(" of ", 1)[0]
+                    prefix = unify_prompt_name(prefix)
+                    relation_type = prefix
+                relation_type_dict.setdefault(relation_type,
+                                              []).append(relation_data[i][1])
+    return relation_type_dict
 
 
 def add_entity_negative_example(examples, texts, prompts, label_set,
@@ -338,16 +426,24 @@ def add_relation_negative_example(redundants, text, num_positive, ratio):
     return added_example, rest_example
 
 
-def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
-                              subject_goldens):
+def add_full_negative_example(examples,
+                              texts,
+                              relation_prompts,
+                              predicate_set,
+                              subject_goldens,
+                              schema_lang="ch"):
     with tqdm(total=len(relation_prompts)) as pbar:
         for i, relation_prompt in enumerate(relation_prompts):
             negative_sample = []
             for subject in subject_goldens[i]:
                 for predicate in predicate_set:
                     # The relation prompt is constructed as follows:
-                    # subject + "的" + predicate
-                    prompt = subject + "的" + predicate
+                    # subject + "的" + predicate -> Chinese
+                    # predicate + " of " + subject -> English
+                    if schema_lang == "ch":
+                        prompt = subject + "的" + predicate
+                    else:
+                        prompt = predicate + " of " + subject
                     if prompt not in relation_prompt:
                         negative_result = {
                             "content": texts[i],
@@ -401,7 +497,8 @@ def convert_ext_examples(raw_examples,
                          prompt_prefix="情感倾向",
                          options=["正向", "负向"],
                          separator="##",
-                         is_train=True):
+                         is_train=True,
+                         schema_lang="ch"):
     """
     Convert labeled data export from doccano for extraction and aspect-level classification task.
     """
@@ -498,7 +595,12 @@ def convert_ext_examples(raw_examples,
                     entity["label"], separator)
 
                 # Define the prompt prefix for entity-level classification
-                entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
+                # xxx + "的" + 情感倾向 -> Chinese
+                # Sentiment classification + " of " + xxx -> English
+                if schema_lang == "ch":
+                    entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
+                else:
+                    entity_cls_prompt_prefix = prompt_prefix + " of " + entity_name
                 if entity_cls_label is not None:
                     entity_cls_example = generate_cls_example(
                         text, entity_cls_label, entity_cls_prompt_prefix,
@@ -544,8 +646,17 @@ def convert_ext_examples(raw_examples,
                 subject_id = relation["from_id"]
                 object_id = relation["to_id"]
                 # The relation prompt is constructed as follows:
-                # subject + "的" + predicate
-                prompt = entity_map[subject_id]["name"] + "的" + predicate
+                # subject + "的" + predicate -> Chinese
+                # predicate + " of " + subject -> English
+                if schema_lang == "ch":
+                    prompt = entity_map[subject_id]["name"] + "的" + predicate
+                    inverse_negative = entity_map[object_id][
+                        "name"] + "的" + predicate
+                else:
+                    prompt = predicate + " of " + entity_map[subject_id]["name"]
+                    inverse_negative = predicate + " of " + entity_map[
+                        object_id]["name"]
+
                 if entity_map[subject_id]["name"] not in subject_golden:
                     subject_golden.append(entity_map[subject_id]["name"])
                 result = {
@@ -554,8 +665,6 @@ def convert_ext_examples(raw_examples,
                     "end": entity_map[object_id]["end"]
                 }
 
-                inverse_negative = entity_map[object_id][
-                    "name"] + "的" + predicate
                 inverse_relation.append(inverse_negative)
                 predicates.append(predicate)
 
@@ -610,26 +719,47 @@ def convert_ext_examples(raw_examples,
                     redundants1 = inverse_relation_list[i]
 
                     # 2. entity_name_set ^ subject_goldens[i]
-                    nonentity_list = list(
-                        set(entity_name_set) ^ set(subject_goldens[i]))
-                    nonentity_list.sort()
+                    redundants2 = []
+                    if len(predicate_list[i]) != 0:
+                        nonentity_list = list(
+                            set(entity_name_set) ^ set(subject_goldens[i]))
+                        nonentity_list.sort()
 
-                    redundants2 = [
-                        nonentity + "的" + predicate_list[i][random.randrange(
-                            len(predicate_list[i]))]
-                        for nonentity in nonentity_list
-                    ]
+                        if schema_lang == "ch":
+                            redundants2 = [
+                                nonentity + "的" +
+                                predicate_list[i][random.randrange(
+                                    len(predicate_list[i]))]
+                                for nonentity in nonentity_list
+                            ]
+                        else:
+                            redundants2 = [
+                                predicate_list[i][random.randrange(
+                                    len(predicate_list[i]))] + " of " +
+                                nonentity for nonentity in nonentity_list
+                            ]
 
                     # 3. entity_label_set ^ entity_prompts[i]
-                    non_ent_label_list = list(
-                        set(entity_label_set) ^ set(entity_prompts[i]))
-                    non_ent_label_list.sort()
+                    redundants3 = []
+                    if len(subject_goldens[i]) != 0:
+                        non_ent_label_list = list(
+                            set(entity_label_set) ^ set(entity_prompts[i]))
+                        non_ent_label_list.sort()
 
-                    redundants3 = [
-                        subject_goldens[i][random.randrange(
-                            len(subject_goldens[i]))] + "的" + non_ent_label
-                        for non_ent_label in non_ent_label_list
-                    ]
+                        if schema_lang == "ch":
+                            redundants3 = [
+                                subject_goldens[i][random.randrange(
+                                    len(subject_goldens[i]))] + "的" +
+                                non_ent_label
+                                for non_ent_label in non_ent_label_list
+                            ]
+                        else:
+                            redundants3 = [
+                                non_ent_label + " of " +
+                                subject_goldens[i][random.randrange(
+                                    len(subject_goldens[i]))]
+                                for non_ent_label in non_ent_label_list
+                            ]
 
                     redundants_list = [redundants1, redundants2, redundants3]
 
@@ -657,12 +787,72 @@ def convert_ext_examples(raw_examples,
                     positive_examples.extend(relation_examples[i])
                     negative_examples.extend(negative_example)
                     pbar.update(1)
+            all_relation_examples = positive_examples + negative_examples
         else:
             relation_examples = add_full_negative_example(
-                relation_examples, texts, relation_prompts, predicate_set,
-                subject_goldens)
+                relation_examples,
+                texts,
+                relation_prompts,
+                predicate_set,
+                subject_goldens,
+                schema_lang=schema_lang)
             all_relation_examples = [
                 r for relation_example in relation_examples
                 for r in relation_example
             ]
     return all_entity_examples, all_relation_examples, entity_cls_examples
+
+
+def convert_example(example, tokenizer, max_seq_len, multilingual=False):
+    """
+    example: {
+        title
+        prompt
+        content
+        result_list
+    }
+    """
+    encoded_inputs = tokenizer(text=[example["prompt"]],
+                               text_pair=[example["content"]],
+                               truncation=True,
+                               max_seq_len=max_seq_len,
+                               pad_to_max_seq_len=True,
+                               return_attention_mask=True,
+                               return_position_ids=True,
+                               return_dict=False,
+                               return_offsets_mapping=True)
+    encoded_inputs = encoded_inputs[0]
+    offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
+    bias = 0
+    for index in range(1, len(offset_mapping)):
+        mapping = offset_mapping[index]
+        if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
+            bias = offset_mapping[index - 1][1] + 1  # Includes [SEP] token
+        if mapping[0] == 0 and mapping[1] == 0:
+            continue
+        offset_mapping[index][0] += bias
+        offset_mapping[index][1] += bias
+    start_ids = [0.0 for x in range(max_seq_len)]
+    end_ids = [0.0 for x in range(max_seq_len)]
+    for item in example["result_list"]:
+        start = map_offset(item["start"] + bias, offset_mapping)
+        end = map_offset(item["end"] - 1 + bias, offset_mapping)
+        start_ids[start] = 1.0
+        end_ids[end] = 1.0
+    if multilingual:
+        tokenized_output = {
+            "input_ids": encoded_inputs["input_ids"],
+            "pos_ids": encoded_inputs["position_ids"],
+            "start_positions": start_ids,
+            "end_positions": end_ids
+        }
+    else:
+        tokenized_output = {
+            "input_ids": encoded_inputs["input_ids"],
+            "token_type_ids": encoded_inputs["token_type_ids"],
+            "pos_ids": encoded_inputs["position_ids"],
+            "att_mask": encoded_inputs["attention_mask"],
+            "start_positions": start_ids,
+            "end_positions": end_ids
+        }
+    return tokenized_output

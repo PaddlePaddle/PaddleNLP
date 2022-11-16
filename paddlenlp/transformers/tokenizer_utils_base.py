@@ -1356,7 +1356,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     def __init__(self, **kwargs):
         # inputs and kwargs for saving and re-loading (see ``from_pretrained`` and ``save_pretrained``)
         self.init_inputs = ()
-        self.init_kwargs = copy.deepcopy(kwargs)
+
+        self.init_kwargs = getattr(self, "init_kwargs",
+                                   None) or copy.deepcopy(kwargs)
         self.name_or_path = kwargs.pop("name_or_path", "")
         self._processor_class = kwargs.pop("processor_class", None)
 
@@ -1532,13 +1534,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
-                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                              pretrained_model_name_or_path,
-                                              file_name)
+                full_file_name = "/".join([
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                    file_name
+                ])
                 vocab_files[file_id] = full_file_name
-            vocab_files["tokenizer_config_file"] = os.path.join(
+            vocab_files["tokenizer_config_file"] = "/".join([
                 COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                cls.tokenizer_config_file)
+                cls.tokenizer_config_file
+            ])
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}

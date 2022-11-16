@@ -2417,7 +2417,6 @@ class ReformerPretrainedModel(PretrainedModel):
     """
 
     base_model_prefix = "reformer"
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "reformer-enwik8": {
@@ -2532,7 +2531,6 @@ class ReformerPretrainedModel(PretrainedModel):
         },
     }
 
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "reformer-enwik8":

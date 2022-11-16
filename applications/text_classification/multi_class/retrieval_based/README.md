@@ -29,7 +29,6 @@
 |—— base_model.py # 语义索引模型基类
 |—— train.py # In-batch Negatives 策略的训练主脚本
 |—— model.py # In-batch Negatives 策略核心网络结构
-|—— ann_util.py # Ann 建索引库相关函数
 
 |—— recall.py # 基于训练好的语义索引模型，从召回库中召回给定文本的相似文本
 |—— evaluate.py # 根据召回结果和评估集计算评估指标
@@ -147,7 +146,7 @@ unzip  webtext2019zh_qa.zip
 
 ### 单机单卡训练/单机多卡训练
 
-这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1,2,3 卡;如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可。
+这里采用单机多卡方式进行训练，通过如下命令，指定 GPU 0,1 卡;如果采用单机单卡训练，只需要把`--gpus`参数设置成单卡的卡号即可。
 
 如果使用CPU进行训练，则需要吧`--gpus`参数去除，然后吧`device`设置成cpu即可，详细请参考train.sh文件的训练设置
 
@@ -156,7 +155,7 @@ unzip  webtext2019zh_qa.zip
 ```
 root_path=inbatch
 data_path=data
-python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+python -u -m paddle.distributed.launch --gpus "0,1" \
     train.py \
     --device gpu \
     --save_dir ./checkpoints/${root_path} \
@@ -172,7 +171,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     --recall_result_file "recall_result.txt" \
     --train_set_file ${data_path}/train.txt \
     --corpus_file ${data_path}/label.txt   \
-    --similar_text_pair ${data_path}/dev.txt \
+    --similar_text_pair_file ${data_path}/dev.txt \
     --evaluate True
 ```
 
@@ -196,7 +195,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
 * `recall_num`: 对 1 个文本召回的相似文本数量
 * `similar_text_pair`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
-* `similar_text_pair`: 由相似文本对构成的评估集
 
 也可以使用bash脚本：
 

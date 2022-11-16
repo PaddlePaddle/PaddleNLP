@@ -252,7 +252,6 @@ class BigBirdPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "bigbird-base-uncased": {
             "num_layers": 12,
@@ -276,7 +275,6 @@ class BigBirdPretrainedModel(PretrainedModel):
             "initializer_range": 0.02,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "bigbird-base-uncased":

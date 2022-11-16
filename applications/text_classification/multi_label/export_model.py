@@ -20,27 +20,33 @@ from paddlenlp.transformers import AutoModelForSequenceClassification
 
 # yapf: disable
 parser = argparse.ArgumentParser()
+parser.add_argument('--multilingual', action='store_true', help='Whether is multilingual task')
 parser.add_argument("--params_path", type=str, default='./checkpoint/', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
 # yapf: enable
 
-args = parser.parse_args()
-
 if __name__ == "__main__":
 
     model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
     model.eval()
-
+    if args.multilingual:
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids')
+        ]
+    else:
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None],
+                                    dtype="int64",
+                                    name='token_type_ids')
+        ]
     # Convert to static graph with specific input description
-    model = paddle.jit.to_static(
-        model,
-        input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
-        ])
+    model = paddle.jit.to_static(model, input_spec=input_spec)
 
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "float32")

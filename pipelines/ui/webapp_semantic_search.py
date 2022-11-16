@@ -55,10 +55,24 @@ def on_change_text():
     st.session_state.raw_json = None
 
 
+def upload():
+    data_files = st.session_state.upload_files['files']
+    for data_file in data_files:
+        # Upload file
+        if data_file and data_file.name not in st.session_state.upload_files[
+                'uploaded_files']:
+            raw_json = upload_doc(data_file)
+            st.session_state.upload_files['uploaded_files'].append(
+                data_file.name)
+    # Save the uploaded files
+    st.session_state.upload_files['uploaded_files'] = list(
+        set(st.session_state.upload_files['uploaded_files']))
+
+
 def main():
 
     st.set_page_config(
-        page_title="pipelines 语义检索",
+        page_title="PaddleNLP Pipelines 语义检索",
         page_icon=
         "https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
@@ -67,6 +81,7 @@ def main():
     set_state_if_absent("results", None)
     set_state_if_absent("raw_json", None)
     set_state_if_absent("random_question_requested", False)
+    set_state_if_absent("upload_files", {'uploaded_files': [], 'files': []})
 
     # Small callback to reset the interface in case the text of the question changes
     def reset_results(*args):
@@ -75,7 +90,7 @@ def main():
         st.session_state.raw_json = None
 
     # Title
-    st.write("# PaddleNLP语义检索")
+    st.write("# PaddleNLP Pipelines 语义检索")
     # Sidebar
     st.sidebar.header("选项")
     top_k_reader = st.sidebar.slider(
@@ -100,13 +115,13 @@ def main():
         data_files = st.sidebar.file_uploader(
             "",
             type=["pdf", "txt", "docx", "png"],
-            help="文件上传",
+            help="选择多个文件",
             accept_multiple_files=True)
-        for data_file in data_files:
-            # Upload file
-            if data_file:
-                raw_json = upload_doc(data_file)
-                st.sidebar.write(str(data_file.name) + " &nbsp;&nbsp; ✅ ")
+        st.session_state.upload_files['files'] = data_files
+        st.sidebar.button("文件上传", on_click=upload)
+        for data_file in st.session_state.upload_files['uploaded_files']:
+            st.sidebar.write(str(data_file) + " &nbsp;&nbsp; ✅ ")
+
     hs_version = ""
     try:
         hs_version = f" <small>(v{pipelines_version()})</small>"
@@ -197,6 +212,9 @@ def main():
                 markdown(context),
                 unsafe_allow_html=True,
             )
+            # Sqlalchemy Support storing list type data by adding value semicolon, so split str data into separate files
+            if (type(result['images']) == str):
+                result['images'] = result['images'].split(';')
             for image_path in result['images']:
                 image_url = pipelines_files(image_path)
                 st.image(

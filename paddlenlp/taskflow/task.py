@@ -169,7 +169,10 @@ class Task(metaclass=abc.ABCMeta):
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
+        if self.task in ["document_intelligence", "knowledge_mining"]:
+            self._config.switch_ir_optim(False)
         self.predictor = paddle.inference.create_predictor(self._config)
+        self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [
             self.predictor.get_input_handle(name)
             for name in self.predictor.get_input_names()
@@ -188,7 +191,7 @@ class Task(metaclass=abc.ABCMeta):
         if not os.path.exists(onnx_dir):
             os.mkdir(onnx_dir)
         float_onnx_file = os.path.join(onnx_dir, 'model.onnx')
-        if not os.path.exists(float_onnx_file):
+        if not os.path.exists(float_onnx_file) or self._param_updated:
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
                 model_file=self._static_model_file,
                 params_file=self._static_params_file,
@@ -197,7 +200,7 @@ class Task(metaclass=abc.ABCMeta):
             with open(float_onnx_file, "wb") as f:
                 f.write(onnx_model)
         fp16_model_file = os.path.join(onnx_dir, 'fp16_model.onnx')
-        if not os.path.exists(fp16_model_file):
+        if not os.path.exists(fp16_model_file) or self._param_updated:
             onnx_model = onnx.load_model(float_onnx_file)
             trans_model = float16.convert_float_to_float16(onnx_model,
                                                            keep_io_types=True)
@@ -220,6 +223,20 @@ class Task(metaclass=abc.ABCMeta):
         """
         Return the inference program, inputs and outputs in static mode. 
         """
+        if self._custom_model:
+            param_path = os.path.join(self._task_path, "model_state.pdparams")
+            if os.path.exists(param_path):
+                cache_info_path = os.path.join(self._task_path, ".cache_info")
+                md5 = md5file(param_path)
+                self._param_updated = True
+                if os.path.exists(cache_info_path) and open(
+                        cache_info_path).read() == md5:
+                    self._param_updated = False
+                else:
+                    fp = open(cache_info_path, "w")
+                    fp.write(md5)
+                    fp.close()
+
         inference_model_path = os.path.join(self._task_path, "static",
                                             "inference")
         if not os.path.exists(inference_model_path +

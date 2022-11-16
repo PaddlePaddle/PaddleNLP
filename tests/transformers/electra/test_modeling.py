@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 import unittest
+from parameterized import parameterized_class
 
 import paddle
 
@@ -43,7 +45,7 @@ class ElectraModelTester:
         self.is_training = True
         self.use_input_mask = True
         self.use_token_type_ids = True
-        self.use_labels = True
+        self.use_inputs_embeds = False
         self.vocab_size = 99
         self.embedding_size = 32
         self.hidden_size = 32
@@ -60,12 +62,17 @@ class ElectraModelTester:
         self.layer_norm_eps = 1e-12
         self.type_sequence_label_size = 2
         self.num_classes = 3
-        self.num_labels = 4
         self.num_choices = 2
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length],
-                               self.vocab_size)
+        input_ids = None
+        inputs_embeds = None
+        if self.use_inputs_embeds:
+            inputs_embeds = floats_tensor(
+                [self.batch_size, self.seq_length, self.embedding_size])
+        else:
+            input_ids = ids_tensor([self.batch_size, self.seq_length],
+                                   self.vocab_size)
 
         input_mask = None
         if self.use_input_mask:
@@ -80,15 +87,15 @@ class ElectraModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
-        if self.use_labels:
+        if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size],
                                          self.type_sequence_label_size)
             token_labels = ids_tensor([self.batch_size, self.seq_length],
-                                      self.num_labels)
+                                      self.num_classes)
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
         config = self.get_config()
-        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+        return config, input_ids, token_type_ids, input_mask, inputs_embeds, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
         return {
@@ -113,6 +120,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -121,11 +129,60 @@ class ElectraModelTester:
         model.eval()
         result = model(input_ids,
                        attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+                       token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
+                       return_dict=self.parent.return_dict)
         result = model(input_ids, token_type_ids=token_type_ids)
-        result = model(input_ids)
+        result = model(input_ids, return_dict=self.parent.return_dict)
+
+        if paddle.is_tensor(result):
+            result = [result]
+
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.hidden_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.hidden_size])
+
+    def create_and_check_electra_model_cache(self, config, input_ids,
+                                             token_type_ids, input_mask,
+                                             inputs_embeds, sequence_labels,
+                                             token_labels, choice_labels):
+        model = ElectraModel(**config)
+        model.eval()
+
+        input_ids = ids_tensor((self.batch_size, self.seq_length),
+                               self.vocab_size)
+        input_token_types = ids_tensor([self.batch_size, self.seq_length],
+                                       self.type_vocab_size)
+
+        # first forward pass
+        first_pass_outputs = model(input_ids,
+                                   token_type_ids=input_token_types,
+                                   use_cache=True,
+                                   return_dict=True)
+        past_key_values = first_pass_outputs.past_key_values
+
+        # fully-visible attention mask
+        attention_mask = paddle.ones([self.batch_size, self.seq_length * 2])
+
+        # second forward pass with past_key_values with visible mask
+        second_pass_outputs = model(input_ids,
+                                    token_type_ids=input_token_types,
+                                    attention_mask=attention_mask,
+                                    past_key_values=past_key_values,
+                                    return_dict=self.parent.return_dict)
+
+        # last_hidden_state should have the same shape but different values when given past_key_values
+        if self.parent.return_dict:
+            self.parent.assertEqual(second_pass_outputs.last_hidden_state.shape,
+                                    first_pass_outputs.last_hidden_state.shape)
+            self.parent.assertFalse(
+                paddle.allclose(second_pass_outputs.last_hidden_state,
+                                first_pass_outputs.last_hidden_state))
+        else:
+            self.parent.assertEqual(second_pass_outputs.shape,
+                                    first_pass_outputs[0].shape)
+            self.parent.assertFalse(
+                paddle.allclose(second_pass_outputs, first_pass_outputs[0]))
 
     def create_and_check_electra_for_masked_lm(
         self,
@@ -133,19 +190,30 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
     ):
         model = ElectraForMaskedLM(ElectraModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
+
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_electra_for_token_classification(
         self,
@@ -153,6 +221,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -160,13 +229,24 @@ class ElectraModelTester:
         model = ElectraForTokenClassification(ElectraModel(**config),
                                               num_classes=self.num_classes)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
+                       labels=token_labels,
+                       return_dict=self.parent.return_dict)
+
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
+
         self.parent.assertEqual(
-            result.shape, [self.batch_size, self.seq_length, self.num_classes])
+            result[0].shape,
+            [self.batch_size, self.seq_length, self.num_classes])
 
     def create_and_check_electra_for_pretraining(
         self,
@@ -174,15 +254,19 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
     ):
         model = ElectraForPretraining(ElectraModel(**config))
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
+        )
         self.parent.assertEqual(result.logits.shape,
                                 (self.batch_size, self.seq_length))
 
@@ -192,20 +276,30 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
     ):
-        model = ElectraForSequenceClassification(ElectraModel(**config),
-                                                 num_classes=self.num_classes)
+        model = ElectraForSequenceClassification(
+            ElectraModel(**config), num_classes=self.type_sequence_label_size)
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
-        self.parent.assertEqual(result.shape,
-                                [self.batch_size, self.num_classes])
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
+                       labels=sequence_labels,
+                       return_dict=self.parent.return_dict)
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
+
+        self.parent.assertEqual(
+            result[0].shape, [self.batch_size, self.type_sequence_label_size])
 
     def create_and_check_electra_for_question_answering(
         self,
@@ -213,17 +307,24 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
     ):
         model = ElectraForQuestionAnswering(ElectraModel(**config))
         model.eval()
-        result = model(
-            input_ids,
-            attention_mask=input_mask,
-            token_type_ids=token_type_ids,
-        )
+        result = model(input_ids,
+                       attention_mask=input_mask,
+                       token_type_ids=token_type_ids,
+                       inputs_embeds=inputs_embeds,
+                       start_positions=sequence_labels,
+                       end_positions=sequence_labels,
+                       return_dict=self.parent.return_dict)
+
+        if token_labels is not None:
+            result = result[1:]
+
         self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.seq_length])
         self.parent.assertEqual(result[1].shape,
@@ -235,6 +336,7 @@ class ElectraModelTester:
         input_ids,
         token_type_ids,
         input_mask,
+        inputs_embeds,
         sequence_labels,
         token_labels,
         choice_labels,
@@ -248,12 +350,22 @@ class ElectraModelTester:
             [-1, self.num_choices, -1])
         multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
             [-1, self.num_choices, -1])
-        result = model(
-            multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
-        )
-        self.parent.assertEqual(result.shape,
+        result = model(multiple_choice_inputs_ids,
+                       attention_mask=multiple_choice_input_mask,
+                       token_type_ids=multiple_choice_token_type_ids,
+                       inputs_embeds=inputs_embeds,
+                       labels=choice_labels,
+                       return_dict=self.parent.return_dict)
+
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
+
+        if paddle.is_tensor(result):
+            result = [result]
+        elif token_labels is not None:
+            result = result[1:]
+
+        self.parent.assertEqual(result[0].shape,
                                 [self.batch_size, self.num_choices])
 
     def prepare_config_and_inputs_for_common(self):
@@ -262,6 +374,7 @@ class ElectraModelTester:
             config,
             input_ids,
             token_type_ids,
+            inputs_embeds,
             input_mask,
             sequence_labels,
             token_labels,
@@ -270,14 +383,26 @@ class ElectraModelTester:
         inputs_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
-            "attention_mask": input_mask
+            "attention_mask": input_mask,
+            "inputs_embeds": inputs_embeds
         }
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels", "use_inputs_embeds"), [
+    [False, False, True],
+    [False, False, False],
+    [False, True, False],
+    [True, False, False],
+    [True, True, False],
+])
 class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
     test_resize_embeddings = False
     base_model_class = ElectraModel
+
+    use_labels = False
+    return_dict = False
+
     all_model_classes = (
         ElectraModel,
         ElectraForMaskedLM,
@@ -290,9 +415,17 @@ class ElectraModelTest(ModelTesterMixin, unittest.TestCase):
     def setUp(self):
         self.model_tester = ElectraModelTester(self)
 
+        # set attribute in setUp to overwrite the static attribute
+        self.test_resize_embeddings = False
+
     def test_electra_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_electra_model(*config_and_inputs)
+
+    def test_electra_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_electra_model_cache(
+            *config_and_inputs)
 
     def test_for_masked_lm(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
