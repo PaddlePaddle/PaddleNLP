@@ -1,4 +1,4 @@
-for %%x in (6 7 8 9) do (
+for %%x in (6 7 8 9 10) do (
   if not exist build_py3%%x mkdir build_py3%%x
   cd build_py3%%x
   for /d %%G in ("*") do rmdir /s /q "%%G"
