@@ -62,16 +62,20 @@ def extract_paramaters(model_file="model_state.pdparams"):
     bert = {}
     for k, v in state_dict.items():
         unet_key = "unet."
-        if unet_key in k:
+        if k.startswith(unet_key):
             unet[k.replace(unet_key, "")] = v
 
         vae_key = "vae."
-        if vae_key in k:
+        vqvae_key = "vqvae."
+        if k.startswith(vae_key):
             vae[k.replace(vae_key, "")] = v
+        elif k.startswith(vqvae_key):
+            vae[k.replace(vqvae_key, "")] = v
 
         bert_key = "text_encoder."
-        if bert_key in k:
+        if k.startswith(bert_key):
             bert[k.replace(bert_key, "")] = v
+
     return unet, vae, bert
 
 
