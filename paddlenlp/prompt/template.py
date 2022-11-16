@@ -303,12 +303,12 @@ class Template(nn.Layer):
             
             For example, if we define `prompt` as 
 
-            "{'text': 'hypothesis'}基于这一假设{'mask'}推断出{'options'}",
+            "{'text': 'hypothesis'}基于这一假设{'mask'}推断出{'options': 'label.txt'}",
 
             then this function returns
 
-            [{"text": "hypothesis"}, {"discrete": "基于这一假设"}, {"mask": "mask"},
-             {"discrete": "推断出"}, {"options": "labels"}].
+            [{"text": "hypothesis"}, {"hard": "基于这一假设"}, {"mask": null},
+             {"hard": "推断出"}, {"options": ["正确", "错误"]}].
 
         Raises:
             ValueError: A error occurred parsing an string with unmatched punctuations.
