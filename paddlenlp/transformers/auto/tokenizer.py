@@ -27,7 +27,6 @@ from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.import_utils import is_fast_tokenizer_available
 
-
 __all__ = [
     "AutoTokenizer",
 ]
