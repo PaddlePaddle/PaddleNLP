@@ -15,6 +15,7 @@
 from dataclasses import dataclass, field
 import os
 import sys
+from collections import defaultdict
 
 import paddle
 import paddle.nn.functional as F
@@ -41,9 +42,6 @@ from metric import MetricReport
 class DataArguments:
     data_dir: str = field(default="./data", metadata={"help": "The dataset dictionary includes train.txt, dev.txt, test.txt, label.txt and data.txt (optional) files."})
     prompt: str = field(default=None, metadata={"help": "The input prompt for tuning."})
-    soft_encoder: str = field(default="lstm", metadata={"help": "The encoder type of soft template, `lstm`, `mlp` or None."})
-    encoder_hidden_size: int = field(default=200, metadata={"help": "The dimension of soft embeddings."})
-
 
 @dataclass
 class ModelArguments:
@@ -67,17 +65,20 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Define the template for preprocess and the verbalizer for postprocess.
-    template = AutoTemplate.create_from(
-        data_args.prompt,
-        tokenizer,
-        training_args.max_seq_length,
-        model=model,
-        prompt_encoder=data_args.soft_encoder,
-        encoder_hidden_size=data_args.encoder_hidden_size)
-    logger.info("Using template: {}".format(template.template))
+    template = AutoTemplate.create_from(data_args.prompt,
+                                        tokenizer,
+                                        training_args.max_seq_length,
+                                        model=model)
+    logger.info("Using template: {}".format(template.prompt))
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
-    verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
+    with open(label_file, "r", encoding="utf-8") as fp:
+        label_words = defaultdict(list)
+        for line in fp:
+            data = line.strip().split("==")
+            word = data[1] if len(data) > 1 else data[0].split("##")[-1]
+            label_words[data[0]].append(word)
+    verbalizer = SoftVerbalizer(label_words, tokenizer, model)
 
     # Load the few-shot datasets.
     train_ds, dev_ds, test_ds = load_local_dataset(
@@ -139,11 +140,24 @@ def main():
 
     # Export static model.
     if training_args.do_export:
+        template = prompt_model.template
+        template_keywords = template.extract_template_keywords(template.prompt)
         input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # mask_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # soft_token_ids
+            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
+            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
+            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
+            InputSpec(shape=[None, None, None, None],
+                      dtype="float32")  # attention_mask
         ]
+        if "mask" in template_keywords:
+            input_spec.append(InputSpec(shape=[None],
+                                        dtype="int64"))  # masked_positions
+        if "soft" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None],
+                                        dtype="int64"))  # soft_token_ids
+        if "encoder" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None],
+                                        dtype="int64"))  # encoder_ids
         export_path = os.path.join(training_args.output_dir, 'export')
         trainer.export_model(export_path,
                              input_spec=input_spec,
