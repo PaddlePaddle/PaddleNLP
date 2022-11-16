@@ -1557,6 +1557,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = file_path
                 continue
             if from_hf_hub:
+                # if file_id not in cls.resource_files_names:
+                #     resolved_vocab_files[file_id] = None
+                # else:
                 resolved_vocab_files[file_id] = hf_hub_download(repo_id=pretrained_model_name_or_path, filename=file_path, cache_dir=MODEL_HOME)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
