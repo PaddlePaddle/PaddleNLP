@@ -253,7 +253,7 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin,
             *config_and_inputs)
 
     def test_inputs_embeds_for_mbart(self):
-        # rewrite test inputs embeds for mbart model since scaler not equal to 1.0
+        # NOTE: rewrite test inputs embeds for mbart model since scaler not equal to 1.0
         # get config for model and inputs_dict for model forward
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
         )

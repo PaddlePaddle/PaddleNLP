@@ -17,7 +17,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import TransformerEncoder
-
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
 
@@ -177,28 +177,44 @@ class UnifiedTransformerEmbeddings(nn.Layer):
                 input_ids,
                 token_type_ids=None,
                 position_ids=None,
-                role_ids=None):
+                role_ids=None,
+                input_embeddings=None):
+        if input_ids is None and input_embeddings is None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time"
+            )
+        elif input_ids is not None:
+            inputs_sample = input_ids
+        elif input_embeddings is not None:
+            inputs_sample = input_embeddings[:, :, -1]
+        else:
+            raise ValueError(
+                "You have to specify either input_ids or inputs_embeds")
+        if input_embeddings is None:
+            input_embeddings = self.word_embeddings(input_ids)
+
         if position_ids is None:
             if self.pad_token_id is None:
                 position_ids = paddle.expand_as(
-                    paddle.arange(end=paddle.shape(input_ids)[1],
-                                  dtype="int64"), input_ids)
+                    paddle.arange(end=paddle.shape(inputs_sample)[1],
+                                  dtype="int64"), inputs_sample)
             else:
                 # NOTE: If there is a unk_token_id in input_ids, the following logic is wrong.
                 # In that case, the position_ids must be provided.
                 # And this is for left padding input_ids.
+                assert input_ids is not None, "position_ids or pad_token_ids" \
+                    " should be provided when input_embedds is specified"
                 num_pad = paddle.sum(
                     (input_ids == self.pad_token_id).astype("float32"),
                     axis=-1,
                     keepdim=True)
                 position_ids = F.relu(
                     paddle.expand_as(
-                        paddle.arange(end=paddle.shape(input_ids)[1],
-                                      dtype="float32"), input_ids) -
+                        paddle.arange(end=paddle.shape(inputs_sample)[1],
+                                      dtype="float32"), inputs_sample) -
                     num_pad).astype("int64")
             position_ids.stop_gradient = True
 
-        input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
         if token_type_ids is None:
@@ -206,7 +222,7 @@ class UnifiedTransformerEmbeddings(nn.Layer):
             token_type_ids.stop_gradient = True
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        embeddings = input_embeddings + position_embeddings + token_type_embeddings
         # A model with role_embeddings can generate without role_ids.
         if role_ids is not None:
             embeddings += self.role_embeddings(role_ids)
@@ -338,13 +354,14 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
         self.embeddings.word_embeddings = value
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
                 use_cache=False,
                 cache=None,
                 role_ids=None,
+                inputs_embeds=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -396,6 +413,11 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 Indices of role ids indicated different roles.
                  It's data type should be `int64` and has a shape of 
                 [batch_size, sequence_length]. Defaults to None.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation 
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over 
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix. 
+                Default to None.
             output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
                 tensors for more detail. Defaults to `False`.
@@ -432,15 +454,21 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                     is_split_into_words=False)
                 outputs = model(**inputs)
         """
+
         if attention_mask is None:
-            attention_mask = ((input_ids == self.pad_token_id).astype(
-                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            if input_ids is not None:
+                attention_mask = ((input_ids == self.pad_token_id).astype(
+                    paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            else:
+                logger.warning("provided inputs_embeds without attention_mask")
+        if attention_mask is not None:
             attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(input_ids,
                                            token_type_ids,
                                            position_ids,
-                                           role_ids=role_ids)
+                                           role_ids=role_ids,
+                                           input_embeddings=inputs_embeds)
         if use_cache and cache is None:
             cache = self.encoder.gen_cache(embedding_output)
 
@@ -509,7 +537,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
+                input_ids=None,
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None,
@@ -518,6 +546,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 cache=None,
                 role_ids=None,
                 labels=None,
+                inputs_embeds=None,
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
@@ -544,6 +573,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 Labels for computing the left-to-right language modeling loss. Indices should be in
                 `[-100, 0, ..., vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
                 ignored (masked), the loss is only computed for the tokens with labels n `[0, ..., vocab_size]`
+            inputs_embeds (Tensor, optional):
+                See :class:`UnifiedTransformerModel`.
             output_attentions (bool, optional):
                 See :class: `UnifiedTransformerModel`
             output_hidden_states (bool, optional):
@@ -586,12 +617,15 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             use_cache,
             cache,
             role_ids=role_ids,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+        input_type = type(input_ids) if input_ids is not None else type(
+            inputs_embeds)
         sequence_output = outputs if isinstance(outputs,
-                                                type(input_ids)) else outputs[0]
+                                                input_type) else outputs[0]
         logits = self.lm_head(sequence_output, masked_positions)
 
         lm_loss = None
@@ -600,7 +634,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             lm_loss = loss_fct(logits.reshape((-1, logits.shape[-1])),
                                labels.reshape([-1]))
         if not return_dict:
-            if isinstance(outputs, type(input_ids)):
+            if isinstance(outputs, input_type):
                 return (lm_loss, logits) if lm_loss is not None else logits
             else:
                 outputs = (logits, ) + outputs[1:]

@@ -519,9 +519,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         else:
             past_length = cache[0][0].shape[-2]
 
-
-#TODO SLOW TEST
-# Attention mask.
+        # Attention mask.
         if attention_mask is None:
             if input_ids is not None:
                 if batch_size == 1 and past_length != 0:
