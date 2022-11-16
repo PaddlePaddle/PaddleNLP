@@ -24,7 +24,7 @@ FastTokenizer是一款简单易用、功能强大的跨平台高性能文本预�
 
 ## 快速开始
 
-下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ Demo](./fast_tokenizer/demo/README.md)。
+下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)。
 
 ### 环境依赖
 
@@ -128,3 +128,4 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
 ## 相关文档
 
 [FastTokenizer编译指南](docs/compile/README.md)
+[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)

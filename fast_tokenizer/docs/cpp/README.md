@@ -1,15 +1,15 @@
-# FastTokenizer C++ Demo
+# FastTokenizer C++ 库使用教程
 
 ## 1. 快速安装
 
 当前版本FastTokenizer C++库支持不同的操作系统以及硬件平台，并为以下平台提供预编译包：
 |系统|下载地址|
 |---|---|
-|Linux-x64| [fast_tokenizer-linux-x64-dev.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-dev.tgz) |
-|Linux-aarch64| [fast_tokenizer-linux-aarch64-dev.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-aarch64-dev.tgz) |
-|Windows| [fast_tokenizer-win-x64-dev.zip](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-win-x64-dev.zip) |
-|MacOS-x64| [fast_tokenizer-osx-x86_64-dev.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-x86_64-dev.tgz) |
-|MacOS-arm64| [fast_tokenizer-osx-arm64-dev.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-arm64-dev.tgz) |
+|Linux-x64| [fast_tokenizer-linux-x64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.0.tgz) |
+|Linux-aarch64| [fast_tokenizer-linux-aarch64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-aarch64-1.0.0.tgz) |
+|Windows| [fast_tokenizer-win-x64-1.0.0.zip](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-win-x64-1.0.0.zip) |
+|MacOS-x64| [fast_tokenizer-osx-x86_64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-x86_64-1.0.0.tgz) |
+|MacOS-arm64| [fast_tokenizer-osx-arm64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-osx-arm64-1.0.0.tgz) |
 
 ### 环境依赖
 
@@ -35,14 +35,14 @@
 
 ## 2. 快速开始
 
-以下以Linux平台为例, 介绍如何使用FastTokenizer CPP预编译包完成demo示例编译及运行。
+以下以Linux平台为例, 将介绍如何使用FastTokenizer C++预编译包完成demo示例编译及运行。该示例会生成两个可执行文件，分别是`ernie_fast_tokenizer_demo`和`clip_fast_tokenizer_demo`。
 
 ### 2.1 下载解压
 
 ```shell
-wget -c https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-dev.tgz
+wget -c https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.0.tgz
 
-tar xvfz fast_tokenizer-linux-x64-dev.tgz
+tar xvfz fast_tokenizer-linux-x64-1.0.0.tgz
 # 解压后为fast_tokenizer目录
 ```
 
