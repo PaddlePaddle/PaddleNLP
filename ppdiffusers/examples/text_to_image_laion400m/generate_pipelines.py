@@ -23,27 +23,27 @@ from paddlenlp.utils.log import logger
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_file",
-                        type == str,
+                        type=str,
                         default='./model_state.pdparams',
                         help="path to pretrained model_state.pdparams")
     parser.add_argument("--output_path",
-                        type == str,
+                        type=str,
                         default='./ldm_pipelines',
                         help="the output path of pipeline.")
     parser.add_argument("--vae_name_or_path",
-                        type == str,
+                        type=str,
                         default='CompVis/stable-diffusion-v1-4/vae',
                         help="pretrained_vae_name_or_path.")
     parser.add_argument("--text_encoder_config_file",
                         type=str,
-                        default="./config/bert.json",
+                        default="./config/ldmbert.json",
                         help="text_encoder_config_file.")
     parser.add_argument("--unet_config_file",
                         type=str,
                         default="./config/unet.json",
-                        help="text_encoder_config_file.")
+                        help="unet_config_file.")
     parser.add_argument(
-        "--tokenizer_name",
+        "--tokenizer_name_or_path",
         type=str,
         default="bert-base-uncased",
         help="Pretrained tokenizer name or path if not the same as model_name.")
@@ -81,12 +81,29 @@ def read_json(file):
     return data
 
 
+def check_keys(model, state_dict):
+    missing_keys = []
+    mismatched_keys = []
+    for k, v in model.state_dict().items():
+        if k not in state_dict.keys():
+            missing_keys.append(k)
+        if list(v.shape) != list(state_dict[k].shape):
+            mismatched_keys.append(k)
+    if len(missing_keys):
+        missing_keys_str = ",".join(missing_keys)
+        print(f"Found missing_keys {missing_keys_str}!")
+    if len(mismatched_keys):
+        mismatched_keys_str = ",".join(mismatched_keys)
+        print(f"Found mismatched_keys {mismatched_keys_str}!")
+
+
 def build_pipelines(model_file,
                     output_path,
                     vae_name_or_path,
                     unet_config_file,
                     text_encoder_config_file,
                     tokenizer_name_or_path="bert-base-uncased",
+                    batch_size=64,
                     model_max_length=77):
     vae = AutoencoderKL.from_config(vae_name_or_path)
     unet = UNet2DConditionModel(**read_json(unet_config_file))
@@ -114,6 +131,9 @@ def build_pipelines(model_file,
                               clip_sample=False,
                               set_alpha_to_one=False)
     unet_dict, vae_dict, text_encoder_dict = extract_paramaters(model_file)
+    check_keys(unet, unet_dict)
+    check_keys(vae, vae_dict)
+    check_keys(text_encoder, text_encoder_dict)
     unet.load_dict(unet_dict)
     vae.load_dict(vae_dict)
     text_encoder.load_dict(text_encoder_dict)

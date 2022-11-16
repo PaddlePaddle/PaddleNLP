@@ -20,12 +20,25 @@ from tqdm.auto import tqdm
 from ppdiffusers import PNDMScheduler, LMSDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMScheduler, LDMTextToImagePipeline
 
 
+def batchify(data, batch_size=64):
+    one_batch = []
+    for example in data:
+        one_batch.append(example)
+        if len(one_batch) == batch_size:
+            yield one_batch
+            one_batch = []
+    if one_batch:
+        yield one_batch
+
+
 def generate_images(model_name_or_path,
+                    batch_size=16,
                     file='./data/mscoco.en.1k',
                     save_path="output",
                     seed=42,
                     scheduler_type="ddim",
                     eta=0.,
+                    num_inference_steps=50,
                     guidance_scales=[3, 4, 5, 6, 7, 8],
                     device="gpu"):
     paddle.set_device(device)
@@ -67,15 +80,23 @@ def generate_images(model_name_or_path,
         all_prompt = [p.strip() for p in f.readlines()]
 
     for cfg in guidance_scales:
+        cfg = int(cfg)
         new_save_path = os.path.join(save_path, f"mscoco.en_g{cfg}")
         os.makedirs(new_save_path, exist_ok=True)
         if seed is not None:
             random.seed(seed)
-        for i, prompt in tqdm(enumerate(all_prompt)):
+        i = 0
+        for batch_prompt in tqdm(batchify(all_prompt, batch_size=batch_size)):
             sd = random.randint(0, 2**32)
-            image = pipe(prompt, guidance_scale=cfg, seed=sd, eta=eta)[0][0]
-            path = os.path.join(new_save_path, "{:05d}_000.png".format(i))
-            image.save(path)
+            images = pipe(batch_prompt,
+                          guidance_scale=cfg,
+                          seed=sd,
+                          eta=eta,
+                          num_inference_steps=num_inference_steps)[0]
+            for image in images:
+                path = os.path.join(new_save_path, "{:05d}_000.png".format(i))
+                image.save(path)
+                i += 1
 
 
 if __name__ == "__main__":
@@ -87,7 +108,7 @@ if __name__ == "__main__":
                         help="model_name_or_path.")
     parser.add_argument(
         "--file",
-        default="./data/mscoco.en.1k",
+        default="./mscoco.en.1k",
         type=str,
         help="eval file.",
     )
@@ -106,14 +127,19 @@ if __name__ == "__main__":
         "Type of scheduler to use. Should be one of ['pndm', 'lms', 'ddim', 'euler-ancest']",
     )
     parser.add_argument("--device", default="gpu", type=str, help="device")
+    parser.add_argument("--batch_size", default=16, type=int, help="batch_size")
+    parser.add_argument("--num_inference_steps",
+                        default=50,
+                        type=int,
+                        help="num_inference_steps")
     parser.add_argument("--save_path",
                         default="output/1.5b_ldm/12w.pd",
                         type=str,
                         help="Path to the output file.")
     parser.add_argument("--guidance_scales",
-                        default="3 4 5 6 7 8",
+                        default=[3, 4, 5, 6, 7, 8],
                         nargs="+",
-                        type=int,
+                        type=str,
                         help="guidance_scales list.")
     args = parser.parse_args()
     print('-----------  Configuration Arguments -----------')
@@ -121,8 +147,10 @@ if __name__ == "__main__":
         print('%s: %s' % (arg, value))
     print('------------------------------------------------')
     generate_images(model_name_or_path=args.model_name_or_path,
+                    batch_size=args.batch_size,
                     file=args.file,
                     save_path=args.save_path,
                     seed=args.seed,
+                    num_inference_steps=args.num_inference_steps,
                     scheduler_type=args.scheduler_type,
                     device=args.device)

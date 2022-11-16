@@ -810,8 +810,12 @@ class Trainer:
         # TODO  @ZHUI paddle need return the results of set_state_dict.
         self.model.set_state_dict(state_dict)
 
-    def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
-                                 ignore_keys_for_eval, inputs):
+    def _maybe_log_save_evaluate(self,
+                                 tr_loss,
+                                 model,
+                                 epoch,
+                                 ignore_keys_for_eval,
+                                 input=None):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}

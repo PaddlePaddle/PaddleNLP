@@ -1,6 +1,6 @@
 ## Latent Diffusion Model 从零训练代码
 
-本教程带领大家如何开启32层的**Latent Diffusion Model**的训练。
+本教程带领大家如何开启32层的**Latent Diffusion Model**的训练（支持切换`中文`和`英文`分词器）。
 
 ## 1 本地运行
 ### 1.1 安装依赖
@@ -72,8 +72,7 @@ python -u train_txt2img_laion400m_trainer.py \
     --model_max_length 77 \
     --tokenizer_name bert-base-uncased \
     --max_grad_norm -1 \
-    --fp16 \
-    --fp16_opt_level "O2"
+    --fp16
 ```
 
 
@@ -99,7 +98,7 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--file_list`: file_list文件地址。
 > * `--num_inference_steps`: 推理预测时候使用的步数。
 > * `--model_max_length`: `tokenizer`中的`model_max_length`参数，超过该长度将会被截断。
-> * `--tokenizer_name`: 我们需要使用的`tokenizer_name`。
+> * `--tokenizer_name`: 我们需要使用的`tokenizer_name`，我们可以使用英文的分词器`bert-base-uncased`，也可以使用中文的分词器`ernie-1.0`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
@@ -130,9 +129,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_la
     --num_inference_steps 200 \
     --model_max_length 77 \
     --tokenizer_name bert-base-uncased \
-    --max_grad_norm -1 \
-    --fp16 \
-    --fp16_opt_level "O2"
+    --max_grad_norm -1
 ```
 
 ### 1.4 自定义训练逻辑开启训练
@@ -226,9 +223,19 @@ python generate_pipelines.py \
     --vae_name_or_path CompVis/stable-diffusion-v1-4/vae \
     --text_encoder_config_file ./config/ldmbert.json \
     --unet_config_file ./config/unet.json \
-    --tokenizer_name bert-base-uncased \
+    --tokenizer_name_or_path bert-base-uncased \
     --model_max_length 77
 ```
+`generate_pipelines.py`代码可传入的参数解释如下：
+> * `--model_file`: 我们使用`train_txt2img_laion400m_trainer.py`代码，训练好所得到的`model_state.pdparams`文件。
+> * `--output_path`: 生成的pipeline所要保存的路径。
+> * `--vae_name_or_path`: 使用的`vae`的名字或者本地路径，注意我们需要里面的`config.json`文件。
+> * `--text_encoder_config_file`: 文本编码器的`config`配置文件。
+> * `--unet_config_file`: `unet`的`config`配置文件。
+> * `--tokenizer_name_or_path`: 所使用的`tokenizer`名称或者本地路径，名称可以是`bert-base-uncased`, `bert-base-chinese`, `ernie-1.0`等。
+> * `--model_max_length`: `tokenizer`中的`model_max_length`参数，超过该长度将会被截断。
+
+
 输出的模型目录结构如下：
 ```shell
 ├── ldm_pipelines  # 我们指定的输出文件路径
@@ -259,4 +266,55 @@ pipe = LDMTextToImagePipeline.from_pretrained(model_name_or_path)
 prompt = "a photo of an astronaut riding a horse on mars"
 image = pipe(prompt, guidance_scale=7.5).images[0]
 image.save("astronaut_rides_horse.png")
+```
+
+当然，我们也可以使用训练好的模型在`coco en 1k`数据集上生成图片。
+首先我们需要下载`mscoco.en.1k`文件。
+```bash
+wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mscoco.en.1k
+```
+然后可以`generate_images.py`文件生成对应的图片。
+```bash
+python generate_images.py \
+    --model_name_or_path ./ldm_pipelines \
+    --file ./mscoco.en.1k \
+    --batch_size 16 \
+    --save_path ./outputs \
+    --guidance_scales 3 4 5 6 7 8 \
+    --seed 42 \
+    --scheduler_type ddim \
+    --num_inference_steps 50 \
+    --device gpu
+```
+`generate_images.py`代码可传入的参数解释如下：
+> * `--model_name_or_path`: 我们需要评估的模型名称或地址，这里我们使用上一步生成的`ldm_pipelines`。
+> * `--file`: 需要评估的文件，我们可以从[这里](https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mscoco.en.1k)下载。
+> * `--batch_size`: 生成图片所使用的batch_size。
+> * `--save_path`: 生成的图片所要保存的路径。
+> * `--guidance_scales`: guidance_scales值，我们可以输入3 4 5 6 7 8。
+> * `--seed`: 为了保证不同guidance_scales值，能够使用相同的`latents`初始值。
+> * `--scheduler_type`: 采样器的类型，支持`ddim`, `pndm`, `euler-ancest` 和 `lms`。
+> * `--num_inference_steps`: 推理预测时候使用的步数。
+> * `--device`: 使用的设备，可以是`gpu`, `cpu`, `gpu:0`, `gpu:1`等。
+
+
+输出的图片目录如下：
+```shell
+├── outputs  # 我们指定的输出文件路径
+    ├── mscoco.en_g3 # guidance_scales为3的输出图片
+        ├── 00000_000.png
+        ├── 00001_000.png
+        ......
+        ├── 00999_000.png
+    ├── mscoco.en_g4 # guidance_scales为4的输出图片
+        ├── 00000_000.png
+        ├── 00001_000.png
+        ......
+        ├── 00999_000.png
+    ......
+    ├── mscoco.en_g8 # guidance_scales为8的输出图片
+        ├── 00000_000.png
+        ├── 00001_000.png
+        ......
+        ├── 00999_000.png
 ```

@@ -79,8 +79,12 @@ class LatentDiffusionTrainer(Trainer):
             worker_init_fn=worker_init_fn,
         )
 
-    def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
-                                 ignore_keys_for_eval, inputs):
+    def _maybe_log_save_evaluate(self,
+                                 tr_loss,
+                                 model,
+                                 epoch,
+                                 ignore_keys_for_eval,
+                                 inputs=None):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
