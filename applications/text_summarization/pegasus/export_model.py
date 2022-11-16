@@ -99,12 +99,9 @@ def do_predict(args):
     model = PegasusForConditionalGeneration.from_pretrained(model_name_or_path)
     tokenizer = PegasusChineseTokenizer.from_pretrained(model_name_or_path)
 
-    pegasus = FasterPegasus(
-        model=model,
-        use_fp16_decoding=args.use_fp16_decoding,
-        trans_out=True,
-        decoding_lib=
-        "/home/gongenlei/pegasus/paddlenlp/ops/build/lib/libdecoding_op.so")
+    pegasus = FasterPegasus(model=model,
+                            use_fp16_decoding=args.use_fp16_decoding,
+                            trans_out=True)
 
     # Set evaluate mode
     pegasus.eval()

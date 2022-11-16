@@ -19,6 +19,7 @@ import numpy as np
 import random
 
 from tests.testing_utils import slow
+from parameterized import parameterized_class
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
@@ -150,9 +151,15 @@ class UnifiedTransformerModelTester:
             paddle.arange(end=self.seq_length, dtype="int64").reshape([1, -1]),
             [self.batch_size, 1])
 
+        lm_labels = None
+        if self.parent.use_labels:
+            lm_labels = ids_tensor([self.batch_size, self.seq_length],
+                                   self.vocab_size)
+
         config = self.get_config()
 
-        return (config, input_ids, input_mask, token_type_ids, position_ids)
+        return (config, input_ids, input_mask, token_type_ids, position_ids,
+                lm_labels)
 
     def get_config(self):
         return {
@@ -177,9 +184,10 @@ class UnifiedTransformerModelTester:
         }
 
     def prepare_config_and_inputs_for_decoder(self):
-        (config, input_ids, input_mask, token_type_ids,
-         position_ids) = self.prepare_config_and_inputs()
-        return (config, input_ids, input_mask, token_type_ids, position_ids)
+        (config, input_ids, input_mask, token_type_ids, position_ids,
+         lm_labels) = self.prepare_config_and_inputs()
+        return (config, input_ids, input_mask, token_type_ids, position_ids,
+                lm_labels)
 
     def create_and_check_unified_transformer_model(self, config, input_ids,
                                                    input_mask, token_type_ids,
@@ -191,7 +199,8 @@ class UnifiedTransformerModelTester:
                               token_type_ids=token_type_ids,
                               position_ids=position_ids,
                               attention_mask=input_mask,
-                              use_cache=True)
+                              use_cache=True,
+                              return_dict=self.parent.return_dict)[:2]
 
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.hidden_size])
@@ -209,23 +218,24 @@ class UnifiedTransformerModelTester:
                         token_type_ids=token_type_ids,
                         position_ids=position_ids,
                         attention_mask=input_mask,
-                        use_cache=True)
-        outputs_use_cache_conf = model(
-            input_ids,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            attention_mask=input_mask,
-        )
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids,
+                                       token_type_ids=token_type_ids,
+                                       position_ids=position_ids,
+                                       attention_mask=input_mask,
+                                       return_dict=self.parent.return_dict)
         outputs_no_past = model(input_ids,
                                 token_type_ids=token_type_ids,
                                 position_ids=position_ids,
                                 attention_mask=input_mask,
-                                use_cache=False)
+                                use_cache=False,
+                                return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(
             len(outputs_no_past) == len(outputs_use_cache_conf))
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1),
@@ -252,18 +262,21 @@ class UnifiedTransformerModelTester:
                                        value=0)(next_attention_mask)
         next_attention_mask[:, :, -1, -1] = 1
 
-        output_from_no_past, cache = model(next_input_ids,
-                                           token_type_ids=next_token_type_ids,
-                                           position_ids=next_position_ids,
-                                           attention_mask=next_attention_mask,
-                                           use_cache=True)
+        output_from_no_past, cache = model(
+            next_input_ids,
+            token_type_ids=next_token_type_ids,
+            position_ids=next_position_ids,
+            attention_mask=next_attention_mask,
+            use_cache=True,
+            return_dict=self.parent.return_dict)[:2]
         output_from_past = model(next_tokens,
                                  token_type_ids=next_token_types,
                                  position_ids=next_position,
                                  attention_mask=next_attention_mask[:, :,
                                                                     -1:, :],
                                  use_cache=True,
-                                 cache=past)[0]
+                                 cache=past,
+                                 return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -292,7 +305,8 @@ class UnifiedTransformerModelTester:
                              token_type_ids=token_type_ids,
                              position_ids=position_ids,
                              attention_mask=input_mask,
-                             use_cache=True)
+                             use_cache=True,
+                             return_dict=self.parent.return_dict)[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -324,21 +338,22 @@ class UnifiedTransformerModelTester:
         next_attention_mask[:, :, -3, -1] = 1
         next_attention_mask[:, :, -3, -2] = 1
 
-        output_from_no_past = model(
-            next_input_ids,
-            token_type_ids=next_token_type_ids,
-            attention_mask=next_attention_mask,
-            position_ids=next_position_ids,
-            use_cache=False,
-        )
-        output_from_past = model(
-            next_tokens,
-            token_type_ids=next_token_types,
-            attention_mask=next_attention_mask[:, :, -3:, :],
-            position_ids=next_position,
-            cache=past,
-            use_cache=True,
-        )[0]
+        output_from_no_past = model(next_input_ids,
+                                    token_type_ids=next_token_type_ids,
+                                    attention_mask=next_attention_mask,
+                                    position_ids=next_position_ids,
+                                    use_cache=False,
+                                    return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(next_tokens,
+                                 token_type_ids=next_token_types,
+                                 attention_mask=next_attention_mask[:, :,
+                                                                    -3:, :],
+                                 position_ids=next_position,
+                                 cache=past,
+                                 use_cache=True,
+                                 return_dict=self.parent.return_dict)[0]
         self.parent.assertTrue(
             output_from_past.shape[1] == next_tokens.shape[1])
 
@@ -359,37 +374,48 @@ class UnifiedTransformerModelTester:
                             atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask,
-                                       token_type_ids, position_ids, *args):
+                                       token_type_ids, position_ids, lm_labels,
+                                       *args):
         base_model = UnifiedTransformerModel(**config)
         model = UnifiedTransformerLMHeadModel(base_model)
         model.eval()
 
-        result = model(input_ids,
-                       token_type_ids=token_type_ids,
-                       position_ids=position_ids,
-                       attention_mask=input_mask)
+        outputs = model(input_ids,
+                        token_type_ids=token_type_ids,
+                        position_ids=position_ids,
+                        attention_mask=input_mask,
+                        labels=lm_labels,
+                        return_dict=self.parent.return_dict)
+        if self.parent.use_labels:
+            loss, result = outputs[:2]
+            self.parent.assertIsInstance(loss.item(), float)
+        else:
+            result = outputs[0] if self.parent.return_dict else outputs
         self.parent.assertEqual(
             result.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids,
                                                input_mask, token_type_ids,
-                                               position_ids, *args):
+                                               position_ids, lm_head, *args):
         base_model = UnifiedTransformerModel(**config)
         model = UnifiedTransformerLMHeadModel(base_model)
-        model.eval()
 
-        logits = model(input_ids,
-                       token_type_ids=token_type_ids,
-                       attention_mask=input_mask,
-                       position_ids=position_ids)
+        loss, logits = model(input_ids,
+                             token_type_ids=token_type_ids,
+                             attention_mask=input_mask,
+                             position_ids=position_ids,
+                             label=input_ids,
+                             return_dict=self.parent.return_dict)[:2]
+        self.parent.assertIsInstance(loss.item(), float)
         self.parent.assertEqual(
             logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+        loss.backward()
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
 
-        (config, input_ids, input_mask, token_type_ids,
-         position_ids) = config_and_inputs
+        (config, input_ids, input_mask, token_type_ids, position_ids,
+         lm_labels) = config_and_inputs
 
         inputs_dict = {
             "input_ids": input_ids,
@@ -401,6 +427,12 @@ class UnifiedTransformerModelTester:
         return config, inputs_dict
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class UnifiedTransformerModelTest(ModelTesterMixin, GenerationTesterMixin,
                                   unittest.TestCase):
     base_model_class = UnifiedTransformerModel
@@ -412,15 +444,19 @@ class UnifiedTransformerModelTest(ModelTesterMixin, GenerationTesterMixin,
     }
     test_missing_keys = False
 
+    use_labels = False
+    return_dict = False
+
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class, return_labels=False):
         inputs_dict = super()._prepare_for_class(inputs_dict, model_class)
         return inputs_dict
 
     def setUp(self):
-        random.seed(128)
-        np.random.seed(128)
-        paddle.seed(128)
+        seed = 1028
+        random.seed(seed)
+        np.random.seed(seed)
+        paddle.seed(seed)
 
         self.model_tester = UnifiedTransformerModelTester(self)
 
