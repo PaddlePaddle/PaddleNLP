@@ -12,7 +12,7 @@
 
 如果基于GPU部署，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖:
 ```shell
-python -m pip install onnxruntime-gpu onnx onnxconverter-common
+python -m pip install onnxruntime-gpu onnx onnxconverter-common==1.9.0
 ```
 
 如果基于CPU部署，请使用如下命令安装所需依赖:
@@ -20,10 +20,10 @@ python -m pip install onnxruntime-gpu onnx onnxconverter-common
 python -m pip install onnxruntime
 ```
 
-安装FasterTokenizer文本处理加速库（可选）
-推荐安装faster_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
+安装FastTokenizer文本处理加速库（可选）
+推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 ```shell
-pip install faster_tokenizer
+pip install fast_tokenizer
 ```
 ## 基于GPU部署推理样例
 

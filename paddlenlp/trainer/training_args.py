@@ -21,12 +21,13 @@ import json
 import math
 import os
 from dataclasses import asdict, dataclass, field
-from paddle.distributed import fleet
+import warnings
 from enum import Enum
 import types
 from typing import Any, Dict, List, Optional
 
 import paddle
+from paddle.distributed import fleet
 
 from ..utils.log import logger
 from .trainer_utils import (
