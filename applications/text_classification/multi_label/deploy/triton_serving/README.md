@@ -104,7 +104,7 @@ models
     └── config.pbtxt
 ```
 
-模型配置文件config.pbtxt配置细节请参见[Triton Server Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md)
+模型配置文件config.pbtxt配置细节请参见[Triton Server Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md)
 
 ## 部署模型
 
