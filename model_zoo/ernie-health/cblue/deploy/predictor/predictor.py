@@ -122,7 +122,7 @@ class EHealthPredictor(object):
     def __init__(self, args, label_list):
         self.label_list = label_list
         self._tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
-                                                        use_faster=True)
+                                                        use_fast=True)
         self._max_seq_length = args.max_seq_length
         self._batch_size = args.batch_size
         self.inference_backend = InferBackend(args.model_path_prefix,
