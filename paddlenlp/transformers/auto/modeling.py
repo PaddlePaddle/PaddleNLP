@@ -170,6 +170,7 @@ class _BaseAutoModelClass:
     def _from_pretrained(cls,
                          pretrained_model_name_or_path,
                          task=None,
+                         from_hf_hub=False,
                          *model_args,
                          **kwargs):
         if task:
@@ -266,6 +267,7 @@ class _BaseAutoModelClass:
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, *model_args, **kwargs)
+        # TODO: insert logic
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join([
@@ -350,6 +352,8 @@ class AutoModel(_BaseAutoModelClass):
                         task=None,
                         *model_args,
                         **kwargs):
+        print(model_args)
+        print(kwargs)
         """
         Creates an instance of `AutoModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
