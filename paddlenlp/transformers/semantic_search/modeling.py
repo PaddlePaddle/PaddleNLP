@@ -97,8 +97,8 @@ class ErnieDualEncoder(nn.Layer):
         assert (self.query_ernie is not None) or (self.title_ernie is not None), \
             "At least one of query_ernie and title_ernie should not be None"
 
-        # Compatible to rocketv2 initialization
-        if (reinitialize):
+        # Compatible to rocketv2 initialization for setting layer._epsilon to 1e-5
+        if reinitialize:
             self.apply(self.init_weights)
 
     def init_weights(self, layer):
@@ -210,7 +210,6 @@ class ErnieDualEncoder(nn.Layer):
             paddle.distributed.all_gather(tensor_list, all_title_cls_embedding)
             all_title_cls_embedding = paddle.concat(x=tensor_list, axis=0)
 
-        # multiply
         logits = paddle.matmul(query_cls_embedding,
                                all_title_cls_embedding,
                                transpose_y=True)
@@ -258,8 +257,8 @@ class ErnieCrossEncoder(nn.Layer):
 
         self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path,
                                                   num_classes=num_classes)
-        # Compatible to rocketv2 initialization
-        if (reinitialize):
+        # Compatible to rocketv2 initialization for setting layer._epsilon to 1e-5
+        if reinitialize:
             self.apply(self.init_weights)
 
     def init_weights(self, layer):
