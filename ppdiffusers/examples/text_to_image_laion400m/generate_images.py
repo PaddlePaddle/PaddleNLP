@@ -20,7 +20,7 @@ from tqdm.auto import tqdm
 from ppdiffusers import PNDMScheduler, LMSDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMScheduler, LDMTextToImagePipeline
 
 
-def batchify(data, batch_size=64):
+def batchify(data, batch_size=16):
     one_batch = []
     for example in data:
         one_batch.append(example)

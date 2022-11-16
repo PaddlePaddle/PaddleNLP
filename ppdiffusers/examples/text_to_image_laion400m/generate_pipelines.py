@@ -103,7 +103,6 @@ def build_pipelines(model_file,
                     unet_config_file,
                     text_encoder_config_file,
                     tokenizer_name_or_path="bert-base-uncased",
-                    batch_size=64,
                     model_max_length=77):
     vae = AutoencoderKL.from_config(vae_name_or_path)
     unet = UNet2DConditionModel(**read_json(unet_config_file))
