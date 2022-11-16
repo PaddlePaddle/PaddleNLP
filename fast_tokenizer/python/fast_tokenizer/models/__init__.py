@@ -43,7 +43,7 @@ class WordPiece(Model):
 
     def __init__(self,
                  vocab: Dict[str, int],
-                 unk_token: str,
+                 unk_token: str = "[UNK]",
                  max_input_chars_per_word: int = 100,
                  continuing_subword_prefix: str = "##",
                  handle_chinese_chars: bool = True):
@@ -55,17 +55,27 @@ class WordPiece(Model):
                                              handle_chinese_chars)
 
     @staticmethod
-    def read_file(self, vocab: str):
-        wp = WordPiece(None)
-        wp._model = C.models.WordPiece.read_file(vocab)
-        return wp
+    def read_file(vocab: str):
+        """ Read a vocab.txt file
+
+        :params vocab: (str) The path to a vocab.txt file
+        :return: Dict[str, int], The vocabulary as a dict
+        """
+        return C.models.WordPiece.read_file(vocab)
 
     @staticmethod
-    def from_file(self,
-                  vocab: str,
+    def from_file(vocab: str,
                   unk_token: str = "[UNK]",
                   max_input_chars_per_word: int = 100,
                   continuing_subword_prefix: str = "continuing_subword_prefix"):
+        """ Load a WordPiece instance from vocab file.
+
+        :param vocab: (str) The path to a vocab.txt file
+        :param unk_token: (str) The unknown token
+        :param max_input_chars_per_word: (int) The max number of char when tokenize a word
+        :param continuing_subword_prefix: (str) The latter subword prefix.
+        :return: An instance of WordPiece.
+        """
         wp = WordPiece(None)
         wp._model = C.models.WordPiece.from_file(vocab, unk_token,
                                                  max_input_chars_per_word,
@@ -77,7 +87,7 @@ class FastWordPiece(Model):
 
     def __init__(self,
                  vocab: Dict[str, int],
-                 unk_token: str,
+                 unk_token: str = "[UNK]",
                  max_input_chars_per_word: int = 100,
                  continuing_subword_prefix: str = "##",
                  with_pretokenization: bool = False):
@@ -89,17 +99,27 @@ class FastWordPiece(Model):
                                                  with_pretokenization)
 
     @staticmethod
-    def read_file(self, vocab: str):
-        wp = FastWordPiece(None)
-        wp._model = C.models.FastWordPiece.read_file(vocab)
-        return wp
+    def read_file(vocab: str):
+        """ Read a vocab.txt file
+
+        :params vocab: (str) The path to a vocab.txt file
+        :return: Dict[str, int], The vocabulary as a dict
+        """
+        return C.models.FastWordPiece.read_file(vocab)
 
     @staticmethod
-    def from_file(self,
-                  vocab: str,
+    def from_file(vocab: str,
                   unk_token: str = "[UNK]",
                   max_input_chars_per_word: int = 100,
                   continuing_subword_prefix: str = "continuing_subword_prefix"):
+        """ Load a FastWordPiece instance from vocab file.
+
+        :param vocab: (str) The path to a vocab.txt file
+        :param unk_token: (str) The unknown token
+        :param max_input_chars_per_word: (int) The max number of char when tokenize a word
+        :param continuing_subword_prefix: (str) The latter subword prefix.
+        :return: An instance of FastWordPiece.
+        """
         wp = FastWordPiece(None)
         wp._model = C.models.FastWordPiece.from_file(vocab, unk_token,
                                                      max_input_chars_per_word,
@@ -123,13 +143,11 @@ class BPE(Model):
                                    end_of_word_suffix, fuse_unk)
 
     @staticmethod
-    def read_file(self, vocab: str, merges: str):
-        bpe = BPE()
-        bpe._model = C.models.BPE.read_file(vocab, merges)
-        return bpe
+    def read_file(vocab: str, merges: str):
+        return C.models.BPE.read_file(vocab, merges)
 
     @staticmethod
-    def from_file(self, vocab: str, merges: str, **kwargs):
+    def from_file(vocab: str, merges: str, **kwargs):
         bpe = BPE()
         bpe._model = C.models.BPE.from_file(vocab, merges, **kwargs)
         return bpe

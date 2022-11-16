@@ -466,7 +466,7 @@ class Tokenizer:
                           max_length: int,
                           stride: int = 0,
                           strategy: str = "longest_first",
-                          direction: str = "direction"):
+                          direction: str = "right"):
         return self._tokenizer.enable_truncation(max_length, stride, strategy,
                                                  direction)
 
@@ -518,13 +518,13 @@ class Tokenizer:
         return self._tokenizer.to_str(pretty)
 
     @staticmethod
-    def from_str(self, json: str):
+    def from_str(json: str):
         tr = Tokenizer(None)
         tr._tokenizer = C.tokenizer.from_str(json)
         return tr
 
     @staticmethod
-    def from_file(self, json: str):
+    def from_file(json: str):
         tr = Tokenizer(None)
         tr._tokenizer = C.tokenizer.from_file(json)
         return tr
