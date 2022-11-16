@@ -177,6 +177,7 @@ class MLMPromptTokenizer(object):
         omask_index.append(opt_end)
         for opt_begin, opt_end in zip(omask_index[:-1], omask_index[1:]):
             attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 0
+        attention_mask = (1 - attention_mask) * -1e4
         return attention_mask
 
     def _create_masked_positions(self, input_ids: List[int],
