@@ -1253,7 +1253,7 @@ class Trainer:
         A helper wrapper that creates an appropriate context manager for `autocast` while feeding it the desired
         arguments, depending on the situation.
         """
-        if self.args.fp16:
+        if self.args.fp16 or self.args.bf16:
             ctx_manager = autocast(True,
                                    custom_black_list=[
                                        "reduce_sum",
