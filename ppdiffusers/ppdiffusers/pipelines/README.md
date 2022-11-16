@@ -44,7 +44,7 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 
 扩散模型系统通常由多个独立训练的模型以及调度器等其他组件构成。
 其中每个模型都是在不同的任务上独立训练的，调度器可以很容易地进行替换。
-然而，在推理过程中，我们希望能够轻松地加载所有组件并在推理中使用它们，即使某个组件来自不同的库（例如来自于[Transformers](https://github.com/huggingface/transformers)的CLIP的文本编码器）. 为此，所有管道都提供以下功能：
+然而，在推理过程中，我们希望能够轻松地加载所有组件并在推理中使用它们，即使某个组件来自不同的库, 为此，所有pipeline都提供以下功能：
 
 
 - `from_pretrained` 该方法接收PaddleNLP模型库id（例如`runwayml/stable-diffusion-v1-5`）或本地目录路径。为了能够准确加载相应的模型和组件，相应目录下必须提供`model_index.json`文件。
