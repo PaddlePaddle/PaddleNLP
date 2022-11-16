@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from milvus import MetricType, IndexType
 
 MILVUS_HOST = 'localhost'

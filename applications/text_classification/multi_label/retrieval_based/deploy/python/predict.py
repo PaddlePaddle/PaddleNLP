@@ -17,9 +17,9 @@ import os
 import sys
 
 import numpy as np
-import paddle
 from scipy.special import softmax
 from scipy import spatial
+import paddle
 from paddle import inference
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.data import Stack, Tuple, Pad

@@ -18,8 +18,8 @@ import time
 
 import numpy as np
 from tqdm import tqdm
+
 from metric import MetricReport
-from paddlenlp.utils.log import logger
 from data import label2ids
 
 # yapf: disable
