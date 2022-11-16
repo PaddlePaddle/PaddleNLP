@@ -42,7 +42,9 @@ pip install -U visualdl fastcore Pillow
 
 ### 1.3 使用trainner开启训练
 #### 1.3.1 硬件要求
-下面的代码需要具有40GB的显卡才可以预训练成功。
+Tips：
+- FP16 O2 在 32GB 的显卡上可正常训练。
+- FP32 在 40GB 的显卡上可正常训练。
 
 #### 1.3.2 单机单卡训练
 ```bash
@@ -56,6 +58,7 @@ python -u train_txt2img_laion400m_trainer.py \
     --max_steps 1000000000 \
     --lr_scheduler_type "constant" \
     --warmup_steps 0 \
+    --image_logging_steps 1000 \
     --logging_steps 50 \
     --save_steps 5000 \
     --save_total_limit 50 \
@@ -68,7 +71,9 @@ python -u train_txt2img_laion400m_trainer.py \
     --num_inference_steps 200 \
     --model_max_length 77 \
     --tokenizer_name bert-base-uncased \
-    --max_grad_norm -1
+    --max_grad_norm -1 \
+    --fp16 \
+    --fp16_opt_level "O2"
 ```
 
 
@@ -86,7 +91,8 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--save_total_limit`: 最多保存多少个模型。
 > * `--lr_scheduler_type`: 要使用的学习率调度策略。默认为 `constant`。
 > * `--warmup_steps`: 用于从 0 到 `learning_rate` 的线性 warmup 的步数。
-> * `--logging_steps`: logging日志的步数。
+> * `--image_logging_steps`: 每隔多少步，log训练过程中的图片，默认为`1000`步，注意`image_logging_steps`需要是`logging_steps`的整数倍。
+> * `--logging_steps`: logging日志的步数，默认为`50`步。
 > * `--output_dir`: 模型保存路径。
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
 > * `--dataloader_num_workers`: Dataloader所使用的`dataloader_num_workers`参数。
@@ -96,6 +102,8 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
+> * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
+> * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
 
 #### 1.3.3 单机多卡训练
 ```bash
@@ -109,6 +117,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_la
     --max_steps 1000000000 \
     --lr_scheduler_type "constant" \
     --warmup_steps 0 \
+    --image_logging_steps 1000 \
     --logging_steps 50 \
     --save_steps 5000 \
     --save_total_limit 50 \
@@ -121,7 +130,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_la
     --num_inference_steps 200 \
     --model_max_length 77 \
     --tokenizer_name bert-base-uncased \
-    --max_grad_norm -1
+    --max_grad_norm -1 \
+    --fp16 \
+    --fp16_opt_level "O2"
 ```
 
 ### 1.4 自定义训练逻辑开启训练
@@ -136,6 +147,7 @@ python -u train_txt2img_laion400m_no_trainer.py \
     --max_steps 1000000000 \
     --lr_scheduler_type "constant" \
     --warmup_steps 0 \
+    --image_logging_steps 1000 \
     --logging_steps 50 \
     --save_steps 5000 \
     --seed 23 \
@@ -164,7 +176,8 @@ python -u train_txt2img_laion400m_no_trainer.py \
 > * `--save_steps`: 每间隔多少步`（global step步数）`，保存模型。
 > * `--lr_scheduler_type`: 要使用的学习率调度策略。默认为 `constant`。
 > * `--warmup_steps`: 用于从 0 到 `learning_rate` 的线性 warmup 的步数。
-> * `--logging_steps`: logging日志的步数。
+> * `--image_logging_steps`: 每隔多少步，log训练过程中的图片，默认为`1000`步，注意`image_logging_steps`需要是`logging_steps`的整数倍。
+> * `--logging_steps`: logging日志的步数，默认为`50`步。
 > * `--output_dir`: 模型保存路径。
 > * `--seed`: 随机种子，为了可以复现训练结果，Tips：当前paddle设置该随机种子后仍无法完美复现。
 > * `--dataloader_num_workers`: Dataloader所使用的`num_workers`参数。
@@ -174,6 +187,8 @@ python -u train_txt2img_laion400m_no_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
+> * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
+> * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
 
 #### 1.4.2 单机多卡训练
 ```bash
@@ -186,6 +201,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_la
     --max_steps 1000000000 \
     --lr_scheduler_type "constant" \
     --warmup_steps 0 \
+    --image_logging_steps 1000 \
     --logging_steps 50 \
     --save_steps 5000 \
     --seed 23 \

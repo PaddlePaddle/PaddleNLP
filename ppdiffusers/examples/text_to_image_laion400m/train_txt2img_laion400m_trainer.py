@@ -11,19 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import math
 import os
 import paddle
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.utils.log import logger
-
-from ldm import TextImagePair, DataArguments, ModelArguments, LatentDiffusionTrainer, LatentDiffusionModel
+import itertools
+from ldm import TextImagePair, DataArguments, ModelArguments, LatentDiffusionTrainer, LatentDiffusionModel, LitEmaCallback
 
 
 def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.image_logging_steps = model_args.image_logging_steps = math.ceil(
+        model_args.image_logging_steps /
+        training_args.logging_steps) * training_args.logging_steps
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 
@@ -59,7 +62,11 @@ def main():
     trainer = LatentDiffusionTrainer(model=model,
                                      args=training_args,
                                      train_dataset=train_dataset,
-                                     tokenizer=model.tokenizer)
+                                     tokenizer=model.tokenizer,
+                                     callbacks=[LitEmaCallback()])
+    params_to_train = itertools.chain(trainer.model.text_encoder.parameters(),
+                                      trainer.model.unet.parameters())
+    trainer.set_optimizer_grouped_parameters(params_to_train)
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:

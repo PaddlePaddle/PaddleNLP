@@ -52,6 +52,8 @@ class ModelArguments:
             "help":
             "Path to pretrained model or model, when we want to resume training."
         })
+    image_logging_steps: Optional[int] = field(
+        default=1000, metadata={"help": "Log image every X steps."})
 
 
 @dataclass

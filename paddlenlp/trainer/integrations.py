@@ -18,7 +18,7 @@
 
 import importlib
 import json
-
+import numpy as np
 from .trainer_callback import TrainerCallback
 from ..utils.log import logger
 from ..transformers import PretrainedModel

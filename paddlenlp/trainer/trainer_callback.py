@@ -359,64 +359,71 @@ class CallbackHandler(TrainerCallback):
         return "\n".join(cb.__class__.__name__ for cb in self.callbacks)
 
     def on_init_end(self, args: TrainingArguments, state: TrainerState,
-                    control: TrainerControl):
-        return self.call_event("on_init_end", args, state, control)
+                    control: TrainerControl, **kwargs):
+        return self.call_event("on_init_end", args, state, control, **kwargs)
 
     def on_train_begin(self, args: TrainingArguments, state: TrainerState,
-                       control: TrainerControl):
+                       control: TrainerControl, **kwargs):
         control.should_training_stop = False
-        return self.call_event("on_train_begin", args, state, control)
+        return self.call_event("on_train_begin", args, state, control, **kwargs)
 
     def on_train_end(self, args: TrainingArguments, state: TrainerState,
-                     control: TrainerControl):
-        return self.call_event("on_train_end", args, state, control)
+                     control: TrainerControl, **kwargs):
+        return self.call_event("on_train_end", args, state, control, **kwargs)
 
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState,
-                       control: TrainerControl):
+                       control: TrainerControl, **kwargs):
         control.should_epoch_stop = False
-        return self.call_event("on_epoch_begin", args, state, control)
+        return self.call_event("on_epoch_begin", args, state, control, **kwargs)
 
     def on_epoch_end(self, args: TrainingArguments, state: TrainerState,
-                     control: TrainerControl):
-        return self.call_event("on_epoch_end", args, state, control)
+                     control: TrainerControl, **kwargs):
+        return self.call_event("on_epoch_end", args, state, control, **kwargs)
 
     def on_step_begin(self, args: TrainingArguments, state: TrainerState,
-                      control: TrainerControl):
+                      control: TrainerControl, **kwargs):
         control.should_log = False
         control.should_evaluate = False
         control.should_save = False
-        return self.call_event("on_step_begin", args, state, control)
+        return self.call_event("on_step_begin", args, state, control, **kwargs)
 
     def on_substep_end(self, args: TrainingArguments, state: TrainerState,
-                       control: TrainerControl):
-        return self.call_event("on_substep_end", args, state, control)
+                       control: TrainerControl, **kwargs):
+        return self.call_event("on_substep_end", args, state, control, **kwargs)
 
     def on_step_end(self, args: TrainingArguments, state: TrainerState,
-                    control: TrainerControl):
-        return self.call_event("on_step_end", args, state, control)
+                    control: TrainerControl, **kwargs):
+        return self.call_event("on_step_end", args, state, control, **kwargs)
 
     def on_evaluate(self, args: TrainingArguments, state: TrainerState,
-                    control: TrainerControl, metrics):
+                    control: TrainerControl, metrics, **kwargs):
         control.should_evaluate = False
         return self.call_event("on_evaluate",
                                args,
                                state,
                                control,
-                               metrics=metrics)
+                               metrics=metrics,
+                               **kwargs)
 
     def on_save(self, args: TrainingArguments, state: TrainerState,
-                control: TrainerControl):
+                control: TrainerControl, **kwargs):
         control.should_save = False
-        return self.call_event("on_save", args, state, control)
+        return self.call_event("on_save", args, state, control, **kwargs)
 
     def on_log(self, args: TrainingArguments, state: TrainerState,
-               control: TrainerControl, logs):
+               control: TrainerControl, logs, **kwargs):
         control.should_log = False
-        return self.call_event("on_log", args, state, control, logs=logs)
+        return self.call_event("on_log",
+                               args,
+                               state,
+                               control,
+                               logs=logs,
+                               **kwargs)
 
     def on_prediction_step(self, args: TrainingArguments, state: TrainerState,
-                           control: TrainerControl):
-        return self.call_event("on_prediction_step", args, state, control)
+                           control: TrainerControl, **kwargs):
+        return self.call_event("on_prediction_step", args, state, control,
+                               **kwargs)
 
     def call_event(self, event, args, state, control, **kwargs):
         for callback in self.callbacks:

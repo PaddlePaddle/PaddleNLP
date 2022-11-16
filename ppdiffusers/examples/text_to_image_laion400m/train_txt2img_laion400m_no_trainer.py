@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 import time
 import itertools
@@ -25,9 +26,9 @@ from paddlenlp.trainer import set_seed
 from ppdiffusers.optimization import get_scheduler
 
 from ppdiffusers.modeling_utils import unwrap_model
-from ldm import LatentDiffusionModel, TextImagePair, worker_init_fn, DataArguments, ModelArguments, NoTrainerTrainingArguments
 from paddle.optimizer import AdamW
 from paddlenlp.trainer import PdArgumentParser
+from ldm import LatentDiffusionModel, TextImagePair, worker_init_fn, DataArguments, ModelArguments, NoTrainerTrainingArguments
 
 
 def get_writer(training_args):
@@ -46,6 +47,9 @@ def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, NoTrainerTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.image_logging_steps = model_args.image_logging_steps = math.ceil(
+        model_args.image_logging_steps /
+        training_args.logging_steps) * training_args.logging_steps
     training_args.print_config(training_args, "Training")
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -175,7 +179,7 @@ def main():
                         (time.time() - tic_train) / training_args.logging_steps)
                     logger.info(log_str)
 
-                    if global_steps % (training_args.logging_steps * 20) == 0:
+                    if global_steps % training_args.image_logging_steps == 0:
                         reconstruction_img = unwrap_model(model).decode_image(
                             pixel_values=batch["pixel_values"])
                         ddim_10_img = unwrap_model(model).log_image(

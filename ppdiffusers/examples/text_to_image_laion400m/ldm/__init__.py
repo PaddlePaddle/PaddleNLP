@@ -15,4 +15,4 @@
 from .text_image_pair_dataset import TextImagePair, worker_init_fn
 from .ldm_args import ModelArguments, DataArguments, NoTrainerTrainingArguments
 from .model import LatentDiffusionModel
-from .ldm_trainer import LatentDiffusionTrainer
+from .ldm_trainer import LatentDiffusionTrainer, LitEmaCallback
