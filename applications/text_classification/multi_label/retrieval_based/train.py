@@ -216,7 +216,6 @@ def do_train():
                                                batch_size=args.batch_size,
                                                batchify_fn=batchify_fn_dev,
                                                trans_fn=eval_func)
-        # convert_corpus_example
         query_func = partial(convert_example,
                              tokenizer=tokenizer,
                              max_seq_length=args.max_seq_length)

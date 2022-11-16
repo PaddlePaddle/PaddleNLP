@@ -60,14 +60,14 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
                                    title_cls_embedding,
                                    transpose_y=True)
 
-        # substract margin from all positive samples cosine_sim()
+        # Substract margin from all positive samples cosine_sim()
         margin_diag = paddle.full(shape=[query_cls_embedding.shape[0]],
                                   fill_value=self.margin,
                                   dtype=paddle.get_default_dtype())
 
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 
-        # scale cosine to ease training converge
+        # Scale cosine to ease training converge
         cosine_sim *= self.sacle
 
         labels = paddle.arange(0, query_cls_embedding.shape[0], dtype='int64')
