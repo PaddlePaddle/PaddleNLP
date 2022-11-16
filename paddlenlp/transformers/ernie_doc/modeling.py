@@ -869,7 +869,7 @@ class ErnieDocModel(ErnieDocPretrainedModel):
         self.pooler = ErnieDocPooler(hidden_size, cls_token_idx)
 
     def _create_n_head_attn_mask(self, attn_mask, batch_size):
-        # attn_mask shape: [B, T, 1]
+        # attn_mask shape: [B, 1, 1, M+T]
         # concat an data_mask, shape: [B, M + T, 1]
         data_mask = paddle.concat([
             paddle.ones(shape=[batch_size, self.memory_len, 1],
@@ -1012,19 +1012,6 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             batch_size, seq_len, _ = input_ids.shape
             position_ids = self.get_related_pos(batch_size, seq_len)
 
-        if attn_mask is None:
-            attn_mask = paddle.ones_like(input_ids,
-                                         dtype=paddle.get_default_dtype())
-
-        # unsequeeze
-        token_type_ids = self.check_dim(token_type_ids)
-        position_ids = self.check_dim(position_ids)
-
-        input_embeddings, position_embeddings, token_embeddings = \
-            self.embeddings(input_ids, token_type_ids, position_ids)
-
-        batch_size = input_embeddings.shape[0]
-
         if memories is None:
             memories = [
                 paddle.zeros(shape=[
@@ -1035,9 +1022,40 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 for _ in range(self.config['num_hidden_layers'])
             ]
 
+        batch_size = memories[0].shape[0]
+        memory_length = memories[0].shape[1]
+
+        if attn_mask is None:
+            attn_mask = paddle.unsqueeze(
+                (input_ids.squeeze([-1]) == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
+                axis=[1, 2])
+
+            past_mask = paddle.zeros([batch_size, 1, 1, memory_length],
+                                     dtype=attn_mask.dtype)
+
+            attn_mask = paddle.concat([past_mask, attn_mask], axis=-1)
+
+        else:
+            if attn_mask.ndim == 2:
+                # attn_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attn_mask = attn_mask.unsqueeze(axis=[1, 2]).astype(
+                    paddle.get_default_dtype())
+                attn_mask = (1.0 - attn_mask) * -1e4
+
+        # unsequeeze
+        token_type_ids = self.check_dim(token_type_ids)
+        position_ids = self.check_dim(position_ids)
+
+        input_embeddings, position_embeddings, token_embeddings = \
+            self.embeddings(input_ids, token_type_ids, position_ids)
+
+        batch_size = input_embeddings.shape[0]
+
         # [B, N, T, M + T]
-        n_head_self_attn_mask = self._create_n_head_attn_mask(
-            attn_mask, batch_size)
+        n_head_self_attn_mask = attn_mask
+        # n_head_self_attn_mask = self._create_n_head_attn_mask(
+        #     attn_mask, batch_size)
         # memories contains n_layer memory whose shape is [B, M, H]
         outputs = self.encoder(enc_input=input_embeddings,
                                memories=memories,
