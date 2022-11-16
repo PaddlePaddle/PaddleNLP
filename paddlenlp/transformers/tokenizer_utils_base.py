@@ -1535,7 +1535,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # From HF Hub
         elif from_hf_hub:
             # Only include the necessary resource files specified by the tokenizer cls
-            vocab_files = cls.resource_files_names
+            # Deep copy to avoid modifiying the class attributes
+            vocab_files = copy.deepcopy(cls.resource_files_names)
             vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         else:
             # Assuming from community-contributed pretrained models
@@ -1566,6 +1567,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 if os.path.exists(path):
                     logger.info("Already cached %s" % path)
                     resolved_vocab_files[file_id] = path
+
                 else:
                     logger.info("Downloading %s and saved to %s" %
                                 (file_path, default_root))
@@ -1638,6 +1640,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # use pretrained_init_configuration as `init_kwargs` to init which
             # does not include the vocab file in it, thus add vocab file into
             # args.
+
             if args_name not in init_kwargs:
                 init_kwargs[args_name] = file_path
             # when `pretrained_model_name_or_path` is a pretrained model dir,
@@ -1650,7 +1653,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
-
         special_tokens_map_file = resolved_vocab_files.pop(
             "special_tokens_map_file", None)
         if special_tokens_map_file is not None:
@@ -1673,7 +1675,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                         for token in value
                     ]
                 setattr(tokenizer, key, value)
-
         # Add supplementary tokens.
         special_tokens = tokenizer.all_special_tokens
         if added_tokens_file is not None:
@@ -1702,14 +1703,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
                 tokenizer.add_tokens(
                     token, special_tokens=bool(token in special_tokens))
-
         # Check all our special tokens are registered as "no split" token (we don't cut them) and are in the vocab
         added_tokens = tokenizer.sanitize_special_tokens()
         if added_tokens:
             logger.info(
                 "Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained."
             )
-
         # save all of related things into default root dir
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             tokenizer.save_pretrained(default_root)
