@@ -13,7 +13,7 @@
            * [性能测试](#性能测试)
                * [CPU 性能](#CPU性能)
                * [GPU 性能](#CPU性能)
-   * [使用 FasterTokenizer 加速](#使用FasterTokenizer加速)
+   * [使用 FastTokenizer 加速](#使用FastTokenizer加速)
    * [部署](#部署)
        * [Python 部署](#Python部署)
        * [服务化部署](#服务化部署)
@@ -1549,13 +1549,13 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 
 三类任务（分类、序列标注、阅读理解）经过裁剪 + 量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在 0.5 以内（0.46）。
 
-<a name="使用FasterTokenizer加速"></a>
+<a name="使用FastTokenizer加速"></a>
 
-### 使用 FasterTokenizer 加速
+### 使用 FastTokenizer 加速
 
-FasterTokenizer 是飞桨提供的速度领先的文本处理算子库，集成了 Google 于 2021 年底发布的 LinMaxMatch 算法，该算法引入 Aho-Corasick 将 WordPiece 的时间复杂度从 O(N<sup>2</sup>) 优化到 O(N)，已在 Google 搜索业务中大规模上线。FasterTokenizer 速度显著领先，且呈现 batch_size 越大，优势越突出。例如，设置 batch_size = 64 时，FasterTokenizer 切词速度比 HuggingFace 快 28 倍。
+FastTokenizer 是飞桨提供的速度领先的文本处理算子库，集成了 Google 于 2021 年底发布的 LinMaxMatch 算法，该算法引入 Aho-Corasick 将 WordPiece 的时间复杂度从 O(N<sup>2</sup>) 优化到 O(N)，已在 Google 搜索业务中大规模上线。FastTokenizer 速度显著领先，且呈现 batch_size 越大，优势越突出。例如，设置 batch_size = 64 时，FastTokenizer 切词速度比 HuggingFace 快 28 倍。
 
-在 ERNIE 3.0 轻量级模型裁剪、量化基础上，当设置切词线程数为 4 时，使用 FasterTokenizer 在 NVIDIA Tesla T4 环境下在 IFLYTEK （长文本分类数据集，最大序列长度为 128）数据集上性能提升了 2.39 倍，相比 BERT-Base 性能提升了 7.09 倍，在 Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz、线程数为 8 的情况下性能提升了 1.27 倍，相比 BERT-Base 性能提升了 5.13 倍。加速效果如下图所示：
+在 ERNIE 3.0 轻量级模型裁剪、量化基础上，当设置切词线程数为 4 时，使用 FastTokenizer 在 NVIDIA Tesla T4 环境下在 IFLYTEK （长文本分类数据集，最大序列长度为 128）数据集上性能提升了 2.39 倍，相比 BERT-Base 性能提升了 7.09 倍，在 Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz、线程数为 8 的情况下性能提升了 1.27 倍，相比 BERT-Base 性能提升了 5.13 倍。加速效果如下图所示：
 
 <table>
     <tr>
@@ -1564,12 +1564,12 @@ FasterTokenizer 是飞桨提供的速度领先的文本处理算子库，集成�
     </tr>
 </table>
 
-使用 FasterTokenizer 的方式非常简单，在安装 faster_tokenizer 包之后，仅需在 tokenizer 实例化时直接传入 `use_faster=True` 即可。目前已在 Linux 系统下支持 BERT、ERNIE、TinyBERT 等模型。
+使用 FastTokenizer 的方式非常简单，在安装 fast_tokenizer 包之后，仅需在 tokenizer 实例化时直接传入 `use_fast=True` 即可。目前已在 Linux 系统下支持 BERT、ERNIE、TinyBERT 等模型。
 
-安装 faster_tokenizer 包的命令：
+安装 fast_tokenizer 包的命令：
 
 ```shell
-pip install faster_tokenizer
+pip install fast_tokenizer
 ```
 
 如需设置切词线程数，需要运行前先设置环境变量 `OMP_NUM_THREADS` ：
@@ -1579,11 +1579,11 @@ pip install faster_tokenizer
 export OMP_NUM_THREADS=4
 ```
 
-调用 `from_pretrained` 时只需轻松传入一个参数 `use_faster=True`：
+调用 `from_pretrained` 时只需轻松传入一个参数 `use_fast=True`：
 
 ```python
 from paddlenlp.transformers import AutoTokenizer
-AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 ```
 
 <a name="部署"></a>

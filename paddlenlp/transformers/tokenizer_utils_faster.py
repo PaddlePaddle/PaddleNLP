@@ -20,8 +20,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
 import six
 
-from faster_tokenizer import Encoding as FasterEncoding
-from faster_tokenizer import Tokenizer as FasterTokenizer
+from fast_tokenizer import Encoding as FastEncoding
+from fast_tokenizer import Tokenizer as FastTokenizer
 
 from .utils import InitTrackerMeta, fn_args_to_dict
 from .convert_slow_tokenizer import convert_slow_tokenizer
@@ -48,7 +48,7 @@ ADDED_TOKENS_FILE = "added_tokens.json"
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 
 
-class PretrainedFasterTokenizer(PretrainedTokenizerBase):
+class PretrainedFastTokenizer(PretrainedTokenizerBase):
     resource_files_names = VOCAB_FILES_NAMES
     slow_tokenizer_class: PretrainedTokenizer = None
     can_save_slow_tokenizer: bool = True
@@ -56,30 +56,30 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
     def __init__(self, *args, **kwargs):
         tokenizer_object = kwargs.pop("tokenizer_object", None)
         slow_tokenizer = kwargs.pop("__slow_tokenizer", None)
-        faster_tokenizer_file = kwargs.pop("tokenizer_file", None)
+        fast_tokenizer_file = kwargs.pop("tokenizer_file", None)
         from_slow = kwargs.pop("from_slow", False)
         if tokenizer_object is not None:
-            faster_tokenizer = tokenizer_object
-        elif faster_tokenizer_file is not None and not from_slow:
+            fast_tokenizer = tokenizer_object
+        elif fast_tokenizer_file is not None and not from_slow:
             # We have a serialization from tokenizers which let us directly build the backend
             # From json file
-            faster_tokenizer = FasterTokenizer.from_file(faster_tokenizer_file)
+            fast_tokenizer = FastTokenizer.from_file(fast_tokenizer_file)
         elif slow_tokenizer is not None:
             # We need to convert a slow tokenizer to build the backend
-            faster_tokenizer = convert_slow_tokenizer(slow_tokenizer)
+            fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         elif self.slow_tokenizer_class is not None:
             # We need to create and convert a slow tokenizer to build the backend
             slow_tokenizer = self.slow_tokenizer_class(*args, **kwargs)
-            faster_tokenizer = convert_slow_tokenizer(slow_tokenizer)
+            fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         else:
             raise ValueError(
                 "Couldn't instantiate the backend tokenizer from one of: \n"
-                "(1) a `faster_tokenizer` library serialization file, \n"
+                "(1) a `fast_tokenizer` library serialization file, \n"
                 "(2) a slow tokenizer instance to convert or \n"
                 "(3) an equivalent slow tokenizer class to instantiate and convert. \n"
                 "You need to have sentencepiece installed to convert a slow tokenizer to a fast one."
             )
-        self._tokenizer = faster_tokenizer
+        self._tokenizer = fast_tokenizer
 
         if slow_tokenizer is not None:
             kwargs.update(slow_tokenizer.init_kwargs)
@@ -126,12 +126,12 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         return self._tokenizer.get_vocab_size(with_added_tokens=True)
 
     @property
-    def backend_tokenizer(self) -> FasterTokenizer:
+    def backend_tokenizer(self) -> FastTokenizer:
         return self._tokenizer
 
     def _convert_encoding(
         self,
-        encoding: FasterEncoding,
+        encoding: FastEncoding,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_overflowing_tokens: bool = False,
@@ -140,9 +140,9 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         return_length: bool = False,
         return_position_ids: bool = False,
         verbose: bool = True,
-    ) -> Tuple[Dict[str, Any], List[FasterEncoding]]:
+    ) -> Tuple[Dict[str, Any], List[FastEncoding]]:
         """
-        Convert the encoding representation (from low-level PaddleNLP FasterTokenizer output) to a python Dict and a list
+        Convert the encoding representation (from low-level PaddleNLP FastTokenizer output) to a python Dict and a list
         of encodings, take care of building a batch from overflowing tokens.
 
         Overflowing tokens are converted to additional examples (like batches) so the output values of the dict are
@@ -268,7 +268,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         pad_to_multiple_of: Optional[int],
     ):
         """
-        Define the truncation and the padding strategies for fast tokenizers (provided by PaddleNLP's faster_tokenizer
+        Define the truncation and the padding strategies for fast tokenizers (provided by PaddleNLP's fast_tokenizer
         library) and restore the tokenizer settings afterwards.
 
         The provided tokenizer has no padding / truncation strategy before the managed section. If your tokenizer set a
@@ -374,7 +374,7 @@ class PretrainedFasterTokenizer(PretrainedTokenizerBase):
         # Convert encoding to dict
         # `Tokens` has type: Tuple[
         #                       List[Dict[str, List[List[int]]]] or List[Dict[str, 2D-Tensor]],
-        #                       List[FasterEncoding]
+        #                       List[FastEncoding]
         #                    ]
         # with nested dimensions corresponding to batch, overflows, sequence length
         tokens_and_encodings = [
