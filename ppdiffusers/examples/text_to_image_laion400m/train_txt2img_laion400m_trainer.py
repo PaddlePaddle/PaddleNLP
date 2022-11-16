@@ -17,13 +17,15 @@ import paddle
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.utils.log import logger
 import itertools
-from ldm import TextImagePair, DataArguments, ModelArguments, LatentDiffusionTrainer, LatentDiffusionModel, LitEmaCallback
+from ldm import TextImagePair, DataArguments, ModelArguments, LatentDiffusionTrainer, LatentDiffusionModel
 
 
 def main():
     parser = PdArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    # report to custom_visualdl
+    training_args.report_to = ["custom_visualdl"]
     training_args.image_logging_steps = model_args.image_logging_steps = math.ceil(
         model_args.image_logging_steps /
         training_args.logging_steps) * training_args.logging_steps
@@ -62,8 +64,7 @@ def main():
     trainer = LatentDiffusionTrainer(model=model,
                                      args=training_args,
                                      train_dataset=train_dataset,
-                                     tokenizer=model.tokenizer,
-                                     callbacks=[LitEmaCallback()])
+                                     tokenizer=model.tokenizer)
     params_to_train = itertools.chain(trainer.model.text_encoder.parameters(),
                                       trainer.model.unet.parameters())
     trainer.set_optimizer_grouped_parameters(params_to_train)

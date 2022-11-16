@@ -71,8 +71,7 @@ python -u train_txt2img_laion400m_trainer.py \
     --num_inference_steps 200 \
     --model_max_length 77 \
     --tokenizer_name bert-base-uncased \
-    --max_grad_norm -1 \
-    --fp16
+    --max_grad_norm -1
 ```
 
 

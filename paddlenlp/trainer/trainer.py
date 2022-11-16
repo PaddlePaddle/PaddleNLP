@@ -842,7 +842,7 @@ class Trainer:
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
 
-            self.log(logs)
+            self.log(logs, **kwargs)
 
         metrics = None
         if self.control.should_evaluate:
@@ -1570,7 +1570,7 @@ class Trainer:
                     paddle.load(os.path.join(checkpoint, SCALER_NAME),
                                 return_numpy=True))
 
-    def log(self, logs: Dict[str, float]) -> None:
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
         Log `logs` on the various objects watching training.
 
@@ -1586,7 +1586,8 @@ class Trainer:
         output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state,
-                                                    self.control, logs)
+                                                    self.control, logs,
+                                                    **kwargs)
 
     def evaluate(
         self,

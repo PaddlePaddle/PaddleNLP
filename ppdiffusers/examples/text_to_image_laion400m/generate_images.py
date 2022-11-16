@@ -151,6 +151,7 @@ if __name__ == "__main__":
                     file=args.file,
                     save_path=args.save_path,
                     seed=args.seed,
+                    guidance_scales=args.guidance_scales,
                     num_inference_steps=args.num_inference_steps,
                     scheduler_type=args.scheduler_type,
                     device=args.device)
