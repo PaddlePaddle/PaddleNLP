@@ -13,12 +13,30 @@
 # limitations under the License.
 
 import unittest
+from tempfile import TemporaryDirectory
+from tests.testing_utils import slow
+from multiprocessing import Pool
 from paddlenlp.transformers import TinyBertModel
 
 
 class TestModeling(unittest.TestCase):
     """Test PretrainedModel single time, not in Transformer models"""
 
+    @slow
     def test_from_pretrained_with_load_as_state_np_params(self):
         """init model with `load_state_as_np` params"""
         TinyBertModel.from_pretrained("tinybert-4l-312d", load_state_as_np=True)
+
+    @slow
+    def test_multiprocess_downloading(self):
+        num_process, num_iter = 2, 3
+        small_model_path = "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams"
+
+        from paddlenlp.transformers.model_utils import get_path_from_url
+        with TemporaryDirectory() as tempdir:
+
+            with Pool(num_process) as pool:
+                pool.starmap(get_path_from_url, [
+                    dict(url=small_model_path, root_dir=tempdir)
+                    for _ in range(num_iter)
+                ])

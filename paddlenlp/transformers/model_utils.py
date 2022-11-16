@@ -29,10 +29,11 @@ import numpy as np
 import paddle.nn as nn
 from paddle.nn import Layer, Embedding
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddle.utils.download import get_path_from_url, is_url
+from paddle.utils.download import is_url
 from paddlenlp.utils.downloader import download_check, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.file_lock import FileLock
 
 from .generation_utils import GenerationMixin
 from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, resolve_cache_dir
@@ -42,6 +43,37 @@ __all__ = [
     'PretrainedModel',
     'register_base_model',
 ]
+
+
+def get_path_from_url(url: str,
+                      root_dir: str,
+                      md5sum: Optional[str] = None,
+                      check_exist: bool = True) -> str:
+    """construct `get_path_from_url` for `model_utils` to avoid multi-process downloading
+
+    Args:
+        url (str): the url of resource file
+        root_dir (str): the local download path
+        md5sum (str, optional): md5sum string for file. Defaults to None.
+        check_exist (bool, optional): whether check the file is exist. Defaults to True.
+
+    Returns:
+        str: the path of downloaded file
+    """
+    os.makedirs(root_dir, exist_ok=True)
+
+    lock_file = os.path.join(root_dir, 'download.lock')
+    with FileLock(lock_file) as file_lock:
+        file_lock.acquire()
+
+        # import get_path_from_url from paddle framework
+        from paddle.utils.download import get_path_from_url as _get_path_from_url
+        result = _get_path_from_url(url=url,
+                                    root_dir=root_dir,
+                                    md5sum=md5sum,
+                                    check_exist=check_exist)
+        file_lock.release()
+    return result
 
 
 def unwrap_model(model, *args, **kwargs):
