@@ -22,7 +22,7 @@ from paddlenlp.utils.import_utils import is_package_available
 if not is_package_available("typer"):
     raise ModuleNotFoundError(
         f'paddlenlp-cli tools is not installed correctly, you can use the following command'
-        ' to use paddlenlp cli tool: >>> pip install paddlenlp[cli]')
+        ' to install paddlenlp cli tool: >>> pip install paddlenlp[cli]')
 
 import typer
 from typer import Typer
@@ -163,11 +163,11 @@ def convert(input: Optional[str] = None, output: Optional[str] = None):
 
     if not os.path.isdir(input):
         logger.warning(
-            f"receive input<{input}> which is not a local dir, so we can't convert it paddle related file. "
-            "We will support online-converting<AutoModel.from_pretrained('transformer-model-name')> feature "
+            f"receive input<{input}> which is not a local dir, so we can't convert it paddle related file now. "
+            "We will support online-converting<AutoModel.from_pretrained('huggingface-model-name')> feature "
             "as soon as possible. Please keep eyes on the latest version of paddlenlp."
         )
-        os._exit(0)
+        return
 
     convert_from_local_dir(pretrained_dir=input, output=output)
 
