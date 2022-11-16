@@ -72,7 +72,7 @@
 
 3. PaddlePaddle 版本：2.4rc
 
-4. PaddleNLP 版本：2.4.2 (develop)
+4. PaddleNLP 版本：2.4.3
 
 5. 评估设置
 
