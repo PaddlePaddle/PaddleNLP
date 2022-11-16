@@ -12,11 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import unittest
+import shutil
 from tempfile import TemporaryDirectory
 from tests.testing_utils import slow
 from multiprocessing import Pool
-from paddlenlp.transformers import TinyBertModel
+from paddlenlp.transformers import TinyBertModel, AlbertModel
+from paddlenlp.utils.env import PPNLP_HOME
+
+
+def download_albert_model(model_name: str):
+    """set the global method: multiprocessing can not pickle local method
+
+    Args:
+        model_name (str): the model name
+    """
+    model = AlbertModel.from_pretrained(model_name, load_state_as_np=True)
+    # free the model resource
+    del model
+    return True
 
 
 class TestModeling(unittest.TestCase):
@@ -29,14 +44,27 @@ class TestModeling(unittest.TestCase):
 
     @slow
     def test_multiprocess_downloading(self):
-        num_process, num_iter = 2, 3
+        # download once
+        num_process, num_iter = 30, 100
         small_model_path = "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams"
 
         from paddlenlp.transformers.model_utils import get_path_from_url
         with TemporaryDirectory() as tempdir:
 
             with Pool(num_process) as pool:
-                pool.starmap(get_path_from_url, [
-                    dict(url=small_model_path, root_dir=tempdir)
-                    for _ in range(num_iter)
-                ])
+                pool.starmap(get_path_from_url, [(small_model_path, tempdir)
+                                                 for _ in range(num_iter)])
+
+    @slow
+    def test_model_from_pretrained_with_multiprocessing(self):
+        """this test can not init tooooo many models which will occupy CPU/GPU memorys."""
+        num_process, num_iter = 3, 10
+
+        # 1.remove tinybert model weight file
+        model_name = "albert-base-v1"
+        shutil.rmtree(os.path.join(PPNLP_HOME, model_name), ignore_errors=True)
+
+        # 2. downloaing tinybert modeling using multi-processing
+        with Pool(num_process) as pool:
+            pool.starmap(download_albert_model,
+                         [(model_name, ) for _ in range(num_iter)])

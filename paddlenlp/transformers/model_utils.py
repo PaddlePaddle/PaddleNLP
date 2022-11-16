@@ -22,6 +22,7 @@ import six
 import inspect
 from typing import Optional, Type, Dict, List, Tuple, Union, Any
 import shutil
+from uuid import uuid4
 
 import paddle
 from paddle import Tensor
@@ -61,18 +62,15 @@ def get_path_from_url(url: str,
         str: the path of downloaded file
     """
     os.makedirs(root_dir, exist_ok=True)
+    lock_file = os.path.join(root_dir, '.download_lock_file')
 
-    lock_file = os.path.join(root_dir, 'download.lock')
-    with FileLock(lock_file) as file_lock:
-        file_lock.acquire()
-
+    with FileLock(lock_file):
         # import get_path_from_url from paddle framework
         from paddle.utils.download import get_path_from_url as _get_path_from_url
         result = _get_path_from_url(url=url,
                                     root_dir=root_dir,
                                     md5sum=md5sum,
                                     check_exist=check_exist)
-        file_lock.release()
     return result
 
 
