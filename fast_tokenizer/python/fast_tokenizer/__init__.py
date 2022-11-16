@@ -18,6 +18,7 @@ from typing import Tuple, Union, Tuple, List, Dict
 import sys
 import os
 import platform
+from . import core_tokenizers as C
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -66,17 +67,6 @@ PreTokenizedEncodeInput = Union[PreTokenizedInputSequence,
 InputSequence = Union[TextInputSequence, PreTokenizedInputSequence]
 
 EncodeInput = Union[TextEncodeInput, PreTokenizedEncodeInput]
-
-from . import core_tokenizers as C
-
-from .core_tokenizers import models, normalizers, pretokenizers, postprocessors, decoders
-
-from .models import *
-from .normalizers import *
-from .pretokenizers import *
-from .postprocessors import *
-from .decoders import *
-from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer
 
 
 class OffsetType:
@@ -301,8 +291,8 @@ class Encoding:
     def __init__(self, ids: List[int], type_ids: List[int], tokens: List[str],
                  words_idx: List[int], offsets: List[Tuple[int, int]],
                  special_tokens_mask: List[int], attention_mask: List[int],
-                 overflowing: List[Encoding],
-                 sequence_ranges: Dict[str, Tuple[int, int]]):
+                 overflowing: List, sequence_ranges: Dict[str, Tuple[int,
+                                                                     int]]):
         self._encoding = C.Encoding(ids, type_ids, tokens, words_idx, offsets,
                                     special_tokens_mask, attention_mask,
                                     overflowing, sequence_ranges)
@@ -363,7 +353,7 @@ class Encoding:
         return self._encoding.char_to_token(char_pos, sequence_index)
 
     @staticmethod
-    def merge(encodings: List[Encoding], growing_offsets: bool = True):
+    def merge(encodings: List, growing_offsets: bool = True):
         return C.Encoding.merge(encodings, growing_offsets)
 
     def token_to_chars(self, token_index: int):
@@ -397,6 +387,149 @@ class Encoding:
                                   pad_token)
 
 
+class Tokenizer:
+
+    def __init__(self, model):
+        self._tokenizer = None
+        if model is not None:
+            self._tokenizer = C.Tokenizer(model._model)
+
+    @property
+    def normalizer(self):
+        return self._tokenizer.normalizer
+
+    @normalizer.setter
+    def normalizer(self, normalizer):
+        self._tokenizer.normalizer = normalizer._normalizer
+
+    @property
+    def pretokenizer(self):
+        return self._tokenizer.pretokenizer
+
+    @pretokenizer.setter
+    def pretokenizer(self, pretokenizer):
+        self._tokenizer.pretokenizer = pretokenizer._pretokenizer
+
+    @property
+    def model(self):
+        return self._tokenizer.model
+
+    @model.setter
+    def model(self, model):
+        self._tokenizer.model = model._model
+
+    @property
+    def postprocessor(self):
+        return self._tokenizer.postprocessor
+
+    @postprocessor.setter
+    def postprocessor(self, postprocessor):
+        self._tokenizer.postprocessor = postprocessor._postprocessor
+
+    @property
+    def decoder(self):
+        return self._tokenizer.decoder
+
+    @decoder.setter
+    def decoder(self, decoder):
+        self._tokenizer.decoder = decoder._decoder
+
+    @property
+    def padding(self):
+        return self._tokenizer.padding
+
+    @property
+    def truncation(self):
+        return self._tokenizer.truncation
+
+    def add_special_tokens(self, tokens: List[str]):
+        return self._tokenizer.add_special_tokens(tokens)
+
+    def add_tokens(self, tokens: List[str]):
+        return self._tokenizer.add_tokens(tokens)
+
+    def enable_padding(self,
+                       direction: str = "right",
+                       pad_id: int = 0,
+                       pad_type_id: int = 0,
+                       pad_token: str = "[PAD]",
+                       length: int = None,
+                       pad_to_multiple_of: int = None):
+        return self._tokenizer.enable_padding(direction, pad_id, pad_type_id,
+                                              pad_token, length,
+                                              pad_to_multiple_of)
+
+    def disable_padding(self):
+        return self._tokenizer.disable_padding()
+
+    def enable_truncation(self,
+                          max_length: int,
+                          stride: int = 0,
+                          strategy: str = "longest_first",
+                          direction: str = "direction"):
+        return self._tokenizer.enable_truncation(max_length, stride, strategy,
+                                                 direction)
+
+    def disable_truncation(self):
+        return self._tokenizer.disable_truncation()
+
+    def get_vocab(self, with_added_vocabulary: bool = True):
+        return self._tokenizer.get_vocab(with_added_vocabulary)
+
+    def get_vocab_size(self, with_added_vocabulary: bool = True):
+        return self._tokenizer.get_vocab_size(with_added_vocabulary)
+
+    def encode(self,
+               sequence: InputSequence,
+               pair: InputSequence = None,
+               is_pretokenized: bool = False,
+               add_special_tokens: bool = True):
+        return self._tokenizer.encode(sequence, pair, is_pretokenized,
+                                      add_special_tokens)
+
+    def encode_batch(self,
+                     input: Union[List[EncodeInput], Tuple[EncodeInput]],
+                     add_special_tokens: bool = True,
+                     is_pretokenized: bool = False):
+        return self._tokenizer.encode_batch(input, add_special_tokens,
+                                            is_pretokenized)
+
+    def decode(self, ids: List[int], skip_special_tokens: bool = True):
+        return self._tokenizer.decode(ids, skip_special_tokens)
+
+    def decode_batch(self,
+                     sequences: List[List[int]],
+                     skip_special_tokens: bool = True):
+        return self._tokenizer.decode_batch(sequence, skip_special_tokens)
+
+    def id_to_token(self, id: int):
+        return self._tokenizer.id_to_token(id)
+
+    def token_to_id(self, token: str):
+        return self._tokenizer.token_to_id(token)
+
+    def num_special_tokens_to_add(self, is_pair: bool = True):
+        return self._tokenizer.num_special_tokens_to_add(is_pair)
+
+    def save(self, path: str, pretty: bool = True):
+        return self._tokenizer.save(path, pretty)
+
+    def to_str(self, pretty: bool = True):
+        return self._tokenizer.to_str(pretty)
+
+    @staticmethod
+    def from_str(self, json: str):
+        tr = Tokenizer(None)
+        tr._tokenizer = C.tokenizer.from_str(json)
+        return tr
+
+    @staticmethod
+    def from_file(self, json: str):
+        tr = Tokenizer(None)
+        tr._tokenizer = C.tokenizer.from_file(json)
+        return tr
+
+
 def set_thread_num(thread_num):
     """ Set the number of threads for accelerating batch tokenization
     :param thread_num: (int) The number of threads
@@ -410,3 +543,11 @@ def get_thread_num():
     :return int
     """
     return C.get_thread_num()
+
+
+from . import models
+from . import normalizers
+from . import pretokenizers
+from . import postprocessors
+from . import decoders
+from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer
