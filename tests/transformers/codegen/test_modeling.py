@@ -417,6 +417,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
     use_test_model_name_list = False
     return_dict = False
     use_labels = False
+    use_test_inputs_embeds = True
 
     # attention mask issue
     def _get_input_ids_and_config(self):
