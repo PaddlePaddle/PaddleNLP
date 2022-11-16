@@ -365,10 +365,10 @@ class Trainer:
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(
-                    f"No valid checkpoint found in output directory ({args.output_dir})"
+                    f"No valid checkpoint found in output directory ({self.args.output_dir})"
                 )
 
         if resume_from_checkpoint is not None:
@@ -532,10 +532,10 @@ class Trainer:
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)):
             self.state = TrainerState.load_from_json(
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
-            epochs_trained = self.state.global_step // args.num_update_steps_per_epoch
+            epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (
-                    args.num_update_steps_per_epoch)
+                    num_update_steps_per_epoch)
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
