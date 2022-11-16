@@ -153,6 +153,7 @@ def get_init_configurations():
 
     return CONFIGURATION_MODEL_MAPPING
 
+
 class _BaseAutoModelClass:
     # Base class for auto models.
     _pretrained_model_dict = None
@@ -167,9 +168,8 @@ class _BaseAutoModelClass:
         )
 
     @classmethod
-    def _get_model_class_from_config(cls,
-                                    pretrained_model_name_or_path,
-                                    config_file_path):
+    def _get_model_class_from_config(cls, pretrained_model_name_or_path,
+                                     config_file_path):
         with io.open(config_file_path, encoding="utf-8") as f:
             init_kwargs = json.load(f)
         # class name corresponds to this configuration
@@ -199,15 +199,13 @@ class _BaseAutoModelClass:
             all_model_classes = import_class.__all__
             all_tasks = {
                 get_task_name(m)
-                for m in all_model_classes
-                if get_task_name(m) is not None
+                for m in all_model_classes if get_task_name(m) is not None
             }
             raise AttributeError(
                 f"module '{import_class.__name__}' only supports the following classes: "
                 + ", ".join(m for m in all_model_classes) + "\n"
                 "Hint: you can use interface " +
-                " or ".join(task + ".from_pretrained"
-                            for task in all_tasks) +
+                " or ".join(task + ".from_pretrained" for task in all_tasks) +
                 f" to load '{pretrained_model_name_or_path}'\n")
 
     @classmethod
@@ -270,23 +268,26 @@ class _BaseAutoModelClass:
                                        cls.model_config_file)
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(
-                    pretrained_model_name_or_path,
-                    config_file)
+                    pretrained_model_name_or_path, config_file)
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, *model_args, **kwargs)
         # From HF
         elif from_hf_hub:
-            config_file = hf_hub_download(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file, cache_dir=MODEL_HOME)
+            config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
+                                          filename=cls.model_config_file,
+                                          cache_dir=MODEL_HOME)
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(
-                    pretrained_model_name_or_path,
-                    config_file)
+                    pretrained_model_name_or_path, config_file)
                 logger.info("We are using %s to load '%s'." %
-                        (model_class, pretrained_model_name_or_path))
+                            (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
-                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs)
+                    pretrained_model_name_or_path,
+                    from_hf_hub=from_hf_hub,
+                    *model_args,
+                    **kwargs)
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join([
@@ -312,8 +313,7 @@ class _BaseAutoModelClass:
 
             if os.path.exists(resolved_vocab_file):
                 model_class = cls._get_model_class_from_config(
-                    pretrained_model_name_or_path,
-                    resolved_vocab_file)
+                    pretrained_model_name_or_path, resolved_vocab_file)
                 logger.info("We are using %s to load '%s'." %
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(

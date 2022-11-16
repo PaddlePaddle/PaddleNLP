@@ -322,7 +322,11 @@ class PretrainedModel(Layer, GenerationMixin):
             cls.config_class, PretrainedConfig)
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        *args,
+                        from_hf_hub=False,
+                        **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -416,7 +420,6 @@ class PretrainedModel(Layer, GenerationMixin):
                 cls.model_config_file
             ])
 
-        
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
@@ -425,7 +428,10 @@ class PretrainedModel(Layer, GenerationMixin):
                 continue
             # If from_hf_hub, let HF Hub takes care of the cache and the download process
             if from_hf_hub:
-                resolved_resource_files[file_id] = hf_hub_download(repo_id=pretrained_model_name_or_path, filename=file_path, cache_dir=MODEL_HOME)
+                resolved_resource_files[file_id] = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                    cache_dir=MODEL_HOME)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):

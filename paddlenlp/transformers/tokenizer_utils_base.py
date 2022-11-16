@@ -1463,7 +1463,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         raise NotImplementedError()
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        *args,
+                        from_hf_hub=False,
+                        **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
         by specifying name of a built-in pretrained model, or a community-contributed
@@ -1561,7 +1565,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 # if file_id not in cls.resource_files_names:
                 #     resolved_vocab_files[file_id] = None
                 # else:
-                resolved_vocab_files[file_id] = hf_hub_download(repo_id=pretrained_model_name_or_path, filename=file_path, cache_dir=MODEL_HOME)
+                resolved_vocab_files[file_id] = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                    cache_dir=MODEL_HOME)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
