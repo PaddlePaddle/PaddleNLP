@@ -14,6 +14,7 @@
 
 import os
 import time
+import math
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -524,6 +525,29 @@ class LatentDiffusionTrainer(Trainer):
             num_workers=self.args.dataloader_num_workers,
             worker_init_fn=worker_init_fn,
         )
+
+    def init_num_steps(self, args, num_samples_per_epoch):
+        args.total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+
+        num_update_steps_per_epoch = num_samples_per_epoch // args.train_batch_size + int(
+            num_samples_per_epoch % args.train_batch_size > 0)
+        num_update_steps_per_epoch //= args.gradient_accumulation_steps
+        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+        args.num_update_steps_per_epoch = num_update_steps_per_epoch
+
+        if args.max_steps > 0:
+            args.num_training_steps = args.max_steps
+            args.num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
+                args.max_steps % num_update_steps_per_epoch > 0)
+            args.num_train_samples = args.max_steps * args.total_train_batch_size
+        else:
+            args.num_training_steps = num_update_steps_per_epoch * args.num_train_epochs
+            args.num_train_epochs = math.ceil(args.num_train_epochs)
+            args.num_train_samples = num_samples_per_epoch * args.num_train_epochs
+
+        if args.warmup_steps <= 0:
+            args.warmup_steps = int(args.warmup_ratio * args.num_training_steps)
+        return args
 
     def log(self, logs: Dict[str, float]) -> None:
         """
