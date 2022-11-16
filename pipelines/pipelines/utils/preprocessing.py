@@ -1,10 +1,24 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Callable, Dict, List, Optional
 
 import re
 import logging
 from pathlib import Path
 
-from pipelines.nodes.file_converter import BaseConverter, DocxToTextConverter, PDFToTextConverter, TextConverter
+from pipelines.nodes.file_converter import BaseConverter, DocxToTextConverter, PDFToTextConverter, TextConverter, ImageToTextConverter
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +39,7 @@ def convert_files_to_dicts(dir_path: str,
     :param encoding: character encoding to use when converting pdf documents.
     """
     file_paths = [p for p in Path(dir_path).glob("**/*")]
-    allowed_suffixes = [".pdf", ".txt", ".docx"]
+    allowed_suffixes = [".pdf", ".txt", ".docx", ".png", '.jpg']
     suffix2converter: Dict[str, BaseConverter] = {}
 
     suffix2paths: Dict[str, List[Path]] = {}
@@ -49,6 +63,8 @@ def convert_files_to_dicts(dir_path: str,
             suffix2converter[file_suffix] = TextConverter()
         if file_suffix == ".docx":
             suffix2converter[file_suffix] = DocxToTextConverter()
+        if file_suffix == ".png" or file_suffix == ".jpg":
+            suffix2converter[file_suffix] = ImageToTextConverter()
 
     documents = []
     for suffix, paths in suffix2paths.items():
@@ -56,39 +72,52 @@ def convert_files_to_dicts(dir_path: str,
             if encoding is None and suffix == ".pdf":
                 encoding = "Latin1"
             logger.info("Converting {}".format(path))
-            document = suffix2converter[suffix].convert(
+            list_documents = suffix2converter[suffix].convert(
                 file_path=path,
                 meta=None,
                 encoding=encoding,
-            )[0]  # PDFToTextConverter, TextConverter, and DocxToTextConverter return a list containing a single dict
-            text = document["content"]
+            )  # PDFToTextConverter, TextConverter, ImageToTextConverter and DocxToTextConverter return a list containing a single dict
+            for document in list_documents:
+                text = document["content"]
 
-            if clean_func:
-                text = clean_func(text)
+                if clean_func:
+                    text = clean_func(text)
 
-            if split_paragraphs:
-                for para in text.split("\n"):
-                    if not para.strip():  # skip empty paragraphs
-                        continue
-                    if (split_answers):
-                        query, answer = para.split('\t')
-                        documents.append({
-                            "content": query,
-                            "meta": {
+                if split_paragraphs:
+                    for para in text.split("\n"):
+                        if not para.strip():  # skip empty paragraphs
+                            continue
+                        if (split_answers):
+                            query, answer = para.split('\t')
+                            meta_data = {"name": path.name, "answer": answer}
+                            # Add image list parsed from docx into meta
+                            if (document['meta'] is not None
+                                    and 'images' in document['meta']):
+                                meta_data['images'] = document['meta']['images']
+
+                            documents.append({
+                                "content": query,
+                                "meta": meta_data
+                            })
+                        else:
+                            meta_data = {
                                 "name": path.name,
-                                "answer": answer,
                             }
-                        })
-                    else:
-                        documents.append({
-                            "content": para,
-                            "meta": {
-                                "name": path.name
-                            }
-                        })
-            else:
-                documents.append({"content": text, "meta": {"name": path.name}})
-
+                            # Add image list parsed from docx into meta
+                            if (document['meta'] is not None
+                                    and 'images' in document['meta']):
+                                meta_data['images'] = document['meta']['images']
+                            documents.append({
+                                "content": para,
+                                "meta": meta_data
+                            })
+                else:
+                    documents.append({
+                        "content": text,
+                        "meta": document['meta'] if 'meta' in document else {
+                            "name": path.name
+                        }
+                    })
     return documents
 
 

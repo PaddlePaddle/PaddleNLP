@@ -46,12 +46,53 @@ python run_glue.py \
 - `scheduler_type` scheduler类型，可选linear和cosine，默认linear。
 - `output_dir` 表示模型保存路径。
 
+使用trainer进行Fine-tuning:
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue_trainer.py \
+    --model_name_or_path t5-base \
+    --task_name rte \
+    --max_seq_length 256 \
+    --do_train \
+    --do_eval \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 64 \
+    --learning_rate 1e-4 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.1 \
+    --num_train_epochs 10 \
+    --eval_steps 200 \
+    --logging_steps 20 \
+    --save_steps 200 \
+    --save_total_limit 3 \
+    --metric_for_best_model "eval_accuarcy" \
+    --fp16 false \
+    --fp16_opt_level "O1" \
+    --recompute true \
+    --sharding "stage1" \
+    --overwrite_output_dir \
+    --disable_tqdm true \
+    --output_dir outputs/rte/
+```
+具体参数含义请参见: https://paddlenlp.readthedocs.io/zh/latest/trainer.html
+
 ###### t5-base模型在GLUE开发集上的结果：
 | Model                          | cola  | sst-2  | mrpc        | sts-b             | qqp         | mnli       | qnli | rte   | mean |
 |--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|-------|
 |                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |         |
 | T5-base-Paddle | 61.74 | 95.18 | 90.44 | 90.09   | 91.60 | 87.18 | 93.56 | 81.95 | 86.4675 |
 
+###### t5_v1_1-base模型在GLUE开发集上的结果：
+使用`run_glue_trainer.py`运行，由于`t5_v1_1-base`没有在glue任务上进行训练过，直接生成label的策略需要的训练时间需要更长。
+| Model                          | cola  | sst-2  | mrpc        | sts-b             | qqp         | mnli       | qnli | rte   |
+|--------------------------------|-------|-------|-------------|------------------|-------------|-------------|------|-------|
+|                                | mcc   | acc   | acc      | pearson | acc      | acc      | acc  | acc   |
+| T5-v1_1-base Paddle | 47.6845 | 94.38 | 84.31 | 87.74   | 88.05 | 85.39 | 90.518 | 65.70 |
+| epoch | 100 | 10 | 100 | 100   | 3 | 3 | 10 | 100 |
+
+注：
+- 直接生成label的finetune方式难度较大，前期基本学习如何正确生成label标签，后期才学习分类任务。
+- 生成的label标签设计，标签差异大一些，效果会更好一些。
+- `qqp`,`mnli`数据集适当增大训练epoch数，可以取得更好效果。
 
 ### GLUE Demo测试
 

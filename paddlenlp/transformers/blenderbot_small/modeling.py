@@ -78,7 +78,6 @@ class BlenderbotSmallPretrainedModel(PretrainedModel):
     loading pretrained models.
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "blenderbot_small-90M": {
             "vocab_size": 54944,
@@ -103,7 +102,6 @@ class BlenderbotSmallPretrainedModel(PretrainedModel):
             "normalize_before": False,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "blenderbot_small-90M":

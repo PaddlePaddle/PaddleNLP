@@ -43,35 +43,35 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 - torch version 1.10.0+cu113
 - transformers version 4.12.5
 
-**BART** (bart-base, batch_size=4, max_length=32)
+### **BART** (bart-base, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183384011-0df9a81e-72ac-429e-88da-166d48128b67.png" width="800" height ="400" />
 </p>
 
-**GPT** (gpt2, batch_size=4, max_length=32)
+### **GPT** (gpt2, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183376427-638a7dd1-94b0-4b45-bd52-7c38f12f090f.png" width="800" height ="400" />
 </p>
 
-**OPT** (opt, batch_size=4, max_length=32)
+### **OPT** (opt, batch_size=4, max_length=32)
 
 <p align="left">
   <img src="https://user-images.githubusercontent.com/10242208/183376428-7e7a0998-803c-4bc3-acf6-971a9471b300.png" width="800" height ="400" />
 </p>
 
-**CodeGen:**
+### **CodeGen:**
 * 环境和超参
-- Platform: Tesla V100-SXM2-32GB
-- CUDA 10.1
-- CUDNN 7.6.5
-- PaddlePaddle-gpu 2.3.1.post101
-- transformers==4.21.1
-- torch==1.11.0
-- Batch Size: 1
-- Input Length: 60
-- Output Length: 20
+  - Platform: Tesla V100-SXM2-32GB
+  - CUDA 10.1
+  - CUDNN 7.6.5
+  - PaddlePaddle-gpu 2.3.1.post101
+  - transformers==4.21.1
+  - torch==1.11.0
+  - Batch Size: 1
+  - Input Length: 60
+  - Output Length: 20
 <p align="left">
   <img src="https://user-images.githubusercontent.com/24390500/185611444-df2bec75-6cec-4c86-afd6-3049faae6288.png" width="800" height ="350" />
 </p>
@@ -79,6 +79,23 @@ FasterGeneration的高性能解码相比原版generate方法加速明显，并�
 - Platform: A100-40G
 <p align="left">
   <img src="https://user-images.githubusercontent.com/24390500/185743415-317e75f5-029b-4037-aaaa-75d38db6b288.png" width="800" height ="350" />
+</p>
+
+### **Pegasus**
+* 环境和超参
+  - Platform: Tesla V100-SXM2-32GB
+  - CUDA 10.1
+  - CUDNN 7.6.5
+  - PaddlePaddle-gpu 2.3.2.post101
+  - transformers==4.21.1
+  - torch==1.11.0
+  - Batch Size: 4
+  - Input Length: 60
+  - Output Length: 20
+  - Decode_strategy: beam search
+  - num_beams: 4
+<p align="left">
+  <img src="https://user-images.githubusercontent.com/24390500/198013848-96ada404-c936-42a0-a83d-eedb8193ef53.png" width="800" height ="400" />
 </p>
 
 更详细的性能数据请参见[这里](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation/perf)

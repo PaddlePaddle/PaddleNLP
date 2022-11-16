@@ -36,7 +36,7 @@
 
 - 【标注成本高、标注样本较少的小样本场景】 👉 [提示学习层次分类方案](./few-shot#readme)
 
-- 【标签类别不固定场景】 👉 [语义索引层次分类方案](./retrieval_based#readme)
+- 【标签类别不固定场景、标签数量众多】 👉 [语义索引层次分类方案](./retrieval_based#readme)
 
 <a name="快速开始"></a>
 
@@ -65,7 +65,7 @@ rm baidu_extract_2020.tar.gz
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.3.4
+- paddlenlp >= 2.4
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -77,7 +77,7 @@ rm baidu_extract_2020.tar.gz
 
 安装PaddleNLP默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 ```shell
-python3 -m pip install paddlenlp==2.3.4 -i https://mirror.baidu.com/pypi/simple
+python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
 ```
 
 
@@ -92,20 +92,13 @@ python3 -m  pip install scikit-learn==1.0.2
 
 ```text
 hierarchical/
+├── few-shot # 小样本学习方案
+├── retrieval_based # 语义索引方案
+├── analysis # 分析模块
 ├── deploy # 部署
 │   └── predictor # 离线部署
-│   │   ├── infer.py # 测试脚本
-│   │   ├── predictor.py 离线部署脚本
-│   │   └── README.md # 离线部署使用说明
 │   ├── paddle_serving # PaddleServing在线服务化部署
-│   │   ├──config.yml # 服务端的配置文件
-│   │   ├──rpc_client.py # 客户端预测脚本
-│   │   ├──service.py # 服务端的脚本
-│   │   └── README.md # 在线服务化部署使用说明
 │   └── triton_serving # Triton在线服务化部署
-│       ├── README.md # Triton部署使用说明
-│       ├── seqcls_grpc_client.py # 客户端预测脚本
-│       └── models
 ├── train.py # 训练评估脚本
 ├── predict.py # 预测脚本
 ├── export_model.py # 静态图模型导出脚本
@@ -130,7 +123,7 @@ data/
 └── data.txt # 待预测数据文件（可选）
 ```
 
-**训练、开发、测试数据集文件：** 文本与标签类别名用tab符`'\t'`分隔开，标签中多个标签之间用英文逗号`','`分隔开。
+**训练、开发、测试数据集文件：** 文本与标签类别名用tab符`'\t'`分隔开，标签中多个标签之间用英文逗号`','`分隔开，文本中避免出现tab符`'\t'`。
 
 - train.txt/dev.txt/test.txt 文件格式：
 ```text
@@ -188,8 +181,6 @@ data/
 
 ### 2.4 模型训练
 
-
-
 #### 2.4.1 预训练模型微调
 
 使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
@@ -200,19 +191,20 @@ python train.py \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
-
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
 ```shell
 python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
     --dataset_dir "data" \
-    --device "gpu" \
+    --device "cpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
 
 如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus "0,1"。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况。
@@ -225,7 +217,8 @@ python -m paddle.distributed.launch --gpus "0" train.py \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
-    --early_stop
+    --early_stop \
+    --epochs 100
 ```
 
 
@@ -235,7 +228,7 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 * `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt，dev.txt和label.txt文件;默认为None。
 * `save_dir`：保存训练模型的目录；默认保存在当前目录checkpoint文件夹下。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
-* `model_name`：选择预训练模型,可选"ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-1.0-large-zh-cw"；默认为"ernie-3.0-medium-zh"。
+* `model_name`：选择预训练模型,可选"ernie-1.0-large-zh-cw","ernie-3.0-xbase-zh", "ernie-3.0-base-zh", "ernie-3.0-medium-zh", "ernie-3.0-micro-zh", "ernie-3.0-mini-zh", "ernie-3.0-nano-zh", "ernie-2.0-base-en", "ernie-2.0-large-en","ernie-m-base","ernie-m-large"；默认为"ernie-3.0-medium-zh",根据任务复杂度和硬件条件进行选择。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `learning_rate`：训练最大学习率；默认为3e-5。
 * `epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
@@ -263,14 +256,20 @@ checkpoint/
 
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `--init_from_ckpt checkpoint/model_state.pdparams` 。
-* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"，更多可选模型可参考[Transformer预训练模型](https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer)。
-* 英文和中文以外文本分类任务建议使用多语言预训练模型"ernie-m-base","ernie-m-large"， 多语言模型暂不支持文本分类模型部署，相关功能正在加速开发中。
+* 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
+* 英文和中文以外语言的文本分类任务，推荐使用基于96种语言（涵盖法语、日语、韩语、德语、西班牙语等几乎所有常见语言）进行预训练的多语言预训练模型"ernie-m-base"、"ernie-m-large"，详情请参见[ERNIE-M论文](https://arxiv.org/pdf/2012.15674.pdf)。
 #### 2.4.2 训练评估与模型优化
 
-训练后的模型我们可以使用 [模型分析模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
+文本分类预测过程中常会遇到诸如"模型为什么会预测出错误的结果"，"如何提升模型的表现"等问题。[Analysis模块](./analysis) 提供了**模型评估、可解释性分析、数据优化**等功能，旨在帮助开发者更好地分析文本分类模型预测结果和对模型效果进行优化。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/63761690/195241942-70068989-df17-4f53-9f71-c189d8c5c88d.png" width="600">
+</div>
+
+**模型评估：** 训练后的模型我们可以使用 [Analysis模块](./analysis) 对每个类别分别进行评估，并输出预测错误样本（bad case），默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`:
 
 ```shell
-python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_path "./bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
+python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 --bad_case_file "bad_case.txt" --dataset_dir "data" --params_path "./checkpoint"
 ```
 
 输出打印示例：
@@ -297,15 +296,38 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 预测错误的样本保存在bad_case.txt文件中：
 
 ```text
-Prediction    Label    Text
-组织关系,组织关系##解雇 组织关系,组织关系##加盟,组织关系##裁员  据猛龙随队记者JoshLewenberg报道，消息人士透露，猛龙已将前锋萨加巴-科纳特裁掉。此前他与猛龙签下了一份Exhibit10合同。在被裁掉后，科纳特下赛季大概率将前往猛龙的发展联盟球队效力。
-组织关系,组织关系##解雇    组织关系,组织关系##裁员    冠军射手被裁掉，欲加入湖人队，但湖人却无意，冠军射手何去何从
-组织关系,组织关系##裁员    组织关系,组织关系##退出,组织关系##裁员    有多名魅族员工表示，从6月份开始，魅族开始了新一轮裁员，重点裁员区域是营销和线下。裁员占比超过30%，剩余员工将不过千余人，魅族的知名工程师，爱讲真话的洪汉生已经从钉钉里退出了，外界传言说他去了OPPO。
-人生,人生##死亡,灾害/意外,灾害/意外##坍/垮塌    灾害/意外,灾害/意外##坍/垮塌    冲刺千亿的美的置业贵阳项目倒塌致8人死亡已责令全面停工
+Text	Label	Prediction
+据猛龙随队记者JoshLewenberg报道，消息人士透露，猛龙已将前锋萨加巴-科纳特裁掉。此前他与猛龙签下了一份Exhibit10合同。在被裁掉后，科纳特下赛季大概率将前往猛龙的发展联盟球队效力。	组织关系,组织关系##加盟,组织关系##裁员	组织关系,组织关系##解雇
+冠军射手被裁掉，欲加入湖人队，但湖人却无意，冠军射手何去何从	组织关系,组织关系##裁员	组织关系,组织关系##解雇
+6月7日报道，IBM将裁员超过1000人。IBM周四确认，将裁减一千多人。据知情人士称，此次裁员将影响到约1700名员工，约占IBM全球逾34万员工中的0.5%。IBM股价今年累计上涨16%，但该公司4月发布的财报显示，一季度营收下降5%，低于市场预期。	组织关系,组织关系##裁员	组织关系,组织关系##裁员,财经/交易
+有多名魅族员工表示，从6月份开始，魅族开始了新一轮裁员，重点裁员区域是营销和线下。裁员占比超过30%，剩余员工将不过千余人，魅族的知名工程师，爱讲真话的洪汉生已经从钉钉里退出了，外界传言说他去了OPPO。	组织关系,组织关系##退出,组织关系##裁员	组织关系,组织关系##裁员
 ...
 ```
 
-模型表现常常受限于数据质量，在analysis模块中我们提供了基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)的稀疏数据筛选、脏数据清洗、数据增强三种优化方案助力开发者提升模型效果，更多模型评估和优化方案细节详见[训练评估与模型优化指南](analysis/README.md)。
+**可解释性分析：** 基于[TrustAI](https://github.com/PaddlePaddle/TrustAI)提供单词和句子级别的模型可解释性分析，帮助理解模型预测结果，用于错误样本（bad case）分析，细节详见[训练评估与模型优化指南](analysis/README.md)。
+
+- 单词级别可解释性分析，也即分析待预测样本中哪一些单词对模型预测结果起重要作用。以下图为例，用颜色深浅表示单词对预测结果的重要性。
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/63761690/195334753-78cc2dc8-a5ba-4460-9fde-3b1bb704c053.png" width="1000">
+</div>
+
+- 句子级别可解释性分析 ，也即分析对待预测样本的模型预测结果与训练集中中哪些样本有重要关系。下面的例子表明句子级别可解释性分析可以帮助理解待预测样本的预测结果与训练集中样本之间的关联。
+```text
+text: 据猛龙随队记者JoshLewenberg报道，消息人士透露，猛龙已将前锋萨加巴-科纳特裁掉。此前他与猛龙签下了一份Exhibit10合同。在被裁掉后，科纳特下赛季大概率将前往猛龙的发展联盟球队效力。
+predict label: 组织关系,组织关系##解雇
+label: 组织关系,组织关系##加盟,组织关系##裁员
+examples with positive influence
+support1 text: 尼克斯官方今日宣布，他们已经裁掉了前锋扎克-欧文，后者昨日才与尼克斯签约。	label: 组织关系,组织关系##加盟,组织关系##解雇	score: 0.99357
+support2 text: 活塞官方今日宣布，他们已经签下了克雷格-斯沃德，并且裁掉了托德-威瑟斯。	label: 组织关系,组织关系##加盟,组织关系##解雇	score: 0.98344
+support3 text: 孟菲斯灰熊今年宣布，球队已经签下后卫达斯蒂-汉纳斯（DustyHannahs，版头图）并裁掉马特-穆尼。	label: 组织关系,组织关系##加盟,组织关系##解雇	score: 0.98219
+...
+```
+
+**数据优化：** 结合[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[数据增强API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化策略，从多角度优化训练数据提升模型效果，策略细节详见[训练评估与模型优化指南](analysis/README.md)。
+
+- 稀疏数据筛选主要是解决数据不均衡、训练数据覆盖不足的问题，通过数据增强和数据标注两种方式解决这一问题。
+- 脏数据清洗可以帮助开发者筛选训练集中错误标注的数据，对这些数据重新进行人工标注，得到标注正确的数据再重新进行训练。
+- 数据增强策略提供多种数据增强方案，可以快速扩充数据，提高模型泛化性和鲁棒性。
 
 #### 2.4.3 模型预测
 训练结束后，输入待预测数据(data.txt)和类别标签对照列表(label.txt)，使用训练好的模型进行，默认在GPU环境下使用，在CPU环境下修改参数配置为`--device "cpu"`：
@@ -337,8 +359,13 @@ python predict.py --device "gpu" --max_seq_length 128 --batch_size 32 --dataset_
 python export_model.py --params_path ./checkpoint/ --output_path ./export
 ```
 
-可支持配置的参数：
+如果使用多语言模型 ERNIE M作为预训练模型，运行方式：
+```shell
+python export_model.py --params_path ./checkpoint/ --output_path ./export --multilingual
+```
 
+可支持配置的参数：
+* `multilingual`：是否为多语言任务（是否使用ERNIE M作为预训练模型）；默认为False。
 * `params_path`：动态图训练保存的参数路径；默认为"./checkpoint/"。
 * `output_path`：静态图图保存的参数路径；默认为"./export"。
 
@@ -397,9 +424,9 @@ python prune.py \
 ```text
 prune/
 ├── width_mult_0.75
-│   ├── float32.pdiparams
-│   ├── float32.pdiparams.info
-│   ├── float32.pdmodel
+│   ├── pruned_model.pdiparams
+│   ├── pruned_model.pdiparams.info
+│   ├── pruned_model.pdmodel
 │   ├── model_state.pdparams
 │   └── model_config.json
 └── ...
@@ -412,7 +439,6 @@ prune/
 2. 模型裁剪主要用于推理部署，因此裁剪后的模型都是静态图模型，只可用于推理部署，不能再通过 `from_pretrained` 导入继续训练。导出模型之后用于部署，项目提供了基于ONNXRuntime的 [离线部署方案](./deploy/predictor/README.md) 和基于Paddle Serving的 [在线服务化部署方案](./deploy/predictor/README.md)。
 
 3. ERNIE Base、Medium、Mini、Micro、Nano的模型宽度（multi head数量）为12，ERNIE Xbase、Large 模型宽度（multi head数量）为16，保留比例`width_mult`乘以宽度（multi haed数量）应为整数。
-
 
 #### 2.5.3 部署方案
 
@@ -454,11 +480,13 @@ prune/
 
 |   | 模型结构  |Micro F1(%)   | Macro F1(%) | latency(ms) |
 | -------------------------- | ------------ | ------------ | ------------ |------------ |
-|ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|95.68|93.39| 4.63 |
-|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|95.26|93.22| 2.42|
-|ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|94.72|93.03| 0.93|
-|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.70|
-|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|93.98|91.25|0.54|
+|ERNIE 1.0 Large Cw  |24-layer, 1024-hidden, 20-heads|96.24|94.24 |5.59 |
+|ERNIE 3.0 Xbase |20-layer, 1024-hidden, 16-heads|96.21|94.13| 5.51 |
+|ERNIE 3.0 Base |12-layer, 768-hidden, 12-heads|95.68|93.39| 2.01 |
+|ERNIE 3.0 Medium| 6-layer, 768-hidden, 12-heads|95.26|93.22| 1.01|
+|ERNIE 3.0 Mini|6-layer, 384-hidden, 12-heads|94.72|93.03| 0.36|
+|ERNIE 3.0 Micro | 4-layer, 384-hidden, 12-heads|94.24|93.08| 0.24|
+|ERNIE 3.0 Nano |4-layer, 312-hidden, 12-heads|93.98|91.25|0.19|
 | ERNIE 3.0 Medium + 裁剪(保留比例3/4)|6-layer, 768-hidden, 9-heads| 95.45|93.40| 0.81   |
 | ERNIE 3.0 Medium + 裁剪(保留比例2/3)|6-layer, 768-hidden, 8-heads| 95.23|93.27 | 0.74  |
 | ERNIE 3.0 Medium + 裁剪(保留比例1/2)|6-layer, 768-hidden, 6-heads| 94.92 | 92.70| 0.61 |

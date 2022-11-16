@@ -24,7 +24,11 @@ from pipelines.nodes.reader import BaseReader
 from pipelines.nodes.ranker import BaseRanker
 from pipelines.nodes.retriever import BaseRetriever
 from pipelines.document_stores import BaseDocumentStore
+from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
+from pipelines.nodes.answer_extractor import AnswerExtractor, QAFilter
+from pipelines.nodes.question_generator import QuestionGenerator
 from pipelines.pipelines import Pipeline
+from pipelines.nodes.base import BaseComponent
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +170,26 @@ class BaseStandardPipeline(ABC):
         """
         return self.pipeline.get_document_store()
 
+    def run_batch(self,
+                  queries: List[str],
+                  params: Optional[dict] = None,
+                  debug: Optional[bool] = None):
+        """
+        Run a batch of queries through the pipeline.
+        :param queries: List of query strings.
+        :param params: Parameters for the individual nodes of the pipeline. For instance,
+                       `params={"Retriever": {"top_k": 10}, "Reader": {"top_k": 5}}`
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+                      about their execution. By default these include the input parameters
+                      they received and the output they generated.
+                      All debug information can then be found in the dict returned
+                      by this method under the key "_debug"
+        """
+        output = self.pipeline.run_batch(queries=queries,
+                                         params=params,
+                                         debug=debug)
+        return output
+
 
 class ExtractiveQAPipeline(BaseStandardPipeline):
     """
@@ -242,4 +266,108 @@ class SemanticSearchPipeline(BaseStandardPipeline):
               by this method under the key "_debug"
         """
         output = self.pipeline.run(query=query, params=params, debug=debug)
+        return output
+
+
+class DocPipeline(BaseStandardPipeline):
+    """
+    Pipeline for document intelligence.
+    """
+
+    def __init__(self, preprocessor: BaseComponent, docreader: BaseComponent):
+        """
+        :param preprocessor: file/image preprocessor instance
+        :param docreader: document model runner instance
+        """
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=preprocessor,
+                               name="PreProcessor",
+                               inputs=["Query"])
+        self.pipeline.add_node(component=docreader,
+                               name="Reader",
+                               inputs=["PreProcessor"])
+
+    def run(self,
+            meta: dict,
+            params: Optional[dict] = None,
+            debug: Optional[bool] = None):
+        """
+        :param query: the query string.
+        :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+              about their execution. By default these include the input parameters
+              they received and the output they generated.
+              All debug information can then be found in the dict returned
+              by this method under the key "_debug"
+        """
+        output = self.pipeline.run(meta=meta, params=params, debug=debug)
+        return output
+
+
+class TextToImagePipeline(BaseStandardPipeline):
+    """
+    A simple pipeline that takes prompt texts as input and generates
+    images.
+    """
+
+    def __init__(self, text_to_image_generator: ErnieTextToImageGenerator):
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=text_to_image_generator,
+                               name="TextToImageGenerator",
+                               inputs=["Query"])
+
+    def run(self,
+            query: str,
+            params: Optional[dict] = None,
+            debug: Optional[bool] = None):
+        output = self.pipeline.run(query=query, params=params, debug=debug)
+        return output
+
+    def run_batch(
+        self,
+        documents: List[Document],
+        params: Optional[dict] = None,
+        debug: Optional[bool] = None,
+    ):
+        output = self.pipeline.run_batch(documents=documents,
+                                         params=params,
+                                         debug=debug)
+        return output
+
+
+class QAGenerationPipeline(BaseStandardPipeline):
+    """
+    Pipeline for semantic search.
+    """
+
+    def __init__(self, answer_extractor: AnswerExtractor,
+                 question_generator: QuestionGenerator, qa_filter: QAFilter):
+        """
+        :param retriever: Retriever instance
+        """
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=answer_extractor,
+                               name="AnswerExtractor",
+                               inputs=["Query"])
+        self.pipeline.add_node(component=question_generator,
+                               name="QuestionGenerator",
+                               inputs=["AnswerExtractor"])
+        self.pipeline.add_node(component=qa_filter,
+                               name="QAFilter",
+                               inputs=["QuestionGenerator"])
+
+    def run(self,
+            meta: List[str],
+            params: Optional[dict] = None,
+            debug: Optional[bool] = None):
+        """
+        :param query: the query string.
+        :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+              about their execution. By default these include the input parameters
+              they received and the output they generated.
+              All debug information can then be found in the dict returned
+              by this method under the key "_debug"
+        """
+        output = self.pipeline.run(meta=meta, params=params, debug=debug)
         return output

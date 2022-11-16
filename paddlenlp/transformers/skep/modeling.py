@@ -25,15 +25,11 @@ if compare_version(paddle.version.full_version, "2.2.0") >= 0:
 else:
     from paddlenlp.layers.crf import ViterbiDecoder
 
-from ..model_outputs import (
-    BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
-)
+from ..model_outputs import (BaseModelOutputWithPoolingAndCrossAttentions,
+                             SequenceClassifierOutput, TokenClassifierOutput,
+                             QuestionAnsweringModelOutput,
+                             MultipleChoiceModelOutput, MaskedLMOutput,
+                             CausalLMOutputWithCrossAttentions, tuple_output)
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
@@ -122,7 +118,6 @@ class SkepPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "skep_ernie_1.0_large_ch": {
             "attention_probs_dropout_prob": 0.1,
@@ -167,7 +162,6 @@ class SkepPretrainedModel(PretrainedModel):
             "pad_token_id": 1,
         },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "skep_ernie_1.0_large_ch":
@@ -389,7 +383,7 @@ class SkepModel(SkepPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict)
 
-        if paddle.is_tensor(encoder_outputs):
+        if isinstance(encoder_outputs, type(input_ids)):
             encoder_outputs = (encoder_outputs, )
 
         sequence_output = encoder_outputs[0]
@@ -530,11 +524,7 @@ class SkepForSequenceClassification(SkepPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            if loss is not None:
-                return (loss, ) + output
-            if len(output) == 1:
-                return output[0]
-            return output
+            return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -644,11 +634,7 @@ class SkepForTokenClassification(SkepPretrainedModel):
 
         if not return_dict:
             output = (logits, ) + outputs[2:]
-            if loss is not None:
-                return (loss, ) + output
-            if len(output) == 1:
-                return output[0]
-            return output
+            return tuple_output(output, loss)
 
         return TokenClassifierOutput(
             loss=loss,

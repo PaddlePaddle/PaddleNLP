@@ -44,6 +44,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("ErnieDocTokenizer", "ernie_doc"),
     ("ErnieDocBPETokenizer", "ernie_doc"),
     ("ErnieGramTokenizer", "ernie_gram"),
+    ("ErnieLayoutTokenizer", "ernie_layout"),
     ("ErnieMTokenizer", "ernie_m"),
     ("ErnieTokenizer", "ernie"),
     ("FNetTokenizer", "fnet"),
@@ -53,6 +54,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("LayoutLMTokenizer", "layoutlm"),
     ("LukeTokenizer", "luke"),
     ("MBartTokenizer", "mbart"),
+    ("MBart50Tokenizer", "mbart"),
     ("MegatronBertTokenizer", "megatronbert"),
     ("MobileBertTokenizer", "mobilebert"),
     ("MPNetTokenizer", "mpnet"),
@@ -82,6 +84,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict([
     ("CLIPTokenizer", "clip"),
     ("ArtistTokenizer", "artist"),
     ("ErnieViLTokenizer", "ernie_vil"),
+    ("PegasusChineseTokenizer", 'pegasus'),
 ])
 
 FASTER_TOKENIZER_MAPPING_NAMES = OrderedDict([
@@ -123,6 +126,7 @@ class AutoTokenizer():
     MAPPING_NAMES = get_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
+    _faster_name_mapping = FASTER_TOKENIZER_MAPPING_NAMES
     tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
@@ -183,7 +187,6 @@ class AutoTokenizer():
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:
                 all_tokenizer_names.append(name)
-
         # From built-in pretrained models
         if pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():
@@ -234,11 +237,22 @@ class AutoTokenizer():
                 init_class = init_kwargs.pop("init_class", None)
                 if init_class is None:
                     init_class = init_kwargs.pop("tokenizer_class", None)
+
                 if init_class:
                     class_name = cls._name_mapping[init_class]
                     import_class = importlib.import_module(
                         f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
+                    if use_faster:
+                        for faster_tokenizer_class, name in cls._faster_name_mapping.items(
+                        ):
+                            if name == class_name:
+                                import_class = importlib.import_module(
+                                    f"paddlenlp.transformers.{class_name}.faster_tokenizer"
+                                )
+                                tokenizer_class = getattr(
+                                    import_class, faster_tokenizer_class)
+                                break
                     logger.info(
                         "We are using %s to load '%s'." %
                         (tokenizer_class, pretrained_model_name_or_path))
@@ -265,9 +279,10 @@ class AutoTokenizer():
                                 **kwargs)
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                                 pretrained_model_name_or_path,
-                                                 cls.tokenizer_config_file)
+            community_config_path = "/".join([
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
+                cls.tokenizer_config_file
+            ])
 
             default_root = os.path.join(MODEL_HOME,
                                         pretrained_model_name_or_path)

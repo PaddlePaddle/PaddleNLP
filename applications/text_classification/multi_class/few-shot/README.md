@@ -2,17 +2,18 @@
 
 ## 目录
 
-  * [1. 项目说明](1.项目说明)
-  * [2. 效果展示](2.效果展示)
-  * [3. 定制训练](3.定制训练)
-    * [3.1 运行环境](3.1运行环境)
-    * [3.2 代码结构](3.2代码结构)
-    * [3.3 数据标注](3.3数据标注)
-    * [3.4 模型训练](3.4模型训练)
-    * [3.5 模型评估](3.5模型评估)
-    * [3.6 模型部署](3.6模型部署)
-  * [4. References](4.References)
+- [1. 项目说明](#项目说明)
+- [2. 效果展示](#效果展示)
+- [3. 定制训练](#定制训练)
+  - [3.1 运行环境](#运行环境)
+  - [3.2 代码结构](#代码结构)
+  - [3.3 数据标注](#数据标注)
+  - [3.4 模型训练](#模型训练)
+  - [3.5 模型评估](#模型评估)
+  - [3.6 模型部署](#模型部署)
+- [4. References](#References)
 
+<a name="项目说明"></a>
 ## 1. 项目说明
 
 本项目提供了小样本场景下文本二/多分类的解决方案，在 ERNIE3.0 的基础上利用提示学习取得比微调更好的分类效果，充分利用标注信息。
@@ -41,6 +42,7 @@
 - **标注成本低**：以往的微调方式需要大量的数据标注才能保证模型分类效果。提示学习可以降低数据标注依赖，在少样本（few-shot）的场景下取得比微调更好的分类效果。
 - **全流程打通**：提供了从训练到部署的完整解决方案，可以低成本迁移至实际应用场景。
 
+<a name="效果展示"></a>
 ## 2.效果展示
 
 本项目中使用了 ERNIE3.0 模型，对于中文训练任务可以根据需求选择不同的预训练模型参数进行训练，我们测评了 Base 模型在新闻分类任务上的表现。测试配置如下：
@@ -63,9 +65,9 @@
 
    内存: 630 GB
 
-3. PaddlePaddle 版本：2.3.1
+3. PaddlePaddle 版本：2.4rc
 
-4. PaddleNLP 版本：2.3.5 (develop)
+4. PaddleNLP 版本：2.4.3
 
 5. 评估设置
 
@@ -80,7 +82,7 @@ python train.py --dataset_dir "./data/" --save_dir "./checkpoints" --max_seq_len
 - 提示学习
 
 ```
-python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条新闻写的是" --model_name_or_path ernie-3.0-base-zh --max_seq_length 128  --learning_rate 3e-5 --ppt_learning_rate 3e-4 --do_train --do_eval --num_train_epochs 100 --logging_steps 5 --per_device_eval_batch_size 32 --per_device_train_batch_size 8 --do_predict --metric_for_best_model accuracy --load_best_model_at_end --evaluation_strategy epoch --save_strategy epoch
+python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条新闻写的是" --model_name_or_path ernie-3.0-base-zh --max_seq_length 128  --learning_rate 3e-5 --ppt_learning_rate 3e-4 --do_train --do_eval --num_train_epochs 100 --logging_steps 5 --per_device_eval_batch_size 32 --per_device_train_batch_size 8 --do_predict --metric_for_best_model accuracy --load_best_model_at_end --evaluation_strategy epoch --save_strategy epoch --save_total_limit 1
 ```
 
 6. 精度评价指标：Accuracy
@@ -92,17 +94,20 @@ python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条�
 | ernie-3.0-base-zh | 提示学习 | 0.5521 |
 
 
+<a name="定制训练"></a>
 ## 3.定制训练
 
 下边通过**新闻分类**的例子展示如何使用小样本学习来进行文本分类。
 
+<a name="运行环境"></a>
 ### 3.1 运行环境
 
-- python >= 3.6
-- paddlepaddle >= 2.3
-- paddlenlp >= 2.3.5
-- paddle2onnx >= 1.0.0rc3
+- python >= 3.7
+- paddlepaddle >= 2.4rc
+- paddlenlp >= 2.4.3
+- paddle2onnx >= 1.0.3
 
+<a name="代码结构"></a>
 ### 3.2 代码结构
 
 ```text
@@ -113,6 +118,7 @@ python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条�
 └── README.md
 ```
 
+<a name="数据标注"></a>
 ### 3.3 数据标注
 
 我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano)进行自定义数据标注，本项目也打通了从标注到训练的通道，即doccano导出数据后可通过[doccano.py](../../doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考[doccano数据标注指南](../../doccano.md)。
@@ -186,6 +192,7 @@ news_culture==文化
 ```
 **Note**: 这里的标签映射词定义遵循的规则是，不同映射词尽可能长度一致，映射词和提示需要尽可能构成通顺的语句。越接近自然语句，小样本下模型训练效果越好。如果原标签名已经可以构成通顺语句，也可以不构造映射词，每行一个标签即可。
 
+<a name="模型训练"></a>
 ### 3.4 模型训练
 
 **单卡训练**
@@ -197,14 +204,16 @@ python train.py \
 --output_dir ./checkpoints/ \
 --prompt "这条新闻标题的主题是" \
 --max_seq_length 128  \
---learning_rate 3e-5 \
---ppt_learning_rate 3e-4 \
+--learning_rate 3e-6 \
+--ppt_learning_rate 3e-5 \
 --do_train \
 --do_eval \
 --use_rdrop \
 --max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 5 \
+--save_total_limit 1 \
+--load_best_model_at_end True \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
 --do_predict \
@@ -219,8 +228,8 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --output_dir ./checkpoints/ \
 --prompt "这条新闻标题的主题是" \
 --max_seq_length 128  \
---learning_rate 3e-5 \
---ppt_learning_rate 3e-4 \
+--learning_rate 3e-6 \
+--ppt_learning_rate 3e-5 \
 --do_train \
 --do_eval \
 --use_rdrop \
@@ -228,6 +237,8 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 5 \
+--save_total_limit 1 \
+--load_best_model_at_end True \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
 --do_predict \
@@ -236,7 +247,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 
 可配置参数说明：
 - `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-base-zh`。
-- `data_dir`: 训练数据集路径，数据格式要求详见[数据准备](数据准备)。
+- `data_dir`: 训练数据集路径，数据格式要求详见[数据标注](#数据标注)。
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `prompt`: 提示模板。定义了如何将文本和提示拼接结合。
 - `soft_encoder`: 提示向量的编码器，`lstm`表示双向LSTM, `mlp`表示双层线性层, None表示直接使用提示向量。默认为`lstm`。
@@ -251,14 +262,16 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `do_predict`: 是否进行预测。
 - `do_export`: 是否在运行结束时将模型导出为静态图，保存路径为`output_dir/export`。
 - `max_steps`: 训练的最大步数。此设置将会覆盖`num_train_epochs`。
+- `save_total_limit`: 模型检查点保存数量。
 - `eval_steps`: 评估模型的间隔步数。
 - `device`: 使用的设备，默认为`gpu`。
 - `logging_steps`: 打印日志的间隔步数。
 - `per_device_train_batch_size`: 每次训练每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 - `per_device_eval_batch_size`: 每次评估每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 
-更多参数介绍可参考[配置文件](../../../../paddlenlp/trainer/trainer_args.py)。
+更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
+<a name="模型评估"></a>
 ### 3.5 模型评估
 
 在模型训练时开启`--do_predict`，训练结束后直接在测试集上`test.txt`进行评估，也可以在训练结束后，通过运行以下命令加载模型参数进行评估：
@@ -274,6 +287,7 @@ python train.py --do_predict --data_dir ./data --output_dir ./predict_checkpoint
 - `do_predict`: 是否进行预测。
 - `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 
+<a name="模型部署"></a>
 ### 3.6 模型部署
 
 #### 模型导出
@@ -324,9 +338,9 @@ python infer.py --model_path_prefix checkpoints/export/model --data_dir ./data -
 可配置参数说明：
 
 - `model_path_prefix`: 导出的静态图模型路径及文件前缀。
-- `model_name_or_path`: 内置预训练模型名，或者模型参数配置目录路径，用于加载tokenizer。默认为`ernie-3.0-base-zh`。
+- `model_name`: 内置预训练模型名，用于加载tokenizer。默认为`ernie-3.0-base-zh`。
 - `data_dir`: 待推理数据所在路径，数据应存放在该目录下的`data.txt`文件。
-- `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
+- `max_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `batch_size`: 每次预测的样本数量。
 - `device`: 选择推理设备，包括`cpu`和`gpu`。默认为`gpu`。
 - `device_id`: 指定GPU设备ID。
@@ -335,6 +349,7 @@ python infer.py --model_path_prefix checkpoints/export/model --data_dir ./data -
 
 **Note**: 在GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，在包括V100、T4、A10、A100、GTX 20系列和30系列显卡等设备上可以开启FP16进行加速，在CPU或者CUDA计算能力 (CUDA Compute Capability) 小于7.0时开启不会带来加速效果。
 
+<a name="References"></a>
 ## 4. References
 
 - Liu, Xiao, et al. "GPT understands, too." arXiv preprint arXiv:2103.10385 (2021). [[PDF]](https://arxiv.org/abs/2103.10385)

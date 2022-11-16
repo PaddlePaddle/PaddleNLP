@@ -15,7 +15,7 @@
 - **Back-Translation masked language modeling(BTMLM)**: 该方法基于回译机制从单语语料中学习语言间的对齐关系。通过CAMLM 生成伪平行语料，然后让模型学习生成的伪平行句子，使模型可以利用单语语料更好地建模语义对齐关系。
 
 
-![framework](./framework.png)
+![framework](https://user-images.githubusercontent.com/40912707/201308423-bf4f0100-3ada-4bae-89d5-b07ffec1e2c0.png)
 
 本项目是 ERNIE-M 的 PaddlePaddle 动态图实现， 包含模型训练，模型验证等内容。以下是本例的简要目录结构及说明：
 
