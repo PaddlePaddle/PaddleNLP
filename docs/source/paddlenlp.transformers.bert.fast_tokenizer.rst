@@ -1,7 +1,7 @@
-faster\_tokenizer
+fast\_tokenizer
 ====================================================
 
-.. automodule:: paddlenlp.transformers.bert.faster_tokenizer
+.. automodule:: paddlenlp.transformers.bert.fast_tokenizer
    :members:
    :no-undoc-members:
    :show-inheritance:
