@@ -21,7 +21,7 @@ components:    # define all the building-blocks for Pipeline
     params:
       model_name_or_path: rocketqav2-en-marco-cross-encoder
       top_k: 3
-      user_en: True,
+      use_en: True,
       reinitialize: True
   - name: TextFileConverter
     type: TextConverter

@@ -49,7 +49,7 @@ class ErnieRanker(BaseRanker):
         progress_bar: bool = True,
         batch_size: int = 1000,
         reinitialize: bool = False,
-        user_en: bool = False,
+        use_en: bool = False,
     ):
         """
         :param model_name_or_path: Directory of a saved model or the name of a public model e.g.
@@ -62,11 +62,12 @@ class ErnieRanker(BaseRanker):
         self.set_config(
             model_name_or_path=model_name_or_path,
             top_k=top_k,
-            user_en=user_en,
+            use_en=use_en,
         )
 
         self.top_k = top_k
-        self.user_en = user_en
+        # Parameter to control the use of English Cross Encoder Model
+        self.use_en = use_en
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
                                                      multi_gpu=True)
@@ -168,7 +169,7 @@ class ErnieRanker(BaseRanker):
             tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
 
             with paddle.no_grad():
-                if (self.user_en):
+                if (self.use_en):
                     similarity_scores = self.transformer_model.matching_v2(
                         **tensors).numpy()
                 else:
