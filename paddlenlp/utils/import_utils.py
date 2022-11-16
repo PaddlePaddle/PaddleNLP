@@ -23,8 +23,8 @@ import importlib.util
 from paddlenlp.utils.log import logger
 
 
-def is_faster_tokenizer_available():
-    package_spec = importlib.util.find_spec("faster_tokenizer")
+def is_fast_tokenizer_available():
+    package_spec = importlib.util.find_spec("fast_tokenizer")
     return package_spec is not None and package_spec.has_location
 
 

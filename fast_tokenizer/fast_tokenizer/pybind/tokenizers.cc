@@ -431,7 +431,7 @@ int TokenizerInit(PyObject* self, PyObject* args, PyObject* kwargs) {
       py_tokenizer_ptr->tokenizer.SetModel(model);
     } else {
       std::ostringstream oss;
-      oss << "Expected tpye of arguments is `model`";
+      oss << "Expected type of arguments is `model`";
       throw std::runtime_error(oss.str());
     }
     return 0;
