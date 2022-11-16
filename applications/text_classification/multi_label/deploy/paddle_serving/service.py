@@ -49,7 +49,7 @@ class Op(Op):
 
     def init_op(self):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name,
-                                                       use_faster=True)
+                                                       use_fast=True)
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
         self.fetch_names = [

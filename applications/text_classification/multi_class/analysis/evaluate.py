@@ -156,16 +156,17 @@ def evaluate():
     logger.info("Dev dataset size: {}".format(len(dev_ds)))
     logger.info("Accuracy in dev dataset: {:.2f}%".format(report['accuracy'] *
                                                           100))
-    logger.info("Top-2 accuracy in dev dataset: {:.2f}%".format(
-        top_k_accuracy_score(y_true=labels,
-                             y_score=probs,
-                             k=2,
-                             labels=list(range(len(label_list)))) * 100))
-    logger.info("Top-3 accuracy in dev dataset: {:.2f}%".format(
-        top_k_accuracy_score(y_true=labels,
-                             y_score=probs,
-                             k=3,
-                             labels=list(range(len(label_list)))) * 100))
+    if len(labels) > 2:
+        logger.info("Top-2 accuracy in dev dataset: {:.2f}%".format(
+            top_k_accuracy_score(y_true=labels,
+                                 y_score=probs,
+                                 k=2,
+                                 labels=list(range(len(label_list)))) * 100))
+        logger.info("Top-3 accuracy in dev dataset: {:.2f}%".format(
+            top_k_accuracy_score(y_true=labels,
+                                 y_score=probs,
+                                 k=3,
+                                 labels=list(range(len(label_list)))) * 100))
 
     for i, l in enumerate(label_list):
         logger.info("Class name: {}".format(l))
