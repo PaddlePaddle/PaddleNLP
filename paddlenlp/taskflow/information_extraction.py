@@ -372,8 +372,8 @@ class UIETask(Task):
             'lazy_load'] if 'lazy_load' in self.kwargs else False
         self._num_workers = self.kwargs[
             'num_workers'] if 'num_workers' in self.kwargs else 0
-        self.use_faster = self.kwargs[
-            'use_faster'] if 'use_faster' in self.kwargs else False
+        self.use_fast = self.kwargs[
+            'use_fast'] if 'use_fast' in self.kwargs else False
         self._construct_tokenizer()
 
     def set_schema(self, schema):
@@ -425,8 +425,8 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self._task_path, use_faster=self.use_faster)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path,
+                                                        use_fast=self.use_fast)
 
     def _preprocess(self, inputs):
         """
@@ -882,7 +882,7 @@ class GPTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        # TODO(zhoushunjie): Will set use_faster=True in future.
+        # TODO(zhoushunjie): Will set use_fast=True in future.
         self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):
