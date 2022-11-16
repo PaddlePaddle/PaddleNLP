@@ -26,7 +26,9 @@ extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
 extras["tests"] = read_requirements_file("tests/requirements.txt")
 extras["docs"] = read_requirements_file("docs/requirements.txt")
-extras["dev"] = extras["tests"] + extras["docs"]
+extras["cli"] = read_requirements_file("paddlenlp/cli/requirements.txt")
+
+extras["dev"] = extras["tests"] + extras["docs"] + extras['cli']
 
 
 def read(*names, **kwargs):
@@ -83,6 +85,7 @@ setuptools.setup(
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
+    entry_points={'console_scripts': ['paddlenlp = paddlenlp.cli:main']},
     extras_require=extras,
     python_requires='>=3.6',
     classifiers=[
