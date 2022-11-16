@@ -237,6 +237,10 @@ def gradient_cache_train(train_data_loader, model, optimizer, lr_scheduler,
 
     if args.batch_size % args.chunk_numbers == 0:
         chunk_numbers = args.chunk_numbers
+    else:
+        raise Exception(
+            f" Batch_size {args.batch_size} must divides chunk_numbers {args.chunk_numbers} without producing a remainder "
+        )
 
     def split(inputs, chunk_numbers, axis=0):
         if inputs.shape[0] % chunk_numbers == 0:
