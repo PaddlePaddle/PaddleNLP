@@ -138,6 +138,18 @@ class LatentDiffusionTrainer(Trainer):
             self.control = self.callback_handler.on_save(
                 self.args, self.state, self.control)
 
+    def log(self, logs: Dict[str, float], image_logs=None) -> None:
+        if self.state.epoch is not None:
+            logs["epoch"] = round(self.state.epoch, 4)
+
+        output = {**logs, **{"step": self.state.global_step}}
+        self.state.log_history.append(output)
+        self.control = self.callback_handler.on_log(self.args,
+                                                    self.state,
+                                                    self.control,
+                                                    logs,
+                                                    image_logs=image_logs)
+
 
 def worker_init_fn(_):
     worker_info = get_worker_info()

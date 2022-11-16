@@ -810,12 +810,8 @@ class Trainer:
         # TODO  @ZHUI paddle need return the results of set_state_dict.
         self.model.set_state_dict(state_dict)
 
-    def _maybe_log_save_evaluate(self,
-                                 tr_loss,
-                                 model,
-                                 epoch,
-                                 ignore_keys_for_eval,
-                                 input=None):
+    def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
+                                 ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
@@ -1574,7 +1570,7 @@ class Trainer:
                     paddle.load(os.path.join(checkpoint, SCALER_NAME),
                                 return_numpy=True))
 
-    def log(self, logs: Dict[str, float], **kwargs) -> None:
+    def log(self, logs: Dict[str, float]) -> None:
         """
         Log `logs` on the various objects watching training.
 
@@ -1590,8 +1586,7 @@ class Trainer:
         output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state,
-                                                    self.control, logs,
-                                                    **kwargs)
+                                                    self.control, logs)
 
     def evaluate(
         self,
