@@ -18,3 +18,4 @@ from ...utils import is_paddlenlp_available
 
 if is_paddlenlp_available():
     from .pipeline_latent_diffusion import LDMBertModel, LDMTextToImagePipeline
+    from .pipeline_latent_diffusion_superresolution import LDMSuperResolutionPipeline

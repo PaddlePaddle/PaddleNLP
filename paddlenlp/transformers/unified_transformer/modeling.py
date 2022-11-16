@@ -19,6 +19,7 @@ import paddle.nn.functional as F
 from paddle.nn import TransformerEncoder
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import CausalLMOutputWithCrossAttentions
 
 __all__ = [
     "UnifiedTransformerPretrainedModel",
@@ -343,7 +344,10 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 attention_mask=None,
                 use_cache=False,
                 cache=None,
-                role_ids=None):
+                role_ids=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The UnifiedTransformerModel forward method, overrides the special 
         :meth:`__call__` method.
@@ -392,17 +396,25 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                 Indices of role ids indicated different roles.
                  It's data type should be `int64` and has a shape of 
                 [batch_size, sequence_length]. Defaults to None.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object.
+                If `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor|tuple: If `use_cache` is False, it is a tensor 
-            representing the output of :class:`UnifiedTransformerModel`, with 
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=None`, 
+            returns a tensor representing the output of :class:`UnifiedTransformerModel`, with 
             shape [batch_size, sequence_length, hidden_size]. The data type is 
-            float32 or float64. Otherwise, it is a tuple, besides the output of 
-            :class:`UnifiedTransformerModel`, the tuple also includes the new 
-            cache which is same as input `cache` but `incremental_cache` in it 
-            has an incremental length. 
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
-            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+            float32 or float64. 
 
         Example:
             .. code-block::
@@ -429,16 +441,18 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
                                            token_type_ids,
                                            position_ids,
                                            role_ids=role_ids)
-        if use_cache:
-            if cache is None:
-                cache = self.encoder.gen_cache(embedding_output)
-            sequence_output, cache = self.encoder(embedding_output,
-                                                  attention_mask, cache)
-            return sequence_output, cache
-        else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
+        if use_cache and cache is None:
+            cache = self.encoder.gen_cache(embedding_output)
 
-            return sequence_output
+        sequence_output = self.encoder(
+            embedding_output,
+            attention_mask,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        return sequence_output
 
 
 class UnifiedTransformerLMHead(nn.Layer):
@@ -502,7 +516,11 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 masked_positions=None,
                 use_cache=False,
                 cache=None,
-                role_ids=None):
+                role_ids=None,
+                labels=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The UnifiedTransformerLMHeadModel forward method, overrides the special 
         :meth:`__call__` method.
@@ -522,17 +540,26 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 See :class:`UnifiedTransformerModel`.
             role_ids: (Tensor, optional):
                 See :class:`UnifiedTransformerModel`.
+            labels: (Tensor, optional):
+                Labels for computing the left-to-right language modeling loss. Indices should be in
+                `[-100, 0, ..., vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
+                ignored (masked), the loss is only computed for the tokens with labels n `[0, ..., vocab_size]`
+            output_attentions (bool, optional):
+                See :class: `UnifiedTransformerModel`
+            output_hidden_states (bool, optional):
+                See :class: `UnifiedTransformerModel`
+            return_dict (bool, optional):
+                See :class: `UnifiedTransformerModel`
 
         Returns:
-            Tensor|tuple: If `use_cache` is False, it is a tensor 
-            representing the output of :class:`UnifiedTransformerLMHeadModel`, 
+            An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=labels=None`, 
+            returns a tensor representing the output of :class:`UnifiedTransformerLMHeadModel`, 
             with shape [batch_size, sequence_length, vocab_size]. The data type 
-            is float32 or float64. Otherwise, it is a tuple, besides the output 
-            of :class:`UnifiedTransformerLMHeadModel`, the tuple also includes 
-            the new cache which is same as input `cache` but `incremental_cache` 
-            in it has an incremental length. 
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and 
-            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+            is float32 or float64. 
 
         Example:
             .. code-block::
@@ -551,20 +578,43 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.unified_transformer(input_ids,
-                                           token_type_ids,
-                                           position_ids,
-                                           attention_mask,
-                                           use_cache,
-                                           cache,
-                                           role_ids=role_ids)
-        sequence_output = outputs[0] if use_cache else outputs
+        outputs = self.unified_transformer(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            use_cache,
+            cache,
+            role_ids=role_ids,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs if isinstance(outputs,
+                                                type(input_ids)) else outputs[0]
         logits = self.lm_head(sequence_output, masked_positions)
-        if use_cache:
-            cache = outputs[1]
-            return logits, cache
-        else:
-            return logits
+
+        lm_loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            lm_loss = loss_fct(logits.reshape((-1, logits.shape[-1])),
+                               labels.reshape([-1]))
+        if not return_dict:
+            if isinstance(outputs, type(input_ids)):
+                return (lm_loss, logits) if lm_loss is not None else logits
+            else:
+                outputs = (logits, ) + outputs[1:]
+                return ((lm_loss, ) +
+                        outputs) if lm_loss is not None else outputs
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=lm_loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterUnifiedTransformer

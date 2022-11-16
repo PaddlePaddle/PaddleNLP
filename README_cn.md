@@ -30,6 +30,9 @@
 **PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
 
 ## News 📢
+
+* 🔥 **2022.11.12 PaddleNLP新增AutoPrompt自动化提示功能，登顶FewCLUE小样本学习榜单!**
+  * 🥇 PaddleNLP 团队开源了 **AutoPrompt** 方案，基于开源的文心 ERNIE 预训练语言模型 ，结合了领域预训练和自动化提示学习技术，以291M 参数量的模型在小样本权威学习榜单 FewCLUE 排名第一，[详见](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
   * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
   * 发布 🖼[**PPDiffusers**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，可快速体验、二次开发 **Stable Diffusion**，持续支持更多模型。
@@ -234,7 +237,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 
 ### 高性能分布式训练与推理
 
-#### ⚡ FasterTokenizer：高性能文本处理库
+#### ⚡ FastTokenizer：高性能文本处理库
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
@@ -244,7 +247,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
 ```
 
-为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FasterTokenizer文档](./faster_tokenizer)。
+为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FastTokenizer文档](./fast_tokenizer)。
 
 #### ⚡️ FasterGeneration：高性能生成加速库
 
