@@ -37,8 +37,8 @@ do
    then
        echo "Successfully compile."
    else
-   fi
        echo "Fail compiling."
+   fi
    cd ..
 done
 
