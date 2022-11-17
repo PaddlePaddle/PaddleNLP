@@ -193,19 +193,22 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 python train.py \
     --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
-    --output_dir ./checkpoints/ \
+    --output_dir checkpoint \
     --device gpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
+    --early_stopping_patience 4 \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
     --per_device_train_batch_size 32 \
+    --num_train_epochs 100 \
     --do_train \
     --do_eval \
     --metric_for_best_model accuracy \
     --load_best_model_at_end \
     --evaluation_strategy epoch \
-    --save_strategy epoch
+    --save_strategy epoch \
+    --save_total_limit 1
 ```
 
 如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
@@ -213,19 +216,22 @@ python train.py \
 python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
     --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
-    --output_dir ./checkpoints/ \
+    --output_dir checkpoint \
     --device cpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
     --per_device_train_batch_size 32 \
+    --num_train_epochs 100 \
+    --early_stopping_patience 4 \
     --do_train \
     --do_eval \
     --metric_for_best_model accuracy \
     --load_best_model_at_end \
     --evaluation_strategy epoch \
-    --save_strategy epoch
+    --save_strategy epoch \
+    --save_total_limit 1
 ```
 
 如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus 0,1。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况:
@@ -233,21 +239,23 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus 0,1 train.py \
-    --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
-    --output_dir ./checkpoints/ \
+    --output_dir checkpoint \
     --device cpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
     --per_device_train_batch_size 32 \
+    --num_train_epochs 100 \
+    --early_stopping_patience 4 \
     --do_train \
     --do_eval \
     --metric_for_best_model accuracy \
     --load_best_model_at_end \
     --evaluation_strategy epoch \
-    --save_strategy epoch
+    --save_strategy epoch \
+    --save_total_limit 1 
 ```
 
 主要的配置的参数为：
@@ -256,6 +264,7 @@ python -m paddle.distributed.launch --gpus 0,1 train.py \
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `num_train_epochs`: 训练轮次，使用早停法时可以选择100
+- `early_stopping_patience`: 在设定的早停训练轮次内，模型在开发集上表现不再上升，训练终止；默认为4。
 - `learning_rate`: 预训练语言模型参数基础学习率大小，将与learning rate scheduler产生的值相乘作为当前学习率。
 - `do_train`: 是否进行训练。
 - `do_eval`: 是否进行评估。
