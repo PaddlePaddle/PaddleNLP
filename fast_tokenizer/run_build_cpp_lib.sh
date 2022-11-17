@@ -27,4 +27,10 @@ echo "Compile with $core_num cores"
 cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
 make -j${core_num}
 
+if [[$? == 0]];
+then
+    echo "Successfully compile."
+else
+fi
+    echo "Fail compiling."
 cd ..
