@@ -44,6 +44,11 @@ class TestModeling(unittest.TestCase):
 
     @slow
     def test_multiprocess_downloading(self):
+        """test downloading with multi-process.
+
+            `num_process_in_pool` is the number of process in Pool.
+            And the `num_jobs` is the number of total process to download file.
+        """
         num_process_in_pool, num_jobs = 10, 20
         small_model_path = "https://paddlenlp.bj.bcebos.com/models/community/__small_models__/bert-base-uncased/model_state.pdparams"
 
@@ -56,7 +61,12 @@ class TestModeling(unittest.TestCase):
 
     # @slow
     def test_model_from_pretrained_with_multiprocessing(self):
-        """this test can not init tooooo many models which will occupy CPU/GPU memorys."""
+        """
+        this test can not init tooooo many models which will occupy CPU/GPU memorys.
+
+            `num_process_in_pool` is the number of process in Pool.
+            And the `num_jobs` is the number of total process to download file.
+        """
         num_process_in_pool, num_jobs = 1, 10
 
         # 1.remove tinybert model weight file
