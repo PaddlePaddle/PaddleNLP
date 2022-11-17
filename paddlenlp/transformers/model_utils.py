@@ -62,13 +62,11 @@ def get_path_from_url(url: str,
         str: the path of downloaded file
     """
     os.makedirs(root_dir, exist_ok=True)
-    lock_file = os.path.join(root_dir, '.download_lock_file')
 
     # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
-    lock_file = os.path.join(LOCK_FILE_HOME, str(hash(url + root_dir)))
-    with FileLock(lock_file) as file_lock:
-        file_lock.acquire()
-
+    lock_file_path = os.path.join(LOCK_FILE_HOME,
+                                  f"{str(hash(url + root_dir))}")
+    with FileLock(lock_file_path):
         # import get_path_from_url from paddle framework
         from paddle.utils.download import get_path_from_url as _get_path_from_url
         result = _get_path_from_url(url=url,

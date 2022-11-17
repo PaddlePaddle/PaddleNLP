@@ -18,20 +18,20 @@ import shutil
 from tempfile import TemporaryDirectory
 from tests.testing_utils import slow
 from multiprocessing import Pool
-from paddlenlp.transformers import TinyBertModel, AlbertModel
-from paddlenlp.utils.env import PPNLP_HOME
+from paddlenlp.transformers import TinyBertModel, BertModel
+from paddlenlp.utils.env import MODEL_HOME
 
 
-def download_albert_model(model_name: str):
+def download_bert_model(model_name: str):
     """set the global method: multiprocessing can not pickle local method
 
     Args:
         model_name (str): the model name
     """
-    model = AlbertModel.from_pretrained(model_name, load_state_as_np=True)
+
+    model = BertModel.from_pretrained(model_name)
     # free the model resource
     del model
-    return True
 
 
 class TestModeling(unittest.TestCase):
@@ -54,16 +54,16 @@ class TestModeling(unittest.TestCase):
                 pool.starmap(get_path_from_url, [(small_model_path, tempdir)
                                                  for _ in range(num_iter)])
 
-    @slow
+    # @slow
     def test_model_from_pretrained_with_multiprocessing(self):
         """this test can not init tooooo many models which will occupy CPU/GPU memorys."""
-        num_process, num_iter = 3, 10
+        num_process, num_iter = 1, 10
 
         # 1.remove tinybert model weight file
         model_name = "__small_models__/bert-base-uncased"
-        shutil.rmtree(os.path.join(PPNLP_HOME, model_name), ignore_errors=True)
+        shutil.rmtree(os.path.join(MODEL_HOME, model_name), ignore_errors=True)
 
         # 2. downloaing tinybert modeling using multi-processing
         with Pool(num_process) as pool:
-            pool.starmap(download_albert_model,
+            pool.starmap(download_bert_model,
                          [(model_name, ) for _ in range(num_iter)])
