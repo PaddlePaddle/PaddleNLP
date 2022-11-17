@@ -31,6 +31,6 @@ if [[$? == 0]];
 then
     echo "Successfully compile."
 else
-fi
     echo "Fail compiling."
+fi
 cd ..
