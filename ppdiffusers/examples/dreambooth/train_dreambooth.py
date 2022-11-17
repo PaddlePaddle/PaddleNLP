@@ -39,7 +39,7 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 from pathlib import Path
 
 
-def parse_args(input_args):
+def parse_args(input_args=None):
     parser = argparse.ArgumentParser(
         description="Simple example of a training dreambooth script.")
     parser.add_argument(

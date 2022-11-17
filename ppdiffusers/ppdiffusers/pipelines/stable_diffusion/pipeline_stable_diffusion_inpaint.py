@@ -30,7 +30,13 @@ from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPToke
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler, EulerAncestralDiscreteScheduler
+from ...schedulers import (
+    DDIMScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+)
 from ...utils import deprecate, logging
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
@@ -72,8 +78,9 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
@@ -88,6 +95,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
+                         EulerDiscreteScheduler,
                          EulerAncestralDiscreteScheduler],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -109,6 +117,23 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
                       standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
+            scheduler._internal_dict = FrozenDict(new_config)
+
+        if hasattr(scheduler.config,
+                   "clip_sample") and scheduler.config.clip_sample is True:
+            deprecation_message = (
+                f"The configuration file of this scheduler: {scheduler} has not set the configuration `clip_sample`."
+                " `clip_sample` should be set to False in the configuration file. Please make sure to update the"
+                " config accordingly as not setting `clip_sample` in the config might lead to incorrect results in"
+                " future versions. If you have downloaded this checkpoint from the Hugging Face Hub, it would be very"
+                " nice if you could open a Pull request for the `scheduler/scheduler_config.json` file"
+            )
+            deprecate("clip_sample not set",
+                      "1.0.0",
+                      deprecation_message,
+                      standard_warn=False)
+            new_config = dict(scheduler.config)
+            new_config["clip_sample"] = False
             scheduler._internal_dict = FrozenDict(new_config)
 
         if safety_checker is None:
@@ -294,7 +319,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         if do_classifier_free_guidance:
             uncond_tokens: List[str]
             if negative_prompt is None:
-                uncond_tokens = [""]
+                uncond_tokens = [""] * batch_size
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
@@ -324,7 +349,7 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
             uncond_embeddings = uncond_embeddings.tile(
-                [batch_size, num_images_per_prompt, 1])
+                [1, num_images_per_prompt, 1])
             uncond_embeddings = uncond_embeddings.reshape(
                 [batch_size * num_images_per_prompt, seq_len, -1])
 
@@ -357,11 +382,13 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
 
         # prepare mask and masked_image
         mask, masked_image = prepare_mask_and_masked_image(image, mask_image)
-        mask = mask.astype(dtype=text_embeddings.dtype)
-        masked_image = masked_image.astype(dtype=text_embeddings.dtype)
 
         # resize the mask to latents shape as we concatenate the mask to the latents
+        # we do that before converting to dtype to avoid breaking in case we're using cpu_offload
+        # and half precision
         mask = F.interpolate(mask, size=(height // 8, width // 8))
+        mask = mask.astype(text_embeddings.dtype)
+        masked_image = masked_image.astype(text_embeddings.dtype)
 
         # encode the mask image into latents space so we can concatenate it to the latents
         masked_image_latents = self.vae.encode(
@@ -369,15 +396,19 @@ class StableDiffusionInpaintPipeline(DiffusionPipeline):
         masked_image_latents = 0.18215 * masked_image_latents
 
         # duplicate mask and masked_image_latents for each generation per prompt, using mps friendly method
-        mask = mask.tile([num_images_per_prompt, 1, 1, 1])
+        mask = mask.tile([batch_size * num_images_per_prompt, 1, 1, 1])
         masked_image_latents = masked_image_latents.tile(
-            [num_images_per_prompt, 1, 1, 1])
+            [batch_size * num_images_per_prompt, 1, 1, 1])
 
         mask = paddle.concat([mask] *
                              2) if do_classifier_free_guidance else mask
         masked_image_latents = (paddle.concat([masked_image_latents] *
                                               2) if do_classifier_free_guidance
                                 else masked_image_latents)
+
+        # aligning device to prevent device errors when concating it with the latent model input
+        masked_image_latents = masked_image_latents.astype(
+            text_embeddings.dtype)
 
         num_channels_mask = mask.shape[1]
         num_channels_masked_image = masked_image_latents.shape[1]

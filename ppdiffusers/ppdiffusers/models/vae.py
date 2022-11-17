@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 import numpy as np
 import paddle
@@ -23,7 +23,7 @@ import paddle.nn as nn
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput
-from .unet_blocks import UNetMidBlock2D, get_down_block, get_up_block
+from .unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
 
 
 @dataclass
@@ -257,7 +257,7 @@ class VectorQuantizer(nn.Layer):
     # specify legacy=False to fix it.
     def __init__(self,
                  n_e,
-                 e_dim,
+                 vq_embed_dim,
                  beta,
                  remap=None,
                  unknown_index="random",
@@ -265,12 +265,12 @@ class VectorQuantizer(nn.Layer):
                  legacy=True):
         super().__init__()
         self.n_e = n_e
-        self.e_dim = e_dim
+        self.vq_embed_dim = vq_embed_dim
         self.beta = beta
         self.legacy = legacy
 
         self.embedding = nn.Embedding(self.n_e,
-                                      self.e_dim,
+                                      self.vq_embed_dim,
                                       weight_attr=nn.initializer.Uniform(
                                           -1.0 / self.n_e, 1.0 / self.n_e))
 
@@ -312,15 +312,15 @@ class VectorQuantizer(nn.Layer):
         used = self.used.astype(inds.dtype)
         if self.re_embed > self.used.shape[0]:  # extra token
             inds[inds >= self.used.shape[0]] = 0  # simply set to zero
-        back = paddle.gather(used[None, :][inds.shape[0] * [0], :],
-                             inds,
-                             axis=1)
+        back = paddle.take_along_axis(used[None, :][inds.shape[0] * [0], :],
+                                      inds,
+                                      axis=1)
         return back.reshape(ishape)
 
     def forward(self, z):
         # reshape z -> (batch, height, width, channel) and flatten
         z = z.transpose([0, 2, 3, 1])
-        z_flattened = z.reshape([-1, self.e_dim])
+        z_flattened = z.reshape([-1, self.vq_embed_dim])
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
 
         d = (
@@ -445,6 +445,7 @@ class VQModel(ModelMixin, ConfigMixin):
         latent_channels (`int`, *optional*, defaults to `3`): Number of channels in the latent space.
         sample_size (`int`, *optional*, defaults to `32`): TODO
         num_vq_embeddings (`int`, *optional*, defaults to `256`): Number of codebook vectors in the VQ-VAE.
+        vq_embed_dim (`int`, *optional*): Hidden dim of codebook vectors in the VQ-VAE.
     """
 
     @register_to_config
@@ -461,6 +462,7 @@ class VQModel(ModelMixin, ConfigMixin):
         sample_size: int = 32,
         num_vq_embeddings: int = 256,
         norm_num_groups: int = 32,
+        vq_embed_dim: Optional[int] = None,
     ):
         super().__init__()
 
@@ -475,14 +477,15 @@ class VQModel(ModelMixin, ConfigMixin):
             norm_num_groups=norm_num_groups,
             double_z=False,
         )
+        vq_embed_dim = vq_embed_dim if vq_embed_dim is not None else latent_channels
 
-        self.quant_conv = nn.Conv2D(latent_channels, latent_channels, 1)
+        self.quant_conv = nn.Conv2D(latent_channels, vq_embed_dim, 1)
         self.quantize = VectorQuantizer(num_vq_embeddings,
-                                        latent_channels,
+                                        vq_embed_dim,
                                         beta=0.25,
                                         remap=None,
                                         sane_index_shape=False)
-        self.post_quant_conv = nn.Conv2D(latent_channels, latent_channels, 1)
+        self.post_quant_conv = nn.Conv2D(vq_embed_dim, latent_channels, 1)
 
         # pass init params to Decoder
         self.decoder = Decoder(

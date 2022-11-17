@@ -89,6 +89,14 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
             stable diffusion.
 
     """
+    _compatible_classes = [
+        "DDIMScheduler",
+        "DDPMScheduler",
+        "LMSDiscreteScheduler",
+        "EulerDiscreteScheduler",
+        "EulerAncestralDiscreteScheduler",
+        "DPMSolverMultistepScheduler",
+    ]
 
     @register_to_config
     def __init__(

@@ -30,7 +30,13 @@ from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPToke
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler, EulerAncestralDiscreteScheduler
+from ...schedulers import (
+    DDIMScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+)
 from ...utils import deprecate, logging
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
@@ -475,8 +481,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/junnyu/stable-diffusion-v1-4-paddle) for details.
@@ -491,6 +498,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
+                         EulerDiscreteScheduler,
                          EulerAncestralDiscreteScheduler],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -705,7 +713,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         if latents is None:
             if seed is not None:
                 paddle.seed(seed)
-
             latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
         else:
             if latents.shape != latents_shape:
@@ -898,7 +905,8 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                         skip_parsing=skip_parsing,
                         skip_weighting=skip_weighting,
                         epoch_time=time.time())
-
+        if seed is not None:
+            paddle.seed(seed)
         if isinstance(prompt, str):
             batch_size = 1
         elif isinstance(prompt, list):
@@ -979,9 +987,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         timesteps = timesteps.tile([
             batch_size * num_images_per_prompt,
         ])
-
-        if seed is not None:
-            paddle.seed(seed)
         # add noise to latents using the timesteps
         noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
         init_latents = self.scheduler.add_noise(init_latents, noise, timesteps)
@@ -1176,6 +1181,8 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                         skip_parsing=skip_parsing,
                         skip_weighting=skip_weighting,
                         epoch_time=time.time())
+        if seed is not None:
+            paddle.seed(seed)
         if isinstance(prompt, str):
             batch_size = 1
         elif isinstance(prompt, list):
@@ -1252,8 +1259,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         ])
 
         # add noise to latents using the timesteps
-        if seed is not None:
-            paddle.seed(seed)
         noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
         init_latents = self.scheduler.add_noise(init_latents, noise, timesteps)
 

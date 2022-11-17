@@ -107,6 +107,7 @@ class TransformerEncoderLayer(nn.TransformerEncoderLayer):
 
 @register_base_model
 class LDMBertModel(LDMBertPretrainedModel):
+    _no_split_modules = []
 
     def __init__(self,
                  vocab_size=30522,
@@ -275,7 +276,7 @@ class LDMTextToImagePipeline(DiffusionPipeline):
             [BertTokenizer](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html#paddlenlp.transformers.bert.tokenizer.BertTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
     """
 

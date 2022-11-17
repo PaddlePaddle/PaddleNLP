@@ -23,7 +23,14 @@ from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPToke
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler, EulerAncestralDiscreteScheduler
+from ...schedulers import (
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+)
 from ...utils import deprecate, logging
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
@@ -50,11 +57,12 @@ class StableDiffusionPipeline(DiffusionPipeline):
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
-            Please, refer to the [model card](https://huggingface.co/junnyu/stable-diffusion-v1-4-paddle) for details.
+            Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
@@ -66,7 +74,9 @@ class StableDiffusionPipeline(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
-                         EulerAncestralDiscreteScheduler],
+                         EulerDiscreteScheduler,
+                         EulerAncestralDiscreteScheduler,
+                         DPMSolverMultistepScheduler, ],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
     ):
@@ -89,11 +99,28 @@ class StableDiffusionPipeline(DiffusionPipeline):
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
 
+        if hasattr(scheduler.config,
+                   "clip_sample") and scheduler.config.clip_sample is True:
+            deprecation_message = (
+                f"The configuration file of this scheduler: {scheduler} has not set the configuration `clip_sample`."
+                " `clip_sample` should be set to False in the configuration file. Please make sure to update the"
+                " config accordingly as not setting `clip_sample` in the config might lead to incorrect results in"
+                " future versions. If you have downloaded this checkpoint from the Hugging Face Hub, it would be very"
+                " nice if you could open a Pull request for the `scheduler/scheduler_config.json` file"
+            )
+            deprecate("clip_sample not set",
+                      "1.0.0",
+                      deprecation_message,
+                      standard_warn=False)
+            new_config = dict(scheduler.config)
+            new_config["clip_sample"] = False
+            scheduler._internal_dict = FrozenDict(new_config)
+
         if safety_checker is None:
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
+                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
@@ -185,7 +212,7 @@ class StableDiffusionPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             seed (`int`, *optional*):
-                Random number seed.
+                A random seed.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -266,7 +293,7 @@ class StableDiffusionPipeline(DiffusionPipeline):
         if do_classifier_free_guidance:
             uncond_tokens: List[str]
             if negative_prompt is None:
-                uncond_tokens = [""]
+                uncond_tokens = [""] * batch_size
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
@@ -289,7 +316,6 @@ class StableDiffusionPipeline(DiffusionPipeline):
                 truncation=True,
                 return_tensors="pd",
             )
-            # paddlenlp's attention_mask is not like transforemrs's attention_mask
             attention_mask = paddle.ones_like(uncond_input.input_ids)
             uncond_embeddings = self.text_encoder(
                 uncond_input.input_ids, attention_mask=attention_mask)[0]
@@ -297,7 +323,7 @@ class StableDiffusionPipeline(DiffusionPipeline):
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
             uncond_embeddings = uncond_embeddings.tile(
-                [batch_size, num_images_per_prompt, 1])
+                [1, num_images_per_prompt, 1])
             uncond_embeddings = uncond_embeddings.reshape(
                 [batch_size * num_images_per_prompt, seq_len, -1])
 
@@ -316,11 +342,11 @@ class StableDiffusionPipeline(DiffusionPipeline):
             batch_size * num_images_per_prompt, self.unet.in_channels,
             height // 8, width // 8
         ]
+        latents_dtype = text_embeddings.dtype
         if latents is None:
             if seed is not None:
                 paddle.seed(seed)
-
-            latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
+            latents = paddle.randn(latents_shape, dtype=latents_dtype)
         else:
             if latents.shape != latents_shape:
                 raise ValueError(

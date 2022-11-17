@@ -18,12 +18,14 @@ import os
 import random
 import re
 import unittest
+import urllib.parse
 from distutils.util import strtobool
 from pathlib import Path
 from typing import Union
+from io import BytesIO, StringIO
 
 import paddle
-
+import numpy as np
 import PIL.Image
 import PIL.ImageOps
 import requests
@@ -32,6 +34,14 @@ from .import_utils import is_paddle_available, is_onnx_available
 
 global_rng = random.Random()
 paddle_device = "gpu" if paddle.device.is_compiled_with_cuda() else "cpu"
+
+
+def paddle_all_close(a, b, *args, **kwargs):
+    if not is_paddle_available():
+        raise ValueError("Paddle needs to be installed to use this function.")
+    if not paddle.allclose(a, b, *args, **kwargs):
+        assert False, f"Max diff is absolute {(a - b).abs().max()}. Diff tensor is {(a - b).abs()}."
+    return True
 
 
 def get_tests_dir(append_path=None):
@@ -120,6 +130,28 @@ def require_onnxruntime(test_case):
     """
     return unittest.skipUnless(is_onnx_available(),
                                "test requires onnxruntime")(test_case)
+
+
+def load_numpy(arry: Union[str, np.ndarray]) -> np.ndarray:
+    if isinstance(arry, str):
+        if arry.startswith("http://") or arry.startswith("https://"):
+            response = requests.get(arry)
+            response.raise_for_status()
+            arry = np.load(BytesIO(response.content))
+        elif os.path.isfile(arry):
+            arry = np.load(arry)
+        else:
+            raise ValueError(
+                f"Incorrect path or url, URLs must start with `http://` or `https://`, and {arry} is not a valid path"
+            )
+    elif isinstance(arry, np.ndarray):
+        pass
+    else:
+        raise ValueError(
+            "Incorrect format used for numpy ndarray. Should be an url linking to an image, a local path, or a"
+            " ndarray.")
+
+    return arry
 
 
 def load_image(image: Union[str, PIL.Image.Image]) -> PIL.Image.Image:

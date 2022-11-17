@@ -33,7 +33,9 @@ from .logging import get_logger
 from .outputs import BaseOutput
 
 if is_paddle_available():
-    from .testing_utils import floats_tensor, load_image, parse_flag_from_env, slow
+    from .testing_utils import (floats_tensor, load_image, load_numpy,
+                                parse_flag_from_env, require_torch_gpu, slow,
+                                paddle_all_close)
 
 logger = get_logger(__name__)
 

@@ -392,16 +392,21 @@ def get_weighted_text_embeddings(
     # assign weights to the prompts and normalize in the sense of mean
     # TODO: should we normalize by chunk or in a whole (current implementation)?
     if (not skip_parsing) and (not skip_weighting):
-        previous_mean = text_embeddings.mean(axis=[-2, -1])
+        previous_mean = text_embeddings.astype("float32").mean(
+            axis=[-2, -1]).astype(text_embeddings.dtype)
         text_embeddings *= prompt_weights.unsqueeze(-1)
-        text_embeddings *= (
-            previous_mean /
-            text_embeddings.mean(axis=[-2, -1])).unsqueeze(-1).unsqueeze(-1)
+        current_mean = text_embeddings.astype("float32").mean(
+            axis=[-2, -1]).astype(text_embeddings.dtype)
+        text_embeddings *= (previous_mean /
+                            current_mean).unsqueeze(-1).unsqueeze(-1)
         if uncond_prompt is not None:
-            previous_mean = uncond_embeddings.mean(axis=[-2, -1])
+            previous_mean = uncond_embeddings.astype("float32").mean(
+                axis=[-2, -1]).astype(uncond_embeddings.dtype)
             uncond_embeddings *= uncond_weights.unsqueeze(-1)
-            uncond_embeddings *= (previous_mean / uncond_embeddings.mean(
-                axis=[-2, -1])).unsqueeze(-1).unsqueeze(-1)
+            current_mean = uncond_embeddings.astype("float32").mean(
+                axis=[-2, -1]).astype(uncond_embeddings.dtype)
+            uncond_embeddings *= (previous_mean /
+                                  current_mean).unsqueeze(-1).unsqueeze(-1)
 
     if uncond_prompt is not None:
         return text_embeddings, uncond_embeddings
@@ -487,6 +492,23 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
 
+        if hasattr(scheduler.config,
+                   "clip_sample") and scheduler.config.clip_sample is True:
+            deprecation_message = (
+                f"The configuration file of this scheduler: {scheduler} has not set the configuration `clip_sample`."
+                " `clip_sample` should be set to False in the configuration file. Please make sure to update the"
+                " config accordingly as not setting `clip_sample` in the config might lead to incorrect results in"
+                " future versions. If you have downloaded this checkpoint from the Hugging Face Hub, it would be very"
+                " nice if you could open a Pull request for the `scheduler/scheduler_config.json` file"
+            )
+            deprecate("clip_sample not set",
+                      "1.0.0",
+                      deprecation_message,
+                      standard_warn=False)
+            new_config = dict(scheduler.config)
+            new_config["clip_sample"] = False
+            scheduler._internal_dict = FrozenDict(new_config)
+
         if safety_checker is None:
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
@@ -554,6 +576,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -614,10 +637,14 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
                 called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
+            is_cancelled_callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. If the function returns
+                `True`, the inference will be cancelled.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
         Returns:
+            `None` if cancelled by `is_cancelled_callback`,
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
             When returning a tuple, the first element is a list with the generated images, and the second element is a
@@ -813,8 +840,12 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
             # call the callback, if provided
-            if callback is not None and i % callback_steps == 0:
-                callback(i, t, latents)
+            if i % callback_steps == 0:
+                if callback is not None:
+                    callback(i, t, latents)
+                if is_cancelled_callback is not None and is_cancelled_callback(
+                ):
+                    return None
 
         latents = 1 / 0.18215 * latents
         image = self.vae.decode(latents).sample
@@ -860,6 +891,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -906,10 +938,14 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
                 called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
+            is_cancelled_callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. If the function returns
+                `True`, the inference will be cancelled.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
         Returns:
+            `None` if cancelled by `is_cancelled_callback`,
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
             When returning a tuple, the first element is a list with the generated images, and the second element is a
@@ -931,6 +967,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
+            is_cancelled_callback=is_cancelled_callback,
             callback_steps=callback_steps,
             **kwargs,
         )
@@ -950,6 +987,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -997,10 +1035,14 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
                 called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
+            is_cancelled_callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. If the function returns
+                `True`, the inference will be cancelled.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
         Returns:
+            `None` if cancelled by `is_cancelled_callback`,
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
             When returning a tuple, the first element is a list with the generated images, and the second element is a
@@ -1021,6 +1063,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
+            is_cancelled_callback=is_cancelled_callback,
             callback_steps=callback_steps,
             **kwargs,
         )
@@ -1041,6 +1084,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        is_cancelled_callback: Optional[Callable[[], bool]] = None,
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
@@ -1092,10 +1136,14 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
                 called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
+            is_cancelled_callback (`Callable`, *optional*):
+                A function that will be called every `callback_steps` steps during inference. If the function returns
+                `True`, the inference will be cancelled.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
         Returns:
+            `None` if cancelled by `is_cancelled_callback`,
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
             When returning a tuple, the first element is a list with the generated images, and the second element is a
@@ -1117,6 +1165,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
+            is_cancelled_callback=is_cancelled_callback,
             callback_steps=callback_steps,
             **kwargs,
         )

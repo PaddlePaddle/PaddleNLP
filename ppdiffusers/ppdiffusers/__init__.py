@@ -33,7 +33,7 @@ from .utils import logging
 
 if is_paddle_available():
     from .modeling_utils import ModelMixin
-    from .models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel
+    from .models import AutoencoderKL, Transformer2DModel, UNet1DModel, UNet2DConditionModel, UNet2DModel, VQModel
     from .optimization import (
         get_constant_schedule,
         get_constant_schedule_with_warmup,
@@ -44,15 +44,29 @@ if is_paddle_available():
         get_scheduler,
     )
     from .pipeline_utils import DiffusionPipeline
-    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, LDMSuperResolutionPipeline, PNDMPipeline, ScoreSdeVePipeline
+    from .pipelines import (
+        DanceDiffusionPipeline,
+        DDIMPipeline,
+        DDPMPipeline,
+        KarrasVePipeline,
+        LDMPipeline,
+        PNDMPipeline,
+        RePaintPipeline,
+        ScoreSdeVePipeline,
+    )
     from .schedulers import (
         EulerAncestralDiscreteScheduler,
         DDIMScheduler,
         DDPMScheduler,
+        DPMSolverMultistepScheduler,
+        EulerDiscreteScheduler,
+        IPNDMScheduler,
         KarrasVeScheduler,
         PNDMScheduler,
+        RePaintScheduler,
         SchedulerMixin,
         ScoreSdeVeScheduler,
+        VQDiffusionScheduler,
     )
     from .training_utils import EMAModel
 else:
@@ -64,12 +78,11 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
-                            StableDiffusionImg2ImgPipeline,
-                            StableDiffusionInpaintPipeline,
-                            StableDiffusionInpaintPipelineLegacy,
-                            StableDiffusionPipeline,
-                            StableDiffusionPipelineAllinOne)
+    from .pipelines import (
+        CycleDiffusionPipeline, LDMBertModel, LDMTextToImagePipeline,
+        StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline,
+        StableDiffusionInpaintPipelineLegacy, StableDiffusionPipeline,
+        VQDiffusionPipeline, StableDiffusionPipelineAllinOne)
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 

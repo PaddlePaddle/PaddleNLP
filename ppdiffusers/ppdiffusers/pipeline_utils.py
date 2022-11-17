@@ -74,6 +74,19 @@ class ImagePipelineOutput(BaseOutput):
     images: Union[List[PIL.Image.Image], np.ndarray]
 
 
+@dataclass
+class AudioPipelineOutput(BaseOutput):
+    """
+    Output class for audio pipelines.
+    Args:
+        audios (`np.ndarray`)
+            List of denoised samples of shape `(batch_size, num_channels, sample_rate)`. Numpy array present the
+            denoised audio samples of the diffusion pipeline.
+    """
+
+    audios: np.ndarray
+
+
 class DiffusionPipeline(ConfigMixin):
     r"""
     Base class for all models.
@@ -150,6 +163,10 @@ class DiffusionPipeline(ConfigMixin):
 
         for pipeline_component_name in model_index_dict.keys():
             sub_model = getattr(self, pipeline_component_name)
+            if sub_model is None:
+                # edge case for saving a pipeline with safety_checker=None
+                continue
+
             model_cls = sub_model.__class__
 
             save_method_name = None
@@ -165,9 +182,6 @@ class DiffusionPipeline(ConfigMixin):
                 if save_method_name is not None:
                     break
 
-            # TODO 1014 junnyu for save null safety checker
-            if pipeline_component_name == "safety_checker" and save_method_name is None:
-                continue
             save_method = getattr(sub_model, save_method_name)
             save_method(os.path.join(save_directory, pipeline_component_name))
 
@@ -310,10 +324,8 @@ class DiffusionPipeline(ConfigMixin):
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
-            # TODO 1014 junnyu for load null safety checker
-            if name == "safety_checker" and (library_name is None
-                                             or class_name is None):
-                logger.warn("You have disabled the safety checker!")
+            if class_name is None:
+                # edge case for when the pipeline was saved with safety_checker=None
                 init_kwargs[name] = None
                 continue
 
@@ -410,8 +422,9 @@ class DiffusionPipeline(ConfigMixin):
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):
-                if next(loaded_sub_model.named_parameters()
-                        )[1].dtype != paddle_dtype:
+                if paddle_dtype is not None and next(
+                        loaded_sub_model.named_parameters(
+                        ))[1].dtype != paddle_dtype:
                     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
                 # paddlenlp model is training mode not eval mode
                 loaded_sub_model.eval()
@@ -438,7 +451,7 @@ class DiffusionPipeline(ConfigMixin):
     @property
     def components(self) -> Dict[str, Any]:
         r"""
-        The `self.compenents` property can be useful to run different pipelines with the same weights and
+        The `self.components` property can be useful to run different pipelines with the same weights and
         configurations to not have to re-allocate memory.
         Examples:
         ```py
@@ -447,12 +460,12 @@ class DiffusionPipeline(ConfigMixin):
         ...     StableDiffusionImg2ImgPipeline,
         ...     StableDiffusionInpaintPipeline,
         ... )
-        >>> img2text = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
+        >>> img2text = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         >>> img2img = StableDiffusionImg2ImgPipeline(**img2text.components)
         >>> inpaint = StableDiffusionInpaintPipeline(**img2text.components)
         ```
         Returns:
-            A dictionaly containing all the modules needed to initialize the pipleline.
+            A dictionaly containing all the modules needed to initialize the pipeline.
         """
         components = {
             k: getattr(self, k)
@@ -480,7 +493,10 @@ class DiffusionPipeline(ConfigMixin):
         pil_images = []
         argument = kwargs.pop("argument", None)
         for image in images:
-            image = Image.fromarray(image)
+            if images.shape[-1] == 1:
+                image = Image.fromarray(image.squeeze(), mode="L")
+            else:
+                image = Image.fromarray(image)
             if argument is not None:
                 image.argument = argument
             pil_images.append(image)

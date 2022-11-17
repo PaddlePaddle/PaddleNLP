@@ -78,7 +78,7 @@ class ScoreSdeVePipeline(DiffusionPipeline):
         self.scheduler.set_sigmas(num_inference_steps)
 
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
-            sigma_t = self.scheduler.sigmas[i] * paddle.ones(shape[0])
+            sigma_t = self.scheduler.sigmas[i] * paddle.ones((shape[0], ))
 
             # correction step
             for _ in range(self.scheduler.config.correct_steps):

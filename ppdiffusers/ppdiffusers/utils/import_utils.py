@@ -18,9 +18,10 @@ Import utilities: Utilities related to imports and our lazy inits.
 import importlib.util
 import os
 import sys
+import operator as op
 from collections import OrderedDict
-
-from packaging import version
+from typing import Union
+from packaging.version import Version, parse
 
 from . import logging
 
@@ -34,6 +35,14 @@ logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 ENV_VARS_TRUE_VALUES = {"1", "ON", "YES", "TRUE"}
 ENV_VARS_TRUE_AND_AUTO_VALUES = ENV_VARS_TRUE_VALUES.union({"AUTO"})
+STR_OPERATION_TO_FUNC = {
+    ">": op.gt,
+    ">=": op.ge,
+    "==": op.eq,
+    "!=": op.ne,
+    "<=": op.le,
+    "<": op.lt
+}
 
 USE_PADDLE = os.environ.get("USE_PADDLE", "AUTO").upper()
 
@@ -82,6 +91,7 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _modelcards_available = False
 
+_onnxruntime_version = "N/A"
 _onnx_available = importlib.util.find_spec("onnxruntime") is not None
 if _onnx_available:
     candidates = ("onnxruntime", "onnxruntime-gpu", "onnxruntime-directml",
@@ -201,3 +211,27 @@ class DummyObject(type):
         if key.startswith("_"):
             return super().__getattr__(cls, key)
         requires_backends(cls, cls._backends)
+
+
+# This function was copied from: https://github.com/huggingface/accelerate/blob/874c4967d94badd24f893064cc3bef45f57cadf7/src/accelerate/utils/versions.py#L319
+def compare_versions(library_or_version: Union[str, Version], operation: str,
+                     requirement_version: str):
+    """
+    Args:
+    Compares a library version to some requirement using a given operation.
+        library_or_version (`str` or `packaging.version.Version`):
+            A library name or a version to check.
+        operation (`str`):
+            A string representation of an operator, such as `">"` or `"<="`.
+        requirement_version (`str`):
+            The version to compare the library version against
+    """
+    if operation not in STR_OPERATION_TO_FUNC.keys():
+        raise ValueError(
+            f"`operation` must be one of {list(STR_OPERATION_TO_FUNC.keys())}, received {operation}"
+        )
+    operation = STR_OPERATION_TO_FUNC[operation]
+    if isinstance(library_or_version, str):
+        library_or_version = parse(
+            importlib_metadata.version(library_or_version))
+    return operation(library_or_version, parse(requirement_version))

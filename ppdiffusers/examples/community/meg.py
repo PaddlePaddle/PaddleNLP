@@ -1,5 +1,4 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,54 +13,63 @@
 # limitations under the License.
 
 import inspect
-import time
-from pathlib import Path
 from typing import Callable, List, Optional, Union
-
+import json
 import numpy as np
 import paddle
+
+import PIL
+from paddlenlp.utils.tools import compare_version
+if compare_version(PIL.__version__, "9.1.0") >= 0:
+    Resampling = PIL.Image.Resampling
+else:
+    Resampling = PIL.Image
+
+from tqdm.auto import tqdm
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ppdiffusers.configuration_utils import FrozenDict
 from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
 from ppdiffusers.pipeline_utils import DiffusionPipeline
+from ppdiffusers.schedulers import (
+    DDIMScheduler,
+    EulerAncestralDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+)
+from ppdiffusers.utils import deprecate, logging
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from ppdiffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
-from ppdiffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
-from ppdiffusers.utils import deprecate, logging
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+logger = logging.get_logger(__name__)
 
 
-def slerp(t, v0, v1, DOT_THRESHOLD=0.9995):
-    """helper function to spherically interpolate two arrays v1 v2"""
-
-    if not isinstance(v0, np.ndarray):
-        inputs_are_paddle = True
-        v0 = v0.cpu().numpy()
-        v1 = v1.cpu().numpy()
-
-    dot = np.sum(v0 * v1 / (np.linalg.norm(v0) * np.linalg.norm(v1)))
-    if np.abs(dot) > DOT_THRESHOLD:
-        v2 = (1 - t) * v0 + t * v1
-    else:
-        theta_0 = np.arccos(dot)
-        sin_theta_0 = np.sin(theta_0)
-        theta_t = theta_0 * t
-        sin_theta_t = np.sin(theta_t)
-        s0 = np.sin(theta_0 - theta_t) / sin_theta_0
-        s1 = sin_theta_t / sin_theta_0
-        v2 = s0 * v0 + s1 * v1
-
-    if inputs_are_paddle:
-        v2 = paddle.to_tensor(v2)
-
-    return v2
+def preprocess_image(image):
+    w, h = image.size
+    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+    image = image.resize((w, h), resample=Resampling.LANCZOS)
+    image = np.array(image).astype(np.float32) / 255.0
+    image = image[None].transpose(0, 3, 1, 2)
+    image = paddle.to_tensor(image)
+    return 2.0 * image - 1.0
 
 
-class StableDiffusionWalkPipeline(DiffusionPipeline):
+def preprocess_mask(mask):
+    mask = mask.convert("L")
+    w, h = mask.size
+    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+    mask = mask.resize((w // 8, h // 8), resample=Resampling.NEAREST)
+    mask = np.array(mask).astype(np.float32) / 255.0
+    mask = np.tile(mask, (4, 1, 1))
+    mask = mask[None].transpose(0, 1, 2, 3)  # what does this step do?
+    mask = 1 - mask  # repaint white, keep black
+    mask = paddle.to_tensor(mask)
+    return mask
+
+
+class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
     r"""
-    Pipeline for text-to-image generation using Stable Diffusion.
+    Pipeline for text-guided image inpainting using Stable Diffusion. *This is an experimental feature*.
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
     Args:
@@ -76,8 +84,9 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
@@ -91,12 +100,12 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
+                         EulerAncestralDiscreteScheduler],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
-
         if hasattr(scheduler.config,
                    "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
@@ -135,7 +144,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             logger.warn(
                 f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
                 " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. Both the diffusers team and Hugging Face"
+                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
                 " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
                 " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
                 " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
@@ -175,41 +184,50 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         Disable sliced attention computation. If `enable_attention_slicing` was previously invoked, this method will go
         back to computing attention in one step.
         """
-        # set slice_size = `None` to disable `attention slicing`
+        # set slice_size = `None` to disable `set_attention_slice`
         self.enable_attention_slicing(None)
 
     @paddle.no_grad()
     def __call__(
         self,
-        prompt: Optional[Union[str, List[str]]] = None,
-        height: int = 512,
-        width: int = 512,
-        num_inference_steps: int = 50,
-        guidance_scale: float = 7.5,
+        prompt: Union[str, List[str]],
+        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        mask_image: Union[paddle.Tensor, PIL.Image.Image],
+        noisefile: str = None,
+        strength: float = 0.8,
+        num_inference_steps: Optional[int] = 50,
+        guidance_scale: Optional[float] = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
-        eta: float = 0.0,
+        eta: Optional[float] = 0.0,
         seed: Optional[int] = None,
-        latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
-        text_embeddings: Optional[paddle.Tensor] = None,
         **kwargs,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
         Args:
-            prompt (`str` or `List[str]`, *optional*, defaults to `None`):
-                The prompt or prompts to guide the image generation. If not provided, `text_embeddings` is required.
-            height (`int`, *optional*, defaults to 512):
-                The height in pixels of the generated image.
-            width (`int`, *optional*, defaults to 512):
-                The width in pixels of the generated image.
+            prompt (`str` or `List[str]`):
+                The prompt or prompts to guide the image generation.
+            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+                `Image`, or tensor representing an image batch, that will be used as the starting point for the
+                process. This is the image whose masked region will be inpainted.
+            mask_image (`paddle.Tensor` or `PIL.Image.Image`):
+                `Image`, or tensor representing an image batch, to mask `init_image`. White pixels in the mask will be
+                replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
+                PIL image, it will be converted to a single channel (luminance) before use. If it's a tensor, it should
+                contain one color channel (L) instead of 3, so the expected shape would be `(B, H, W, 1)`.
+            strength (`float`, *optional*, defaults to 0.8):
+                Conceptually, indicates how much to inpaint the masked area. Must be between 0 and 1. When `strength`
+                is 1, the denoising process will be run on the masked area for the full number of iterations specified
+                in `num_inference_steps`. `init_image` will be used as a reference for the masked area, adding more
+                noise to that region the larger the `strength`. If `strength` is 0, no inpainting will occur.
             num_inference_steps (`int`, *optional*, defaults to 50):
-                The number of denoising steps. More denoising steps usually lead to a higher quality image at the
-                expense of slower inference.
+                The reference number of denoising steps. More denoising steps usually lead to a higher quality image at
+                the expense of slower inference. This parameter will be modulated by `strength`, as explained above.
             guidance_scale (`float`, *optional*, defaults to 7.5):
                 Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
                 `guidance_scale` is defined as `w` of equation 2. of [Imagen
@@ -225,11 +243,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             seed (`int`, *optional*):
-                Random number seed.
-            latents (`paddle.Tensor`, *optional*):
-                Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
-                generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
-                tensor will ge generated by sampling using the supplied random `seed`.
+                A random seed.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
@@ -242,10 +256,6 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
-            text_embeddings (`paddle.Tensor`, *optional*, defaults to `None`):
-                Pre-generated text embeddings to be used as inputs for image generation. Can be used in place of
-                `prompt` to avoid re-computing the embeddings. If not provided, the embeddings will be generated from
-                the supplied `prompt`.
         Returns:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
@@ -253,11 +263,21 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-
-        if height % 8 != 0 or width % 8 != 0:
+        # add noise to latents using the timesteps
+        if seed is not None:
+            paddle.seed(seed)
+        if isinstance(prompt, str):
+            batch_size = 1
+        elif isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
             raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
+                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
             )
+
+        if strength < 0 or strength > 1:
+            raise ValueError(
+                f"The value of strength should in [0.0, 1.0] but is {strength}")
 
         if (callback_steps is None) or (callback_steps is not None and
                                         (not isinstance(callback_steps, int)
@@ -266,39 +286,28 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
                 f" {type(callback_steps)}.")
 
-        if text_embeddings is None:
-            if isinstance(prompt, str):
-                batch_size = 1
-            elif isinstance(prompt, list):
-                batch_size = len(prompt)
-            else:
-                raise ValueError(
-                    f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-                )
+        # set timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
 
-            # get prompt text embeddings
-            text_inputs = self.tokenizer(
-                prompt,
-                padding="max_length",
-                max_length=self.tokenizer.model_max_length,
-                return_tensors="pd",
-            )
-            text_input_ids = text_inputs.input_ids
+        # get prompt text embeddings
+        text_inputs = self.tokenizer(
+            prompt,
+            padding="max_length",
+            max_length=self.tokenizer.model_max_length,
+            return_tensors="pd",
+        )
+        text_input_ids = text_inputs.input_ids
 
-            if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
-                removed_text = self.tokenizer.batch_decode(
-                    text_input_ids[:, self.tokenizer.model_max_length:])
-                print(
-                    "The following part of your input was truncated because CLIP can only handle sequences up to"
-                    f" {self.tokenizer.model_max_length} tokens: {removed_text}"
-                )
-                text_input_ids = text_input_ids[:, :self.tokenizer.
-                                                model_max_length]
-            attention_mask = paddle.ones_like(text_input_ids)
-            text_embeddings = self.text_encoder(
-                text_input_ids, attention_mask=attention_mask)[0]
-        else:
-            batch_size = text_embeddings.shape[0]
+        if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
+            removed_text = self.tokenizer.batch_decode(
+                text_input_ids[:, self.tokenizer.model_max_length:])
+            logger.warning(
+                "The following part of your input was truncated because CLIP can only handle sequences up to"
+                f" {self.tokenizer.model_max_length} tokens: {removed_text}")
+            text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
+        attention_mask = paddle.ones_like(text_input_ids)
+        text_embeddings = self.text_encoder(text_input_ids,
+                                            attention_mask=attention_mask)[0]
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
@@ -329,7 +338,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             else:
                 uncond_tokens = negative_prompt
 
-            max_length = self.tokenizer.model_max_length
+            max_length = text_input_ids.shape[-1]
             uncond_input = self.tokenizer(
                 uncond_tokens,
                 padding="max_length",
@@ -354,37 +363,51 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             text_embeddings = paddle.concat(
                 [uncond_embeddings, text_embeddings])
 
-        # get the initial random noise unless the user supplied it
+        # preprocess image
+        if not isinstance(init_image, paddle.Tensor):
+            init_image = preprocess_image(init_image)
 
-        # Unlike in other pipelines, latents need to be generated in the target device
-        # for 1-to-1 results reproducibility with the CompVis implementation.
-        # However this currently doesn't work in `mps`.
-        latents_shape = [
-            batch_size * num_images_per_prompt, self.unet.in_channels,
-            height // 8, width // 8
-        ]
+        # encode the init image into latents and scale the latents
         latents_dtype = text_embeddings.dtype
-        if latents is None:
-            if seed is not None:
-                paddle.seed(seed)
+        init_image = init_image.astype(dtype=latents_dtype)
+        init_latent_dist = self.vae.encode(init_image).latent_dist
+        init_latents = init_latent_dist.sample()
+        init_latents = 0.18215 * init_latents
 
-            latents = paddle.randn(latents_shape, dtype=latents_dtype)
+        # Expand init_latents for batch_size and num_images_per_prompt
+        init_latents = paddle.concat([init_latents] * batch_size *
+                                     num_images_per_prompt,
+                                     axis=0)
+        init_latents_orig = init_latents
+
+        # preprocess mask
+        if not isinstance(mask_image, paddle.Tensor):
+            mask_image = preprocess_mask(mask_image)
+        mask_image = mask_image.astype(dtype=latents_dtype)
+        mask = paddle.concat([mask_image] * batch_size * num_images_per_prompt)
+
+        # check sizes
+        if not mask.shape == init_latents.shape:
+            raise ValueError("The mask and init_image should be the same size!")
+
+        # get the original timestep using init_timestep
+        offset = self.scheduler.config.get("steps_offset", 0)
+        init_timestep = int(num_inference_steps * strength) + offset
+        init_timestep = min(init_timestep, num_inference_steps)
+
+        timesteps = self.scheduler.timesteps[-init_timestep]
+        timesteps = timesteps.tile([
+            batch_size * num_images_per_prompt,
+        ])
+
+        if noisefile is not None:
+            with open(noisefile, 'r') as f:
+                noise = json.loads(f.readline())
+            noise = paddle.to_tensor(noise, dtype=init_latents.dtype)
         else:
-            if latents.shape != latents_shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}"
-                )
-            latents = latents
+            noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
 
-        # set timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-
-        # Some schedulers like PNDM have timesteps as arrays
-        # It's more optimized to move all timesteps to correct device beforehand
-        timesteps_tensor = self.scheduler.timesteps
-
-        # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * self.scheduler.init_noise_sigma
+        init_latents = self.scheduler.add_noise(init_latents, noise, timesteps)
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -396,7 +419,15 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
-        for i, t in enumerate(self.progress_bar(timesteps_tensor)):
+        latents = init_latents
+
+        t_start = max(num_inference_steps - init_timestep + offset, 0)
+
+        # Some schedulers like PNDM have timesteps as arrays
+        # It's more optimized to move all timesteps to correct device beforehand
+        timesteps = self.scheduler.timesteps[t_start:]
+
+        for i, t in tqdm(enumerate(timesteps)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = paddle.concat(
                 [latents] * 2) if do_classifier_free_guidance else latents
@@ -418,6 +449,12 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
             latents = self.scheduler.step(noise_pred, t, latents,
                                           **extra_step_kwargs).prev_sample
 
+            # masking
+            if i <= int(len(timesteps) * 0.3):
+                init_latents_proper = self.scheduler.add_noise(
+                    init_latents_orig, noise, t)
+                latents = (init_latents_proper * mask) + (latents * (1 - mask))
+
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
                 callback(i, t, latents)
@@ -426,9 +463,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         image = self.vae.decode(latents).sample
 
         image = (image / 2 + 0.5).clip(0, 1)
-
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
-        image = image.transpose([0, 2, 3, 1]).astype("float32").numpy()
+        image = image.transpose([0, 2, 3, 1]).numpy()
 
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(
@@ -448,131 +483,3 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
 
         return StableDiffusionPipelineOutput(
             images=image, nsfw_content_detected=has_nsfw_concept)
-
-    def embed_text(self, text):
-        """takes in text and turns it into text embeddings"""
-        text_input = self.tokenizer(
-            text,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="pd",
-        )
-        with paddle.no_grad():
-            attention_mask = paddle.ones_like(text_input.input_ids)
-            embed = self.text_encoder(text_input.input_ids,
-                                      attention_mask=attention_mask)[0]
-        return embed
-
-    def get_noise(self, seed, dtype=paddle.float32, height=512, width=512):
-        """Takes in random seed and returns corresponding noise vector"""
-        if seed is None:
-            paddle.seed(seed)
-        return paddle.randn(
-            (1, self.unet.in_channels, height // 8, width // 8),
-            dtype=dtype,
-        )
-
-    def walk(
-        self,
-        prompts: List[str],
-        seeds: List[int],
-        num_interpolation_steps: Optional[int] = 6,
-        output_dir: Optional[str] = "./dreams",
-        name: Optional[str] = None,
-        batch_size: Optional[int] = 1,
-        height: Optional[int] = 512,
-        width: Optional[int] = 512,
-        guidance_scale: Optional[float] = 7.5,
-        num_inference_steps: Optional[int] = 50,
-        eta: Optional[float] = 0.0,
-    ) -> List[str]:
-        """
-        Walks through a series of prompts and seeds, interpolating between them and saving the results to disk.
-        Args:
-            prompts (`List[str]`):
-                List of prompts to generate images for.
-            seeds (`List[int]`):
-                List of seeds corresponding to provided prompts. Must be the same length as prompts.
-            num_interpolation_steps (`int`, *optional*, defaults to 6):
-                Number of interpolation steps to take between prompts.
-            output_dir (`str`, *optional*, defaults to `./dreams`):
-                Directory to save the generated images to.
-            name (`str`, *optional*, defaults to `None`):
-                Subdirectory of `output_dir` to save the generated images to. If `None`, the name will
-                be the current time.
-            batch_size (`int`, *optional*, defaults to 1):
-                Number of images to generate at once.
-            height (`int`, *optional*, defaults to 512):
-                Height of the generated images.
-            width (`int`, *optional*, defaults to 512):
-                Width of the generated images.
-            guidance_scale (`float`, *optional*, defaults to 7.5):
-                Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
-                `guidance_scale` is defined as `w` of equation 2. of [Imagen
-                Paper](https://arxiv.org/pdf/2205.11487.pdf). Guidance scale is enabled by setting `guidance_scale >
-                1`. Higher guidance scale encourages to generate images that are closely linked to the text `prompt`,
-                usually at the expense of lower image quality.
-            num_inference_steps (`int`, *optional*, defaults to 50):
-                The number of denoising steps. More denoising steps usually lead to a higher quality image at the
-                expense of slower inference.
-            eta (`float`, *optional*, defaults to 0.0):
-                Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
-                [`schedulers.DDIMScheduler`], will be ignored for others.
-        Returns:
-            `List[str]`: List of paths to the generated images.
-        """
-        if not len(prompts) == len(seeds):
-            raise ValueError(
-                f"Number of prompts and seeds must be equalGot {len(prompts)} prompts and {len(seeds)} seeds"
-            )
-
-        name = name or time.strftime("%Y%m%d-%H%M%S")
-        save_path = Path(output_dir) / name
-        save_path.mkdir(exist_ok=True, parents=True)
-
-        frame_idx = 0
-        frame_filepaths = []
-        for prompt_a, prompt_b, seed_a, seed_b in zip(prompts, prompts[1:],
-                                                      seeds, seeds[1:]):
-            # Embed Text
-            embed_a = self.embed_text(prompt_a)
-            embed_b = self.embed_text(prompt_b)
-
-            # Get Noise
-            noise_dtype = embed_a.dtype
-            noise_a = self.get_noise(seed_a, noise_dtype, height, width)
-            noise_b = self.get_noise(seed_b, noise_dtype, height, width)
-
-            noise_batch, embeds_batch = None, None
-            T = np.linspace(0.0, 1.0, num_interpolation_steps)
-            for i, t in enumerate(T):
-                noise = slerp(float(t), noise_a, noise_b)
-                embed = paddle.lerp(embed_a, embed_b, t)
-
-                noise_batch = noise if noise_batch is None else paddle.concat(
-                    [noise_batch, noise], axis=0)
-                embeds_batch = embed if embeds_batch is None else paddle.concat(
-                    [embeds_batch, embed], axis=0)
-
-                batch_is_ready = embeds_batch.shape[
-                    0] == batch_size or i + 1 == T.shape[0]
-                if batch_is_ready:
-                    outputs = self(
-                        latents=noise_batch,
-                        text_embeddings=embeds_batch,
-                        height=height,
-                        width=width,
-                        guidance_scale=guidance_scale,
-                        eta=eta,
-                        num_inference_steps=num_inference_steps,
-                    )
-                    noise_batch, embeds_batch = None, None
-
-                    for image in outputs["images"]:
-                        frame_filepath = str(save_path /
-                                             f"frame_{frame_idx:06d}.png")
-                        image.save(frame_filepath)
-                        frame_filepaths.append(frame_filepath)
-                        frame_idx += 1
-        return frame_filepaths

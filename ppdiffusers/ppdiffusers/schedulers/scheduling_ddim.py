@@ -110,6 +110,14 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             stable diffusion.
 
     """
+    _compatible_classes = [
+        "PNDMScheduler",
+        "DDPMScheduler",
+        "LMSDiscreteScheduler",
+        "EulerDiscreteScheduler",
+        "EulerAncestralDiscreteScheduler",
+        "DPMSolverMultistepScheduler",
+    ]
 
     @register_to_config
     def __init__(
@@ -213,6 +221,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         sample: paddle.Tensor,
         eta: float = 0.0,
         use_clipped_model_output: bool = False,
+        variance_noise: Optional[paddle.Tensor] = None,
         return_dict: bool = True,
     ) -> Union[DDIMSchedulerOutput, Tuple]:
         """
@@ -225,7 +234,13 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
             eta (`float`): weight of noise for added noise in diffusion step.
-            use_clipped_model_output (`bool`): TODO
+            use_clipped_model_output (`bool`): if `True`, compute "corrected" `model_output` from the clipped
+                predicted original sample. Necessary because predicted original sample is clipped to [-1, 1] when
+                `self.config.clip_sample` is `True`. If no clipping has happened, "corrected" `model_output` would
+                coincide with the one provided as input and `use_clipped_model_output` will have not effect.
+            variance_noise (`torch.FloatTensor`): instead of generating noise for the variance using `generator`, we
+                can directly provide the noise for the variance itself. This is useful for methods such as
+                CycleDiffusion. (https://arxiv.org/abs/2210.05559)
             return_dict (`bool`): option for returning tuple rather than DDIMSchedulerOutput class
 
         Returns:
@@ -289,9 +304,11 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
 
         if eta > 0:
             # randn_like does not support seed https://github.com/pytorch/pytorch/issues/27072
-            noise = paddle.randn(model_output.shape, dtype=model_output.dtype)
-            variance = self._get_variance(timestep,
-                                          prev_timestep)**(0.5) * eta * noise
+            if variance_noise is None:
+                variance_noise = paddle.randn(model_output.shape,
+                                              dtype=model_output.dtype)
+            variance = self._get_variance(
+                timestep, prev_timestep)**(0.5) * eta * variance_noise
 
             prev_sample = prev_sample + variance
 
