@@ -1,6 +1,5 @@
-# coding=utf-8
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 The HuggingFace Inc. team.
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,22 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Conversion script for the LDM checkpoints. """
-
-import argparse
 import os
-
 import torch
 import paddle
 
 paddle.set_device("cpu")
-
+import argparse
 try:
     from omegaconf import OmegaConf
 except ImportError:
     raise ImportError(
         "OmegaConf is required to convert the LDM checkpoints. Please install it with `pip install OmegaConf`."
     )
+from ppdiffusers import LDMBertModel, AutoencoderKL, UNet2DConditionModel, DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler, EulerAncestralDiscreteScheduler, LDMTextToImagePipeline
+from paddlenlp.transformers import BertTokenizer
 
 
 def shave_segments(path, n_shave_prefix_segments=1):
@@ -87,15 +84,6 @@ def renew_attention_paths(old_list, n_shave_prefix_segments=0):
     mapping = []
     for old_item in old_list:
         new_item = old_item
-
-        #         new_item = new_item.replace('norm.weight', 'group_norm.weight')
-        #         new_item = new_item.replace('norm.bias', 'group_norm.bias')
-
-        #         new_item = new_item.replace('proj_out.weight', 'proj_attn.weight')
-        #         new_item = new_item.replace('proj_out.bias', 'proj_attn.bias')
-
-        #         new_item = shave_segments(new_item, n_shave_prefix_segments=n_shave_prefix_segments)
-
         mapping.append({"old": old_item, "new": new_item})
 
     return mapping
@@ -266,10 +254,42 @@ def create_vae_diffusers_config(original_config):
     return config
 
 
-def convert_ldm_unet_checkpoint(unet_state_dict, config):
+def convert_ldm_unet_checkpoint(checkpoint,
+                                config,
+                                path=None,
+                                extract_ema=False):
     """
     Takes a state dict and a config, and returns a converted checkpoint.
     """
+
+    # extract state_dict for UNet
+    unet_state_dict = {}
+    keys = list(checkpoint.keys())
+
+    unet_key = "model.diffusion_model."
+    # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
+    if sum(k.startswith("model_ema") for k in keys) > 100:
+        print(f"Checkpoint {path} has both EMA and non-EMA weights.")
+        if extract_ema:
+            print(
+                "In this conversion only the EMA weights are extracted. If you want to instead extract the non-EMA"
+                " weights (useful to continue fine-tuning), please make sure to remove the `--extract_ema` flag."
+            )
+            for key in keys:
+                if key.startswith("model.diffusion_model"):
+                    flat_ema_key = "model_ema." + "".join(key.split(".")[1:])
+                    unet_state_dict[key.replace(
+                        unet_key, "")] = checkpoint.pop(flat_ema_key)
+        else:
+            print(
+                "In this conversion only the non-EMA weights are extracted. If you want to instead extract the EMA"
+                " weights (usually better for inference), please make sure to add the `--extract_ema` flag."
+            )
+
+    for key in keys:
+        if key.startswith(unet_key):
+            unet_state_dict[key.replace(unet_key, "")] = checkpoint.pop(key)
+
     new_checkpoint = {}
 
     new_checkpoint["time_embedding.linear_1.weight"] = unet_state_dict[
@@ -468,7 +488,14 @@ def convert_ldm_unet_checkpoint(unet_state_dict, config):
     return new_checkpoint
 
 
-def convert_ldm_vae_checkpoint(vae_state_dict, config):
+def convert_ldm_vae_checkpoint(checkpoint, config):
+    # extract state dict for VAE
+    vae_state_dict = {}
+    vae_key = "first_stage_model."
+    keys = list(checkpoint.keys())
+    for key in keys:
+        if key.startswith(vae_key):
+            vae_state_dict[key.replace(vae_key, "")] = checkpoint.get(key)
 
     new_checkpoint = {}
 
@@ -638,268 +665,269 @@ def convert_ldm_vae_checkpoint(vae_state_dict, config):
     return new_checkpoint
 
 
-def convert_unet(unet, out_path):
-    need_transpose = [
-        'time_embedding.linear_1.weight', 'time_embedding.linear_2.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'down_blocks.0.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn1.to_q.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn1.to_k.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn1.to_v.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn1.to_out.0.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.ff.net.0.proj.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.ff.net.2.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_q.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_k.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_v.weight',
-        'down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_out.0.weight',
-        'down_blocks.0.resnets.0.time_emb_proj.weight',
-        'down_blocks.0.resnets.1.time_emb_proj.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn1.to_q.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn1.to_k.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn1.to_v.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn1.to_out.0.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.ff.net.0.proj.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.ff.net.2.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn2.to_q.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn2.to_k.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn2.to_v.weight',
-        'down_blocks.1.attentions.1.transformer_blocks.0.attn2.to_out.0.weight',
-        'down_blocks.1.resnets.0.time_emb_proj.weight',
-        'down_blocks.1.resnets.1.time_emb_proj.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'down_blocks.2.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn1.to_q.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn1.to_k.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn1.to_v.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn1.to_out.0.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.ff.net.0.proj.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.ff.net.2.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn2.to_q.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn2.to_k.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn2.to_v.weight',
-        'down_blocks.2.attentions.1.transformer_blocks.0.attn2.to_out.0.weight',
-        'down_blocks.2.resnets.0.time_emb_proj.weight',
-        'down_blocks.2.resnets.1.time_emb_proj.weight',
-        'down_blocks.3.resnets.0.time_emb_proj.weight',
-        'down_blocks.3.resnets.1.time_emb_proj.weight',
-        'up_blocks.0.resnets.0.time_emb_proj.weight',
-        'up_blocks.0.resnets.1.time_emb_proj.weight',
-        'up_blocks.0.resnets.2.time_emb_proj.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.1.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.1.attentions.1.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.1.attentions.2.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.1.resnets.0.time_emb_proj.weight',
-        'up_blocks.1.resnets.1.time_emb_proj.weight',
-        'up_blocks.1.resnets.2.time_emb_proj.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.2.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.2.attentions.1.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.2.attentions.2.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.2.resnets.0.time_emb_proj.weight',
-        'up_blocks.2.resnets.1.time_emb_proj.weight',
-        'up_blocks.2.resnets.2.time_emb_proj.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.3.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.3.attentions.1.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn1.to_q.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn1.to_k.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn1.to_v.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn1.to_out.0.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.ff.net.0.proj.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.ff.net.2.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn2.to_q.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn2.to_k.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn2.to_v.weight',
-        'up_blocks.3.attentions.2.transformer_blocks.0.attn2.to_out.0.weight',
-        'up_blocks.3.resnets.0.time_emb_proj.weight',
-        'up_blocks.3.resnets.1.time_emb_proj.weight',
-        'up_blocks.3.resnets.2.time_emb_proj.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn1.to_q.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn1.to_k.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn1.to_v.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn1.to_out.0.weight',
-        'mid_block.attentions.0.transformer_blocks.0.ff.net.0.proj.weight',
-        'mid_block.attentions.0.transformer_blocks.0.ff.net.2.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn2.to_q.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn2.to_k.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn2.to_v.weight',
-        'mid_block.attentions.0.transformer_blocks.0.attn2.to_out.0.weight',
-        'mid_block.resnets.0.time_emb_proj.weight',
-        'mid_block.resnets.1.time_emb_proj.weight'
-    ]
-    new_unet = {}
-    for k, v in unet.items():
+def convert_diffusers_vae_unet_to_ppdiffusers(vae_or_unet,
+                                              diffusers_vae_unet_checkpoint,
+                                              dtype="float32"):
+    need_transpose = []
+    for k, v in vae_or_unet.named_sublayers(include_self=True):
+        if isinstance(v, paddle.nn.Linear):
+            need_transpose.append(k + ".weight")
+    new_vae_or_unet = {}
+    for k, v in diffusers_vae_unet_checkpoint.items():
         if k not in need_transpose:
-            new_unet[k] = v.numpy()
+            new_vae_or_unet[k] = v.numpy().astype(dtype)
         else:
-            new_unet[k] = v.t().numpy()
-
-    paddle.save(new_unet, out_path)
-
-    return new_unet
+            new_vae_or_unet[k] = v.t().numpy().astype(dtype)
+    return new_vae_or_unet
 
 
-def convert_vae(vae, out_path):
-    need_transpose = [
-        'encoder.mid_block.attentions.0.query.weight',
-        'encoder.mid_block.attentions.0.key.weight',
-        'encoder.mid_block.attentions.0.value.weight',
-        'encoder.mid_block.attentions.0.proj_attn.weight',
-        'decoder.mid_block.attentions.0.query.weight',
-        'decoder.mid_block.attentions.0.key.weight',
-        'decoder.mid_block.attentions.0.value.weight',
-        'decoder.mid_block.attentions.0.proj_attn.weight'
-    ]
-    new_vae = {}
-    for k, v in vae.items():
-        if k not in need_transpose:
-            new_vae[k] = v.numpy()
-        else:
-            new_vae[k] = v.t().numpy()
-    paddle.save(new_vae, out_path)
-    return new_vae
+def check_keys(model, state_dict):
+    missing_keys = []
+    mismatched_keys = []
+    for k, v in model.state_dict().items():
+        if k not in state_dict.keys():
+            missing_keys.append(k)
+        if list(v.shape) != list(state_dict[k].shape):
+            mismatched_keys.append(k)
+    if len(missing_keys):
+        missing_keys_str = ",".join(missing_keys)
+        print(f"Found missing_keys {missing_keys_str}!")
+    if len(mismatched_keys):
+        mismatched_keys_str = ",".join(mismatched_keys)
+        print(f"Found mismatched_keys {mismatched_keys_str}!")
+
+
+def get_default(params, key, default):
+    if key in params:
+        return params[key]
+    else:
+        return default
+
+
+def create_ldm_bert_config(original_config):
+    bert_params = dict(original_config.model.params.cond_stage_config.params)
+    config = dict(vocab_size=get_default(bert_params, "vocab_size", 30522),
+                  max_position_embeddings=get_default(bert_params,
+                                                      "max_seq_len", 77),
+                  encoder_layers=get_default(bert_params, "n_layer", 32),
+                  encoder_ffn_dim=get_default(bert_params, "n_embed", 1280) * 4,
+                  encoder_attention_heads=8,
+                  head_dim=64,
+                  activation_function="gelu",
+                  d_model=get_default(bert_params, "n_embed", 1280),
+                  dropout=0.0,
+                  attention_dropout=0.0,
+                  activation_dropout=0.0,
+                  init_std=0.02,
+                  pad_token_id=0)
+    return config
+
+
+def convert_ldm_bert_to_ppdiffusers(checkpoint, config):
+    # extract state dict for bert
+    bert_state_dict = {}
+    bert_key = "cond_stage_model."
+    keys = list(checkpoint.keys())
+    for key in keys:
+        if key.startswith(bert_key):
+            bert_state_dict[key.replace(bert_key, "")] = checkpoint.get(key)
+
+    new_checkpoint = {}
+    new_checkpoint["embeddings.word_embeddings.weight"] = bert_state_dict[
+        "transformer.token_emb.weight"].numpy()
+    new_checkpoint["embeddings.position_embeddings.weight"] = bert_state_dict[
+        "transformer.pos_emb.emb.weight"].numpy()
+    for i in range(config["encoder_layers"]):
+        double_i = 2 * i
+        double_i_plus1 = 2 * i + 1
+        # convert norm
+        new_checkpoint[f"encoder.layers.{i}.norm1.weight"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i}.0.weight"].numpy()
+        new_checkpoint[f"encoder.layers.{i}.norm1.bias"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i}.0.bias"].numpy()
+
+        new_checkpoint[
+            f"encoder.layers.{i}.self_attn.q_proj.weight"] = bert_state_dict[
+                f"transformer.attn_layers.layers.{double_i}.1.to_q.weight"].t(
+                ).numpy()
+        new_checkpoint[
+            f"encoder.layers.{i}.self_attn.k_proj.weight"] = bert_state_dict[
+                f"transformer.attn_layers.layers.{double_i}.1.to_k.weight"].t(
+                ).numpy()
+        new_checkpoint[
+            f"encoder.layers.{i}.self_attn.v_proj.weight"] = bert_state_dict[
+                f"transformer.attn_layers.layers.{double_i}.1.to_v.weight"].t(
+                ).numpy()
+        new_checkpoint[
+            f"encoder.layers.{i}.self_attn.out_proj.weight"] = bert_state_dict[
+                f"transformer.attn_layers.layers.{double_i}.1.to_out.weight"].t(
+                ).numpy()
+        new_checkpoint[
+            f"encoder.layers.{i}.self_attn.out_proj.bias"] = bert_state_dict[
+                f"transformer.attn_layers.layers.{double_i}.1.to_out.bias"].numpy(
+                )
+
+        new_checkpoint[f"encoder.layers.{i}.norm2.weight"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i_plus1}.0.weight"].numpy(
+            )
+        new_checkpoint[f"encoder.layers.{i}.norm2.bias"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i_plus1}.0.bias"].numpy()
+        new_checkpoint[f"encoder.layers.{i}.linear1.weight"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i_plus1}.1.net.0.0.weight"].t(
+            ).numpy()
+        new_checkpoint[f"encoder.layers.{i}.linear1.bias"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i_plus1}.1.net.0.0.bias"].numpy(
+            )
+        new_checkpoint[f"encoder.layers.{i}.linear2.weight"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i_plus1}.1.net.2.weight"].t(
+            ).numpy()
+        new_checkpoint[f"encoder.layers.{i}.linear2.bias"] = bert_state_dict[
+            f"transformer.attn_layers.layers.{double_i_plus1}.1.net.2.bias"].t(
+            ).numpy()
+
+    new_checkpoint["final_layer_norm.weight"] = bert_state_dict[
+        "transformer.norm.weight"].numpy()
+    new_checkpoint["final_layer_norm.bias"] = bert_state_dict[
+        "transformer.norm.bias"].numpy()
+
+    return new_checkpoint
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--unet_checkpoint_path",
-                        default="init_weights/unet.pt",
+    parser.add_argument("--checkpoint_path",
+                        default=None,
                         type=str,
-                        required=False,
+                        required=True,
                         help="Path to the checkpoint to convert.")
-    parser.add_argument("--vae_checkpoint_path",
-                        default="init_weights/vae.pt",
-                        type=str,
-                        required=False,
-                        help="Path to the checkpoint to convert.")
+    # wget https://raw.githubusercontent.com/CompVis/latent-diffusion/main/configs/latent-diffusion/txt2img-1p4B-eval.yaml
     parser.add_argument(
         "--original_config_file",
-        default="configs/latent-diffusion/text2img_L12H768_unet800M.yaml",
+        default="text2img_L32H1280_unet800M.yaml",
         type=str,
         help="The YAML config file corresponding to the original architecture.",
     )
+    parser.add_argument(
+        "--scheduler_type",
+        default="ddim",
+        type=str,
+        choices=["ddim", "lms", "pndm", "euler-ancest"],
+        help=
+        "Type of scheduler to use. Should be one of ['pndm', 'lms', 'ddim', 'euler-ancest']",
+    )
+    parser.add_argument(
+        "--extract_ema",
+        action="store_true",
+        help=
+        ("Only relevant for checkpoints that have both EMA and non-EMA weights. Whether to extract the EMA weights"
+         " or not. Defaults to `False`. Add `--extract_ema` to extract the EMA weights. EMA weights usually yield"
+         " higher quality images for inference. Non-EMA weights are usually better to continue fine-tuning."
+         ),
+    )
     parser.add_argument("--dump_path",
-                        default="pretrained_paddle_model",
+                        default=None,
                         type=str,
+                        required=True,
                         help="Path to the output model.")
 
     args = parser.parse_args()
 
+    if args.original_config_file is None:
+        os.system(
+            "wget https://raw.githubusercontent.com/CompVis/latent-diffusion/main/configs/latent-diffusion/txt2img-1p4B-eval.yaml"
+        )
+        args.original_config_file = "./txt2img-1p4B-eval.yaml"
+
     original_config = OmegaConf.load(args.original_config_file)
-    unet_checkpoint = torch.load(args.unet_checkpoint_path, map_location="cpu")
-    vae_checkpoint = torch.load(args.vae_checkpoint_path, map_location="cpu")
 
-    # Convert the UNet2DConditionModel model.
-    unet_config = create_unet_diffusers_config(original_config)
-    converted_unet_checkpoint = convert_ldm_unet_checkpoint(
-        unet_checkpoint, unet_config)
+    checkpoint = torch.load(args.checkpoint_path, map_location="cpu")
+    checkpoint = checkpoint.get("state_dict", checkpoint)
 
-    # Convert the VAE model.
+    # 1. Convert the UNet2DConditionModel model.
+    diffusers_unet_config = create_unet_diffusers_config(original_config)
+    diffusers_unet_checkpoint = convert_ldm_unet_checkpoint(
+        checkpoint,
+        diffusers_unet_config,
+        path=args.checkpoint_path,
+        extract_ema=args.extract_ema)
+    unet = UNet2DConditionModel(**diffusers_unet_config)
+    ppdiffusers_unet_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(
+        unet, diffusers_unet_checkpoint)
+    check_keys(unet, ppdiffusers_unet_checkpoint)
+    unet.load_dict(ppdiffusers_unet_checkpoint)
+
+    # 2. Convert the VAE model.
     vae_config = create_vae_diffusers_config(original_config)
-    converted_vae_checkpoint = convert_ldm_vae_checkpoint(
-        vae_checkpoint, vae_config)
-    os.makedirs(os.path.join(args.dump_path, "unet"), exist_ok=True)
-    os.makedirs(os.path.join(args.dump_path, "vae"), exist_ok=True)
+    diffusers_vae_checkpoint = convert_ldm_vae_checkpoint(
+        checkpoint, vae_config)
+    vae = AutoencoderKL(**vae_config)
+    ppdiffusers_vae_checkpoint = convert_diffusers_vae_unet_to_ppdiffusers(
+        vae, diffusers_vae_checkpoint)
+    check_keys(vae, ppdiffusers_vae_checkpoint)
+    vae.load_dict(ppdiffusers_vae_checkpoint)
 
-    convert_unet(converted_unet_checkpoint,
-                 os.path.join(args.dump_path, "unet", "model_state.pdparams"))
-    convert_vae(converted_vae_checkpoint,
-                os.path.join(args.dump_path, "vae", "model_state.pdparams"))
+    # 3. Convert the text model.
+    text_model_type = original_config.model.params.cond_stage_config.target.split(
+        ".")[-1]
+
+    if text_model_type != "BERTEmbedder":
+        print("We only support BERTEmbedder as text_encoder!")
+
+    # 4. Convert the Bert model.
+    bert_config = create_ldm_bert_config(original_config)
+    ppdiffusers_bert_checkpoint = convert_ldm_bert_to_ppdiffusers(
+        checkpoint, bert_config)
+    bert = LDMBertModel(**bert_config)
+    check_keys(bert, ppdiffusers_bert_checkpoint)
+    bert.load_dict(ppdiffusers_bert_checkpoint)
+
+    # 5. Convert tokenizer.
+    tokenizer = BertTokenizer.from_pretrained(
+        "bert-base-uncased",
+        model_max_length=bert_config["max_position_embeddings"])
+    if tokenizer.vocab_size != bert_config["vocab_size"]:
+        print(
+            "Vocab size mismatched! Please verify your tokenizer or text encoder!"
+        )
+
+    # 6. Convert scheduler.
+    num_train_timesteps = original_config.model.params.timesteps
+    beta_start = original_config.model.params.linear_start
+    beta_end = original_config.model.params.linear_end
+    if args.scheduler_type == "pndm":
+        scheduler = PNDMScheduler(
+            beta_end=beta_end,
+            beta_schedule="scaled_linear",
+            beta_start=beta_start,
+            num_train_timesteps=num_train_timesteps,
+            skip_prk_steps=True,
+        )
+    elif args.scheduler_type == "lms":
+        scheduler = LMSDiscreteScheduler(beta_start=beta_start,
+                                         beta_end=beta_end,
+                                         beta_schedule="scaled_linear")
+    elif args.scheduler_type == "euler-ancestral":
+        scheduler = EulerAncestralDiscreteScheduler(
+            beta_start=beta_start,
+            beta_end=beta_end,
+            beta_schedule="scaled_linear")
+    elif args.scheduler_type == "ddim":
+        scheduler = DDIMScheduler(
+            beta_start=beta_start,
+            beta_end=beta_end,
+            beta_schedule="scaled_linear",
+            clip_sample=False,
+            set_alpha_to_one=False,
+        )
+    else:
+        raise ValueError(
+            f"Scheduler of type {args.scheduler_type} doesn't exist!")
+
+    pipe = LDMTextToImagePipeline(vqvae=vae,
+                                  bert=bert,
+                                  tokenizer=tokenizer,
+                                  unet=unet,
+                                  scheduler=scheduler)
+
+    pipe.save_pretrained(args.dump_path)
