@@ -89,6 +89,8 @@ MAPPING_NAMES = OrderedDict([
     ("Bart", "bart"),
     ("GAUAlpha", "gau_alpha"),
     ("CodeGen", "codegen"),
+    ("CLIPVision", "clip"),
+    ("CLIPText", "clip"),
     ("CLIP", "clip"),
     ("Artist", "artist"),
     ("OPT", 'opt'),
