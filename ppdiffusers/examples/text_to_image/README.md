@@ -34,7 +34,6 @@ export dataset_name="lambdalabs/pokemon-blip-captions"
 python -u train_text_to_image.py \
   --pretrained_model_name_or_path=$MODEL_NAME \
   --dataset_name=$dataset_name \
-  --use_ema \
   --resolution=512 --center_crop --random_flip \
   --train_batch_size=1 \
   --gradient_accumulation_steps=4 \
@@ -108,7 +107,6 @@ export dataset_name="lambdalabs/pokemon-blip-captions"
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" train_text_to_image.py \
   --pretrained_model_name_or_path=$MODEL_NAME \
   --dataset_name=$dataset_name \
-  --use_ema \
   --resolution=512 --center_crop --random_flip \
   --train_batch_size=1 \
   --gradient_accumulation_steps=4 \

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Tuple
+from paddle import Tensor
 import paddle
 import paddle.nn as nn
 
@@ -56,15 +58,18 @@ class RoFormerEmbeddings(nn.Layer):
         self.layer_norm = nn.LayerNorm(embedding_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None):
+    def forward(self, input_ids=None, token_type_ids=None, inputs_embeds=None):
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
 
         if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids_shape = paddle.shape(inputs_embeds)[:-1]
+            token_type_ids = paddle.zeros(token_type_ids_shape, dtype="int64")
 
-        input_embedings = self.word_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + token_type_embeddings
+        embeddings = inputs_embeds + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -581,19 +586,20 @@ class RoFormerModel(RoFormerPretrainedModel):
         self.embeddings.word_embeddings = value
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                attention_mask=None,
-                past_key_values=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 It's data type should be `int64` and has a shape of [batch_size, sequence_length].
@@ -617,6 +623,9 @@ class RoFormerModel(RoFormerPretrainedModel):
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
                 [batch_size, num_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             past_key_values (tuple(tuple(Tensor)), optional):
                 The length of tuple equals to the number of layers, and each inner
                 tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
@@ -656,11 +665,34 @@ class RoFormerModel(RoFormerPretrainedModel):
                 output = model(**tokenized_inputs)
 
         """
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time."
+            )
+
+        # init the default bool value
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+        use_cache = use_cache if use_cache is not None else False
+
+        past_key_values_length = 0
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
+
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
                 (input_ids == self.pad_token_id).astype(
                     self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2])
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = paddle.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask],
+                                               axis=-1)
+
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
@@ -668,12 +700,13 @@ class RoFormerModel(RoFormerPretrainedModel):
             attention_mask = (1.0 - attention_mask) * -1e4
 
         embedding_output = self.embeddings(input_ids=input_ids,
-                                           token_type_ids=token_type_ids)
+                                           token_type_ids=token_type_ids,
+                                           inputs_embeds=inputs_embeds)
+
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 
         self.encoder._use_cache = use_cache  # To be consistent with HF
-
         encoder_outputs = self.encoder(
             embedding_output,
             src_mask=attention_mask,
@@ -733,14 +766,15 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                attention_mask=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                start_positions: Optional[Tensor] = None,
+                end_positions: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -750,6 +784,8 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
+                See :class:`RoFormerModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             start_positions (Tensor of shape `(batch_size,)`, optional):
                 Labels for position (index) of the start of the labelled span for computing the token classification loss.
@@ -791,6 +827,7 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
         outputs = self.roformer(input_ids,
                                 token_type_ids=token_type_ids,
                                 attention_mask=attention_mask,
+                                inputs_embeds=inputs_embeds,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
@@ -856,13 +893,14 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -872,6 +910,8 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
+                See :class:`RoFormerModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
@@ -909,6 +949,7 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
         outputs = self.roformer(input_ids,
                                 token_type_ids=token_type_ids,
                                 attention_mask=attention_mask,
+                                inputs_embeds=inputs_embeds,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
@@ -969,13 +1010,14 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForTokenClassification forward method, overrides the __call__() special method.
 
@@ -985,6 +1027,8 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
+                See :class:`RoFormerModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
@@ -1019,6 +1063,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
         outputs = self.roformer(input_ids,
                                 token_type_ids=token_type_ids,
                                 attention_mask=attention_mask,
+                                inputs_embeds=inputs_embeds,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
@@ -1073,13 +1118,14 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1090,6 +1136,8 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
                 See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (Tensor, optional):
                 See :class:`RoFormerModel` and shape as [batch_size, num_choice, sequence_length].
+            inputs_embeds(Tensor, optional):
+                See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size, )`, optional):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
                 num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
@@ -1159,6 +1207,7 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
         outputs = self.roformer(input_ids,
                                 token_type_ids=token_type_ids,
                                 attention_mask=attention_mask,
+                                inputs_embeds=inputs_embeds,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
@@ -1208,13 +1257,14 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForMaskedLM forward method, overrides the __call__() special method.
 
@@ -1224,6 +1274,8 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
+                See :class:`RoFormerModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -1262,6 +1314,7 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
         outputs = self.roformer(input_ids,
                                 token_type_ids=token_type_ids,
                                 attention_mask=attention_mask,
+                                inputs_embeds=inputs_embeds,
                                 output_attentions=output_attentions,
                                 output_hidden_states=output_hidden_states,
                                 return_dict=return_dict)
@@ -1312,15 +1365,16 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                attention_mask=None,
-                labels=None,
-                past_key_values=None,
-                use_cache=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                use_cache: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The RoFormerForCausalLM forward method, overrides the __call__() special method.
 
@@ -1330,6 +1384,8 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
             token_type_ids (Tensor, optional):
                 See :class:`RoFormerModel`.
             attention_mask (Tensor, optional):
+                See :class:`RoFormerModel`.
+            inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the left-to-right language modeling loss (next word prediction). Indices should be in
@@ -1373,6 +1429,7 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
         outputs = self.roformer(input_ids,
                                 token_type_ids=token_type_ids,
                                 attention_mask=attention_mask,
+                                inputs_embeds=inputs_embeds,
                                 past_key_values=past_key_values,
                                 use_cache=use_cache,
                                 output_attentions=output_attentions,
