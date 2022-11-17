@@ -24,19 +24,19 @@ import os.path as osp
 import re
 import shutil
 import warnings
-import copy
-from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type,
+                    TypeVar, Union)
 
 from huggingface_hub import hf_hub_download
-from paddlenlp.transformers.utils import resolve_cache_dir
 
+from paddlenlp import __version__
+from paddlenlp.transformers.utils import resolve_cache_dir
 from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, is_url, get_path_from_url
-
-from paddlenlp.utils.log import logger
-from paddlenlp import __version__
+from ..utils.downloader import (COMMUNITY_MODEL_PREFIX, get_path_from_url,
+                                is_url)
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -745,10 +745,11 @@ class PretrainedConfig:
 
         # 2. get the configuration file from HF hub
         elif from_hf_hub:
-            resolved_config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
-                                          filename=CONFIG_NAME,
-                                          cache_dir=MODEL_HOME)
-        
+            resolved_config_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=CONFIG_NAME,
+                cache_dir=MODEL_HOME)
+
         # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url(

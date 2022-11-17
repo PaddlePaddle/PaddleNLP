@@ -14,14 +14,21 @@
 # limitations under the License.
 
 import unittest
+
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import ErnieModel, ErnieForQuestionAnswering, ErnieForSequenceClassification,\
-    ErnieForTokenClassification, ErnieForPretraining, ErnieForMultipleChoice, ErnieForMaskedLM, ErniePretrainedModel
+from paddlenlp.transformers import (ErnieForMaskedLM, ErnieForMultipleChoice,
+                                    ErnieForPretraining,
+                                    ErnieForQuestionAnswering,
+                                    ErnieForSequenceClassification,
+                                    ErnieForTokenClassification, ErnieModel,
+                                    ErniePretrainedModel)
 
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
 from ...testing_utils import slow
+from ..test_modeling_common import (ModelTesterMixin,
+                                    ModelTesterPretrainedMixin, floats_tensor,
+                                    ids_tensor, random_attention_mask)
 
 
 class ErnieModelTester:

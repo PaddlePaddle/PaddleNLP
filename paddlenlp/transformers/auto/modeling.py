@@ -246,7 +246,9 @@ class _BaseAutoModelClass:
                     *model_args,
                     **kwargs)
             else:
-                logger.warning(f"{config_file}  is not a valid path to a model config file")
+                logger.warning(
+                    f"{config_file}  is not a valid path to a model config file"
+                )
         # From built-in pretrained models
         elif pretrained_model_name_or_path in all_model_names:
             for pretrained_model_names, model_name in cls._pretrained_model_dict.items(
@@ -294,7 +296,9 @@ class _BaseAutoModelClass:
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, *model_args, **kwargs)
             else:
-                logger.warning(f"{config_file}  is not a valid path to a model config file")
+                logger.warning(
+                    f"{config_file}  is not a valid path to a model config file"
+                )
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join([
@@ -326,7 +330,9 @@ class _BaseAutoModelClass:
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, *model_args, **kwargs)
             else:
-                logger.warning(f"{resolved_vocab_file}  is not a valid path to a model config file")
+                logger.warning(
+                    f"{resolved_vocab_file}  is not a valid path to a model config file"
+                )
 
 
 class AutoModel(_BaseAutoModelClass):

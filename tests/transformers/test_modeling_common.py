@@ -13,19 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import inspect
 import os
 import random
 import shutil
-import copy
-import inspect
 import tempfile
 import unittest
-import numpy as np
 
+import numpy as np
 import paddle
+
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.env import MODEL_HOME
+
 from ..testing_utils import slow
 
 
@@ -118,7 +120,7 @@ class ModelTesterMixin:
                 out_1[np.isnan(out_1)] = 0
                 max_diff = np.amax(np.abs(out_1 - out_2))
                 self.assertLessEqual(max_diff, 1e-5)
-    
+
     def test_save_load(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
         )
@@ -598,14 +600,16 @@ class ModelTesterPretrainedMixin:
     def test_model_from_pretrained_hf_hub(self):
         if self.hf_remote_test_model_path is None:
             return
-        model = self.base_model_class.from_pretrained(self.hf_remote_test_model_path, from_hf_hub=True)
+        model = self.base_model_class.from_pretrained(
+            self.hf_remote_test_model_path, from_hf_hub=True)
         self.assertIsNotNone(model)
-    
+
     @slow
     def test_model_from_pretrained_paddle_hub(self):
         if self.paddlehub_remote_test_model_path is None:
             return
-        model = self.base_model_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        model = self.base_model_class.from_pretrained(
+            self.paddlehub_remote_test_model_path)
         self.assertIsNotNone(model)
 
     @slow

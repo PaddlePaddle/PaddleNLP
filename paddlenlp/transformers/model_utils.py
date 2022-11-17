@@ -377,7 +377,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
         if cls.constructed_from_pretrained_config():
-            return cls.from_pretrained_v2(pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *args,
+            return cls.from_pretrained_v2(pretrained_model_name_or_path,
+                                          from_hf_hub=from_hf_hub,
+                                          *args,
                                           **kwargs)
 
         resource_files = {}
@@ -389,7 +391,7 @@ class PretrainedModel(Layer, GenerationMixin):
         if from_hf_hub:
             resource_files = cls.resource_files_names
             resource_files["model_config_file"] = cls.model_config_file
-        
+
         # From built-in pretrained models
         elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
@@ -840,10 +842,11 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 1. when it's from HF
         if from_hf_hub:
-            return hf_hub_download(repo_id=pretrained_model_name_or_path,
-                                          filename=cls.resource_files_names['model_state'],
-                                          cache_dir=MODEL_HOME)
-        
+            return hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.resource_files_names['model_state'],
+                cache_dir=MODEL_HOME)
+
         # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # check the cache_dir:
@@ -1155,7 +1158,9 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 3. resolve model_weight file
         model_weight_file = cls._resolve_model_file_path(
-            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub)
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub)
 
         # 4. loading the state dict
         model_state_dict = paddle.load(model_weight_file,

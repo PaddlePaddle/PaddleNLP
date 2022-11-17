@@ -24,8 +24,8 @@ from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
                                         get_path_from_url)
 from paddlenlp.utils.env import MODEL_HOME
-from paddlenlp.utils.log import logger
 from paddlenlp.utils.import_utils import is_fast_tokenizer_available
+from paddlenlp.utils.log import logger
 
 __all__ = [
     "AutoTokenizer",
