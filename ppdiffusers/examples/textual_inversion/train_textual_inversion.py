@@ -468,7 +468,7 @@ def main():
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
-        tokenizer = AutoModel.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
 
     # Add the placeholder token in tokenizer
