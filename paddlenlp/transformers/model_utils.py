@@ -50,7 +50,7 @@ def get_path_from_url(url: str,
                       root_dir: str,
                       md5sum: Optional[str] = None,
                       check_exist: bool = True) -> str:
-    """construct `get_path_from_url` for `model_utils` to avoid multi-process downloading
+    """construct `get_path_from_url` for `model_utils` to enable downloading multiprocess-safe
 
     Args:
         url (str): the url of resource file
