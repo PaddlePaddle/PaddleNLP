@@ -29,8 +29,8 @@ class TestModeling(unittest.TestCase):
 
     @slow
     def test_multiprocess_downloading(self):
-        num_process, num_iter = 2, 3
-        small_model_path = "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams"
+        num_process, num_iter = 10, 20
+        small_model_path = "https://paddlenlp.bj.bcebos.com/models/community/__small_models__/bert-base-uncased/model_state.pdparams"
 
         from paddlenlp.transformers.model_utils import get_path_from_url
         with TemporaryDirectory() as tempdir:
