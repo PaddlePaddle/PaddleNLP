@@ -1,3 +1,4 @@
+
 # ⚡ FastTokenizer：高性能文本处理库
 
 ------------------------------------------------------------------------------------------
@@ -19,12 +20,12 @@ FastTokenizer是一款简单易用、功能强大的跨平台高性能文本预�
 
 - 高性能。由于底层采用C++实现，所以其性能远高于目前常规Python实现的Tokenizer。在文本分类任务上，FastTokenizer对比Python版本Tokenizer加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
 - 跨平台。FastTokenizer可在不同的系统平台上使用，目前已支持Windows x64，Linux x64以及MacOS 10.14+平台上使用。
-- 多编程语言支持。FastTokenizer提供在C++、Python语言上开发的能力。
+- 多编程语言支持。FastTokenizer提供在[C++](./docs/cpp/README.md)、[Python](./docs/python/README.md)语言上开发的能力。
 - 灵活性强。用户可以通过指定不同的FastTokenizer组件定制满足需求的Tokenizer。
 
 ## 快速开始
 
-下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ Demo](./fast_tokenizer/demo/README.md)。
+下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)。
 
 ### 环境依赖
 
@@ -128,3 +129,7 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
 ## 相关文档
 
 [FastTokenizer编译指南](docs/compile/README.md)
+
+[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)
+
+[FastTokenizer Python 库使用教程](./docs/python/README.md)
