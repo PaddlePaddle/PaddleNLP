@@ -16,9 +16,9 @@
 import json
 from typing import List, Optional, Tuple
 
-from faster_tokenizer import normalizers
-from ..tokenizer_utils_faster import PretrainedFasterTokenizer
-from .tokenizer import ErnieTokenizer
+from fast_tokenizer import normalizers
+from ..tokenizer_utils_faster import PretrainedFastTokenizer
+from .tokenizer import BertTokenizer
 
 VOCAB_FILES_NAMES = {
     "vocab_file": "vocab.txt",
@@ -26,11 +26,12 @@ VOCAB_FILES_NAMES = {
 }
 
 
-class ErnieFasterTokenizer(PretrainedFasterTokenizer):
+class BertFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
-    slow_tokenizer_class = ErnieTokenizer
+    slow_tokenizer_class = BertTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
+
     padding_side = 'right'
 
     def __init__(self,
@@ -79,5 +80,6 @@ class ErnieFasterTokenizer(PretrainedFasterTokenizer):
     def save_vocabulary(self,
                         save_directory: str,
                         filename_prefix: Optional[str] = None) -> Tuple[str]:
-        files = self._tokenizer.model.save(save_directory, filename_prefix)
+        files = self._tokenizer.model.save(save_directory,
+                                           prefix=filename_prefix)
         return tuple(files)

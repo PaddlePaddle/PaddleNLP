@@ -1,4 +1,4 @@
-# FastTokenizer
+# ⚡ FastTokenizer：高性能文本处理库
 
 ------------------------------------------------------------------------------------------
 
@@ -70,6 +70,13 @@ print("type_ids: ", output.type_ids)
 print("tokens: ", output.tokens)
 print("offsets: ", output.offsets)
 print("attention_mask: ", output.attention_mask)
+
+# 5. 示例输出
+# ids:  [1, 75, 329, 12, 20, 2]
+# type_ids:  [0, 0, 0, 0, 0, 0]
+# tokens:  ['[CLS]', '我', '爱', '中', '国', '[SEP]']
+# offsets:  [(0, 0), (0, 1), (1, 2), (2, 3), (3, 4), (0, 0)]
+# attention_mask:  [1, 1, 1, 1, 1, 1]
 ```
 
 ### FastTokenizer在PaddleNLP Tokenizer模块加速示例
@@ -89,6 +96,11 @@ text2 = fast_tokenizer('自然语言处理')
 
 print(text1)
 print(text2)
+
+# 示例输出
+# {'input_ids': [1, 67, 187, 405, 545, 239, 38, 2], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}
+# {'input_ids': [1, 67, 187, 405, 545, 239, 38, 2], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}
+
 ```
 
 目前PaddleNLP已支持BERT、ERNIE、TinyBERT以及ERNIE-M 4种Tokenizer的Fast版本，其余模型的Tokenizer暂不支持Fast版本。

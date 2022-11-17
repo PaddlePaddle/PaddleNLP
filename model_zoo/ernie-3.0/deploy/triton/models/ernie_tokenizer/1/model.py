@@ -47,7 +47,7 @@ class TritonPythonModel:
           * model_name: Model name
         """
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
-                                                       use_faster=True)
+                                                       use_fast=True)
         # You must parse model_config. JSON string is not parsed here
         self.model_config = json.loads(args['model_config'])
         print("model_config:", self.model_config)

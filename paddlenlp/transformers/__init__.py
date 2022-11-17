@@ -141,8 +141,9 @@ from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 
 # For faster tokenizer
-from ..utils.import_utils import is_faster_tokenizer_available
-if is_faster_tokenizer_available():
-    from .bert.faster_tokenizer import *
-    from .ernie.faster_tokenizer import *
-    from .tinybert.faster_tokenizer import *
+from ..utils.import_utils import is_fast_tokenizer_available
+if is_fast_tokenizer_available():
+    from .bert.fast_tokenizer import *
+    from .ernie.fast_tokenizer import *
+    from .tinybert.fast_tokenizer import *
+    from .ernie_m.fast_tokenizer import *

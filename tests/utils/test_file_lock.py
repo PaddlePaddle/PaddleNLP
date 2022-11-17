@@ -21,22 +21,35 @@ from tempfile import TemporaryDirectory, TemporaryFile
 from paddlenlp.utils.file_lock import FileLock
 
 
+def time_lock(lock_file: str) -> datetime:
+    """just sleep 1.2 seconds to test sequence timing
+
+    Args:
+        lock_file (str): the path of lock file
+
+    Returns:
+        datetime: the current datetime
+    """
+    with FileLock(lock_file):
+        time.sleep(1.2)
+    return datetime.now()
+
+
 class TestFileLock(unittest.TestCase):
 
     def test_time_lock(self):
+        """lock the time"""
         with TemporaryDirectory() as tempdir:
-            tempfile = os.path.join(tempdir, 'download.lock')
+            lock_file = os.path.join(tempdir, 'download.lock')
+            pre_time, seconds = datetime.now(), 0
 
-            with FileLock(tempfile) as file_lock:
+            with Pool(4) as pool:
+                datetimes = pool.map(time_lock, [lock_file for _ in range(10)])
+                datetimes.sort()
 
-                pre_time, seconds = datetime.now(), 0
-
-                def time_lock(*args, **kwargs):
-                    file_lock.acquire()
-                    time.sleep(0.5)
-                    assert (datetime.now() - pre_time).seconds >= (0.5 - 1e-3)
-                    pre_time = datetime.now()
-                    file_lock.release()
-
-                with Pool(4) as pool:
-                    pool.starmap(time_lock, [_ for _ in range(10)])
+                pre_time = None
+                for current_time in datetimes:
+                    if pre_time is None:
+                        pre_time = current_time
+                    else:
+                        assert (current_time - pre_time).seconds > (1 - 1e-3)
