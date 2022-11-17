@@ -12,9 +12,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "fast_tokenizer/tokenizers/clip_fast_tokenizer.h"
 #include <iostream>
 #include <vector>
+#include "fast_tokenizer/tokenizers/clip_fast_tokenizer.h"
 using namespace paddlenlp;
 
 template <typename T>
@@ -35,10 +35,10 @@ fast_tokenizer::tokenizers_impl::ClipFastTokenizer CreateClipFastTokenizer(
     const std::string& vocab_path,
     const std::string& merge_path,
     uint32_t max_length,
-    bool pad = true) {
+    bool pad_to_max_length = true) {
   fast_tokenizer::tokenizers_impl::ClipFastTokenizer tokenizer(
       vocab_path, merge_path, max_length);
-  if (pad) {
+  if (pad_to_max_length) {
     tokenizer.EnablePadMethod(fast_tokenizer::core::RIGHT,
                               tokenizer.GetPadTokenId(),
                               0,
@@ -51,16 +51,20 @@ fast_tokenizer::tokenizers_impl::ClipFastTokenizer CreateClipFastTokenizer(
 
 int main() {
   // 1. Define a clip fast tokenizer
-  auto tokenizer =
-      CreateClipFastTokenizer("clip_vocab.json", "clip_merges.txt", 77, true);
+  auto tokenizer = CreateClipFastTokenizer("clip_vocab.json",
+                                           "clip_merges.txt",
+                                           /*max_length = */ 77,
+                                           /* pad_to_max_length = */ true);
   // 2. Tokenize the input strings
   std::vector<fast_tokenizer::core::Encoding> encodings;
   std::vector<std::string> texts = {
       "a photo of an astronaut riding a horse on mars"};
   tokenizer.EncodeBatchStrings(texts, &encodings);
-  for (auto&& encoding : encodings) {
-    auto ids = encoding.GetIds();
-    std::cout << ids << std::endl;
+
+  for (int i = 0; i < texts.size(); ++i) {
+    std::cout << "text = \"" << texts[i] << "\"" << std::endl;
+    std::cout << "ids = " << encodings[i].GetIds() << std::endl;
   }
+
   return 0;
 }
