@@ -1,0 +1,2 @@
+typer
+rich

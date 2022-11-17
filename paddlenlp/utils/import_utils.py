@@ -17,10 +17,47 @@ import sys
 import os
 import site
 import shutil
-from typing import Optional
+from typing import Optional, Type
 import pip
 import importlib.util
 from paddlenlp.utils.log import logger
+import importlib.util
+import importlib_metadata
+
+
+def is_package_available(package_name: str) -> bool:
+    """check if the package is avaliable
+    Args:
+        package_name (str): the installed package name
+    Returns:
+        bool: the existence of installed package
+    """
+    package_spec = importlib.util.find_spec(package_name)
+    return package_spec is not None and package_spec.has_location
+
+
+def is_faster_tokenizer_available() -> bool:
+    """check if `faster_tokenizer` ia avaliable
+    Returns:
+        bool: if `faster_tokenizer` is avaliable
+    """
+    return is_package_available("faster_tokenizer")
+
+
+def is_torch_available() -> bool:
+    """check if `torch` package is installed
+    Returns:
+        bool: if `torch` is available
+    """
+    return is_package_available("torch")
+
+
+def is_transformers_available() -> bool:
+    """check if `transformers` package is installed
+    Returns:
+        bool: if `transformers` is available
+    """
+    return is_package_available("transformers")
 
 
 def is_fast_tokenizer_available():
@@ -106,3 +143,23 @@ def uninstall_package(package_name: str, module_name: Optional[str] = None):
     for key in list(sys.modules.keys()):
         if module_name in key:
             del sys.modules[key]
+
+
+def import_module(module_name: str) -> Optional[Type]:
+    """import moudle base on the model
+    Args:
+        module_name (str): the name of target module
+    """
+    # 1. prepare the name
+    assert '.' in module_name, '`.` must be in the module_name'
+    index = module_name.rindex('.')
+    module = module_name[:index]
+    target_module_name = module_name[index + 1:]
+
+    # 2. get the target module name
+    try:
+        module = importlib.import_module(module)
+        target_module = getattr(module, target_module_name, None)
+        return target_module
+    except ModuleNotFoundError:
+        return None
