@@ -12,25 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Can be used in linux and mac
-mkdir -p build_cpp
-cd build_cpp
-rm -rf *
-platform="$(uname -s)"
-if [[ $platform == Linux* ]];
-then
-  core_num=`nproc`
-else
-  core_num=`sysctl -n hw.logicalcpu`
-fi
-echo "Compile with $core_num cores"
-cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
-make -j${core_num}
+import fast_tokenizer
+from fast_tokenizer import ErnieFastTokenizer, models
 
-if [[ $? == 0 ]];
-then
-    echo "Successfully compile."
-else
-    echo "Fail compiling."
-fi
-cd ..
+fast_tokenizer.set_thread_num(1)
+vocab = models.WordPiece.read_file("ernie_vocab.txt")
+fast_tokenizer = ErnieFastTokenizer(vocab)
+output = fast_tokenizer.encode("我爱中国")
+print("ids: ", output.ids)
+print("type_ids: ", output.type_ids)
+print("tokens: ", output.tokens)
+print("offsets: ", output.offsets)
+print("attention_mask: ", output.attention_mask)
