@@ -630,6 +630,8 @@ class BertCompatibilityTest(unittest.TestCase):
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = BertModel
+    hf_remote_test_model_path = "PaddlePaddle/ci-test-bert-model"
+    paddlehub_remote_test_model_path = "__internal_testing__/bert"
 
     @slow
     def test_inference_no_attention(self):

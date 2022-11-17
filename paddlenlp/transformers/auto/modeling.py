@@ -230,8 +230,25 @@ class _BaseAutoModelClass:
             for name in pretrained_model_names:
                 all_model_names.append(name)
 
+        # From HF
+        if from_hf_hub:
+            config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
+                                          filename=cls.model_config_file,
+                                          cache_dir=MODEL_HOME)
+            if os.path.exists(config_file):
+                model_class = cls._get_model_class_from_config(
+                    pretrained_model_name_or_path, config_file)
+                logger.info("We are using %s to load '%s'." %
+                            (model_class, pretrained_model_name_or_path))
+                return model_class.from_pretrained(
+                    pretrained_model_name_or_path,
+                    from_hf_hub=from_hf_hub,
+                    *model_args,
+                    **kwargs)
+            else:
+                logger.warning(f"{config_file}  is not a valid path to a model config file")
         # From built-in pretrained models
-        if pretrained_model_name_or_path in all_model_names:
+        elif pretrained_model_name_or_path in all_model_names:
             for pretrained_model_names, model_name in cls._pretrained_model_dict.items(
             ):
                 # From built-in pretrained models
@@ -276,21 +293,8 @@ class _BaseAutoModelClass:
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, *model_args, **kwargs)
-        # From HF
-        elif from_hf_hub:
-            config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
-                                          filename=cls.model_config_file,
-                                          cache_dir=MODEL_HOME)
-            if os.path.exists(config_file):
-                model_class = cls._get_model_class_from_config(
-                    pretrained_model_name_or_path, config_file)
-                logger.info("We are using %s to load '%s'." %
-                            (model_class, pretrained_model_name_or_path))
-                return model_class.from_pretrained(
-                    pretrained_model_name_or_path,
-                    from_hf_hub=from_hf_hub,
-                    *model_args,
-                    **kwargs)
+            else:
+                logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join([
@@ -321,6 +325,8 @@ class _BaseAutoModelClass:
                             (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                logger.warning(f"{resolved_vocab_file}  is not a valid path to a model config file")
 
 
 class AutoModel(_BaseAutoModelClass):
@@ -343,7 +349,7 @@ class AutoModel(_BaseAutoModelClass):
                         **kwargs):
         """
         Creates an instance of `AutoModel`. Model weights are loaded
-        by specifying name of a built-in pretrained model, or a community contributed model,
+        by specifying name of a built-in pretrained model, a pretrained model on HF, a community contributed model,
         or a local file directory path.
 
         Args:

@@ -118,6 +118,33 @@ class ModelTesterMixin:
                 out_1[np.isnan(out_1)] = 0
                 max_diff = np.amax(np.abs(out_1 - out_2))
                 self.assertLessEqual(max_diff, 1e-5)
+    
+    def test_save_load(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
+        )
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+            with paddle.no_grad():
+                outputs = model(
+                    **self._prepare_for_class(inputs_dict, model_class))
+
+            out_2 = outputs[0].numpy()
+            out_2[np.isnan(out_2)] = 0
+
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                model.save_pretrained(tmpdirname)
+                model = model_class.from_pretrained(tmpdirname)
+                model.eval()
+                with paddle.no_grad():
+                    after_outputs = model(
+                        **self._prepare_for_class(inputs_dict, model_class))
+
+                # Make sure we don't have nans
+                out_1 = after_outputs[0].numpy()
+                out_1[np.isnan(out_1)] = 0
+                max_diff = np.amax(np.abs(out_1 - out_2))
+                self.assertLessEqual(max_diff, 1e-5)
 
     def test_determinism(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
@@ -564,6 +591,22 @@ class ModelTesterMixin:
 
 class ModelTesterPretrainedMixin:
     base_model_class: PretrainedModel = None
+    hf_remote_test_model_path: str = None
+    paddlehub_remote_test_model_path: str = None
+
+    @slow
+    def test_model_from_pretrained_hf_hub(self):
+        if self.hf_remote_test_model_path is None:
+            return
+        model = self.base_model_class.from_pretrained(self.hf_remote_test_model_path, from_hf_hub=True)
+        self.assertIsNotNone(model)
+    
+    @slow
+    def test_model_from_pretrained_paddle_hub(self):
+        if self.paddlehub_remote_test_model_path is None:
+            return
+        model = self.base_model_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        self.assertIsNotNone(model)
 
     @slow
     def test_model_from_pretrained_with_cache_dir(self):
