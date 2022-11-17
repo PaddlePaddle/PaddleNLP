@@ -12,9 +12,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
 #include <iostream>
 #include <vector>
+#include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
 using namespace paddlenlp;
 
 int main() {
