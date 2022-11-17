@@ -172,6 +172,7 @@ class _BaseAutoModelClass:
             f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
         )
 
+    # TODO: same logic also used in paddlenlp cli. We can potential refactor as a common method
     @classmethod
     def _get_model_class_from_config(cls, pretrained_model_name_or_path,
                                      config_file_path):
