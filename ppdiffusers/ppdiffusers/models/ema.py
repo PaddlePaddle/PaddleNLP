@@ -76,9 +76,7 @@ class LitEma(nn.Layer):
         shadow_params = dict(self.named_buffers())
         for key in m_param:
             if not m_param[key].stop_gradient:
-                m_param[key].copy_(
-                    shadow_params[self.m_name2s_name[key]].cast(
-                        m_param[key].dtype), True)
+                m_param[key].copy_(shadow_params[self.m_name2s_name[key]], True)
             else:
                 assert not key in self.m_name2s_name
 
@@ -103,4 +101,4 @@ class LitEma(nn.Layer):
             updated with the stored parameters.
         """
         for c_param, param in zip(self.collected_params, parameters):
-            param.copy_(c_param.cast(param.dtype), True)
+            param.copy_(c_param, True)

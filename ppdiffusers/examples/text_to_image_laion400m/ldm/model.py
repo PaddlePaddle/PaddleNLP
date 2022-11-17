@@ -175,7 +175,7 @@ class LatentDiffusionModel(nn.Layer):
         latents = self.vae.encode(pixel_values).latent_dist.sample()
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1])
-        image = (image * 255.).numpy().round()
+        image = (image * 255.).cast("float32").numpy().round()
         return image
 
     @paddle.no_grad()
@@ -245,4 +245,4 @@ class LatentDiffusionModel(nn.Layer):
             latents = 1 / 0.18215 * latents
             image = self.vae.decode(latents).sample
             image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1]) * 255.
-        return image.numpy().round()
+        return image.cast("float32").numpy().round()
