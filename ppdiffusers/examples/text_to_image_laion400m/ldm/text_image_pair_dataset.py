@@ -85,7 +85,7 @@ def parse_line(line, filename):
         return None
 
 
-# dont use random.randint
+# donot use random.randint
 class RandomCrop(transforms.RandomCrop):
 
     def _get_param(self, img, output_size):

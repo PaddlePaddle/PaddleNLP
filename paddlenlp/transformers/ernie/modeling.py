@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Tuple
+from paddle import Tensor
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -78,31 +81,31 @@ class ErnieEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                task_type_ids=None,
-                inputs_embeds=None,
-                past_key_values_length=None):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                task_type_ids: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                past_key_values_length: int = 0):
+
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
-            input_embeddings = self.word_embeddings(input_ids)
-        else:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
-            input_embeddings = inputs_embeds
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        input_shape = paddle.shape(inputs_embeds)[:-1]
 
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
-            #seq_length = input_ids.shape[1]
             ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=1)
             position_ids = seq_length - ones
-            if past_key_values_length is not None:
-                position_ids += past_key_values_length
+
+            if past_key_values_length > 0:
+                position_ids = position_ids + past_key_values_length
+
             position_ids.stop_gradient = True
 
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embeddings + position_embeddings
+        embeddings = inputs_embeds + position_embeddings
 
         if self.type_vocab_size > 0:
             if token_type_ids is None:
@@ -927,17 +930,17 @@ class ErnieModel(ErniePretrainedModel):
         self.embeddings.word_embeddings = value
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                task_type_ids=None,
-                past_key_values=None,
-                inputs_embeds=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                task_type_ids: Optional[Tensor] = None,
+                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                use_cache: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -1019,15 +1022,13 @@ class ErnieModel(ErniePretrainedModel):
             raise ValueError(
                 "You cannot specify both input_ids and inputs_embeds at the same time."
             )
-        elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
-        elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
-        else:
-            raise ValueError(
-                "You have to specify either input_ids or inputs_embeds")
 
-        past_key_values_length = None
+        # init the default bool value
+        output_attentions = output_attentions if output_attentions is not None else False
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else False
+        return_dict = return_dict if return_dict is not None else False
+        use_cache = use_cache if use_cache is not None else False
+        past_key_values_length = 0
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
 
@@ -1043,11 +1044,13 @@ class ErnieModel(ErniePretrainedModel):
                     dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask],
                                                axis=-1)
+
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(
                 attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
+
         attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(
@@ -1110,15 +1113,15 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -1222,16 +1225,16 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                start_positions: Optional[Tensor] = None,
+                end_positions: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -1353,15 +1356,15 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -1559,17 +1562,17 @@ class ErnieForPretraining(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                inputs_embeds=None,
-                labels=None,
-                next_sentence_label=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                masked_positions: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                next_sentence_label: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         Args:
             input_ids (Tensor):
@@ -1740,16 +1743,16 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                inputs_embeds=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                masked_positions: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
 
         Args:
@@ -1862,15 +1865,15 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
         self.apply(self.init_weights)
 
     def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                inputs_embeds=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+                input_ids: Optional[Tensor] = None,
+                token_type_ids: Optional[Tensor] = None,
+                position_ids: Optional[Tensor] = None,
+                attention_mask: Optional[Tensor] = None,
+                inputs_embeds: Optional[Tensor] = None,
+                labels: Optional[Tensor] = None,
+                output_hidden_states: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
         r"""
         The ErnieForMultipleChoice forward method, overrides the __call__() special method.
 
