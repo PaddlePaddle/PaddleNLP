@@ -1,172 +1,54 @@
-# 🧨 Diffusers Paddle Pipelines
+# PPDiffusers Pipelines
 
-Pipelines provide a simple way to run state-of-the-art diffusion models in inference.
-Most diffusion systems consist of multiple independently-trained models and highly adaptable scheduler
-components - all of which are needed to have a functioning end-to-end diffusion system.
+Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理的简单方式。
+大多数扩散模型系统由多个独立训练的模型和高度自适应的调度器(scheduler)组成，通过pipeline我们可以很方便的对这些扩散模型系统进行端到端的推理。
 
-As an example, [Stable Diffusion](https://huggingface.co/blog/stable_diffusion) has three independently trained models:
-- [Autoencoder](https://github.com/huggingface/diffusers/blob/5cbed8e0d157f65d3ddc2420dfd09f2df630e978/src/diffusers/models/vae.py#L392)
-- [Conditional Unet](https://github.com/huggingface/diffusers/blob/5cbed8e0d157f65d3ddc2420dfd09f2df630e978/src/diffusers/models/unet_2d_condition.py#L12)
-- [CLIP text encoder](https://huggingface.co/docs/transformers/v4.21.2/en/model_doc/clip#transformers.CLIPTextModel)
-- a scheduler component, [scheduler](https://github.com/huggingface/diffusers/blob/main/src/diffusers/schedulers/scheduling_pndm.py),
-- a [CLIPFeatureExtractor](https://huggingface.co/docs/transformers/v4.21.2/en/model_doc/clip#transformers.CLIPFeatureExtractor),
-- as well as a [safety checker](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/safety_checker.py).
-All of these components are necessary to run stable diffusion in inference even though they were trained
-or created independently from each other.
+举例来说， [Stable Diffusion](https://huggingface.co/blog/stable_diffusion)由以下组件构成:
+- Autoencoder
+- Conditional Unet
+- CLIP text encoder
+- scheduler
+- CLIPFeatureExtractor
+- safety checker
 
-To that end, we strive to offer all open-sourced, state-of-the-art diffusion system under a unified API.
-More specifically, we strive to provide pipelines that
-- 1. can load the officially published weights and yield 1-to-1 the same outputs as the original implementation according to the corresponding paper (*e.g.* [LatentDiffusionPipeline](https://github.com/huggingface/diffusers/tree/main/src/diffusers/pipelines/latent_diffusion), uses the officially released weights of [High-Resolution Image Synthesis with Latent Diffusion Models](https://arxiv.org/abs/2112.10752)),
-- 2. have a simple user interface to run the model in inference (see the [Pipelines API](#pipelines-api) section),
-- 3. are easy to understand with code that is self-explanatory and can be read along-side the official paper (see [Pipelines summary](#pipelines-summary)),
-- 4. can easily be contributed by the community (see the [Contribution](#contribution) section).
+这些组件之间是独立训练或创建的，同时在Stable Diffusion的推理运行中也是必需的，我们可以通过pipelines来对整个系统进行封装，从而提供一个简洁的推理接口。
 
-**Note** that pipelines do not (and should not) offer any training functionality.
-If you are looking for *official* training examples, please have a look at [examples](https://github.com/huggingface/diffusers/tree/main/examples).
+我们通过pipelines在统一的API下提供所有开源且SOTA的扩散模型系统的推理能力。具体来说，我们的pipelines能够提供以下功能：
+1. 可以加载官方发布的权重，并根据相应的论文复现出与原始实现相同的输出
+2. 提供一个简单的用户界面来推理运行扩散模型系统，参见[Pipelines API](#pipelines-api)部分
+3. 提供易于理解的代码实现，可以与官方文档一起阅读，参见[Pipelines汇总](#Pipelines汇总)部分
+4. 可以很容易地由社区贡献
 
+**【注意】** Pipelines不（也不应该）提供任何训练功能。
+如果您正在寻找训练的相关示例，请查看[examples](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples).
 
-## Pipelines Summary
+## Pipelines汇总
 
-The following table summarizes all officially supported pipelines, their corresponding paper, and if
-available a colab notebook to directly try them out.
+下表总结了所有支持的Pipelines，以及相应的论文、任务、推理脚本。
 
-| Pipeline | Paper | Tasks | Colab
-|---|---|:---:|:---:|
-| [ddpm](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/ddpm) | [**Denoising Diffusion Probabilistic Models**](https://arxiv.org/abs/2006.11239) | *Unconditional Image Generation* |
-| [ddim](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/ddim) | [**Denoising Diffusion Implicit Models**](https://arxiv.org/abs/2010.02502) | *Unconditional Image Generation* | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/training_example.ipynb)
-| [latent_diffusion](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/latent_diffusion) | [**High-Resolution Image Synthesis with Latent Diffusion Models**](https://arxiv.org/abs/2112.10752)| *Text-to-Image Generation* |
-| [latent_diffusion_uncond](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/latent_diffusion_uncond) | [**High-Resolution Image Synthesis with Latent Diffusion Models**](https://arxiv.org/abs/2112.10752) | *Unconditional Image Generation* |
-| [pndm](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/pndm) | [**Pseudo Numerical Methods for Diffusion Models on Manifolds**](https://arxiv.org/abs/2202.09778) | *Unconditional Image Generation* |
-| [score_sde_ve](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/score_sde_ve) | [**Score-Based Generative Modeling through Stochastic Differential Equations**](https://openreview.net/forum?id=PxTIG12RRHS) | *Unconditional Image Generation* |
-| [score_sde_vp](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/score_sde_vp) | [**Score-Based Generative Modeling through Stochastic Differential Equations**](https://openreview.net/forum?id=PxTIG12RRHS) | *Unconditional Image Generation* |
-| [stable_diffusion](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion) | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release) | *Text-to-Image Generation* | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/training_example.ipynb)
-| [stable_diffusion](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion) | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release) | *Image-to-Image Text-Guided Generation* | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/image_2_image_using_diffusers.ipynb)
-| [stable_diffusion](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion) | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release) | *Text-Guided Image Inpainting* | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/in_painting_with_stable_diffusion_using_diffusers.ipynb)
-| [stochastic_karras_ve](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stochastic_karras_ve) | [**Elucidating the Design Space of Diffusion-Based Generative Models**](https://arxiv.org/abs/2206.00364) | *Unconditional Image Generation* |
+| Pipeline                                                                                                                      | Source                                                                                                                       | Tasks | Inference
+|-------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|:---:|:---:|
+| [ddpm](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/ddpm)                                       | [**Denoising Diffusion Probabilistic Models**](https://arxiv.org/abs/2006.11239)                                             | *Unconditional Image Generation* |  [link](../../scripts/inference/unconditional_image_generation-ddpm.py)
+| [ddim](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/ddim)                                       | [**Denoising Diffusion Implicit Models**](https://arxiv.org/abs/2010.02502)                                                  | *Unconditional Image Generation* | [link](../../scripts/inference/unconditional_image_generation-ddim.py)
+| [latent_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/latent_diffusion)               | [**High-Resolution Image Synthesis with Latent Diffusion Models**](https://arxiv.org/abs/2112.10752)                         | *Text-to-Image Generation* | [link](../../scripts/inference/text_to_image_generation-latent_diffusion.py)
+| [latent_diffusion_uncond](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/latent_diffusion_uncond) | [**High-Resolution Image Synthesis with Latent Diffusion Models**](https://arxiv.org/abs/2112.10752)                         | *Unconditional Image Generation* | [link](../../scripts/inference/unconditional_image_generation-latent_diffusion_uncond.py)
+| [pndm](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/pndm)                                       | [**Pseudo Numerical Methods for Diffusion Models on Manifolds**](https://arxiv.org/abs/2202.09778)                           | *Unconditional Image Generation* | [link](../../scripts/inference/unconditional_image_generation-pndm.py)
+| [score_sde_ve](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/score_sde_ve)                       | [**Score-Based Generative Modeling through Stochastic Differential Equations**](https://openreview.net/forum?id=PxTIG12RRHS) | *Unconditional Image Generation* | [link](../../scripts/inference/unconditional_image_generation-score_sde_ve.py)
+| [stable_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release)                                            | *Text-to-Image Generation* | [link](../../scripts/inference/text_to_image_generation-stable_diffusion.py)
+| [stable_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)               | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release)                                            | *Image-to-Image Text-Guided Generation* | [link](../../scripts/inference/image_to_image_text_guided_generation-stable_diffusion.py)
+| [stable_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                 | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release)                                            | *Text-Guided Image Inpainting* | [link](../../scripts/inference/text_guided_image_inpainting-stable_diffusion.py)
 
-**Note**: Pipelines are simple examples of how to play around with the diffusion systems as described in the corresponding papers.
-However, most of them can be adapted to use different scheduler components or even different model components. Some pipeline examples are shown in the [Examples](#examples) below.
+**【注意】** Pipelines可以端到端的展示相应论文中描述的扩散模型系统。然而，大多数Pipelines可以使用不同的调度器组件，甚至不同的模型组件。
 
 ## Pipelines API
 
-Diffusion models often consist of multiple independently-trained models or other previously existing components.
+扩散模型系统通常由多个独立训练的模型以及调度器等其他组件构成。
+其中每个模型都是在不同的任务上独立训练的，调度器可以很容易地进行替换。
+然而，在推理过程中，我们希望能够轻松地加载所有组件并在推理中使用它们，即使某个组件来自不同的库, 为此，所有pipeline都提供以下功能：
 
 
-Each model has been trained independently on a different task and the scheduler can easily be swapped out and replaced with a different one.
-During inference, we however want to be able to easily load all components and use them in inference - even if one component, *e.g.* CLIP's text encoder, originates from a different library, such as [Transformers](https://github.com/huggingface/transformers). To that end, all pipelines provide the following functionality:
+- `from_pretrained` 该方法接收PaddleNLP模型库id（例如`runwayml/stable-diffusion-v1-5`）或本地目录路径。为了能够准确加载相应的模型和组件，相应目录下必须提供`model_index.json`文件。
 
-- [`from_pretrained` method](https://github.com/huggingface/diffusers/blob/5cbed8e0d157f65d3ddc2420dfd09f2df630e978/src/diffusers/pipeline_utils.py#L139) that accepts a Hugging Face Hub repository id, *e.g.* [junnyu/stable-diffusion-v1-4-paddle](https://huggingface.co/junnyu/stable-diffusion-v1-4-paddle) or a path to a local directory, *e.g.*
-"./stable-diffusion". To correctly retrieve which models and components should be loaded, one has to provide a `model_index.json` file, *e.g.* [junnyu/stable-diffusion-v1-4-paddle/model_index.json](https://huggingface.co/junnyu/stable-diffusion-v1-4-paddle/blob/main/model_index.json), which defines all components that should be
-loaded into the pipelines. More specifically, for each model/component one needs to define the format `<name>: ["<library>", "<class name>"]`. `<name>` is the attribute name given to the loaded instance of `<class name>` which can be found in the library or pipeline folder called `"<library>"`.
-- [`save_pretrained`](https://github.com/huggingface/diffusers/blob/5cbed8e0d157f65d3ddc2420dfd09f2df630e978/src/diffusers/pipeline_utils.py#L90) that accepts a local path, *e.g.* `./stable-diffusion` under which all models/components of the pipeline will be saved. For each component/model a folder is created inside the local path that is named after the given attribute name, *e.g.* `./stable_diffusion/unet`.
-In addition, a `model_index.json` file is created at the root of the local path, *e.g.* `./stable_diffusion/model_index.json` so that the complete pipeline can again be instantiated
-from the local path.
-- [`to`](https://github.com/huggingface/diffusers/blob/5cbed8e0d157f65d3ddc2420dfd09f2df630e978/src/diffusers/pipeline_utils.py#L118) which accepts a `string` or `paddle.device` to move all models that are of type `paddle.nn.Layer` to the passed device. The behavior is fully analogous to [PyTorch's `to` method](https://pytorch.org/docs/stable/generated/paddle.nn.Layer.html#paddle.nn.Layer.to).
-- [`__call__`] method to use the pipeline in inference. `__call__` defines inference logic of the pipeline and should ideally encompass all aspects of it, from pre-processing to forwarding tensors to the different models and schedulers, as well as post-processing. The API of the `__call__` method can strongly vary from pipeline to pipeline. *E.g.* a text-to-image pipeline, such as [`StableDiffusionPipeline`](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py) should accept among other things the text prompt to generate the image. A pure image generation pipeline, such as [DDPMPipeline](https://github.com/huggingface/diffusers/tree/main/src/diffusers/pipelines/ddpm) on the other hand can be run without providing any inputs. To better understand what inputs can be adapted for
-each pipeline, one should look directly into the respective pipeline.
+- `save_pretrained` 该方法接受一个本地目录路径，Pipelines的所有模型或组件都将被保存到该目录下。对于每个模型或组件，都会在给定目录下创建一个子文件夹。同时`model_index.json`文件将会创建在本地目录路径的根目录下，以便可以再次从本地路径实例化整个Pipelines。
 
-**Note**: All pipelines have PyTorch's autograd disabled by decorating the `__call__` method with a [`torch.no_grad`](https://pytorch.org/docs/stable/generated/torch.no_grad.html) decorator because pipelines should
-not be used for training. If you want to store the gradients during the forward pass, we recommend writing your own pipeline, see also our [community-examples](https://github.com/huggingface/diffusers/tree/main/examples/community)
-
-## Contribution
-
-We are more than happy about any contribution to the officially supported pipelines 🤗. We aspire
-all of our pipelines to be  **self-contained**, **easy-to-tweak**, **beginner-friendly** and for **one-purpose-only**.
-
-- **Self-contained**: A pipeline shall be as self-contained as possible. More specifically, this means that all functionality should be either directly defined in the pipeline file itself, should be inherited from (and only from) the [`DiffusionPipeline` class](https://github.com/huggingface/diffusers/blob/5cbed8e0d157f65d3ddc2420dfd09f2df630e978/src/diffusers/pipeline_utils.py#L56) or be directly attached to the model and scheduler components of the pipeline.
-- **Easy-to-use**: Pipelines should be extremely easy to use - one should be able to load the pipeline and
-use it for its designated task, *e.g.* text-to-image generation, in just a couple of lines of code. Most
-logic including pre-processing, an unrolled diffusion loop, and post-processing should all happen inside the `__call__` method.
-- **Easy-to-tweak**: Certain pipelines will not be able to handle all use cases and tasks that you might like them to. If you want to use a certain pipeline for a specific use case that is not yet supported, you might have to copy the pipeline file and tweak the code to your needs. We try to make the pipeline code as readable as possible so that each part –from pre-processing to diffusing to post-processing– can easily be adapted. If you would like the community to benefit from your customized pipeline, we would love to see a contribution to our [community-examples](https://github.com/huggingface/diffusers/tree/main/examples/community). If you feel that an important pipeline should be part of the official pipelines but isn't, a contribution to the [official pipelines](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines) would be even better.
-- **One-purpose-only**: Pipelines should be used for one task and one task only. Even if two tasks are very similar from a modeling point of view, *e.g.* image2image translation and in-painting, pipelines shall be used for one task only to keep them *easy-to-tweak* and *readable*.
-
-## Examples
-
-### Text-to-Image generation with Stable Diffusion
-
-```python
-import paddle
-from ppdiffusers import StableDiffusionPipeline
-
-pipe = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
-
-prompt = "a photo of an astronaut riding a horse on mars"
-image = pipe(prompt).images[0]
-
-image.save("astronaut_rides_horse.png")
-```
-
-### Image-to-Image text-guided generation with Stable Diffusion
-
-The `StableDiffusionImg2ImgPipeline` lets you pass a text prompt and an initial image to condition the generation of new images.
-
-```python
-import requests
-import paddle
-from PIL import Image
-from io import BytesIO
-
-from ppdiffusers import StableDiffusionImg2ImgPipeline
-
-# load the pipeline
-pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-    "CompVis/stable-diffusion-v1-4",
-    paddle_dtype=paddle.float16,
-)
-
-# let's download an initial image
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
-
-response = requests.get(url)
-init_image = Image.open(BytesIO(response.content)).convert("RGB")
-init_image = init_image.resize((768, 512))
-
-prompt = "A fantasy landscape, trending on artstation"
-with paddle.amp.auto_cast(True):
-    image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
-
-image.save("fantasy_landscape.png")
-```
-You can also run this example on colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/image_2_image_using_diffusers.ipynb)
-
-### Tweak prompts reusing seeds and latents
-
-You can generate your own latents to reproduce results, or tweak your prompt on a specific result you liked. [This notebook](https://github.com/pcuenca/diffusers-examples/blob/main/notebooks/stable-diffusion-seeds.ipynb) shows how to do it step by step. You can also run it in Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pcuenca/diffusers-examples/blob/main/notebooks/stable-diffusion-seeds.ipynb).
-
-
-### In-painting using Stable Diffusion
-
-The `StableDiffusionInpaintPipeline` lets you edit specific parts of an image by providing a mask and text prompt.
-
-```python
-import paddle
-from io import BytesIO
-
-import requests
-import PIL
-
-from ppdiffusers import StableDiffusionInpaintPipeline
-
-def download_image(url):
-    response = requests.get(url)
-    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
-
-img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
-mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
-
-init_image = download_image(img_url).resize((512, 512))
-mask_image = download_image(mask_url).resize((512, 512))
-
-pipe = StableDiffusionInpaintPipeline.from_pretrained(
-    "CompVis/stable-diffusion-v1-4",
-    paddle_dtype=paddle.float16,
-)
-
-prompt = "a cat sitting on a bench"
-with paddle.amp.auto_cast(True):
-    image = pipe(prompt=prompt, init_image=init_image, mask_image=mask_image, strength=0.75).images[0]
-
-image.save("cat_on_bench.png")
-```
-
-You can also run this example on colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/in_painting_with_stable_diffusion_using_diffusers.ipynb)
+- `__call__` Pipelines在推理时将调用该方法。该方法定义了Pipelines的推理逻辑，它应该包括预处理、张量在不同模型之间的前向传播、后处理等整个推理流程。

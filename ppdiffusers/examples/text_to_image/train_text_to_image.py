@@ -39,7 +39,7 @@ from datasets import load_dataset
 from paddle.vision import transforms, BaseTransform
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextModel, AutoTokenizer, BertModel
 
 
 class Lambda(BaseTransform):
@@ -330,9 +330,14 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Load models and create wrapper for stable diffusion
-    tokenizer = CLIPTokenizer.from_pretrained(
+    tokenizer = AutoTokenizer.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
-    text_encoder = CLIPTextModel.from_pretrained(
+
+    if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
+        model_cls = BertModel
+    else:
+        model_cls = CLIPTextModel
+    text_encoder = model_cls.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
@@ -479,7 +484,8 @@ def main():
         pixel_values = pixel_values.astype("float32")
         input_ids = [example["input_ids"] for example in examples]
         padded_tokens = tokenizer.pad({"input_ids": input_ids},
-                                      padding=True,
+                                      padding="max_length",
+                                      max_length=tokenizer.model_max_length,
                                       return_tensors="pd")
         return {
             "pixel_values": pixel_values,
@@ -566,7 +572,9 @@ def main():
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
             # Get the text embedding for conditioning
-            encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+            attention_mask = paddle.ones_like(batch["input_ids"])
+            encoder_hidden_states = text_encoder(
+                batch["input_ids"], attention_mask=attention_mask)[0]
 
             if num_processes > 1 and (args.gradient_checkpointing or (
                 (step + 1) % args.gradient_accumulation_steps != 0)):

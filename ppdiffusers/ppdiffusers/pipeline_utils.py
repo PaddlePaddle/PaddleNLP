@@ -398,21 +398,23 @@ class DiffusionPipeline(ConfigMixin):
                 load_method = getattr(class_obj, load_method_name)
                 loading_kwargs = {}
 
-                if issubclass(class_obj, nn.Layer):
-                    loading_kwargs["paddle_dtype"] = paddle_dtype
                 if issubclass(class_obj, OnnxRuntimeModel):
                     loading_kwargs["provider"] = provider
                     loading_kwargs["sess_options"] = sess_options
 
-                loaded_sub_model = load_method(
-                    os.path.join(pretrained_model_name_or_path, name),
-                    **loading_kwargs)
+                model_path_dir = os.path.join(
+                    pretrained_model_name_or_path, name) if os.path.isdir(
+                        pretrained_model_name_or_path
+                    ) else pretrained_model_name_or_path + "/" + name
+                loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):
                 if next(loaded_sub_model.named_parameters()
                         )[1].dtype != paddle_dtype:
                     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
+                # paddlenlp model is training mode not eval mode
+                loaded_sub_model.eval()
             init_kwargs[
                 name] = loaded_sub_model  # UNet(...), # DiffusionSchedule(...)
 
