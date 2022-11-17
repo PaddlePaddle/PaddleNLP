@@ -31,7 +31,7 @@ from paddle.nn import Layer, Embedding
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
 from paddlenlp.utils.downloader import download_check, COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.file_lock import FileLock
 
@@ -62,7 +62,8 @@ def get_path_from_url(url: str,
     """
     os.makedirs(root_dir, exist_ok=True)
 
-    lock_file = os.path.join(root_dir, 'download.lock')
+    # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
+    lock_file = os.path.join(LOCK_FILE_HOME, str(hash(url + root_dir)))
     with FileLock(lock_file) as file_lock:
         file_lock.acquire()
 
