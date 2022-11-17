@@ -24,5 +24,5 @@ endif()
 include(${FAST_TOKENIZER_INSTALL_DIR}/FastTokenizer.cmake)
 include_directories(${FAST_TOKENIZER_INCS})
 
-add_executable(clip_fast_tokenizer_demo ${PROJECT_SOURCE_DIR}/clip_fast_tokenizer_demo.cc)
-target_link_libraries(clip_fast_tokenizer_demo ${FAST_TOKENIZER_LIBS})
+add_executable(demo ${PROJECT_SOURCE_DIR}/demo.cc)
+target_link_libraries(demo ${FAST_TOKENIZER_LIBS})

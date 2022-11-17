@@ -12,9 +12,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "fast_tokenizer/tokenizers/clip_fast_tokenizer.h"
 #include <iostream>
 #include <vector>
+#include "fast_tokenizer/tokenizers/clip_fast_tokenizer.h"
 using namespace paddlenlp;
 
 template <typename T>
@@ -51,8 +51,10 @@ fast_tokenizer::tokenizers_impl::ClipFastTokenizer CreateClipFastTokenizer(
 
 int main() {
   // 1. Define a clip fast tokenizer
-  auto tokenizer =
-      CreateClipFastTokenizer("clip_vocab.json", "clip_merges.txt", /*max_length = */77, /* pad_to_max_length = */true);
+  auto tokenizer = CreateClipFastTokenizer("clip_vocab.json",
+                                           "clip_merges.txt",
+                                           /*max_length = */ 77,
+                                           /* pad_to_max_length = */ true);
   // 2. Tokenize the input strings
   std::vector<fast_tokenizer::core::Encoding> encodings;
   std::vector<std::string> texts = {
@@ -60,8 +62,8 @@ int main() {
   tokenizer.EncodeBatchStrings(texts, &encodings);
 
   for (int i = 0; i < texts.size(); ++i) {
-      std::cout << "text = \"" << texts[i] << "\"" << std::endl;
-      std::cout << "ids = " << encodings[i].GetIds() << std::endl;
+    std::cout << "text = \"" << texts[i] << "\"" << std::endl;
+    std::cout << "ids = " << encodings[i].GetIds() << std::endl;
   }
 
   return 0;
