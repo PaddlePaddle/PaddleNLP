@@ -62,7 +62,7 @@ fast_tokenizer
 推荐用户直接使用cmake方式引入FastTokenizer库。在CMake引入FastTokenizer时，只需添加一行 `include(FastTokenizer.cmake)`，即可获取FastTokenizer的预定义的CMake变量`FAST_TOKENIZER_INCS`和`FAST_TOKENIZER_LIBS`，分别指定FastTokenizer的头文件目录以及动态链接库目录。
 
 
-### 2.1 编译
+### 2.2 编译
 
 示例提供简单的CMakeLists.txt, 用户仅需指定fast_tokenizer包的路径，即可完成编译。
 
@@ -80,14 +80,16 @@ make
 
 ```
 
-### 2.2 运行
+### 2.3 运行
 
 ```shell
 ./demo
 ```
 
 
-### 2.3 样例输出
+### 2.4 样例输出
+
+输出包含原始文本的输入，以及分词后的ids序列结果（含padding）。
 
 ```shell
 
