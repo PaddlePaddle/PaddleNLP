@@ -43,7 +43,7 @@ else:
 from paddle.vision.transforms import RandomHorizontalFlip
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import AutoModel, AutoTokenizer, BertModel
+from paddlenlp.transformers import CLIPTextModel, AutoTokenizer, BertModel
 
 
 def get_writer(args):
@@ -490,7 +490,11 @@ def main():
         args.placeholder_token)
 
     # Load models and create wrapper for stable diffusion
-    text_encoder = AutoModel.from_pretrained(
+    if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
+        model_cls = BertModel
+    else:
+        model_cls = CLIPTextModel
+    text_encoder = model_cls.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
