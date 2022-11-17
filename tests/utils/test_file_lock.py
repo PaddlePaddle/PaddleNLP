@@ -52,4 +52,5 @@ class TestFileLock(unittest.TestCase):
                     if pre_time is None:
                         pre_time = current_time
                     else:
-                        assert (current_time - pre_time).seconds > (1 - 1e-3)
+                        self.assertGreater((current_time - pre_time).seconds,
+                                           1 - 1e-3)
