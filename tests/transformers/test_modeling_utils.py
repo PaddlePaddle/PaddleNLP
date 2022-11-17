@@ -50,7 +50,7 @@ class TestModeling(unittest.TestCase):
             And the `num_jobs` is the number of total process to download file.
         """
         num_process_in_pool, num_jobs = 10, 20
-        small_model_path = "https://paddlenlp.bj.bcebos.com/models/community/__small_models__/bert-base-uncased/model_state.pdparams"
+        small_model_path = "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/bert/model_state.pdparams"
 
         from paddlenlp.transformers.model_utils import get_path_from_url
         with TemporaryDirectory() as tempdir:
@@ -70,7 +70,7 @@ class TestModeling(unittest.TestCase):
         num_process_in_pool, num_jobs = 1, 10
 
         # 1.remove tinybert model weight file
-        model_name = "__small_models__/bert-base-uncased"
+        model_name = "__internal_testing__/bert"
         shutil.rmtree(os.path.join(MODEL_HOME, model_name), ignore_errors=True)
 
         # 2. downloaing tinybert modeling using multi-processing
