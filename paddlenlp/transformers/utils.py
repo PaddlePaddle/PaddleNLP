@@ -11,16 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 import functools
 import inspect
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, Type, TYPE_CHECKING, List
 import warnings
 
+if TYPE_CHECKING:
+    from paddlenlp.transformers import PretrainedModel
+
+from paddlenlp.utils.import_utils import import_module
 from paddle.nn import Layer
 from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
 
 
@@ -211,3 +217,62 @@ def resolve_cache_dir(pretrained_model_name_or_path: str,
         return pretrained_model_name_or_path
 
     return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+
+
+def find_transformer_model_type(model_class: Type) -> str:
+    """get the model type from module name, 
+        eg:
+            BertModel -> bert,
+            RobertaForTokenClassification -> roberta
+
+    Args:
+        model_class (Type): the class of model
+
+    Returns:
+        str: the type string
+    """
+    from paddlenlp.transformers import PretrainedModel
+
+    default_model_type = ''
+
+    if not issubclass(model_class, PretrainedModel):
+        return default_model_type
+
+    module_name: str = model_class.__module__
+    if not module_name.startswith("paddlenlp.transformers."):
+        return default_model_type
+
+    tokens = module_name.split(".")
+    if len(tokens) < 3:
+        return default_model_type
+
+    return tokens[2]
+
+
+def find_transformer_model_class_by_name(
+        model_name: str) -> Optional[Type[PretrainedModel]]:
+    """find transformer model_class by name
+
+    Args:
+        model_name (str): the string of class name
+
+    Returns:
+        Optional[Type[PretrainedModel]]: optional pretrained-model class
+    """
+    transformer_module = import_module("paddlenlp.transformers")
+
+    for obj_name in dir(transformer_module):
+        if obj_name.startswith("_"):
+            continue
+        obj = getattr(transformer_module, obj_name, None)
+        if obj is None:
+            continue
+
+        name = getattr(obj, "__name__", None)
+        if name is None:
+            continue
+
+        if name == model_name:
+            return obj
+    logger.debug(f"can not find model_class<{model_name}>")
+    return None

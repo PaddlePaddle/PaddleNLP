@@ -285,6 +285,60 @@ class ErnieModelTester:
             result[0].shape,
             [self.batch_size, self.seq_length, self.num_classes])
 
+    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
+                                     input_mask, sequence_labels, token_labels,
+                                     choice_labels):
+        model = ErnieModel(**config)
+        model.eval()
+
+        # first forward pass
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[
+            2]
+
+        # create hypothetical multiple next token and extent to next_input_ids
+        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
+        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2)
+
+        # append to next input_ids and
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
+
+        outputs = model(next_input_ids,
+                        attention_mask=next_attention_mask,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_no_past = outputs[2][0]
+
+        outputs = model(next_tokens,
+                        attention_mask=next_attention_mask,
+                        past_key_values=past_key_values,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_past = outputs[2][0]
+
+        # select random slice
+        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:,
+                                                        random_slice_idx].detach(
+                                                        )
+        output_from_past_slice = output_from_past[:, :,
+                                                  random_slice_idx].detach()
+
+        self.parent.assertTrue(
+            output_from_past_slice.shape[1] == next_tokens.shape[1])
+
+        # test that outputs are equal for slice
+        self.parent.assertTrue(
+            paddle.allclose(output_from_past_slice,
+                            output_from_no_past_slice,
+                            atol=1e-3))
+
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
         (
@@ -356,6 +410,10 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
 
+    def test_for_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_cache(*config_and_inputs)
+
     @slow
     def test_model_from_pretrained(self):
         for model_name in list(
@@ -400,6 +458,43 @@ class ErnieModelIntegrationTest(unittest.TestCase):
                                             [-0.0986, -0.7947, -0.1932]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_past_key_value(self):
+        model = ErnieModel.from_pretrained("ernie-1.0")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output[0].shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [[[-0.06635337, -1.32662833, -0.39223742],
+              [-0.24396378, -1.36314595, -1.07446611],
+              [-0.09860237, -0.79468340, -0.19317953]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        expected_slice = paddle.to_tensor(
+            [[[0.07865857, -1.07012558, -1.02596498],
+              [0.12576045, -1.76696026, -1.18682015],
+              [-0.08606864, -1.37880838, -0.12364164]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

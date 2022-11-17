@@ -35,7 +35,7 @@ from PIL import Image
 from paddle.vision import transforms
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
-from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.transformers import BertModel, AutoTokenizer, CLIPTextModel
 from pathlib import Path
 
 
@@ -427,7 +427,11 @@ def main(args):
             os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
 
     # Load models and create wrapper for stable diffusion
-    text_encoder = AutoModel.from_pretrained(
+    if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
+        model_cls = BertModel
+    else:
+        model_cls = CLIPTextModel
+    text_encoder = model_cls.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
                                         subfolder="vae")
