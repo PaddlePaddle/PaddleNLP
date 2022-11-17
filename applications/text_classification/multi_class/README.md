@@ -255,7 +255,7 @@ python -m paddle.distributed.launch --gpus 0,1 train.py \
     --load_best_model_at_end \
     --evaluation_strategy epoch \
     --save_strategy epoch \
-    --save_total_limit 1 
+    --save_total_limit 1
 ```
 
 主要的配置的参数为：
