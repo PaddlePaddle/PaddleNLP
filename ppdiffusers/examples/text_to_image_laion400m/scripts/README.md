@@ -24,8 +24,8 @@ image = pipe(prompt, guidance_scale=7.5)[0][0]
 image.save("demo.jpg")
 ```
 
-## PPDiffusers版的LDM权重转换为原版LDM权重
-### 1.1 转换权重
+## 2. PPDiffusers版的LDM权重转换为原版LDM权重
+### 2.1 转换权重
 假设我们已经使用 `../generate_pipelines.py`生成了`ldm_pipelines`目录。
 ```shell
 ├── ldm_pipelines  # 我们指定的输出文件路径
@@ -53,7 +53,7 @@ python convert_ppdiffusers_to_orig_ldm_ckpt.py \
     --dump_path ldm_19w.ckpt
 ```
 
-### 1.2 推理预测
+### 2.2 推理预测
 使用`CompVis`[原版txt2img.py](https://github.com/CompVis/latent-diffusion/blob/main/scripts/txt2img.py)脚本生成图片。
 ```shell
 python ./txt2img.py --prompt "a blue t shirt" --ddim_eta 0.0 --n_samples 1 --n_iter 1 --scale 7.5  --ddim_steps 50
