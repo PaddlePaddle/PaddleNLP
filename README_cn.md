@@ -31,6 +31,9 @@
 
 ## News 📢
 
+* 🔥 **2022.11.17 发布 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3)**
+  * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 FewCLUE 夺冠；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增支持 Seq2seqTrainer、sharding、bf16 和 IterableDataset，功能覆盖更全面。
+  * 💢 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，新增**量化训练和部署**能力，推理速度可提升 3 倍以上。💬 新增[**无监督问答 Pipiline**](./pipelines/examples/unsupervised-question-answering/)，解决标注数据稀缺问题，支持低成本快速搭建问答对自动生成智能检索问答系统，效果领先。
 * 🔥 **2022.11.12 PaddleNLP新增AutoPrompt自动化提示功能，登顶FewCLUE小样本学习榜单!**
   * 🥇 PaddleNLP 团队开源了 **AutoPrompt** 方案，基于开源的文心 ERNIE 预训练语言模型 ，结合了领域预训练和自动化提示学习技术，以291M 参数量的模型在小样本权威学习榜单 FewCLUE 排名第一，[详见](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
