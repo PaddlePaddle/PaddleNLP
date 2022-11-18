@@ -292,8 +292,6 @@ class CrossAttention(nn.Layer):
         return tensor
 
     def forward(self, hidden_states, context=None, mask=None):
-        # batch_size, sequence_length, _ = hidden_states.shape
-
         query = self.to_q(hidden_states)
         context = context if context is not None else hidden_states
         key = self.to_k(context)
@@ -306,12 +304,10 @@ class CrossAttention(nn.Layer):
         # TODO(PVP) - mask is currently never used. Remember to re-implement when used
 
         # attention, what we cannot get enough of
-
-        # if self._slice_size is None or query.shape[0] // self._slice_size == 1:
-        hidden_states = self._attention(query, key, value)
-        # else:
-        #     hidden_states = self._sliced_attention(query, key, value,
-        #                                            sequence_length)
+        if self._slice_size is None:
+            hidden_states = self._attention(query, key, value)
+        else:
+            hidden_states = self._sliced_attention(query, key, value)
 
         return self.to_out(hidden_states)
 
@@ -326,28 +322,36 @@ class CrossAttention(nn.Layer):
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
         return hidden_states
 
-    # def _sliced_attention(self, query, key, value, sequence_length):
-    #     batch_size_attention = query.shape[0]
-    #     hidden_states = paddle.zeros(
-    #         (batch_size_attention, sequence_length, self.head_dim),
-    #         dtype=query.dtype)
-    #     slice_size = self._slice_size if self._slice_size is not None else hidden_states.shape[
-    #         0]
-    #     for i in range(hidden_states.shape[0] // slice_size):
-    #         start_idx = i * slice_size
-    #         end_idx = (i + 1) * slice_size
-    #         attn_slice = (paddle.matmul(query[start_idx:end_idx],
-    #                                     key[start_idx:end_idx],
-    #                                     transpose_y=True) * self.scale
-    #                       )  # TODO: use baddbmm for better performance
-    #         attn_slice = F.softmax(attn_slice, axis=-1)
-    #         attn_slice = paddle.matmul(attn_slice, value[start_idx:end_idx])
+    def _sliced_attention(self, query, key, value):
+        # query, key, value flatten [bs*num_heads, seqlen, head_dim]
+        query = query.flatten(0, 1)
+        key = key.flatten(0, 1)
+        value = value.flatten(0, 1)
 
-    #         hidden_states[start_idx:end_idx] = attn_slice
+        batch_size_attention, sequence_length = query.shape[0], query.shape[1]
+        hidden_states = paddle.zeros(
+            (batch_size_attention, sequence_length, self.head_dim),
+            dtype=query.dtype)
+        slice_size = self._slice_size if self._slice_size is not None else batch_size_attention
 
-    #     # reshape hidden_states
-    #     hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-    #     return hidden_states
+        for i in range(batch_size_attention // slice_size):
+            start_idx = i * slice_size
+            end_idx = (i + 1) * slice_size
+            attn_slice = (paddle.matmul(query[start_idx:end_idx],
+                                        key[start_idx:end_idx],
+                                        transpose_y=True) * self.scale
+                          )  # TODO: use baddbmm for better performance
+            attn_slice = F.softmax(attn_slice, axis=-1)
+            attn_slice = paddle.matmul(attn_slice, value[start_idx:end_idx])
+
+            hidden_states[start_idx:end_idx] = attn_slice
+
+        # reshape back to [bs, num_heads, seqlen, head_dim]
+        hidden_states = hidden_states.reshape(
+            [-1, self.num_heads, sequence_length, self.head_dim])
+        # reshape hidden_states
+        hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
+        return hidden_states
 
 
 class FeedForward(nn.Layer):
