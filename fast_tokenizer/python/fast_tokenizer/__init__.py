@@ -550,4 +550,4 @@ from . import normalizers
 from . import pretokenizers
 from . import postprocessors
 from . import decoders
-from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer
+from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer, ClipFastTokenizer
