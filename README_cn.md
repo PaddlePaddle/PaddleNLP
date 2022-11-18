@@ -32,7 +32,7 @@
 ## News 📢
 
 * 🔥 **2022.11.17 发布 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3)**
-  * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 [FewCLUE 小样本打榜实践](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持。
+  * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 [FewCLUE AutoPrompt 方案](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持。
   * 🔨 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。💬 新增[**无监督问答 Pipiline**](./pipelines/examples/unsupervised-question-answering/)，支持用少量标注数据低成本搭建检索问答系统，效果领先。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
   * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
