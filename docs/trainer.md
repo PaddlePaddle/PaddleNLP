@@ -374,11 +374,11 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         training. (default: 42)
 
   --bf16
-                        是否使用 bf16 混合精度训练而不是 fp32 训练。需要 Ampere 或更高的 NVIDIA 
+                        是否使用 bf16 混合精度训练而不是 fp32 训练。需要 Ampere 或更高的 NVIDIA
                         显卡架构支持。这是实验性质的API，以后可能会修改。
                         (`bool`, 可选, 默认为 `False`)
 
-                        Whether to use bf16 (mixed) precision instead of 
+                        Whether to use bf16 (mixed) precision instead of
                         32-bit. Requires Ampere or higher NVIDIA architecture.
                         This is an experimental API and it may change.
                         (default: False)
@@ -391,9 +391,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         32-bit (default: False)
 
   --fp16_opt_level
-                        混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 
+                        混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1.
                         O1表示混合精度训练，O2表示纯fp16/bf16训练。
-                        只在fp16或bf16选项开启时候生效. 
+                        只在fp16或bf16选项开启时候生效.
                         (`str`, 可选, 默认为 `O1`)
 
                         For fp16: AMP optimization level selected in
