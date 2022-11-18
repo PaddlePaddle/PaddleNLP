@@ -26,29 +26,8 @@ class PromptTuningArguments(TrainingArguments):
     The arguments' subset for training loop during prompt tuning.
     """
 
-    task_type: str = field(
-        default="multi-class",
-        metadata={"help": "The task type of prompt tuning. Support "\
-                          "`multi-class`, `multi-label` and `hierachical`."})
-
     max_seq_length: int = field(
         default=512, metadata={"help": "The maximum length of all input text."})
-    first_max_length: int = field(
-        default=None,
-        metadata={"help": "The maximum length of the first sentence."})
-    other_max_length: int = field(
-        default=None,
-        metadata={"help": "The maximum length of other sentences."})
-    truncate_mode: str = field(
-        default="tail",
-        metadata={
-            "help":
-            "How to truncate input text, `head`, `tail` or "
-            "`manual`. Truncate input text according to "
-            "`first_max_length` and `other_max_length` in the "
-            "manual mode."
-        })
-
     freeze_plm: bool = field(
         default=False,
         metadata={"help": "If True, the pretrained parameters won't be "\

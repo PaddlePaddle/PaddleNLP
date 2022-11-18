@@ -32,6 +32,7 @@ from .onnx_utils import OnnxRuntimeModel
 from .utils import logging
 
 if is_paddle_available():
+    from .initializer import *
     from .modeling_utils import ModelMixin
     from .models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel
     from .optimization import (

@@ -12,25 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Can be used in linux and mac
-mkdir -p build_cpp
-cd build_cpp
-rm -rf *
-platform="$(uname -s)"
-if [[ $platform == Linux* ]];
-then
-  core_num=`nproc`
-else
-  core_num=`sysctl -n hw.logicalcpu`
-fi
-echo "Compile with $core_num cores"
-cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
-make -j${core_num}
-
-if [[ $? == 0 ]];
-then
-    echo "Successfully compile."
-else
-    echo "Fail compiling."
-fi
-cd ..
+from .text_image_pair_dataset import TextImagePair, worker_init_fn
+from .ldm_args import ModelArguments, DataArguments, NoTrainerTrainingArguments
+from .model import LatentDiffusionModel
+from .ldm_trainer import LatentDiffusionTrainer
