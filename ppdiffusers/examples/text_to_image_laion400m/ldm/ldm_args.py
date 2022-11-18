@@ -61,17 +61,15 @@ class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training.
     """
-    file_list: Optional[str] = field(
-        default="./data/filelist/train.filelist.list",
-        metadata={"help": "The name of the file_list."})
-    resolution: Optional[str] = field(
+    file_list: str = field(default="./data/filelist/train.filelist.list",
+                           metadata={"help": "The name of the file_list."})
+    resolution: int = field(
         default=256,
         metadata={
             "help":
             "The resolution for input images, all the images in the train/validation dataset will be resized to this resolution."
         })
-    num_records: Optional[str] = field(default=10000000,
-                                       metadata={"help": "num_records"})
+    num_records: int = field(default=10000000, metadata={"help": "num_records"})
     buffer_size: int = field(
         default=100,
         metadata={"help": "Buffer size"},
