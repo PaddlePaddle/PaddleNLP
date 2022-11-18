@@ -1569,14 +1569,15 @@ FastTokenizer 是飞桨提供的速度领先的文本处理算子库，集成了
 安装 fast_tokenizer 包的命令：
 
 ```shell
-pip install fast_tokenizer
+pip install fast-tokenizer-python
 ```
 
-如需设置切词线程数，需要运行前先设置环境变量 `OMP_NUM_THREADS` ：
+如需设置切词线程数，需要运行前调用接口`fast_tokenizer.set_thread_num` ：
 
-```shell
+```python
 # 设置切词线程数为 4
-export OMP_NUM_THREADS=4
+import fast_tokenizer
+fast_tokenizer.set_thread_num(4)
 ```
 
 调用 `from_pretrained` 时只需轻松传入一个参数 `use_fast=True`：
