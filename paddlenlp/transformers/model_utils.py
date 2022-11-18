@@ -22,7 +22,6 @@ import six
 import inspect
 from typing import Optional, Type, Dict, List, Tuple, Union, Any
 import shutil
-from uuid import uuid4
 
 import paddle
 from paddle import Tensor
