@@ -23,10 +23,11 @@ from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoTokenizer, UIEX
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.ie_utils import unify_prompt_name, get_relation_type_dict, uie_loss_func, compute_metrics
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
 
-from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, uie_loss_func, compute_metrics
+from utils import convert_example, reader
 
 
 # yapf: disable

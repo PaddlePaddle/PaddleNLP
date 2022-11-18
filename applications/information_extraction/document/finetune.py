@@ -18,14 +18,14 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 import paddle
-from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer, UIEX, export_model
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.ie_utils import uie_loss_func, compute_metrics
 
-from utils import reader, convert_example, uie_loss_func, compute_metrics
+from utils import reader, convert_example
 
 
 # yapf: disable

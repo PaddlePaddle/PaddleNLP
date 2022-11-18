@@ -25,11 +25,12 @@ import paddle
 from ..datasets import load_dataset
 from ..transformers import AutoTokenizer, AutoModel, UIE, UIEM, UIEX
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from ..utils.image_utils import (DocParser, ResizeImage, Permute,
-                                 NormalizeImage, load_image)
+from ..utils.doc_parser import DocParser
+from ..utils.ie_utils import map_offset, pad_image_data
+from ..utils.tools import get_span, get_bool_ids_greater_than
 from .task import Task
-from .utils import (get_span, get_id_and_prob, get_bool_ids_greater_than,
-                    dbc2sbc, gp_decode, map_offset, SchemaTree, DataCollatorGP)
+from .utils import (get_id_and_prob, dbc2sbc, gp_decode, SchemaTree,
+                    DataCollatorGP)
 
 usage = r"""
             from paddlenlp import Taskflow
@@ -98,13 +99,6 @@ usage = r"""
             '''
          """
 
-resize_func = ResizeImage(target_size=224, interp=1)
-norm_func = NormalizeImage(is_channel_first=False,
-                           is_scale=True,
-                           mean=[0.485, 0.456, 0.406],
-                           std=[0.229, 0.224, 0.225])
-permute_func = Permute(to_bgr=False)
-doc_parser = DocParser()
 MODEL_MAP = {"UIE": UIE, "UIEM": UIEM, "UIEX": UIEX}
 
 
@@ -395,6 +389,7 @@ class UIETask(Task):
         self.use_faster = kwargs.get("use_faster", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
+        self._expand_to_a4_size = kwargs.get("expand_to_a4_size", True)
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
             self.resource_files_names[
@@ -410,15 +405,14 @@ class UIETask(Task):
                                         ] or schema_lang == 'en' else False
 
         self._summary_token_num = 3
-        self._ocr_loaded = False
         if self._init_class in ["UIEX"]:
             self._summary_token_num = 4  # [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
             if not self._layout_analysis:
                 self._construct_ocr_engine(lang=self._ocr_lang)
             else:
                 self._construce_layout_analysis_engine()
-            self._ocr_loaded = True
 
+        self._doc_parser = None
         self._schema_tree = None
         self.set_schema(schema)
         self._check_predictor_type()
@@ -521,13 +515,12 @@ class UIETask(Task):
                 data = {}
                 if isinstance(example, dict):
                     if "doc" in example.keys():
-                        data["doc"] = load_image(example["doc"])
-                        if not self._ocr_loaded:
-                            if not self._layout_analysis:
-                                self._construct_ocr_engine(lang=self._ocr_lang)
-                            else:
-                                self._construce_layout_analysis_engine()
-                            self._ocr_loaded = True
+                        if not self._doc_parser:
+                            self._doc_parser = DocParser(
+                                layout_analysis=self._layout_analysis)
+                        data = self._doc_parser.parse(
+                            {"doc": example["doc"]},
+                            expand_to_a4_size=self._expand_to_a4_size)
                     elif "text" in example.keys():
                         if not isinstance(example["text"], str):
                             raise TypeError(
@@ -558,11 +551,11 @@ class UIETask(Task):
             max(prompts)) - self._summary_token_num
 
         if self._init_class in ["UIEX"]:
-            bboxes_list = [d["bboxes"] for d in inputs]
-            short_input_texts, short_bboxes_list, input_mapping = self._auto_splitter(
+            boxes_list = [d["boxes"] for d in inputs]
+            short_input_texts, short_boxes_list, input_mapping = self._auto_splitter(
                 input_texts,
                 max_predict_len,
-                bboxes_list=bboxes_list,
+                boxes_list=boxes_list,
                 split_sentence=self._split_sentence)
         else:
             short_input_texts, input_mapping = self._auto_splitter(
@@ -580,7 +573,7 @@ class UIETask(Task):
             short_inputs = [{
                 "text": short_input_texts[i],
                 "prompt": short_texts_prompts[i],
-                "bboxes": short_bboxes_list[i],
+                "boxes": short_boxes_list[i],
                 "image": image_list[i]
             } for i in range(len(short_input_texts))]
         else:
@@ -629,22 +622,6 @@ class UIETask(Task):
                     if 0 <= index_token < len(bbox_list):
                         bbox_list[index_token] = bbox
                 return bbox_list
-
-            def _pad_image_data(image_data):
-                if not image_data:
-                    image = np.zeros([3, 224, 224])
-                    return image
-                # decode image
-                data = np.frombuffer(bytearray(image_data), dtype="uint8")
-                image = np.array(Image.open(BytesIO(data)).convert('RGB'))
-                sample = {"image": image}
-                # resize image
-                sample = resize_func(sample)
-                # norm image
-                sample = norm_func(sample)
-                # permute
-                sample = permute_func(sample)
-                return sample['image']
 
             def _encode_doc(tokenizer, offset_mapping, last_offset, prompt,
                             this_text_line, inputs_ids, q_sep_index,
@@ -701,7 +678,7 @@ class UIETask(Task):
             for example in inputs:
                 content = example["text"]
                 prompt = example["prompt"]
-                bbox_lines = example.get("bboxes", None)
+                bbox_lines = example.get("boxes", None)
                 image_buff_string = example.get("image", None)
 
                 # Text
@@ -806,7 +783,7 @@ class UIETask(Task):
 
                     image_data = base64.b64decode(
                         image_buff_string.encode("utf8"))
-                    padded_image = _pad_image_data(image_data)
+                    padded_image = pad_image_data(image_data)
 
                 input_list = [
                     inputs_ids, token_type_ids, position_ids, attention_mask,
@@ -979,70 +956,31 @@ class UIETask(Task):
         return inputs
 
     def _parse_inputs(self, inputs):
-
-        def _normalize_bbox(bbox, size):
-            return [
-                int(1000 * bbox[0] / size[0]),
-                int(1000 * bbox[1] / size[1]),
-                int(1000 * bbox[2] / size[0]),
-                int(1000 * bbox[3] / size[1]),
-            ]
-
         _inputs = []
         for d in inputs:
             if isinstance(d, dict):
                 if 'doc' in d.keys():
-                    image_buff = base64.b64decode(d['doc'])
-                    image = np.array(Image.open(BytesIO(image_buff)))
-                    image_size = (image.shape[1], image.shape[0])
-
-                    image, offset_x, offset_y = doc_parser.expand_image_to_a4_size(
-                        image, center=True)
-
-                    content = u""
-                    bboxes = []
-                    if not self._layout_analysis:
-                        ocr_result = self._ocr.ocr(image)
-                        ocr_result = ocr_result[0] if len(
-                            ocr_result) == 1 else ocr_result
-                        for segment in ocr_result:
-                            text = segment[1][0]
-                            source_bbox = segment[0]
-                            bbox = source_bbox[0] + source_bbox[2]
-                            bbox = _normalize_bbox([
-                                bbox[0] + offset_x, bbox[1] + offset_y,
-                                bbox[2] + offset_x, bbox[3] + offset_y
-                            ], image_size)
-                            bboxes.extend([bbox for _ in range(len(text))])
-                            content += text
-                    else:
-                        res = self._layout_analysis_engine(image)
-                        for region in res:
-                            ocr_result = region['res']
-                            for segment in ocr_result:
-                                text = segment['text']
-                                source_bbox = segment['text_region']
-                                bbox = source_bbox[0] + source_bbox[2]
-                                bbox = _normalize_bbox([
-                                    bbox[0] + offset_x, bbox[1] + offset_y,
-                                    bbox[2] + offset_x, bbox[3] + offset_y
-                                ], image_size)
-                                bboxes.extend([bbox for _ in range(len(text))])
-                                content += text
-
+                    text = ''
+                    boxes = []
+                    for segment in d['layout']:
+                        box = self._doc_parser._normalize_box(
+                            segment[0], [d['img_w'], d['img_h']], [1000, 1000],
+                            d['offset_x'], d['offset_y'])
+                        text += segment[1]
+                        boxes.extend([box] * len(segment[1]))
                     _inputs.append({
-                        "text": content,
-                        "bboxes": bboxes,
-                        "image": d['doc']
+                        "text": text,
+                        "boxes": boxes,
+                        "image": d['image']
                     })
                 else:
                     _inputs.append({
                         "text": d['text'],
-                        "bboxes": None,
+                        "boxes": None,
                         "image": None
                     })
             else:
-                _inputs.append({"text": d, "bboxes": None, "image": None})
+                _inputs.append({"text": d, "boxes": None, "image": None})
         return _inputs
 
     def _multi_stage_predict(self, data):
@@ -1073,7 +1011,7 @@ class UIETask(Task):
                 for one_data in data:
                     examples.append({
                         "text": one_data["text"],
-                        "bboxes": one_data["bboxes"],
+                        "boxes": one_data["boxes"],
                         "image": one_data["image"],
                         "prompt": dbc2sbc(node.name)
                     })
@@ -1100,7 +1038,7 @@ class UIETask(Task):
                                 prompt = p + node.name
                             examples.append({
                                 "text": one_data["text"],
-                                "bboxes": one_data["bboxes"],
+                                "boxes": one_data["boxes"],
                                 "image": one_data["image"],
                                 "prompt": dbc2sbc(prompt)
                             })
