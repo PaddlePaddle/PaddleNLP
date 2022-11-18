@@ -1,3 +1,17 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
 import argparse
 import re
@@ -5,32 +19,27 @@ import re
 
 def parameter_parser():
     parser = argparse.ArgumentParser(description="Support Args:")
-    parser.add_argument(
-        "-v",
-        "--valid-expr",
-        type=str,
-        default="*",
-        help="when not match, the line will discard.")
-    parser.add_argument(
-        "-e",
-        "--extract-expr",
-        type=str,
-        default="^{%s}$,",
-        help="the extract expr for the loss: loss {%f}")
-    parser.add_argument(
-        "-r",
-        "--reduction-expr",
-        type=str,
-        default="print",
-        help="print | sum | mean")
-    parser.add_argument(
-        "-n",
-        "--discard",
-        type=int,
-        default=0,
-        help="while reduction, discard [0:n] and [-n:]")
-    parser.add_argument(
-        "-d", "--debug", type=bool, default=False, help="debug")
+    parser.add_argument("-v",
+                        "--valid-expr",
+                        type=str,
+                        default="*",
+                        help="when not match, the line will discard.")
+    parser.add_argument("-e",
+                        "--extract-expr",
+                        type=str,
+                        default="^{%s}$,",
+                        help="the extract expr for the loss: loss {%f}")
+    parser.add_argument("-r",
+                        "--reduction-expr",
+                        type=str,
+                        default="print",
+                        help="print | sum | mean")
+    parser.add_argument("-n",
+                        "--discard",
+                        type=int,
+                        default=0,
+                        help="while reduction, discard [0:n] and [-n:]")
+    parser.add_argument("-d", "--debug", type=bool, default=False, help="debug")
     return parser.parse_args()
 
 
@@ -77,7 +86,7 @@ def extract(line, extract_expr):
 
 
 def action(tuple_list, action):
-    # discard the warm up 
+    # discard the warm up
     if args.discard > 0:
         tuple_list = tuple_list[args.discard:]
         tuple_list = tuple_list[:-args.discard]
