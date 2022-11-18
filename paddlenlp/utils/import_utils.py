@@ -52,14 +52,6 @@ def is_faster_tokenizer_available() -> bool:
     return is_package_available("faster_tokenizer")
 
 
-def is_torch_available() -> bool:
-    """check if `torch` package is installed
-    Returns:
-        bool: if `torch` is available
-    """
-    return is_package_available("torch")
-
-
 def is_transformers_available() -> bool:
     """check if `transformers` package is installed
     Returns:
