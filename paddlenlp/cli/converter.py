@@ -76,7 +76,7 @@ def convert_from_local_dir(pretrained_dir: str, output: str):
 
 
 def convert_from_local_file(weight_file_path: str, output: str):
-    """convert from the local weight file
+    """convert from the local weitht file
 
     TODO(wj-Mcat): no model info for weight file, this method is dangerous.
 

@@ -25,6 +25,14 @@ import importlib.util
 import importlib_metadata
 
 
+def is_torch_available() -> bool:
+    """check if `torch` package is installed
+    Returns:
+        bool: if `torch` is available
+    """
+    return is_package_available("torch")
+
+
 def is_package_available(package_name: str) -> bool:
     """check if the package is avaliable
     Args:
