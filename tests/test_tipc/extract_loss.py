@@ -16,7 +16,6 @@ import sys
 import argparse
 import re
 
-
 def parameter_parser():
     parser = argparse.ArgumentParser(description="Support Args:")
     parser.add_argument("-v",

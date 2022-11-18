@@ -16,7 +16,6 @@
 
 source test_tipc/common_func.sh
 
-
 # always use the lite_train_lite_infer mode to speed. Modify the config file.
 MODE=lite_train_lite_infer
 BASEDIR=$(dirname "$0")
