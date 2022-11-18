@@ -40,11 +40,14 @@ class TestModeling(unittest.TestCase):
     @slow
     def test_from_pretrained_with_load_as_state_np_params(self):
         """init model with `load_state_as_np` params"""
-        TinyBertModel.from_pretrained("tinybert-4l-312d", load_state_as_np=True)
+        model = TinyBertModel.from_pretrained("tinybert-4l-312d",
+                                              load_state_as_np=True)
+        self.assertIsNotNone(model)
 
     @slow
     def test_multiprocess_downloading(self):
-        """test downloading with multi-process.
+        """test downloading with multi-process. Some errors may be triggered when downloading model
+            weight file with multiprocess, so this test code was born.
 
             `num_process_in_pool` is the number of process in Pool.
             And the `num_jobs` is the number of total process to download file.
