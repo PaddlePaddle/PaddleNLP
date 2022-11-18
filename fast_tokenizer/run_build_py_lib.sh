@@ -33,7 +33,7 @@ do
    echo "Compile with $core_num cores"
    cmake .. -DWITH_PYTHON=ON -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
    make -j${core_num}
-   if [[$? == 0]];
+   if [[ $? == 0 ]];
    then
        echo "Successfully compile."
    else
