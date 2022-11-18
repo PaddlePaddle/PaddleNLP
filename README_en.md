@@ -31,7 +31,7 @@
 ## News 📢
 
 * 🔥 **2022.11.17 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3) Released!**
-  * 💪 Framework upgrade：🏆 Upgrade [** Prompt API**](./docs/advanced_guide/prompt.md), providing more keywords for flexible prompt definitions which helps win the 1st place in FewCLUE; 🕸 Upgrade [**Trainer API**](./docs/trainer.md), further supporting Seq2seqTrainer, sharding, bf16 and IterableDataset.
+  * 💪 Framework upgrade：🏆 Upgrade [**Prompt API**](./docs/advanced_guide/prompt.md), providing more keywords for flexible prompt definitions which helps win the 1st place in FewCLUE; 🕸 Upgrade [**Trainer API**](./docs/trainer.md), further supporting Seq2seqTrainer, sharding, bf16 and IterableDataset.
   * 💢 Industrial application：🏃 Upgrade for [**Universal Information Extraction**](./model_zoo/uie) and support **quantization aware training**, which improves both model performance and inference performance. 💬 Release [**Unsupervised Question Answering Pipiline**](./pipelines/examples/unsupervised-question-answering/), which supports for fast construction of high-quality question answering system with a little human-annotated data.
 * 🔥 **2022.11.12 PaddleNLP added AutoPrompt and won the first place in FewCLUE!**
   * 🥇 The PaddleNLP team has open-sourced the **AutoPrompt** solution, which is based on the open-source Wenxin ERNIE pre-training language model, combined with domain pre-training and automated prompt learning technology, and ranked first in FewCLUE (a authoritative few-sample learning contest) with a model with 291M parameters. [see details](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA).
