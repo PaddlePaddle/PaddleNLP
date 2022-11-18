@@ -21,6 +21,7 @@ import json
 
 from .trainer_callback import TrainerCallback
 from ..utils.log import logger
+from ..transformers import PretrainedModel
 
 
 def is_visualdl_available():
@@ -94,12 +95,17 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer.add_text("args", args.to_json_string())
             if "model" in kwargs:
                 model = kwargs["model"]
-                if hasattr(model,
-                           "init_config") and model.init_config is not None:
+                if isinstance(model, PretrainedModel
+                              ) and model.constructed_from_pretrained_config():
+                    model.config.architectures = [model.__class__.__name__]
+                    self.vdl_writer.add_text("model_config", str(model.config))
+                elif hasattr(model,
+                             "init_config") and model.init_config is not None:
                     model_config_json = json.dumps(model.get_model_config(),
                                                    ensure_ascii=False,
                                                    indent=2)
                     self.vdl_writer.add_text("model_config", model_config_json)
+
             if hasattr(self.vdl_writer, "add_hparams"):
                 self.vdl_writer.add_hparams(args.to_sanitized_dict(),
                                             metrics_list=[])

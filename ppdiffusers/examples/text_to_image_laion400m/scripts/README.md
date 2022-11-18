@@ -1,19 +1,21 @@
-# 将原版pytorch权重转换为ppdiffusers预训练权重
+# LDM原版Pytorch权重转换为PPDiffusers权重
 
-## Step1
-假设已经有了原版权重`"ldm_1p4b_init0.ckpt"`，从中提取出3个pt文件，ldmbert，unet，vae。
+## 1. 转换权重
+假设已经有了原版权重`"ldm_1p4b_init0.ckpt"`
 ```bash
-python extract_orig_weights.py
+python convert_orig_ldm_ckpt_to_ppdiffusers.py \
+    --checkpoint_path ldm_1p4b_init0.ckpt \
+    --dump_path ldm_1p4b_init0_pytorch \
+    --original_config_file text2img_L32H1280_unet800M.yaml
 ```
 
-## Step2
-转换ldmbert权重(12层)
-```bash
-python convert_orig_ldmbert_to_ppdiffusers.py
-```
-
-## Step3
-转换unet和vae权重
-```bash
-python convert_orig_unet_vae_to_ppdiffusers.py --original_config_file text2img_L12H768_unet800M.yaml
+## 2. 推理预测
+```python
+import paddle
+from ppdiffusers import LDMTextToImagePipeline
+model_path = "./ldm_1p4b_init0_pytorch"
+pipe = LDMTextToImagePipeline.from_pretrained(model_path)
+prompt = "a blue tshirt"
+image = pipe(prompt, guidance_scale=7.5)[0][0]
+image.save("demo.jpg")
 ```

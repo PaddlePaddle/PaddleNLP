@@ -28,7 +28,8 @@ extras["tests"] = read_requirements_file("tests/requirements.txt")
 extras["docs"] = read_requirements_file("docs/requirements.txt")
 extras["autonlp"] = read_requirements_file(
     "paddlenlp/experimental/autonlp/requirements.txt")
-extras["dev"] = extras["tests"] + extras["docs"]
+extras["cli"] = read_requirements_file("paddlenlp/cli/requirements.txt")
+extras["dev"] = extras["tests"] + extras["docs"] + extras["autonlp"] + extras['cli']
 
 
 def read(*names, **kwargs):
@@ -71,7 +72,7 @@ setuptools.setup(
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
         where='.',
-        exclude=('examples*', 'tests*', 'applications*', 'faster_tokenizer*',
+        exclude=('examples*', 'tests*', 'applications*', 'fast_tokenizer*',
                  'faster_generation*', 'model_zoo*')),
     package_data={
         'paddlenlp.ops':
@@ -85,6 +86,7 @@ setuptools.setup(
     },
     setup_requires=['cython', 'numpy'],
     install_requires=REQUIRED_PACKAGES,
+    entry_points={'console_scripts': ['paddlenlp = paddlenlp.cli:main']},
     extras_require=extras,
     python_requires='>=3.6',
     classifiers=[
