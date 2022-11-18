@@ -120,12 +120,14 @@ class ElectraForSPO(ElectraPretrainedModel):
                 token_type_ids=None,
                 position_ids=None,
                 attention_mask=None):
-        sequence_outputs, _, all_hidden_states = self.electra(
-            input_ids,
-            token_type_ids,
-            position_ids,
-            attention_mask,
-            output_hidden_states=True)
+        outputs = self.electra(input_ids,
+                               token_type_ids,
+                               position_ids,
+                               attention_mask,
+                               output_hidden_states=True,
+                               return_dict=True)
+        sequence_outputs = outputs.last_hidden_state
+        all_hidden_states = outputs.hidden_states
         sequence_outputs = self.dropout(sequence_outputs)
         ent_logits = self.classifier(sequence_outputs)
 

@@ -16,8 +16,10 @@
 from ..utils import is_scipy_available, is_paddle_available
 
 if is_paddle_available():
+    from .scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
     from .scheduling_ddim import DDIMScheduler
     from .scheduling_ddpm import DDPMScheduler
+    from .scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
     from .scheduling_karras_ve import KarrasVeScheduler
     from .scheduling_pndm import PNDMScheduler
     from .scheduling_sde_ve import ScoreSdeVeScheduler

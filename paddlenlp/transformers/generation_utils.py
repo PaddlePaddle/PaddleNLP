@@ -422,8 +422,8 @@ class GenerationMixin(object):
         # method.
 
         # update cache
-        if isinstance(outputs,
-                      tuple) and not isinstance(outputs[1], paddle.Tensor):
+        if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(
+                outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
 
         # update token_type_ids with last value
@@ -971,7 +971,8 @@ class GenerationMixin(object):
             probs = F.softmax(logits)
             probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs, next_tokens)
+            next_scores = paddle.index_sample(probs.astype("float32"),
+                                              next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(

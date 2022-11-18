@@ -28,6 +28,8 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "t5-small": 512,
     "t5-base": 512,
     "t5-large": 512,
+    "t5-3b": 512,
+    "t5-11b": 512,
 }
 
 
@@ -69,6 +71,10 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/spiece.model",
             "t5-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/spiece.model",
+            "t5-3b":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/spiece.model",
+            "t5-11b":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/spiece.model",
             "t5-v1_1-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/spiece.model",
             "t5-v1_1-large":
@@ -84,6 +90,12 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             "do_lower_case": False
         },
         "t5-large": {
+            "do_lower_case": False
+        },
+        "t5-3b": {
+            "do_lower_case": False
+        },
+        "t5-11b": {
             "do_lower_case": False
         },
         "t5-v1_1-base": {

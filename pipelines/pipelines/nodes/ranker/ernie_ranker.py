@@ -48,6 +48,8 @@ class ErnieRanker(BaseRanker):
         max_seq_len: int = 256,
         progress_bar: bool = True,
         batch_size: int = 1000,
+        reinitialize: bool = False,
+        use_en: bool = False,
     ):
         """
         :param model_name_or_path: Directory of a saved model or the name of a public model e.g.
@@ -60,14 +62,18 @@ class ErnieRanker(BaseRanker):
         self.set_config(
             model_name_or_path=model_name_or_path,
             top_k=top_k,
+            use_en=use_en,
         )
 
         self.top_k = top_k
+        # Parameter to control the use of English Cross Encoder Model
+        self.use_en = use_en
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
                                                      multi_gpu=True)
         print("Loading Parameters from:{}".format(model_name_or_path))
-        self.transformer_model = ErnieCrossEncoder(model_name_or_path)
+        self.transformer_model = ErnieCrossEncoder(model_name_or_path,
+                                                   reinitialize=reinitialize)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.transformer_model.eval()
         self.progress_bar = progress_bar
@@ -156,15 +162,19 @@ class ErnieRanker(BaseRanker):
         for cur_queries, cur_docs in batches:
             features = self.tokenizer(cur_queries,
                                       [doc.content for doc in cur_docs],
-                                      max_seq_len=256,
+                                      max_seq_len=self.max_seq_len,
                                       pad_to_max_seq_len=True,
                                       truncation_strategy="longest_first")
 
             tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
 
             with paddle.no_grad():
-                similarity_scores = self.transformer_model.matching(
-                    **tensors).numpy()
+                if (self.use_en):
+                    similarity_scores = self.transformer_model.matching_v2(
+                        **tensors).numpy()
+                else:
+                    similarity_scores = self.transformer_model.matching(
+                        **tensors).numpy()
                 preds.extend(similarity_scores)
 
             for doc, rank_score in zip(cur_docs, similarity_scores):
@@ -187,8 +197,7 @@ class ErnieRanker(BaseRanker):
             right_idx = 0
             for number in number_of_docs:
                 right_idx = left_idx + number
-                grouped_predictions.append(
-                    similarity_scores[left_idx:right_idx])
+                grouped_predictions.append(preds[left_idx:right_idx])
                 left_idx = right_idx
             result = []
             for pred_group, doc_group in zip(grouped_predictions, documents):
@@ -202,7 +211,6 @@ class ErnieRanker(BaseRanker):
                     doc for _, doc in sorted_scores_and_documents
                 ]
                 result.append(sorted_documents[:top_k])
-
             return result
 
     def _preprocess_batch_queries_and_docs(

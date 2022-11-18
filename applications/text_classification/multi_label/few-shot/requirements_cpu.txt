@@ -1,0 +1,5 @@
+psutil
+paddlepaddle>=2.4rc
+paddlenlp>=2.4.3
+paddle2onnx>=1.0.3
+onnxruntime

@@ -32,6 +32,7 @@ from .onnx_utils import OnnxRuntimeModel
 from .utils import logging
 
 if is_paddle_available():
+    from .initializer import *
     from .modeling_utils import ModelMixin
     from .models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel
     from .optimization import (
@@ -44,10 +45,12 @@ if is_paddle_available():
         get_scheduler,
     )
     from .pipeline_utils import DiffusionPipeline
-    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, PNDMPipeline, ScoreSdeVePipeline
+    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, LDMSuperResolutionPipeline, PNDMPipeline, ScoreSdeVePipeline
     from .schedulers import (
+        EulerAncestralDiscreteScheduler,
         DDIMScheduler,
         DDPMScheduler,
+        DPMSolverMultistepScheduler,
         KarrasVeScheduler,
         PNDMScheduler,
         SchedulerMixin,
@@ -63,10 +66,6 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    # NEG_INF = float("-inf")
-    # use -1e9 as NEG_INF
-    import paddlenlp.transformers.clip.modeling
-    paddlenlp.transformers.clip.modeling.NEG_INF = -1e9
     from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
                             StableDiffusionImg2ImgPipeline,
                             StableDiffusionInpaintPipeline,
