@@ -17,6 +17,12 @@ limitations under the License. */
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+// For Windows ssize_t
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pybind {
