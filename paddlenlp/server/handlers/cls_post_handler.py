@@ -60,7 +60,6 @@ class MultiLabelClassificationPostHandler(PostModelHandler):
         prob_limit = 0.5
         if 'prob_limit' in parameters:
             prob_limit = parameters['prob_limit']
-        print("The prob limit:{}".format(prob_limit))
         logits = data['logits']
         logits = np.array(logits)
         logits = 1 / (1.0 + np.exp(-logits))

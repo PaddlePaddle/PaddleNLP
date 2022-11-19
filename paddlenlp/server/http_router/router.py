@@ -17,6 +17,7 @@ from typing import Any, List, Optional
 import hashlib
 from fastapi import APIRouter, Request
 from ..base_router import BaseRouterManager
+from ...utils.log import logger
 
 from pydantic import BaseModel, Extra
 from pydantic import create_model
@@ -36,6 +37,10 @@ class HttpRouterManager(BaseRouterManager):
 
         # Url path to register the model
         paths = [f"/models/{task_name}"]
+        for path in paths:
+            logger.info(
+                "   Transformer model request [path]={} is genereated.".format(
+                    path))
 
         # Unique name to create the pydantic model
         unique_name = (hashlib.md5(task_name.encode()).hexdigest())
@@ -78,7 +83,9 @@ class HttpRouterManager(BaseRouterManager):
 
         # Url path to register the model
         paths = [f"/taskflow/{task_name}"]
-        print(paths)
+        for path in paths:
+            logger.info(
+                "   Taskflow  request [path]={} is genereated.".format(path))
 
         # Unique name to create the pydantic model
         unique_name = (hashlib.md5(task_name.encode()).hexdigest())
