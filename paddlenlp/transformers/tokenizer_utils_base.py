@@ -16,21 +16,25 @@
 # limitations under the License.
 
 import copy
+import io
 import json
 import os
-import io
 import re
 import warnings
 from collections import OrderedDict, UserDict
-from shutil import copyfile
 from dataclasses import dataclass, field
-from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.env import MODEL_HOME
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
-import paddle
 from enum import Enum
+from shutil import copyfile
+from typing import (TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional,
+                    Sequence, Tuple, Union)
 
 import numpy as np
+import paddle
+from huggingface_hub import hf_hub_download
+
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
+                                        get_path_from_url)
+from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 
@@ -1461,7 +1465,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         raise NotImplementedError()
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        *args,
+                        from_hf_hub=False,
+                        **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
         by specifying name of a built-in pretrained model, or a community-contributed
@@ -1530,6 +1538,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                               file_name)
                 if os.path.isfile(full_file_name):
                     vocab_files[file_id] = full_file_name
+        # From HF Hub
+        elif from_hf_hub:
+            # Only include the necessary resource files specified by the tokenizer cls
+            # Deep copy to avoid modifiying the class attributes
+            vocab_files = copy.deepcopy(cls.resource_files_names)
+            vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
@@ -1549,28 +1563,38 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
-            path = os.path.join(default_root, file_path.split('/')[-1])
-            if os.path.exists(path):
-                logger.info("Already cached %s" % path)
-                resolved_vocab_files[file_id] = path
+            if from_hf_hub:
+                # if file_id not in cls.resource_files_names:
+                #     resolved_vocab_files[file_id] = None
+                # else:
+                resolved_vocab_files[file_id] = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                    cache_dir=MODEL_HOME)
             else:
-                logger.info("Downloading %s and saved to %s" %
-                            (file_path, default_root))
-                try:
-                    resolved_vocab_files[file_id] = get_path_from_url(
-                        file_path, default_root)
-                except RuntimeError as err:
-                    if file_id not in cls.resource_files_names:
-                        resolved_vocab_files[file_id] = None
-                    else:
-                        logger.error(err)
-                        raise RuntimeError(
-                            f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
-                            f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                            "- a correct model-identifier of built-in pretrained models,\n"
-                            "- or a correct model-identifier of community-contributed pretrained models,\n"
-                            "- or the correct path to a directory containing relevant tokenizer files.\n"
-                        )
+                path = os.path.join(default_root, file_path.split('/')[-1])
+                if os.path.exists(path):
+                    logger.info("Already cached %s" % path)
+                    resolved_vocab_files[file_id] = path
+
+                else:
+                    logger.info("Downloading %s and saved to %s" %
+                                (file_path, default_root))
+                    try:
+                        resolved_vocab_files[file_id] = get_path_from_url(
+                            file_path, default_root)
+                    except RuntimeError as err:
+                        if file_id not in cls.resource_files_names:
+                            resolved_vocab_files[file_id] = None
+                        else:
+                            logger.error(err)
+                            raise RuntimeError(
+                                f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+                                f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                                "- a correct model-identifier of built-in pretrained models,\n"
+                                "- or a correct model-identifier of community-contributed pretrained models,\n"
+                                "- or the correct path to a directory containing relevant tokenizer files.\n"
+                            )
 
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
@@ -1625,6 +1649,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # use pretrained_init_configuration as `init_kwargs` to init which
             # does not include the vocab file in it, thus add vocab file into
             # args.
+
             if args_name not in init_kwargs:
                 init_kwargs[args_name] = file_path
             # when `pretrained_model_name_or_path` is a pretrained model dir,
@@ -1637,7 +1662,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs[args_name] = file_path
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
-
         special_tokens_map_file = resolved_vocab_files.pop(
             "special_tokens_map_file", None)
         if special_tokens_map_file is not None:
@@ -1660,7 +1684,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                         for token in value
                     ]
                 setattr(tokenizer, key, value)
-
         # Add supplementary tokens.
         special_tokens = tokenizer.all_special_tokens
         if added_tokens_file is not None:
@@ -1689,14 +1712,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
                 tokenizer.add_tokens(
                     token, special_tokens=bool(token in special_tokens))
-
         # Check all our special tokens are registered as "no split" token (we don't cut them) and are in the vocab
         added_tokens = tokenizer.sanitize_special_tokens()
         if added_tokens:
             logger.info(
                 "Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained."
             )
-
         # save all of related things into default root dir
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             tokenizer.save_pretrained(default_root)

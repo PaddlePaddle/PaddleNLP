@@ -12,16 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import io
 import importlib
+import io
 import json
+import os
 from collections import OrderedDict
+
+from huggingface_hub import hf_hub_download
+
 from paddlenlp.transformers import *
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
+                                        get_path_from_url)
 from paddlenlp.utils.env import MODEL_HOME
-from paddlenlp.utils.log import logger
 from paddlenlp.utils.import_utils import is_fast_tokenizer_available
+from paddlenlp.utils.log import logger
 
 __all__ = [
     "AutoTokenizer",
@@ -136,7 +140,49 @@ class AutoTokenizer():
         )
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args,
+    def _get_tokenizer_class_from_config(cls, pretrained_model_name_or_path,
+                                         config_file_path, use_fast):
+        with io.open(config_file_path, encoding="utf-8") as f:
+            init_kwargs = json.load(f)
+        # class name corresponds to this configuration
+        init_class = init_kwargs.pop("init_class", None)
+        if init_class is None:
+            init_class = init_kwargs.pop("tokenizer_class", None)
+
+        if init_class:
+            class_name = cls._name_mapping[init_class]
+            import_class = importlib.import_module(
+                f"paddlenlp.transformers.{class_name}.tokenizer")
+            tokenizer_class = getattr(import_class, init_class)
+            if use_fast:
+                for faster_tokenizer_class, name in cls._faster_name_mapping.items(
+                ):
+                    if name == class_name:
+                        import_class = importlib.import_module(
+                            f"paddlenlp.transformers.{class_name}.faster_tokenizer"
+                        )
+                        tokenizer_class = getattr(import_class,
+                                                  faster_tokenizer_class)
+            return tokenizer_class
+        # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
+        else:
+            # TODO: Potential issue https://github.com/PaddlePaddle/PaddleNLP/pull/3786#discussion_r1024689810
+            logger.info(
+                'We use pattern recognition to recognize the Tokenizer class.')
+            for key, pattern in cls._name_mapping.items():
+                if pattern in pretrained_model_name_or_path.lower():
+                    init_class = key
+                    class_name = cls._name_mapping[init_class]
+                    import_class = importlib.import_module(
+                        f"paddlenlp.transformers.{class_name}.tokenizer")
+                    tokenizer_class = getattr(import_class, init_class)
+            return tokenizer_class
+
+    @classmethod
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        from_hf_hub=False,
+                        *model_args,
                         **kwargs):
         """
          Creates an instance of `AutoTokenizer`. Related resources are loaded by
@@ -182,18 +228,33 @@ class AutoTokenizer():
          """
         # Default not to use faster tokenizer
         use_fast = kwargs.pop("use_fast", False)
-        if "use_faster" in kwargs:
-            use_fast = kwargs.pop("use_faster", False)
+        if "use_fast" in kwargs:
+            use_fast = kwargs.pop("use_fast", False)
             logger.warning(
-                "The keyword argument `use_faster` is deprecated in future, please use `use_fast` instead"
+                "The keyword argument `use_fast` is deprecated in future, please use `use_fast` instead"
             )
 
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:
                 all_tokenizer_names.append(name)
+        # From HF Hub
+        if from_hf_hub:
+            config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
+                                          filename=cls.tokenizer_config_file,
+                                          cache_dir=MODEL_HOME)
+            if os.path.exists(config_file):
+                tokenizer_class = cls._get_tokenizer_class_from_config(
+                    pretrained_model_name_or_path, config_file, use_fast)
+                logger.info("We are using %s to load '%s'." %
+                            (tokenizer_class, pretrained_model_name_or_path))
+                return tokenizer_class.from_pretrained(
+                    pretrained_model_name_or_path,
+                    from_hf_hub=from_hf_hub,
+                    *model_args,
+                    **kwargs)
         # From built-in pretrained models
-        if pretrained_model_name_or_path in all_tokenizer_names:
+        elif pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
@@ -236,52 +297,12 @@ class AutoTokenizer():
             config_file = os.path.join(pretrained_model_name_or_path,
                                        cls.tokenizer_config_file)
             if os.path.exists(config_file):
-                with io.open(config_file, encoding="utf-8") as f:
-                    init_kwargs = json.load(f)
-                # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class", None)
-                if init_class is None:
-                    init_class = init_kwargs.pop("tokenizer_class", None)
-
-                if init_class:
-                    class_name = cls._name_mapping[init_class]
-                    import_class = importlib.import_module(
-                        f"paddlenlp.transformers.{class_name}.tokenizer")
-                    tokenizer_class = getattr(import_class, init_class)
-                    if use_fast:
-                        for fast_tokenizer_class, name in cls._faster_name_mapping.items(
-                        ):
-                            if name == class_name:
-                                import_class = importlib.import_module(
-                                    f"paddlenlp.transformers.{class_name}.fast_tokenizer"
-                                )
-                                tokenizer_class = getattr(
-                                    import_class, fast_tokenizer_class)
-                                break
-                    logger.info(
-                        "We are using %s to load '%s'." %
-                        (tokenizer_class, pretrained_model_name_or_path))
-                    return tokenizer_class.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
-                # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
-                else:
-                    print(
-                        'We use pattern recognition to recognize the Tokenizer class.'
-                    )
-                    for key, pattern in cls._name_mapping.items():
-                        if pattern in pretrained_model_name_or_path.lower():
-                            init_class = key
-                            class_name = cls._name_mapping[init_class]
-                            import_class = importlib.import_module(
-                                f"paddlenlp.transformers.{class_name}.tokenizer"
-                            )
-                            tokenizer_class = getattr(import_class, init_class)
-                            logger.info("We are using %s to load '%s'." %
-                                        (tokenizer_class,
-                                         pretrained_model_name_or_path))
-                            return tokenizer_class.from_pretrained(
-                                pretrained_model_name_or_path, *model_args,
-                                **kwargs)
+                tokenizer_class = cls._get_tokenizer_class_from_config(
+                    pretrained_model_name_or_path, config_file, use_fast)
+                logger.info("We are using %s to load '%s'." %
+                            (tokenizer_class, pretrained_model_name_or_path))
+                return tokenizer_class.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
             community_config_path = "/".join([
@@ -305,39 +326,10 @@ class AutoTokenizer():
                 )
 
             if os.path.exists(resolved_vocab_file):
-                with io.open(resolved_vocab_file, encoding="utf-8") as f:
-                    init_kwargs = json.load(f)
-                # class name corresponds to this configuration
-                init_class = init_kwargs.pop("init_class", None)
-                if not init_class:
-                    init_class = init_kwargs.pop("tokenizer_class", None)
-
-                if init_class:
-                    class_name = cls._name_mapping[init_class]
-                    import_class = importlib.import_module(
-                        f"paddlenlp.transformers.{class_name}.tokenizer")
-                    tokenizer_class = getattr(import_class, init_class)
-                    logger.info(
-                        "We are using %s to load '%s'." %
-                        (tokenizer_class, pretrained_model_name_or_path))
-                    return tokenizer_class.from_pretrained(
-                        pretrained_model_name_or_path, *model_args, **kwargs)
-                # If no `init_class`, we use pattern recognition to recognize the Tokenizer class.
-                else:
-                    print(
-                        'We use pattern recognition to recognize the Tokenizer class.'
-                    )
-                    for key, pattern in cls._name_mapping.items():
-                        if pattern in pretrained_model_name_or_path.lower():
-                            init_class = key
-                            class_name = cls._name_mapping[init_class]
-                            import_class = importlib.import_module(
-                                f"paddlenlp.transformers.{class_name}.tokenizer"
-                            )
-                            tokenizer_class = getattr(import_class, init_class)
-                            logger.info("We are using %s to load '%s'." %
-                                        (tokenizer_class,
-                                         pretrained_model_name_or_path))
-                            return tokenizer_class.from_pretrained(
-                                pretrained_model_name_or_path, *model_args,
-                                **kwargs)
+                tokenizer_class = cls._get_tokenizer_class_from_config(
+                    pretrained_model_name_or_path, resolved_vocab_file,
+                    use_fast)
+                logger.info("We are using %s to load '%s'." %
+                            (tokenizer_class, pretrained_model_name_or_path))
+                return tokenizer_class.from_pretrained(
+                    pretrained_model_name_or_path, *model_args, **kwargs)
