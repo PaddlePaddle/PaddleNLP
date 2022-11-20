@@ -2,18 +2,23 @@
 
 本教程带领大家如何开启32层的**Latent Diffusion Model**的训练（支持切换`中文`和`英文`分词器）。
 
+___注意___:
+___官方32层`CompVis/ldm-text2im-large-256`的Latent Diffusion Model使用的是vae，而不是vqvae！而Huggingface团队在设计目录结构的时候把文件夹名字错误的设置成了vqvae！为了与Huggingface团队保持一致，我们同样使用了vqvae文件夹命名！___
+
 ## 1 本地运行
 ### 1.1 安装依赖
 
 在运行这个训练代码前，我们需要安装下面的训练依赖。
 
+___注意___:
+___当前这部分的代码需要使用develop分支的paddlenlp以及develop分支的ppdiffusers才可以正常运行！！！！___
+
 ```bash
 # 安装cuda11.2, python 3.7, develop版本的paddle, commit号为b96a21df4e7a42b2445104426e2be407534705e6.
 wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
 pip install paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-# 安装指定版本的 paddlenlp 和 ppdiffusers.
-pip install paddlenlp==2.4.2 ppdiffusers==0.6.2
-pip install -U visualdl fastcore Pillow
+# 注意当前该部分的训练需要使用develop分支的paddlenlp和develop分支的ppdiffusers。
+pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
 ```
 
 ### 1.2 准备数据
@@ -239,7 +244,7 @@ python generate_pipelines.py \
 ```shell
 ├── ldm_pipelines  # 我们指定的输出文件路径
     ├── model_index.json # 模型index文件
-    ├── vqvae # vae权重文件夹
+    ├── vqvae # vae权重文件夹！实际是vae模型，文件夹名字与HF保持了一致！
         ├── model_state.pdparams
         ├── config.json
     ├── bert # ldmbert权重文件夹
