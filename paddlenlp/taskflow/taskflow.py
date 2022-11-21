@@ -543,7 +543,7 @@ class Taskflow(object):
         else:
             paddle.set_device(device + ":" + str(device_id))
 
-        # special treatment for text classification
+        # Normal tasks with out-of-box zero-shot capability
         if task in TASKS:
             if self.task in ["word_segmentation", "ner"]:
                 tag = "modes"
