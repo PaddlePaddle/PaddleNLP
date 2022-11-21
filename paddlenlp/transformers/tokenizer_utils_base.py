@@ -1946,7 +1946,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                         warnings.warn(
                             "Though `pad_to_max_length` = `True`, it is ignored because `padding`=`True`."
                         )
-                padding_strategy = PaddingStrategy.LONGEST  # Default to pad to the longest sequence in the batch
+                # Default to pad to the longest sequence in the batch
+                padding_strategy = PaddingStrategy.LONGEST
             elif not isinstance(padding, PaddingStrategy):
                 padding_strategy = PaddingStrategy(padding)
             elif isinstance(padding, PaddingStrategy):
@@ -2846,7 +2847,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 offset_mapping = self.build_offset_mapping_with_special_tokens(
                     token_offset_mapping, token_pair_offset_mapping)
             else:
-                offset_mapping = token_offset_mapping + token_pair_offset_mapping if token_pair_offset_mapping else token_offset_mapping
+                offset_mapping = token_offset_mapping + \
+                    token_pair_offset_mapping if token_pair_offset_mapping else token_offset_mapping
             encoded_inputs['offset_mapping'] = offset_mapping
 
         # Check lengths
@@ -2868,7 +2870,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         if return_length:
             encoded_inputs["length"] = len(encoded_inputs["input_ids"])
-            #for compatibility
+            # for compatibility
             encoded_inputs["seq_len"] = encoded_inputs["length"]
 
         batch_outputs = BatchEncoding(encoded_inputs,
