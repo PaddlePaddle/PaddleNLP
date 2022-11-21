@@ -18,7 +18,6 @@ from typing import Tuple, Union, Tuple, List, Dict
 import sys
 import os
 import platform
-from . import core_tokenizers as C
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -51,6 +50,8 @@ except ImportError as e:
         directory. The original error is: \n""" + str(e))
 except Exception as e:
     raise e
+
+from . import core_tokenizers as C
 
 TextInputSequence = str
 PreTokenizedInputSequence = Union[List[str], Tuple[str]]
