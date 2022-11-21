@@ -14,29 +14,32 @@
 from __future__ import annotations
 
 import copy
-import re
+import inspect
 import io
 import json
 import os
-import six
-import inspect
-from typing import Optional, Type, Dict, List, Tuple, Union, Any
+import re
 import shutil
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
-import paddle
-from paddle import Tensor
 import numpy as np
+import paddle
 import paddle.nn as nn
-from paddle.nn import Layer, Embedding
+import six
+from huggingface_hub import hf_hub_download
+from paddle import Tensor
+from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import get_path_from_url, is_url
-from paddlenlp.utils.downloader import download_check, COMMUNITY_MODEL_PREFIX
+
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, download_check
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
-from .generation_utils import GenerationMixin
-from .utils import InitTrackerMeta, fn_args_to_dict, adapt_stale_fwd_patch, resolve_cache_dir
 from .configuration_utils import PretrainedConfig
+from .generation_utils import GenerationMixin
+from .utils import (InitTrackerMeta, adapt_stale_fwd_patch, fn_args_to_dict,
+                    resolve_cache_dir)
 
 __all__ = [
     'PretrainedModel',
@@ -321,7 +324,11 @@ class PretrainedModel(Layer, GenerationMixin):
             cls.config_class, PretrainedConfig)
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained(cls,
+                        pretrained_model_name_or_path,
+                        *args,
+                        from_hf_hub=False,
+                        **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -332,6 +339,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 to load from. The string can be:
 
                 - Name of a built-in pretrained model
+                - Name of a pretrained model from HF hub
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
@@ -369,15 +377,23 @@ class PretrainedModel(Layer, GenerationMixin):
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
         if cls.constructed_from_pretrained_config():
-            return cls.from_pretrained_v2(pretrained_model_name_or_path, *args,
+            return cls.from_pretrained_v2(pretrained_model_name_or_path,
+                                          from_hf_hub=from_hf_hub,
+                                          *args,
                                           **kwargs)
 
         resource_files = {}
         init_configuration = {}
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         track_download = True
+
+        # From HF Hub
+        if from_hf_hub:
+            resource_files = cls.resource_files_names
+            resource_files["model_config_file"] = cls.model_config_file
+
         # From built-in pretrained models
-        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+        elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 if pretrained_model_name_or_path not in map_list:
                     resource_files[file_id] = None
@@ -416,25 +432,32 @@ class PretrainedModel(Layer, GenerationMixin):
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
                 continue
-            path = os.path.join(default_root, file_path.split('/')[-1])
-            if os.path.exists(path):
-                logger.info("Already cached %s" % path)
-                resolved_resource_files[file_id] = path
+            # If from_hf_hub, let HF Hub takes care of the cache and the download process
+            if from_hf_hub:
+                resolved_resource_files[file_id] = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                    cache_dir=MODEL_HOME)
             else:
-                logger.info("Downloading %s and saved to %s" %
-                            (file_path, default_root))
-                try:
-                    resolved_resource_files[file_id] = get_path_from_url(
-                        file_path, default_root)
-                except RuntimeError as err:
-                    logger.error(err)
-                    raise RuntimeError(
-                        f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                        "- a correct model-identifier of built-in pretrained models,\n"
-                        "- or a correct model-identifier of community-contributed pretrained models,\n"
-                        "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
-                    )
+                path = os.path.join(default_root, file_path.split('/')[-1])
+                if os.path.exists(path):
+                    logger.info("Already cached %s" % path)
+                    resolved_resource_files[file_id] = path
+                else:
+                    logger.info("Downloading %s and saved to %s" %
+                                (file_path, default_root))
+                    try:
+                        resolved_resource_files[file_id] = get_path_from_url(
+                            file_path, default_root)
+                    except RuntimeError as err:
+                        logger.error(err)
+                        raise RuntimeError(
+                            f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
+                            f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                            "- a correct model-identifier of built-in pretrained models,\n"
+                            "- or a correct model-identifier of community-contributed pretrained models,\n"
+                            "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
+                        )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
@@ -788,6 +811,7 @@ class PretrainedModel(Layer, GenerationMixin):
     @classmethod
     def _resolve_model_file_path(cls: Type[PretrainedModel],
                                  pretrained_model_name_or_path: str,
+                                 from_hf_hub: bool = False,
                                  cache_dir: Optional[str] = None) -> str:
         """resolve model target file path from `` and `cache_dir`
 
@@ -816,7 +840,14 @@ class PretrainedModel(Layer, GenerationMixin):
         if os.path.isfile(pretrained_model_name_or_path):
             return pretrained_model_name_or_path
 
-        # 1. when it is model-name
+        # 1. when it's from HF
+        if from_hf_hub:
+            return hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.resource_files_names['model_state'],
+                cache_dir=MODEL_HOME)
+
+        # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # check the cache_dir:
             os.makedirs(cache_dir, exist_ok=True)
@@ -831,7 +862,7 @@ class PretrainedModel(Layer, GenerationMixin):
             pretrained_model_name_or_path = cls.pretrained_resource_files_map[
                 'model_state'][pretrained_model_name_or_path]
 
-        # 2. when it is url
+        # 3. when it is url
         if is_url(pretrained_model_name_or_path):
             weight_file_path = get_path_from_url(pretrained_model_name_or_path,
                                                  cache_dir)
@@ -859,7 +890,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
             return weight_file_path
 
-        # 3. when it is local dir
+        # 4. when it is local dir
         if os.path.isdir(pretrained_model_name_or_path):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
@@ -876,7 +907,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 cls.resource_files_names['model_state'])
             assert is_url(pretrained_model_name_or_path)
             return cls._resolve_model_file_path(pretrained_model_name_or_path,
-                                                cache_dir)
+                                                cache_dir=cache_dir)
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>",
@@ -1047,7 +1078,7 @@ class PretrainedModel(Layer, GenerationMixin):
     def from_pretrained_v2(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
-        by specifying name of a built-in pretrained model, or a community contributed model,
+        by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
         or a local file directory path.
 
         Args:
@@ -1055,6 +1086,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 to load from. The string can be:
 
                 - Name of a built-in pretrained model
+                - Name of a pretrained model from HF Hub
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
@@ -1085,6 +1117,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 # Name of built-in pretrained model
                 model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
 
+                # Name of pretrained model from PaddleHub
+                model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
+
                 # Name of community-contributed pretrained model
                 model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned', num_labels=3)
 
@@ -1094,6 +1129,7 @@ class PretrainedModel(Layer, GenerationMixin):
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", False)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop('cache_dir', None)
@@ -1111,6 +1147,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 cache_dir=cache_dir,
                 return_unused_kwargs=True,
                 force_download=force_download,
+                from_hf_hub=from_hf_hub,
                 **kwargs,
             )
         config.save_pretrained(cache_dir)
@@ -1121,7 +1158,9 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 3. resolve model_weight file
         model_weight_file = cls._resolve_model_file_path(
-            pretrained_model_name_or_path, cache_dir=cache_dir)
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub)
 
         # 4. loading the state dict
         model_state_dict = paddle.load(model_weight_file,
