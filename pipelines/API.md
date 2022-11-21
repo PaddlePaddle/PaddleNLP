@@ -13,7 +13,7 @@
 | rocketqa-zh-mini-query-encoder     | Chinese     | 6-layer, 384-hidden, 12-heads, 27M parameters. Trained on DuReader retrieval text.     |
 | rocketqa-zh-micro-query-encoder    | Chinese     | 4-layer, 384-hidden, 12-heads, 23M parameters. Trained on DuReader retrieval text.     |
 | rocketqa-zh-nano-query-encoder     | Chinese     | 4-layer, 312-hidden, 12-heads, 18M parameters. Trained on DuReader retrieval text.     |
-
+| rocketqav2-en-marco-query-encoder    | English     | 12-layer, 768-hidden, 12-heads, 118M parameters. Trained on MSMARCO.     |
 
 ## ErnieRanker
 
@@ -26,7 +26,7 @@
 | rocketqa-mini-cross-encoder    | Chinese     | 6-layer, 384-hidden, 12-heads, 27M parameters. Trained on DuReader retrieval text.     |
 | rocketqa-micro-cross-encoder     | Chinese     | 4-layer, 384-hidden, 12-heads, 23M parameters. Trained on DuReader retrieval text.     |
 | rocketqa-nano-cross-encoder    | Chinese     | 4-layer, 312-hidden, 12-heads, 18M parameters. Trained on DuReader retrieval text.    |
-
+| rocketqav2-en-marco-cross-encoder    | English     | 12-layer, 768-hidden, 12-heads, 118M parameters. Trained on Trained on MSMARCO.    |
 
 ## ErnieReader
 

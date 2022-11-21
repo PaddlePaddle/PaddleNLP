@@ -27,6 +27,7 @@ import socket
 sys.path.append('ui')
 from utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, pipelines_version, get_backlink
 from utils import pipelines_files
+
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP",
                                         "衡量酒水的价格的因素有哪些?")
@@ -227,4 +228,5 @@ def main():
             st.write("___")
 
 
-main()
+if __name__ == "__main__":
+    main()

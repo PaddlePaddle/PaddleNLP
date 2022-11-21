@@ -13,19 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import inspect
 import os
 import random
 import shutil
-import copy
-import inspect
 import tempfile
 import unittest
-import numpy as np
 
+import numpy as np
 import paddle
+
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.env import MODEL_HOME
+
 from ..testing_utils import slow
 
 
@@ -67,6 +69,8 @@ class ModelTesterMixin:
     test_resize_position_embeddings = False
     test_mismatched_shapes = True
     test_missing_keys = True
+    use_test_inputs_embeds = False
+    use_test_model_name_list = True
     is_encoder_decoder = False
     has_attentions = True
     model_split_percents = [0.5, 0.7, 0.9]
@@ -507,7 +511,51 @@ class ModelTesterMixin:
 
             self.assertTrue(models_equal)
 
+    def test_inputs_embeds(self):
+        # pass the test if don't need to test inputs embeddings
+        if not self.use_test_inputs_embeds:
+            return
+        # get config for model and inputs_dict for model forward
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
+        )
+        # test all model classes
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            inputs = copy.deepcopy(
+                self._prepare_for_class(inputs_dict, model_class))
+
+            with paddle.no_grad():
+                ids_output = model(**inputs)
+
+            if not self.is_encoder_decoder:
+                input_ids = inputs["input_ids"]
+                del inputs["input_ids"]
+            else:
+                encoder_input_ids = inputs["input_ids"]
+                decoder_input_ids = inputs.get("decoder_input_ids",
+                                               encoder_input_ids)
+                del inputs["input_ids"]
+                inputs.pop("decoder_input_ids", None)
+
+            wte = model.get_input_embeddings()
+            if not self.is_encoder_decoder:
+                inputs["inputs_embeds"] = wte(input_ids)
+            else:
+                inputs["inputs_embeds"] = wte(encoder_input_ids)
+                inputs["decoder_inputs_embeds"] = wte(decoder_input_ids)
+
+            with paddle.no_grad():
+                embeds_output = model(**inputs)
+
+            self.assertTrue(
+                paddle.allclose(ids_output, embeds_output, rtol=1e-4,
+                                atol=1e-4))
+
     def test_model_name_list(self):
+        if not self.use_test_model_name_list:
+            return
         config = self.model_tester.get_config()
         if isinstance(config, PretrainedConfig):
             model = self.base_model_class(config)
@@ -518,6 +566,24 @@ class ModelTesterMixin:
 
 class ModelTesterPretrainedMixin:
     base_model_class: PretrainedModel = None
+    hf_remote_test_model_path: str = None
+    paddlehub_remote_test_model_path: str = None
+
+    @slow
+    def test_model_from_pretrained_hf_hub(self):
+        if self.hf_remote_test_model_path is None or self.base_model_class is None:
+            return
+        model = self.base_model_class.from_pretrained(
+            self.hf_remote_test_model_path, from_hf_hub=True)
+        self.assertIsNotNone(model)
+
+    @slow
+    def test_model_from_pretrained_paddle_hub(self):
+        if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
+            return
+        model = self.base_model_class.from_pretrained(
+            self.paddlehub_remote_test_model_path)
+        self.assertIsNotNone(model)
 
     @slow
     def test_model_from_pretrained_with_cache_dir(self):

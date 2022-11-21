@@ -30,23 +30,18 @@
 
 ## News 📢
 
-* 💥**Live Preview: Oct 25 - Oct 28**,  Engineers@PaddleNLP will show new features of PaddleNLP v2.4 and more cutting-edge technology.
-
-  - Scan the QR code below using WeChat, follow the PaddlePaddle official account and fill out the questionnaire to join the WeChat group, get the live link and 10G NLP learning materials.
-
-    <div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/197535273-75db1fb3-3a34-4bd2-bac3-bcacb1b986a8.jpg" width="150" height="150" />
-    </div>
+* 🔥 **2022.11.17 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3) Released!**
+  * 💪 Framework upgrade：🏆 Upgrade [**Prompt API**](./docs/advanced_guide/prompt.md), supporting more flexible prompt definitions and winning the 1st place in [FewCLUE](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA); 🕸 Upgrade [**Trainer API**](./docs/trainer.md), supporting Seq2seqTrainer, IterableDataset as well as bf16 and sharding strategies.
+  * 🔨 Industrial application：🏃 Upgrade for [**Universal Information Extraction**](./model_zoo/uie). Support **quantization aware training** and INT8 precision inference for inference performance boost. 💬 Release [**Unsupervised Question Answering Pipiline**](./pipelines/examples/unsupervised-question-answering/), which supports for fast construction of high-quality question answering system with a little human-annotated data.
 * 🔥 **2022.10.27 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2) Released!**
-  * NLG Upgrade: 📄 Release [**Solution of Text Summarization**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus) based on Pegasus；❓ Release [**Solution of Problem Generation**](./examples/question_generation), providing **general problem generation pre-trained model** based on Baidu's UNIMO Text and large-scale multi domain problem generation dataset。Supporting high-performance inference ability based on FasterGeneration , and covering the whole process of training , inference and deployment.
-
+  * NLG Upgrade: 📄 Release [**Solution of Text Summarization**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus) based on Pegasus;❓ Release [**Solution of Problem Generation**](./examples/question_generation), providing **general problem generation pre-trained model** based on Baidu's UNIMO Text and large-scale multi domain problem generation dataset. Supporting high-performance inference ability based on FasterGeneration , and covering the whole process of training , inference and deployment.
 * 🔥 **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**
   * 🧾 Release multilingual/cross-lingual pre-trained models [**ERNIE-Layout**](./model_zoo/ernie-layout/) which achieves new SOTA results in 11 downstream tasks. **DocPrompt** 🔖 based on ERNIE-Layout is also released which has the ability for multilingual document information extraction and question ansering.
 * 🔥 **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
 
   * 💎 NLP Tool：**[Pipelines](./pipelines)** released. Supports for fast construction of search engine and question answering systems, and it is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
 
-  * 💢 Industrial application：Release **[Complete Solution of Text Classification](./applications/text_classification)** covering various scenarios of text classification: multi-class, multi-label and hierarchical, it also supports for **few-shot learning** and the training and optimization of **TrustAI**. Upgrade for [**Universal Information Extraction**](./model_zoo/uie) and release **UIE-M**, support both Chinese and English information extraction in a single model; release the data distillation solution for UIE to break the bottleneck of time-consuming of inference.
+  * 🔨 Industrial application：Release **[Complete Solution of Text Classification](./applications/text_classification)** covering various scenarios of text classification: multi-class, multi-label and hierarchical, it also supports for **few-shot learning** and the training and optimization of **TrustAI**. Upgrade for [**Universal Information Extraction**](./model_zoo/uie) and release **UIE-M**, support both Chinese and English information extraction in a single model; release the data distillation solution for UIE to break the bottleneck of time-consuming of inference.
 
   * 🍭 AIGC: Release code generation SOTA model [**CodeGen**](./examples/code_generation/codegen), supports for multiple programming languages code generation. Integrate [**Text to Image Model**](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) DALL·E Mini, Disco Diffusion, Stable Diffusion, let's play and have some fun! Release [**Chinese Text Summarization Application**](./applications/text_summarization), first release of chinese text summarization model pretrained on a large scale of corpus, it can be use via Taskflow API and support for finetuning on your own data.
 
@@ -229,17 +224,17 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### ⚡ FasterTokenizer: High Performance Text Preprocessing Library
+#### ⚡ FastTokenizer: High Performance Text Preprocessing Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
 </div>
 
 ```python
-AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 ```
 
-Set `use_faster=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FasterTokenizer](./faster_tokenizer).
+Set `use_fast=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FastTokenizer](./fast_tokenizer).
 
 #### ⚡ FasterGeneration: High Perforance Generation Library
 
@@ -271,7 +266,7 @@ For more super large-scale model pre-training details please refer to [GPT-3](./
 
 ### Prerequisites
 
-* python >= 3.6
+* python >= 3.7
 * paddlepaddle >= 2.2
 
 More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
@@ -325,10 +320,6 @@ Please find all PaddleNLP API Reference from our [readthedocs](https://paddlenlp
 
 ## Community
 
-### Special Interest Group (SIG)
-
-Welcome to join [PaddleNLP SIG](https://iwenjuan.baidu.com/?code=bkypg8) for contribution, eg. Dataset, Models and Toolkit.
-
 ### Slack
 
 To connect with other users and contributors, welcome to join our [Slack channel](https://paddlenlp.slack.com/).
@@ -337,9 +328,10 @@ To connect with other users and contributors, welcome to join our [Slack channel
 
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
- <div align="center">
- <img src="https://user-images.githubusercontent.com/11793384/184784832-bb97930f-a738-4480-99be-517aeb65afac.png" width="150" height="150" />
- </div>
+<div align="center">
+<img src="https://user-images.githubusercontent.com/11793384/200770385-a2c02093-0e1d-4189-b324-8b0251cba316.jpg" width="150" height="150" />
+</div>
+
 
 
 ## Citation

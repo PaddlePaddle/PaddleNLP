@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
-from collections import deque
 import warnings
+import threading
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
@@ -572,6 +571,9 @@ class Taskflow(object):
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
+
+        # Add the lock for the concurrency requests
+        self._lock = threading.Lock()
 
     def __call__(self, *inputs):
         """

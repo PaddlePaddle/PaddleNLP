@@ -20,6 +20,8 @@ from paddle.nn import Layer, Embedding
 
 from ..nezha.modeling import ACT2FN
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (BaseModelOutputWithPastAndCrossAttentions,
+                             CausalLMOutputWithCrossAttentions)
 
 CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "Salesforce/codegen-350M-nl",
@@ -154,6 +156,7 @@ class CodeGenAttention(Layer):
         attention_mask=None,
         use_cache=False,
         cache=None,
+        output_attentions=False,
     ):
         qkv = self.qkv_proj(hidden_states)
         mp_num = 4
@@ -225,6 +228,8 @@ class CodeGenAttention(Layer):
         attn_output = self.out_proj(attn_output)
         attn_output = self.resid_dropout(attn_output)
 
+        if output_attentions:
+            return attn_output, present, attn_weights
         return attn_output, present
 
 
@@ -265,13 +270,15 @@ class CodeGenBlock(Layer):
         attention_mask=None,
         use_cache=False,
         cache=None,
+        output_attentions=False,
     ):
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
         attn_outputs = self.attn(hidden_states,
                                  attention_mask=attention_mask,
                                  cache=cache,
-                                 use_cache=use_cache)
+                                 use_cache=use_cache,
+                                 output_attentions=output_attentions)
         attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
         outputs = attn_outputs[1:]
 
@@ -283,7 +290,7 @@ class CodeGenBlock(Layer):
         else:
             outputs = (hidden_states, ) + outputs[1:]
 
-        return outputs  # hidden_states, present, (attentions)
+        return outputs  # hidden_states, (present, attentions)  outputs is a tuple
 
 
 class CodeGenPreTrainedModel(PretrainedModel):
@@ -427,6 +434,9 @@ class CodeGenModel(CodeGenPreTrainedModel):
         token_type_ids=None,
         use_cache=False,
         cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
     ):
         r'''
         The CodeGenModel forward method, overrides the `__call__()` special method.
@@ -454,8 +464,22 @@ class CodeGenModel(CodeGenPreTrainedModel):
                 See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object.
+                If `False`, the output will be a tuple of tensors. Defaults to `False`.
         Returns:
-            Tensor: Returns tensor `decoder_output`, which is the output at the last layer of the model.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=None`, 
+            returns a tensor representing the output of :class:`UnifiedTransformerModel`.
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
         Example:
             .. code-block::
@@ -516,23 +540,48 @@ class CodeGenModel(CodeGenPreTrainedModel):
         output_shape = input_shape[:] + [hidden_states.shape[-1]]
 
         presents = () if use_cache else None
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attentions = () if output_attentions else None
         for i, (block, old_cache) in enumerate(zip(self.h, cache)):
+            if output_hidden_states:
+                all_hidden_states += (hidden_states, )
             outputs = block(hidden_states,
                             attention_mask=attention_mask,
                             use_cache=use_cache,
-                            cache=old_cache)
+                            cache=old_cache,
+                            output_attentions=output_attentions)
 
             hidden_states = outputs[0]
             if use_cache:
                 presents = presents + (outputs[1], )
+            if output_attentions:
+                all_self_attentions += (outputs[-1], )
 
         hidden_states = self.ln_f(hidden_states)
         hidden_states = hidden_states.reshape(shape=output_shape)
 
+        if output_hidden_states:
+            all_hidden_states += (hidden_states, )
+
         last_hidden_state = hidden_states
         new_cache = presents
 
-        return last_hidden_state, new_cache
+        if not return_dict:
+            temp_list = [
+                last_hidden_state,
+                new_cache,
+                all_hidden_states,
+                all_self_attentions,
+            ]
+            return tuple(v for v in temp_list if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=last_hidden_state,
+            past_key_values=new_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions,
+            cross_attentions=None,
+        )
 
 
 class CodeGenForCausalLM(CodeGenPreTrainedModel):
@@ -615,7 +664,11 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                 attention_mask=None,
                 token_type_ids=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                labels=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The CodeGenForCausalLM forward method, overrides the __call__() special method.
         Args:
@@ -627,14 +680,24 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                 See :class:`CodeGenModel`.
             cache (Tensor, optional):
                 See :class:`CodeGenModel`.
+            labels: (Tensor, optional):
+                Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
+                `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100`
+                are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
+            output_attentions (bool, optional):
+                See :class: `CodeGenModel`
+            output_hidden_states (bool, optional):
+                See :class: `CodeGenModel`
+            return_dict (bool, optional):
+                See :class: `CodeGenModel`
         Returns:
-            Tensor or tuple: Returns Tensor `lm_logits` if `use_cache` is `False`, otherwise, returns tuple (`lm_logits`, `cache`).
-            With the fields:
-            - `lm_logits` (Tensor):
-                The generated sentence of the model.
-                Its data type should be float32 and has a shape of [batch_size, sequence_length, vocab_size].
-            - `cache` (Tensor):
-                See :class:`CodeGenModel`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=labels=None`, 
+            returns tensor `lm_logits` of shape [batch_size, sequence_length, vocab_size],
+
         Example:
             .. code-block::
                 import paddle
@@ -646,11 +709,15 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                 outputs = model(**inputs)
         """
 
-        transformer_outputs = self.transformer(input_ids,
-                                               attention_mask=attention_mask,
-                                               token_type_ids=token_type_ids,
-                                               use_cache=use_cache,
-                                               cache=cache)
+        transformer_outputs = self.transformer(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            use_cache=use_cache,
+            cache=cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
 
         hidden_states = transformer_outputs[0]
 
@@ -658,9 +725,30 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         # compute loss in fp32 to match with mesh-tf version
         # https://github.com/EleutherAI/gpt-neo/blob/89ce74164da2fb16179106f54e2269b5da8db333/models/gpt2/gpt2.py#L179
         lm_logits = paddle.cast(self.lm_head(hidden_states), "float32")
-        past_key_values = transformer_outputs[1]
 
-        return lm_logits, past_key_values
+        loss = None
+        if labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = lm_logits[:, :-1, :]
+            shift_labels = labels[:, 1:]
+            # Flatten the tokens
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])),
+                            shift_labels.reshape((-1, )))
+
+        if not return_dict:
+            # if isinstance(transformer_outputs, type(input_ids)):
+            #     return (loss, lm_logits) if loss is not None else lm_logits
+            outputs = (lm_logits, ) + transformer_outputs[1:]
+            return ((loss, ) + outputs) if loss is not None else outputs
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=lm_logits,
+            past_key_values=transformer_outputs.past_key_values,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+        )
 
     def __getattr__(self, name):
         try:

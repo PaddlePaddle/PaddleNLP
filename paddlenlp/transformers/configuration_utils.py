@@ -24,18 +24,19 @@ import os.path as osp
 import re
 import shutil
 import warnings
-import copy
-from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type,
+                    TypeVar, Union)
 
+from huggingface_hub import hf_hub_download
+
+from paddlenlp import __version__
 from paddlenlp.transformers.utils import resolve_cache_dir
-
 from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, is_url, get_path_from_url
-
-from paddlenlp.utils.log import logger
-from paddlenlp import __version__
+from ..utils.downloader import (COMMUNITY_MODEL_PREFIX, get_path_from_url,
+                                is_url)
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -668,8 +669,10 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
+        print(kwargs)
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path,
                                                   **kwargs)
+
         config_dict = flatten_model_config(config_dict)
         if "model_type" in config_dict and hasattr(
                 cls,
@@ -718,6 +721,7 @@ class PretrainedConfig:
                                                                    os.PathLike],
                          **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path,
                                       cache_dir=cache_dir)
 
@@ -726,7 +730,7 @@ class PretrainedConfig:
 
         resolved_config_file = None
 
-        # init from pretrained_init_configuration
+        # 0. init from pretrained_init_configuration
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # which can be: dict or url
             pretrained_model_name_or_path = cls.pretrained_init_configuration[
@@ -739,13 +743,20 @@ class PretrainedConfig:
         if os.path.isfile(pretrained_model_name_or_path):
             resolved_config_file = pretrained_model_name_or_path
 
-        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
+        # 2. get the configuration file from HF hub
+        elif from_hf_hub:
+            resolved_config_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=CONFIG_NAME,
+                cache_dir=MODEL_HOME)
+
+        # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url(
                 pretrained_model_name_or_path,
                 cache_dir,
                 check_exist=not force_download)
-        # 3. get the configuration file from local dir with default name, eg: /local/path
+        # 4. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path,
