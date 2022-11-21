@@ -19,8 +19,9 @@
   - [4.3 模型微调](#模型微调)
   - [4.4 模型评估](#模型评估)
   - [4.5 定制模型一键预测](#定制模型一键预测)
-  - [4.6 实验指标](#实验指标)
-  - [4.7 模型部署](#模型部署)
+  - [4.6 模型快速服务化部署](#模型快速服务化部署)
+  - [4.7 实验指标](#实验指标)
+  - [4.8 模型部署](#模型部署)
 - [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
@@ -816,9 +817,36 @@ python evaluate.py \
           'text': '114'}]}]
 ```
 
+<a name="模型快速服务化部署"></a>
+
+#### 4.6 模型快速服务化部署
+在UIE的服务化能力中我们提供基于PaddleNLP SimpleServing 来搭建服务化能力，通过几行代码即可搭建服务化部署能力
+
+```python
+
+# Save at server.py
+from paddlenlp import SimpleServer
+from paddlenlp import Taskflow
+
+schema = ['出发地', '目的地', '费用', '时间']
+uie = Taskflow("information_extraction",
+               schema=schema,
+               task_path='./checkpoint/model_best/')
+app = SimpleServer()
+app.register_taskflow('uie', uie)
+```
+
+```bash
+# Start the server
+paddlenlp server server:app --host 0.0.0.0 --port 8989
+```
+
+具体使用的方法可以见[UIE SimpleServing 使用方法](./deploy/serving/SimpleServing/README.md)
+
+
 <a name="实验指标"></a>
 
-#### 4.6 实验指标
+#### 4.7 实验指标
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
@@ -839,7 +867,7 @@ python evaluate.py \
 
 <a name="模型部署"></a>
 
-#### 4.7 模型部署
+#### 4.8 模型部署
 
 以下是 UIE Python 端的部署流程，包括环境准备、模型导出和使用示例。
 
