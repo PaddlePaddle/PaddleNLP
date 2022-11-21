@@ -40,7 +40,6 @@ import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-from paddle.distributed.sharding import group_sharded_parallel
 from paddle.fluid.dygraph.parallel import sync_params_buffers
 
 from paddle.io import (
@@ -1218,6 +1217,8 @@ class Trainer:
                     level = "os_g"
                 if ShardingOption.FULL_SHARD in self.args.sharding:
                     level = "p_g_os"
+
+                from paddle.distributed.sharding import group_sharded_parallel
 
                 model, optimizer, _ = group_sharded_parallel(
                     model,
