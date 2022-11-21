@@ -32,7 +32,7 @@ from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
 from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock as get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
 
 from paddlenlp.utils.log import logger
@@ -449,8 +449,9 @@ class PretrainedModel(Layer, GenerationMixin):
                     logger.info("Downloading %s and saved to %s" %
                                 (file_path, default_root))
                     try:
-                        resolved_resource_files[file_id] = get_path_from_url(
-                            file_path, default_root)
+                        resolved_resource_files[
+                            file_id] = get_path_from_url_with_filelock(
+                                file_path, default_root)
                     except RuntimeError as err:
                         logger.error(err)
                         raise RuntimeError(
@@ -866,8 +867,8 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 3. when it is url
         if is_url(pretrained_model_name_or_path):
-            weight_file_path = get_path_from_url(pretrained_model_name_or_path,
-                                                 cache_dir)
+            weight_file_path = get_path_from_url_with_filelock(
+                pretrained_model_name_or_path, cache_dir)
             # # check the downloaded weight file and registered weight file name
 
             # make sure that

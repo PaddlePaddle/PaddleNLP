@@ -33,7 +33,7 @@ import paddle
 from huggingface_hub import hf_hub_download
 
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock as get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -1581,8 +1581,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     logger.info("Downloading %s and saved to %s" %
                                 (file_path, default_root))
                     try:
-                        resolved_vocab_files[file_id] = get_path_from_url(
-                            file_path, default_root)
+                        resolved_vocab_files[
+                            file_id] = get_path_from_url_with_filelock(
+                                file_path, default_root)
                     except RuntimeError as err:
                         if file_id not in cls.resource_files_names:
                             resolved_vocab_files[file_id] = None
