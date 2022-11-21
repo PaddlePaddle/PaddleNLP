@@ -2,8 +2,9 @@
 
 ## 目录
 - [环境准备](#环境准备)
-- [Server启动服务](#模型转换)
-- [Client发送请求](#部署模型)
+- [Server服务启动](#Server服务启动)
+- [Client请求启动](#Client请求启动)
+- [服务化自定义参数](服务化自定义参数)
 
 ## 环境准备
 使用有SimpleServing功能的PaddleNLP版本(或者最新的develop版本)
@@ -19,7 +20,7 @@ pip install paddlenlp >= 2.4.4
 paddlenlp server server:app --host 0.0.0.0 --port 8189
 ```
 
-## 启动 UIE Client 服务
+## Client请求启动
 
 ```bash
 python client.py
