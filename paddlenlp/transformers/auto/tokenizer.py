@@ -283,7 +283,7 @@ class AutoTokenizer():
                                 logger.warning(
                                     "Can't find the fast_tokenizer package, "
                                     "please ensure install fast_tokenizer correctly. "
-                                    "You can install fast_tokenizer by `pip install fast_tokenizer`."
+                                    "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
 
                         logger.info("We are using %s to load '%s'." %
