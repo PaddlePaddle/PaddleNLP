@@ -531,7 +531,9 @@ class Taskflow(object):
     """
 
     def __init__(self, task, model=None, mode=None, device_id=0, **kwargs):
-        assert (task in TASKS) or (task in INFERENCE_ONLY_TASKS),  f"The task name:{task} is not in Taskflow list, please check your task name."
+        assert (task in TASKS) or (
+            task in INFERENCE_ONLY_TASKS
+        ), f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
 
         # Set the device for the task
@@ -551,10 +553,12 @@ class Taskflow(object):
                 tag = "models"
                 ind_tag = "model"
                 self.model = model
-            
+
             if self.model is not None:
-                assert self.model in set(TASKS[task][tag].keys(
-                )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
+                assert self.model in set(
+                    TASKS[task]
+                    [tag].keys()), "The {} name: {} is not in task:[{}]".format(
+                        tag, model, task)
             else:
                 self.model = TASKS[task]['default'][ind_tag]
 
@@ -571,9 +575,9 @@ class Taskflow(object):
             self.kwargs = kwargs
             task_class = TASKS[self.task][tag][self.model]['task_class']
             self.task_instance = task_class(model=self.model,
-                                        task=self.task,
-                                        priority_path=self.priority_path,
-                                        **self.kwargs)
+                                            task=self.task,
+                                            priority_path=self.priority_path,
+                                            **self.kwargs)
         # task is inference only task such as text classification taskflow
         else:
             self.model = model
@@ -581,8 +585,8 @@ class Taskflow(object):
             self.kwargs['device_id'] = device_id
             task_class = INFERENCE_ONLY_TASKS[self.task]['task_class']
             self.task_instance = task_class(model=self.model,
-                                        task=self.task,
-                                        **self.kwargs)
+                                            task=self.task,
+                                            **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
 

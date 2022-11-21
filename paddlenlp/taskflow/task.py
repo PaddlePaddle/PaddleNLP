@@ -51,7 +51,7 @@ class Task(metaclass=abc.ABCMeta):
         self._config = None
         self._custom_model = False
         self._param_updated = False
-        
+
         self._num_threads = self.kwargs[
             'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
                 cpu_count() / 2)
@@ -243,7 +243,7 @@ class Task(metaclass=abc.ABCMeta):
             inference_model_path = self.model
         else:
             inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
+                                                "inference")
         if not os.path.exists(inference_model_path +
                               ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
