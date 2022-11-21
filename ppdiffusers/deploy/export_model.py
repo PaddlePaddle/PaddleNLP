@@ -78,7 +78,7 @@ if __name__ == "__main__":
     vae_decoder = paddle.jit.to_static(
         vae_decoder,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, 4, 64, 64],
+            paddle.static.InputSpec(shape=[None, 4, None, None],
                                     dtype="float32",
                                     name="latent_sample"),  # latent_sample
         ])

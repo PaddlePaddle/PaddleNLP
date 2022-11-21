@@ -244,7 +244,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}")
             text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
         text_embeddings = self.text_encoder(
-            input_ids=text_input_ids.astype(np.int32))[0]
+            input_ids=text_input_ids.astype(np.int64))[0]
 
         # duplicate text embeddings for each generation per prompt
         text_embeddings = np.repeat(text_embeddings,
@@ -283,7 +283,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
             )
             uncond_input_ids = uncond_input.input_ids
             uncond_embeddings = self.text_encoder(
-                input_ids=uncond_input_ids.astype(np.int32))[0]
+                input_ids=uncond_input_ids.astype(np.int64))[0]
 
             # duplicate unconditional embeddings for each generation per prompt
             uncond_embeddings = np.repeat(uncond_embeddings,
@@ -372,9 +372,10 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 latent_model_input, t)
 
             # predict the noise residual
-            noise_pred = self.unet(sample=latent_model_input,
-                                   timestep=np.array(t),
-                                   encoder_hidden_states=text_embeddings)[0]
+            noise_pred = self.unet(sample=latent_model_input.astype(np.float32),
+                                   timestep=np.array([t], dtype=np.int64),
+                                   encoder_hidden_states=text_embeddings.astype(
+                                       np.float32))[0]
 
             # perform guidance
             if do_classifier_free_guidance:
@@ -383,6 +384,9 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                     noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
+            noise_pred = paddle.to_tensor(noise_pred)
+            latents = paddle.to_tensor(latents)
+            t = paddle.to_tensor(t)
             latents = self.scheduler.step(noise_pred, t, latents,
                                           **extra_step_kwargs).prev_sample
             latents = latents.numpy()

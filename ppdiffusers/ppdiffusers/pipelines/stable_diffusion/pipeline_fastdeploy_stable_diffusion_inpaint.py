@@ -276,7 +276,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}")
             text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
         text_embeddings = self.text_encoder(
-            input_ids=text_input_ids.astype(np.int32))[0]
+            input_ids=text_input_ids.astype(np.int64))[0]
 
         # duplicate text embeddings for each generation per prompt
         text_embeddings = np.repeat(text_embeddings,
@@ -316,7 +316,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
             )
             uncond_input_ids = uncond_input.input_ids
             uncond_embeddings = self.text_encoder(
-                input_ids=uncond_input_ids.astype(np.int32))[0]
+                input_ids=uncond_input_ids.astype(np.int64))[0]
 
             # duplicate unconditional embeddings for each generation per prompt
             uncond_embeddings = np.repeat(uncond_embeddings,
