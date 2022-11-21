@@ -25,6 +25,14 @@ import importlib.util
 import importlib_metadata
 
 
+def is_torch_available() -> bool:
+    """check if `torch` package is installed
+    Returns:
+        bool: if `torch` is available
+    """
+    return is_package_available("torch")
+
+
 def is_package_available(package_name: str) -> bool:
     """check if the package is avaliable
     Args:
@@ -42,14 +50,6 @@ def is_faster_tokenizer_available() -> bool:
         bool: if `faster_tokenizer` is avaliable
     """
     return is_package_available("faster_tokenizer")
-
-
-def is_torch_available() -> bool:
-    """check if `torch` package is installed
-    Returns:
-        bool: if `torch` is available
-    """
-    return is_package_available("torch")
 
 
 def is_transformers_available() -> bool:
