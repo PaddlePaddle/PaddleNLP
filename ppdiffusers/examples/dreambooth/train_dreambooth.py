@@ -415,8 +415,8 @@ def main(args):
                         image.save(image_filename)
 
                 del pipeline
-                if paddle.device.is_compiled_with_cuda():
-                    paddle.device.cuda.empty_cache()
+                # if paddle.device.is_compiled_with_cuda():
+                #    paddle.device.cuda.empty_cache()
 
     if args.output_dir is not None:
         os.makedirs(args.output_dir, exist_ok=True)
