@@ -44,7 +44,7 @@ class VAEDecoder(AutoencoderKL):
 class VAEEncoder(AutoencoderKL):
 
     def forward(self, z):
-        return self.encode(z, True).latents
+        return self.encode(z, True).latent_dist.sample()
 
 
 if __name__ == "__main__":
@@ -91,9 +91,10 @@ if __name__ == "__main__":
     vae_encoder = paddle.jit.to_static(
         vae_encoder,
         input_spec=[
-            paddle.static.InputSpec(shape=[512, 512],
-                                    dtype="float32",
-                                    name="sample"),  # latent
+            paddle.static.InputSpec(
+                shape=[None, 3, None, None],  # N, C, H, W
+                dtype="float32",
+                name="sample"),  # latent
         ])
     # Save vae_encoder in static graph model.
     save_path = os.path.join(args.output_path, "vae_encoder", "inference")
