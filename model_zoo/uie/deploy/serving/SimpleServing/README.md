@@ -12,7 +12,7 @@ pip install paddlenlp >= 2.4.3
 ```
 ## Server服务启动
 
-打开 `server.py`, 想自定义自己的在线服务化只要简单替换以下两个字段
+打开 `server.py`, 想自定义自己的在线服务化只要简单替换以下字段
 
 ### schema替换
 ```python
