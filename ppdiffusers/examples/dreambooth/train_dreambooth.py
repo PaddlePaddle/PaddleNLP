@@ -31,13 +31,15 @@ from ppdiffusers.modeling_utils import unwrap_model, freeze_params
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
 
 import itertools
-from PIL import Image
+from PIL import Image, ImageFile
 from paddle.vision import transforms
 from paddle.optimizer import AdamW
 from tqdm.auto import tqdm
 from paddlenlp.transformers import BertModel, AutoTokenizer, CLIPTextModel
 from pathlib import Path
 
+# to fix [image file is truncated (0 bytes not processed)] issue
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 def parse_args(input_args=None):
     parser = argparse.ArgumentParser(
