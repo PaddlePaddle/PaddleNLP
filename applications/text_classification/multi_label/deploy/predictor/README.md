@@ -23,7 +23,7 @@ python -m pip install onnxruntime
 安装FastTokenizer文本处理加速库（可选）
 推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 ```shell
-pip install fast_tokenizer
+pip install fast-tokenizer-python
 ```
 ## 基于GPU部署推理样例
 
