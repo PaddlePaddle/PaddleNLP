@@ -10,44 +10,9 @@
 
 - **Step 3**: 使用标注数据以及步骤2得到的合成数据训练出封闭域Student Model。
 
-## 数据准备
-
-本项目中从CMeIE数据集中采样少量数据展示了UIE数据蒸馏流程，[示例数据下载](https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip)，解压后放在``../data``目录下。
-
-```shell
-wget https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip && unzip data.zip -d ../
-```
-
-示例数据包含以下两部分：
-
-| 名称 |  数量  |
-| :---: | :-----: |
-| doccano格式标注数据（doccano_ext.json）| 200 |
-| 无标注数据（unlabeled_data.txt）| 1277 |
-
 ## UIE Finetune
 
-参考[UIE主文档](../README.md)完成UIE模型微调。
-
-训练集/验证集切分：
-
-```shell
-python doccano.py \
-    --doccano_file ./data/doccano_ext.json \
-    --task_type ext \
-    --save_dir ./data \
-    --splits 0.8 0.2 0
-```
-
-模型微调：
-
-```shell
-python finetune.py \
-    --train_path ./data/train.txt \
-    --dev_path ./data/dev.txt \
-    --learning_rate 5e-6 \
-    --batch_size 2
-```
+参考[UIE关系抽取微调](../README.md)完成模型微调，得到``../checkpoint/model_best``。
 
 ## 离线蒸馏
 
@@ -58,7 +23,7 @@ python data_distill.py \
     --data_path ../data \
     --save_dir student_data \
     --task_type relation_extraction \
-    --synthetic_ratio 10 \
+    --synthetic_ratio 30 \
     --model_path ../checkpoint/model_best
 ```
 
@@ -73,7 +38,7 @@ python data_distill.py \
 
 #### 老师模型评估
 
-UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，不适合关系、事件等任务），可通过以下评估脚本针对原始标注格式数据评估模型效果
+UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，非关系抽取或事件抽取的标准评估方式），可通过以下评估脚本进行端到端评估。
 
 ```shell
 python evaluate_teacher.py \
@@ -101,7 +66,7 @@ python train.py \
     --train_path student_data/train_data.json \
     --dev_path student_data/dev_data.json \
     --label_maps_path student_data/label_maps.json \
-    --num_epochs 200 \
+    --num_epochs 50 \
     --encoder ernie-3.0-mini-zh
 ```
 
@@ -120,7 +85,7 @@ python train.py \
 - `encoder`: 选择学生模型的模型底座，默认为`ernie-3.0-mini-zh`。
 - `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取，需指定任务类型。
 - `logging_steps`: 日志打印的间隔steps数，默认10。
-- `valid_steps`: evaluate的间隔steps数，默认200。
+- `eval_steps`: evaluate的间隔steps数，默认200。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
 - `init_from_ckpt`: 可选，模型参数路径，热启动模型训练；默认为None。
 

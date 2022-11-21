@@ -94,7 +94,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # yapf: enable
 
-    schema = {"疾病": ["手术治疗", "实验室检查", "影像学检查"]}
+    schema = {"武器名称": ["产国", "类型", "研发单位"]}
 
     args.schema = schema
 

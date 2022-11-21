@@ -303,8 +303,6 @@ class Convertor(object):
                 entity_example_map = {}
                 entity_map = {}  # id to entity name
                 for entity in entities:
-                    if entity["label"] in self.ignore_list:
-                        continue
                     entity_name = text[
                         entity["start_offset"]:entity["end_offset"]]
                     entity_map[entity["id"]] = {
@@ -312,6 +310,8 @@ class Convertor(object):
                         "start": entity["start_offset"],
                         "end": entity["end_offset"]
                     }
+                    if entity["label"] in self.ignore_list:
+                        continue
 
                     entity_label, entity_cls_label = _sep_cls_label(
                         entity["label"], self.separator)
