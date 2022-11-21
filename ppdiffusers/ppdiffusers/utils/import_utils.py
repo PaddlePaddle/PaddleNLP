@@ -106,6 +106,14 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _scipy_available = False
 
+_fastdeploy_available = importlib.util.find_spec("fastdeploy") is not None
+try:
+    _fastdeploy_version = importlib_metadata.version("fastdeploy")
+    logger.debug(
+        f"Successfully imported fastdeploy version {_fastdeploy_version}")
+except importlib_metadata.PackageNotFoundError:
+    _fastdeploy_available = False
+
 
 def is_paddle_available():
     return _paddle_available
@@ -133,6 +141,10 @@ def is_onnx_available():
 
 def is_scipy_available():
     return _scipy_available
+
+
+def is_fastdeploy_available():
+    return _fastdeploy_available
 
 
 # docstyle-ignore
