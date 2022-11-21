@@ -11,9 +11,11 @@ paddlenlp.utils
    :maxdepth: 4
 
    paddlenlp.utils.batch_sampler
+   paddlenlp.utils.converter
    paddlenlp.utils.downloader
    paddlenlp.utils.env
    paddlenlp.utils.file_lock
+   paddlenlp.utils.image_utils
    paddlenlp.utils.import_utils
    paddlenlp.utils.log
    paddlenlp.utils.profiler

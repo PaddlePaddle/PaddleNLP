@@ -1,5 +1,5 @@
 fast\_tokenizer
-=====================================================
+===================================================
 
 .. automodule:: paddlenlp.transformers.ernie.fast_tokenizer
    :members:

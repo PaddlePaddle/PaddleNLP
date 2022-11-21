@@ -19,6 +19,7 @@ paddlenlp.taskflow
    paddlenlp.taskflow.code_generation
    paddlenlp.taskflow.dependency_parsing
    paddlenlp.taskflow.dialogue
+   paddlenlp.taskflow.document_intelligence
    paddlenlp.taskflow.information_extraction
    paddlenlp.taskflow.knowledge_mining
    paddlenlp.taskflow.lexical_analysis
@@ -26,12 +27,14 @@ paddlenlp.taskflow
    paddlenlp.taskflow.poetry_generation
    paddlenlp.taskflow.pos_tagging
    paddlenlp.taskflow.question_answering
+   paddlenlp.taskflow.question_generation
    paddlenlp.taskflow.sentiment_analysis
    paddlenlp.taskflow.task
    paddlenlp.taskflow.taskflow
-   paddlenlp.taskflow.text_to_image
    paddlenlp.taskflow.text_correction
    paddlenlp.taskflow.text_generation
    paddlenlp.taskflow.text_similarity
+   paddlenlp.taskflow.text_summarization
+   paddlenlp.taskflow.text_to_image
    paddlenlp.taskflow.utils
    paddlenlp.taskflow.word_segmentation

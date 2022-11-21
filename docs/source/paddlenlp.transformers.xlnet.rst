@@ -10,5 +10,6 @@ xlnet
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.transformers.xlnet.converter
    paddlenlp.transformers.xlnet.modeling
    paddlenlp.transformers.xlnet.tokenizer

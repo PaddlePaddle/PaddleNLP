@@ -1,5 +1,5 @@
 fast\_tokenizer
-====================================================
+==================================================
 
 .. automodule:: paddlenlp.transformers.bert.fast_tokenizer
    :members:

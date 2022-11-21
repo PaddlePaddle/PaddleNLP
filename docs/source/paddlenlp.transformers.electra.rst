@@ -10,5 +10,6 @@ electra
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.transformers.electra.converter
    paddlenlp.transformers.electra.modeling
    paddlenlp.transformers.electra.tokenizer

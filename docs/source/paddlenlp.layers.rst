@@ -11,5 +11,6 @@ paddlenlp.layers
    :maxdepth: 4
 
    paddlenlp.layers.crf
+   paddlenlp.layers.globalpointer
    paddlenlp.layers.sequence
    paddlenlp.layers.tcn

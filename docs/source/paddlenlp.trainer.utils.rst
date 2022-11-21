@@ -10,4 +10,5 @@ utils
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.trainer.utils.doc
    paddlenlp.trainer.utils.helper

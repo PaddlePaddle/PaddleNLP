@@ -10,5 +10,7 @@ roberta
 .. toctree::
    :maxdepth: 4
 
+   paddlenlp.transformers.roberta.configuration
+   paddlenlp.transformers.roberta.converter
    paddlenlp.transformers.roberta.modeling
    paddlenlp.transformers.roberta.tokenizer
