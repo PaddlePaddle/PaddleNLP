@@ -12,24 +12,18 @@ pip install paddlenlp >= 2.4.3
 ```
 ## Server服务启动
 
-打开 `server.py`, 想自定义自己的在线服务化只要简单替换以下两个字段
+打开 `server.py`, 想自定义自己的在线服务化只要简单替换以下字段
 
 ### schema替换
 ```python
 # Default schema
 schema = ['出发地', '目的地', '费用', '时间']
-
-# Defined task schema
-schema = [xxx]
 ```
 
 ### 设置模型路径
 ```
 # Default task_path
 uie = Taskflow('information_extration', task_path='../../../checkpoint/best_model/', schema=schema)
-
-# Defined task_path
-uie = Taskflow('information_extration', task_path='./path/xxx', schema=schema)
 ```
 
 ### 多卡服务化预测
