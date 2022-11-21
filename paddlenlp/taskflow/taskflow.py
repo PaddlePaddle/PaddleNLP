@@ -13,12 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
-from collections import deque
 import warnings
 import paddle
 from ..utils.tools import get_env_device
-from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERWordTagTask
 from .named_entity_recognition import NERLACTask
@@ -28,9 +25,9 @@ from .word_segmentation import SegJiebaTask
 from .word_segmentation import SegLACTask
 from .word_segmentation import SegWordTagTask
 from .pos_tagging import POSTaggingTask
-from .text_generation import TextGenerationTask
 from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
+from .text_classification import TextClassificationTask
 from .dependency_parsing import DDParserTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
@@ -496,6 +493,12 @@ TASKS = {
     },
 }
 
+INFERENCE_ONLY_TASKS = {
+    "text_classification": {
+        "task_class": TextClassificationTask
+    }
+}
+
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
     "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base"
@@ -523,35 +526,13 @@ class Taskflow(object):
         mode (str, optional): Select the mode of the task, only used in the tasks of word_segmentation and ner.
             If set None, will use the default mode.
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
 
     """
 
     def __init__(self, task, model=None, mode=None, device_id=0, **kwargs):
-        assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
-            task)
+        assert (task in TASKS) or (task in INFERENCE_ONLY_TASKS),  f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
-
-        if self.task in ["word_segmentation", "ner"]:
-            tag = "modes"
-            ind_tag = "mode"
-            self.model = mode
-        else:
-            tag = "models"
-            ind_tag = "model"
-            self.model = model
-
-        if self.model is not None:
-            assert self.model in set(TASKS[task][tag].keys(
-            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
-        else:
-            self.model = TASKS[task]['default'][ind_tag]
-
-        if "task_priority_path" in TASKS[self.task][tag][self.model]:
-            self.priority_path = TASKS[self.task][tag][
-                self.model]["task_priority_path"]
-        else:
-            self.priority_path = None
 
         # Set the device for the task
         device = get_env_device()
@@ -560,15 +541,47 @@ class Taskflow(object):
         else:
             paddle.set_device(device + ":" + str(device_id))
 
-        # Update the task config to kwargs
-        config_kwargs = TASKS[self.task][tag][self.model]
-        kwargs['device_id'] = device_id
-        kwargs.update(config_kwargs)
-        self.kwargs = kwargs
-        task_class = TASKS[self.task][tag][self.model]['task_class']
-        self.task_instance = task_class(model=self.model,
+        # special treatment for text classification
+        if task in TASKS:
+            if self.task in ["word_segmentation", "ner"]:
+                tag = "modes"
+                ind_tag = "mode"
+                self.model = mode
+            else:
+                tag = "models"
+                ind_tag = "model"
+                self.model = model
+            
+            if self.model is not None:
+                assert self.model in set(TASKS[task][tag].keys(
+                )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
+            else:
+                self.model = TASKS[task]['default'][ind_tag]
+
+            if "task_priority_path" in TASKS[self.task][tag][self.model]:
+                self.priority_path = TASKS[self.task][tag][
+                    self.model]["task_priority_path"]
+            else:
+                self.priority_path = None
+
+            # Update the task config to kwargs
+            config_kwargs = TASKS[self.task][tag][self.model]
+            kwargs['device_id'] = device_id
+            kwargs.update(config_kwargs)
+            self.kwargs = kwargs
+            task_class = TASKS[self.task][tag][self.model]['task_class']
+            self.task_instance = task_class(model=self.model,
                                         task=self.task,
                                         priority_path=self.priority_path,
+                                        **self.kwargs)
+        # task is inference only task such as text classification taskflow
+        else:
+            self.model = model
+            self.kwargs = kwargs
+            self.kwargs['device_id'] = device_id
+            task_class = INFERENCE_ONLY_TASKS[self.task]['task_class']
+            self.task_instance = task_class(model=self.model,
+                                        task=self.task,
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
