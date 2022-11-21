@@ -16,6 +16,8 @@ import os
 import paddle
 import paddlenlp
 
+import distutils.util
+
 from ppdiffusers import UNet2DConditionModel, AutoencoderKL
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 from paddlenlp.transformers import CLIPTextModel
@@ -25,6 +27,10 @@ def parse_arguments():
     import argparse
     import ast
     parser = argparse.ArgumentParser()
+    parser.add_argument("--inpaint",
+                        type=distutils.util.strtobool,
+                        default=False,
+                        help="Wheter to export inpaint model")
     parser.add_argument("--pretrained_model_name_or_path",
                         default='CompVis/stable-diffusion-v1-4',
                         help="The pretrained diffusion model.")
@@ -102,10 +108,11 @@ if __name__ == "__main__":
     print(f"Save vae_encoder model in {save_path} successfully.")
 
     # Convert to static graph with specific input description
+    unet_channels = 9 if args.inpaint else 4
     unet = paddle.jit.to_static(
         unet,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, 4, None, None],
+            paddle.static.InputSpec(shape=[None, unet_channels, None, None],
                                     dtype="float32",
                                     name="sample"),  # sample
             paddle.static.InputSpec(shape=[1], dtype="int64",

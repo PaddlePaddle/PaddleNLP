@@ -377,7 +377,10 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         self.scheduler.set_timesteps(num_inference_steps)
 
         # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * self.scheduler.init_noise_sigma
+        init_noise_sigma = self.scheduler.init_noise_sigma.numpy(
+        ) if isinstance(self.scheduler.init_noise_sigma,
+                        paddle.Tensor) else self.scheduler.init_noise_sigma
+        latents = latents * init_noise_sigma
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -401,9 +404,10 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
             latent_model_input = latent_model_input.numpy()
 
             # predict the noise residual
-            noise_pred = self.unet(sample=latent_model_input,
-                                   timestep=np.array(t),
-                                   encoder_hidden_states=text_embeddings)[0]
+            noise_pred = self.unet(sample=latent_model_input.astype(np.float32),
+                                   timestep=np.array(t, dtype=np.int64),
+                                   encoder_hidden_states=text_embeddings.astype(
+                                       np.float32))[0]
 
             # perform guidance
             if do_classifier_free_guidance:
@@ -412,7 +416,10 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                     noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
+
+            latents = self.scheduler.step(paddle.to_tensor(noise_pred),
+                                          paddle.to_tensor(t),
+                                          paddle.to_tensor(latents),
                                           **extra_step_kwargs).prev_sample
             latents = latents.numpy()
 

@@ -17,12 +17,17 @@ import os
 
 from paddlenlp.transformers import CLIPTokenizer
 
-from ppdiffusers import FastDeployStableDiffusionPipeline, EulerAncestralDiscreteScheduler, PNDMScheduler, FastDeployRuntimeModel
+from ppdiffusers import FastDeployStableDiffusionInpaintPipeline, EulerAncestralDiscreteScheduler, PNDMScheduler, FastDeployRuntimeModel
 
 import fastdeploy as fd
 from fastdeploy import ModelFormat
 import numpy as np
 import distutils.util
+
+import PIL
+from PIL import Image
+import requests
+from io import BytesIO
 
 
 def parse_arguments():
@@ -41,7 +46,10 @@ def parse_arguments():
                         help="The file prefix of unet model.")
     parser.add_argument("--vae_decoder_model_prefix",
                         default='vae_decoder',
-                        help="The file prefix of vae model.")
+                        help="The file prefix of vae decoder model.")
+    parser.add_argument("--vae_encoder_model_prefix",
+                        default='vae_encoder',
+                        help="The file prefix of vae encoder model.")
     parser.add_argument("--text_encoder_model_prefix",
                         default='text_encoder',
                         help="The file prefix of text_encoder model.")
@@ -188,11 +196,19 @@ if __name__ == "__main__":
     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
 
     # 3. Set dynamic shape for trt backend
-    vae_dynamic_shape = {
-        "latent": {
+    vae_decoder_dynamic_shape = {
+        "latent_sample": {
             "min_shape": [1, 4, 64, 64],
             "max_shape": [2, 4, 64, 64],
             "opt_shape": [2, 4, 64, 64],
+        }
+    }
+
+    vae_encoder_dynamic_shape = {
+        "sample": {
+            "min_shape": [1, 3, 512, 512],
+            "max_shape": [2, 3, 512, 512],
+            "opt_shape": [2, 3, 512, 512],
         }
     }
 
@@ -225,6 +241,10 @@ if __name__ == "__main__":
                                                  args.vae_decoder_model_prefix,
                                                  args.model_format,
                                                  device_id=args.device_id)
+        vae_encoder_runtime = create_ort_runtime(args.model_dir,
+                                                 args.vae_encoder_model_prefix,
+                                                 args.model_format,
+                                                 device_id=args.device_id)
         start = time.time()
         unet_runtime = create_ort_runtime(args.model_dir,
                                           args.unet_model_prefix,
@@ -243,7 +263,14 @@ if __name__ == "__main__":
             args.model_dir,
             args.vae_decoder_model_prefix,
             use_trt,
-            vae_dynamic_shape,
+            vae_decoder_dynamic_shape,
+            use_fp16=args.use_fp16,
+            device_id=args.device_id)
+        vae_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.vae_encoder_model_prefix,
+            use_trt,
+            vae_encoder_dynamic_shape,
             use_fp16=args.use_fp16,
             device_id=args.device_id)
         start = time.time()
@@ -262,7 +289,14 @@ if __name__ == "__main__":
             args.vae_decoder_model_prefix,
             args.model_format,
             workspace=(1 << 30),
-            dynamic_shape=vae_dynamic_shape,
+            dynamic_shape=vae_decoder_dynamic_shape,
+            device_id=args.device_id)
+        vae_encoder_runtime = create_trt_runtime(
+            args.model_dir,
+            args.vae_encoder_model_prefix,
+            args.model_format,
+            workspace=(1 << 30),
+            dynamic_shape=vae_encoder_dynamic_shape,
             device_id=args.device_id)
         start = time.time()
         unet_runtime = create_trt_runtime(args.model_dir,
@@ -272,8 +306,8 @@ if __name__ == "__main__":
                                           device_id=args.device_id)
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
-    pipe = FastDeployStableDiffusionPipeline(
-        vae_encoder=None,
+    pipe = FastDeployStableDiffusionInpaintPipeline(
+        vae_encoder=FastDeployRuntimeModel(model=vae_encoder_runtime),
         vae_decoder=FastDeployRuntimeModel(model=vae_decoder_runtime),
         text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
         tokenizer=tokenizer,
@@ -282,23 +316,23 @@ if __name__ == "__main__":
         safety_checker=None,
         feature_extractor=None)
 
-    prompt = "a photo of an astronaut riding a horse on mars"
-    # Warm up
-    pipe(prompt, num_inference_steps=10)
+    # Download the init image
 
-    time_costs = []
-    print(
-        f"Run the stable diffusion pipeline {args.benchmark_steps} times to test the performance."
-    )
-    for step in range(args.benchmark_steps):
-        start = time.time()
-        images = pipe(prompt, num_inference_steps=args.inference_steps).images
-        latency = time.time() - start
-        time_costs += [latency]
-        print(f"No {step:3d} time cost: {latency:2f} s")
-    print(
-        f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
-        f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
-    )
-    images[0].save(args.image_path)
-    print(f"Image saved in {args.image_path}!")
+
+    def download_image(url):
+        response = requests.get(url)
+        return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+    img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+    mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
+
+    init_image = download_image(img_url).resize((512, 512))
+    mask_image = download_image(mask_url).resize((512, 512))
+
+    prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
+    images = pipe(prompt=prompt,
+                  image=init_image,
+                  mask_image=mask_image,
+                  num_inference_steps=args.inference_steps).images
+
+    images[0].save("cat_on_bench_new.png")
