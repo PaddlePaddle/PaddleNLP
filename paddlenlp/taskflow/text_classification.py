@@ -63,7 +63,9 @@ def softmax(x, axis=None):
 class TextClassificationTask(Task):
     """
     The text classfication model to classify text.
-    NOTE: This task is different from all other tasks that it has no out-of-box zero-shot capabilities. Instead, it's used as a simple inference pipeline.
+    NOTE: This task is different from all other tasks that it has no out-of-box zero-shot capabilities.
+    Instead, it's used as a simple inference pipeline.
+
     Args:
         task (string): The name of task.
         model (string): The local file path to the model path or a pre-trained model
