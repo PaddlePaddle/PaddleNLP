@@ -22,6 +22,7 @@ from .utils import (
     is_paddle_available,
     is_paddlenlp_available,
     is_unidecode_available,
+    is_fastdeploy_available,
 )
 from .version import VERSION
 
@@ -29,6 +30,7 @@ __version__ = VERSION
 
 from .configuration_utils import ConfigMixin
 from .onnx_utils import OnnxRuntimeModel
+from .fastdeploy_utils import FastDeployRuntimeModel
 from .utils import logging
 
 if is_paddle_available():

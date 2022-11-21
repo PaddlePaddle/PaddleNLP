@@ -17,14 +17,12 @@ import os
 
 from paddlenlp.transformers import CLIPTokenizer
 
-from ppdiffusers import FastDeployStableDiffusionPipeline, EulerAncestralDiscreteScheduler, PNDMScheduler
+from ppdiffusers import FastDeployStableDiffusionPipeline, EulerAncestralDiscreteScheduler, PNDMScheduler, FastDeployRuntimeModel
 
 import fastdeploy as fd
 from fastdeploy import ModelFormat
 import numpy as np
 import distutils.util
-
-from predictor import *
 
 
 def parse_arguments():
@@ -274,12 +272,12 @@ if __name__ == "__main__":
                                           device_id=args.device_id)
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
-    pipe = OnnxStableDiffusionPipeline(
+    pipe = FastDeployStableDiffusionPipeline(
         vae_encoder=None,
-        vae_decoder=VAEDecoderPredictor(vae_decoder_runtime),
-        text_encoder=TextEncoderPredictor(text_encoder_runtime),
+        vae_decoder=FastDeployRuntimeModel(model=vae_decoder_runtime),
+        text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
         tokenizer=tokenizer,
-        unet=UNETPredictor(unet_runtime),
+        unet=FastDeployRuntimeModel(model=unet_runtime),
         scheduler=scheduler,
         safety_checker=None,
         feature_extractor=None)
@@ -294,7 +292,7 @@ if __name__ == "__main__":
     )
     for step in range(args.benchmark_steps):
         start = time.time()
-        image = pipe(prompt, num_inference_steps=args.inference_steps)[0]
+        images = pipe(prompt, num_inference_steps=args.inference_steps).images
         latency = time.time() - start
         time_costs += [latency]
         print(f"No {step:3d} time cost: {latency:2f} s")
@@ -302,5 +300,5 @@ if __name__ == "__main__":
         f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
         f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
     )
-    image.save(args.image_path)
+    images[0].save(args.image_path)
     print(f"Image saved in {args.image_path}!")

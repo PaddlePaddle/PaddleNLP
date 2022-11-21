@@ -80,7 +80,7 @@ if __name__ == "__main__":
         input_spec=[
             paddle.static.InputSpec(shape=[None, 4, 64, 64],
                                     dtype="float32",
-                                    name="latent"),  # latent
+                                    name="latent_sample"),  # latent_sample
         ])
     # Save vae_decoder in static graph model.
     save_path = os.path.join(args.output_path, "vae_decoder", "inference")
@@ -107,13 +107,13 @@ if __name__ == "__main__":
         input_spec=[
             paddle.static.InputSpec(shape=[None, 4, None, None],
                                     dtype="float32",
-                                    name="latent_input"),  # latent
+                                    name="sample"),  # sample
             paddle.static.InputSpec(shape=[1], dtype="int64",
                                     name="timestep"),  # timesteps
             paddle.static.InputSpec(
                 shape=[None, None, 768],
                 dtype="float32",
-                name="encoder_embedding")  # encoder_embedding
+                name="encoder_hidden_states")  # encoder_hidden_states
         ])
     save_path = os.path.join(args.output_path, "unet", "inference")
     paddle.jit.save(unet, save_path)

@@ -373,7 +373,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
 
             # predict the noise residual
             noise_pred = self.unet(sample=latent_model_input,
-                                   timestep=np.array([t]),
+                                   timestep=np.array(t),
                                    encoder_hidden_states=text_embeddings)[0]
 
             # perform guidance

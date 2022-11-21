@@ -27,7 +27,7 @@ else:
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
-from ...onnx_utils import OnnxRuntimeModel
+from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import deprecate, logging
@@ -60,7 +60,7 @@ def prepare_mask_and_masked_image(image, mask, latents_shape):
     return mask, masked_image
 
 
-class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
+class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
     r"""
     Pipeline for text-guided image inpainting using Stable Diffusion. *This is an experimental feature*.
 
@@ -87,29 +87,29 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    vae_encoder: OnnxRuntimeModel
-    vae_decoder: OnnxRuntimeModel
-    text_encoder: OnnxRuntimeModel
+    vae_encoder: FastDeployRuntimeModel
+    vae_decoder: FastDeployRuntimeModel
+    text_encoder: FastDeployRuntimeModel
     tokenizer: CLIPTokenizer
-    unet: OnnxRuntimeModel
+    unet: FastDeployRuntimeModel
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
-    safety_checker: OnnxRuntimeModel
+    safety_checker: FastDeployRuntimeModel
     feature_extractor: CLIPFeatureExtractor
 
     def __init__(
         self,
-        vae_encoder: OnnxRuntimeModel,
-        vae_decoder: OnnxRuntimeModel,
-        text_encoder: OnnxRuntimeModel,
+        vae_encoder: FastDeployRuntimeModel,
+        vae_decoder: FastDeployRuntimeModel,
+        text_encoder: FastDeployRuntimeModel,
         tokenizer: CLIPTokenizer,
-        unet: OnnxRuntimeModel,
+        unet: FastDeployRuntimeModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
-        safety_checker: OnnxRuntimeModel,
+        safety_checker: FastDeployRuntimeModel,
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
         logger.info(
-            "`OnnxStableDiffusionInpaintPipeline` is experimental and will very likely change in the future."
+            "`FastDeployStableDiffusionInpaintPipeline` is experimental and will very likely change in the future."
         )
 
         if hasattr(scheduler.config,
@@ -402,7 +402,7 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
 
             # predict the noise residual
             noise_pred = self.unet(sample=latent_model_input,
-                                   timestep=np.array([t]),
+                                   timestep=np.array(t),
                                    encoder_hidden_states=text_embeddings)[0]
 
             # perform guidance

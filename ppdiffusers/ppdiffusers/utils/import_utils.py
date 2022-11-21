@@ -107,12 +107,20 @@ except importlib_metadata.PackageNotFoundError:
     _scipy_available = False
 
 _fastdeploy_available = importlib.util.find_spec("fastdeploy") is not None
-try:
-    _fastdeploy_version = importlib_metadata.version("fastdeploy")
-    logger.debug(
-        f"Successfully imported fastdeploy version {_fastdeploy_version}")
-except importlib_metadata.PackageNotFoundError:
-    _fastdeploy_available = False
+if _fastdeploy_available:
+    candidates = ("fastdeploy_gpu_python", "fastdeploy_python")
+    _fastdeploy_version = None
+    # For the metadata, we have to look for both fastdeploy_python and fastdeploy_gpu_python
+    for pkg in candidates:
+        try:
+            _fastdeploy_version = importlib_metadata.version(pkg)
+            break
+        except importlib_metadata.PackageNotFoundError:
+            pass
+    _fastdeploy_available = _fastdeploy_version is not None
+    if _fastdeploy_available:
+        logger.debug(
+            f"Successfully imported fastdeploy version {_fastdeploy_version}")
 
 
 def is_paddle_available():

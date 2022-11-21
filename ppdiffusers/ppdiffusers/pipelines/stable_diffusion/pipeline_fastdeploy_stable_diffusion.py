@@ -120,7 +120,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}")
             text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
         text_embeddings = self.text_encoder(
-            input_ids=text_input_ids.astype(np.int32))[0]
+            input_ids=text_input_ids.astype(np.int64))[0]
         text_embeddings = np.repeat(text_embeddings,
                                     num_images_per_prompt,
                                     axis=0)
@@ -157,7 +157,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 return_tensors="np",
             )
             uncond_embeddings = self.text_encoder(
-                input_ids=uncond_input.input_ids.astype(np.int32))[0]
+                input_ids=uncond_input.input_ids.astype(np.int64))[0]
             uncond_embeddings = np.repeat(uncond_embeddings,
                                           num_images_per_prompt,
                                           axis=0)
@@ -200,11 +200,11 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 [latents] * 2) if do_classifier_free_guidance else latents
             latent_model_input = self.scheduler.scale_model_input(
                 latent_model_input, t)
-
             # predict the noise residual
-            noise_pred = self.unet(sample=latent_model_input,
-                                   timestep=np.array([t]),
-                                   encoder_hidden_states=text_embeddings)
+            noise_pred = self.unet(sample=latent_model_input.astype(np.float32),
+                                   timestep=np.array(t, dtype=np.int64),
+                                   encoder_hidden_states=text_embeddings.astype(
+                                       np.float32))
             noise_pred = noise_pred[0]
 
             # perform guidance
