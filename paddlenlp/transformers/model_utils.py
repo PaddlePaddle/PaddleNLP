@@ -879,7 +879,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 # copy the weight file
                 shutil.copyfile(weight_file_path, new_weight_file_path)
 
-                # Raise by QA(junjun): it's strange that `shutil.copyfile` will remove `weight_file_path` file.
+                # Raised by QA(junjun): it's strange that `shutil.copyfile` will remove `weight_file_path` file.
                 # so do checking before removin it,
                 if os.path.exist(weight_file_path):
                     os.remove(weight_file_path)
