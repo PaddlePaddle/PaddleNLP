@@ -25,10 +25,9 @@ from paddlenlp.transformers import (ErnieMPretrainedModel, ErnieMModel,
                                     ErnieMForTokenClassification,
                                     ErnieMForQuestionAnswering,
                                     ErnieMForMultipleChoice)
-from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
-                                                     random_attention_mask,
-                                                     ModelTesterMixin)
-from tests.testing_utils import slow
+from ..test_modeling_common import (ids_tensor, floats_tensor,
+                                    random_attention_mask, ModelTesterMixin)
+from ...testing_utils import slow
 
 
 @dataclass
@@ -267,6 +266,56 @@ class ErnieMModelTester:
         self.parent.assertEqual(
             result[0].shape, [self.config.batch_size, self.config.num_choices])
 
+    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
+                                     input_mask, sequence_labels, token_labels,
+                                     choice_labels):
+        model = ErnieMModel(**config)
+        model.eval()
+
+        input_ids = ids_tensor((self.batch_size, self.seq_length),
+                               self.vocab_size)
+
+        # create tensors for past_key_values of shape [batch_size, num_heads, seq_length, head_size]
+        embed_size_per_head = self.hidden_size // self.num_attention_heads
+        key_tensor = floats_tensor((self.batch_size, self.num_attention_heads,
+                                    self.seq_length, embed_size_per_head))
+        values_tensor = floats_tensor(
+            (self.batch_size, self.num_attention_heads, self.seq_length,
+             embed_size_per_head))
+        past_key_values = ((
+            key_tensor,
+            values_tensor,
+        ), ) * self.num_hidden_layers
+
+        # create fully-visible attention mask for input_ids only and input_ids + past
+        attention_mask = paddle.ones([self.batch_size, self.seq_length])
+        attention_mask_with_past = paddle.ones(
+            [self.batch_size, self.seq_length * 2])
+
+        outputs_with_cache = model(input_ids,
+                                   attention_mask=attention_mask_with_past,
+                                   past_key_values=past_key_values,
+                                   return_dict=self.parent.return_dict)
+        outputs_without_cache = model(input_ids,
+                                      attention_mask=attention_mask,
+                                      return_dict=self.parent.return_dict)
+
+        # last_hidden_state should have the same shape but different values when given past_key_values
+        if self.parent.return_dict:
+            self.parent.assertEqual(
+                outputs_with_cache.last_hidden_state.shape,
+                outputs_without_cache.last_hidden_state.shape)
+            self.parent.assertFalse(
+                paddle.allclose(outputs_with_cache.last_hidden_state,
+                                outputs_without_cache.last_hidden_state))
+        else:
+            outputs_with_cache, _ = outputs_with_cache
+            outputs_without_cache, _ = outputs_without_cache
+            self.parent.assertEqual(outputs_with_cache.shape,
+                                    outputs_without_cache.shape)
+            self.parent.assertFalse(
+                paddle.allclose(outputs_with_cache, outputs_without_cache))
+
     def get_config(self) -> dict:
         """get the base model kwargs
 
@@ -324,6 +373,10 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_multiple_choice(
             *config_and_inputs)
 
+    def test_for_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_cache(*config_and_inputs)
+
     @slow
     def test_model_from_pretrained(self):
         for model_name in list(
@@ -350,7 +403,7 @@ class ErnieMModelIntegrationTest(unittest.TestCase):
               [-0.10798159, 0.02311476, -0.17285497],
               [0.05675533, 0.01330730, -0.06826267]]])
         self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
@@ -370,6 +423,44 @@ class ErnieMModelIntegrationTest(unittest.TestCase):
               [0.05675533, 0.01330730, -0.06826267]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_past_key_value(self):
+        model = ErnieMModel.from_pretrained("ernie-m-base")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output[0].shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [[[-0.02920425, -0.00768885, -0.10219190],
+              [-0.10798159, 0.02311476, -0.17285497],
+              [0.05675533, 0.01330730, -0.06826267]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        expected_slice = paddle.to_tensor(
+            [[[0.05163988, -0.07475190, 0.06332156],
+              [0.03051429, -0.01377687, -0.12024689],
+              [0.03379946, 0.00674286, 0.08079184]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

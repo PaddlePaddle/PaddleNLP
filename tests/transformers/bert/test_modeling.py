@@ -13,28 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+
 import os
 import tempfile
+import unittest
 from typing import List
 
-import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import BertModel, BertForQuestionAnswering, BertForSequenceClassification,\
-    BertForTokenClassification, BertForPretraining, BertForMultipleChoice, BertForMaskedLM, BertPretrainedModel
-from paddlenlp.transformers import (AutoModel, AutoModelForTokenClassification,
-                                    AutoModelForQuestionAnswering)
 from paddlenlp import __version__ as current_version
-
+from paddlenlp.transformers import (
+    AutoModel, AutoModelForQuestionAnswering, AutoModelForTokenClassification,
+    BertForMaskedLM, BertForMultipleChoice, BertForPretraining,
+    BertForQuestionAnswering, BertForSequenceClassification,
+    BertForTokenClassification, BertModel, BertPretrainedModel)
 from paddlenlp.transformers.bert.configuration import BertConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils import install_package, uninstall_package
 
-from ..test_modeling_common import ids_tensor, random_attention_mask, ModelTesterMixin, ModelTesterPretrainedMixin
 from ...testing_utils import slow
-
 from ..test_configuration_common import ConfigTester
+from ..test_modeling_common import (ModelTesterMixin,
+                                    ModelTesterPretrainedMixin, ids_tensor,
+                                    random_attention_mask)
 
 
 class BertModelTester:
@@ -503,7 +505,8 @@ class BertCompatibilityTest(unittest.TestCase):
 
         from paddlenlp import __version__
         self.assertEqual(__version__, version)
-        from paddlenlp.transformers import BertForTokenClassification, BertModel
+        from paddlenlp.transformers import (BertForTokenClassification,
+                                            BertModel)
         tempdir = self.get_tempdir()
 
         # prepare the old version of model
@@ -520,7 +523,8 @@ class BertCompatibilityTest(unittest.TestCase):
         from paddlenlp import __version__
         self.assertEqual(__version__, current_version)
 
-        from paddlenlp.transformers import BertForTokenClassification, BertModel
+        from paddlenlp.transformers import (BertForTokenClassification,
+                                            BertModel)
 
         # bert: from old bert
         model = BertModel.from_pretrained(old_model_path)
@@ -573,7 +577,8 @@ class BertCompatibilityTest(unittest.TestCase):
     @slow
     def test_bert_save_token_load(self):
         """bert -> token"""
-        from paddlenlp.transformers import BertModel, BertForTokenClassification
+        from paddlenlp.transformers import (BertForTokenClassification,
+                                            BertModel)
         saved_dir = os.path.join(self.get_tempdir(), 'bert-saved')
         bert: BertModel = BertModel.from_pretrained("bert-base-uncased")
         bert.save_pretrained(saved_dir)
@@ -594,7 +599,8 @@ class BertCompatibilityTest(unittest.TestCase):
     @slow
     def test_token_saved_bert_load(self):
         """token -> bert"""
-        from paddlenlp.transformers import BertModel, BertForTokenClassification
+        from paddlenlp.transformers import (BertForTokenClassification,
+                                            BertModel)
         saved_dir = os.path.join(self.get_tempdir(), 'bert-token-saved')
         bert_for_token = BertForTokenClassification.from_pretrained(
             "bert-base-uncased")
@@ -630,6 +636,8 @@ class BertCompatibilityTest(unittest.TestCase):
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = BertModel
+    hf_remote_test_model_path = "PaddlePaddle/ci-test-bert-model"
+    paddlehub_remote_test_model_path = "__internal_testing__/bert"
 
     @slow
     def test_inference_no_attention(self):
