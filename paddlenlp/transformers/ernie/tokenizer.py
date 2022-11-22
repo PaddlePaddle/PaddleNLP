@@ -70,6 +70,12 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "rocketqav2-en-marco-cross-encoder": 512,
     "rocketqav2-en-marco-query-encoder": 512,
     "rocketqav2-en-marco-para-encoder": 512,
+    "uie-base": 512,
+    "uie-medium": 512,
+    "uie-mini": 512,
+    "uie-micro": 512,
+    "uie-nano": 512,
+    "uie-base-en": 512,
 }
 
 

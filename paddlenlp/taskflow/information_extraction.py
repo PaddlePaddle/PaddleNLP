@@ -351,8 +351,8 @@ class UIETask(Task):
         },
         "uie-x-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v0.1/model_state.pdparams",
-                "0e06dd6f9598578b16917c246c77ebc1"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v1.0/model_state.pdparams",
+                "5504ebfd6da288c8d92cccdace3a93b0"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
@@ -386,7 +386,7 @@ class UIETask(Task):
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
-        self.use_faster = kwargs.get("use_faster", False)
+        self.use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
         self._expand_to_a4_size = kwargs.get("expand_to_a4_size", True)
@@ -551,11 +551,11 @@ class UIETask(Task):
             max(prompts)) - self._summary_token_num
 
         if self._init_class in ["UIEX"]:
-            boxes_list = [d["boxes"] for d in inputs]
-            short_input_texts, short_boxes_list, input_mapping = self._auto_splitter(
+            bbox_list = [d["bbox"] for d in inputs]
+            short_input_texts, short_bbox_list, input_mapping = self._auto_splitter(
                 input_texts,
                 max_predict_len,
-                boxes_list=boxes_list,
+                bbox_list=bbox_list,
                 split_sentence=self._split_sentence)
         else:
             short_input_texts, input_mapping = self._auto_splitter(
@@ -573,7 +573,7 @@ class UIETask(Task):
             short_inputs = [{
                 "text": short_input_texts[i],
                 "prompt": short_texts_prompts[i],
-                "boxes": short_boxes_list[i],
+                "bbox": short_bbox_list[i],
                 "image": image_list[i]
             } for i in range(len(short_input_texts))]
         else:
@@ -678,7 +678,7 @@ class UIETask(Task):
             for example in inputs:
                 content = example["text"]
                 prompt = example["prompt"]
-                bbox_lines = example.get("boxes", None)
+                bbox_lines = example.get("bbox", None)
                 image_buff_string = example.get("image", None)
 
                 # Text
@@ -961,26 +961,26 @@ class UIETask(Task):
             if isinstance(d, dict):
                 if 'doc' in d.keys():
                     text = ''
-                    boxes = []
+                    bbox = []
                     for segment in d['layout']:
                         box = self._doc_parser._normalize_box(
                             segment[0], [d['img_w'], d['img_h']], [1000, 1000],
                             d['offset_x'], d['offset_y'])
                         text += segment[1]
-                        boxes.extend([box] * len(segment[1]))
+                        bbox.extend([box] * len(segment[1]))
                     _inputs.append({
                         "text": text,
-                        "boxes": boxes,
+                        "bbox": bbox,
                         "image": d['image']
                     })
                 else:
                     _inputs.append({
                         "text": d['text'],
-                        "boxes": None,
+                        "bbox": None,
                         "image": None
                     })
             else:
-                _inputs.append({"text": d, "boxes": None, "image": None})
+                _inputs.append({"text": d, "bbox": None, "image": None})
         return _inputs
 
     def _multi_stage_predict(self, data):
@@ -1011,7 +1011,7 @@ class UIETask(Task):
                 for one_data in data:
                     examples.append({
                         "text": one_data["text"],
-                        "boxes": one_data["boxes"],
+                        "bbox": one_data["bbox"],
                         "image": one_data["image"],
                         "prompt": dbc2sbc(node.name)
                     })
@@ -1038,7 +1038,7 @@ class UIETask(Task):
                                 prompt = p + node.name
                             examples.append({
                                 "text": one_data["text"],
-                                "boxes": one_data["boxes"],
+                                "bbox": one_data["bbox"],
                                 "image": one_data["image"],
                                 "prompt": dbc2sbc(prompt)
                             })

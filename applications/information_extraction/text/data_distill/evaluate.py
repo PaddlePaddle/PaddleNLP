@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--model_path", type=str, default=None, help="The path of saved model that you want to load.")
     parser.add_argument("--test_path", type=str, default=None, help="The path of test set.")
-    parser.add_argument("--encoder", default="ernie-3.0-base-zh", type=str, help="Select the pretrained encoder model for GP.")
+    parser.add_argument("--encoder", default="ernie-3.0-mini-zh", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--label_maps_path", default="./ner_data/label_maps.json", type=str, help="The file path of the labels dictionary.")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=128, help="The maximum total input sequence length after tokenization.")

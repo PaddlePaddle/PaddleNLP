@@ -146,16 +146,15 @@ class Convertor(object):
         img_w, img_h = parsed_doc['img_w'], parsed_doc['img_h']
 
         text = ''
-        boxes = []
+        bbox = []
         for segment in parsed_doc['layout']:
             box = doc_parser._normalize_box(segment[0], [img_w, img_h],
                                             [1000, 1000])
             text += segment[1]
-            boxes.extend([box] * len(segment[1]))
-        assert len(text) == len(
-            boxes), "len of text is not equal to len of boxes"
+            bbox.extend([box] * len(segment[1]))
+        assert len(text) == len(bbox), "len of text is not equal to len of bbox"
         items['text'] = text
-        items['boxes'] = boxes
+        items['bbox'] = bbox
         items['image'] = parsed_doc['image']
 
         if task_type == "ext":
@@ -217,19 +216,19 @@ class Convertor(object):
             for line in raw_examples:
                 if self.anno_type == "text":
                     items = self.process_text_tag(line, task_type="cls")
-                    image, boxes = None, None
+                    image, bbox = None, None
                 elif self.anno_type == "image":
                     items = self.process_image_tag(line, task_type="cls")
                     if items is None:
                         continue
-                    image, boxes = items['image'], items['boxes']
+                    image, bbox = items['image'], items['bbox']
                 else:
                     raise ValueError(
                         "The type of annotation should be text or image")
                 text, labels = items["text"], items["label"]
                 example = self.generate_cls_example(text, labels,
                                                     self.prompt_prefix,
-                                                    self.options, image, boxes)
+                                                    self.options, image, bbox)
                 examples.append(example)
         return examples
 
@@ -272,9 +271,9 @@ class Convertor(object):
         predicate_list = []
 
         if self.anno_type == "text":
-            images, boxes_list = None, None
+            images, bbox_list = None, None
         else:
-            images, boxes_list = [], []
+            images, bbox_list = [], []
 
         logger.info(f"Converting annotation data...")
         with tqdm(total=len(raw_examples)) as pbar:
@@ -282,14 +281,14 @@ class Convertor(object):
 
                 if self.anno_type == "text":
                     items = self.process_text_tag(line, task_type="ext")
-                    image, boxes = None, None
+                    image, bbox = None, None
                 elif self.anno_type == "image":
                     items = self.process_image_tag(line, task_type="ext")
                     if items is None:
                         continue
-                    image, boxes = items['image'], items['boxes']
+                    image, bbox = items['image'], items['bbox']
                     images.append(image)
-                    boxes_list.append(boxes)
+                    bbox_list.append(bbox)
                 else:
                     raise ValueError(
                         "The type of annotation should be text or image")
@@ -326,7 +325,7 @@ class Convertor(object):
                     if entity_cls_label is not None:
                         entity_cls_example = self.generate_cls_example(
                             text, entity_cls_label, entity_cls_prompt_prefix,
-                            self.options, image, boxes)
+                            self.options, image, bbox)
 
                         entity_cls_examples.append(entity_cls_example)
 
@@ -343,7 +342,7 @@ class Convertor(object):
                         }
                         if self.anno_type == "image":
                             entity_example_map[entity_label]['image'] = image
-                            entity_example_map[entity_label]['boxes'] = boxes
+                            entity_example_map[entity_label]['bbox'] = bbox
                     else:
                         entity_example_map[entity_label]["result_list"].append(
                             result)
@@ -402,7 +401,7 @@ class Convertor(object):
                         }
                         if self.anno_type == "image":
                             relation_example_map[prompt]['image'] = image
-                            relation_example_map[prompt]['boxes'] = boxes
+                            relation_example_map[prompt]['bbox'] = bbox
                     else:
                         relation_example_map[prompt]["result_list"].append(
                             result)
@@ -424,7 +423,7 @@ class Convertor(object):
         logger.info(f"Adding negative samples for first stage prompt...")
         positive_examples, negative_examples = self.add_entity_negative_example(
             entity_examples, texts, entity_prompt_list, entity_label_set,
-            images, boxes_list)
+            images, bbox_list)
         if len(positive_examples) == 0:
             all_entity_examples = []
         else:
@@ -508,7 +507,7 @@ class Convertor(object):
                             else:
                                 added, rest = self.add_relation_negative_example(
                                     redundants, texts[i], num_positive,
-                                    per_n_ratio, images[i], boxes_list[i])
+                                    per_n_ratio, images[i], bbox_list[i])
                             negative_example.extend(added)
                             collects.extend(rest)
 
@@ -543,7 +542,7 @@ class Convertor(object):
                              prompt_prefix,
                              options,
                              image=None,
-                             boxes=None):
+                             bbox=None):
         random.shuffle(self.options)
         cls_options = ",".join(self.options)
         prompt = prompt_prefix + "[" + cls_options + "]"
@@ -554,9 +553,9 @@ class Convertor(object):
             "result_list": result_list,
             "prompt": prompt
         }
-        if image and boxes:
+        if image and bbox:
             example['image'] = image
-            example['boxes'] = boxes
+            example['bbox'] = bbox
         for label in labels:
             start = prompt.rfind(label) - len(prompt) - 1
             end = start + len(label)
@@ -571,7 +570,7 @@ class Convertor(object):
                                   predicate_set,
                                   subject_golden_list,
                                   images=None,
-                                  boxes_list=None):
+                                  bbox_list=None):
         with tqdm(total=len(relation_prompt_list)) as pbar:
             for i, relation_prompt in enumerate(relation_prompt_list):
                 negative_sample = []
@@ -590,9 +589,9 @@ class Convertor(object):
                                 "result_list": [],
                                 "prompt": prompt
                             }
-                            if images and boxes_list:
+                            if images and bbox_list:
                                 negative_result['image'] = images[i]
-                                negative_result['boxes'] = boxes_list[i]
+                                negative_result['bbox'] = bbox_list[i]
                             negative_sample.append(negative_result)
                 examples[i].extend(negative_sample)
                 pbar.update(1)
@@ -604,7 +603,7 @@ class Convertor(object):
                                     prompts,
                                     label_set,
                                     images=None,
-                                    boxes_list=None):
+                                    bbox_list=None):
         negative_examples = []
         positive_examples = []
         with tqdm(total=len(prompts)) as pbar:
@@ -631,9 +630,9 @@ class Convertor(object):
                         "result_list": [],
                         "prompt": redundants[idx]
                     }
-                    if images and boxes_list:
+                    if images and bbox_list:
                         negative_result['image'] = images[i]
-                        negative_result['boxes'] = boxes_list[i]
+                        negative_result['bbox'] = bbox_list[i]
                     negative_examples.append(negative_result)
                 positive_examples.extend(examples[i])
                 pbar.update(1)
@@ -645,7 +644,7 @@ class Convertor(object):
                                       num_positive,
                                       ratio,
                                       image=None,
-                                      boxes=None):
+                                      bbox=None):
         added_example = []
         rest_example = []
 
@@ -670,9 +669,9 @@ class Convertor(object):
                 "result_list": [],
                 "prompt": redundants[idx]
             }
-            if image and boxes:
+            if image and bbox:
                 negative_result['image'] = image
-                negative_result['boxes'] = boxes
+                negative_result['bbox'] = bbox
             added_example.append(negative_result)
 
         for rest_idx in rest_idxs:
@@ -681,9 +680,9 @@ class Convertor(object):
                 "result_list": [],
                 "prompt": redundants[rest_idx]
             }
-            if image and boxes:
+            if image and bbox:
                 negative_result['image'] = image
-                negative_result['boxes'] = boxes
+                negative_result['bbox'] = bbox
             rest_example.append(negative_result)
 
         return added_example, rest_example

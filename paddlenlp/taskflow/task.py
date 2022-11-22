@@ -321,16 +321,16 @@ class Task(metaclass=abc.ABCMeta):
     def _auto_splitter(self,
                        input_texts,
                        max_text_len,
-                       boxes_list=None,
+                       bbox_list=None,
                        split_sentence=False):
         '''
         Split the raw texts automatically for model inference.
         Args:
             input_texts (List[str]): input raw texts.
             max_text_len (int): cutting length.
-            boxes_list (List[float, float,float, float]): bbox for document input. 
+            bbox_list (List[float, float,float, float]): bbox for document input. 
             split_sentence (bool): If True, sentence-level split will be performed. 
-                `split_sentence` will be set to False if boxes_list is not None since sentence-level split is not support for document.
+                `split_sentence` will be set to False if bbox_list is not None since sentence-level split is not support for document.
         return:
             short_input_texts (List[str]): the short input texts for model inference.
             input_mapping (dict): mapping between raw text and short input texts.
@@ -340,12 +340,12 @@ class Task(metaclass=abc.ABCMeta):
         cnt_org = 0
         cnt_short = 0
         with_bbox = False
-        if boxes_list:
+        if bbox_list:
             with_bbox = True
-            short_boxes_list = []
+            short_bbox_list = []
             if split_sentence:
                 logger.warning(
-                    "`split_sentence` will be set to False if boxes_list is not None since sentence-level split is not support for document."
+                    "`split_sentence` will be set to False if bbox_list is not None since sentence-level split is not support for document."
                 )
                 split_sentence = False
 
@@ -359,7 +359,7 @@ class Task(metaclass=abc.ABCMeta):
                 if lens <= max_text_len:
                     short_input_texts.append(sen)
                     if with_bbox:
-                        short_boxes_list.append(boxes_list[idx])
+                        short_bbox_list.append(bbox_list[idx])
                     input_mapping.setdefault(cnt_org, []).append(cnt_short)
                     cnt_short += 1
                 else:
@@ -369,11 +369,11 @@ class Task(metaclass=abc.ABCMeta):
                     ]
                     short_input_texts.extend(temp_text_list)
                     if with_bbox:
-                        temp_boxes_list = [
-                            boxes_list[idx][i:i + max_text_len]
+                        temp_bbox_list = [
+                            bbox_list[idx][i:i + max_text_len]
                             for i in range(0, lens, max_text_len)
                         ]
-                        short_boxes_list.extend(temp_boxes_list)
+                        short_bbox_list.extend(temp_bbox_list)
                     short_idx = cnt_short
                     cnt_short += math.ceil(lens / max_text_len)
                     temp_text_id = [
@@ -382,7 +382,7 @@ class Task(metaclass=abc.ABCMeta):
                     input_mapping.setdefault(cnt_org, []).extend(temp_text_id)
             cnt_org += 1
         if with_bbox:
-            return short_input_texts, short_boxes_list, input_mapping
+            return short_input_texts, short_bbox_list, input_mapping
         else:
             return short_input_texts, input_mapping
 

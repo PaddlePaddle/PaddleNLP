@@ -66,8 +66,8 @@ rm military.tar.gz
 python ../label_studio.py \
     --label_studio_file ./data/label_studio.json \
     --save_dir ./data \
-    --splits 0.2 0.8 0 \
-    --nrgative_ratio 3 \
+    --splits 0.76 0.24 0 \
+    --negative_ratio 3 \
     --task_type ext
 ```
 
@@ -213,18 +213,18 @@ python evaluate.py \
 输出打印示例：
 
 ```text
-[2022-11-21 09:36:52,545] [    INFO] - -----------------------------
-[2022-11-21 09:36:52,546] [    INFO] - Class Name: 武器名称
-[2022-11-21 09:36:52,546] [    INFO] - Evaluation Precision: 0.82051 | Recall: 0.80000 | F1: 0.81013
-[2022-11-21 09:36:52,668] [    INFO] - -----------------------------
-[2022-11-21 09:36:52,668] [    INFO] - Class Name: X的研发单位
-[2022-11-21 09:36:52,668] [    INFO] - Evaluation Precision: 0.60000 | Recall: 0.50000 | F1: 0.54545
-[2022-11-21 09:36:58,916] [    INFO] - -----------------------------
-[2022-11-21 09:36:58,916] [    INFO] - Class Name: X的产国
-[2022-11-21 09:36:58,916] [    INFO] - Evaluation Precision: 0.96257 | Recall: 0.98361 | F1: 0.97297
-[2022-11-21 09:36:59,391] [    INFO] - -----------------------------
-[2022-11-21 09:36:59,391] [    INFO] - Class Name: X的类型
-[2022-11-21 09:36:59,391] [    INFO] - Evaluation Precision: 0.78947 | Recall: 0.53571 | F1: 0.63830
+[2022-11-21 12:48:41,794] [    INFO] - -----------------------------
+[2022-11-21 12:48:41,795] [    INFO] - Class Name: 武器名称
+[2022-11-21 12:48:41,795] [    INFO] - Evaluation Precision: 0.96667 | Recall: 0.96667 | F1: 0.96667
+[2022-11-21 12:48:44,093] [    INFO] - -----------------------------
+[2022-11-21 12:48:44,094] [    INFO] - Class Name: X的产国
+[2022-11-21 12:48:44,094] [    INFO] - Evaluation Precision: 1.00000 | Recall: 0.99275 | F1: 0.99636
+[2022-11-21 12:48:46,474] [    INFO] - -----------------------------
+[2022-11-21 12:48:46,475] [    INFO] - Class Name: X的研发单位
+[2022-11-21 12:48:46,475] [    INFO] - Evaluation Precision: 0.77519 | Recall: 0.64935 | F1: 0.70671
+[2022-11-21 12:48:48,800] [    INFO] - -----------------------------
+[2022-11-21 12:48:48,801] [    INFO] - Class Name: X的类型
+[2022-11-21 12:48:48,801] [    INFO] - Evaluation Precision: 1.00000 | Recall: 1.00000 | F1: 1.00000
 ```
 
 可配置参数说明：
@@ -252,17 +252,17 @@ python evaluate.py \
 >>> my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best')
 >>> pprint(my_ie("威尔哥（Virgo）减速炸弹是由瑞典FFV军械公司专门为瑞典皇家空军的攻击机实施低空高速轰炸而研制，1956年开始研制，1963年进入服役，装备于A32“矛盾”、A35“龙”、和AJ134“雷”攻击机，主要用于攻击登陆艇、停放的飞机、高炮、野战火炮、轻型防护装甲车辆以及有生力量。"))
 [{'武器名称': [{'end': 14,
-            'probability': 0.9575406187053304,
+            'probability': 0.9998632702221926,
             'relations': {'产国': [{'end': 18,
-                                  'probability': 0.9985741073293752,
+                                  'probability': 0.9998815094394331,
                                   'start': 16,
                                   'text': '瑞典'}],
                           '研发单位': [{'end': 25,
-                                    'probability': 0.9634632182946916,
-                                    'start': 16,
-                                    'text': '瑞典FFV军械公司'}],
+                                    'probability': 0.9995875123178521,
+                                    'start': 18,
+                                    'text': 'FFV军械公司'}],
                           '类型': [{'end': 14,
-                                  'probability': 0.5830895501723887,
+                                  'probability': 0.999877336059086,
                                   'start': 12,
                                   'text': '炸弹'}]},
             'start': 0,
@@ -277,8 +277,11 @@ python evaluate.py \
 
   |  |  Precision  | Recall | F1 Score |
   | :---: | :--------: | :--------: | :--------: |
-  | uie-base (0-shot) | 0.45055| 0.68333 | 0.54305 |
-  | uie-base (finetuned) | 0.52525 | 0.86667 | 0.65409 |
+  | 0-shot | 0.64634| 0.53535 | 0.58564 |
+  | 5-shot | 0.89474 | 0.85000 | 0.87179 |
+  | 10-shot | 0.92793 | 0.85833 | 0.89177 |
+  | full-set | 0.93103 | 0.90000 | 0.91525 |
+
 
 <a name="封闭域蒸馏"></a>
 
