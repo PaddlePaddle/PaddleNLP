@@ -1300,13 +1300,14 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
 
 class UIEX(ErnieLayoutPretrainedModel):
 
-    def __init__(self, encoding_model):
+    def __init__(self, ernie_layout):
         super(UIEX, self).__init__()
-        self.encoder = encoding_model
-        hidden_size = self.encoder.config["hidden_size"]
+        self.ernie_layout = ernie_layout
+        hidden_size = self.ernie_layout.config["hidden_size"]
         self.linear_start = paddle.nn.Linear(hidden_size, 1)
         self.linear_end = paddle.nn.Linear(hidden_size, 1)
         self.sigmoid = paddle.nn.Sigmoid()
+        self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
@@ -1315,12 +1316,12 @@ class UIEX(ErnieLayoutPretrainedModel):
                 attention_mask=None,
                 bbox=None,
                 image=None):
-        sequence_output, _ = self.encoder(input_ids=input_ids,
-                                          token_type_ids=token_type_ids,
-                                          position_ids=position_ids,
-                                          attention_mask=attention_mask,
-                                          bbox=bbox,
-                                          image=image)
+        sequence_output, _ = self.ernie_layout(input_ids=input_ids,
+                                               token_type_ids=token_type_ids,
+                                               position_ids=position_ids,
+                                               attention_mask=attention_mask,
+                                               bbox=bbox,
+                                               image=image)
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
         start_prob = self.sigmoid(start_logits)

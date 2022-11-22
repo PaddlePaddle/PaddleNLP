@@ -2075,13 +2075,14 @@ class UIE(ErniePretrainedModel):
             An instance of `ErnieModel`.
     """
 
-    def __init__(self, encoding_model):
+    def __init__(self, ernie):
         super(UIE, self).__init__()
-        self.encoder = encoding_model
-        hidden_size = self.encoder.config["hidden_size"]
+        self.ernie = ernie
+        hidden_size = self.ernie.config["hidden_size"]
         self.linear_start = paddle.nn.Linear(hidden_size, 1)
         self.linear_end = paddle.nn.Linear(hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
+        self.apply(self.init_weights)
 
     def forward(self,
                 input_ids,
@@ -2112,10 +2113,10 @@ class UIE(ErniePretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 start_prob, end_prob = model(**inputs)
         """
-        sequence_output, _ = self.encoder(input_ids=input_ids,
-                                          token_type_ids=token_type_ids,
-                                          position_ids=position_ids,
-                                          attention_mask=attention_mask)
+        sequence_output, _ = self.ernie(input_ids=input_ids,
+                                        token_type_ids=token_type_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
         start_prob = self.sigmoid(start_logits)

@@ -57,7 +57,7 @@ class DocParser(object):
             return doc
         doc_type = mimetypes.guess_type(doc['doc'])[0]
 
-        if doc_type.startswith("image") or not doc_type:
+        if not doc_type or doc_type.startswith("image"):
             image = self.read_image(doc['doc'])
         elif doc_type == "application/pdf":
             image = self.read_pdf(doc['doc'])

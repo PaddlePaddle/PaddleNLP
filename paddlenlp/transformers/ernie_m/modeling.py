@@ -890,13 +890,14 @@ class UIEM(ErnieMPretrainedModel):
             An instance of `ErnieMModel`.
     """
 
-    def __init__(self, encoding_model):
+    def __init__(self, ernie_m):
         super(UIEM, self).__init__()
-        self.encoder = encoding_model
-        hidden_size = self.encoder.config["hidden_size"]
+        self.ernie_m = ernie_m
+        hidden_size = self.ernie_m.config["hidden_size"]
         self.linear_start = paddle.nn.Linear(hidden_size, 1)
         self.linear_end = paddle.nn.Linear(hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
+        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None):
         r"""
@@ -919,7 +920,7 @@ class UIEM(ErnieMPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 start_prob, end_prob = model(**inputs)
         """
-        sequence_output, _ = self.encoder(input_ids=input_ids,
+        sequence_output, _ = self.ernie_m(input_ids=input_ids,
                                           position_ids=position_ids)
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
