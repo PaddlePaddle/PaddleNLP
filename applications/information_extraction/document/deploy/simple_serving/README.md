@@ -52,8 +52,8 @@ service.register_taskflow('uie', [uie1, uie2])
 ### Client 自定义参数
 
 ```python
-# Changed to input texts you wanted
-texts = ['']
+# Changed to image paths you wanted
+image_paths = ['../../data/images/b1.jpg']
 ```
 
 ### 设置相关参数
