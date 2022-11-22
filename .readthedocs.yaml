@@ -17,9 +17,21 @@ sphinx:
 #formats:
 #   - pdf
 
+# custome building process,
+# get more details: https://docs.readthedocs.io/en/stable/build-customization.html
+build:
+  os: "ubuntu-20.04"
+  tools:
+    python: "3.8"
+  jobs:
+    pre_install:
+      # fix the installation issue: 
+      # get more details: https://github.com/PaddlePaddle/Paddle/issues/45146
+      - apt install libgomp1
+
 # Optionally set the version of Python and requirements required to build your docs
 python:
-  version: 3.8
+  version: "3.8"
   install:
     - requirements: docs/requirements.txt
     - requirements: requirements.txt
