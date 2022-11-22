@@ -32,11 +32,11 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 默认开启国内清华镜像源来加速下载，如果您使用 HTTP 代理可以关闭(-i https://pypi.tuna.tsinghua.edu.cn/simple)
 
 
-### 安装FasterTokenizer文本处理加速库（可选）
-推荐安装faster_tokenizer，可以得到更极致的文本处理效率，进一步提升服务性能。目前faster_tokenizer已支持Windows，Linux x64，Mac x86_64平台。
+### 安装FastTokenizer文本处理加速库（可选）
+推荐安装fast_tokenizer，可以得到更极致的文本处理效率，进一步提升服务性能。目前fast_tokenizer已支持Windows，Linux x64，Mac x86_64平台。
 
 ```
-pip install faster_tokenizer
+pip install fast-tokenizer-python
 ```
 
 

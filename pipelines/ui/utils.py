@@ -24,6 +24,12 @@ from uuid import uuid4
 import streamlit as st
 from io import StringIO
 
+import paddle
+from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
+from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
+from pipelines.nodes import DensePassageRetriever
+from pipelines.utils import launch_es
+
 API_ENDPOINT = os.getenv("API_ENDPOINT")
 STATUS = "initialized"
 HS_VERSION = "hs_version"
@@ -32,6 +38,8 @@ DOC_FEEDBACK = "feedback"
 DOC_UPLOAD = "file-upload"
 DOC_PARSE = 'files'
 IMAGE_REQUEST = 'query_text_to_images'
+QA_PAIR_REQUEST = 'query_qa_pairs'
+FILE_UPLOAD_QA_GENERATE = 'file-upload-qa-generate'
 
 
 def pipelines_is_ready():
@@ -214,6 +222,31 @@ def text_to_image_search(
     return results, response
 
 
+def text_to_qa_pair_search(query,
+                           is_filter=True
+                           ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Send a prompt text and corresponding parameters to the REST API
+    """
+    url = f"{API_ENDPOINT}/{QA_PAIR_REQUEST}"
+    params = {
+        "QAFilter": {
+            "is_filter": is_filter,
+        },
+    }
+
+    req = {"meta": [query], "params": params}
+    response_raw = requests.post(url, json=req)
+    if response_raw.status_code >= 400 and response_raw.status_code != 503:
+        raise Exception(f"{vars(response_raw)}")
+
+    response = response_raw.json()
+    if "errors" in response:
+        raise Exception(", ".join(response["errors"]))
+    results = response["filtered_cqa_triples"]
+    return results, response
+
+
 def send_feedback(query, answer_obj, is_correct_answer, is_correct_document,
                   document) -> None:
     """
@@ -242,6 +275,13 @@ def upload_doc(file):
     return response
 
 
+def file_upload_qa_generate(file):
+    url = f"{API_ENDPOINT}/{FILE_UPLOAD_QA_GENERATE}"
+    files = [("files", file)]
+    response = requests.post(url, files=files).json()
+    return response
+
+
 def get_backlink(result) -> Tuple[Optional[str], Optional[str]]:
     if result.get("document", None):
         doc = result["document"]
@@ -252,3 +292,60 @@ def get_backlink(result) -> Tuple[Optional[str], Optional[str]]:
                             "title", None):
                         return doc["meta"]["url"], doc["meta"]["title"]
     return None, None
+
+
+def offline_ann(index_name,
+                doc_dir,
+                search_engine="elastic",
+                host="127.0.0.1",
+                port="9200",
+                query_embedding_model="rocketqa-zh-nano-query-encoder",
+                passage_embedding_model="rocketqa-zh-nano-para-encoder",
+                params_path="checkpoints/model_40/model_state.pdparams",
+                embedding_dim=312,
+                split_answers=True):
+    if (search_engine == "milvus"):
+        document_store = MilvusDocumentStore(embedding_dim=embedding_dim,
+                                             host=host,
+                                             index=index_name,
+                                             port=port,
+                                             index_param={
+                                                 "M": 16,
+                                                 "efConstruction": 50
+                                             },
+                                             index_type="HNSW")
+    else:
+        launch_es()
+        document_store = ElasticsearchDocumentStore(host=host,
+                                                    port=port,
+                                                    username="",
+                                                    password="",
+                                                    embedding_dim=embedding_dim,
+                                                    index=index_name)
+    # 将每篇文档按照段落进行切分
+    dicts = convert_files_to_dicts(dir_path=doc_dir,
+                                   split_paragraphs=True,
+                                   split_answers=split_answers,
+                                   encoding='utf-8')
+
+    print(dicts[:3])
+
+    # 文档数据写入数据库
+    document_store.write_documents(dicts)
+
+    ### 语义索引模型
+    retriever = DensePassageRetriever(
+        document_store=document_store,
+        query_embedding_model=query_embedding_model,
+        passage_embedding_model=passage_embedding_model,
+        params_path=params_path,
+        output_emb_size=embedding_dim,
+        max_seq_len_query=64,
+        max_seq_len_passage=256,
+        batch_size=1,
+        use_gpu=True,
+        embed_title=False,
+    )
+
+    # 建立索引库
+    document_store.update_embeddings(retriever)

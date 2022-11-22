@@ -20,6 +20,8 @@ PIPELINE_YAML_PATH = os.getenv(
     str((Path(__file__).parent / "pipeline" / "pipelines.yaml").absolute()))
 QUERY_PIPELINE_NAME = os.getenv("QUERY_PIPELINE_NAME", "query")
 INDEXING_PIPELINE_NAME = os.getenv("INDEXING_PIPELINE_NAME", "indexing")
+INDEXING_QA_GENERATING_PIPELINE_NAME = os.getenv(
+    "INDEXING_QA_GENERATING_PIPELINE_NAME", "indexing_qa_generating")
 
 FILE_UPLOAD_PATH = os.getenv(
     "FILE_UPLOAD_PATH", str((Path(__file__).parent / "file-upload").absolute()))

@@ -488,8 +488,8 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self._task_path, use_faster=self.use_faster)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path,
+                                                        use_fast=self.use_fast)
 
     def _preprocess(self, inputs):
         """
@@ -1250,7 +1250,7 @@ class GPTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        # TODO(zhoushunjie): Will set use_faster=True in future.
+        # TODO(zhoushunjie): Will set use_fast=True in future.
         self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):

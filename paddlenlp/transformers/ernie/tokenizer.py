@@ -66,7 +66,16 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "rocketqa-medium-cross-encoder": 2048,
     "rocketqa-mini-cross-encoder": 2048,
     "rocketqa-micro-cross-encoder": 2048,
-    "rocketqa-nano-cross-encoder": 2048
+    "rocketqa-nano-cross-encoder": 2048,
+    "rocketqav2-en-marco-cross-encoder": 512,
+    "rocketqav2-en-marco-query-encoder": 512,
+    "rocketqav2-en-marco-para-encoder": 512,
+    "uie-base": 512,
+    "uie-medium": 512,
+    "uie-mini": 512,
+    "uie-micro": 512,
+    "uie-nano": 512,
+    "uie-base-en": 512,
 }
 
 
@@ -202,6 +211,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
             "rocketqa-nano-cross-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqav2-en-marco-cross-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "rocketqav2-en-marco-query-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "rocketqav2-en-marco-para-encoder":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "uie-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "uie-medium":
@@ -335,6 +350,15 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rocketqa-nano-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqav2-en-marco-cross-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqav2-en-marco-query-encoder": {
+            "do_lower_case": True
+        },
+        "rocketqav2-en-marco-para-encoder": {
             "do_lower_case": True
         },
         "uie-base": {

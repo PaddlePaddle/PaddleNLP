@@ -27,7 +27,7 @@ import pipelines
 from pipelines.pipelines.base import Pipeline
 from rest_api.config import PIPELINE_YAML_PATH, QUERY_PIPELINE_NAME
 from rest_api.config import LOG_LEVEL, CONCURRENT_REQUEST_PER_WORKER
-from rest_api.schema import QueryRequest, QueryResponse, DocumentRequest, DocumentResponse, QueryImageResponse
+from rest_api.schema import QueryRequest, QueryResponse, DocumentRequest, DocumentResponse, QueryImageResponse, QueryQAPairResponse, QueryQAPairRequest
 from rest_api.controller.utils import RequestLimiter
 
 logging.getLogger("pipelines").setLevel(LOG_LEVEL)
@@ -41,6 +41,9 @@ router = APIRouter()
 
 PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH),
                                    pipeline_name=QUERY_PIPELINE_NAME)
+
+QA_PAIR_PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH),
+                                           pipeline_name="query_qa_pairs")
 DOCUMENT_STORE = PIPELINE.get_document_store()
 logging.info(f"Loaded pipeline nodes: {PIPELINE.graph.nodes.keys()}")
 
@@ -76,6 +79,7 @@ def query(request: QueryRequest):
     This endpoint receives the question as a string and allows the requester to set
     additional parameters that will be passed on to the pipelines pipeline.
     """
+    print('query', request)
     with concurrency_limiter.run():
         result = _process_request(PIPELINE, request)
         return result
@@ -115,6 +119,25 @@ def query_documents(request: DocumentRequest):
     params = request.params or {}
     res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
     result['results'] = res['results']
+    return result
+
+
+@router.post("/query_qa_pairs",
+             response_model=QueryQAPairResponse,
+             response_model_exclude_none=True)
+def query_qa_pairs(request: QueryQAPairRequest):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    print('request', request)
+    result = {}
+    result['meta'] = request.meta
+    params = request.params or {}
+    res = QA_PAIR_PIPELINE.run(meta=request.meta,
+                               params=params,
+                               debug=request.debug)
+    result['filtered_cqa_triples'] = res['filtered_cqa_triples']
     return result
 
 
