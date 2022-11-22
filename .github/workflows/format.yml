@@ -1,4 +1,4 @@
-name: PyPI
+name: Format
 
 on: [push, pull_request]
 
