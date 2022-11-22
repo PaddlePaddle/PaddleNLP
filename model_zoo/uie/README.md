@@ -841,7 +841,7 @@ app.register_taskflow('uie', uie)
 paddlenlp server server:app --host 0.0.0.0 --port 8989
 ```
 
-具体使用的方法可以见[UIE SimpleServing 使用方法](./deploy/serving/SimpleServing/README.md)
+具体使用的方法可以见[UIE SimpleServing 使用方法](./deploy/serving/simple_serving/README.md)
 
 
 <a name="实验指标"></a>
