@@ -153,9 +153,9 @@ class Convertor(object):
             text += segment[1]
             boxes.extend([box] * len(segment[1]))
         assert len(text) == len(
-            boxes), "len of text is not equal to len of boxes"
+            boxes), "len of text is not equal to len of bbox"
         items['text'] = text
-        items['boxes'] = boxes
+        items['bbox'] = boxes
         items['image'] = parsed_doc['image']
 
         if task_type == "ext":
@@ -222,7 +222,7 @@ class Convertor(object):
                     items = self.process_image_tag(line, task_type="cls")
                     if items is None:
                         continue
-                    image, boxes = items['image'], items['boxes']
+                    image, boxes = items['image'], items['bbox']
                 else:
                     raise ValueError(
                         "The type of annotation should be text or image")
@@ -287,7 +287,7 @@ class Convertor(object):
                     items = self.process_image_tag(line, task_type="ext")
                     if items is None:
                         continue
-                    image, boxes = items['image'], items['boxes']
+                    image, boxes = items['image'], items['bbox']
                     images.append(image)
                     boxes_list.append(boxes)
                 else:
@@ -343,7 +343,7 @@ class Convertor(object):
                         }
                         if self.anno_type == "image":
                             entity_example_map[entity_label]['image'] = image
-                            entity_example_map[entity_label]['boxes'] = boxes
+                            entity_example_map[entity_label]['bbox'] = boxes
                     else:
                         entity_example_map[entity_label]["result_list"].append(
                             result)
@@ -402,7 +402,7 @@ class Convertor(object):
                         }
                         if self.anno_type == "image":
                             relation_example_map[prompt]['image'] = image
-                            relation_example_map[prompt]['boxes'] = boxes
+                            relation_example_map[prompt]['bbox'] = boxes
                     else:
                         relation_example_map[prompt]["result_list"].append(
                             result)
@@ -556,7 +556,7 @@ class Convertor(object):
         }
         if image and boxes:
             example['image'] = image
-            example['boxes'] = boxes
+            example['bbox'] = boxes
         for label in labels:
             start = prompt.rfind(label) - len(prompt) - 1
             end = start + len(label)
@@ -592,7 +592,7 @@ class Convertor(object):
                             }
                             if images and boxes_list:
                                 negative_result['image'] = images[i]
-                                negative_result['boxes'] = boxes_list[i]
+                                negative_result['bbox'] = boxes_list[i]
                             negative_sample.append(negative_result)
                 examples[i].extend(negative_sample)
                 pbar.update(1)
@@ -633,7 +633,7 @@ class Convertor(object):
                     }
                     if images and boxes_list:
                         negative_result['image'] = images[i]
-                        negative_result['boxes'] = boxes_list[i]
+                        negative_result['bbox'] = boxes_list[i]
                     negative_examples.append(negative_result)
                 positive_examples.extend(examples[i])
                 pbar.update(1)
@@ -672,7 +672,7 @@ class Convertor(object):
             }
             if image and boxes:
                 negative_result['image'] = image
-                negative_result['boxes'] = boxes
+                negative_result['bbox'] = boxes
             added_example.append(negative_result)
 
         for rest_idx in rest_idxs:
@@ -683,7 +683,7 @@ class Convertor(object):
             }
             if image and boxes:
                 negative_result['image'] = image
-                negative_result['boxes'] = boxes
+                negative_result['bbox'] = boxes
             rest_example.append(negative_result)
 
         return added_example, rest_example

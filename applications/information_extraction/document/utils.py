@@ -30,7 +30,7 @@ def reader(data_path, max_seq_len=512):
             json_line = json.loads(line)
             content = json_line['content'].strip()
             prompt = json_line['prompt']
-            bboxes = json_line.get("bboxes", None)
+            boxes = json_line.get("bbox", None)
             image = json_line.get("image", None)
             # Model Input is aslike: [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
             # It include three summary tokens.
@@ -75,12 +75,12 @@ def reader(data_path, max_seq_len=512):
                                 break
                         else:
                             break
-                    if bboxes is not None and image is not None:
+                    if boxes is not None and image is not None:
                         json_line = {
                             'content': cur_content,
                             'result_list': cur_result_list,
                             'prompt': prompt,
-                            'bboxes': bboxes,
+                            'bbox': boxes,
                             'image': image,
                         }
                     else:
@@ -125,7 +125,7 @@ def convert_example(example,
 
     content = example["content"]
     prompt = example["prompt"]
-    bbox_lines = example.get("bboxes", None)
+    bbox_lines = example.get("bbox", None)
     image_buff_string = example.get("image", None)
     # Text
     if bbox_lines is None:

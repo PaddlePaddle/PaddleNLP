@@ -71,7 +71,7 @@
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 <tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td>78.49<td><b>83.02</b>
 <tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
-<tr><td>uie-x-base (12L768H)<td>51.92<td>73.75<td>60.87<td>84.33<td><b>79.38</b><td>80.72
+<tr><td><b>uie-x-base (12L768H)</b><td>51.92<td>73.75<td>60.87<td>84.33<td><b>79.38</b><td>80.72
 </table>
 
 0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
