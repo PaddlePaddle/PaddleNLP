@@ -122,8 +122,8 @@ class UIETask(Task):
     resource_files_urls = {
         "uie-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
-                "aeca0ed2ccf003f4e9c6160363327c9b"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.1/model_state.pdparams",
+                "47b93cf6a85688791699548210048085"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
@@ -144,8 +144,8 @@ class UIETask(Task):
         },
         "uie-medium": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
-                "15874e4e76d05bc6de64cc69717f172e"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.1/model_state.pdparams",
+                "c34475665eb05e25f3c9cd9b020b331a"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
@@ -166,8 +166,8 @@ class UIETask(Task):
         },
         "uie-mini": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
-                "f7b493aae84be3c107a6b4ada660ce2e"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.1/model_state.pdparams",
+                "9a0805762c41b104d590c15fbe9b19fd"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
@@ -188,8 +188,8 @@ class UIETask(Task):
         },
         "uie-micro": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
-                "80baf49c7f853ab31ac67802104f3f15"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.1/model_state.pdparams",
+                "da67287bca2906864929e16493f748e4"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
@@ -210,8 +210,8 @@ class UIETask(Task):
         },
         "uie-nano": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
-                "ba934463c5cd801f46571f2588543700"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.1/model_state.pdparams",
+                "48db5206232e89ef16b66467562d90e5"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
@@ -230,33 +230,10 @@ class UIETask(Task):
                 "59acb0ce78e79180a2491dfd8382b28c"
             ]
         },
-        # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
-        "uie-tiny": {
-            "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
-                "15874e4e76d05bc6de64cc69717f172e"
-            ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
-                "6f1ee399398d4f218450fbbf5f212b15"
-            ],
-            "vocab_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
-            ],
-            "special_tokens_map": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
-            ],
-            "tokenizer_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
-        },
         "uie-medical-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.1/model_state.pdparams",
-                "569b4bc1abf80eedcdad5a6e774d46bf"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.2/model_state.pdparams",
+                "7582d3b01f6faf00b7000111ea853796"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
@@ -277,8 +254,8 @@ class UIETask(Task):
         },
         "uie-base-en": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
-                "2baf0647774d6309e4b2be726ad4283a"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.2/model_state.pdparams",
+                "8c5d5c8faa76681a0aad58f982cd6141"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
@@ -299,8 +276,8 @@ class UIETask(Task):
         },
         "uie-m-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
-                "ed96cb17b4b3283a65ad0846ada7799e"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.1/model_state.pdparams",
+                "eb00c06bd7144e76343d750f5bf36ff6"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
@@ -325,8 +302,8 @@ class UIETask(Task):
         },
         "uie-m-large": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
-                "75f3989c515f05f6842e314d3f75ee27"
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.1/model_state.pdparams",
+                "9db83a67f34a9c2483dbe57d2510b4c2"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
@@ -352,7 +329,7 @@ class UIETask(Task):
         "uie-x-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v1.0/model_state.pdparams",
-                "5504ebfd6da288c8d92cccdace3a93b0"
+                "f378d5572d23dffc1659280fed90b17a"
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
@@ -797,7 +774,6 @@ class UIETask(Task):
                 return_list = [np.array(x, dtype="int64") for x in input_list]
                 return_list.append(np.array(padded_image, dtype="float32"))
                 return_list.append(np.array(offset_mapping, dtype="int64"))
-
                 assert len(inputs_ids) == self._max_seq_len
                 assert len(token_type_ids) == self._max_seq_len
                 assert len(position_ids) == self._max_seq_len
