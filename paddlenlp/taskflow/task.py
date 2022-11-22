@@ -73,7 +73,7 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
-        
+
         if not self.from_hf_hub:
             download_check(self._task_flag)
 
