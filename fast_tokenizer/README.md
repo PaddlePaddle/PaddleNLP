@@ -37,7 +37,7 @@ FastTokenizer是一款简单易用、功能强大的跨平台高性能文本预�
 ### 安装FastTokenizer
 
 ```python
-pip install fast_tokenizer
+pip install fast-tokenizer-python
 ```
 
 ### FastTokenizer使用示例

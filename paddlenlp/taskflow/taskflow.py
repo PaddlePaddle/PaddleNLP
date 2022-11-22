@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import warnings
+import threading
 import paddle
 from ..utils.tools import get_env_device
 from .knowledge_mining import WordTagTask, NPTagTask
@@ -578,6 +579,9 @@ class Taskflow(object):
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
+
+        # Add the lock for the concurrency requests
+        self._lock = threading.Lock()
 
     def __call__(self, *inputs):
         """
