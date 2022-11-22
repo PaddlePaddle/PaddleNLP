@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+
 from .deprecation_utils import deprecate
 from .import_utils import (
     ENV_VARS_TRUE_AND_AUTO_VALUES,
@@ -25,15 +26,25 @@ from .import_utils import (
     is_onnx_available,
     is_scipy_available,
     is_paddle_available,
+    is_paddle_version,
     is_paddlenlp_available,
     is_unidecode_available,
     requires_backends,
 )
 from .logging import get_logger
 from .outputs import BaseOutput
+from .pil_utils import PIL_INTERPOLATION
 
 if is_paddle_available():
-    from .testing_utils import floats_tensor, load_image, parse_flag_from_env, slow
+    from .testing_utils import (
+        floats_tensor,
+        load_hf_numpy,
+        load_image,
+        load_numpy,
+        parse_flag_from_env,
+        slow,
+        paddle_all_close,
+    )
 
 logger = get_logger(__name__)
 
@@ -45,7 +56,18 @@ default_cache_path = _get_sub_home('models')
 CONFIG_NAME = "config.json"
 WEIGHTS_NAME = "model_state.pdparams"
 ONNX_WEIGHTS_NAME = "model.onnx"
+ONNX_EXTERNAL_WEIGHTS_NAME = "weights.pb"
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPDIFFUSERS_CACHE = default_cache_path
 PPDIFFUSERS_DYNAMIC_MODULE_NAME = "ppdiffusers_modules"
 PPNLP_MODULES_CACHE = os.getenv("PPNLP_MODULES_CACHE", _get_sub_home("modules"))
+
+_COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
+    "DDIMScheduler",
+    "DDPMScheduler",
+    "PNDMScheduler",
+    "LMSDiscreteScheduler",
+    "EulerDiscreteScheduler",
+    "EulerAncestralDiscreteScheduler",
+    "DPMSolverMultistepScheduler",
+]

@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +24,14 @@ import paddle.nn as nn
 from .download_utils import ppdiffusers_bos_download
 from requests import HTTPError
 
-from .utils import CONFIG_NAME, PPDIFFUSERS_CACHE, DOWNLOAD_SERVER, WEIGHTS_NAME, logging
+from . import __version__
+from .utils import (
+    CONFIG_NAME,
+    PPDIFFUSERS_CACHE,
+    DOWNLOAD_SERVER,
+    WEIGHTS_NAME,
+    logging,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -213,6 +220,9 @@ class ModelMixin(nn.Layer):
                     - A path to a *directory* containing model weights saved using [`~ModelMixin.save_config`], e.g.,
                       `./my_model_directory/`.
 
+            cache_dir (`Union[str, os.PathLike]`, *optional*):
+                Path to a directory in which a downloaded pretrained model configuration should be cached if the
+                standard cache should not be used.
             paddle_dtype (`str` or `paddle.dtype`, *optional*):
                 Override the default `paddle.dtype` and load the model under this dtype. If `"auto"` is passed the dtype
                 will be automatically derived from the model's weights.
@@ -222,12 +232,8 @@ class ModelMixin(nn.Layer):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
 
-            mirror (`str`, *optional*):
-                Mirror source to accelerate downloads in China. If you are from China and have an accessibility
-                problem, you can set this option to resolve it. Note that we do not guarantee the timeliness or safety.
-                Please refer to the mirror site for more information.
-
         """
+        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         output_loading_info = kwargs.pop("output_loading_info", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
@@ -261,6 +267,7 @@ class ModelMixin(nn.Layer):
                     pretrained_model_name_or_path,
                     filename=WEIGHTS_NAME,
                     subfolder=subfolder,
+                    cache_dir=cache_dir,
                 )
             except HTTPError as err:
                 raise EnvironmentError(
@@ -283,6 +290,7 @@ class ModelMixin(nn.Layer):
 
         model, unused_kwargs = cls.from_config(
             config_path,
+            cache_dir=cache_dir,
             return_unused_kwargs=True,
             subfolder=subfolder,
             **kwargs,
@@ -356,7 +364,7 @@ class ModelMixin(nn.Layer):
                     model_key = checkpoint_key
 
                     if (model_key in model_state_dict
-                            and list(state_dict[checkpoint_key].shape) !=
+                            and state_dict[checkpoint_key].shape !=
                             model_state_dict[model_key].shape):
                         mismatched_keys.append(
                             (checkpoint_key, state_dict[checkpoint_key].shape,
@@ -397,7 +405,7 @@ class ModelMixin(nn.Layer):
                 " BertForSequenceClassification model).")
         else:
             logger.info(
-                f"All model checkpoint weights were used when initializing {model.__class__.__name__}."
+                f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n"
             )
         if len(missing_keys) > 0:
             logger.warning(

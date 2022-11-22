@@ -20,13 +20,14 @@ import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput, logging
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput, logging
 from .scheduling_utils import SchedulerMixin
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 @dataclass
+# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->EulerAncestralDiscrete
 class EulerAncestralDiscreteSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -51,8 +52,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
@@ -66,14 +67,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
-    _compatible_classes = [
-        "DDIMScheduler",
-        "DDPMScheduler",
-        "LMSDiscreteScheduler",
-        "PNDMScheduler",
-        "EulerDiscreteScheduler",
-        "DPMSolverMultistepScheduler",
-    ]
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
 
     @register_to_config
     def __init__(
@@ -166,6 +160,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         model_output: paddle.Tensor,
         timestep: Union[float, paddle.Tensor],
         sample: paddle.Tensor,
+        generator: Optional[paddle.Generator] = None,
         return_dict: bool = True,
     ) -> Union[EulerAncestralDiscreteSchedulerOutput, Tuple]:
         """
@@ -177,6 +172,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
             timestep (`float`): current timestep in the diffusion chain.
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
+            generator (`paddle.Generator`, optional): Random number generator.
             return_dict (`bool`): option for returning tuple rather than EulerAncestralDiscreteSchedulerOutput class
 
         Returns:
@@ -207,7 +203,9 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         prev_sample = sample + derivative * dt
 
-        noise = paddle.randn(model_output.shape, dtype=model_output.dtype)
+        noise = paddle.randn(model_output.shape,
+                             dtype=model_output.dtype,
+                             generator=generator)
 
         prev_sample = prev_sample + noise * sigma_up
 
@@ -223,8 +221,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         noise: paddle.Tensor,
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
-        # Make sure sigmas and timesteps have the same device and dtype as original_samples
-        self.sigmas = self.sigmas.astype(original_samples.dtype)
+        # Make sure sigmas and timesteps have the same dtype as original_samples
+        self.sigmas = self.sigmas.cast(original_samples.dtype)
 
         schedule_timesteps = self.timesteps
         step_indices = [(schedule_timesteps == t).nonzero().item()

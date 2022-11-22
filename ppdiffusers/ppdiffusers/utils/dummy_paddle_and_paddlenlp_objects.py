@@ -19,11 +19,45 @@
 from . import DummyObject, requires_backends
 
 
-class LDMBertModel(metaclass=DummyObject):
+class AltDiffusionImg2ImgPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp"]
 
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+
+class AltDiffusionPipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+
+class CycleDiffusionPipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
@@ -91,6 +125,36 @@ class StableDiffusionInpaintPipelineLegacy(metaclass=DummyObject):
 
 
 class StableDiffusionPipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+
+class StableDiffusionPipelineAllInOne(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp"])
+
+
+class VQDiffusionPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp"]
 
     def __init__(self, *args, **kwargs):

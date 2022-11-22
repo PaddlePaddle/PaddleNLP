@@ -20,6 +20,92 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
+class Upsample1D(nn.Layer):
+    """
+    An upsampling layer with an optional convolution.
+
+    Parameters:
+            channels: channels in the inputs and outputs.
+            use_conv: a bool determining if a convolution is applied.
+            use_conv_transpose:
+            out_channels:
+    """
+
+    def __init__(self,
+                 channels,
+                 use_conv=False,
+                 use_conv_transpose=False,
+                 out_channels=None,
+                 name="conv"):
+        super().__init__()
+        self.channels = channels
+        self.out_channels = out_channels or channels
+        self.use_conv = use_conv
+        self.use_conv_transpose = use_conv_transpose
+        self.name = name
+
+        self.conv = None
+        if use_conv_transpose:
+            self.conv = nn.Conv1DTranspose(channels, self.out_channels, 4, 2, 1)
+        elif use_conv:
+            self.conv = nn.Conv1D(self.channels,
+                                  self.out_channels,
+                                  3,
+                                  padding=1)
+
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        if self.use_conv_transpose:
+            return self.conv(x)
+
+        x = F.interpolate(x, scale_factor=2.0, mode="nearest")
+
+        if self.use_conv:
+            x = self.conv(x)
+
+        return x
+
+
+class Downsample1D(nn.Layer):
+    """
+    A downsampling layer with an optional convolution.
+
+    Parameters:
+        channels: channels in the inputs and outputs.
+        use_conv: a bool determining if a convolution is applied.
+        out_channels:
+        padding:
+    """
+
+    def __init__(self,
+                 channels,
+                 use_conv=False,
+                 out_channels=None,
+                 padding=1,
+                 name="conv"):
+        super().__init__()
+        self.channels = channels
+        self.out_channels = out_channels or channels
+        self.use_conv = use_conv
+        self.padding = padding
+        stride = 2
+        self.name = name
+
+        if use_conv:
+            self.conv = nn.Conv1D(self.channels,
+                                  self.out_channels,
+                                  3,
+                                  stride=stride,
+                                  padding=padding)
+        else:
+            assert self.channels == self.out_channels
+            self.conv = nn.AvgPool1D(kernel_size=stride, stride=stride)
+
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        return self.conv(x)
+
+
 class Upsample2D(nn.Layer):
     """
     An upsampling layer with an optional convolution.
@@ -27,7 +113,8 @@ class Upsample2D(nn.Layer):
     Parameters:
         channels: channels in the inputs and outputs.
         use_conv: a bool determining if a convolution is applied.
-        dims: determines if the signal is 1D, 2D, or 3D. If 3D, then upsampling occurs in the inner-two dimensions.
+        use_conv_transpose:
+        out_channels:
     """
 
     def __init__(self,
@@ -66,7 +153,7 @@ class Upsample2D(nn.Layer):
         # https://github.com/pytorch/pytorch/issues/86679
         dtype = hidden_states.dtype
         if dtype == paddle.bfloat16:
-            hidden_states = hidden_states.astype(paddle.float32)
+            hidden_states = hidden_states.cast("float32")
 
         # if `output_size` is passed we force the interpolation output
         # size and do not make use of `scale_factor=2`
@@ -81,7 +168,7 @@ class Upsample2D(nn.Layer):
 
         # If the input is bfloat16, we cast back to bfloat16
         if dtype == paddle.bfloat16:
-            hidden_states = hidden_states.astype(dtype)
+            hidden_states = hidden_states.cast(dtype)
 
         # TODO(Suraj, Patrick) - clean up after weight dicts are correctly renamed
         if self.use_conv:
@@ -100,7 +187,8 @@ class Downsample2D(nn.Layer):
     Parameters:
         channels: channels in the inputs and outputs.
         use_conv: a bool determining if a convolution is applied.
-        dims: determines if the signal is 1D, 2D, or 3D. If 3D, then downsampling occurs in the inner-two dimensions.
+        out_channels:
+        padding:
     """
 
     def __init__(self,
@@ -508,6 +596,72 @@ class Mish(nn.Layer):
         return hidden_states * paddle.tanh(F.softplus(hidden_states))
 
 
+# unet_rl.py
+def rearrange_dims(tensor):
+    if len(tensor.shape) == 2:
+        return tensor[:, :, None]
+    if len(tensor.shape) == 3:
+        return tensor[:, :, None, :]
+    elif len(tensor.shape) == 4:
+        return tensor[:, :, 0, :]
+    else:
+        raise ValueError(f"`len(tensor)`: {len(tensor)} has to be 2, 3 or 4.")
+
+
+class Conv1dBlock(nn.Layer):
+    """
+    Conv1d --> GroupNorm --> Mish
+    """
+
+    def __init__(self, inp_channels, out_channels, kernel_size, n_groups=8):
+        super().__init__()
+
+        self.conv1d = nn.Conv1D(inp_channels,
+                                out_channels,
+                                kernel_size,
+                                padding=kernel_size // 2)
+        self.group_norm = nn.GroupNorm(n_groups, out_channels)
+        self.mish = nn.Mish()
+
+    def forward(self, x):
+        x = self.conv1d(x)
+        x = rearrange_dims(x)
+        x = self.group_norm(x)
+        x = rearrange_dims(x)
+        x = self.mish(x)
+        return x
+
+
+# unet_rl.py
+class ResidualTemporalBlock1D(nn.Layer):
+
+    def __init__(self, inp_channels, out_channels, embed_dim, kernel_size=5):
+        super().__init__()
+        self.conv_in = Conv1dBlock(inp_channels, out_channels, kernel_size)
+        self.conv_out = Conv1dBlock(out_channels, out_channels, kernel_size)
+
+        self.time_emb_act = nn.Mish()
+        self.time_emb = nn.Linear(embed_dim, out_channels)
+
+        self.residual_conv = (nn.Conv1D(inp_channels, out_channels, 1) if
+                              inp_channels != out_channels else nn.Identity())
+
+    def forward(self, x, t):
+        """
+        Args:
+            x : [ batch_size x inp_channels x horizon ]
+            t : [ batch_size x embed_dim ]
+
+        returns:
+            out : [ batch_size x out_channels x horizon ]
+        """
+        t = self.time_emb_act(t)
+        t = self.time_emb(t)
+        out = self.conv_in(x) + rearrange_dims(t)
+        out = self.conv_out(out)
+        return out + self.residual_conv(x)
+
+
 def upsample_2d(hidden_states, kernel=None, factor=2, gain=1):
     r"""Upsample2D a batch of 2D images with the given filter.
     Accepts a batch of 2D images of the shape `[N, C, H, W]` or `[N, H, W, C]` and upsamples each image with the given
@@ -594,11 +748,10 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     kernel_h, kernel_w = kernel.shape
 
     out = tensor.reshape([-1, in_h, 1, in_w, 1, minor])
-
-    # TODO F.pad
+    # (TODO, junnyu F.pad bug)
     out = F.pad(out, [0, 0, 0, up_x - 1, 0, 0, 0, up_y - 1])
     out = out.reshape([-1, in_h * up_y, in_w * up_x, minor])
-
+    # (TODO, junnyu F.pad bug)
     out = F.pad(
         out,
         [0, 0,
@@ -615,10 +768,12 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
         [-1, 1, in_h * up_y + pad_y0 + pad_y1, in_w * up_x + pad_x0 + pad_x1])
     w = paddle.flip(kernel, [0, 1]).reshape([1, 1, kernel_h, kernel_w])
     out = F.conv2d(out, w)
-    out = out.reshape([
-        -1, minor, in_h * up_y + pad_y0 + pad_y1 - kernel_h + 1,
-        in_w * up_x + pad_x0 + pad_x1 - kernel_w + 1
-    ])
+    out = out.reshape(
+        -1,
+        minor,
+        in_h * up_y + pad_y0 + pad_y1 - kernel_h + 1,
+        in_w * up_x + pad_x0 + pad_x1 - kernel_w + 1,
+    )
     out = out.transpose([0, 2, 3, 1])
     out = out[:, ::down_y, ::down_x, :]
 

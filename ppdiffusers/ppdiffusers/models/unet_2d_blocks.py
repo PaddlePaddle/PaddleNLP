@@ -12,12 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import numpy as np
 import paddle
 from paddle import nn
 
-from .attention import AttentionBlock, SpatialTransformer
+from .attention import AttentionBlock, Transformer2DModel
 from .resnet import Downsample2D, FirDownsample2D, FirUpsample2D, ResnetBlock2D, Upsample2D
 from paddle.distributed.fleet.utils import recompute
 
@@ -115,6 +114,19 @@ def get_down_block(
             resnet_groups=resnet_groups,
             downsample_padding=downsample_padding,
         )
+    elif down_block_type == "AttnDownEncoderBlock2D":
+        return AttnDownEncoderBlock2D(
+            num_layers=num_layers,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            add_downsample=add_downsample,
+            resnet_eps=resnet_eps,
+            resnet_act_fn=resnet_act_fn,
+            resnet_groups=resnet_groups,
+            downsample_padding=downsample_padding,
+            attn_num_head_channels=attn_num_head_channels,
+        )
+    raise ValueError(f"{down_block_type} does not exist.")
 
 
 def get_up_block(
@@ -208,6 +220,17 @@ def get_up_block(
             resnet_act_fn=resnet_act_fn,
             resnet_groups=resnet_groups,
         )
+    elif up_block_type == "AttnUpDecoderBlock2D":
+        return AttnUpDecoderBlock2D(
+            num_layers=num_layers,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            add_upsample=add_upsample,
+            resnet_eps=resnet_eps,
+            resnet_act_fn=resnet_act_fn,
+            resnet_groups=resnet_groups,
+            attn_num_head_channels=attn_num_head_channels,
+        )
     raise ValueError(f"{up_block_type} does not exist.")
 
 
@@ -259,7 +282,7 @@ class UNetMidBlock2D(nn.Layer):
                     num_head_channels=attn_num_head_channels,
                     rescale_output_factor=output_scale_factor,
                     eps=resnet_eps,
-                    num_groups=resnet_groups,
+                    norm_num_groups=resnet_groups,
                 ))
             resnets.append(
                 ResnetBlock2D(
@@ -335,13 +358,13 @@ class UNetMidBlock2DCrossAttn(nn.Layer):
 
         for _ in range(num_layers):
             attentions.append(
-                SpatialTransformer(
-                    in_channels,
+                Transformer2DModel(
                     attn_num_head_channels,
                     in_channels // attn_num_head_channels,
-                    depth=1,
-                    context_dim=cross_attention_dim,
-                    num_groups=resnet_groups,
+                    in_channels=in_channels,
+                    num_layers=1,
+                    cross_attention_dim=cross_attention_dim,
+                    norm_num_groups=resnet_groups,
                 ))
             resnets.append(
                 ResnetBlock2D(
@@ -378,7 +401,7 @@ class UNetMidBlock2DCrossAttn(nn.Layer):
     def forward(self, hidden_states, temb=None, encoder_hidden_states=None):
         hidden_states = self.resnets[0](hidden_states, temb)
         for attn, resnet in zip(self.attentions, self.resnets[1:]):
-            hidden_states = attn(hidden_states, encoder_hidden_states)
+            hidden_states = attn(hidden_states, encoder_hidden_states).sample
             hidden_states = resnet(hidden_states, temb)
 
         return hidden_states
@@ -431,7 +454,7 @@ class AttnDownBlock2D(nn.Layer):
                     num_head_channels=attn_num_head_channels,
                     rescale_output_factor=output_scale_factor,
                     eps=resnet_eps,
-                    num_groups=resnet_groups,
+                    norm_num_groups=resnet_groups,
                 ))
 
         self.attentions = nn.LayerList(attentions)
@@ -439,7 +462,7 @@ class AttnDownBlock2D(nn.Layer):
 
         if add_downsample:
             self.downsamplers = nn.LayerList([
-                Downsample2D(in_channels,
+                Downsample2D(out_channels,
                              use_conv=True,
                              out_channels=out_channels,
                              padding=downsample_padding,
@@ -509,20 +532,20 @@ class CrossAttnDownBlock2D(nn.Layer):
                     pre_norm=resnet_pre_norm,
                 ))
             attentions.append(
-                SpatialTransformer(
-                    out_channels,
+                Transformer2DModel(
                     attn_num_head_channels,
                     out_channels // attn_num_head_channels,
-                    depth=1,
-                    context_dim=cross_attention_dim,
-                    num_groups=resnet_groups,
+                    in_channels=out_channels,
+                    num_layers=1,
+                    cross_attention_dim=cross_attention_dim,
+                    norm_num_groups=resnet_groups,
                 ))
         self.attentions = nn.LayerList(attentions)
         self.resnets = nn.LayerList(resnets)
 
         if add_downsample:
             self.downsamplers = nn.LayerList([
-                Downsample2D(in_channels,
+                Downsample2D(out_channels,
                              use_conv=True,
                              out_channels=out_channels,
                              padding=downsample_padding,
@@ -554,21 +577,26 @@ class CrossAttnDownBlock2D(nn.Layer):
         for resnet, attn in zip(self.resnets, self.attentions):
             if self.training and self.gradient_checkpointing:
 
-                def create_custom_forward(module):
+                def create_custom_forward(module, return_dict=None):
 
                     def custom_forward(*inputs):
-                        return module(*inputs)
+                        if return_dict is not None:
+                            return module(*inputs, return_dict=return_dict)
+                        else:
+                            return module(*inputs)
 
                     return custom_forward
 
                 hidden_states = recompute(create_custom_forward(resnet),
                                           hidden_states, temb)
-                hidden_states = recompute(create_custom_forward(attn),
-                                          hidden_states, encoder_hidden_states)
+                hidden_states = recompute(
+                    create_custom_forward(attn, return_dict=False),
+                    hidden_states, encoder_hidden_states)[0]
             else:
                 hidden_states = resnet(hidden_states, temb)
-                hidden_states = attn(hidden_states,
-                                     context=encoder_hidden_states)
+                hidden_states = attn(
+                    hidden_states,
+                    encoder_hidden_states=encoder_hidden_states).sample
 
             output_states += (hidden_states, )
 
@@ -622,7 +650,7 @@ class DownBlock2D(nn.Layer):
 
         if add_downsample:
             self.downsamplers = nn.LayerList([
-                Downsample2D(in_channels,
+                Downsample2D(out_channels,
                              use_conv=True,
                              out_channels=out_channels,
                              padding=downsample_padding,
@@ -702,7 +730,7 @@ class DownEncoderBlock2D(nn.Layer):
 
         if add_downsample:
             self.downsamplers = nn.LayerList([
-                Downsample2D(in_channels,
+                Downsample2D(out_channels,
                              use_conv=True,
                              out_channels=out_channels,
                              padding=downsample_padding,
@@ -765,7 +793,7 @@ class AttnDownEncoderBlock2D(nn.Layer):
                     num_head_channels=attn_num_head_channels,
                     rescale_output_factor=output_scale_factor,
                     eps=resnet_eps,
-                    num_groups=resnet_groups,
+                    norm_num_groups=resnet_groups,
                 ))
 
         self.attentions = nn.LayerList(attentions)
@@ -773,7 +801,7 @@ class AttnDownEncoderBlock2D(nn.Layer):
 
         if add_downsample:
             self.downsamplers = nn.LayerList([
-                Downsample2D(in_channels,
+                Downsample2D(out_channels,
                              use_conv=True,
                              out_channels=out_channels,
                              padding=downsample_padding,
@@ -860,7 +888,7 @@ class AttnSkipDownBlock2D(nn.Layer):
                 kernel="fir",
             )
             self.downsamplers = nn.LayerList(
-                [FirDownsample2D(in_channels, out_channels=out_channels)])
+                [FirDownsample2D(out_channels, out_channels=out_channels)])
             self.skip_conv = nn.Conv2D(3,
                                        out_channels,
                                        kernel_size=(1, 1),
@@ -944,7 +972,7 @@ class SkipDownBlock2D(nn.Layer):
                 kernel="fir",
             )
             self.downsamplers = nn.LayerList(
-                [FirDownsample2D(in_channels, out_channels=out_channels)])
+                [FirDownsample2D(out_channels, out_channels=out_channels)])
             self.skip_conv = nn.Conv2D(3,
                                        out_channels,
                                        kernel_size=(1, 1),
@@ -1023,7 +1051,7 @@ class AttnUpBlock2D(nn.Layer):
                     num_head_channels=attn_num_head_channels,
                     rescale_output_factor=output_scale_factor,
                     eps=resnet_eps,
-                    num_groups=resnet_groups,
+                    norm_num_groups=resnet_groups,
                 ))
 
         self.attentions = nn.LayerList(attentions)
@@ -1075,7 +1103,6 @@ class CrossAttnUpBlock2D(nn.Layer):
         cross_attention_dim=1280,
         attention_type="default",
         output_scale_factor=1.0,
-        downsample_padding=1,
         add_upsample=True,
     ):
         super().__init__()
@@ -1104,13 +1131,13 @@ class CrossAttnUpBlock2D(nn.Layer):
                     pre_norm=resnet_pre_norm,
                 ))
             attentions.append(
-                SpatialTransformer(
-                    out_channels,
+                Transformer2DModel(
                     attn_num_head_channels,
                     out_channels // attn_num_head_channels,
-                    depth=1,
-                    context_dim=cross_attention_dim,
-                    num_groups=resnet_groups,
+                    in_channels=out_channels,
+                    num_layers=1,
+                    cross_attention_dim=cross_attention_dim,
+                    norm_num_groups=resnet_groups,
                 ))
         self.attentions = nn.LayerList(attentions)
         self.resnets = nn.LayerList(resnets)
@@ -1157,24 +1184,28 @@ class CrossAttnUpBlock2D(nn.Layer):
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = paddle.concat([hidden_states, res_hidden_states],
                                           axis=1)
-
             if self.training and self.gradient_checkpointing:
 
-                def create_custom_forward(module):
+                def create_custom_forward(module, return_dict=None):
 
                     def custom_forward(*inputs):
-                        return module(*inputs)
+                        if return_dict is not None:
+                            return module(*inputs, return_dict=return_dict)
+                        else:
+                            return module(*inputs)
 
                     return custom_forward
 
                 hidden_states = recompute(create_custom_forward(resnet),
                                           hidden_states, temb)
-                hidden_states = recompute(create_custom_forward(attn),
-                                          hidden_states, encoder_hidden_states)
+                hidden_states = recompute(
+                    create_custom_forward(attn, return_dict=False),
+                    hidden_states, encoder_hidden_states)[0]
             else:
                 hidden_states = resnet(hidden_states, temb)
-                hidden_states = attn(hidden_states,
-                                     context=encoder_hidden_states)
+                hidden_states = attn(
+                    hidden_states,
+                    encoder_hidden_states=encoder_hidden_states).sample
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
@@ -1247,7 +1278,6 @@ class UpBlock2D(nn.Layer):
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = paddle.concat([hidden_states, res_hidden_states],
                                           axis=1)
-
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
@@ -1370,7 +1400,7 @@ class AttnUpDecoderBlock2D(nn.Layer):
                     num_head_channels=attn_num_head_channels,
                     rescale_output_factor=output_scale_factor,
                     eps=resnet_eps,
-                    num_groups=resnet_groups,
+                    norm_num_groups=resnet_groups,
                 ))
 
         self.attentions = nn.LayerList(attentions)
@@ -1495,7 +1525,6 @@ class AttnSkipUpBlock2D(nn.Layer):
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = paddle.concat([hidden_states, res_hidden_states],
                                           axis=1)
-
             hidden_states = resnet(hidden_states, temb)
 
         hidden_states = self.attentions[0](hidden_states)

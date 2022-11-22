@@ -34,7 +34,7 @@ from .utils import logging
 if is_paddle_available():
     from .initializer import *
     from .modeling_utils import ModelMixin
-    from .models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel
+    from .models import AutoencoderKL, Transformer2DModel, UNet1DModel, UNet2DConditionModel, UNet2DModel, VQModel
     from .optimization import (
         get_constant_schedule,
         get_constant_schedule_with_warmup,
@@ -45,16 +45,30 @@ if is_paddle_available():
         get_scheduler,
     )
     from .pipeline_utils import DiffusionPipeline
-    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, LDMSuperResolutionPipeline, PNDMPipeline, ScoreSdeVePipeline
+    from .pipelines import (
+        DanceDiffusionPipeline,
+        DDIMPipeline,
+        DDPMPipeline,
+        KarrasVePipeline,
+        LDMPipeline,
+        LDMSuperResolutionPipeline,
+        PNDMPipeline,
+        RePaintPipeline,
+        ScoreSdeVePipeline,
+    )
     from .schedulers import (
-        EulerAncestralDiscreteScheduler,
         DDIMScheduler,
         DDPMScheduler,
         DPMSolverMultistepScheduler,
+        EulerAncestralDiscreteScheduler,
+        EulerDiscreteScheduler,
+        IPNDMScheduler,
         KarrasVeScheduler,
         PNDMScheduler,
+        RePaintScheduler,
         SchedulerMixin,
         ScoreSdeVeScheduler,
+        VQDiffusionScheduler,
     )
     from .training_utils import EMAModel
 else:
@@ -66,20 +80,27 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
-                            StableDiffusionImg2ImgPipeline,
-                            StableDiffusionInpaintPipeline,
-                            StableDiffusionInpaintPipelineLegacy,
-                            StableDiffusionPipeline,
-                            StableDiffusionPipelineAllinOne)
+    from .pipelines import (
+        AltDiffusionImg2ImgPipeline,
+        AltDiffusionPipeline,
+        CycleDiffusionPipeline,
+        LDMBertModel,
+        LDMTextToImagePipeline,
+        LDMSuperResolutionPipeline,
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipeline,
+        StableDiffusionPipelineAllinOne,
+        VQDiffusionPipeline,
+    )
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
-    from .pipelines import (
-        OnnxStableDiffusionImg2ImgPipeline,
-        OnnxStableDiffusionInpaintPipeline,
-        OnnxStableDiffusionPipeline,
-    )
+    from .pipelines import (OnnxStableDiffusionImg2ImgPipeline,
+                            OnnxStableDiffusionInpaintPipeline,
+                            OnnxStableDiffusionInpaintPipelineLegacy,
+                            OnnxStableDiffusionPipeline)
 else:
     from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403

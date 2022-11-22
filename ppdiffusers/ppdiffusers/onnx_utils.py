@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,12 +23,27 @@ import numpy as np
 
 from .download_utils import ppdiffusers_bos_download
 
-from .utils import ONNX_WEIGHTS_NAME, is_onnx_available, logging
+from .utils import ONNX_EXTERNAL_WEIGHTS_NAME, ONNX_WEIGHTS_NAME, is_onnx_available, logging
 
 if is_onnx_available():
     import onnxruntime as ort
 
 logger = logging.get_logger(__name__)
+
+ORT_TO_NP_TYPE = {
+    "tensor(bool)": np.bool_,
+    "tensor(int8)": np.int8,
+    "tensor(uint8)": np.uint8,
+    "tensor(int16)": np.int16,
+    "tensor(uint16)": np.uint16,
+    "tensor(int32)": np.int32,
+    "tensor(uint32)": np.uint32,
+    "tensor(int64)": np.int64,
+    "tensor(uint64)": np.uint64,
+    "tensor(float16)": np.float16,
+    "tensor(float)": np.float32,
+    "tensor(double)": np.float64,
+}
 
 
 class OnnxRuntimeModel:
@@ -39,7 +54,8 @@ class OnnxRuntimeModel:
         )
         self.model = model
         self.model_save_dir = kwargs.get("model_save_dir", None)
-        self.latest_model_name = kwargs.get("latest_model_name", "model.onnx")
+        self.latest_model_name = kwargs.get("latest_model_name",
+                                            ONNX_WEIGHTS_NAME)
 
     def __call__(self, **kwargs):
         inputs = {k: np.array(v) for k, v in kwargs.items()}
@@ -90,6 +106,15 @@ class OnnxRuntimeModel:
         except shutil.SameFileError:
             pass
 
+        # copy external weights (for models >2GB)
+        src_path = self.model_save_dir.joinpath(ONNX_EXTERNAL_WEIGHTS_NAME)
+        if src_path.exists():
+            dst_path = Path(save_directory).joinpath(ONNX_EXTERNAL_WEIGHTS_NAME)
+            try:
+                shutil.copyfile(src_path, dst_path)
+            except shutil.SameFileError:
+                pass
+
     def save_pretrained(
         self,
         save_directory: Union[str, os.PathLike],
@@ -117,7 +142,7 @@ class OnnxRuntimeModel:
     @classmethod
     def _from_pretrained(
         cls,
-        pretrained_model_name_or_path: Union[str, Path],
+        model_id: Union[str, Path],
         cache_dir: Optional[str] = None,
         file_name: Optional[str] = None,
         provider: Optional[str] = None,
@@ -125,10 +150,10 @@ class OnnxRuntimeModel:
         **kwargs,
     ):
         """
-        Load a model from a directory or the HF Hub.
+        Load a model from a directory or the BOS.
 
         Arguments:
-            pretrained_model_name_or_path (`str` or `Path`):
+            model_id (`str` or `Path`):
                 Directory from which to load
             cache_dir (`Union[str, Path]`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
@@ -143,18 +168,19 @@ class OnnxRuntimeModel:
         """
         model_file_name = file_name if file_name is not None else ONNX_WEIGHTS_NAME
         # load model from local directory
-        if os.path.isdir(pretrained_model_name_or_path):
+        if os.path.isdir(model_id):
             model = OnnxRuntimeModel.load_model(os.path.join(
-                pretrained_model_name_or_path, model_file_name),
+                model_id, model_file_name),
                                                 provider=provider,
                                                 sess_options=sess_options)
-            kwargs["model_save_dir"] = Path(pretrained_model_name_or_path)
+            kwargs["model_save_dir"] = Path(model_id)
         # load model from hub
         else:
             # download model
             model_cache_path = ppdiffusers_bos_download(
-                pretrained_model_name_or_path=pretrained_model_name_or_path,
+                pretrained_model_name_or_path=model_id,
                 filename=model_file_name,
+                cache_dir=cache_dir,
             )
             kwargs["model_save_dir"] = Path(model_cache_path).parent
             kwargs["latest_model_name"] = Path(model_cache_path).name
@@ -169,6 +195,7 @@ class OnnxRuntimeModel:
         model_id: Union[str, Path],
         force_download: bool = True,
         use_auth_token: Optional[str] = None,
+        cache_dir: Optional[str] = None,
         **model_kwargs,
     ):
         revision = None
@@ -178,6 +205,7 @@ class OnnxRuntimeModel:
         return cls._from_pretrained(
             model_id=model_id,
             revision=revision,
+            cache_dir=cache_dir,
             force_download=force_download,
             use_auth_token=use_auth_token,
             **model_kwargs,

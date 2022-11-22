@@ -8,6 +8,22 @@
 * 🔥 **2022.11.04 支持 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 和 IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 中文权重**；
 * 🔥 **2022.10.27 发布 PPDiffusers仓库**。
 
+| ppdiffusers支持的模型名称                  | huggingface对应的模型地址                                     |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| CompVis/stable-diffusion-v1-4            | https://huggingface.co/CompVis/stable-diffusion-v1-4       |
+| CompVis/ldm-text2im-large-256            | https://huggingface.co/CompVis/ldm-text2im-large-256       |
+| runwayml/stable-diffusion-v1-5           | https://huggingface.co/runwayml/stable-diffusion-v1-5      |
+| runwayml/stable-diffusion-inpainting     | https://huggingface.co/runwayml/stable-diffusion-inpainting|
+| hakurei/waifu-diffusion                  | https://huggingface.co/hakurei/waifu-diffusion             |
+| hakurei/waifu-diffusion-v1-3             | https://huggingface.co/hakurei/waifu-diffusion             |
+| naclbit/trinart_stable_diffusion_v2_60k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 |
+| naclbit/trinart_stable_diffusion_v2_95k  | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 |
+| naclbit/trinart_stable_diffusion_v2_115k | https://huggingface.co/naclbit/trinart_stable_diffusion_v2 |
+| Deltaadams/Hentai-Diffusion              | https://huggingface.co/Deltaadams/Hentai-Diffusion         |
+| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1       |
+| IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 | https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-EN-v0.1 |
+| BAAI/AltDiffusion                        | https://huggingface.co/BAAI/AltDiffusion                   |
+| BAAI/AltDiffusion-m9                     | https://huggingface.co/BAAI/AltDiffusion-m9                |
 
 ## 2. 安装
 

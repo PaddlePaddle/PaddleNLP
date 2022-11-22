@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 
@@ -23,7 +22,7 @@ from ..configuration_utils import ConfigMixin, register_to_config
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput, logging
 from .embeddings import TimestepEmbedding, Timesteps
-from .unet_blocks import (
+from .unet_2d_blocks import (
     CrossAttnDownBlock2D,
     CrossAttnUpBlock2D,
     DownBlock2D,
@@ -60,7 +59,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         in_channels (`int`, *optional*, defaults to 4): The number of channels in the input sample.
         out_channels (`int`, *optional*, defaults to 4): The number of channels in the output.
         center_input_sample (`bool`, *optional*, defaults to `False`): Whether to center the input sample.
-        flip_sin_to_cos (`bool`, *optional*, defaults to `False`):
+        flip_sin_to_cos (`bool`, *optional*, defaults to `True`):
             Whether to flip the sin to cos in the time embedding.
         freq_shift (`int`, *optional*, defaults to 0): The frequency shift to apply to the time embedding.
         down_block_types (`Tuple[str]`, *optional*, defaults to `("CrossAttnDownBlock2D", "CrossAttnDownBlock2D", "CrossAttnDownBlock2D", "DownBlock2D")`):
@@ -256,7 +255,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         Args:
             sample (`paddle.Tensor`): (batch, channel, height, width) noisy inputs tensor
             timestep (`paddle.Tensor` or `float` or `int`): (batch) timesteps
-            encoder_hidden_states (`paddle.Tensor`): (batch, channel, height, width) encoder hidden states
+            encoder_hidden_states (`paddle.Tensor`):
+                (batch_size, sequence_length, hidden_size) encoder hidden states
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`models.unet_2d_condition.UNet2DConditionOutput`] instead of a plain tuple.
 
@@ -286,6 +286,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # 1. time
         timesteps = timestep
+        timesteps = timestep
         if not paddle.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
             timesteps = paddle.to_tensor([timesteps], dtype="int64")
@@ -302,7 +303,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         # timesteps does not contain any weights and will always return f32 tensors
         # but time_embedding might actually be running in fp16. so we need to cast here.
         # there might be better ways to encapsulate this.
-        t_emb = t_emb.astype(self.dtype)
+        t_emb = t_emb.cast(self.dtype)
         emb = self.time_embedding(t_emb)
 
         # 2. pre-process

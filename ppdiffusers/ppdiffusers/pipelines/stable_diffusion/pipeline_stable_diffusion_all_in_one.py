@@ -30,19 +30,20 @@ from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPToke
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler, EulerAncestralDiscreteScheduler
-from ...utils import deprecate, logging
+from ...schedulers import (
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+)
+from ...utils import PIL_INTERPOLATION, deprecate, logging
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
 from ...utils.testing_utils import load_image
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
-
-from paddlenlp.utils.tools import compare_version
-if compare_version(PIL.__version__, "9.1.0") >= 0:
-    Resampling = PIL.Image.Resampling
-else:
-    Resampling = PIL.Image
 
 
 def save_all(images, FORMAT="jpg", OUTDIR="./outputs/"):
@@ -436,7 +437,7 @@ def get_weighted_text_embeddings(
 def preprocess_image(image):
     w, h = image.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    image = image.resize((w, h), resample=Resampling.LANCZOS)
+    image = image.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])
     image = np.array(image).astype(np.float32) / 255.0
     image = image[None].transpose(0, 3, 1, 2)
     image = paddle.to_tensor(image)
@@ -447,7 +448,7 @@ def preprocess_mask(mask):
     mask = mask.convert("L")
     w, h = mask.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    mask = mask.resize((w // 8, h // 8), resample=Resampling.NEAREST)
+    mask = mask.resize((w // 8, h // 8), resample=PIL_INTERPOLATION["nearest"])
     mask = np.array(mask).astype(np.float32) / 255.0
     mask = np.tile(mask, (4, 1, 1))
     mask = mask[None].transpose(0, 1, 2, 3)  # what does this step do?
@@ -461,7 +462,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
     Pipeline for text-to-image image-to-image inpainting generation using Stable Diffusion.
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular xxxx, etc.)
 
     Args:
         vae ([`AutoencoderKL`]):
@@ -475,8 +476,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            A scheduler to be used in combination with `unet` to denoise the encoded image latens. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
+            A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/junnyu/stable-diffusion-v1-4-paddle) for details.
@@ -491,7 +493,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
-                         EulerAncestralDiscreteScheduler],
+                         EulerDiscreteScheduler,
+                         EulerAncestralDiscreteScheduler,
+                         DPMSolverMultistepScheduler],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
     ):
@@ -705,7 +709,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         if latents is None:
             if seed is not None:
                 paddle.seed(seed)
-
             latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
         else:
             if latents.shape != latents_shape:
@@ -717,7 +720,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         self.scheduler.set_timesteps(num_inference_steps)
 
         # Some schedulers like PNDM have timesteps as arrays
-        # It's more optimized to move all timesteps to correct device beforehand
         timesteps_tensor = self.scheduler.timesteps
 
         # scale the initial noise by the standard deviation required by the scheduler
@@ -898,7 +900,8 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                         skip_parsing=skip_parsing,
                         skip_weighting=skip_weighting,
                         epoch_time=time.time())
-
+        if seed is not None:
+            paddle.seed(seed)
         if isinstance(prompt, str):
             batch_size = 1
         elif isinstance(prompt, list):
@@ -979,9 +982,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         timesteps = timesteps.tile([
             batch_size * num_images_per_prompt,
         ])
-
-        if seed is not None:
-            paddle.seed(seed)
         # add noise to latents using the timesteps
         noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
         init_latents = self.scheduler.add_noise(init_latents, noise, timesteps)
@@ -1001,7 +1001,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         t_start = max(num_inference_steps - init_timestep + offset, 0)
 
         # Some schedulers like PNDM have timesteps as arrays
-        # It's more optimized to move all timesteps to correct device beforehand
         timesteps = self.scheduler.timesteps[t_start:]
 
         for i, t in enumerate(self.progress_bar(timesteps)):
@@ -1176,6 +1175,8 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                         skip_parsing=skip_parsing,
                         skip_weighting=skip_weighting,
                         epoch_time=time.time())
+        if seed is not None:
+            paddle.seed(seed)
         if isinstance(prompt, str):
             batch_size = 1
         elif isinstance(prompt, list):
@@ -1252,8 +1253,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         ])
 
         # add noise to latents using the timesteps
-        if seed is not None:
-            paddle.seed(seed)
         noise = paddle.randn(init_latents.shape, dtype=latents_dtype)
         init_latents = self.scheduler.add_noise(init_latents, noise, timesteps)
 
@@ -1272,7 +1271,6 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         t_start = max(num_inference_steps - init_timestep + offset, 0)
 
         # Some schedulers like PNDM have timesteps as arrays
-        # It's more optimized to move all timesteps to correct device beforehand
         timesteps = self.scheduler.timesteps[t_start:]
 
         for i, t in enumerate(self.progress_bar(timesteps)):
@@ -1331,3 +1329,21 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         return StableDiffusionPipelineOutput(
             images=image, nsfw_content_detected=has_nsfw_concept)
+
+    @staticmethod
+    def numpy_to_pil(images, **kwargs):
+        """
+        Convert a numpy image or a batch of images to a PIL image.
+        """
+        if images.ndim == 3:
+            images = images[None, ...]
+        images = (images * 255).round().astype("uint8")
+        pil_images = []
+        argument = kwargs.pop("argument", None)
+        for image in images:
+            image = PIL.Image.fromarray(image)
+            if argument is not None:
+                image.argument = argument
+            pil_images.append(image)
+
+        return pil_images

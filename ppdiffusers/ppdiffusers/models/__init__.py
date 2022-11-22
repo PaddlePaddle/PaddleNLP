@@ -16,6 +16,8 @@
 from ..utils import is_paddle_available
 
 if is_paddle_available():
+    from .attention import Transformer2DModel
+    from .unet_1d import UNet1DModel
     from .unet_2d import UNet2DModel
     from .unet_2d_condition import UNet2DConditionModel
     from .vae import AutoencoderKL, VQModel

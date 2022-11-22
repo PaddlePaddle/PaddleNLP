@@ -22,12 +22,12 @@ import paddle
 from scipy import integrate
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput, deprecate
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput
 from .scheduling_utils import SchedulerMixin
 
 
 @dataclass
-# Copied from ppdiffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->LMSDiscrete
+# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->LMSDiscrete
 class LMSDiscreteSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -53,8 +53,8 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
@@ -68,6 +68,8 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
+
     @register_to_config
     def __init__(
         self,
@@ -77,7 +79,6 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_schedule: str = "linear",
         trained_betas: Optional[np.ndarray] = None,
     ):
-
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
@@ -111,7 +112,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps = np.linspace(0,
                                 num_train_timesteps - 1,
                                 num_train_timesteps,
-                                dtype=np.float32)[::-1].copy()
+                                dtype=float)[::-1].copy()
         self.timesteps = paddle.to_tensor(timesteps)
         self.derivatives = []
         self.is_scale_input_called = False
@@ -215,17 +216,6 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
                 "See `StableDiffusionPipeline` for a usage example.")
 
-        # if (isinstance(timestep, int) or isinstance(timestep, paddle.Tensor)):
-        #     deprecate(
-        #         "timestep as an index",
-        #         "0.8.0",
-        #         "Passing integer indices (e.g. from `enumerate(timesteps)`) as timesteps to"
-        #         " `LMSDiscreteScheduler.step()` will not be supported in future versions. Make sure to pass"
-        #         " one of the `scheduler.timesteps` as a timestep.",
-        #         standard_warn=False,
-        #     )
-        #     step_index = timestep
-        # else:
         step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]
 
@@ -263,25 +253,13 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure sigmas and timesteps have the same dtype as original_samples
-        self.sigmas = self.sigmas.astype(original_samples.dtype)
-
+        sigmas = self.sigmas.cast(original_samples.dtype)
         schedule_timesteps = self.timesteps
 
-        # if isinstance(timesteps, paddle.Tensor):
-        #     deprecate(
-        #         "timesteps as indices",
-        #         "0.8.0",
-        #         "Passing integer indices  (e.g. from `enumerate(timesteps)`) as timesteps to"
-        #         " `LMSDiscreteScheduler.add_noise()` will not be supported in future versions. Make sure to"
-        #         " pass values from `scheduler.timesteps` as timesteps.",
-        #         standard_warn=False,
-        #     )
-        #     step_indices = timesteps
-        # else:
         step_indices = [(schedule_timesteps == t).nonzero().item()
                         for t in timesteps]
 
-        sigma = self.sigmas[step_indices].flatten()
+        sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
             sigma = sigma.unsqueeze(-1)
 

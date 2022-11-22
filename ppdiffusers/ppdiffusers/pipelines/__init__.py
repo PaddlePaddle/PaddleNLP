@@ -16,26 +16,35 @@
 from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available
 
 if is_paddle_available():
+    from .dance_diffusion import DanceDiffusionPipeline
     from .ddim import DDIMPipeline
     from .ddpm import DDPMPipeline
+    from .latent_diffusion import LDMSuperResolutionPipeline
     from .latent_diffusion_uncond import LDMPipeline
     from .pndm import PNDMPipeline
+    from .repaint import RePaintPipeline
     from .score_sde_ve import ScoreSdeVePipeline
     from .stochastic_karras_ve import KarrasVePipeline
 else:
     from ..utils.dummy_paddle_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
+    from .alt_diffusion import AltDiffusionImg2ImgPipeline, AltDiffusionPipeline, RobertaSeriesModelWithTransformation, XLMRobertaTokenizer
     from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
-    from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
-                                   StableDiffusionInpaintPipeline,
-                                   StableDiffusionPipeline,
-                                   StableDiffusionInpaintPipelineLegacy,
-                                   StableDiffusionPipelineAllinOne)
+    from .stable_diffusion import (
+        CycleDiffusionPipeline,
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipeline,
+        StableDiffusionPipelineAllinOne,
+    )
+    from .vq_diffusion import VQDiffusionPipeline
 
 if is_paddlenlp_available() and is_onnx_available():
     from .stable_diffusion import (
         OnnxStableDiffusionImg2ImgPipeline,
         OnnxStableDiffusionInpaintPipeline,
+        OnnxStableDiffusionInpaintPipelineLegacy,
         OnnxStableDiffusionPipeline,
     )

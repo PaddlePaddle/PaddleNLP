@@ -24,12 +24,12 @@ import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput
 from .scheduling_utils import SchedulerMixin
 
 
 @dataclass
-# Copied from ppdiffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->DDIM
+# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->DDIM
 class DDIMSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -84,8 +84,8 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     For more details, see the original paper: https://arxiv.org/abs/2010.02502
 
@@ -110,6 +110,8 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             stable diffusion.
 
     """
+
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
 
     @register_to_config
     def __init__(
@@ -159,7 +161,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         # setable values
         self.num_inference_steps = None
         self.timesteps = paddle.to_tensor(
-            np.arange(0, num_train_timesteps)[::-1].copy().astype("int64"))
+            np.arange(0, num_train_timesteps)[::-1].copy().astype(np.int64))
 
     def scale_model_input(self,
                           sample: paddle.Tensor,
@@ -202,7 +204,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         # creates integer timesteps by multiplying by ratio
         # casting to int to avoid issues when num_inference_step is power of 3
         timesteps = (np.arange(0, num_inference_steps) *
-                     step_ratio).round()[::-1].copy().astype("int64")
+                     step_ratio).round()[::-1].copy().astype(np.int64)
         self.timesteps = paddle.to_tensor(timesteps)
         self.timesteps += self.config.steps_offset
 
@@ -213,6 +215,8 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         sample: paddle.Tensor,
         eta: float = 0.0,
         use_clipped_model_output: bool = False,
+        generator=None,
+        variance_noise: Optional[paddle.Tensor] = None,
         return_dict: bool = True,
     ) -> Union[DDIMSchedulerOutput, Tuple]:
         """
@@ -225,7 +229,14 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
             eta (`float`): weight of noise for added noise in diffusion step.
-            use_clipped_model_output (`bool`): TODO
+            use_clipped_model_output (`bool`): if `True`, compute "corrected" `model_output` from the clipped
+                predicted original sample. Necessary because predicted original sample is clipped to [-1, 1] when
+                `self.config.clip_sample` is `True`. If no clipping has happened, "corrected" `model_output` would
+                coincide with the one provided as input and `use_clipped_model_output` will have not effect.
+            generator: random number generator.
+            variance_noise (`paddle.Tensor`): instead of generating noise for the variance using `generator`, we
+                can directly provide the noise for the variance itself. This is useful for methods such as
+                CycleDiffusion. (https://arxiv.org/abs/2210.05559)
             return_dict (`bool`): option for returning tuple rather than DDIMSchedulerOutput class
 
         Returns:
@@ -288,10 +299,18 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             0.5) * pred_original_sample + pred_sample_direction
 
         if eta > 0:
-            # randn_like does not support seed https://github.com/pytorch/pytorch/issues/27072
-            noise = paddle.randn(model_output.shape, dtype=model_output.dtype)
-            variance = self._get_variance(timestep,
-                                          prev_timestep)**(0.5) * eta * noise
+            # randn_like does not support generator https://github.com/pytorch/pytorch/issues/27072
+            if variance_noise is not None and generator is not None:
+                raise ValueError(
+                    "Cannot pass both generator and variance_noise. Please make sure that either `generator` or"
+                    " `variance_noise` stays `None`.")
+
+            if variance_noise is None:
+                variance_noise = paddle.randn(model_output.shape,
+                                              generator=generator,
+                                              dtype=model_output.dtype)
+            variance = self._get_variance(
+                timestep, prev_timestep)**(0.5) * eta * variance_noise
 
             prev_sample = prev_sample + variance
 
@@ -308,7 +327,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.astype(original_samples.dtype)
+        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
         sqrt_alpha_prod = self.alphas_cumprod[timesteps]**0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()

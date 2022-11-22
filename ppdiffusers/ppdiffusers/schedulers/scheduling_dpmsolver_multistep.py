@@ -22,6 +22,7 @@ import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS
 from .scheduling_utils import SchedulerMixin, SchedulerOutput
 
 
@@ -51,7 +52,7 @@ def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999):
         t1 = i / num_diffusion_timesteps
         t2 = (i + 1) / num_diffusion_timesteps
         betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
-    return paddle.to_tensor(betas, dtype=paddle.float32)
+    return paddle.to_tensor(betas, dtype="float32")
 
 
 class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
@@ -72,8 +73,8 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
@@ -117,14 +118,7 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
-    _compatible_classes = [
-        "DDIMScheduler",
-        "DDPMScheduler",
-        "PNDMScheduler",
-        "LMSDiscreteScheduler",
-        "EulerDiscreteScheduler",
-        "EulerAncestralDiscreteScheduler",
-    ]
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
 
     @register_to_config
     def __init__(
@@ -149,13 +143,13 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
             self.betas = paddle.linspace(beta_start,
                                          beta_end,
                                          num_train_timesteps,
-                                         dtype=paddle.float32)
+                                         dtype="float32")
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
             self.betas = (paddle.linspace(beta_start**0.5,
                                           beta_end**0.5,
                                           num_train_timesteps,
-                                          dtype=paddle.float32)**2)
+                                          dtype="float32")**2)
         elif beta_schedule == "squaredcos_cap_v2":
             # Glide cosine schedule
             self.betas = betas_for_alpha_bar(num_train_timesteps)
@@ -494,8 +488,8 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
         noise: paddle.Tensor,
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
-        # Make sure alphas_cumprod and timestep have same device and dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.astype(original_samples.dtype)
+        # Make sure alphas_cumprod and timestep have same dtype as original_samples
+        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
         sqrt_alpha_prod = self.alphas_cumprod[timesteps]**0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()

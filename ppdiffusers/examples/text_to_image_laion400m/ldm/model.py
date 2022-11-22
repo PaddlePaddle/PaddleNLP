@@ -22,7 +22,11 @@ from paddlenlp.transformers import AutoTokenizer
 
 from ppdiffusers.modeling_utils import freeze_params
 from ppdiffusers.models.ema import LitEma
-from ppdiffusers.models.attention import AttentionBlock, SpatialTransformer
+from ppdiffusers.models.attention import AttentionBlock
+try:
+    from ppdiffusers.models.attention import SpatialTransformer
+except:
+    from ppdiffusers.models.attention import Transformer2DModel as SpatialTransformer
 from ppdiffusers.models.resnet import ResnetBlock2D
 from ppdiffusers.initializer import reset_initialized_parameter, normal_, zeros_
 from paddlenlp.utils.log import logger
