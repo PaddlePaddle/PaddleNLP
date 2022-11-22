@@ -796,12 +796,6 @@ class T5Stack(nn.Layer):
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=False):
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (output_hidden_states
-                                if output_hidden_states is not None else
-                                self.config.output_hidden_states)
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if input_ids is not None and inputs_embeds is not None:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(
@@ -1128,10 +1122,10 @@ class T5Model(T5PretrainedModel):
                 cache=None,
                 inputs_embeds=None,
                 decoder_inputs_embeds=None,
-                use_cache=True,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                use_cache=None,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The T5Model forward method, overrides the `__call__()` special method.
 
@@ -1369,9 +1363,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 inputs_embeds=None,
                 decoder_inputs_embeds=None,
                 use_cache=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
 
         Args:
@@ -1693,10 +1687,10 @@ class T5EncoderModel(T5PretrainedModel):
         encoder_attention_mask: Optional[Tensor] = None,
         cache=None,
         inputs_embeds: Optional[Tensor] = None,
-        use_cache: Optional[bool] = False,
-        output_attentions: Optional[bool] = False,
-        output_hidden_states: Optional[bool] = False,
-        return_dict: Optional[bool] = False,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         encoder_outputs = self.encoder(
