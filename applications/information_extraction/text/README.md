@@ -66,7 +66,7 @@ rm military.tar.gz
 python ../label_studio.py \
     --label_studio_file ./data/label_studio.json \
     --save_dir ./data \
-    --splits 0.7 0.3 0 \
+    --splits 0.76 0.24 0 \
     --negative_ratio 3 \
     --task_type ext
 ```
@@ -252,17 +252,17 @@ python evaluate.py \
 >>> my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best')
 >>> pprint(my_ie("威尔哥（Virgo）减速炸弹是由瑞典FFV军械公司专门为瑞典皇家空军的攻击机实施低空高速轰炸而研制，1956年开始研制，1963年进入服役，装备于A32“矛盾”、A35“龙”、和AJ134“雷”攻击机，主要用于攻击登陆艇、停放的飞机、高炮、野战火炮、轻型防护装甲车辆以及有生力量。"))
 [{'武器名称': [{'end': 14,
-            'probability': 0.9575406187053304,
+            'probability': 0.9998632702221926,
             'relations': {'产国': [{'end': 18,
-                                  'probability': 0.9985741073293752,
+                                  'probability': 0.9998815094394331,
                                   'start': 16,
                                   'text': '瑞典'}],
                           '研发单位': [{'end': 25,
-                                    'probability': 0.9634632182946916,
-                                    'start': 16,
-                                    'text': '瑞典FFV军械公司'}],
+                                    'probability': 0.9995875123178521,
+                                    'start': 18,
+                                    'text': 'FFV军械公司'}],
                           '类型': [{'end': 14,
-                                  'probability': 0.5830895501723887,
+                                  'probability': 0.999877336059086,
                                   'start': 12,
                                   'text': '炸弹'}]},
             'start': 0,

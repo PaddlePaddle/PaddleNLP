@@ -386,7 +386,7 @@ class UIETask(Task):
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
-        self.use_faster = kwargs.get("use_faster", False)
+        self.use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
         self._expand_to_a4_size = kwargs.get("expand_to_a4_size", True)

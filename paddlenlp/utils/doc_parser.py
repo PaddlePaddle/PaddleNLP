@@ -45,7 +45,11 @@ class DocParser(object):
         self.use_gpu = use_gpu
         self.device_id = device_id
 
-    def parse(self, doc, keep_whitespace=False, expand_to_a4_size=False):
+    def parse(self,
+              doc,
+              keep_whitespace=False,
+              expand_to_a4_size=False,
+              return_ocr_result=True):
         """
         parse
         """
@@ -62,13 +66,14 @@ class DocParser(object):
             image, offset_x, offset_y = self.expand_image_to_a4_size(
                 image, center=True)
         img_w, img_h = image.shape[1], image.shape[0]
-        layout, image = self.ocr(image, keep_whitespace=keep_whitespace)
-        doc['layout'] = layout
         doc['image'] = np2base64(image)
         doc['offset_x'] = offset_x
         doc['offset_y'] = offset_y
         doc['img_w'] = img_w
         doc['img_h'] = img_h
+        if return_ocr_result:
+            layout = self.ocr(image, keep_whitespace=keep_whitespace)
+            doc['layout'] = layout
         return doc
 
     def __call__(self, *args, **kwargs):
@@ -135,7 +140,7 @@ class DocParser(object):
                             cell_box[0], cell_box[1], cell_box[4], cell_box[5]
                         ]
                         layout.append((box, text.replace(" ", ""), 0.9))
-        return layout, image
+        return layout
 
     @classmethod
     def _get_buffer(self, data, file_like=False):
