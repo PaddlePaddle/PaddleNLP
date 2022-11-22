@@ -354,7 +354,7 @@ class UIETask(Task):
                 "f144bd065ea90cc26eaa91197124bdcc"
             ],
             "sentencepiece_model_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/sentencepiece.bpe.model",
                 "bf25eb5120ad92ef5c7d8596b5dc4046"
             ],
         },
@@ -495,8 +495,8 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self._task_path, use_faster=self.use_faster)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path,
+                                                        use_fast=self.use_fast)
 
     def _preprocess(self, inputs):
         """
@@ -1275,7 +1275,7 @@ class GPTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        # TODO(zhoushunjie): Will set use_faster=True in future.
+        # TODO(zhoushunjie): Will set use_fast=True in future.
         self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
 
     def _preprocess(self, inputs):

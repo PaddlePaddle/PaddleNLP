@@ -18,6 +18,7 @@ import tempfile
 import unittest
 import numpy as np
 import random
+from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
@@ -90,7 +91,6 @@ class BartModelTester:
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.is_training = is_training
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -168,15 +168,18 @@ class BartModelTester:
         decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1],
                                               dtype=paddle.get_default_dtype())
 
-        encoder_output = encoder(input_ids, attention_mask)
+        encoder_output = encoder(input_ids,
+                                 attention_mask,
+                                 return_dict=self.parent.return_dict)
         origin_cache = decoder.decoder.gen_cache(encoder_output)
         outputs = decoder(decoder_input_ids,
                           decoder_attention_mask,
                           encoder_output,
                           attention_mask,
-                          cache=origin_cache)
+                          cache=origin_cache,
+                          return_dict=self.parent.return_dict)
 
-        output, cache = outputs
+        output, cache = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3),
@@ -191,16 +194,19 @@ class BartModelTester:
         next_attention_mask = paddle.concat(
             [decoder_attention_mask, next_attn_mask], axis=-1)
 
-        output_from_no_past, _ = decoder(next_input_ids,
-                                         next_attention_mask,
-                                         encoder_output,
-                                         attention_mask,
-                                         cache=origin_cache)
+        output_from_no_past = decoder(next_input_ids,
+                                      next_attention_mask,
+                                      encoder_output,
+                                      attention_mask,
+                                      return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
         output_from_past, _ = decoder(next_tokens,
                                       next_attention_mask,
                                       encoder_output,
                                       attention_mask,
-                                      cache=cache)
+                                      cache=cache,
+                                      return_dict=self.parent.return_dict)[:2]
 
         # select random slice
         random_slice_idx = ids_tensor((1, ),
@@ -222,8 +228,16 @@ class BartModelTester:
                             atol=1e-3))
 
 
+@parameterized_class(("return_dict", "use_labels"), [
+    [False, False],
+    [False, True],
+    [True, False],
+    [True, True],
+])
 class BartHeadTests(unittest.TestCase):
     vocab_size = 99
+    use_labels = False
+    return_dict = False
 
     def _get_config_and_data(self):
         input_ids = paddle.to_tensor(
@@ -266,27 +280,57 @@ class BartHeadTests(unittest.TestCase):
         config, input_ids, batch_size = self._get_config_and_data()
         bart_model = BartModel(**config)
         num_labels = 2
+        labels = _long_tensor([1] * batch_size) if self.use_labels else None
         model = BartForSequenceClassification(bart_model, num_labels=num_labels)
-        outputs = model(input_ids=input_ids, decoder_input_ids=input_ids)
+        outputs = model(input_ids=input_ids,
+                        decoder_input_ids=input_ids,
+                        labels=labels,
+                        return_dict=self.return_dict)
         expected_shape = [batch_size, num_labels]
-        self.assertEqual(outputs.shape, expected_shape)
+        if self.use_labels:
+            self.assertIsInstance(outputs[0].item(), float)  # test loss
+            self.assertEqual(outputs[1].shape, expected_shape)  # test logits
+        elif isinstance(outputs, paddle.Tensor):
+            self.assertEqual(outputs.shape, expected_shape)
+        else:
+            self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_question_answering_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
+        sequence_labels = ids_tensor([batch_size],
+                                     2) if self.use_labels else None
         bart_model = BartModel(**config)
         model = BartForQuestionAnswering(bart_model)
-        start_logits, end_logits = model(input_ids=input_ids)
+        outputs = model(input_ids=input_ids,
+                        start_positions=sequence_labels,
+                        end_positions=sequence_labels,
+                        return_dict=self.return_dict)
 
+        if self.use_labels:
+            loss, start_logits, end_logits = outputs[:3]
+            self.assertIsInstance(loss.item(), float)
+        else:
+            start_logits, end_logits = outputs[:2]
         self.assertEqual(start_logits.shape, input_ids.shape)
         self.assertEqual(end_logits.shape, input_ids.shape)
 
     def test_lm_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
         bart_model = BartModel(**config)
+        lm_labels = ids_tensor([batch_size, input_ids.shape[1]],
+                               self.vocab_size) if self.use_labels else None
         lm_model = BartForConditionalGeneration(bart_model)
-        outputs = lm_model(input_ids=input_ids)
+        outputs = lm_model(input_ids=input_ids,
+                           labels=lm_labels,
+                           return_dict=self.return_dict)
         expected_shape = [batch_size, input_ids.shape[1], config["vocab_size"]]
-        self.assertEqual(outputs.shape, expected_shape)
+        if self.use_labels:
+            self.assertIsInstance(outputs[0].item(), float)
+            self.assertEqual(outputs[1].shape, expected_shape)
+        elif isinstance(outputs, paddle.Tensor):
+            self.assertEqual(outputs.shape, expected_shape)
+        else:
+            self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_lm_uneven_forward(self):
         config = {
@@ -307,10 +351,18 @@ class BartHeadTests(unittest.TestCase):
             dtype="int64")
         summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]],
                                    dtype="int64")
-        outputs = lm_model(input_ids=context, decoder_input_ids=summary)
+        outputs = lm_model(input_ids=context,
+                           decoder_input_ids=summary,
+                           labels=summary if self.use_labels else None,
+                           return_dict=self.return_dict)
         expected_shape = summary.shape
         expected_shape.append(config["vocab_size"])
-        self.assertEqual(outputs.shape, expected_shape)
+        if self.use_labels:
+            self.assertIsInstance(outputs[0].item(), float)
+        elif isinstance(outputs, paddle.Tensor):
+            self.assertEqual(outputs.shape, expected_shape)
+        else:
+            self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_generate_beam_search(self):
         input_ids = paddle.to_tensor([[71, 82, 2], [68, 34, 2]], dtype="int64")
@@ -363,8 +415,9 @@ class BartHeadTests(unittest.TestCase):
             paddle.to_tensor([0, 11349, 495, 4040, 571, 2]),
         ]
         for ex, desired_result in zip(examples, fairseq_results):
-            bart_toks = tokenizer.encode(ex, return_tensors="pd").squeeze()
-            assert_tensors_close(desired_result.long(), bart_toks, prefix=ex)
+            bart_toks = tokenizer.encode(
+                ex, return_tensors="pd")["input_ids"].squeeze()
+            assert_tensors_close(desired_result, bart_toks, prefix=ex)
 
 
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
@@ -373,6 +426,7 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     all_model_classes = (BartModel, BartForConditionalGeneration,
                          BartForSequenceClassification,
                          BartForQuestionAnswering)
+
     all_generative_model_classes = {
         BartForConditionalGeneration: (BartModel, "bart")
     }
@@ -380,6 +434,8 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     fx_compatible = True
     test_pruning = False
     test_missing_keys = False
+    use_labels = False
+    return_dict = False
 
     def setUp(self):
         self.model_tester = BartModelTester(self)
@@ -398,11 +454,11 @@ def assert_tensors_close(a, b, atol=1e-12, prefix=""):
     if a is None and b is None:
         return True
     try:
-        if paddle.allclose(a, b, atol=atol):
+        if paddle.allclose(a.astype("float32"), b.astype("float32"), atol=atol):
             return True
         raise
     except Exception:
-        pct_different = (paddle.gt((a - b).abs(), atol)).float().mean().item()
+        pct_different = ((a - b).abs() > atol).astype("float").mean().item()
         if a.numel() > 100:
             msg = f"tensor values are {pct_different:.1%} percent different."
         else:
@@ -427,8 +483,9 @@ class FastIntegrationTests(unittest.TestCase):
         return BartForConditionalGeneration.from_pretrained("bart-base")
 
     def test_bart_base_generation(self):
-        model = self.bart_base
-        tok = self.tok
+        model = self.bart_base()
+        model.eval()
+        tok = self.tok()
         ARTICLE = (
             "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
             " Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The"
@@ -467,7 +524,7 @@ class FastIntegrationTests(unittest.TestCase):
             " 2002 to prosecute genocide, crimes against humanity and war crimes."
         )
         EXPECTED = (
-            " The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC's founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed \"in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014.\" Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday's ceremony said it was a move toward greater justice. \"As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice,\" he said, according to an ICC news release. \"Indeed, today brings us closer to our shared goals of ending a long era of impunity and peace. \"Indeed, today brings us closer to our shared goals of justice and peace,\" he said, according to an ICC news release. \"The ICC is a step closer to ending a long era of impunity and injustice,\" he said, according to an ICC news release. \"Indeed, today brings us closer to our shared goals of justice and peace.\" Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. \"As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly,\" she said. Rights group Human Rights Watch said the development. \"Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court's treaty should speak out to welcome its membership. \"What's objectionable is the attempts to undermine international justice, not Palestine's decision to join a treaty to which over 100 countries around the world are members.\" In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. \"As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that Palestine is eligible to join the ICC,\" the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. \"We will continue to support actions against Palestine,\" it said in a statement, it said. \"We will continue to support the court's decision. \"We will continue to fight against the ICC and the ICC. We will continue to fight for the rights of the Palestinians, and we will continue to fight for the cause of Palestine. We will continue to fight for justice and justice,\" it said in a statement. \"We will continue to fight against the ICC for its purposes and refers to the territories as \"Palestine.\" While a preliminary examination is not a formal investigation, it allows the court. The court is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would \"conduct its analysis in full independence and impartiality.\" The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes. "
+            'The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC\'s founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed "in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014." Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians\' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday\'s ceremony, said it was a move toward greater justice. "As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly," she said. Rights group Human Rights Watch welcomed the development. "Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court\'s treaty should speak out to welcome its membership," said Balkees Jarrah, international justice counsel for the group. "What\'s objectionable is the attempts to undermine international justice, not Palestine\'s decision to join a treaty to which over 100 countries around the world are members." In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. The United States also said it "strongly" disagreed with the court\'s decision. "As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that it is eligible to join the ICC," the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. "We will continue to oppose actions against Israel at the ICC as counterproductive to the cause of peace," it said. But the ICC begs to differ with the definition of a state for its purposes and refers to the territories as "Palestine." While a preliminary examination is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would "conduct its analysis in full independence and impartiality." The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes.'
         )
 
         dct = tok(ARTICLE, return_tensors="pd")
@@ -478,12 +535,11 @@ class FastIntegrationTests(unittest.TestCase):
                                           decode_strategy="beam_search",
                                           max_length=1024)
         result = tok.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        assert EXPECTED == result
+        assert EXPECTED == result, f"{EXPECTED}\n{result}"
 
     def test_xsum_1_1_batch_generation(self):
         # test batch
-
-        batch = self.tok(
+        batch = self.tok()(
             [
                 "The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
                 " Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories."
@@ -600,16 +656,22 @@ class FastIntegrationTests(unittest.TestCase):
             padding="longest",
             truncation=True,
         )
-        generated_ids = self.xsum_1_1_model.generate(**batch, num_beams=4)
-        result = self.tok.batch_decode(generated_ids, skip_special_tokens=True)
+        model = self.bart_base()
+        model.eval()
+
+        generated_ids, _ = model.generate(**batch,
+                                          num_beams=4,
+                                          decode_strategy="beam_search")
+        result = self.tok().batch_decode(generated_ids,
+                                         skip_special_tokens=True)
         assert (
             result[0] ==
-            " The International Criminal Court (ICC) has announced that it has been announced by the International"
-            " Criminal court.")
+            "The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a"
+        )
         assert (
             result[1] ==
-            " An investigation into the crash that killed at least 10 people in the French capital has been"
-            " released by the French police investigating the crash.")
+            "The French prosecutor leading an investigation into the crash of Germanwings Flight 9525 insisted Wednesday that"
+        )
 
 
 class BartModelIntegrationTests(unittest.TestCase):
@@ -631,7 +693,7 @@ class BartModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             output = model(input_ids=input_ids, attention_mask=attention_mask)
         expected_shape = [1, 11, 1024]
-        self.assertEqual(output.shape, expected_shape)
+        self.assertEqual(output[0].shape, expected_shape)
 
     @slow
     def test_cnn_summarization_same_as_fairseq(self):

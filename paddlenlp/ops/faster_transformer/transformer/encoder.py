@@ -116,7 +116,7 @@ def infer_transformer_encoder(
 
     attrs_names = [
         'head_num', 'size_per_head', 'use_gelu', "remove_padding", 'int8_mode',
-        'num_layer', 'layer_idx', 'allow_gemm_test', 'use_trt_kernel'
+        'num_layer', 'layer_idx', 'allow_gemm_test', 'use_trt_kernel',
         'normalize_before'
     ]
 

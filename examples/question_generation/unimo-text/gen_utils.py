@@ -162,9 +162,7 @@ def convert_example(example,
                 index_list[0]) + [3] * (index_list[4] - index_list[1]) + [0] * (
                     index_list[6] - index_list[4]) + [1] * (
                         len(tokenized_example['input_ids']) - index_list[6])
-        assert ('target' in example
-                and example['target']) or ('question' in example
-                                           and example['question']), example
+
         if 'target' in example and example['target']:
             tokenized_example['target'] = example['target']
         elif 'question' in example and example['question']:

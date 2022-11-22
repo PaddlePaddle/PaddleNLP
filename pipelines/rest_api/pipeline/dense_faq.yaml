@@ -32,13 +32,14 @@ components:    # define all the building-blocks for Pipeline
   - name: Preprocessor
     type: PreProcessor
     params:
-      split_by: word
-      split_length: 1000
+      split_by: passage
+      split_respect_sentence_boundary: False
+      split_answers: True
   - name: FileTypeClassifier
     type: FileTypeClassifier
 
 pipelines:
-  - name: query    # a sample extractive-qa Pipeline
+  - name: query 
     type: Query
     nodes:
       - name: Retriever

@@ -65,9 +65,9 @@
 
    内存: 630 GB
 
-3. PaddlePaddle 版本：2.3.1
+3. PaddlePaddle 版本：2.4rc
 
-4. PaddleNLP 版本：2.3.5 (develop)
+4. PaddleNLP 版本：2.4.3
 
 5. 评估设置
 
@@ -76,13 +76,14 @@
 - 微调
 
 ```
+cd ../
 python train.py --dataset_dir "./data/" --save_dir "./checkpoints" --max_seq_length 128 --model_name "ernie-3.0-base-zh" --batch_size 8 --learning_rate 3e-5 --epochs 100 --logging_steps 5 --early_stop
 ```
 
 - 提示学习
 
 ```
-python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条新闻写的是" --model_name_or_path ernie-3.0-base-zh --max_seq_length 128  --learning_rate 3e-5 --ppt_learning_rate 3e-4 --do_train --do_eval --num_train_epochs 100 --logging_steps 5 --per_device_eval_batch_size 32 --per_device_train_batch_size 8 --do_predict --metric_for_best_model accuracy --load_best_model_at_end --evaluation_strategy epoch --save_strategy epoch
+python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条新闻写的是" --model_name_or_path ernie-3.0-base-zh --max_seq_length 128  --learning_rate 3e-5 --ppt_learning_rate 3e-4 --do_train --do_eval --num_train_epochs 100 --logging_steps 5 --per_device_eval_batch_size 32 --per_device_train_batch_size 8 --do_predict --metric_for_best_model accuracy --load_best_model_at_end --evaluation_strategy epoch --save_strategy epoch --save_total_limit 1
 ```
 
 6. 精度评价指标：Accuracy
@@ -102,10 +103,10 @@ python train.py --data_dir ./data/ --output_dir ./checkpoints/ --prompt "这条�
 <a name="运行环境"></a>
 ### 3.1 运行环境
 
-- python >= 3.6
-- paddlepaddle > 2.3 （2.4版本发布前推荐安装[develop版本](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html)）
-- paddlenlp >= 2.3.5
-- paddle2onnx >= 1.0.0rc3
+- python >= 3.7
+- paddlepaddle >= 2.4rc
+- paddlenlp >= 2.4.3
+- paddle2onnx >= 1.0.3
 
 <a name="代码结构"></a>
 ### 3.2 代码结构
@@ -204,14 +205,15 @@ python train.py \
 --output_dir ./checkpoints/ \
 --prompt "这条新闻标题的主题是" \
 --max_seq_length 128  \
---learning_rate 3e-5 \
---ppt_learning_rate 3e-4 \
+--learning_rate 3e-6 \
+--ppt_learning_rate 3e-5 \
 --do_train \
 --do_eval \
 --use_rdrop \
 --max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 5 \
+--save_total_limit 1 \
 --load_best_model_at_end True \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
@@ -227,8 +229,8 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --output_dir ./checkpoints/ \
 --prompt "这条新闻标题的主题是" \
 --max_seq_length 128  \
---learning_rate 3e-5 \
---ppt_learning_rate 3e-4 \
+--learning_rate 3e-6 \
+--ppt_learning_rate 3e-5 \
 --do_train \
 --do_eval \
 --use_rdrop \
@@ -236,6 +238,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 --max_steps 1000 \
 --eval_steps 10 \
 --logging_steps 5 \
+--save_total_limit 1 \
 --load_best_model_at_end True \
 --per_device_eval_batch_size 32 \
 --per_device_train_batch_size 8 \
@@ -245,7 +248,7 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 
 可配置参数说明：
 - `model_name_or_path`: 内置模型名，或者模型参数配置目录路径。默认为`ernie-3.0-base-zh`。
-- `data_dir`: 训练数据集路径，数据格式要求详见[数据准备](数据准备)。
+- `data_dir`: 训练数据集路径，数据格式要求详见[数据标注](#数据标注)。
 - `output_dir`: 模型参数、训练日志和静态图导出的保存目录。
 - `prompt`: 提示模板。定义了如何将文本和提示拼接结合。
 - `soft_encoder`: 提示向量的编码器，`lstm`表示双向LSTM, `mlp`表示双层线性层, None表示直接使用提示向量。默认为`lstm`。
@@ -260,13 +263,14 @@ python -u -m paddle.distributed.launch --gpus 0,1,2,3 train.py \
 - `do_predict`: 是否进行预测。
 - `do_export`: 是否在运行结束时将模型导出为静态图，保存路径为`output_dir/export`。
 - `max_steps`: 训练的最大步数。此设置将会覆盖`num_train_epochs`。
+- `save_total_limit`: 模型检查点保存数量。
 - `eval_steps`: 评估模型的间隔步数。
 - `device`: 使用的设备，默认为`gpu`。
 - `logging_steps`: 打印日志的间隔步数。
 - `per_device_train_batch_size`: 每次训练每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 - `per_device_eval_batch_size`: 每次评估每张卡上的样本数量。可根据实际GPU显存适当调小/调大此配置。
 
-更多参数介绍可参考[配置文件](../../../../paddlenlp/trainer/trainer_args.py)。
+更多参数介绍可参考[配置文件](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
 <a name="模型评估"></a>
 ### 3.5 模型评估
@@ -335,9 +339,9 @@ python infer.py --model_path_prefix checkpoints/export/model --data_dir ./data -
 可配置参数说明：
 
 - `model_path_prefix`: 导出的静态图模型路径及文件前缀。
-- `model_name_or_path`: 内置预训练模型名，或者模型参数配置目录路径，用于加载tokenizer。默认为`ernie-3.0-base-zh`。
+- `model_name`: 内置预训练模型名，用于加载tokenizer。默认为`ernie-3.0-base-zh`。
 - `data_dir`: 待推理数据所在路径，数据应存放在该目录下的`data.txt`文件。
-- `max_seq_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
+- `max_length`: 最大句子长度，超过该长度的文本将被截断，不足的以Pad补全。提示文本不会被截断。
 - `batch_size`: 每次预测的样本数量。
 - `device`: 选择推理设备，包括`cpu`和`gpu`。默认为`gpu`。
 - `device_id`: 指定GPU设备ID。

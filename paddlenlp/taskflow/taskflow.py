@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
-from collections import deque
 import warnings
+import threading
 import paddle
 from ..utils.tools import get_env_device
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
@@ -232,9 +231,25 @@ TASKS = {
                 "task_flag": "text_summarization-unimo-text-1.0-summary",
                 "task_priority_path": "unimo-text-1.0-summary",
             },
+            "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+            },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
+            },
         },
         "default": {
-            "model": "unimo-text-1.0-summary"
+            "model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"
         }
     },
     "word_segmentation": {
@@ -462,15 +477,25 @@ TASKS = {
                 "task_class": QuestionGenerationTask,
                 "task_flag": "question_generation-unimo-text-1.0",
             },
-            "unimo-text-1.0-dureader_qg-template1": {
+            "unimo-text-1.0-dureader_qg": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0-dureader_qg",
+            },
+            "unimo-text-1.0-question-generation": {
                 "task_class":
                 QuestionGenerationTask,
                 "task_flag":
-                "question_generation-unimo-text-1.0-dureader_qg-template1",
+                "question_generation-unimo-text-1.0-question-generation",
+            },
+            "unimo-text-1.0-question-generation-dureader_qg": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-question-generation-dureader_qg",
             },
         },
         "default": {
-            "model": "unimo-text-1.0-dureader_qg-template1"
+            "model": "unimo-text-1.0-dureader_qg"
         }
     },
 }
@@ -552,6 +577,9 @@ class Taskflow(object):
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
+
+        # Add the lock for the concurrency requests
+        self._lock = threading.Lock()
 
     def __call__(self, *inputs):
         """

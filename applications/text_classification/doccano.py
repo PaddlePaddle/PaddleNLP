@@ -115,14 +115,15 @@ def do_convert():
                     level_labels = label.split(args.separator)
                     for i in range(len(level_labels)):
                         l = args.separator.join(level_labels[:i + 1])
-                        label_dict.append(l)
+                        if l not in label_dict:
+                            label_dict.append(l)
                         if l not in label_list:
                             label_list.append(l)
                 if args.dirty:
                     text = ' '.join(text.strip().split('\t')[:-1])
                 else:
                     text = ' '.join(text.strip().split('\t'))
-                example = text + '\t' + ','.join(label_list) + '\n'
+                example = text + '\t' + ','.join(label_dict) + '\n'
             examples.append(example)
 
     if not args.dirty and not args.valid:

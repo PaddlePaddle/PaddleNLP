@@ -6,7 +6,11 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端FAQ智能问答的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。
+本项目提供了低成本搭建端到端FAQ智能问答的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/faq_finance)，模型的接入流程参考Pipelines语义检索中Neural Search模型接入流程即可。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190307449-38135678-f259-4483-ac0f-2fa3ae4be97f.gif" width="500px">
+</div>
 
 ### 2.1 系统特色
 
@@ -62,10 +66,10 @@ FAQ智能问答数据库的数据来自于[8000 多条保险行业问答数据](
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
 export CUDA_VISIBLE_DEVICES=0
-python examples/frequently-asked-question/dense_faq_example.py --device gpu
+python examples/FAQ/dense_faq_example.py --device gpu
 # 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
 unset CUDA_VISIBLE_DEVICES
-python examples/frequently-asked-question/dense_faq_example.py --device cpu
+python examples/FAQ/dense_faq_example.py --device cpu
 ```
 `dense_faq_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
 
@@ -132,7 +136,7 @@ python rest_api/application.py 8891
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh examples/frequently-asked-question/run_faq_server.sh
+sh examples/FAQ/run_faq_server.sh
 ```
 启动后可以使用curl命令验证是否成功运行：
 
@@ -151,19 +155,28 @@ python -m streamlit run ui/webapp_faq.py --server.port 8502
 Linux 用户推荐采用 Shell 脚本来启动服务：：
 
 ```bash
-sh examples/frequently-asked-question/run_faq_web.sh
+sh examples/FAQ/run_faq_web.sh
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验FAQ智能问答系统服务了。
 
 #### 3.4.5 数据更新
 
-数据更新使用前面的 `utils/offline_ann.py`进行数据更新，示例数据如下(demo.txt)：
+数据更新有两种，第一种是使用界面的文件上传，支持txt，word，必须是Question和Answer两列，用\t进行分隔，另外word格式的数据，数据间用空行分隔开，txt格式按正常回车键分隔即可。第二种是使用前面的 `utils/offline_ann.py`进行数据更新，示例数据如下(demo.txt)：
 
 ```
 我想买保险，可以买哪些？    人身保障的保险，主要可以分为四大险种——即意外险、重疾险、医疗险和寿险。意外险——像过马路被车撞、被开水烫伤等等意外，意外险皆可赔付。医疗险——花多少钱报销多少钱，一般建议买百万医疗险。重疾险——得了重疾，按比例一次性赔付你约定保额。寿险——身故即赔。
 选保险产品时，保险公司很重要吗？    重要，但不是第一重要，也不是最重要。产品应该是优先于公司的，毕竟产品的保障才是最直接和我们的利益挂钩的。在保险产品的保障差不多的情况下，知名度更高的保险公司会更好。
 ```
+word示例数据：
+
+```
+我想买保险，可以买哪些？	可以买哪些？人身保障的保险，主要可以分为四大险种——即意外险、重疾险、医疗险和寿险。意外险——像过马路被车撞、被开水烫伤等等意外，意外险皆可赔付。医疗险——花多少钱报销多少钱，一般建议买百万医疗险。重疾险——得了重疾，按比例一次性赔付你约定保额。寿险——身故即赔。
+
+选保险产品时，保险公司很重要吗？	重要，但不是第一重要，也不是最重要。产品应该是优先于公司的，毕竟产品的保障才是最直接和我们的利益挂钩的。在保险产品的保障差不多的情况下，知名度更高的保险公司会更好。
+
+```
+
 
 如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
 

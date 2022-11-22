@@ -266,6 +266,13 @@ def do_train(args):
             # and add it to 'paddle.amp.decorate'
             multi_precision=args.use_pure_fp16)
 
+    # decorate @to_static for benchmark, skip it by default.
+    if args.to_static:
+        specs = None
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info(
+            "Successfully to apply @to_static with specs: {}".format(specs))
+
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         # level O2 means converting the network to FP16
