@@ -18,29 +18,37 @@ jobs:
           pip install -r ppdiffusers/requirements.txt
           pre-commit install
 
-  Lint:
-    name: Lint the package
+  PreCommit:
+    name: run pre-commit
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: run the project basic tools
-        run: pre-commit run 
+      - name: run the command
+        run: make yapf
 
-      - name: run isort
-        run: make lint-isort
+  Isort:
+    name: isort the imports
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: run the command
+        run: make isort
+    
+  Flake8:
+    name: check code style
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: run the command
+        run: make flake8 
+  
+  PyLint:
+    name: analysis code 
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: run the command
+        run: make pylint
 
-      - name: Is A Publish Branch
-        if: steps.check-branch.outputs.match == 'true' && steps.should-deploy.outputs.should_deploy == 'true'
-        env:
-          TWINE_USERNAME: paddle-dev
-          TWINE_PASSWORD: ${{ secrets.paddlenlp }}
-        run: |
-          make deploy-ppdiffusers
-
-      - name: Should Not Deploy To Pypi Server
-        if: steps.should-deploy.outputs.should_deploy != 'true'
-        run: echo 'should not deploy pypi server'
-
-      - name: Is Not A Publish Branch
-        if: steps.check-branch.outputs.match != 'true'
-        run: echo 'Not A Publish Branch'

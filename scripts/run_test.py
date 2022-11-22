@@ -13,26 +13,49 @@
 # limitations under the License.
 
 import os
-from typing import List
-from git import Repo, Diff
-from typer import Typer
 import subprocess
+from typing import List
+
+from git import Diff, Repo
+from typer import Typer
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT_DIR)
 
+from paddlenlp.utils.log import logger  # noqa: E402
+
+
+def file_in_dir(file_path: str, dir_path: str) -> bool:
+    """check whether the `file_path` is the file under `dir_path`
+
+    Args:
+        file_path (str): the path of file
+        dir_path (str): the path of dir
+    """
+    assert os.path.isfile(file_path)
+    assert os.path.isdir(dir_path)
+    return os.path.abspath(dir_path) in os.path.abspath(file_path)
+
 
 def get_changed_files() -> List[str]:
+    """get the changed file locally.
+
+    Returns:
+        List[str]: list of path of changed files
+    """
     repo = Repo(ROOT_DIR)
+    logger.warning(
+        "you should run the command: `git fetch upstream` to fetch the "
+        "latest commit info of upstream.")
 
-    # Your last commit of the dev branch
-    develop_commit = repo.commit("origin/develop")
-    all_files = set()
-
+    develop_commit = repo.commit("upstream/develop")
     diff_indexes: List[Diff] = repo.head.commit.diff(develop_commit)
 
     all_files = set()
+
+    diffs = []
     for diff_index in diff_indexes:
+        diffs.append(diff_index.change_type)
         all_files.add(diff_index.a_path)
         all_files.add(diff_index.b_path)
 
@@ -46,6 +69,15 @@ def get_changed_files() -> List[str]:
 
 
 def get_target_changed_files(file_suffix: str = '.py') -> List[str]:
+    """get the target changed files with file_suffix.
+
+    Args:
+        file_suffix (str, optional): the suffix of different type of file,
+            which can be `.md`, `.py`, `.yml`. Defaults to '.py'.
+
+    Returns:
+        List[str]: the different type of file path
+    """
     files = get_changed_files()
     files = [file for file in files if file.endswith(file_suffix)]
     return files
@@ -56,7 +88,12 @@ app = Typer()
 
 @app.command(help='use isort to lint the importings')
 def isort():
+    logger.info("start to use `isort` to lint the imports in python files")
     python_files = get_target_changed_files()
+
+    for file in python_files:
+        logger.debug(f"find file: {file}")
+
     file_string = " ".join(python_files)
     subprocess.call(f'cd {ROOT_DIR} && isort {file_string}', shell=True)
 
@@ -66,6 +103,13 @@ def flake8():
     python_files = get_target_changed_files()
     file_string = " ".join(python_files)
     subprocess.call(f'cd {ROOT_DIR} && flake8 {file_string}', shell=True)
+
+
+@app.command(help='run pylint')
+def pylint():
+    python_files = get_target_changed_files()
+    file_string = " ".join(python_files)
+    subprocess.call(f'cd {ROOT_DIR} && pylint {file_string}', shell=True)
 
 
 if __name__ == "__main__":
