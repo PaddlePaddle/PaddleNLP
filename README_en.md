@@ -266,7 +266,7 @@ For more super large-scale model pre-training details please refer to [GPT-3](./
 
 ### Prerequisites
 
-* python >= 3.6
+* python >= 3.7
 * paddlepaddle >= 2.2
 
 More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
