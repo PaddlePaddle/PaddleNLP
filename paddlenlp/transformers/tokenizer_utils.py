@@ -1331,21 +1331,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         if text is None:
             return None
-        split_tokens = []
-        if hasattr(self, "basic_tokenizer"):
-            for token in self.basic_tokenizer.tokenize(
-                    text, never_split=self.all_special_tokens):
-                # If the token is part of the never_split set
-                if token in self.basic_tokenizer.never_split:
-                    split_tokens.append(token)
-                else:
-                    for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                        split_tokens.append(
-                            sub_token if sub_token != self.unk_token else token)
-        else:
-            for sub_token in self.wordpiece_tokenizer.tokenize(text):
-                split_tokens.append(
-                    sub_token if sub_token != self.unk_token else text)
+        split_tokens = self.tokenize(text)
 
         normalized_text, char_mapping = '', []
 
