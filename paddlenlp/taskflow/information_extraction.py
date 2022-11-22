@@ -551,11 +551,11 @@ class UIETask(Task):
             max(prompts)) - self._summary_token_num
 
         if self._init_class in ["UIEX"]:
-            boxes_list = [d["bbox"] for d in inputs]
-            short_input_texts, short_boxes_list, input_mapping = self._auto_splitter(
+            bbox_list = [d["bbox"] for d in inputs]
+            short_input_texts, short_bbox_list, input_mapping = self._auto_splitter(
                 input_texts,
                 max_predict_len,
-                boxes_list=boxes_list,
+                bbox_list=bbox_list,
                 split_sentence=self._split_sentence)
         else:
             short_input_texts, input_mapping = self._auto_splitter(
@@ -573,7 +573,7 @@ class UIETask(Task):
             short_inputs = [{
                 "text": short_input_texts[i],
                 "prompt": short_texts_prompts[i],
-                "bbox": short_boxes_list[i],
+                "bbox": short_bbox_list[i],
                 "image": image_list[i]
             } for i in range(len(short_input_texts))]
         else:
@@ -961,16 +961,16 @@ class UIETask(Task):
             if isinstance(d, dict):
                 if 'doc' in d.keys():
                     text = ''
-                    boxes = []
+                    bbox = []
                     for segment in d['layout']:
                         box = self._doc_parser._normalize_box(
                             segment[0], [d['img_w'], d['img_h']], [1000, 1000],
                             d['offset_x'], d['offset_y'])
                         text += segment[1]
-                        boxes.extend([box] * len(segment[1]))
+                        bbox.extend([box] * len(segment[1]))
                     _inputs.append({
                         "text": text,
-                        "bbox": boxes,
+                        "bbox": bbox,
                         "image": d['image']
                     })
                 else:

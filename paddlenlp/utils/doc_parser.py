@@ -122,7 +122,7 @@ class DocParser(object):
                 else:
                     table_result = region['res']
                     html = table_result['html']
-                    cell_boxes = table_result['cell_bbox']
+                    cell_bbox = table_result['cell_bbox']
 
                     table_list = []
                     lines = re.findall('<tr>(.*?)</tr>', html)
@@ -130,7 +130,7 @@ class DocParser(object):
                         table_list.extend(re.findall('<td>(.*?)</td>', line))
                         table_list.extend(
                             re.findall('<td colspan="2">(.*?)</td>', line))
-                    for cell_box, text in zip(cell_boxes, table_list):
+                    for cell_box, text in zip(cell_bbox, table_list):
                         box = [
                             cell_box[0], cell_box[1], cell_box[4], cell_box[5]
                         ]
