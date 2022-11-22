@@ -316,19 +316,23 @@ void masked_attention_dispatch_v2(
     params.timestep = step-1;
     params.num_heads = head_num;
     params.hidden_size_per_head = size_per_head;
-    params.inv_sqrt_dh = 1.F / sqrtf((float) params.hidden_size_per_head);
 
     params.is_mask = false;
+    params.input_lengths = nullptr;
+    params.max_input_len = 0;
 
-    if (relative_attention_bias != nullptr) {
+    if (relative_attention_bias) {
+      params.inv_sqrt_dh = 1.F;
+
       if (sizeof(T) == 4) {
         params.relative_attention_bias_float = reinterpret_cast<const float*>(relative_attention_bias);
       } else {
         params.relative_attention_bias_half = reinterpret_cast<const half*>(relative_attention_bias);
       }
 
-      // params.relative_attention_bias_stride = relative_attention_bias_stride;
       params.relative_attention_bias_stride = max_seq_len + 1;
+    } else {
+      params.inv_sqrt_dh = 1.F / sqrtf((float) params.hidden_size_per_head);
     }
 
     masked_multihead_attention(params, stream);
@@ -406,22 +410,26 @@ void fusedQKV_masked_attention_dispatch_v3(
     params.v_cache = reinterpret_cast<DataType *>(value_cache);
     params.batch_size = inference_batch_size;
     params.seq_length = max_seq_len;
-    params.timestep = step-1;
+    params.timestep = step - 1;
     params.num_heads = head_num;
     params.hidden_size_per_head = size_per_head;
-    params.inv_sqrt_dh = 1.F / sqrtf((float) params.hidden_size_per_head);
 
     params.is_mask = false;
+    params.input_lengths = nullptr;
+    params.max_input_len = 0;
 
-    if (relative_attention_bias != nullptr) {
+    if (relative_attention_bias) {
+      params.inv_sqrt_dh = 1.F;
+
       if (sizeof(T) == 4) {
         params.relative_attention_bias_float = reinterpret_cast<const float*>(relative_attention_bias);
       } else {
         params.relative_attention_bias_half = reinterpret_cast<const half*>(relative_attention_bias);
       }
 
-      // params.relative_attention_bias_stride = relative_attention_bias_stride;
       params.relative_attention_bias_stride = max_seq_len + 1;
+    } else {
+      params.inv_sqrt_dh = 1.F / sqrtf((float) params.hidden_size_per_head);
     }
 
     masked_multihead_attention(params, stream);

@@ -122,6 +122,7 @@ public:
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
+
     args_.batch_size_ = batch_size;
     args_.beam_width_ = beam_width;
     args_.seq_len_ = seq_len;
@@ -288,8 +289,8 @@ public:
     }
 
     size_t lm_head_buffer_size = (prefix_lm)
-                                     ? decoder_normed_result_buffer_size
-                                     : decoder_normed_result_buffer_size * 3;
+                                     ? decoder_normed_result_buffer_size * 3
+                                     : decoder_normed_result_buffer_size;
 
     size_t datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +
@@ -608,7 +609,8 @@ public:
             args_.seq_len_,
             true, /* is_cross_attention */
             keep_alive_beam_ ? alive_finished_buf_ : finished_buf_,
-            relative_attention_bias_);
+            relative_attention_bias_,
+            true);
 
 #ifndef NDEBUG
         cudaDeviceSynchronize();
@@ -632,6 +634,8 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+
+        alpha = (DataType_) pow((float)(k), -0.5);
 
         cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
                                             decoding_params.cublas_handle,
@@ -684,6 +688,7 @@ public:
           if (keep_alive_beam_) {
             // Use separated alive and finish beam queues to avoid the decrease
             // of alive beams.
+
             topK_softMax_update(tmp_logits_buf_,
                                 embedding_bias_ptr,
                                 finished_buf_,
@@ -698,6 +703,7 @@ public:
                                 step,
                                 args_,
                                 decoding_params.stream);
+
           } else {
             topK_softMax(tmp_logits_buf_,
                          embedding_bias_ptr,
@@ -754,6 +760,7 @@ public:
                 step,
                 args_,
                 decoding_params.stream);
+
           } else {
             update_logits(logits_buf_,
                           tmp_logits_buf_,

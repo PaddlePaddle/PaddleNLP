@@ -160,7 +160,7 @@ __global__ void build_relative_attention_bias_kernel(
             }
         }
         else {
-            relative_position = abs(relative_position);
+            relative_position = -min(relative_position, 0);
         }
 
         int max_exact = tmp_num_bucket / 2;
@@ -176,7 +176,7 @@ __global__ void build_relative_attention_bias_kernel(
         relative_buckets += is_small ? relative_position : relative_position_if_large;
 
         relative_attention_bias[head_id * seq_len * seq_len + seq_id] =
-            relative_attention_bias_table[head_id * num_bucket + relative_buckets];
+            relative_attention_bias_table[relative_buckets * gridDim.x + head_id];
     }
 }
 

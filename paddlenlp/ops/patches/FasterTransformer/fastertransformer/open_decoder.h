@@ -287,7 +287,8 @@ public:
                const int decoder_max_seq_len,
                const bool is_cross_attention,
                const bool *finished = nullptr,
-               const DataType_* relative_attention_bias = nullptr) {
+               const DataType_* relative_attention_bias = nullptr,
+               const bool use_t5_layer_norm = false) {
 #ifndef NDEBUG
 // PRINT_FUNC_NAME_();
 #endif
@@ -298,7 +299,7 @@ public:
       /* layernorm(from_tensor) -> norm_from_tensor_buf_ */
       if (normalization_before_) {
 
-        if (relative_attention_bias) {
+        if (use_t5_layer_norm) {
           t5_layer_norm(from_tensor,
                         param_.self_layernorm.gamma,
                         param_.self_layernorm.beta,
@@ -343,7 +344,7 @@ public:
               masked_output_buf_ + from_tensor -> masked_output_buf_
               norm(masked_output_buf_) -> norm_masked_output_buf_
           */
-          if (relative_attention_bias) {
+          if (use_t5_layer_norm) {
             add_bias_input_t5_layernorm_2_kernelLauncher(
                 from_tensor,
                 param_.cross_layernorm.gamma,
@@ -393,7 +394,7 @@ public:
               cross_output_buf_ + bias + masked_output_buf_ -> cross_output_buf_
               norm(cross_otuput_buf) -> normed_last_context (input for ffn)
           */
-          if (relative_attention_bias) {
+          if (use_t5_layer_norm) {
             add_bias_input_t5_layernorm_2_kernelLauncher(
                 masked_output_buf_,
                 param_.ffn_layernorm.gamma,
@@ -441,7 +442,7 @@ public:
                                         hidden_units_,
                                         param_.stream);
         } else {
-          if (relative_attention_bias) {
+          if (use_t5_layer_norm) {
             add_bias_input_t5_layernorm_2_kernelLauncher(
                 from_tensor,
                 param_.ffn_layernorm.gamma,

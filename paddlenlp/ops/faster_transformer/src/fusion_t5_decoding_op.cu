@@ -137,7 +137,16 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
 
   auto q_weight_shape = self_attn_query_weight[0].shape();
   auto k_weight_shape = self_attn_key_weight[0].shape();
-  bool fuse_qkv = (q_weight_shape[1] == k_weight_shape[1]) ? false : true;
+
+  if (decoding_strategy == "beam_search" ||
+      decoding_strategy == "beam_search_v2" ||
+      decoding_strategy == "beam_search_v3") {
+    decoding_params.request_batch_size = batch_size_ * beam_width_;
+  } else if (decoding_strategy == "sampling" ||
+             decoding_strategy == "topk_sampling" ||
+             decoding_strategy == "topp_sampling") {
+    decoding_params.request_batch_size = batch_size_;
+  }
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -300,7 +309,7 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,  // is_fuse_topk_softMax
-        fuse_qkv,
+        true,  // fuse_qkv
         false,                 // keep_alive_beam
         0.6,                   // alpha
         true,                  // normalization_before
@@ -337,7 +346,7 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         end_id_,
         beam_search_diversity_rate_,
         true,  // is_fuse_topk_softMax
-        fuse_qkv,
+        true,  // fuse_qkv
         true,  // keep_alive_beam
         alpha,
         true,                     // normalization_before
@@ -346,7 +355,7 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         false,                    // pos_bias
         false,                    // prefix_lm
         finished_candidate_num_,  // finished_candidate_num
-        false,                    // early_stopping
+        early_stopping,           // early_stopping
         false,                    // is_mbart
         0,                        // min_length
         inner_coeff,
@@ -375,7 +384,7 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         end_id_,
         candidate_num_,
         probability_threshold_,
-        fuse_qkv,
+        true,  // fuse_qkv
         true,                  // normalization_before
         0,                     // pos_offset
         ActivationType::RELU,  // act

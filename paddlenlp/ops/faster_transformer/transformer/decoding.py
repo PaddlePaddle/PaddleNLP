@@ -3398,12 +3398,6 @@ class InferT5Decoding(InferBase):
             if arg not in ["self", "model"]:
                 setattr(self, "_" + arg, value)
 
-        # import pdb; pdb.set_trace()
-
-        # for item in model.state_dict():
-        #     print(item)
-        # exit()
-
         self._num_decoder_layers = model.t5.config['num_decoder_layers']
         self._n_head = model.t5.config['num_heads']
         self._d_model = model.t5.config['d_model']
@@ -3423,13 +3417,6 @@ class InferT5Decoding(InferBase):
                            is_bias=False,
                            dtype="float16" if use_fp16_decoding else "float32",
                            restore_data=True)
-        ]
-        self.decoder_ln_bias = [
-            getattr(
-                model.t5.decoder.final_layer_norm, "bias",
-                paddle.zeros(
-                    shape=[model.t5.decoder.final_layer_norm.weight.shape[0]],
-                    dtype="float16" if use_fp16_decoding else "float32"))
         ]
 
         self.word_emb = [
