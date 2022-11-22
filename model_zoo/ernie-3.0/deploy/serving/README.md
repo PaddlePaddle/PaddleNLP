@@ -36,7 +36,7 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 推荐安装fast_tokenizer，可以得到更极致的文本处理效率，进一步提升服务性能。目前fast_tokenizer已支持Windows，Linux x64，Mac x86_64平台。
 
 ```
-pip install fast_tokenizer
+pip install fast-tokenizer-python
 ```
 
 

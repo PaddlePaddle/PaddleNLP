@@ -54,7 +54,7 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 
 在容器内安装 fast_tokenizer
 ```shell
-python3 -m pip install fast_tokenizer
+python3 -m pip install fast-tokenizer-python
 ```
 
 

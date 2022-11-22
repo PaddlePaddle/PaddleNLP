@@ -373,6 +373,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         Random seed that will be set at the beginning of
                         training. (default: 42)
 
+  --bf16
+                        是否使用 bf16 混合精度训练而不是 fp32 训练。需要 Ampere 或更高的 NVIDIA
+                        显卡架构支持。这是实验性质的API，以后可能会修改。
+                        (`bool`, 可选, 默认为 `False`)
+
+                        Whether to use bf16 (mixed) precision instead of
+                        32-bit. Requires Ampere or higher NVIDIA architecture.
+                        This is an experimental API and it may change.
+                        (default: False)
+
   --fp16
                         是否使用 fp16 混合精度训练而不是 fp32 训练。
                         (`bool`, 可选, 默认为 `False`)
@@ -381,7 +391,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         32-bit (default: False)
 
   --fp16_opt_level
-                        混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效
+                        混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1.
+                        O1表示混合精度训练，O2表示纯fp16/bf16训练。
+                        只在fp16或bf16选项开启时候生效.
                         (`str`, 可选, 默认为 `O1`)
 
                         For fp16: AMP optimization level selected in
@@ -390,7 +402,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         dle/amp/auto_cast_cn.html (default: O1)
 
   --scale_loss
-                        FP16训练时，scale_loss的初始值。
+                        fp16/bf16训练时，scale_loss的初始值。
                         （`float`，可选，默认为 32768）
 
                         The value of initial scale_loss for fp16. (default: 32768)
@@ -428,7 +440,8 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
   --recompute
                         是否使用重计算训练。可以节省显存。
-                        重新计算前向过程以获取梯度，减少中间变量显存
+                        重新计算前向过程以获取梯度，减少中间变量显存.
+                        注：需要组网支持 recompute，默认使用 enable_recompute 关键字作为recompute功能开关。
                         (`bool`, 可选, 默认为 `False`)
 
                         Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
