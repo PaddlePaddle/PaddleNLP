@@ -3,7 +3,7 @@
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
 
 # Required
-version: 2
+version: 3
 
 submodules:
   include: all
@@ -31,7 +31,7 @@ sphinx:
 
 # Optionally set the version of Python and requirements required to build your docs
 python:
-  version: 3.8
+  version: 3
   install:
     - requirements: docs/requirements.txt
     - requirements: requirements.txt
