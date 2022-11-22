@@ -23,7 +23,7 @@ python data_distill.py \
     --data_path ../data \
     --save_dir student_data \
     --task_type relation_extraction \
-    --synthetic_ratio 30 \
+    --synthetic_ratio 10 \
     --model_path ../checkpoint/model_best
 ```
 
