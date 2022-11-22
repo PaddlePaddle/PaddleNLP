@@ -1115,6 +1115,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         custom_query: Optional[str] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
+        all_terms_must_match: bool = False,
+        scale_score: bool = True,
     ) -> List[Document]:
         """
         Scan through documents in DocumentStore and return a small number documents
@@ -1297,6 +1299,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     "The query provided seems to be not a string, but an object "
                     f"of type {type(query)}. This can cause Elasticsearch to fail."
                 )
+            operator = "AND" if all_terms_must_match else "OR"
             body = {
                 "size": str(top_k),
                 "query": {
@@ -1305,7 +1308,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                             "multi_match": {
                                 "query": query,
                                 "type": "most_fields",
-                                "fields": self.search_fields
+                                "fields": self.search_fields,
+                                "operator": operator,
                             }
                         }]
                     }
@@ -1581,6 +1585,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             "content_type": hit["_source"].get("content_type", None),
             "meta": meta_data,
             "es_ann_score": score,
+            "score": score,
             "embedding": embedding,
         }
         document = Document.from_dict(doc_dict)

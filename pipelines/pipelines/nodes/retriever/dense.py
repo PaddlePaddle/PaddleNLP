@@ -15,8 +15,8 @@
 
 from typing import List, Dict, Union, Optional
 import os
-
 import logging
+
 import numpy as np
 from pathlib import Path
 from tqdm.auto import tqdm

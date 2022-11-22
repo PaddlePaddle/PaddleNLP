@@ -143,6 +143,60 @@ def query(query,
     return results, response
 
 
+def multi_recall_semantic_search(
+        query,
+        filters={},
+        top_k_ranker=5,
+        top_k_bm25_retriever=5,
+        top_k_dpr_retriever=5) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Send a query to the REST API and parse the answer.
+    Returns both a ready-to-use representation of the results and the raw JSON.
+    """
+
+    url = f"{API_ENDPOINT}/{DOC_REQUEST}"
+    params = {
+        "filters": filters,
+        "DenseRetriever": {
+            "top_k": top_k_dpr_retriever
+        },
+        "BMRetriever": {
+            "top_k": top_k_bm25_retriever
+        },
+        "Ranker": {
+            "top_k": top_k_ranker
+        }
+    }
+    req = {"query": query, "params": params}
+    response_raw = requests.post(url, json=req)
+
+    if response_raw.status_code >= 400 and response_raw.status_code != 503:
+        raise Exception(f"{vars(response_raw)}")
+
+    response = response_raw.json()
+    if "errors" in response:
+        raise Exception(", ".join(response["errors"]))
+
+    # Format response
+    results = []
+    answers = response["documents"]
+    for answer in answers:
+        results.append({
+            "context":
+            answer["content"],
+            "source":
+            answer["meta"]["name"],
+            "answer":
+            answer["meta"]["answer"]
+            if "answer" in answer["meta"].keys() else "",
+            "relevance":
+            round(answer["score"] * 100, 2),
+            "images":
+            answer["meta"]["images"] if 'images' in answer["meta"] else [],
+        })
+    return results, response
+
+
 def semantic_search(
         query,
         filters={},

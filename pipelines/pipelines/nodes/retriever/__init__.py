@@ -14,3 +14,4 @@
 
 from pipelines.nodes.retriever.base import BaseRetriever
 from pipelines.nodes.retriever.dense import DensePassageRetriever
+from pipelines.nodes.retriever.sparse import BM25Retriever
