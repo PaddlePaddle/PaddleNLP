@@ -5,6 +5,10 @@
 #
 
 # get source_glob with git tool
+export PYTHONPATH=./
+
+file:
+	python scripts/run_test.py
 
 SOURCE_GLOB=$(wildcard paddlenlp/**/*.py tests/**/*.py examples/**/*.py model_zoo/**/*.py)
 
