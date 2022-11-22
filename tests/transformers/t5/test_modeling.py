@@ -26,6 +26,7 @@ from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
 
 import paddle
+from paddlenlp.transformers.t5.configuration import T5Config
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Model, T5Tokenizer, T5EncoderModel
 from paddlenlp.transformers.t5.modeling import T5_PRETRAINED_MODEL_ARCHIVE_LIST
 
@@ -35,11 +36,11 @@ def masked_fill(x, mask, value):
     return paddle.where(mask, y, x)
 
 
-def make_model_instance(config, model_class, base_model_class):
+def make_model_instance(config: T5Config, model_class, base_model_class):
     if model_class == base_model_class:
-        return model_class(**config)
+        return model_class(config)
     else:
-        return model_class(base_model_class(**config))
+        return model_class(base_model_class(config))
 
 
 class T5ModelTester:
@@ -119,45 +120,43 @@ class T5ModelTester:
             lm_labels,
         )
 
-    def get_pipeline_config(self):
-        return {
-            "vocab_size": 166,  # t5 forces 100 extra tokens
-            "d_model": self.hidden_size,
-            "d_ff": self.d_ff,
-            "d_kv": self.hidden_size // self.num_attention_heads,
-            "num_layers": self.num_hidden_layers,
-            "num_decoder_layers": self.decoder_layers,
-            "num_heads": self.num_attention_heads,
-            "relative_attention_num_buckets":
-            self.relative_attention_num_buckets,
-            "dropout_rate": self.dropout_rate,
-            "initializer_factor": self.initializer_factor,
-            "eos_token_id": self.eos_token_id,
-            "bos_token_id": self.pad_token_id,
-            "pad_token_id": self.pad_token_id,
-        }
+    def get_pipeline_config(self) -> T5Config:
+        return T5Config(
+            vocab_size=166,  # t5 forces 100 extra tokens
+            d_model=self.hidden_size,
+            d_ff=self.d_ff,
+            d_kv=self.hidden_size // self.num_attention_heads,
+            num_layers=self.num_hidden_layers,
+            num_decoder_layers=self.decoder_layers,
+            num_heads=self.num_attention_heads,
+            relative_attention_num_buckets=self.relative_attention_num_buckets,
+            dropout_rate=self.dropout_rate,
+            initializer_factor=self.initializer_factor,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.pad_token_id,
+            pad_token_id=self.pad_token_id,
+        )
 
-    def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "d_model": self.hidden_size,
-            "d_ff": self.d_ff,
-            "d_kv": self.hidden_size // self.num_attention_heads,
-            "num_layers": self.num_hidden_layers,
-            "num_decoder_layers": self.decoder_layers,
-            "num_heads": self.num_attention_heads,
-            "relative_attention_num_buckets":
-            self.relative_attention_num_buckets,
-            "dropout_rate": self.dropout_rate,
-            "initializer_factor": self.initializer_factor,
-            "eos_token_id": self.eos_token_id,
-            "bos_token_id": self.pad_token_id,
-            "pad_token_id": self.pad_token_id,
-        }
+    def get_config(self) -> T5Config:
+        return T5Config(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            d_ff=self.d_ff,
+            d_kv=self.hidden_size // self.num_attention_heads,
+            num_layers=self.num_hidden_layers,
+            num_decoder_layers=self.decoder_layers,
+            num_heads=self.num_attention_heads,
+            relative_attention_num_buckets=self.relative_attention_num_buckets,
+            dropout_rate=self.dropout_rate,
+            initializer_factor=self.initializer_factor,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.pad_token_id,
+            pad_token_id=self.pad_token_id,
+        )
 
     def check_prepare_lm_labels_via_shift_left(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
@@ -166,7 +165,7 @@ class T5ModelTester:
     ):
         if not self.parent.use_labels:
             return
-        model = T5Model(**config)
+        model = T5Model(config)
         model.eval()
 
         # make sure that lm_labels are correctly padded from the right
@@ -205,14 +204,14 @@ class T5ModelTester:
 
     def create_and_check_model(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
         decoder_attention_mask,
         lm_labels,
     ):
-        model = T5Model(**config)
+        model = T5Model(config)
         model.eval()
         result = model(input_ids=input_ids,
                        decoder_input_ids=decoder_input_ids,
@@ -239,15 +238,14 @@ class T5ModelTester:
 
     def create_and_check_with_lm_head(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
         decoder_attention_mask,
         lm_labels,
     ):
-        pretrained_model = T5Model(**config)
-        model = T5ForConditionalGeneration(pretrained_model)
+        model = T5ForConditionalGeneration(config)
         model.eval()
         outputs = model(input_ids=input_ids,
                         decoder_input_ids=decoder_input_ids,
@@ -268,14 +266,14 @@ class T5ModelTester:
 
     def create_and_check_decoder_model_past(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
         decoder_attention_mask,
         lm_labels,
     ):
-        model = T5Model(**config).get_decoder()
+        model = T5Model(config).get_decoder()
         model.eval()
         # first forward pass
         outputs = model(input_ids,
@@ -322,14 +320,14 @@ class T5ModelTester:
 
     def create_and_check_decoder_model_attention_mask_past(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
         decoder_attention_mask,
         lm_labels,
     ):
-        model = T5Model(**config).get_decoder()
+        model = T5Model(config).get_decoder()
         model.eval()
 
         # create attention mask
@@ -391,14 +389,14 @@ class T5ModelTester:
 
     def create_and_check_decoder_model_past_large_inputs(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
         decoder_attention_mask,
         lm_labels,
     ):
-        model = T5Model(**config).get_decoder()
+        model = T5Model(config).get_decoder()
         model.eval()
         # first forward pass
         outputs = model(input_ids,
@@ -446,7 +444,7 @@ class T5ModelTester:
 
     def create_and_check_generate_with_past_key_values(
         self,
-        config,
+        config: T5Config,
         input_ids,
         decoder_input_ids,
         attention_mask,
@@ -457,8 +455,7 @@ class T5ModelTester:
         np.random.seed(0)
         random.seed(0)
 
-        pretrained_model = T5Model(**config)
-        model = T5ForConditionalGeneration(pretrained_model)
+        model = T5ForConditionalGeneration(config)
         model.eval()
 
         output_without_past_cache, _ = model.generate(
@@ -482,12 +479,11 @@ class T5ModelTester:
 
     def check_resize_embeddings_t5_v1_1(
         self,
-        config,
+        config: T5Config,
     ):
         prev_vocab_size = config["vocab_size"]
 
-        pretrained_model = T5Model(**config)
-        model = T5ForConditionalGeneration(pretrained_model)
+        model = T5ForConditionalGeneration(config)
         model.eval()
         model.resize_token_embeddings(prev_vocab_size - 10)
 
@@ -683,7 +679,7 @@ class T5EncoderOnlyModelTester:
         self.is_training = is_training
 
     def get_config(self):
-        config = dict(
+        config = T5Config(
             vocab_size=self.vocab_size,
             d_model=self.hidden_size,
             d_ff=self.d_ff,
@@ -718,11 +714,11 @@ class T5EncoderOnlyModelTester:
 
     def create_and_check_model(
         self,
-        config,
+        config: T5Config,
         input_ids,
         attention_mask,
     ):
-        model = T5EncoderModel(**config)
+        model = T5EncoderModel(config)
         model.eval()
         result = model(
             input_ids=input_ids,
@@ -757,8 +753,8 @@ class T5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
     test_model_parallel = True
     all_parallelizable_model_classes = (T5EncoderModel, )
 
-    def _make_model_instance(self, config, model_class):
-        return model_class(**config)
+    def _make_model_instance(self, config: T5Config, model_class):
+        return model_class(config)
 
     def setUp(self):
         self.model_tester = T5EncoderOnlyModelTester(self)
@@ -1152,8 +1148,7 @@ class TestAsymmetricT5(unittest.TestCase):
             decoder_attention_mask,
             lm_labels,
         ) = inputs
-        pretrained_model = T5Model(**config)
-        model = T5ForConditionalGeneration(pretrained_model)
+        model = T5ForConditionalGeneration(config)
         model.eval()
         outputs = model(input_ids=input_ids,
                         decoder_input_ids=decoder_input_ids,
