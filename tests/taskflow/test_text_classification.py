@@ -59,17 +59,19 @@ class TestTextClassificationTask(unittest.TestCase):
             0: "negative",
             1: "positive",
         }
-        dygraph_taskflow = TextClassificationTask(task="text_classification",
-                                                  model=self.dygraph_model_path,
+        dygraph_taskflow = TextClassificationTask(model="multi_class",
+                                                    task="text_classification",
+                                                  task_path=self.dygraph_model_path,
                                                   id2label=id2label,
                                                   batch_size=batch_size)
 
         dygraph_results = dygraph_taskflow(input_text)
         self.assertEqual(len(dygraph_results), len(input_text[0]))
 
-        static_taskflow = TextClassificationTask(task="text_classification",
+        static_taskflow = TextClassificationTask(model="multi_class",
+            task="text_classification",
                                                  is_static_model=True,
-                                                 model=self.static_model_path,
+                                                 task_path=self.static_model_path,
                                                  id2label=id2label,
                                                  batch_size=batch_size)
 
@@ -90,17 +92,20 @@ class TestTextClassificationTask(unittest.TestCase):
             0: "negative",
             1: "positive",
         }
-        dygraph_taskflow = Taskflow(task="text_classification",
-                                    model=self.dygraph_model_path,
+        dygraph_taskflow = Taskflow(
+                                    model="multi_class",
+                                    task="text_classification",
+                                    task_path=self.dygraph_model_path,
                                     id2label=id2label,
                                     batch_size=batch_size)
 
         dygraph_results = dygraph_taskflow(input_text)
         self.assertEqual(len(dygraph_results), len(input_text))
 
-        static_taskflow = Taskflow(task="text_classification",
+        static_taskflow = Taskflow(model="multi_class",
+            task="text_classification",
                                    is_static_model=True,
-                                   model=self.static_model_path,
+                                   task_path=self.static_model_path,
                                    id2label=id2label,
                                    batch_size=batch_size)
 

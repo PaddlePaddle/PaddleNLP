@@ -30,7 +30,12 @@ usage = r"""
             0: "negative",
             1: "positive"
         }
-        text_cls = Taskflow("text_classification", model=<local_saved_model_path>, id2label=id2label)
+        text_cls = Taskflow(
+            "text_classification",
+            model="multi_class",
+            task_path=<local_saved_model>,
+            id2label=id2label
+            )
         text_cls('房间依然很整洁，相当不错')
         '''
         [
@@ -68,7 +73,8 @@ class TextClassificationTask(Task):
 
     Args:
         task (string): The name of task.
-        model (string): The local file path to the model path or a pre-trained model
+        model (string): Mode of the classification, only support `multi_class` for now
+        task_path (string): The local file path to the model path or a pre-trained model
         id2label (string): The dictionary to map the predictions from class ids to class names
         is_static_model (string): Whether the model is a static model
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
@@ -86,25 +92,24 @@ class TextClassificationTask(Task):
                          **kwargs)
         self.id2label = id2label
         self.is_static_model = is_static_model
-        self._construct_tokenizer(model)
+        self._construct_tokenizer(self._task_path)
         if self.is_static_model:
             self._get_inference_model()
         else:
-            self._construct_model(model)
-        # self._label_map = {0: 'negative', 1: 'positive'}
+            self._construct_model(self._task_path)
 
     def _construct_input_spec(self):
         """
-       Construct the input spec for the convert dygraph model to static model.
-       """
-        pass
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        raise NotImplementedError("Conversion from dygraph to static graph is not supported in TextClassificationTask")
 
     def _construct_model(self, model: str):
         """
         Construct the inference model for the predictor.
         """
         model_instance = AutoModelForSequenceClassification.from_pretrained(
-            self.model, num_labels=len(self.id2label))
+            model, num_labels=len(self.id2label))
         # Load the model parameter for the predict
         model_instance.eval()
         self._model = model_instance
@@ -148,6 +153,7 @@ class TextClassificationTask(Task):
         """
         Run the task model from the outputs of the `_tokenize` function. 
         """
+        # TODO: support multi_label, hierachical classification
         model_outputs = []
         if self.is_static_model:
             with static_mode_guard():
@@ -184,6 +190,7 @@ class TextClassificationTask(Task):
         """
         The model output is tag ids, this function will convert the model output to raw text.
         """
+        # TODO: support multi_label, hierachical classification
         postprocessed_outputs = []
         for i, model_output in enumerate(inputs["model_outputs"]):
             model_output["label"] = self.id2label[model_output["label"]]

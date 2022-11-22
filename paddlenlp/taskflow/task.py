@@ -239,9 +239,9 @@ class Task(metaclass=abc.ABCMeta):
                     fp.write(md5)
                     fp.close()
 
-        # When the user-entered model path is already a static model, skip to_static conversion
+        # When the user-provided model path is already a static model, skip to_static conversion
         if self.is_static_model:
-            inference_model_path = self.model
+            inference_model_path = self._task_path
         else:
             inference_model_path = os.path.join(self._task_path, "static",
                                                 "inference")
