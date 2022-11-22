@@ -102,7 +102,9 @@ class TextClassificationTask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        raise NotImplementedError("Conversion from dygraph to static graph is not supported in TextClassificationTask")
+        raise NotImplementedError(
+            "Conversion from dygraph to static graph is not supported in TextClassificationTask"
+        )
 
     def _construct_model(self, model: str):
         """

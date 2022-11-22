@@ -555,10 +555,8 @@ class Taskflow(object):
             self.model = model
 
         if self.model is not None:
-            assert self.model in set(
-                TASKS[task]
-                [tag].keys()), "The {} name: {} is not in task:[{}]".format(
-                    tag, model, task)
+            assert self.model in set(TASKS[task][tag].keys(
+            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
         else:
             self.model = TASKS[task]['default'][ind_tag]
 
