@@ -21,12 +21,17 @@ from .export import export_model
 
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .bert.configuration import *
+from .bert.converter import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
+from .roberta.configuration import *
+from .roberta.converter import *
 from .electra.modeling import *
 from .electra.tokenizer import *
+from .electra.converter import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bart.modeling import *
@@ -113,6 +118,7 @@ from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .xlnet.converter import *
 from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
@@ -133,14 +139,16 @@ from .clip.modeling import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
+from .clip.converter import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 
 # For faster tokenizer
-from ..utils.import_utils import is_faster_tokenizer_available
-if is_faster_tokenizer_available():
-    from .bert.faster_tokenizer import *
-    from .ernie.faster_tokenizer import *
-    from .tinybert.faster_tokenizer import *
+from ..utils.import_utils import is_fast_tokenizer_available
+if is_fast_tokenizer_available():
+    from .bert.fast_tokenizer import *
+    from .ernie.fast_tokenizer import *
+    from .tinybert.fast_tokenizer import *
+    from .ernie_m.fast_tokenizer import *

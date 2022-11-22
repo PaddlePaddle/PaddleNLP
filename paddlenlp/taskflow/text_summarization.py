@@ -24,7 +24,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from ..transformers import AutoTokenizer, AutoModelForConditionalGeneration, UNIMOForConditionalGeneration, PegasusForConditionalGeneration
+from ..transformers import AutoTokenizer, AutoModelForConditionalGeneration, UNIMOForConditionalGeneration
 from ..datasets import load_dataset
 from ..data import Stack, Pad, Tuple
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard

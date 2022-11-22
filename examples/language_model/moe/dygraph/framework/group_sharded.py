@@ -35,7 +35,6 @@ from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.clip import ClipGradBase, _squared_l2_norm
 from paddle.fluid.dygraph import base as imperative_base
 from paddle.fluid import core, layers, framework
-from paddle.distributed import collective
 from paddle.incubate.distributed.models.moe.grad_clip import ClipGradForMOEByGlobalNorm
 
 # Old version
@@ -72,18 +71,19 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
         global_norm_var_normal, sum_dtype \
             = self.get_l2_norm_pow(normal_params_grads)
         if global_norm_var_normal is not None:
-            collective.all_reduce(global_norm_var_normal,
-                                  op=collective.ReduceOp.SUM,
-                                  group=self.moe_group)
+            paddle.distributed.all_reduce(global_norm_var_normal,
+                                          op=paddle.distributed.ReduceOp.SUM,
+                                          group=self.moe_group)
 
         global_norm_var_moe = None
         if len(moe_params_grads) > 0:
             global_norm_var_moe, _ \
                 = self.get_l2_norm_pow(moe_params_grads, sum_dtype)
             if global_norm_var_moe is not None:
-                collective.all_reduce(global_norm_var_moe,
-                                      op=collective.ReduceOp.SUM,
-                                      group=self.moe_group)
+                paddle.distributed.all_reduce(
+                    global_norm_var_moe,
+                    op=paddle.distributed.ReduceOp.SUM,
+                    group=self.moe_group)
 
         if global_norm_var_normal is None and global_norm_var_moe is None:
             return params_grads

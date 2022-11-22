@@ -537,6 +537,7 @@ class T5ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     test_pruning = False
     test_resize_embeddings = True
     test_model_parallel = True
+    use_test_inputs_embeds = True
     is_encoder_decoder = True
     # The small T5 model needs higher percentages for CPU/MP tests
     model_split_percents = [0.8, 0.9]

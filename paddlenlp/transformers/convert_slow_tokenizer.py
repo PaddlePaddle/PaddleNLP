@@ -17,8 +17,8 @@
 
 from typing import Dict, List, Tuple
 
-from faster_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
-from faster_tokenizer.models import WordPiece, FasterWordPiece, BPE, Unigram
+from fast_tokenizer import Tokenizer, normalizers, pretokenizers, postprocessors, decoders
+from fast_tokenizer.models import WordPiece, FastWordPiece, BPE, Unigram
 
 
 # Extract the vocab and merge file from sentencepiece file
@@ -69,9 +69,9 @@ class BertConverter(Converter):
     def converted(self) -> Tokenizer:
         vocab = self.original_tokenizer.vocab
         tokenizer = Tokenizer(
-            FasterWordPiece(vocab._token_to_idx,
-                            unk_token=str(self.original_tokenizer.unk_token),
-                            with_pretokenization=True))
+            FastWordPiece(vocab._token_to_idx,
+                          unk_token=str(self.original_tokenizer.unk_token),
+                          with_pretokenization=True))
 
         tokenize_chinese_chars = True
         strip_accents = True
@@ -85,7 +85,7 @@ class BertConverter(Converter):
             strip_accents=strip_accents,
             lowercase=do_lower_case,
         )
-        # No need to init pretokenizer because FasterWordPiece can pretokenize
+        # No need to init pretokenizer because FastWordPiece can pretokenize
         # tokenizer.pretokenizer = pretokenizers.BertPreTokenizer()
 
         cls_token = str(self.original_tokenizer.cls_token)
@@ -282,11 +282,11 @@ def convert_slow_tokenizer(transformer_tokenizer) -> Tokenizer:
     Args:
         transformer_tokenizer ([`~tokenizer_utils_base.PretrainedTokenizer`]):
             Instance of a slow tokenizer to convert in the backend tokenizer for
-            [`~tokenizer_utils_base.PretrainedFasterTokenizer`].
+            [`~tokenizer_utils_base.PretrainedFastTokenizer`].
 
     Return:
         A instance of [`~tokenizers.Tokenizer`] to be used as the backend tokenizer of a
-        [`~tokenizer_utils_base.PretrainedFasterTokenizer`]
+        [`~tokenizer_utils_base.PretrainedFastTokenizer`]
     """
 
     tokenizer_class_name = transformer_tokenizer.__class__.__name__

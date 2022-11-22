@@ -56,6 +56,20 @@ def on_change_text():
     st.session_state.raw_json = None
 
 
+def upload():
+    data_files = st.session_state.upload_files['files']
+    for data_file in data_files:
+        # Upload file
+        if data_file and data_file.name not in st.session_state.upload_files[
+                'uploaded_files']:
+            raw_json = upload_doc(data_file)
+            st.session_state.upload_files['uploaded_files'].append(
+                data_file.name)
+    # Save the uploaded files
+    st.session_state.upload_files['uploaded_files'] = list(
+        set(st.session_state.upload_files['uploaded_files']))
+
+
 def main():
 
     st.set_page_config(
@@ -68,6 +82,7 @@ def main():
     set_state_if_absent("results", None)
     set_state_if_absent("raw_json", None)
     set_state_if_absent("random_question_requested", False)
+    set_state_if_absent("upload_files", {'uploaded_files': [], 'files': []})
 
     # Small callback to reset the interface in case the text of the question changes
     def reset_results(*args):
@@ -101,13 +116,13 @@ def main():
         data_files = st.sidebar.file_uploader(
             "",
             type=["pdf", "txt", "docx", "png"],
-            help="文件上传",
+            help="选择多个文件",
             accept_multiple_files=True)
-        for data_file in data_files:
-            # Upload file
-            if data_file:
-                raw_json = upload_doc(data_file)
-                st.sidebar.write(str(data_file.name) + " &nbsp;&nbsp; ✅ ")
+        st.session_state.upload_files['files'] = data_files
+        st.sidebar.button("文件上传", on_click=upload)
+        for data_file in st.session_state.upload_files['uploaded_files']:
+            st.sidebar.write(str(data_file) + " &nbsp;&nbsp; ✅ ")
+
     hs_version = ""
     try:
         hs_version = f" <small>(v{pipelines_version()})</small>"
