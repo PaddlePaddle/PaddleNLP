@@ -55,7 +55,7 @@ def parse_arguments():
                         help="The file prefix of text_encoder model.")
     parser.add_argument("--inference_steps",
                         type=int,
-                        default=100,
+                        default=50,
                         help="The number of unet inference steps.")
     parser.add_argument("--benchmark_steps",
                         type=int,
