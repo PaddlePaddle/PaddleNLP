@@ -1009,6 +1009,17 @@ class PretrainedConfig:
 
         cls._auto_class = auto_class
 
+    def get(self, key, default=None):
+        """
+        Return the value for key if config class has the attribute , else default. If default is not given, it defaults to None, so that this method never raises a AttributeError.
+        """
+        try:
+            value = self.__getattribute__(key)
+        except:
+            return default
+        else:
+            return value
+
 
 def get_configuration_file(configuration_files: List[str]) -> str:
     """
