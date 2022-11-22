@@ -87,3 +87,13 @@ dist:
 .PHONY: publish
 publish:
 	PATH=~/.local/bin:${PATH} twine upload dist/*
+
+
+.PHONY: deploy-ppdiffusers
+deploy-ppdiffusers:
+	cd ppdiffusers && make
+
+.PHONY: install-ppdiffusers
+install-ppdiffusers:
+	cd ppdiffusers && make install
+

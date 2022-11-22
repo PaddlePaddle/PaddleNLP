@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
     SequenceClassifierOutput,
     TokenClassifierOutput,
@@ -30,8 +29,8 @@ from ..model_outputs import (
     MultipleChoiceModelOutput,
     MaskedLMOutput,
     CausalLMOutputWithCrossAttentions,
-    ModelOutput,
 )
+from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
 
 __all__ = [
     'RobertaModel',
@@ -50,25 +49,19 @@ class RobertaEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 pad_token_id=0,
-                 cls_token_id=101):
+    def __init__(self, config: RobertaConfig):
         super(RobertaEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size,
-                                            hidden_size,
-                                            padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
-        self.padding_idx = pad_token_id
-        self.cls_token_id = cls_token_id
+        self.word_embeddings = nn.Embedding(config.vocab_size,
+                                            config.hidden_size,
+                                            padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
+                                                config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size,
+                                                  config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.padding_idx = config.pad_token_id
+        self.cls_token_id = config.cls_token_id
 
     def forward(self,
                 input_ids,
@@ -126,92 +119,9 @@ class RobertaPretrainedModel(PretrainedModel):
 
     """
 
-    pretrained_init_configuration = {
-        "hfl/roberta-wwm-ext": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "hfl/roberta-wwm-ext-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "hfl/rbt6": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 6,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0,
-        },
-        "hfl/rbt4": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 4,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0,
-        },
-        "hfl/rbt3": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 3,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0,
-        },
-        "hfl/rbtl3": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "intermediate_size": 4096,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 3,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        }
-    }
+    pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
+    config_class = RobertaConfig
+
     pretrained_resource_files_map = {
         "model_state": {
             "hfl/roberta-wwm-ext":
@@ -306,40 +216,24 @@ class RobertaModel(RobertaPretrainedModel):
             Defaults to `101`.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 layer_norm_eps=1e-12,
-                 cls_token_id=101):
-        super(RobertaModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.layer_norm_eps = layer_norm_eps
-        self.embeddings = RobertaEmbeddings(vocab_size, hidden_size,
-                                            hidden_dropout_prob,
-                                            max_position_embeddings,
-                                            type_vocab_size, pad_token_id,
-                                            cls_token_id)
+    def __init__(self, config: RobertaConfig):
+        super(RobertaModel, self).__init__(config)
+
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.layer_norm_eps = config.layer_norm_eps
+        self.embeddings = RobertaEmbeddings(config)
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = RobertaPooler(hidden_size)
+        self.encoder = nn.TransformerEncoder(encoder_layer,
+                                             config.num_hidden_layers)
+        self.pooler = RobertaPooler(config.hidden_size)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -456,6 +350,7 @@ class RobertaModel(RobertaPretrainedModel):
             past_key_values_length=past_key_values_length)
 
         self.encoder._use_cache = use_cache  # To be consistent with HF
+
         encoder_outputs = self.encoder(
             embedding_output,
             src_mask=attention_mask,
@@ -472,6 +367,7 @@ class RobertaModel(RobertaPretrainedModel):
             pooled_output = self.pooler(sequence_output)
             if not return_dict:
                 return (sequence_output, pooled_output) + encoder_outputs[1:]
+
             return BaseModelOutputWithPoolingAndCrossAttentions(
                 last_hidden_state=sequence_output,
                 pooler_output=pooled_output,
@@ -490,10 +386,11 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
             An instance of RobertaModel.
     """
 
-    def __init__(self, roberta):
-        super(RobertaForQuestionAnswering, self).__init__()
-        self.roberta = roberta  # allow roberta to be config
-        self.classifier = nn.Linear(self.roberta.config["hidden_size"], 2)
+    def __init__(self, config: RobertaConfig):
+        super(RobertaForQuestionAnswering, self).__init__(config)
+
+        self.roberta = RobertaModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -613,14 +510,14 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             of `RobertaModel` instance `roberta`. Defaults to `None`.
     """
 
-    def __init__(self, roberta, num_classes=2, dropout=None):
-        super(RobertaForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.roberta = roberta  # allow roberta to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  roberta.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roberta.config["hidden_size"],
-                                    num_classes)
+    def __init__(self, config: RobertaConfig):
+        super(RobertaForSequenceClassification, self).__init__(config)
+        self.roberta = RobertaModel(config)
+
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -690,12 +587,12 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.config.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)),
+                loss = loss_fct(logits.reshape((-1, self.config.num_labels)),
                                 labels.reshape((-1, )))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
@@ -729,14 +626,14 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
             of `RobertaModel` instance `roberta`. Defaults to `None`.
     """
 
-    def __init__(self, roberta, num_classes=2, dropout=None):
-        super(RobertaForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.roberta = roberta  # allow roberta to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  roberta.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roberta.config["hidden_size"],
-                                    num_classes)
+    def __init__(self, config: RobertaConfig):
+        super(RobertaForTokenClassification, self).__init__(config)
+
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -805,7 +702,7 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)),
+            loss = loss_fct(logits.reshape((-1, self.config.num_labels)),
                             labels.reshape((-1, )))
         if not return_dict:
 
@@ -840,13 +737,13 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
             instance `bert`. Defaults to None.
     """
 
-    def __init__(self, roberta):
-        super().__init__()
-
-        self.roberta = roberta
-        self.dropout = nn.Dropout(self.roberta.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roberta.config["hidden_size"], 1)
-
+    def __init__(self, config: RobertaConfig):
+        super(RobertaForMultipleChoice, self).__init__(config)
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.
+            classifier_dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -995,15 +892,11 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
 
     """
 
-    def __init__(self, roberta):
-        super().__init__()
+    def __init__(self, config: RobertaConfig):
+        super(RobertaForMaskedLM, self).__init__(config)
 
-        self.roberta = roberta
-        hidden_size = self.roberta.config['hidden_size']
-        layer_norm_eps = self.roberta.config['layer_norm_eps']
-        vocab_size = self.roberta.config['vocab_size']
-
-        self.lm_head = RobertaLMHead(hidden_size, layer_norm_eps, vocab_size)
+        self.roberta = RobertaModel(config)
+        self.lm_head = RobertaLMHead(config)
 
         self.apply(self.init_weights)
 
@@ -1104,12 +997,13 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
 class RobertaLMHead(nn.Layer):
     """Roberta Head for masked language modeling."""
 
-    def __init__(self, hidden_size, layer_norm_eps, vocab_size):
+    def __init__(self, config: RobertaConfig):
         super().__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size,
+                                       epsilon=config.layer_norm_eps)
 
-        self.decoder = nn.Linear(hidden_size, vocab_size)
+        self.decoder = nn.Linear(config.hidden_size, config.vocab_size)
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
@@ -1132,16 +1026,10 @@ class RobertaForCausalLM(RobertaPretrainedModel):
 
     """
 
-    def __init__(self, roberta):
-        super().__init__()
-
-        self.roberta = roberta
-        hidden_size = self.roberta.config['hidden_size']
-        layer_norm_eps = self.roberta.config['layer_norm_eps']
-        vocab_size = self.roberta.config['vocab_size']
-
-        self.lm_head = RobertaLMHead(hidden_size, layer_norm_eps, vocab_size)
-
+    def __init__(self, config: RobertaConfig):
+        super().__init__(config)
+        self.roberta = RobertaModel(config)
+        self.lm_head = RobertaLMHead(config)
         self.apply(self.init_weights)
 
     def get_output_embeddings(self):
