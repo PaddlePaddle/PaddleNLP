@@ -55,7 +55,7 @@
 下载军事关系抽取数据集：
 
 ```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/tax.tar.gz
+wget https://paddlenlp.bj.bcebos.com/datasets/military.tar.gz
 tar -zxvf military.tar.gz
 mv military data
 rm military.tar.gz
