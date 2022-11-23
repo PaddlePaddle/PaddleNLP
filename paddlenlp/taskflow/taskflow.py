@@ -80,6 +80,7 @@ TASKS = {
         "models": {
             "fill_mask": {
                 "task_class": FillMaskTask,
+                "task_flag": "fill_mask-fill_mask"
             },
         },
         "default": {
