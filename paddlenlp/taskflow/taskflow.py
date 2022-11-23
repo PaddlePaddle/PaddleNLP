@@ -13,33 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 import threading
+import warnings
+
 import paddle
+
+from ..transformers import ErnieCtmTokenizer, ErnieCtmWordtagModel
 from ..utils.tools import get_env_device
-from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask, NPTagTask
-from .named_entity_recognition import NERWordTagTask
-from .named_entity_recognition import NERLACTask
-from .sentiment_analysis import SentaTask, SkepTask
-from .lexical_analysis import LacTask
-from .word_segmentation import SegJiebaTask
-from .word_segmentation import SegLACTask
-from .word_segmentation import SegWordTagTask
-from .pos_tagging import POSTaggingTask
-from .text_generation import TextGenerationTask
-from .poetry_generation import PoetryGenerationTask
-from .question_answering import QuestionAnsweringTask
-from .dependency_parsing import DDParserTask
-from .text_correction import CSCTask
-from .text_similarity import TextSimilarityTask
-from .dialogue import DialogueTask
-from .information_extraction import UIETask, GPTask
 from .code_generation import CodeGenerationTask
-from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
-from .text_summarization import TextSummarizationTask
+from .dependency_parsing import DDParserTask
+from .dialogue import DialogueTask
 from .document_intelligence import DocPromptTask
+from .fill_mask import FillMaskTask
+from .information_extraction import GPTask, UIETask
+from .knowledge_mining import NPTagTask, WordTagTask
+from .lexical_analysis import LacTask
+from .named_entity_recognition import NERLACTask, NERWordTagTask
+from .poetry_generation import PoetryGenerationTask
+from .pos_tagging import POSTaggingTask
+from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
+from .sentiment_analysis import SentaTask, SkepTask
+from .text_correction import CSCTask
+from .text_generation import TextGenerationTask
+from .text_similarity import TextSimilarityTask
+from .text_summarization import TextSummarizationTask
+from .text_to_image import (TextToImageDiscoDiffusionTask,
+                            TextToImageGenerationTask,
+                            TextToImageStableDiffusionTask)
+from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -72,6 +74,17 @@ TASKS = {
         },
         "default": {
             "model": "plato-mini",
+        }
+    },
+    'fill_mask': {
+        "models": {
+            "fill_mask": {
+                "task_class": FillMaskTask,
+                "task_flag": "fill_mask-fill_mask"
+            },
+        },
+        "default": {
+            "model": "fill_mask",
         }
     },
     "knowledge_mining": {
