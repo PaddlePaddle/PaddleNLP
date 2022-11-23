@@ -496,7 +496,7 @@ class ResnetBlock2D(nn.Layer):
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
         output_tensor = (input_tensor +
-                        hidden_states) / self.output_scale_factor
+                         hidden_states) / self.output_scale_factor
         return output_tensor
 
 
@@ -531,7 +531,7 @@ def upsample_2d(hidden_states, kernel=None, factor=2, gain=1):
     if kernel.ndim == 1:
         kernel = paddle.outer(kernel, kernel)
     kernel /= paddle.sum(kernel)
-    if(gain != 1):
+    if (gain != 1):
         kernel = kernel * (gain * (factor**2))
     else:
         kernel = kernel * (factor**2)

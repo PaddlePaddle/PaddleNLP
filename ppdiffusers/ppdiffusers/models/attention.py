@@ -179,7 +179,8 @@ class SpatialTransformer(nn.Layer):
         residual = hidden_states
         hidden_states = self.norm(hidden_states)
         hidden_states = self.proj_in(hidden_states)
-        hidden_states = paddle.flatten(hidden_states.transpose([0, 2, 3, 1]),1,2)
+        hidden_states = paddle.flatten(hidden_states.transpose([0, 2, 3, 1]), 1,
+                                       2)
         for block in self.transformer_blocks:
             hidden_states = block(hidden_states, context=context)
         hidden_states = hidden_states.reshape(
