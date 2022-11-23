@@ -191,7 +191,7 @@ class Task(metaclass=abc.ABCMeta):
             self._config.enable_mkldnn()
         else:
             self._config.enable_use_gpu(100, self.kwargs['device_id'])
-            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after predictor is fixed
+            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
         self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
@@ -199,7 +199,7 @@ class Task(metaclass=abc.ABCMeta):
         self._config.enable_memory_optim()
 
         # TODO(linjieccc): some temporary settings and will be remove in future
-        # after predictor is fixed
+        # after fixed
         if self.task in ["document_intelligence", "knowledge_mining"]:
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":

@@ -238,13 +238,6 @@ def convert_example(example,
 
         offset_mapping += [[0, 0]] * (max_seq_len - seq_len)
 
-        # Reindex the text
-        text_start_idx = offset_mapping[1:].index([0, 0
-                                                   ]) + summary_token_num - 1
-        for idx in range(text_start_idx, max_seq_len):
-            offset_mapping[idx][0] -= offset_bias
-            offset_mapping[idx][1] -= offset_bias
-
         position_ids = list(range(seq_len))
 
         position_ids = position_ids + [0] * (max_seq_len - seq_len)

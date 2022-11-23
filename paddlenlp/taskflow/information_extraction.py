@@ -781,7 +781,6 @@ class UIETask(Task):
                 assert len(position_ids) == self._max_seq_len
                 assert len(attention_mask) == self._max_seq_len
                 assert len(bbox_list) == self._max_seq_len
-
                 yield tuple(return_list)
 
         reader = doc_reader if self._init_class in ["UIEX"] else text_reader
