@@ -33,12 +33,15 @@ def reader(data_path, max_seq_len=512):
             boxes = json_line.get("bbox", None)
             image = json_line.get("image", None)
             # Model Input is aslike: [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
-            # It include three summary tokens.
-            if max_seq_len <= len(prompt) + 3:
+            if boxes is not None and image is not None:
+                summary_token_num = 4
+            else:
+                summary_token_num = 3
+            if max_seq_len <= len(prompt) + summary_token_num:
                 raise ValueError(
                     "The value of max_seq_len is too small, please set a larger value"
                 )
-            max_content_len = max_seq_len - len(prompt) - 3
+            max_content_len = max_seq_len - len(prompt) - summary_token_num
             if len(content) <= max_content_len:
                 yield json_line
             else:
@@ -102,7 +105,7 @@ def reader(data_path, max_seq_len=512):
                         result['start'] -= max_content_len
                         result['end'] -= max_content_len
                     accumulate += max_content_len
-                    max_content_len = max_seq_len - len(prompt) - 3
+                    max_content_len = max_seq_len - len(prompt) - summary_token_num
                     if len(res_content) == 0:
                         break
                     elif len(res_content) < max_content_len:
