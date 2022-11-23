@@ -495,12 +495,8 @@ class ResnetBlock2D(nn.Layer):
 
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
-        if (self.output_scale_factor!=1.0):
-            output_tensor = (input_tensor +
-                            hidden_states) / self.output_scale_factor
-        else:
-            output_tensor = (input_tensor + hidden_states)
-
+        output_tensor = (input_tensor +
+                        hidden_states) / self.output_scale_factor
         return output_tensor
 
 

@@ -112,10 +112,7 @@ class AttentionBlock(nn.Layer):
             [batch, channel, height, width])
 
         # res connect and rescale
-        if(self.rescale_output_factor!=1.0):
-            hidden_states = (hidden_states + residual) / self.rescale_output_factor
-        else:
-            hidden_states = hidden_states + residual
+        hidden_states = (hidden_states + residual) / self.rescale_output_factor
         return hidden_states
 
 
