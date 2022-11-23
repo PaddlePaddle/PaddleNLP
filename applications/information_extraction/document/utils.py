@@ -128,6 +128,7 @@ def reader(data_path, max_seq_len=512):
                         break
                     else:
                         content = res_content
+                        boxes = res_boxes
 
                 for json_line in json_lines:
                     yield json_line
