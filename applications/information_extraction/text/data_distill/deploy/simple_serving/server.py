@@ -19,6 +19,7 @@ from paddlenlp import Taskflow
 schema = {"武器名称": ["产国", "类型", "研发单位"]}
 # The task path changed to your best model path
 uie = Taskflow('information_extraction',
+               model='uie-data-distill-gp',
                schema=schema,
                task_path='../../checkpoint/model_best/')
 # If you want to define the finetuned uie service
