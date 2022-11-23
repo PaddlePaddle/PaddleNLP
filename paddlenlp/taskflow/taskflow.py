@@ -526,9 +526,14 @@ class Taskflow(object):
 
     """
 
-    def __init__(self, task, model=None, mode=None, device_id=0, **kwargs):
-        assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
-            task)
+    def __init__(self,
+                 task,
+                 model=None,
+                 mode=None,
+                 device_id=0,
+                 from_hf_hub=False,
+                 **kwargs):
+        assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
 
         if self.task in ["word_segmentation", "ner"]:
@@ -542,7 +547,7 @@ class Taskflow(object):
 
         if self.model is not None:
             assert self.model in set(TASKS[task][tag].keys(
-            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
+            )), f"The {tag} name: {model} is not in task:[{task}]"
         else:
             self.model = TASKS[task]['default'][ind_tag]
 
@@ -568,6 +573,7 @@ class Taskflow(object):
         self.task_instance = task_class(model=self.model,
                                         task=self.task,
                                         priority_path=self.priority_path,
+                                        from_hf_hub=from_hf_hub,
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
