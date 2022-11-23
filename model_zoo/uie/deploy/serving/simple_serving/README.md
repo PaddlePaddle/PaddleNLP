@@ -17,7 +17,7 @@ pip install paddlenlp >= 2.4.4
 ## Server服务启动
 
 ```bash
-paddlenlp server server:app --host 0.0.0.0 --port 8189
+paddlenlp server server:app --workers 1 --host 0.0.0.0 --port 8189
 ```
 
 ## Client请求启动
