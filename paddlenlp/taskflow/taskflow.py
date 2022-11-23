@@ -27,6 +27,7 @@ from .word_segmentation import SegJiebaTask
 from .word_segmentation import SegLACTask
 from .word_segmentation import SegWordTagTask
 from .pos_tagging import POSTaggingTask
+from .fill_mask import FillMaskTask
 from .text_generation import TextGenerationTask
 from .poetry_generation import PoetryGenerationTask
 from .question_answering import QuestionAnsweringTask
@@ -72,6 +73,16 @@ TASKS = {
         },
         "default": {
             "model": "plato-mini",
+        }
+    },
+    'fill_mask': {
+        "models": {
+            "fill_mask": {
+                "task_class": FillMaskTask,
+            },
+        },
+        "default": {
+            "model": "fill_mask",
         }
     },
     "knowledge_mining": {
