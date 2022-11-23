@@ -103,7 +103,7 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
         global_norm_var = paddle.sqrt(global_norm_var)
         max_global_norm = paddle.full(shape=[1],
                                       dtype=global_norm_var.dtype,
-                                      value=self.clip_norm)
+                                      fill_value=self.clip_norm)
         clip_var = paddle.maximum(x=max_global_norm,
                                   y=paddle.maximum(x=global_norm_var,
                                                    y=max_global_norm))
