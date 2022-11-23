@@ -411,7 +411,8 @@ class ElectraModel(ElectraPretrainedModel):
                  type_vocab_size,
                  initializer_range,
                  pad_token_id,
-                 layer_norm_eps=1e-12):
+                 layer_norm_eps=1e-12,
+                 **kwargs):
         super(ElectraModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range

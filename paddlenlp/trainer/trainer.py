@@ -40,7 +40,6 @@ import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-from paddle.distributed.sharding import group_sharded_parallel
 from paddle.fluid.dygraph.parallel import sync_params_buffers
 
 from paddle.io import (
@@ -177,7 +176,7 @@ class Trainer:
     def __init__(
         self,
         model: Union[PretrainedModel, nn.Layer] = None,
-        criterion: Union[nn.Layer] = None,
+        criterion: nn.Layer = None,
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,
         train_dataset: Optional[Dataset] = None,
@@ -241,6 +240,7 @@ class Trainer:
         self.state = TrainerState()
         self.control = TrainerControl()
         self._signature_columns = None
+        self.optimizer_grouped_parameters = None
 
         if (self.sharding is not None) and (self.optimizer is not None
                                             or self.lr_scheduler is not None):
@@ -365,10 +365,10 @@ class Trainer:
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(
-                    f"No valid checkpoint found in output directory ({args.output_dir})"
+                    f"No valid checkpoint found in output directory ({self.args.output_dir})"
                 )
 
         if resume_from_checkpoint is not None:
@@ -532,10 +532,10 @@ class Trainer:
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)):
             self.state = TrainerState.load_from_json(
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
-            epochs_trained = self.state.global_step // args.num_update_steps_per_epoch
+            epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (
-                    args.num_update_steps_per_epoch)
+                    num_update_steps_per_epoch)
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
@@ -710,9 +710,11 @@ class Trainer:
 
                     self.control = self.callback_handler.on_step_end(
                         args, self.state, self.control)
-
-                    self._maybe_log_save_evaluate(tr_loss, model, epoch,
-                                                  ignore_keys_for_eval)
+                    self._maybe_log_save_evaluate(tr_loss,
+                                                  model,
+                                                  epoch,
+                                                  ignore_keys_for_eval,
+                                                  inputs=inputs)
                 else:
                     self.control = self.callback_handler.on_substep_end(
                         args, self.state, self.control)
@@ -730,8 +732,11 @@ class Trainer:
 
             self.control = self.callback_handler.on_epoch_end(
                 args, self.state, self.control)
-            self._maybe_log_save_evaluate(tr_loss, model, epoch,
-                                          ignore_keys_for_eval)
+            self._maybe_log_save_evaluate(tr_loss,
+                                          model,
+                                          epoch,
+                                          ignore_keys_for_eval,
+                                          inputs=inputs)
 
             if self.control.should_training_stop:
                 break
@@ -805,7 +810,7 @@ class Trainer:
         self.model.set_state_dict(state_dict)
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch,
-                                 ignore_keys_for_eval):
+                                 ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
@@ -836,7 +841,7 @@ class Trainer:
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
 
-            self.log(logs)
+            self.log(logs, **kwargs)
 
         metrics = None
         if self.control.should_evaluate:
@@ -1024,11 +1029,16 @@ class Trainer:
         Trainer's init through `optimizers`, or subclass and override this method in a subclass.
         """
         if self.optimizer is None:
-            decay_parameters = [
-                p.name for n, p in self.model.named_parameters()
-                if not any(nd in n for nd in ["bias", "norm"])
-            ]
-            apply_decay_param_fun = lambda x: x in decay_parameters
+            if self.optimizer_grouped_parameters is not None:
+                params = self.optimizer_grouped_parameters
+                apply_decay_param_fun = None
+            else:
+                params = self.model.parameters()
+                decay_parameters = [
+                    p.name for n, p in self.model.named_parameters()
+                    if not any(nd in n for nd in ["bias", "norm"])
+                ]
+                apply_decay_param_fun = lambda x: x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
                 self.args)
@@ -1038,22 +1048,24 @@ class Trainer:
                 self.optimizer = DygraphShardingOptimizer(
                     hcg=fleet.get_hybrid_communicate_group(),
                     user_defined_strategy=None,
-                    params=self.model.parameters(),
+                    params=params,
                     inner_optimizer_class=optimizer_cls,
                     learning_rate=self.lr_scheduler
                     if lr_scheduler is None else lr_scheduler,
                     apply_decay_param_fun=apply_decay_param_fun,
                     weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
+                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
+                    if self.args.max_grad_norm > 0 else None,
                     **optimizer_kwargs)
             else:
                 self.optimizer = optimizer_cls(
                     learning_rate=self.lr_scheduler
                     if lr_scheduler is None else lr_scheduler,
                     apply_decay_param_fun=apply_decay_param_fun,
-                    parameters=self.model.parameters(),
+                    parameters=params,
                     weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
+                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
+                    if self.args.max_grad_norm > 0 else None,
                     **optimizer_kwargs)
 
         return self.optimizer
@@ -1206,6 +1218,8 @@ class Trainer:
                 if ShardingOption.FULL_SHARD in self.args.sharding:
                     level = "p_g_os"
 
+                from paddle.distributed.sharding import group_sharded_parallel
+
                 model, optimizer, _ = group_sharded_parallel(
                     model,
                     self.optimizer,
@@ -1253,7 +1267,7 @@ class Trainer:
         A helper wrapper that creates an appropriate context manager for `autocast` while feeding it the desired
         arguments, depending on the situation.
         """
-        if self.args.fp16:
+        if self.args.fp16 or self.args.bf16:
             ctx_manager = autocast(True,
                                    custom_black_list=[
                                        "reduce_sum",
@@ -1429,6 +1443,10 @@ class Trainer:
         if self.args.should_save:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
+    def set_optimizer_grouped_parameters(self,
+                                         optimizer_grouped_parameters=None):
+        self.optimizer_grouped_parameters = optimizer_grouped_parameters
+
     def _sorted_checkpoints(self,
                             output_dir=None,
                             checkpoint_prefix=PREFIX_CHECKPOINT_DIR,
@@ -1553,7 +1571,7 @@ class Trainer:
                     paddle.load(os.path.join(checkpoint, SCALER_NAME),
                                 return_numpy=True))
 
-    def log(self, logs: Dict[str, float]) -> None:
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
         Log `logs` on the various objects watching training.
 
@@ -1569,7 +1587,8 @@ class Trainer:
         output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state,
-                                                    self.control, logs)
+                                                    self.control, logs,
+                                                    **kwargs)
 
     def evaluate(
         self,

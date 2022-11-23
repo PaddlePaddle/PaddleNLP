@@ -33,6 +33,7 @@ from . import utils
 from . import losses
 from . import experimental
 from .taskflow import Taskflow
+from .server import SimpleServer
 from . import trainer
 from . import prompt
 from . import dataaug

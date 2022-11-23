@@ -64,7 +64,7 @@ def get_version():
 
 long_description = "PaddleNLP Fast Tokenizer Library written in C++ "
 setup(
-    name="fast_tokenizer",
+    name="fast-tokenizer-python",
     version=get_version(),
     author="PaddlePaddle Speech and Language Team",
     author_email="paddlesl@baidu.com",
@@ -77,7 +77,7 @@ setup(
         "fast_tokenizer", "fast_tokenizer.tokenizers_impl",
         "fast_tokenizer.normalizers", "fast_tokenizer.pretokenizers",
         "fast_tokenizer.models", "fast_tokenizer.postprocessors",
-        "fast_tokenizer.libs"
+        "fast_tokenizer.libs", "fast_tokenizer.decoders"
     ],
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},
@@ -97,5 +97,6 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
 )

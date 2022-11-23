@@ -15,3 +15,4 @@
 from .base_tokenizer import BaseFastTokenizer
 from .ernie import ErnieFastTokenizer
 from .sentencepiece_bpe import SentencePieceBPEFastTokenizer
+from .clip import ClipFastTokenizer

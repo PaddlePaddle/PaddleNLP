@@ -48,13 +48,13 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 3. 更多关于PaddleNLP安装的详细教程请查看[Installation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 
-### 安装FasterTokenizers文本处理加速库（可选）
+### 安装FastTokenizer文本处理加速库（可选）
 
-部署环境是Linux，推荐安装faster_tokenizers可以得到更极致的文本处理效率，进一步提升服务性能。
+部署环境是Linux，推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
 
-在容器内安装 faster_tokenizers
+在容器内安装 fast_tokenizer
 ```shell
-python3 -m pip install faster_tokenizers
+python3 -m pip install fast-tokenizer-python
 ```
 
 
@@ -102,7 +102,7 @@ models
     └── config.pbtxt
 ```
 
-模型配置文件config.pbtxt配置细节请参见[Triton Server Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md)
+模型配置文件config.pbtxt配置细节请参见[Triton Server Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md)
 
 ## 部署模型
 
