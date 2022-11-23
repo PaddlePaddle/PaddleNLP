@@ -105,17 +105,16 @@ public:
                        const bool keep_alive_beam = false,
                        const float alpha = 0.6,
                        const bool normalization_before = true,
-                       const int pos_offset = 0,
                        const ActivationType act = ActivationType::RELU,
-                       const bool pos_bias = false,
-                       const bool prefix_lm = false,
                        const int finished_candidate_num = -1,
                        const bool early_stopping = false,
-                       const bool is_mbart = false,
                        const int min_length = 0,
                        const int inner_coeff = 4,
+                       const int inner_size = -1,
                        const int num_bucket = -1,
-                       const int max_distance = 128)
+                       const int max_distance = 128,
+                       const bool tie_word_embeddings = true,
+                       const bool use_gated = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -144,14 +143,9 @@ public:
 
     args_.alpha_ = alpha;
     args_.normalization_before_ = normalization_before;
-    args_.pos_offset_ = pos_offset;
-    args_.pos_bias_ = pos_bias;
     args_.act_ = act;
 
     args_.min_length_ = min_length;
-
-    args_.prefix_lm_ = prefix_lm;
-    args_.is_mbart_ = is_mbart;
 
     args_.finished_candidate_num_ = (finished_candidate_num == -1)
                                         ? beam_width * 2
@@ -160,6 +154,7 @@ public:
 
     args_.num_bucket_ = num_bucket;
     args_.max_distance_ = max_distance;
+    args_.tie_word_embeddings_ = tie_word_embeddings;
 
     K_cache_ = new DataType_ *[2];
     V_cache_ = new DataType_ *[2];
@@ -173,7 +168,9 @@ public:
                                         is_fuse_qkv,
                                         normalization_before,
                                         args_.act_,
-                                        inner_coeff);
+                                        inner_coeff,
+                                        inner_size,
+                                        use_gated);
     decoder_->set_max_batch_size(batch_size * beam_width);
 
     size_t from_tensor_size =
@@ -181,15 +178,9 @@ public:
     size_t decoder_workspace_size = decoder_->getWorkspaceSize();     // type T
     size_t decoder_normed_result_buffer_size =
         args_.batch_size_ * args_.beam_width_ * args_.hidden_units_;  // type T
-    size_t cache_size = (prefix_lm)
-                            ? (args_.batch_size_ * args_.beam_width_ *
-                               (args_.seq_len_ + args_.memory_max_seq_len_) *
-                               args_.hidden_units_)
-                            : (args_.batch_size_ * args_.beam_width_ *
+    size_t cache_size = (args_.batch_size_ * args_.beam_width_ *
                                args_.seq_len_ * args_.hidden_units_);  // type T
-    size_t mem_cache_size =
-        (prefix_lm) ? 0
-                    : (args_.batch_size_ * args_.beam_width_ *
+    size_t mem_cache_size = (args_.batch_size_ * args_.beam_width_ *
                        memory_max_seq_len * args_.hidden_units_);  // type T
 
     size_t logits_buf_size = args_.batch_size_ * args_.beam_width_ *
@@ -288,9 +279,7 @@ public:
                           0);
     }
 
-    size_t lm_head_buffer_size = (prefix_lm)
-                                     ? decoder_normed_result_buffer_size * 3
-                                     : decoder_normed_result_buffer_size;
+    size_t lm_head_buffer_size = decoder_normed_result_buffer_size;
 
     size_t datatype_buf_size =
         from_tensor_size * 2 + decoder_workspace_size +
@@ -350,21 +339,9 @@ public:
 
     decoder_buf_ = V_cache_[1] + cache_size * args_.decoder_layers_;
 
-    if (prefix_lm) {
-      trans_out_buf_ = (decoder_buf_ + decoder_workspace_size);
-      lm_normed_result_buf_ =
-          (trans_out_buf_ + decoder_normed_result_buffer_size);
-
-      decoder_normed_result_buf_ =
-          (lm_normed_result_buf_ + decoder_normed_result_buffer_size);
-      // Used for post-norm.
-      embedding_buf_ =
-          (lm_normed_result_buf_ + decoder_normed_result_buffer_size);
-    } else {
-      decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
-      // Used for post-norm.
-      embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
-    }
+    decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
+    // Used for post-norm.
+    embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
 
     logits_buf_ = (float *)(decoder_normed_result_buf_ +
                             decoder_normed_result_buffer_size);
@@ -549,11 +526,7 @@ public:
       embedding_bias_ptr = padded_embedding_bias;
     }
 
-    int cache_size =
-        (args_.prefix_lm_)
-            ? (m * (args_.seq_len_ + args_.memory_max_seq_len_) *
-               args_.hidden_units_)
-            : (m * args_.seq_len_ * args_.hidden_units_);  // type T
+    int cache_size = (m * args_.seq_len_ * args_.hidden_units_);  // type T
 
     for (uint step = 1; step <= args_.seq_len_; ++step) {
       // we use two-way buffer
@@ -635,7 +608,9 @@ public:
         check_cuda_error(cudaGetLastError());
 #endif
 
-        alpha = (DataType_) pow((float)(k), -0.5);
+        if (args_.tie_word_embeddings_) {
+          alpha = (DataType_) pow((float)(k), -0.5);
+        }
 
         cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
                                             decoding_params.cublas_handle,

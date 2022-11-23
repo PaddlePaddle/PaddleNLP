@@ -55,8 +55,10 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
     const std::vector<paddle::Tensor>& cross_out_bias,
     const std::vector<paddle::Tensor>& ffn_ln_weight,
     const std::vector<paddle::Tensor>& ffn_ln_bias,
-    const std::vector<paddle::Tensor>& ffn_inter_weight,
-    const std::vector<paddle::Tensor>& ffn_inter_bias,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_0,
+    const std::vector<paddle::Tensor>& ffn_inter_bias_0,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_1,
+    const std::vector<paddle::Tensor>& ffn_inter_bias_1,
     const std::vector<paddle::Tensor>& ffn_out_weight,
     const std::vector<paddle::Tensor>& ffn_out_bias,
     const paddle::Tensor& self_relative_attention_bias_weight,
@@ -82,4 +84,6 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
     const float& temperature,
     const bool& early_stopping,
     const int& max_distance,
-    const int& num_buckets);
+    const int& num_buckets,
+    const bool& tie_word_embeddings,
+    const std::string& act);

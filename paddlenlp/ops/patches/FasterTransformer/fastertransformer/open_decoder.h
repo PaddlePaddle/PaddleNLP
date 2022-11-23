@@ -105,6 +105,8 @@ private:
   int memory_hidden_units_;
   int normalization_before_;
   int inner_coeff_ = 4;
+  int inner_size_ = -1;
+  bool use_gated_ = false;
   ActivationType act_;
 
   DataType_ *norm_from_tensor_buf_, *query_buf_;
@@ -150,7 +152,9 @@ public:
               bool is_fuse_QKV_in_normal_gemm = false,
               bool normalization_before = true,
               ActivationType act = ActivationType::GELU,
-              const int inner_coeff = 4)
+              const int inner_coeff = 4,
+              const int inner_size = -1,
+              const bool use_gated = false)
       // Activation function default to GELU for GPT.
       : head_num_(head_num),
         size_per_head_(size_per_head),
@@ -158,7 +162,9 @@ public:
         is_fuse_QKV_in_normal_gemm_(is_fuse_QKV_in_normal_gemm),
         normalization_before_(normalization_before),
         act_(act),
-        inner_coeff_(inner_coeff) {
+        inner_coeff_(inner_coeff),
+        inner_size_(inner_size),
+        use_gated_(use_gated) {
 #ifndef NDEBUG
     PRINT_FUNC_NAME_();
 #endif
@@ -205,7 +211,18 @@ public:
 
   int getWorkspaceSize() {
     assert(max_batch_size_ != -1);
-    return (9 + inner_coeff_) * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9;
+    int inner_buf_size = 0;
+    if (inner_size_ <= 0) {
+      inner_buf_size = inner_coeff_ * max_batch_size_ * hidden_units_;
+    } else {
+      inner_buf_size = max_batch_size_ * inner_size_;
+    }
+
+    if (use_gated_) {
+      inner_buf_size *= 2;
+    }
+
+    return 9 * max_batch_size_ * hidden_units_ + sizeof(DataType_ *) * 9 + inner_buf_size;
   }
 
   void set_tensor_parallel_param(const TensorParallelParam param) {
@@ -252,7 +269,18 @@ public:
     ffn_inner_buf_ =
         norm_cross_output_buf_ + buf_size;  // inner_coeff_(4) buf size to store inner product
 
-    qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + inner_coeff_ * buf_size);
+    int ffn_inner_buf_size = 0;
+    if (inner_size_ <= 0) {
+      ffn_inner_buf_size = inner_coeff_ * buf_size;
+    } else {
+      ffn_inner_buf_size = max_batch_size_ * inner_size_;
+    }
+
+    if (use_gated_) {
+      ffn_inner_buf_size *= 2;
+    }
+
+    qkv_kernel_ = (DataType_ **)(ffn_inner_buf_ + ffn_inner_buf_size);
     qkv_input_ = qkv_kernel_ + 3;
     qkv_buf_ = qkv_input_ + 3;
 
@@ -293,6 +321,9 @@ public:
 // PRINT_FUNC_NAME_();
 #endif
     const int m = l_parallel_param_.local_batch_size;
+    if (inner_size_ <= 0) {
+      inner_size_ = inner_coeff_ * t_parallel_param_.local_hidden_units_;
+    }
 
     try {
       /* masked multi-head attention */
@@ -427,9 +458,10 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
-              act_);
+              act_,
+              step);
 #ifndef NDEBUG
           cudaDeviceSynchronize();
           check_cuda_error(cudaGetLastError());
@@ -476,7 +508,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -569,7 +601,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
 
@@ -603,7 +635,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -754,7 +786,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
 #ifndef NDEBUG
@@ -802,7 +834,7 @@ public:
               ffn_inner_buf_,
               decoder_output,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -898,7 +930,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
 
@@ -932,7 +964,7 @@ public:
               ffn_inner_buf_,
               ffn_out_buf_,
               m,
-              inner_coeff_ * t_parallel_param_.local_hidden_units_,
+              inner_size_,
               hidden_units_,
               act_);
           POP_RANGE
@@ -986,9 +1018,20 @@ public:
             t_parallel_param_.local_hidden_units_ /* q_buf, k_buf, v_buf */ +
         qk_buf_size +
         2 * m * t_parallel_param_.local_hidden_units_ /* trans_attn, attn */;
-    return (m * hidden_units_ * 3 + attn_work_space_size +
-            m * t_parallel_param_.local_hidden_units_ * inner_coeff_ /* ffn buffer */) *
-           sizeof(DataType_);
+
+    int inner_buf_size = 0;
+    if (inner_size_ <= 0) {
+      inner_buf_size = m * t_parallel_param_.local_hidden_units_ * inner_coeff_;
+    } else {
+      inner_buf_size = m * inner_size_;
+    }
+
+    if (use_gated_) {
+      inner_buf_size *= 2;
+    }
+
+    return (m * hidden_units_ * 3 + attn_work_space_size + inner_buf_size/* ffn buffer */) *
+          sizeof(DataType_);
   }
 
   // use to compute the context of gpt model
@@ -1652,7 +1695,8 @@ public:
            const int m,
            const int inner_size,
            const int n,
-           ActivationType activation_type) {
+           ActivationType activation_type,
+           const int step = -1) {
     int m1 = m, k1 = n, n1 = inner_size;
     DataType_ alpha = (DataType_)1.0f;
     DataType_ beta = (DataType_)0.0f;
@@ -1679,12 +1723,46 @@ public:
                                         cublasAlgoMap_,
                                         cublas_workspace_);
 
-    add_bias_act_kernelLauncher(ffn_inner,
-                                param_.ffn.intermediate_weight.bias,
-                                m1,
-                                inner_size,
-                                activation_type,
-                                param_.stream);
+    if (param_.ffn.intermediate_weight_1.kernel) {
+      cublasMM_cublasLtMM_wrapper_decoder(param_.cublaslt_handle,
+                                          param_.cublas_handle,
+                                          CUBLAS_OP_N,
+                                          CUBLAS_OP_N,
+                                          n1,
+                                          m1,
+                                          k1,
+                                          &alpha,
+                                          param_.ffn.intermediate_weight_1.kernel,
+                                          AType_,
+                                          n1,
+                                          input,
+                                          BType_,
+                                          k1,
+                                          &beta,
+                                          ffn_inner + m1 * inner_size,
+                                          CType_,
+                                          n1,
+                                          param_.stream,
+                                          cublasAlgoMap_,
+                                          cublas_workspace_);
+
+      gated_add_bias_act_kernelLauncher(ffn_inner,
+                                        param_.ffn.intermediate_weight.bias,
+                                        param_.ffn.intermediate_weight_1.bias,
+                                        m1,
+                                        inner_size,
+                                        activation_type,
+                                        param_.stream);
+
+    } else {
+      add_bias_act_kernelLauncher(ffn_inner,
+                                  param_.ffn.intermediate_weight.bias,
+                                  m1,
+                                  inner_size,
+                                  activation_type,
+                                  param_.stream);
+
+    }
 
     int m2 = m, n2 = n, k2 = inner_size;
     cublasMM_cublasLtMM_wrapper_decoder(param_.cublaslt_handle,

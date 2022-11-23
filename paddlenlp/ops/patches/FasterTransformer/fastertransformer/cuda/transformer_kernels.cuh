@@ -36,4 +36,13 @@ void add_bias_input_t5_layernorm_2_kernelLauncher(const T* input,
                                                   int n,
                                                   cudaStream_t stream);
 
+template <typename T>
+void gated_add_bias_act_kernelLauncher(T* out,
+                                       const T* bias0,
+                                       const T* bias1,
+                                       int m,
+                                       int n,
+                                       ActivationType activation_type,
+                                       cudaStream_t stream);
+
 }  // namespace fastertransformer

@@ -53,8 +53,10 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
     const std::vector<paddle::Tensor>& cross_attn_output_bias,
     const std::vector<paddle::Tensor>& ffn_layernorm_weight,
     const std::vector<paddle::Tensor>& ffn_layernorm_bias,
-    const std::vector<paddle::Tensor>& ffn_intermediate_weight,
-    const std::vector<paddle::Tensor>& ffn_intermediate_bias,
+    const std::vector<paddle::Tensor>& ffn_intermediate_weight_0,
+    const std::vector<paddle::Tensor>& ffn_intermediate_bias_0,
+    const std::vector<paddle::Tensor>& ffn_intermediate_weight_1,
+    const std::vector<paddle::Tensor>& ffn_intermediate_bias_1,
     const std::vector<paddle::Tensor>& ffn_output_weight,
     const std::vector<paddle::Tensor>& ffn_output_bias,
     const paddle::Tensor& self_relative_attention_bias_weight,
@@ -81,6 +83,8 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
     const bool& early_stopping,
     const int& max_distance,
     const int& num_buckets,
+    const bool& tie_word_embeddings,
+    const std::string& act,
     cudaStream_t stream) {
   int beam_width_ = (decoding_strategy == "beam_search" ||
                      decoding_strategy == "beam_search_v2" ||
@@ -133,7 +137,8 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
   DecoderInitParam<DataType_>* params =
       new DecoderInitParam<DataType_>[num_layer_];
 
-  int inner_coeff = ffn_intermediate_weight[0].shape()[1] / memory_hidden_dim;
+  int inner_coeff = ffn_intermediate_weight_0[0].shape()[1] / memory_hidden_dim;
+  int inner_size = ffn_intermediate_weight_0[0].shape()[1];
 
   auto q_weight_shape = self_attn_query_weight[0].shape();
   auto k_weight_shape = self_attn_key_weight[0].shape();
@@ -147,6 +152,8 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
              decoding_strategy == "topp_sampling") {
     decoding_params.request_batch_size = batch_size_;
   }
+
+  bool use_gated = false;
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -255,9 +262,22 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
     // intermediate proj
     params[i].ffn.intermediate_weight.kernel =
         reinterpret_cast<const DataType_*>(
-            ffn_intermediate_weight[i].data<data_t_>());
+            ffn_intermediate_weight_0[i].data<data_t_>());
     params[i].ffn.intermediate_weight.bias = reinterpret_cast<const DataType_*>(
-        ffn_intermediate_bias[i].data<data_t_>());
+        ffn_intermediate_bias_0[i].data<data_t_>());
+
+    if (ffn_intermediate_weight_1[i].shape()[0] != 1) {
+        use_gated = true;
+        params[i].ffn.intermediate_weight_1.kernel =
+            reinterpret_cast<const DataType_*>(
+                ffn_intermediate_weight_1[i].data<data_t_>());
+        params[i].ffn.intermediate_weight_1.bias = reinterpret_cast<const DataType_*>(
+            ffn_intermediate_bias_1[i].data<data_t_>());
+    } else {
+        params[i].ffn.intermediate_weight_1.kernel = nullptr;
+        params[i].ffn.intermediate_weight_1.bias = nullptr;
+    }
+    
     // out proj
     params[i].ffn.output_weight.kernel = reinterpret_cast<const DataType_*>(
         ffn_output_weight[i].data<data_t_>());
@@ -292,6 +312,9 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
   int finished_candidate_num_ =
       ("beam_search_v3" == decoding_strategy) ? beam_width_ : beam_width_ * 2;
 
+  ActivationType activate =
+      (act == "gelu") ? ActivationType::GELU : ActivationType::RELU;
+
   if ("beam_search" == decoding_strategy) {
     T5DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beam_search_;
     decoding_beam_search_ = new T5DecodingBeamsearch<DecodingTraits_::OpType>(
@@ -313,17 +336,16 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         false,                 // keep_alive_beam
         0.6,                   // alpha
         true,                  // normalization_before
-        0,                     // pos_offset
-        ActivationType::RELU,  // act
-        false,                 // pos_bias
-        false,                 // prefix_lm
+        activate,
         -1,                    // finished_candidate_num
         false,                 // early_stopping
-        false,                 // is_mbart
         0,                     // min_length
         inner_coeff,
+        inner_size,
         num_buckets,
-        max_distance);
+        max_distance,
+        tie_word_embeddings,
+        use_gated);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -350,17 +372,16 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         true,  // keep_alive_beam
         alpha,
         true,                     // normalization_before
-        0,                        // pos_offset
-        ActivationType::RELU,     // act
-        false,                    // pos_bias
-        false,                    // prefix_lm
-        finished_candidate_num_,  // finished_candidate_num
-        early_stopping,           // early_stopping
-        false,                    // is_mbart
+        activate,
+        finished_candidate_num_,
+        early_stopping,
         0,                        // min_length
         inner_coeff,
+        inner_size,
         num_buckets,
-        max_distance);
+        max_distance,
+        tie_word_embeddings,
+        use_gated);
 
     decoding_beam_search_->forward(params, decoding_params);
 
@@ -386,17 +407,19 @@ std::vector<paddle::Tensor> t5_decoding_kernel(
         probability_threshold_,
         true,  // fuse_qkv
         true,                  // normalization_before
-        0,                     // pos_offset
-        ActivationType::RELU,  // act
-        false,                 // pos_bias
+        activate,
         1.0,                   // temperature
         1.0,                   // repeat_penalty
-        false,                 // prefix_lm
-        false,                 // is_mbart
         0,                     // min_length
         inner_coeff,
+        inner_size,
+        -1,  // seed
+        1,  // tensor_para_size
+        1,  // layer_para_size
         num_buckets,
-        max_distance);
+        max_distance,
+        tie_word_embeddings,
+        use_gated);
 
     decoding_sampling_->forward(params, decoding_params);
 
@@ -438,8 +461,10 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
     const std::vector<paddle::Tensor>& cross_out_bias,
     const std::vector<paddle::Tensor>& ffn_ln_weight,
     const std::vector<paddle::Tensor>& ffn_ln_bias,
-    const std::vector<paddle::Tensor>& ffn_inter_weight,
-    const std::vector<paddle::Tensor>& ffn_inter_bias,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_0,
+    const std::vector<paddle::Tensor>& ffn_inter_bias_0,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_1,
+    const std::vector<paddle::Tensor>& ffn_inter_bias_1,
     const std::vector<paddle::Tensor>& ffn_out_weight,
     const std::vector<paddle::Tensor>& ffn_out_bias,
     const paddle::Tensor& self_relative_attention_bias_weight,
@@ -465,7 +490,9 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
     const float& temperature,
     const bool& early_stopping,
     const int& max_distance,
-    const int& num_buckets) {
+    const int& num_buckets,
+    const bool& tie_word_embeddings,
+    const std::string& act) {
   auto stream = input.stream();
 
   cublasSetStream(CublasHandle::GetInstance()->cublas_handle_, stream);
@@ -500,8 +527,10 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
           cross_out_bias,
           ffn_ln_weight,
           ffn_ln_bias,
-          ffn_inter_weight,
-          ffn_inter_bias,
+          ffn_inter_weight_0,
+          ffn_inter_bias_0,
+          ffn_inter_weight_1,
+          ffn_inter_bias_1,
           ffn_out_weight,
           ffn_out_bias,
           self_relative_attention_bias_weight,
@@ -528,6 +557,8 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
           early_stopping,
           max_distance,
           num_buckets,
+          tie_word_embeddings,
+          act,
           stream);
       break;
     }
@@ -558,8 +589,10 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
           cross_out_bias,
           ffn_ln_weight,
           ffn_ln_bias,
-          ffn_inter_weight,
-          ffn_inter_bias,
+          ffn_inter_weight_0,
+          ffn_inter_bias_0,
+          ffn_inter_weight_1,
+          ffn_inter_bias_1,
           ffn_out_weight,
           ffn_out_bias,
           self_relative_attention_bias_weight,
@@ -586,6 +619,8 @@ std::vector<paddle::Tensor> T5DecodingCUDAForward(
           early_stopping,
           max_distance,
           num_buckets,
+          tie_word_embeddings,
+          act,
           stream);
       break;
     }

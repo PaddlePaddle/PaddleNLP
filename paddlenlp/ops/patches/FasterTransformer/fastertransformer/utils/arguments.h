@@ -152,11 +152,13 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
 struct T5SamplingArguments : public DecodingSamplingArguments {
   int num_bucket_{-1};
   int max_distance_{128};
+  bool tie_word_embeddings_{true};
 };
 
 struct T5BeamsearchArguments : public DecodingBeamsearchArguments {
   int num_bucket_{-1};
   int max_distance_{128};
+  bool tie_word_embeddings_{true};
 };
 
 struct GptArguments : public DecodingSamplingArguments {

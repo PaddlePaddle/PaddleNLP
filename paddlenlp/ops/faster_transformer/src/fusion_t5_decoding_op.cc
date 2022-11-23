@@ -45,8 +45,10 @@ std::vector<paddle::Tensor> T5DecodingForward(
     const std::vector<paddle::Tensor>& cross_out_bias,
     const std::vector<paddle::Tensor>& ffn_ln_weight,
     const std::vector<paddle::Tensor>& ffn_ln_bias,
-    const std::vector<paddle::Tensor>& ffn_inter_weight,
-    const std::vector<paddle::Tensor>& ffn_inter_bias,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_0,
+    const std::vector<paddle::Tensor>& ffn_inter_bias_0,
+    const std::vector<paddle::Tensor>& ffn_inter_weight_1,
+    const std::vector<paddle::Tensor>& ffn_inter_bias_1,
     const std::vector<paddle::Tensor>& ffn_out_weight,
     const std::vector<paddle::Tensor>& ffn_out_bias,
     const paddle::Tensor& self_relative_attention_bias_weight,
@@ -70,7 +72,9 @@ std::vector<paddle::Tensor> T5DecodingForward(
     const float& temperature,
     const bool& early_stopping,
     const int& max_distance,
-    const int& num_buckets) {
+    const int& num_buckets,
+    const bool& tie_word_embeddings,
+    const std::string& act) {
   int batch_size = input.shape()[0];
   int max_out_len = rel_len ? max_len + input.shape()[1] : max_len;
 
@@ -142,8 +146,10 @@ std::vector<paddle::Tensor> T5DecodingForward(
                                  cross_out_bias,
                                  ffn_ln_weight,
                                  ffn_ln_bias,
-                                 ffn_inter_weight,
-                                 ffn_inter_bias,
+                                 ffn_inter_weight_0,
+                                 ffn_inter_bias_0,
+                                 ffn_inter_weight_1,
+                                 ffn_inter_bias_1,
                                  ffn_out_weight,
                                  ffn_out_bias,
                                  self_relative_attention_bias_weight,
@@ -169,7 +175,9 @@ std::vector<paddle::Tensor> T5DecodingForward(
                                  temperature,
                                  early_stopping,
                                  max_distance,
-                                 num_buckets);
+                                 num_buckets,
+                                 tie_word_embeddings,
+                                 act);
   } else {
     PD_THROW("Not implemented place. Only GPU is supported. ");
   }
@@ -201,8 +209,10 @@ std::vector<std::vector<int64_t>> T5DecodingInferShape(
     const std::vector<std::vector<int64_t>>& cross_out_bias_shapes,
     const std::vector<std::vector<int64_t>>& ffn_ln_weight_shapes,
     const std::vector<std::vector<int64_t>>& ffn_ln_bias_shapes,
-    const std::vector<std::vector<int64_t>>& ffn_inter_weight_shapes,
-    const std::vector<std::vector<int64_t>>& ffn_inter_bias_shapes,
+    const std::vector<std::vector<int64_t>>& ffn_inter_weight_0_shapes,
+    const std::vector<std::vector<int64_t>>& ffn_inter_bias_0_shapes,
+    const std::vector<std::vector<int64_t>>& ffn_inter_weight_1_shapes,
+    const std::vector<std::vector<int64_t>>& ffn_inter_bias_1_shapes,
     const std::vector<std::vector<int64_t>>& ffn_out_weight_shapes,
     const std::vector<std::vector<int64_t>>& ffn_out_bias_shapes,
     const std::vector<int64_t>& self_relative_attention_bias_weight_shapes,
@@ -226,7 +236,9 @@ std::vector<std::vector<int64_t>> T5DecodingInferShape(
     const float& temperature,
     const bool& early_stopping,
     const int& max_distance,
-    const int& num_buckets) {
+    const int& num_buckets,
+    const bool& tie_word_embeddings,
+    const std::string& act) {
   int batch_size = input_shape[0];
 
   std::vector<int64_t> output_dims;
@@ -286,8 +298,10 @@ std::vector<paddle::DataType> T5DecodingInferDtype(
     const std::vector<paddle::DataType>& cross_out_bias,
     const std::vector<paddle::DataType>& ffn_ln_weight,
     const std::vector<paddle::DataType>& ffn_ln_bias,
-    const std::vector<paddle::DataType>& ffn_inter_weight,
-    const std::vector<paddle::DataType>& ffn_inter_bias,
+    const std::vector<paddle::DataType>& ffn_inter_weight_0,
+    const std::vector<paddle::DataType>& ffn_inter_bias_0,
+    const std::vector<paddle::DataType>& ffn_inter_weight_1,
+    const std::vector<paddle::DataType>& ffn_inter_bias_1,
     const std::vector<paddle::DataType>& ffn_out_weight,
     const std::vector<paddle::DataType>& ffn_out_bias,
     const paddle::DataType& self_relative_attention_bias_weight,
@@ -327,8 +341,10 @@ PD_BUILD_OP(fusion_t5_decoding)
              paddle::Vec("CrossOutBias"),
              paddle::Vec("FFNLayernormWeight"),
              paddle::Vec("FFNLayernormBias"),
-             paddle::Vec("FFNInterWeight"),
-             paddle::Vec("FFNInterBias"),
+             paddle::Vec("FFNInterWeight0"),
+             paddle::Vec("FFNInterBias0"),
+             paddle::Vec("FFNInterWeight1"),
+             paddle::Vec("FFNInterBias1"),
              paddle::Vec("FFNOutWeight"),
              paddle::Vec("FFNOutBias"),
              "SelfRelativeAttentionBiasWeight",
@@ -353,7 +369,9 @@ PD_BUILD_OP(fusion_t5_decoding)
             "temperature: float",
             "early_stopping: bool",
             "max_distance: int",
-            "num_buckets: int"})
+            "num_buckets: int",
+            "tie_word_embeddings: bool",
+            "act: std::string"})
     .SetKernelFn(PD_KERNEL(T5DecodingForward))
     .SetInferShapeFn(PD_INFER_SHAPE(T5DecodingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(T5DecodingInferDtype));

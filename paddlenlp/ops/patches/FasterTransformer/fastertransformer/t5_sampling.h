@@ -98,20 +98,19 @@ public:
                      const float probability_threshold = 0.0,
                      const int is_fuse_qkv = false,
                      const bool normalization_before = true,
-                     const int pos_offset = 0,
                      const ActivationType act = ActivationType::RELU,
-                     const bool pos_bias = false,
                      const float temperature = 1.0,
                      const float repeat_penalty = 1.0,
-                     const bool prefix_lm = false,
-                     const bool is_mbart = false,
                      const int min_length = 0,
                      const int inner_coeff = 4,
+                     const int inner_size = -1,
                      const int seed = -1,
                      const int tensor_para_size = 1,
                      const int layer_para_size = 1,
                      const int num_bucket = -1,
-                     const int max_distance = 128)
+                     const int max_distance = 128,
+                     const bool tie_word_embeddings = true,
+                     const bool use_gated = false)
       : allocator_(allocator) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
@@ -126,18 +125,13 @@ public:
     args_.start_id_ = start_id;
     args_.end_id_ = end_id;
     args_.normalization_before_ = normalization_before;
-    args_.pos_offset_ = pos_offset;
     args_.act_ = act;
 
-    args_.pos_bias_ = pos_bias;
     args_.temperature_ = temperature;
     args_.repeat_penalty_ = repeat_penalty;
 
     args_.min_length_ = min_length;
     args_.seed_ = seed;
-
-    args_.prefix_lm_ = prefix_lm;
-    args_.is_mbart_ = is_mbart;
 
     args_.num_bucket_ = num_bucket;
     args_.max_distance_ = max_distance;
@@ -179,7 +173,9 @@ public:
                                         is_fuse_qkv,
                                         normalization_before,
                                         args_.act_,
-                                        inner_coeff);
+                                        inner_coeff,
+                                        inner_size,
+                                        use_gated);
     decoder_->set_max_batch_size(batch_size);
 
     size_t from_tensor_size =
@@ -188,15 +184,9 @@ public:
     size_t decoder_normed_result_buffer_size =
         args_.batch_size_ * args_.hidden_units_;  // type T
 
-    size_t cache_size = (prefix_lm)
-                            ? (args_.batch_size_ *
-                               (args_.seq_len_ + args_.memory_max_seq_len_) *
-                               args_.hidden_units_)
-                            : (args_.batch_size_ * args_.seq_len_ *
-                               args_.hidden_units_);  // type T
-    size_t mem_cache_size = (prefix_lm)
-                                ? 0
-                                : (args_.batch_size_ * memory_max_seq_len *
+    size_t cache_size = (args_.batch_size_ * args_.seq_len_ *
+                         args_.hidden_units_);  // type T
+    size_t mem_cache_size = (args_.batch_size_ * memory_max_seq_len *
                                    args_.hidden_units_);  // type T
     if (tensor_para_size != 1) {                          // tensor parallel
       cache_size /= tensor_para_size;
@@ -306,21 +296,9 @@ public:
 
     decoder_buf_ = V_cache_[0] + cache_size * args_.decoder_layers_;
 
-    if (prefix_lm) {
-      trans_out_buf_ = (decoder_buf_ + decoder_workspace_size);
-      lm_normed_result_buf_ =
-          (trans_out_buf_ + decoder_normed_result_buffer_size);
-
-      decoder_normed_result_buf_ =
-          (lm_normed_result_buf_ + decoder_normed_result_buffer_size);
-      // Used for post-norm.
-      embedding_buf_ =
-          (lm_normed_result_buf_ + decoder_normed_result_buffer_size);
-    } else {
-      decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
-      // Used for post-norm.
-      embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
-    }
+    decoder_normed_result_buf_ = (decoder_buf_ + decoder_workspace_size);
+    // Used for post-norm.
+    embedding_buf_ = (decoder_buf_ + decoder_workspace_size);
 
     logits_buf_ =
         decoder_normed_result_buf_ + decoder_normed_result_buffer_size;
@@ -495,19 +473,11 @@ public:
     }
 
     // TODO(guosheng): move cache offset into for loop for pipeline parallel
-    size_t cache_size =
-        (args_.prefix_lm_) ? (args_.batch_size_ *
-                              (args_.seq_len_ + args_.memory_max_seq_len_) *
-                              t_parallel_param_.local_hidden_units_)
-                           : (args_.batch_size_ * args_.seq_len_ *
-                              t_parallel_param_.local_hidden_units_);  // type T
+    size_t cache_size = (args_.batch_size_ * args_.seq_len_ *
+                         t_parallel_param_.local_hidden_units_);  // type T
 
     const int local_batch = l_parallel_param_.local_batch_size;
     for (uint step = 1; step <= args_.seq_len_; ++step) {
-      // const int ite_num = args_.batch_size_ / local_batch;
-      // for (size_t ite = 0; ite < ite_num; ite++) {
-      // }
-
 
       words_embeddings_kernel_launcher(from_tensor_[0],
                                        decoding_params.embedding_table,
@@ -560,7 +530,8 @@ public:
                             args_.seq_len_,
                             true, /* is_cross_attention */
                             finished_buf_,
-                            relative_attention_bias_);
+                            relative_attention_bias_,
+                            true);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -585,6 +556,10 @@ public:
         cudaDeviceSynchronize();
         check_cuda_error(cudaGetLastError());
 #endif
+
+        if (args_.tie_word_embeddings_) {
+          alpha = (DataType_) pow((float)(k), -0.5);
+        }
 
         cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
                                             decoding_params.cublas_handle,
