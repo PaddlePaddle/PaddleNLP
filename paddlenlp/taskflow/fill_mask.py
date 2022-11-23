@@ -94,7 +94,8 @@ class FillMaskTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = AutoModelForMaskedLM.from_pretrained(model)
+        model_instance = AutoModelForMaskedLM.from_pretrained(
+            model, from_hf_hub=self.from_hf_hub)
         model_instance.eval()
         self._model = model_instance
 
@@ -102,7 +103,8 @@ class FillMaskTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(model)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            model, from_hf_hub=self.from_hf_hub)
 
     def get_masked_index(self, input_ids):
         return paddle.nonzero(input_ids == self._tokenizer.mask_token_id)
