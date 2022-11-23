@@ -31,23 +31,23 @@ pylint:
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-# # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
+# # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # # 
+
+.PHONY: all-test
+all-test: test gpu-test
 
 # default for cpu-test
 .PHONY: test
-test: 
-	example-test 
+test:
+	python -m unittest discover -p "test_*.py"
 
 .PHONY: gpu-test
 gpu-test:
+	# TODO(wj-Mcat): need to intergrate this test into iPipe
 	echo "only run gpu-test"
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-
-.PHONY: format
-format:
-	pre-commit run yapf
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
