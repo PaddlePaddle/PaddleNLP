@@ -15,6 +15,10 @@
 from genericpath import isdir
 import os
 import json
+from pathlib import Path
+from typing import Type, List, Tuple, Optional
+from uvicorn.config import LOGGING_CONFIG
+from uvicorn.main import LEVEL_CHOICES
 from typing import Type, List, Tuple, Optional
 from paddlenlp.utils.import_utils import is_package_available
 
@@ -36,6 +40,7 @@ from paddlenlp.cli.converter import convert_from_local_dir
 from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
 from paddlenlp.transformers.utils import find_transformer_model_type
 from paddlenlp.cli.download import load_community_models
+from paddlenlp.cli.server import start_backend
 
 
 def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
@@ -170,6 +175,68 @@ def convert(input: Optional[str] = None, output: Optional[str] = None):
         return
 
     convert_from_local_dir(pretrained_dir=input, output=output)
+
+
+@app.command(help="Start the PaddleNLP SimpleServer.")
+def server(
+    app: str,
+    host: str = typer.Option('127.0.0.1',
+                             '--host',
+                             help="Bind socket to this host."),
+    port: int = typer.Option('8000', '--port',
+                             help="Bind socket to this port."),
+    app_dir: str = typer.Option(None,
+                                '--app_dir',
+                                help="The application directory path."),
+    workers: int = typer.Option(
+        None,
+        '--workers',
+        help=
+        "Number of worker processes. Defaults to the $WEB_CONCURRENCY environment"
+        " variable if available, or 1. Not valid with --reload."),
+    log_level: int = typer.Option(None,
+                                  '--log_level',
+                                  help="Log level. [default: info]"),
+    limit_concurrency: int = typer.Option(
+        None,
+        '--limit-concurrency',
+        help=
+        "Maximum number of concurrent connections or tasks to allow, before issuing"
+    ),
+    limit_max_requests: int = typer.Option(
+        None,
+        '--limit-max-requests',
+        help=
+        "Maximum number of requests to service before terminating the process."
+    ),
+    timeout_keep_alive: int = typer.Option(
+        15,
+        '--timeout-keep-alive',
+        help=
+        "Close Keep-Alive connections if no new data is received within this timeout."
+    ),
+    reload: bool = typer.Option(
+        False,
+        '--reload',
+        help="Reload the server when the app_dir is changed.")):
+    """The main function for the staring the SimpleServer"""
+    logger.info("starting to PaddleNLP SimpleServer...")
+    if app_dir is None:
+        app_dir = str(Path(os.getcwd()))
+    # Flags of uvicorn
+    backend_kwargs = {
+        "host": host,
+        "port": port,
+        "log_config": LOGGING_CONFIG,
+        "log_level": log_level,
+        "workers": workers,
+        "limit_concurrency": limit_concurrency,
+        "limit_max_requests": limit_max_requests,
+        "timeout_keep_alive": timeout_keep_alive,
+        "app_dir": app_dir,
+        "reload": reload
+    }
+    start_backend(app, **backend_kwargs)
 
 
 def main():
