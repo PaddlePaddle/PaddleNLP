@@ -82,7 +82,8 @@ class DialogueTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
-        self._check_task_files()
+        if not self.from_hf_hub:
+            self._check_task_files()
         self._construct_tokenizer(
             self._task_path if self.from_hf_hub else model)
         self._batch_size = batch_size
