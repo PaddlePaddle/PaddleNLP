@@ -303,23 +303,21 @@ def create_infer_loader(args):
 def adapt_vocab_size(args):
     if args.src_vocab:
         src_vocab = Vocab.load_vocabulary(filepath=args.src_vocab,
-                                          unk_token=args.unk_token,
                                           bos_token=args.bos_token,
                                           eos_token=args.eos_token,
                                           pad_token=args.pad_token)
     elif not args.benchmark:
         from paddlenlp.datasets import load_dataset
         datasets = load_dataset('wmt14ende', splits=('test'))
-        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["bpe"])
+        src_vocab = Vocab.load_vocabulary(**datasets.vocab_info["bpe"])
     else:
         from paddlenlp.datasets import load_dataset
         datasets = load_dataset('wmt14ende', splits=('test'))
-        src_vocab = Vocab.load_vocabulary(**datasets[0].vocab_info["benchmark"])
+        src_vocab = Vocab.load_vocabulary(**datasets.vocab_info["benchmark"])
 
     if not args.joined_dictionary:
         if args.trg_vocab is not None:
             trg_vocab = Vocab.load_vocabulary(filepath=args.trg_vocab,
-                                              unk_token=args.unk_token,
                                               bos_token=args.bos_token,
                                               eos_token=args.eos_token,
                                               pad_token=args.pad_token)
