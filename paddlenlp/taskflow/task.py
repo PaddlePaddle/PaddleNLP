@@ -62,6 +62,8 @@ class Task(metaclass=abc.ABCMeta):
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
         self._task_flag = self.kwargs[
             'task_flag'] if 'task_flag' in self.kwargs else self.model
+        self.from_hf_hub = kwargs.pop("from_hf_hub", False)
+
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
             self._custom_model = True
@@ -71,7 +73,9 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
-        download_check(self._task_flag)
+
+        if not self.from_hf_hub:
+            download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
