@@ -12,16 +12,158 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import json
 import types
-from functools import partial
+import pathlib
 
 import numpy as np
 
 import paddle
 from paddle import Tensor
+
 from paddlenlp.datasets import load_dataset
-from paddlenlp.prompt import ManualVerbalizer
+
+LABEL_TO_STANDARD = {
+    "tnews": {
+        'news_story': '100',
+        'news_culture': '101',
+        'news_entertainment': '102',
+        'news_sports': '103',
+        'news_finance': '104',
+        'news_house': '106',
+        'news_car': '107',
+        'news_edu': '108',
+        'news_tech': '109',
+        'news_military': '110',
+        'news_travel': '112',
+        'news_world': '113',
+        'news_stock': '114',
+        'news_agriculture': '115',
+        'news_game': '116'
+    },
+    "iflytek": {
+        "打车": 0,
+        "美颜": 100,
+        "影像剪辑": 101,
+        "摄影修图": 102,
+        "相机": 103,
+        "绘画": 104,
+        "二手": 105,
+        "电商": 106,
+        "团购": 107,
+        "外卖": 108,
+        "电影票务": 109,
+        "社区服务": 10,
+        "社区超市": 110,
+        "购物咨询": 111,
+        "笔记": 112,
+        "办公": 113,
+        "日程管理": 114,
+        "女性": 115,
+        "经营": 116,
+        "收款": 117,
+        "其他": 118,
+        "薅羊毛": 11,
+        "魔幻": 12,
+        "仙侠": 13,
+        "卡牌": 14,
+        "飞行空战": 15,
+        "射击游戏": 16,
+        "休闲益智": 17,
+        "动作类": 18,
+        "体育竞技": 19,
+        "地图导航": 1,
+        "棋牌中心": 20,
+        "经营养成": 21,
+        "策略": 22,
+        "MOBA": 23,
+        "辅助工具": 24,
+        "约会社交": 25,
+        "即时通讯": 26,
+        "工作社交": 27,
+        "论坛圈子": 28,
+        "婚恋社交": 29,
+        "免费WIFI": 2,
+        "情侣社交": 30,
+        "社交工具": 31,
+        "生活社交": 32,
+        "微博博客": 33,
+        "新闻": 34,
+        "漫画": 35,
+        "小说": 36,
+        "技术": 37,
+        "教辅": 38,
+        "问答交流": 39,
+        "租车": 3,
+        "搞笑": 40,
+        "杂志": 41,
+        "百科": 42,
+        "影视娱乐": 43,
+        "求职": 44,
+        "兼职": 45,
+        "视频": 46,
+        "短视频": 47,
+        "音乐": 48,
+        "直播": 49,
+        "同城服务": 4,
+        "电台": 50,
+        "K歌": 51,
+        "成人": 52,
+        "中小学": 53,
+        "职考": 54,
+        "公务员": 55,
+        "英语": 56,
+        "视频教育": 57,
+        "高等教育": 58,
+        "成人教育": 59,
+        "快递物流": 5,
+        "艺术": 60,
+        "语言(非英语)": 61,
+        "旅游资讯": 62,
+        "综合预定": 63,
+        "民航": 64,
+        "铁路": 65,
+        "酒店": 66,
+        "行程管理": 67,
+        "民宿短租": 68,
+        "出国": 69,
+        "婚庆": 6,
+        "工具": 70,
+        "亲子儿童": 71,
+        "母婴": 72,
+        "驾校": 73,
+        "违章": 74,
+        "汽车咨询": 75,
+        "汽车交易": 76,
+        "日常养车": 77,
+        "行车辅助": 78,
+        "租房": 79,
+        "家政": 7,
+        "买房": 80,
+        "装修家居": 81,
+        "电子产品": 82,
+        "问诊挂号": 83,
+        "养生保健": 84,
+        "医疗服务": 85,
+        "减肥瘦身": 86,
+        "美妆美业": 87,
+        "菜谱": 88,
+        "餐饮店": 89,
+        "公共交通": 8,
+        "体育咨讯": 90,
+        "运动健身": 91,
+        "支付": 92,
+        "保险": 93,
+        "股票": 94,
+        "借贷": 95,
+        "理财": 96,
+        "彩票": 97,
+        "记账": 98,
+        "银行": 99,
+        "政务": 9
+    }
+}
 
 
 def load_prompt_arguments(args):
@@ -62,204 +204,80 @@ def maskedlm_wrapper(verbalizer):
         outputs = outputs.reshape([batch_size, -1, num_pred])
         return outputs
 
-    verbalizer.eval_process_outputs = verbalizer.process_outputs
+    def eval_process_outputs(self, outputs: Tensor):
+        token_ids = self.token_ids[:, 0, :].T
+        batch_size, num_token, num_pred = outputs.shape
+        results = paddle.index_select(outputs[:, 0, :], token_ids[0], axis=1)
+        for index in range(1, num_token):
+            results *= paddle.index_select(outputs[:, index, :],
+                                           token_ids[index],
+                                           axis=1)
+        return results
+
+    verbalizer.eval_process_outputs = types.MethodType(eval_process_outputs,
+                                                       verbalizer)
     verbalizer.process_outputs = types.MethodType(process_outputs, verbalizer)
     return verbalizer
 
 
-def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
-    """
-    Extend train dataset with pseudo labeled examples if exists.
-    """
-    if pseudo_path is None:
-        return data_ds
-    with open(pseudo_path, "r", encoding="utf-8") as fp:
-        pseudo_data = [json.loads(x.strip()) for x in fp]
-    data_ds = MapDataset([x for x in data_ds] + pseudo_data)
-    return data_ds
-
-
-def extend_with_data_augment(data_ds,
-                             aug_type,
-                             num_aug=10,
-                             percent=0.1,
-                             aug_base="mlm"):
-    """
-    Extend train dataset with augmentation.
-    """
-    if aug_type is None or aug_type == "None":
-        return data_ds
-    if aug_type == "delete":
-        aug = WordDelete(create_n=num_aug, aug_percent=percent)
-    elif aug_type == "substitute":
-        aug = WordSubstitute(aug_base, create_n=num_aug, aug_percent=percent)
-    elif aug_type == "insert":
-        aug = WordInsert(aug_base, create_n=num_aug, aug_percent=percent)
-    elif aug_type == "swap":
-        aug = WordSwap(create_n=num_aug, aug_percent=percent)
-    elif aug_type == "generate":
-        aug = SentenceSynonym(create_n, generate_n=create_n + 3)
-    else:
-        raise ValueError(
-            "Unsupported data augment strategy `{}`".format(aug_type))
-
-    aug_data = []
-    for example in data_ds:
-        text_a_aug = aug.augment(example["text_a"])
-        for text in text_a_aug:
-            new_example = example.copy()
-            example["text_a"] = text
-            aug_data.append(new_example)
-
-        if "text_b" in example and example["text_b"] is not None:
-            text_b_aug = aug.augment(example["text_b"])
-            for text in text_b_aug:
-                new_example = example.copy()
-                example["text_b"] = text
-                aug_data.append(new_example)
-    data_ds = MapDataset([x for x in data_ds] + aug_data)
-    return data_ds
-
-
-def convert_chid(data_ds):
-    """
-    Insert idioms into positions of `#idiom#` so that the task is converted
-    to binary classification.
-    """
-    split_data_ds = []
-    for example in data_ds:
-        fragments = example["content"].split("#idiom#")
-        label = example.get("answer", None)
-        for index, cand in enumerate(example["candidates"]):
-            text = fragments[0] + "（" + cand + "）" + fragments[1]
-            new_example = {
-                "content_pre": fragments[0],
-                "content_post": fragments[1],
-                "idiom": cand
-            }
-            if label is not None:
-                new_example["labels"] = int(index == label)
-            split_data_ds.append(new_example)
-    return MapDataset(split_data_ds)
-
-
-def convert_cluewsc(data_ds):
-    """
-    Mark the pronoun and entity with special tokens. 
-    """
-    marked_data_ds = []
-    for example in data_ds:
-        target, text = example["target"], list(example["text"])
-        pronoun, p_index = target["span2_text"], target["span2_index"]
-        entity, e_index = target["span1_text"], target["span1_index"]
-        label = example.get("label", None)
-        if p_index > e_index:
-            text.insert(p_index, "_")
-            text.insert(p_index + len(pronoun) + 1, "_")
-            text.insert(e_index, "[")
-            text.insert(e_index + len(entity) + 1, "]")
-        else:
-            text.insert(e_index, "[")
-            text.insert(e_index + len(entity) + 1, "]")
-            text.insert(p_index, "_")
-            text.insert(p_index + len(pronoun) + 1, "_")
-        new_example = {
-            "text": "".join(text),
-            "pronoun": pronoun,
-            "entity": entity
-        }
-        if label is not None:
-            new_example["labels"] = label
-        marked_data_ds.append(new_example)
-    return MapDataset(marked_data_ds)
-
-
-def convert_labels_to_ids(example, orig_key, labels_to_ids):
-    """
-    Convert the keyword in datasets to `labels`.
-    """
-    if orig_key in example:
-        example["label_ids"] = labels_to_ids[example.pop(orig_key)]
-    return example
-
-
-def convert_ids_to_words(example, token_ids):
-    """
-    Convert label id to the first word in mapping from labels to words,
-    the length of which should coincide with that of `mask` in prompt.
-    """
-    if "label_ids" in example:
-        example["labels"] = paddle.index_select(token_ids,
-                                                paddle.to_tensor(
-                                                    example["label_ids"]),
-                                                axis=0)
-    return example
-
-
-def load_fewclue_dataset(args, verbalizer):
-    """
-    Load fewclue datasets and convert them to the standard format of PET.
-    """
-    split_id = args.split_id
-    splits = [f"train_{split_id}", f"dev_{split_id}", f"test_public", "test"]
-    if args.task_name == "cluewsc":
-        train_ds, dev_ds, public_test_ds, test_ds = load_dataset(
-            "fewclue", name=args.task_name, splits=splits)
-        unlabeled_ds = None
-    else:
-        splits.append("unlabeled")
-        train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_dataset(
-            "fewclue", name=args.task_name, splits=splits)
-    data_ds = [train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds]
-
-    # Preprocess data for mask prediction task.
-    if args.task_name == "chid":
-        for index, sub_data_ds in enumerate(data_ds):
-            data_ds[index] = convert_chid(sub_data_ds)
-    elif args.task_name == "cluewsc":
-        for index, sub_data_ds in enumerate(data_ds):
-            data_ds[index] = convert_cluewsc(sub_data_ds)
-    else:
-        if args.task_name in ("tnews", "iflytek"):
-            orig_key = "label_des"
-        else:
-            orig_key = "label"
-        convert_label = partial(convert_labels_to_ids,
-                                orig_key=orig_key,
-                                labels_to_ids=verbalizer.labels_to_ids)
-        for index, sub_data_ds in enumerate(data_ds):
-            if sub_data_ds is not None:
-                data_ds[index] = sub_data_ds.map(convert_label)
-
-    # Extend train dataset with data augmentation and pseudo-label data.
-    data_ds[0] = extend_with_data_augment(data_ds[0], args.augment_type,
-                                          args.num_augment,
-                                          args.word_augment_percent,
-                                          args.augment_method)
-    data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path,
-                                         verbalizer.labels_to_ids)
-
-    dev_labels = [x["label_ids"] for x in data_ds[1]]
-    test_labels = [x["label_ids"] for x in data_ds[2]]
-
-    convert_fn = partial(convert_ids_to_words,
-                         token_ids=verbalizer.token_ids[:, 0, :])
-    data_ds[:3] = [x.map(convert_fn) for x in data_ds[:3]]
-
-    return data_ds, (dev_labels, test_labels)
-
-
-def combine_data_label_and_save(data_path, data_ds, label_preds, labels):
+def save_pseudo_data(save_path, task_name, label_preds, verbalizer, labels):
     """
     Combine unsupervised data and corresponding predicted labels and 
     save one example per line.
     """
-    predictions = paddle.to_tensor(label_preds.predictions)
-    predictions = paddle.nn.functional.softmax(predictions, axis=1).numpy()
-    label_preds = np.argmax(predictions, axis=1)
-    label_probs = np.max(predictions, axis=1)
-    with open(data_path, "w") as fp:
-        for index, example in enumerate(data_ds):
-            example["labels"] = labels[label_preds[index]]
-            example["prob"] = label_probs[index]
+    if task_name == "cluewsc":
+        return None
+
+    data_ds = load_dataset("fewclue", name=task_name, splits="unlabeled")
+    preds = paddle.to_tensor(label_preds.predictions)
+    preds = verbalizer.eval_process_outputs(preds)
+    preds = paddle.nn.functional.softmax(preds, axis=1).numpy()
+    label_preds = np.argmax(preds, axis=1)
+    label_probs = np.max(preds, axis=1)
+    pseudo_data = []
+    for index, example in enumerate(data_ds):
+        example["labels"] = labels[label_preds[index]]
+        example["prob"] = str(label_probs[index])
+        pseudo_data.append(example)
+    save_data(pseudo_data, save_path)
+
+
+def save_fewclue_prediction(save_path, task_name, label_preds, verbalizer,
+                            labels):
+    """
+    Extract predicted labels and save as the format required by FewCLUE.
+    """
+    preds = paddle.to_tensor(label_preds.predictions)
+    preds = verbalizer.eval_process_outputs(preds)
+    if task_name == "chid":
+        batch_size = preds.shape[0]
+        preds = paddle.nn.functional.softmax(preds, axis=1)[:, 1]
+        preds = preds.reshape([batch_size // 7, 7])
+    preds = paddle.nn.functional.softmax(preds, axis=1).numpy()
+    preds = np.argmax(preds, axis=1)
+    test_ds = load_dataset("fewclue", name=task_name, splits="test")
+
+    ret_list = []
+    maps = LABEL_TO_STANDARD.get(task_name, None)
+    for idx, example in enumerate(test_ds):
+        uid = example.get("id", idx)
+        if task_name in ["bustm", "csl"]:
+            ret_list.append({"id": uid, "label": str(preds[idx])})
+        elif task_name == "chid":
+            ret_list.append({"id": uid, "answer": preds[idx]})
+        elif task_name in ["cluewsc", "eprstmt", "ocnli", "csldcp"]:
+            ret_list.append({"id": uid, "label": labels[preds[idx]]})
+        elif task_name in ["iflytek", "tnews"]:
+            ret_list.append({"id": uid, "label": str(maps[labels[preds[idx]]])})
+    save_file = task_name if task_name in ["bustm", "csldcp", "eprstmt"
+                                           ] else task_name + "f"
+    save_data(ret_list, save_path, save_file + "_predict.json")
+
+
+def save_data(data, save_path, save_file=None):
+    if save_file is not None:
+        pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
+        save_path = os.path.join(save_path, save_file)
+    with open(save_path, "w") as fp:
+        for example in data:
             fp.write(json.dumps(example, ensure_ascii=False) + "\n")

@@ -30,8 +30,9 @@ from paddlenlp.prompt import (
     PromptTrainer,
 )
 
-from utils import (load_prompt_arguments, combine_data_label_and_save,
-                   load_fewclue_dataset, maskedlm_wrapper)
+from data import load_fewclue_dataset
+from utils import (load_prompt_arguments, maskedlm_wrapper, save_pseudo_data,
+                   save_fewclue_prediction)
 
 
 # yapf: disable
@@ -41,7 +42,7 @@ class DataArguments:
     split_id: str = field(default="0", metadata={"help": "The split id of datasets, including 0, 1, 2, 3, 4, few_all."})
     prompt_path: str = field(default="prompt.json", metadata={"help": "Path to the defined prompts."})
     prompt_index: int = field(default=0, metadata={"help": "The index of defined prompt for training."})
-    augment_type: str = field(default=None, metadata={"help": "The strategy used for data augmentation, including `swap`, `delete`, `insert`, `subsitute`, `generate`."})
+    augment_type: str = field(default=None, metadata={"help": "The strategy used for data augmentation, including `swap`, `delete`, `insert`, `subsitute`."})
     num_augment: str = field(default=5, metadata={"help": "Number of augmented data per example, which works when `augment_type` is set."})
     word_augment_percent: str = field(default=0.1, metadata={"help": "Percentage of augmented words in sequences, used for `swap`, `delete`, `insert`, `subsitute`."})
     augment_method: str = field(default="mlm", metadata={"help": "Strategy used for `insert` and `subsitute`."})
@@ -80,9 +81,10 @@ def main():
     logger.info("Using template: {}".format(template.prompt))
 
     verbalizer = ManualVerbalizer(data_args.label_words, tokenizer)
+    verbalizer.mask_aggregate_type = "mean"
     verbalizer = maskedlm_wrapper(verbalizer)
     labels_to_ids = verbalizer.labels_to_ids
-    labels = {idx: label for label, idx in labels_to_ids.items()}
+    ids_to_labels = {idx: label for label, idx in labels_to_ids.items()}
     logger.info("Using verbalizer: {}".format(data_args.label_words))
 
     # Load datasets.
@@ -133,7 +135,7 @@ def main():
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
-    time_stamp = time.strftime("%m%d-%H-%M—%S", time.localtime())
+    time_stamp = time.strftime("%m%d-%H-%M-%S", time.localtime())
 
     # Test.
     if data_args.do_test and public_test_ds is not None:
@@ -148,18 +150,19 @@ def main():
     if training_args.do_predict and test_ds is not None:
         pred_ret = trainer.predict(test_ds)
         logger.info("Prediction done.")
-        predict_path = os.path.join(data_args.data_path,
-                                    "test_predictions_" + time_stamp + ".txt")
-        combine_data_label_and_save(predict_path, test_ds, pred_ret, labels)
+        predict_path = os.path.join(training_args.output_dir,
+                                    "fewclue_submit_examples_" + time_stamp)
+        save_fewclue_prediction(predict_path, data_args.task_name, pred_ret,
+                                verbalizer, ids_to_labels)
 
     # Label unsupervised data.
     if data_args.do_label and unlabeled_ds is not None:
         label_ret = trainer.predict(unlabeled_ds)
         logger.info("Labeling done.")
-        pseudo_path = os.path.join(data_args.data_path,
+        pseudo_path = os.path.join(training_args.output_dir,
                                    "pseudo_data_" + time_stamp + ".txt")
-        combine_data_label_and_save(pseudo_path, unlabeled_ds, label_ret,
-                                    labels)
+        save_pseudo_data(pseudo_path, data_args.task_name, label_ret,
+                         verbalizer, ids_to_labels)
 
 
 if __name__ == "__main__":
