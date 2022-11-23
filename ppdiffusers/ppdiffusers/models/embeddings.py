@@ -46,7 +46,8 @@ def get_timestep_embedding(
     emb = timesteps[:, None].astype("float32") * emb[None, :]
 
     # scale embeddings
-    emb = scale * emb
+    if(scale!=1):
+        emb = scale * emb
 
     # concat sine and cosine embeddings
     emb = paddle.concat([paddle.sin(emb), paddle.cos(emb)], axis=-1)
