@@ -16,7 +16,7 @@ from paddlenlp import SimpleServer
 from paddlenlp import Taskflow
 
 # The schema changed to your defined schema
-schema = ['出发地', '目的地', '费用', '时间']
+schema = {"武器名称": ["产国", "类型", "研发单位"]}
 # The task path changed to your best model path
 uie = Taskflow('information_extraction',
                schema=schema,

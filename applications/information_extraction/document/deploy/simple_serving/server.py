@@ -21,7 +21,7 @@ schema = [
 ]
 # The task path changed to your best model path
 uie = Taskflow(
-    "information_extraction",
+    'information_extraction',
     schema=schema,
     task_path='../../checkpoint/model_best',
 )
