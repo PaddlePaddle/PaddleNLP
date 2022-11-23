@@ -1,0 +1,45 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  Env:
+    name: Install Environment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          make install
+
+  Tests:
+    name: run test in ./tests dir
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: run the command
+        run: make tests-test
+
+  Example:
+    name: run test in ./example dir
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: run the command
+        run: make example-test
+    
+  ModelZoo:
+    name: run test in ./model_zoo dir
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: run the command
+        run: make model-zoo-test
+  

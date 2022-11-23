@@ -38,8 +38,22 @@ all-test: test gpu-test
 
 # default for cpu-test
 .PHONY: test
-test:
-	python -m unittest discover -f -p "test_*.py"
+test: tests-test example-test model-zoo-test
+
+.PHONY: tests-test
+tests-test:
+	echo "do test on ./tests dir"
+	# python -m unittest discover -s tests -f -p "test*.py"
+
+.PHONY: example-test
+example-test:
+	echo "do test on ./examples dir"
+	# python -m unittest discover -s examples -f -p "test*.py"
+
+.PHONY: model-zoo-test
+model-zoo-test:
+	echo "do test on ./model_zoo dir"
+	# python -m unittest discover -s model_zoo -f -p "test*.py"
 
 .PHONY: gpu-test
 gpu-test:
@@ -47,6 +61,12 @@ gpu-test:
 	echo "only run gpu-test"
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+.PHONY: install
+install:
+	pip install -r requirements.txt
+	pip install -r requirements-dev.txt
+	pre-commit install
 
 
 .PHONY: deploy-ppdiffusers
