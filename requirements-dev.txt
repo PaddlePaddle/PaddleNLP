@@ -2,3 +2,6 @@ paddlepaddle>=2.2.2,<2.4.0
 pre-commit
 isort
 GitPython
+pylint
+flake8
+yapf
