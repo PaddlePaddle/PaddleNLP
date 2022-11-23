@@ -113,11 +113,8 @@ class DialogueTask(Task):
         """
         model_instance = UnifiedTransformerLMHeadModel.from_pretrained(
             model, from_hf_hub=self.from_hf_hub)
-        model_path = os.path.join(self._task_path, "model_state.pdparams")
-        state_dict = paddle.load(model_path)
-        model_instance.set_state_dict(state_dict)
+        model_instance.eval()
         self._model = model_instance
-        self._model.eval()
 
     def _construct_tokenizer(self, model):
         """
