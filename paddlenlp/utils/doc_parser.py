@@ -55,7 +55,6 @@ class DocParser(object):
         """
         if 'layout' in doc:
             return doc
-        print(doc['doc'])
         doc_type = mimetypes.guess_type(doc['doc'])[0]
 
         if not doc_type or doc_type.startswith("image"):

@@ -1,4 +1,4 @@
- # UIE Taskflow使用指南
+# UIE Taskflow使用指南
 
 **目录**
 - [1. 功能简介](#1)
@@ -13,8 +13,9 @@
   - [3.7 模型选择](#37)
   - [3.8 更多配置](#38)
 - [4. 文档信息抽取](#4)
-  - [4.1 抽取](#41)
-  - [4.1 实体抽取](#42)
+  - [4.1 实体抽取](#41)
+  - [4.2 关系抽取](#42)
+  - [4.3 更多配置](#44)
 
 <a name="1"></a>
 
@@ -497,9 +498,9 @@ UIE不限定行业领域和抽取目标，以下是一些通过Taskflow实现开
 ```
 
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
-* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
+* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-x-base`,`uie-m-base`和`uie-m-large`模型有效。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`，`uie-x-base`。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 * `use_fast`: 使用C++实现的高性能分词算子FastTokenizer进行文本预处理加速。需要通过`pip install fast-tokenizer-python`安装FastTokenizer库后方可使用。默认为`False`。更多使用说明可参考[FastTokenizer文档](../../fast_tokenizer)。
@@ -512,13 +513,132 @@ UIE-X支持端到端的文档信息抽取，schema配置和输出形式与[文�
 
 <a name="41"></a>
 
-#### 4.1 证件信息抽取
+#### 4.1 实体抽取
+
+- 证件
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/203457596-8dbc9241-833d-4b0e-9291-f134a790d0e1.jpeg height=350 width=500 hspace='10'/>
+</div>
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+>>> schema = ['姓名', '性别', '学校']
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base")
+>>> pprint(ie({"doc": "./cases/student_id.jpeg"}))
+[{'姓名': [{'end': 16,
+          'probability': 0.6738645758156565,
+          'start': 14,
+          'text': '吴磊'}],
+  '学校': [{'end': 9,
+          'probability': 0.8072635771428587,
+          'start': 0,
+          'text': '四川省成都列五中学'}],
+  '性别': [{'end': 20,
+          'probability': 0.840880616278028,
+          'start': 19,
+          'text': '男'}]}]
+```
+
+- 单据、票据
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/203457719-84a70241-607e-4bb1-ab4c-3d9beee9e254.jpeg height=800 width=500 hspace='10'/>
+</div>
+
+```python
+>>> schema = ['收发货人', '进口口岸', '进口日期', '申报日期', '提运单号']
+>>> ie.set_schema(schema)
+>>> pprint(ie({"doc": "./cases/custom.jpeg"}))
+[{'提运单号': [{'end': 197,
+            'probability': 0.985449746345779,
+            'start': 188,
+            'text': '769428175'}],
+  '收发货人': [{'end': 95,
+            'probability': 0.5309611882936238,
+            'start': 82,
+            'text': '上海新尚实国际贸易有限公司'}],
+  '申报日期': [{'end': 140,
+            'probability': 0.9262545894964944,
+            'start': 130,
+            'text': '2017-02-23'}],
+  '进口口岸': [{'end': 120,
+            'probability': 0.9799873036392412,
+            'start': 111,
+            'text': '洋山港区-2248'}],
+  '进口日期': [{'end': 130,
+            'probability': 0.8883286952976022,
+            'start': 120,
+            'text': '2017-02-24'}]}]
+```
 
 
 <a name="42"></a>
 
-#### 4.2 票据、单据信息抽取
+#### 4.2 关系抽取
+
+- 单据、票据
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/203457817-76fe638a-3277-4619-9066-d1dffd52c5d4.jpg height=400 width=650 hspace='10'/>
+</div>
+
+```python
+>>> schema = {'项目名': '单价'}
+>>> ie.set_schema(schema)
+>>> pprint(ie({'doc': "./cases/medical.png"}))
+[{'项目名': [{'end': 178,
+           'probability': 0.6219053739514173,
+           'relations': {'单价': [{'end': 142,
+                                 'probability': 0.5131751051094824,
+                                 'start': 136,
+                                 'text': '26.000'}]},
+           'start': 174,
+           'text': '头针治疗'},
+          {'end': 158,
+           'probability': 0.576683802116392,
+           'relations': {'单价': [{'end': 164,
+                                 'probability': 0.9167558518149299,
+                                 'start': 158,
+                                 'text': '54.000'}]},
+           'start': 152,
+           'text': '特殊穴位针刺'},
+          {'end': 136,
+           'probability': 0.666216406596444,
+           'relations': {'单价': [{'end': 142,
+                                 'probability': 0.7802317480024143,
+                                 'start': 136,
+                                 'text': '26.000'}]},
+           'start': 131,
+           'text': '腕踝针治疗'}]}]
+```
 
 <a name="43"></a>
 
-#### 4.3 票据、单据信息抽取
+#### 4.3 更多配置
+
+```python
+>>> from paddlenlp import Taskflow
+
+>>> ie = Taskflow('information_extraction',
+                  schema="",
+                  schema_lang="zh",
+                  batch_size=1,
+                  model='uie-x-base',
+                  expand_to_a4_size=True,
+                  layout_analysis=False,
+                  position_prob=0.5,
+                  precision='fp32',
+                  use_fast=False)
+```
+
+* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
+* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`，`uie-x-base`。
+* `expand_to_a4_size`：是否将图片处理为A4大小，零样本使用建议打开，可提升效果，默认为True。
+* `layout_analysis`：是否使用PPStructure对文档进行布局分析，默认为False。
+* `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
+* `use_fast`: 使用C++实现的高性能分词算子FastTokenizer进行文本预处理加速。需要通过`pip install fast-tokenizer-python`安装FastTokenizer库后方可使用。默认为`False`。更多使用说明可参考[FastTokenizer文档](../../fast_tokenizer)。

@@ -380,6 +380,7 @@ class UIETask(Task):
                 del self.resource_files_names['sentencepiece_model_file']
         self._is_en = True if model in ['uie-base-en'
                                         ] or schema_lang == 'en' else False
+        self._keep_whitespace = True
 
         self._summary_token_num = 3
         if self._init_class in ["UIEX"]:
@@ -497,6 +498,7 @@ class UIETask(Task):
                                 layout_analysis=self._layout_analysis)
                         data = self._doc_parser.parse(
                             {"doc": example["doc"]},
+                            keep_whitespace=self._keep_whitespace,
                             expand_to_a4_size=self._expand_to_a4_size)
                     elif "text" in example.keys():
                         if not isinstance(example["text"], str):
