@@ -59,7 +59,7 @@ class SimpleServer(FastAPI):
         # Register transformers model server router
         self._router_manager.register_models_router(task_name)
 
-    def register_taskflow(self, task_name, task, func=None):
+    def register_taskflow(self, task_name, task, taskflow_handler=None):
         """
         The register function for the SimpleServer, the main register argrument as follows:
         
@@ -85,6 +85,6 @@ class SimpleServer(FastAPI):
                 .format(type(task)))
 
         # Register Taskflow server router
-        taskflow_manager = TaskflowManager(task, func)
+        taskflow_manager = TaskflowManager(task, taskflow_handler)
         self._taskflow_manager = taskflow_manager
         self._router_manager.register_taskflow_router(task_name)

@@ -20,7 +20,7 @@ import paddlenlp
 from .predictor import Predictor
 from ..utils.tools import get_env_device
 from ..transformers import AutoTokenizer
-from .handlers import BaseModelHandler, PostModelHandler
+from .handlers import BaseModelHandler, BaseModelHandler
 from .utils import lock_predictor
 from ..utils.log import logger
 
@@ -47,9 +47,9 @@ class ModelManager:
             )
         self._model_handler = self._model_handler.process
 
-        if not issubclass(self._post_handler, PostModelHandler):
+        if not issubclass(self._post_handler, BaseModelHandler):
             raise TypeError(
-                "The post_handler must be subclass of paddlenlp.server.handlers.PostModelHandler, please check the type."
+                "The post_handler must be subclass of paddlenlp.server.handlers.BaseModelHandler, please check the type."
             )
         self._post_handler = self._post_handler.process
 

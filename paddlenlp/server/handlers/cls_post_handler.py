@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
-from .base_handler import PostModelHandler
+from .base_handler import BasePostHandler
 from ...transformers import AutoTokenizer
 from ...data import Tuple, Pad
 from ...utils.log import logger
 
 
-class MultiClassificationPostHandler(PostModelHandler):
+class MultiClassificationPostHandler(BasePostHandler):
 
     def __init__(self):
         super().__init__()
@@ -44,7 +44,7 @@ class MultiClassificationPostHandler(PostModelHandler):
         return out_dict
 
 
-class MultiLabelClassificationPostHandler(PostModelHandler):
+class MultiLabelClassificationPostHandler(BasePostHandler):
 
     def __init__(self):
         super().__init__()
