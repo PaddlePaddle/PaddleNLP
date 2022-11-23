@@ -39,7 +39,7 @@ all-test: test gpu-test
 # default for cpu-test
 .PHONY: test
 test:
-	python -m unittest discover -p "test_*.py"
+	python -m unittest discover -f -p "test_*.py"
 
 .PHONY: gpu-test
 gpu-test:
