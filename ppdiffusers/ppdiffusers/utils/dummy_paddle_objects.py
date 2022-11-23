@@ -198,6 +198,21 @@ class LDMPipeline(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
+class LDMSuperResolutionPipeline(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
 class PNDMPipeline(metaclass=DummyObject):
     _backends = ["paddle"]
 
@@ -229,6 +244,21 @@ class ScoreSdeVePipeline(metaclass=DummyObject):
 
 
 class DDIMScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
+class EulerAncestralDiscreteScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
