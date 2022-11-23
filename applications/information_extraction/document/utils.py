@@ -60,6 +60,9 @@ def reader(data_path, max_seq_len=512):
 
                     cur_content = content[:max_content_len]
                     res_content = content[max_content_len:]
+                    if boxes is not None and image is not None:
+                        cur_boxes = boxes[:max_content_len]
+                        res_boxes = boxes[max_content_len:]
 
                     while True:
                         if len(result_list) == 0:
@@ -75,12 +78,13 @@ def reader(data_path, max_seq_len=512):
                                 break
                         else:
                             break
+
                     if boxes is not None and image is not None:
                         json_line = {
                             'content': cur_content,
                             'result_list': cur_result_list,
                             'prompt': prompt,
-                            'bbox': boxes,
+                            'bbox': cur_boxes,
                             'image': image,
                         }
                     else:
@@ -102,11 +106,21 @@ def reader(data_path, max_seq_len=512):
                     if len(res_content) == 0:
                         break
                     elif len(res_content) < max_content_len:
-                        json_line = {
-                            'content': res_content,
-                            'result_list': result_list,
-                            'prompt': prompt
-                        }
+                        if boxes is not None and image is not None:
+                            json_line = {
+                                'content': res_content,
+                                'result_list': result_list,
+                                'prompt': prompt,
+                                'bbox': res_boxes,
+                                'image': image,
+                            }
+                        else:
+                            json_line = {
+                                'content': res_content,
+                                'result_list': result_list,
+                                'prompt': prompt
+                            }
+
                         json_lines.append(json_line)
                         break
                     else:
