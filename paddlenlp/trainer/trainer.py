@@ -296,7 +296,8 @@ class Trainer:
 
             else:
                 self.scaler = paddle.amp.GradScaler(
-                    init_loss_scaling=self.args.scale_loss)
+                    init_loss_scaling=self.args.scale_loss,
+                    use_dynamic_loss_scaling=False)
 
         if args.recompute:
 
