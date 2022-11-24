@@ -77,7 +77,7 @@ python ../label_studio.py \
     --layout_analysis True
 ```
 
-更多不同类型任务（含实体抽取、关系抽取、文档分类等）的标注规则及参数说明，请参考[Label Studio数据标注指南](../label_studio.md)。
+更多不同类型任务（含实体抽取、关系抽取、文档分类等）的标注规则及参数说明，请参考[Label Studio数据标注指南](../label_studio_doc.md)。
 
 <a name="模型微调"></a>
 

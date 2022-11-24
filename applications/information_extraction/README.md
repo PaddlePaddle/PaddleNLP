@@ -6,6 +6,7 @@
   - [2.1 信息抽取方案全覆盖](#21)
   - [2.2 强大的训练基座](#22)
   - [2.3 产业级全流程方案](#23)
+  - [2.4 效果展示](#24)
 - [3. 快速开始](#快速开始)
   - [3.1 Taskflow开箱即用](#31)
   - [3.2 文本信息抽取](#32)
@@ -86,9 +87,29 @@
 
 - 基于UIE优秀的小样本微调能力，实现低成本模型定制适配。
 
-**模型部署**
+<a name="24"></a>
 
-- 信息抽取应用提供了离线部署，并且支持在GPU设备使用FP16，在CPU设备使用动态量化的低精度加速推理；同时提供封闭域数据蒸馏方案，详见文档中模型部署介绍。
+### 2.4 👀 效果展示
+
+<details open>
+<summary>实体抽取</summary>
+
+<div align="center">
+    <img src="doc/imgs_results/PP-OCRv3/en/en_1.png" width="800">
+    <img src="doc/imgs_results/PP-OCRv3/en/en_2.png" width="800">
+</div>
+
+</details>
+
+<details open>
+<summary>关系抽取</summary>
+
+<div align="center">
+    <img src="doc/imgs_results/PP-OCRv3/en/en_1.png" width="800">
+    <img src="doc/imgs_results/PP-OCRv3/en/en_2.png" width="800">
+</div>
+
+</details>
 
 <a name="3"></a>
 
@@ -98,7 +119,7 @@
 
 ### 3.1 Taskflow开箱即用
 
-- 通过Taskflow实现开箱即用 👉 [纯文本抽取 Taskflow使用指南](./taskflow_text.md) 🧾 [文档抽取 Taskflow使用指南](./taskflow_doc.md)
+- 通过Taskflow实现开箱即用 👉 [纯文本抽取 Taskflow使用指南](./taskflow_text.md) 及 [文档抽取 Taskflow使用指南](./taskflow_doc.md)
 
 <a name="32"></a>
 
