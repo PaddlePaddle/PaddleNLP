@@ -27,6 +27,7 @@ else:
 
 if is_paddle_available() and is_paddlenlp_available():
     from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
+    from .video_diffusion import VideoDiffusionPipeline
     from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
                                    StableDiffusionInpaintPipeline,
                                    StableDiffusionPipeline,

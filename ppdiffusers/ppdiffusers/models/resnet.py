@@ -14,10 +14,13 @@
 # limitations under the License.
 
 from functools import partial
+from einops import rearrange
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+
+from .video_utils import exists
 
 
 class Upsample2D(nn.Layer):
@@ -626,3 +629,88 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     out_w = (in_w * up_x + pad_x0 + pad_x1 - kernel_w) // down_x + 1
 
     return out.reshape([-1, channel, out_h, out_w])
+
+
+class LayerNorm(nn.Layer):
+
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        x = paddle.ones([1, dim, 1, 1, 1])
+        self.gamma = paddle.create_parameter(
+            shape=x.shape,
+            dtype=str(x.numpy().dtype),
+            default_initializer=paddle.nn.initializer.Assign(x))
+
+    def forward(self, x):
+        var = paddle.var(x, axis=1, unbiased=False, keepdim=True)
+        mean = paddle.mean(x, axis=1, keepdim=True)
+        return (x - mean) / (var + self.eps).sqrt() * self.gamma
+
+
+class PreNorm(nn.Layer):
+
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.fn = fn
+        self.norm = LayerNorm(dim)
+
+    def forward(self, x, **kwargs):
+        x = self.norm(x)
+        return self.fn(x, **kwargs)
+
+
+class Residual(nn.Layer):
+
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, *args, **kwargs):
+        return self.fn(x, *args, **kwargs) + x
+
+
+class Block3D(nn.Layer):
+
+    def __init__(self, dim, dim_out, groups=8):
+        super().__init__()
+        self.proj = nn.Conv3D(dim, dim_out, (1, 3, 3), padding=(0, 1, 1))
+        self.norm = nn.GroupNorm(groups, dim_out)
+        self.act = nn.Silu()
+
+    def forward(self, x, scale_shift=None):
+        x = self.proj(x)
+        x = self.norm(x)
+
+        if exists(scale_shift):
+            scale, shift = scale_shift
+            x = x * (scale + 1) + shift
+        return self.act(x)
+
+
+class ResnetBlock3D(nn.Layer):
+
+    def __init__(self, dim, dim_out, *, time_emb_dim=None, groups=8):
+        super().__init__()
+        self.mlp = nn.Sequential(nn.Silu(), nn.Linear(
+            time_emb_dim, dim_out * 2)) if exists(time_emb_dim) else None
+
+        self.block1 = Block3D(dim, dim_out, groups=groups)
+        self.block2 = Block3D(dim_out, dim_out, groups=groups)
+        self.res_conv = nn.Conv3D(dim, dim_out,
+                                  1) if dim != dim_out else nn.Identity()
+
+    def forward(self, x, time_emb=None):
+
+        scale_shift = None
+        if exists(self.mlp):
+            assert exists(time_emb), 'time emb must be passed in'
+            time_emb = self.mlp(time_emb)
+            time_emb = paddle.to_tensor(
+                rearrange(time_emb.numpy(), 'b c -> b c 1 1 1'))
+            scale_shift = time_emb.chunk(2, axis=1)
+
+        h = self.block1(x, scale_shift=scale_shift)
+
+        h = self.block2(h)
+        return h + self.res_conv(x)

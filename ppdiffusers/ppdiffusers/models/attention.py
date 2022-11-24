@@ -15,10 +15,14 @@
 
 import math
 from typing import Optional
+from einops import rearrange
+from einops_exts import rearrange_many
 
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
+
+from .video_utils import exists
 
 
 class AttentionBlock(nn.Layer):
@@ -401,3 +405,117 @@ class GEGLU(nn.Layer):
     def forward(self, hidden_states):
         hidden_states, gate = self.proj(hidden_states).chunk(2, axis=-1)
         return hidden_states * F.gelu(gate)
+
+
+class SpatialTemporalAttention(nn.Layer):
+
+    def __init__(self, dim, heads=4, dim_head=32, rotary_emb=None):
+        super().__init__()
+        self.scale = dim_head**-0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+
+        self.rotary_emb = rotary_emb
+        self.to_qkv = nn.Linear(dim, hidden_dim * 3, bias_attr=False)
+        self.to_out = nn.Linear(hidden_dim, dim, bias_attr=False)
+
+    def forward(self, x, pos_bias=None, focus_present_mask=None):
+        n = x.shape[-2]
+
+        qkv = self.to_qkv(x).chunk(3, axis=-1)
+
+        if exists(focus_present_mask) and focus_present_mask.all():
+            values = qkv[-1]
+            return self.to_out(values)
+
+        # split out heads
+        qkv = [a.numpy() for a in qkv]
+        q, k, v = rearrange_many(qkv, '... n (h d) -> ... h n d', h=self.heads)
+        q = paddle.to_tensor(q)
+        k = paddle.to_tensor(k)
+        v = paddle.to_tensor(v)
+
+        # scale
+        q = q * self.scale
+
+        # rotate positions into queries and keys for time attention
+        if exists(self.rotary_emb):
+            q = self.rotary_emb.rotate_queries_or_keys(q)
+            k = self.rotary_emb.rotate_queries_or_keys(k)
+
+        # similarity
+        sim = paddle.einsum('... h i d, ... h j d -> ... h i j', q, k)
+
+        # relative positional bias
+        if exists(pos_bias):
+            sim = sim + pos_bias
+
+        if exists(focus_present_mask) and not (~focus_present_mask).all():
+            attend_all_mask = paddle.cast(paddle.ones((n, n)),
+                                          dtype=paddle.bool)
+            attend_self_mask = paddle.cast(paddle.eye(n), dtype=paddle.bool)
+            mask = paddle.where(
+                paddle.to_tensor(
+                    rearrange(focus_present_mask.numpy(), 'b -> b 1 1 1 1')),
+                paddle.to_tensor(
+                    rearrange(attend_self_mask.numpy(), 'i j -> 1 1 1 i j')),
+                paddle.to_tensor(
+                    rearrange(attend_all_mask.numpy(), 'i j -> 1 1 1 i j')),
+            )
+
+            def masked_fill(x, mask, value):
+                y = paddle.full(x.shape, value, x.dtype)
+                return paddle.where(mask, y, x)
+
+            sim = masked_fill(sim, ~mask, -paddle.iinfo(sim.dtype).max)
+
+        # numerical stability
+        sim = sim - sim.amax(axis=-1, keepdim=True).detach()
+        attn = F.softmax(sim, axis=-1)
+
+        # aggregate values
+        out = paddle.einsum('... h i j, ... h j d -> ... h i d', attn, v)
+        out = paddle.to_tensor(
+            rearrange(out.numpy(), '... h n d -> ... n (h d)'))
+        return self.to_out(out)
+
+
+class SpatialLinearAttention(nn.Layer):
+
+    def __init__(self, dim, heads=4, dim_head=32):
+        super().__init__()
+        self.scale = dim_head**-0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+        self.to_qkv = nn.Conv2D(dim, hidden_dim * 3, 1, bias_attr=False)
+        self.to_out = nn.Conv2D(hidden_dim, dim, 1)
+
+    def forward(self, x):
+        b, c, f, h, w = x.shape
+        x = paddle.to_tensor(rearrange(x.numpy(), 'b c f h w -> (b f) c h w'))
+
+        qkv = self.to_qkv(x).chunk(3, axis=1)
+        q, k, v = [
+            paddle.to_tensor(b)
+            for b in rearrange_many([a.numpy() for a in qkv],
+                                    'b (h c) x y -> b h c (x y)',
+                                    h=self.heads)
+        ]
+
+        q = F.softmax(q, axis=-2)
+        k = F.softmax(k, axis=-1)
+
+        q = q * self.scale
+
+        context = paddle.einsum('b h d n, b h e n -> b h d e', k, v)
+
+        out = paddle.einsum('b h d e, b h d n -> b h e n', context, q)
+        out = paddle.to_tensor(
+            rearrange(out.numpy(),
+                      'b h c (x y) -> b (h c) x y',
+                      h=self.heads,
+                      x=h,
+                      y=w))
+        out = self.to_out(out)
+        return paddle.to_tensor(
+            rearrange(out.numpy(), '(b f) c h w -> b c f h w', b=b))

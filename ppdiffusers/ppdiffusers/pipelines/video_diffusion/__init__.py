@@ -13,11 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..utils import is_paddle_available
+# flake8: noqa
+from ...utils import is_paddlenlp_available
 
-if is_paddle_available():
-    from .unet_2d import UNet2DModel
-    from .unet_2d_condition import UNet2DConditionModel
-    from .unet_3d import UNet3DModel
-    from .vae import AutoencoderKL, VQModel
-    from .video_vae import AutoencoderKLVid
+if is_paddlenlp_available():
+    from .pipeline_video_diffusion import VideoDiffusionPipeline

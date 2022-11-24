@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
-
 import numpy as np
+from einops import rearrange
+
 import paddle
 from paddle import nn
 
@@ -118,3 +119,66 @@ class GaussianFourierProjection(nn.Layer):
         x_proj = x[:, None] * self.weight[None, :] * 2 * np.pi
         out = paddle.concat([paddle.sin(x_proj), paddle.cos(x_proj)], axis=-1)
         return out
+
+
+class RelativePositionBias(nn.Layer):
+
+    def __init__(self, heads=8, num_buckets=32, max_distance=128):
+        super().__init__()
+        self.num_buckets = num_buckets
+        self.max_distance = max_distance
+        self.relative_attention_bias = nn.Embedding(num_buckets, heads)
+
+    @staticmethod
+    def _relative_position_bucket(relative_position,
+                                  num_buckets=32,
+                                  max_distance=128):
+        ret = 0
+        n = -relative_position
+
+        num_buckets //= 2
+        ret += paddle.cast((n < 0), dtype=paddle.int64) * num_buckets
+        n = paddle.abs(n)
+
+        max_exact = num_buckets // 2
+        is_small = n < max_exact
+
+        val_if_large = max_exact + paddle.cast(
+            (paddle.log(paddle.cast(n, dtype=paddle.float32) / max_exact) /
+             math.log(max_distance / max_exact) * (num_buckets - max_exact)),
+            dtype=paddle.int64)
+        sub = paddle.full_like(val_if_large, num_buckets - 1)
+        val_if_large = paddle.minimum(val_if_large, sub)
+
+        ret += paddle.where(is_small, n, val_if_large)
+        return ret
+
+    def forward(self, n, device=None):
+        q_pos = paddle.arange(n, dtype=paddle.int64)
+        k_pos = paddle.arange(n, dtype=paddle.int64)
+        rel_pos = paddle.to_tensor(rearrange(
+            k_pos.numpy(), 'j -> 1 j')) - paddle.to_tensor(
+                rearrange(q_pos.numpy(), 'i -> i 1'))
+        rp_bucket = self._relative_position_bucket(
+            rel_pos,
+            num_buckets=self.num_buckets,
+            max_distance=self.max_distance)
+        values = self.relative_attention_bias(rp_bucket)
+        return paddle.to_tensor(rearrange(values.numpy(), 'i j h -> h i j'))
+
+
+class SinusoidalPosEmb(nn.Layer):
+
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, x):
+        half_dim = self.dim // 2
+        emb = math.log(10000) / (half_dim - 1)
+        emb = paddle.exp(paddle.arange(half_dim) * -emb)
+        emb = paddle.cast(x[:, None], dtype=paddle.float32) * emb[None, :]
+        emb = paddle.concat((paddle.sin(paddle.cast(emb, paddle.float32)),
+                             paddle.cos(paddle.cast(emb, paddle.float32))),
+                            axis=-1)
+        return emb

@@ -34,7 +34,7 @@ from .utils import logging
 if is_paddle_available():
     from .initializer import *
     from .modeling_utils import ModelMixin
-    from .models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel
+    from .models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel, UNet3DModel, AutoencoderKLVid
     from .optimization import (
         get_constant_schedule,
         get_constant_schedule_with_warmup,
@@ -66,12 +66,11 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
-                            StableDiffusionImg2ImgPipeline,
-                            StableDiffusionInpaintPipeline,
-                            StableDiffusionInpaintPipelineLegacy,
-                            StableDiffusionPipeline,
-                            StableDiffusionPipelineAllinOne)
+    from .pipelines import (
+        LDMBertModel, LDMTextToImagePipeline, StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline, StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipeline, StableDiffusionPipelineAllinOne,
+        VideoDiffusionPipeline)
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
