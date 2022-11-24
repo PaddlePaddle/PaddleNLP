@@ -53,8 +53,6 @@ class DocParser(object):
         """
         parse
         """
-        if 'layout' in doc:
-            return doc
         doc_type = mimetypes.guess_type(doc['doc'])[0]
 
         if not doc_type or doc_type.startswith("image"):
@@ -72,8 +70,8 @@ class DocParser(object):
         doc['img_w'] = img_w
         doc['img_h'] = img_h
         if return_ocr_result:
-            layout = self.ocr(image, keep_whitespace=keep_whitespace)
-            doc['layout'] = layout
+            ocr_result = self.ocr(image, keep_whitespace=keep_whitespace)
+            doc['bbox'] = ocr_result
         return doc
 
     def __call__(self, *args, **kwargs):
@@ -139,7 +137,7 @@ class DocParser(object):
                         box = [
                             cell_box[0], cell_box[1], cell_box[4], cell_box[5]
                         ]
-                        layout.append((box, text.replace(" ", ""), 0.9))
+                        layout.append((box, text.replace(" ", "")))
         return layout
 
     @classmethod

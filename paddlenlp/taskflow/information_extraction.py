@@ -366,7 +366,7 @@ class UIETask(Task):
         self.use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
-        self._expand_to_a4_size = True if self._custom_model else False
+        self._expand_to_a4_size = False if self._custom_model else True
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
             self.resource_files_names[
@@ -496,10 +496,18 @@ class UIETask(Task):
                         if not self._doc_parser:
                             self._doc_parser = DocParser(
                                 layout_analysis=self._layout_analysis)
-                        data = self._doc_parser.parse(
-                            {"doc": example["doc"]},
-                            keep_whitespace=self._keep_whitespace,
-                            expand_to_a4_size=self._expand_to_a4_size)
+                        if "bbox" in example.keys():
+                            data = self._doc_parser.parse(
+                                {"doc": example["doc"]},
+                                keep_whitespace=self._keep_whitespace,
+                                return_ocr_result=False,
+                                expand_to_a4_size=self._expand_to_a4_size)
+                            data["bbox"] = example["bbox"]
+                        else:
+                            data = self._doc_parser.parse(
+                                {"doc": example["doc"]},
+                                keep_whitespace=self._keep_whitespace,
+                                expand_to_a4_size=self._expand_to_a4_size)
                     elif "text" in example.keys():
                         if not isinstance(example["text"], str):
                             raise TypeError(
@@ -939,7 +947,7 @@ class UIETask(Task):
                 if 'doc' in d.keys():
                     text = ''
                     bbox = []
-                    for segment in d['layout']:
+                    for segment in d['bbox']:
                         box = self._doc_parser._normalize_box(
                             segment[0], [d['img_w'], d['img_h']], [1000, 1000],
                             d['offset_x'], d['offset_y'])
