@@ -55,8 +55,8 @@ def parse_args():
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument( "--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
-    parser.add_argument("--is_debug", default=False, type=bool, help="Whether to debug.")
-    parser.add_argument("--ignore_pad_token_for_loss", default=True, type=bool, help="Whether to ignore the tokens corresponding to padded labels in the loss computation or not.")
+    parser.add_argument("--is_debug", action='store_true', help="Whether to debug.")
+    parser.add_argument("--ignore_pad_token_for_loss", action='store_true', help="Whether to ignore the tokens corresponding to padded labels in the loss computation or not.")
 
     args = parser.parse_args()
     return args
