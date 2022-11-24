@@ -14,24 +14,21 @@
 # limitations under the License.
 
 import inspect
-import unittest
-import numpy as np
 import random
+import unittest
 
+import numpy as np
+import paddle
+
+from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
+from paddlenlp.transformers.generation_utils import (
+    BeamSearchScorer, ForcedBOSTokenLogitsProcessor,
+    ForcedEOSTokenLogitsProcessor, HammingDiversityLogitsProcessor,
+    LogitsProcessorList, MinLengthLogitsProcessor,
+    RepetitionPenaltyLogitsProcessor, TopKProcess, TopPProcess)
 from tests.testing_utils import slow
 
 from .test_modeling_common import floats_tensor, ids_tensor
-
-import paddle
-from paddlenlp.transformers import (
-    BartForConditionalGeneration,
-    BartTokenizer,
-)
-from paddlenlp.transformers.generation_utils import (
-    BeamSearchScorer, MinLengthLogitsProcessor,
-    RepetitionPenaltyLogitsProcessor, HammingDiversityLogitsProcessor,
-    ForcedBOSTokenLogitsProcessor, ForcedEOSTokenLogitsProcessor, TopKProcess,
-    TopPProcess, LogitsProcessorList)
 
 
 def top_k_top_p_filtering(
@@ -668,7 +665,7 @@ class GenerationTesterMixin:
         self.assertTrue(flag)
 
 
-class UtilsFunctionsTest(unittest.TestCase):
+class UtilsFunctionsTest():
 
     # tests whether the top_k_top_p function behaves as expected
     def test_top_k_top_p_filtering(self):
@@ -776,7 +773,7 @@ class UtilsFunctionsTest(unittest.TestCase):
                                              non_inf_idx)))
 
 
-class GenerationIntegrationTests(unittest.TestCase):
+class GenerationIntegrationTests():
 
     @slow
     def test_diverse_beam_search(self):

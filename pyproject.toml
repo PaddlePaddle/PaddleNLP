@@ -21,3 +21,8 @@ max-returns = 8
 [tool.yapf]
 COLUMN_LIMIT=120
 max-line-length=120
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]

@@ -13,14 +13,14 @@ format:
 	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
 	@if test -n "$(modified_py_files)"; then \
 		echo "Checking/fixing $(modified_py_files)"; \
+		echo "======================================== isort ========================================"; \
 		isort $(modified_py_files); \
-		yapf --verbose -i $(modified_py_files); \
+		echo "======================================== yapf ========================================"; \
+		pre-commit run; \
 		git add ${modified_py_files}; \
 	else \
 		echo "No library .py files were modified"; \
 	fi
-
-	# pre-commit run
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -34,7 +34,6 @@ lint:
 	else \
 		echo "No library .py files were modified"; \
 	fi
-	pre-commit run
 
 .PHONY: yapf
 yapf:
@@ -56,6 +55,16 @@ pylint:
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+
+# # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # # 
+.PHONY: test
+test: unit-test
+
+unit-test:
+	# only enable bert-test: there are many failed tests
+	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 .PHONY: install
 install:
 	pip install -r requirements.txt

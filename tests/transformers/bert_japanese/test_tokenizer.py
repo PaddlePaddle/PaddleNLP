@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import os
 import unittest
-from paddlenlp.transformers import BertTokenizer, BertJapaneseTokenizer
-from paddlenlp.data import Vocab
 
-from common_test import CpuCommonTest
-from util import slow, assert_raises
-import unittest
+import numpy as np
+
+from paddlenlp.data import Vocab
+from paddlenlp.transformers import BertJapaneseTokenizer, BertTokenizer
+from tests.common_test import CpuCommonTest
+from tests.testing_utils import assert_raises, slow
 
 
 class TestBertJapaneseTokenizerFromPretrained(CpuCommonTest):

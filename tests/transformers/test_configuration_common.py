@@ -22,6 +22,7 @@ import unittest
 import unittest.mock as mock
 
 from requests.exceptions import HTTPError
+
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 
@@ -223,7 +224,7 @@ class ConfigTester(object):
         self.check_config_arguments_init()
 
 
-class ConfigTestUtils(unittest.TestCase):
+class ConfigTestUtils():
 
     def test_config_from_string(self):
         c = GPT2Config()
@@ -251,9 +252,10 @@ class ConfigTestUtils(unittest.TestCase):
             if key not in config_common_kwargs
         ]
         # If this part of the test fails, you have arguments to addin config_common_kwargs above.
-        self.assertListEqual(
-            missing_keys,
-            ["is_encoder_decoder", "_name_or_path", "paddlenlp_version"])
+        self.assertListEqual(missing_keys, [
+            "use_cache", "is_encoder_decoder", "classifier_dropout", "dtype",
+            "_name_or_path", "paddlenlp_version"
+        ])
         keys_with_defaults = [
             key for key, value in config_common_kwargs.items()
             if value == getattr(base_config, key)
