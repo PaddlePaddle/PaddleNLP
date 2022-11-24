@@ -96,8 +96,10 @@ class PromptDataCollatorWithPadding:
                         length = len(value)
                         new_values[index][0, :length, :length] = value
                     values = new_values
-                elif key != "labels":
+                elif key in ("soft_token_ids", "encoder_ids"):
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_length - len(value))
+                elif key != "labels":
+                    continue
                 batch[key] = self._convert_to_tensors(values)
         return batch
