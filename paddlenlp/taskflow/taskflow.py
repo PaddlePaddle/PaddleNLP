@@ -405,6 +405,7 @@ TASKS = {
         "models": {
             "multi_class": {
                 "task_class": TextClassificationTask,
+                "task_flag": "text_classification-text_classification",
             },
         },
         "default": {
