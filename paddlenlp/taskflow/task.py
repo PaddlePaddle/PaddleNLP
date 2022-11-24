@@ -39,17 +39,19 @@ class Task(metaclass=abc.ABCMeta):
 
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
+        self.is_static_model = kwargs.get("is_static_model", False)
         self.task = task
         self.kwargs = kwargs
         self._priority_path = priority_path
         self._usage = ""
-        # The dygraph model instantce
+        # The dygraph model instance
         self._model = None
-        # The static model instantce
+        # The static model instance
         self._input_spec = None
         self._config = None
         self._custom_model = False
         self._param_updated = False
+
         self._num_threads = self.kwargs[
             'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
                 cpu_count() / 2)
@@ -62,6 +64,8 @@ class Task(metaclass=abc.ABCMeta):
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
         self._task_flag = self.kwargs[
             'task_flag'] if 'task_flag' in self.kwargs else self.model
+        self.from_hf_hub = kwargs.pop("from_hf_hub", False)
+
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
             self._custom_model = True
@@ -71,7 +75,9 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
-        download_check(self._task_flag)
+
+        if not self.from_hf_hub:
+            download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
@@ -271,8 +277,12 @@ class Task(metaclass=abc.ABCMeta):
                     fp.write(md5)
                     fp.close()
 
-        inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
+        # When the user-provided model path is already a static model, skip to_static conversion
+        if self.is_static_model:
+            inference_model_path = self._task_path
+        else:
+            inference_model_path = os.path.join(self._task_path, "static",
+                                                "inference")
         if not os.path.exists(inference_model_path +
                               ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
