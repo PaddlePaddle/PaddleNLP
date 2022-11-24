@@ -13,33 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 import threading
+import warnings
+
 import paddle
+
 from ..utils.tools import get_env_device
-from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask, NPTagTask
-from .named_entity_recognition import NERWordTagTask
-from .named_entity_recognition import NERLACTask
-from .sentiment_analysis import SentaTask, SkepTask
-from .lexical_analysis import LacTask
-from .word_segmentation import SegJiebaTask
-from .word_segmentation import SegLACTask
-from .word_segmentation import SegWordTagTask
-from .pos_tagging import POSTaggingTask
-from .text_generation import TextGenerationTask
-from .poetry_generation import PoetryGenerationTask
-from .question_answering import QuestionAnsweringTask
+from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
+from .dialogue import DialogueTask
+from .document_intelligence import DocPromptTask
+from .fill_mask import FillMaskTask
+from .information_extraction import GPTask, UIETask
+from .knowledge_mining import NPTagTask, WordTagTask
+from .lexical_analysis import LacTask
+from .named_entity_recognition import NERLACTask, NERWordTagTask
+from .poetry_generation import PoetryGenerationTask
+from .pos_tagging import POSTaggingTask
+from .question_answering import QuestionAnsweringTask
+from .question_generation import QuestionGenerationTask
+from .sentiment_analysis import SentaTask, SkepTask
+from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
-from .dialogue import DialogueTask
-from .information_extraction import UIETask, GPTask
-from .code_generation import CodeGenerationTask
-from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
-from .document_intelligence import DocPromptTask
-from .question_generation import QuestionGenerationTask
+from .text_to_image import (TextToImageDiscoDiffusionTask,
+                            TextToImageGenerationTask,
+                            TextToImageStableDiffusionTask)
+from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -72,6 +73,17 @@ TASKS = {
         },
         "default": {
             "model": "plato-mini",
+        }
+    },
+    'fill_mask': {
+        "models": {
+            "fill_mask": {
+                "task_class": FillMaskTask,
+                "task_flag": "fill_mask-fill_mask"
+            },
+        },
+        "default": {
+            "model": "fill_mask",
         }
     },
     "knowledge_mining": {
@@ -389,6 +401,17 @@ TASKS = {
             "model": "Salesforce/codegen-350M-mono",
         },
     },
+    "text_classification": {
+        "models": {
+            "multi_class": {
+                "task_class": TextClassificationTask,
+                "task_flag": "text_classification-text_classification",
+            },
+        },
+        "default": {
+            "model": "multi_class"
+        },
+    },
     "text_to_image": {
         "models": {
             "dalle-mini": {
@@ -522,7 +545,7 @@ class Taskflow(object):
         mode (str, optional): Select the mode of the task, only used in the tasks of word_segmentation and ner.
             If set None, will use the default mode.
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
 
     """
 
@@ -535,6 +558,13 @@ class Taskflow(object):
                  **kwargs):
         assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
+
+        # Set the device for the task
+        device = get_env_device()
+        if device == 'cpu' or device_id == -1:
+            paddle.set_device('cpu')
+        else:
+            paddle.set_device(device + ":" + str(device_id))
 
         if self.task in ["word_segmentation", "ner"]:
             tag = "modes"
@@ -556,13 +586,6 @@ class Taskflow(object):
                 self.model]["task_priority_path"]
         else:
             self.priority_path = None
-
-        # Set the device for the task
-        device = get_env_device()
-        if device == 'cpu' or device_id == -1:
-            paddle.set_device('cpu')
-        else:
-            paddle.set_device(device + ":" + str(device_id))
 
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task][tag][self.model]
