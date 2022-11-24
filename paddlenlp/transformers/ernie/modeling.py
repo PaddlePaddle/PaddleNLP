@@ -147,7 +147,7 @@ class ErniePretrainedModel(PretrainedModel):
     An abstract class for pretrained ERNIE models. It provides ERNIE related
     `model_config_file`, `pretrained_init_configuration`, `resource_files_names`,
     `pretrained_resource_files_map`, `base_model_prefix` for downloading and
-    loading pretrained models. 
+    loading pretrained models.
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
 
     """
@@ -819,6 +819,36 @@ class ErniePretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
+    @staticmethod
+    def map_hf_config(hf_config: dict) -> dict:
+        """map huggingface configuration to paddle config
+
+        Args:
+            hf_config (dict): the dict data in config.json
+
+        Returns:
+            dict: init_kwargs of paddlenlp model
+        """
+        return dict(
+            vocab_size=hf_config["vocab_size"],
+            hidden_size=hf_config["hidden_size"],
+            num_hidden_layers=hf_config["num_hidden_layers"],
+            num_attention_heads=hf_config["num_attention_heads"],
+            intermediate_size=hf_config["intermediate_size"],
+            hidden_act=hf_config["hidden_act"],
+            hidden_dropout_prob=hf_config["hidden_dropout_prob"],
+            attention_probs_dropout_prob=hf_config[
+                "attention_probs_dropout_prob"],
+            max_position_embeddings=hf_config["max_position_embeddings"],
+            type_vocab_size=hf_config["type_vocab_size"],
+            initializer_range=hf_config["initializer_range"],
+            pad_token_id=hf_config["pad_token_id"],
+            task_type_vocab_size=hf_config["task_type_vocab_size"],
+            task_id=hf_config["task_id"],
+            use_task_id=hf_config["use_task_id"],
+            enable_recompute=hf_config["enable_recompute"],
+        )
+
 
 @register_base_model
 class ErnieModel(ErniePretrainedModel):
@@ -867,7 +897,7 @@ class ErnieModel(ErniePretrainedModel):
         initializer_range (float, optional):
             The standard deviation of the normal initializer for initializing all weight matrices.
             Defaults to `0.02`.
-            
+
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
                 See :meth:`ErniePretrainedModel._init_weights()` for how weights are initialized in `ErnieModel`.
@@ -1092,13 +1122,13 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        ernie (ErnieModel): 
+        ernie (ErnieModel):
             An instance of `paddlenlp.transformers.ErnieModel`.
-        num_classes (int, optional): 
+        num_classes (int, optional):
             The number of classes. Default to `2`.
-        dropout (float, optional): 
-            The dropout probability for output of ERNIE. 
-            If None, use the same value as `hidden_dropout_prob` 
+        dropout (float, optional):
+            The dropout probability for output of ERNIE.
+            If None, use the same value as `hidden_dropout_prob`
             of `paddlenlp.transformers.ErnieModel` instance. Defaults to `None`.
     """
 
@@ -1214,7 +1244,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
     designed for question-answering tasks like SQuAD.
 
     Args:
-        ernie (`ErnieModel`): 
+        ernie (`ErnieModel`):
             An instance of `ErnieModel`.
     """
 
@@ -1335,13 +1365,13 @@ class ErnieForTokenClassification(ErniePretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        ernie (`ErnieModel`): 
+        ernie (`ErnieModel`):
             An instance of `ErnieModel`.
-        num_classes (int, optional): 
+        num_classes (int, optional):
             The number of classes. Defaults to `2`.
-        dropout (float, optional): 
-            The dropout probability for output of ERNIE. 
-            If None, use the same value as `hidden_dropout_prob` 
+        dropout (float, optional):
+            The dropout probability for output of ERNIE.
+            If None, use the same value as `hidden_dropout_prob`
             of `ErnieModel` instance `ernie`. Defaults to `None`.
     """
 
@@ -1765,7 +1795,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
             attention_mask (Tensor, optional):
                 See :class:`ErnieModel`.
             masked_positions:
-                masked positions of output. 
+                masked positions of output.
             inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
@@ -1795,7 +1825,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
 
                 tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
                 model = ErnieForMaskedLM.from_pretrained('ernie-1.0')
-                
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
@@ -1843,7 +1873,7 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
     """
     Ernie Model with a linear layer on top of the hidden-states output layer,
     designed for multiple choice tasks like RocStories/SWAG tasks.
-    
+
     Args:
         ernie (:class:`ErnieModel`):
             An instance of ErnieModel.

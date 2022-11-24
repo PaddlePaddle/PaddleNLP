@@ -15,6 +15,7 @@ import os
 import sys
 import os.path as osp
 import shutil
+from typing import Optional
 import json
 import requests
 import hashlib
@@ -25,6 +26,7 @@ import uuid
 import threading
 from collections import OrderedDict
 from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS
+from huggingface_hub.file_download import hf_hub_download
 
 try:
     from tqdm import tqdm
@@ -116,7 +118,7 @@ def get_weights_path_from_url(url, md5sum=None):
     Args:
         url (str): download url
         md5sum (str): md5 sum of download package
-    
+
     Returns:
         str: a local path to save downloaded weights.
     Examples:
@@ -146,7 +148,7 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
         root_dir (str): root dir for downloading, it should be
                         WEIGHTS_HOME or DATASET_HOME
         md5sum (str): md5 sum of download package
-    
+
     Returns:
         str: a local path to save downloaded models & weights & datasets.
     """
@@ -431,3 +433,24 @@ def download_check(model_id, model_class, addition=None):
         checker.start()
         checker.join()
     logger.enable()
+
+
+def hf_file_exists(repo_id: str,
+                   filename: str,
+                   cache_dir: Optional[str] = None) -> bool:
+    """check if the target file exist in repo
+
+    Args:
+        repo_id (str): the repo nam
+        filename (str): the file name hf repo
+        cache_dir (Optional[str], optional): the cache dir. Defaults to None.
+
+    Returns:
+        bool: whether the `filename` exists in repo
+    """
+    from huggingface_hub.utils._errors import EntryNotFoundError
+    try:
+        hf_hub_download(repo_id=repo_id, filename=filename, cache_dir=cache_dir)
+        return True
+    except EntryNotFoundError:
+        return False

@@ -76,6 +76,41 @@ class PegasusPretrainedModel(PretrainedModel):
         elif isinstance(layer, PegasusSinusoidalPositionalEmbedding):
             pass
 
+    @staticmethod
+    def map_hf_config(hf_config: dict) -> dict:
+        """map huggingface config to paddle config
+
+        Args:
+            hf_config (dict): huggingface config dict object
+
+        Returns:
+            dict: paddlenlp model configuration
+        """
+        return dict(
+            vocab_size=hf_config["vocab_size"],
+            bos_token_id=hf_config["bos_token_id"],
+            pad_token_id=hf_config["pad_token_id"],
+            eos_token_id=hf_config["eos_token_id"],
+
+            # TODO(wj-Mcat): need gongenlei to review this configuration
+            forced_eos_token_id=hf_config["eos_token_id"],
+            decoder_start_token_id=hf_config["bos_token_id"],
+            d_model=hf_config["d_model"],
+            num_encoder_layers=hf_config["encoder_layers"],
+            num_decoder_layers=hf_config["decoder_layers"],
+            encoder_attention_heads=hf_config["encoder_attention_heads"],
+            decoder_attention_heads=hf_config["decoder_attention_heads"],
+            encoder_ffn_dim=hf_config["encoder_ffn_dim"],
+            decoder_ffn_dim=hf_config["decoder_ffn_dim"],
+            dropout=hf_config["dropout"],
+            activation_function=hf_config["activation_function"],
+            attention_dropout=hf_config["attention_dropout"],
+            activation_dropout=hf_config["activation_dropout"],
+            max_position_embeddings=hf_config["max_position_embeddings"],
+            scale_embedding=hf_config["scale_embedding"],
+            init_std=hf_config["init_std"],
+        )
+
 
 class PegasusSinusoidalPositionalEmbedding(Embedding):
     """
@@ -325,7 +360,7 @@ class PegasusModel(PegasusPretrainedModel):
             A special token representing the end of a sequence that was used during pretraining.
             Defaults to `1`.
         forced_eos_token_id (int, optional):
-            The id of the token to force as the last generated token when max_length is reached. 
+            The id of the token to force as the last generated token when max_length is reached.
             Usually set to eos_token_id. Defaults to `1`.
         decoder_start_token_id (int, optional):
             If an encoder-decoder model starts decoding with a different token than bos, the id of that token.

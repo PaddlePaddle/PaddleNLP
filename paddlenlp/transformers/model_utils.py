@@ -32,7 +32,7 @@ from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import get_path_from_url, is_url
 
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, download_check
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, download_check, hf_file_exists
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -141,6 +141,62 @@ def register_base_model(cls):
     ), "`register_base_model` should be used on subclasses of PretrainedModel."
     base_cls.base_model_class = cls
     return cls
+
+
+def load_hf_model_config_file(cls: Type[PretrainedModel],
+                              pretrained_model_name: str,
+                              cache_dir: str) -> str:
+
+    def map_hf_config(config: Union[str, dict], _cache_dir: str) -> dict:
+
+        if isinstance(config, str):
+            with open(config, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+        map_hf_config_func = getattr(cls, 'map_hf_config', None)
+        if map_hf_config_func is None:
+            raise NotImplementedError(
+                f"class<{cls}> don not support `map_hf_config` feature, "
+                "so you should set `from_hf_hub=False`")
+        hf_config = map_hf_config_func(config)
+
+        config_file = os.path.join(_cache_dir, "model_config.json")
+
+        with open(config_file, "w", encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False)
+
+        return hf_config
+
+    # 1. if pretrained_model_name is directory
+    if os.path.isdir(pretrained_model_name):
+        config_file = os.path.join(cache_dir, 'model_config.json')
+        if os.path.exists(config_file):
+            return config_file
+
+        config_file = os.path.join(cache_dir, 'config.json')
+        if os.path.exists(config_file):
+            config_file = map_hf_config(config_file, pretrained_model_name)
+            return config_file
+
+        raise FileNotFoundError(
+            "`model_config.json` and `config.json` file not found under the "
+            f"{pretrained_model_name}")
+
+    # 2. is name, fetch from hf
+    if hf_file_exists(pretrained_model_name,
+                      "model_config.json",
+                      cache_dir=cache_dir):
+        config_file = hf_hub_download(repo_id=pretrained_model_name,
+                                      filename="model_config.json",
+                                      cache_dir=cache_dir)
+    else:
+        # try to load huggingface config.json file
+        config_file = hf_hub_download(repo_id=pretrained_model_name,
+                                      filename="config.json",
+                                      cache_dir=cache_dir)
+
+        config_file = map_hf_config(config_file, cache_dir)
+    return config_file
 
 
 @six.add_metaclass(InitTrackerMeta)
@@ -325,9 +381,10 @@ class PretrainedModel(Layer, GenerationMixin):
 
     @classmethod
     def from_pretrained(cls,
-                        pretrained_model_name_or_path,
+                        pretrained_model_name_or_path: str,
                         *args,
-                        from_hf_hub=False,
+                        from_hf_hub: bool = False,
+                        load_state_as_np: bool = False,
                         **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
@@ -434,10 +491,18 @@ class PretrainedModel(Layer, GenerationMixin):
                 continue
             # If from_hf_hub, let HF Hub takes care of the cache and the download process
             if from_hf_hub:
-                resolved_resource_files[file_id] = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
-                    cache_dir=MODEL_HOME)
+                if file_path == cls.model_config_file:
+                    resolved_resource_files[
+                        file_id] = load_hf_model_config_file(
+                            cls=cls,
+                            pretrained_model_name=pretrained_model_name_or_path,
+                            cache_dir=MODEL_HOME)
+                else:
+                    resolved_resource_files[file_id] = hf_hub_download(
+                        pretrained_model_name_or_path,
+                        file_path,
+                        cache_dir=MODEL_HOME)
+
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
@@ -769,14 +834,14 @@ class PretrainedModel(Layer, GenerationMixin):
         """
         Build a resized Embedding Module from a provided token Embedding Module. Increasing the size will add newly
         initialized vectors at the end. Reducing the size will remove vectors from the end
-        
+
         Args:
             old_embeddings (nn.Embedding):
                 Old embeddings to be resized.
             new_num_tokens (Optional[int]):
                 New number of tokens in the embedding matrix.
                 Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
-                vectors from the end. 
+                vectors from the end.
 
         Returns:
             paddle.nn.Embedding: The resized Embedding Module or the old Embedding Module if new_num_tokens is None.
@@ -821,10 +886,10 @@ class PretrainedModel(Layer, GenerationMixin):
         1. when it is model-name:
             1.1 check default `MODEL_HOME` + `model-mame` + model_state.pdparams
             1.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
-        
+
         2. when it is url:
             fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-mame`)
-        
+
         3. when it is local dir:
             check whether the file<local_dir + weight_file> exist
 
@@ -924,7 +989,7 @@ class PretrainedModel(Layer, GenerationMixin):
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
-            * check the 
+            * check the
 
         Args:
             model (PretrainedModel): the pretrained model instance
