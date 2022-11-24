@@ -55,18 +55,3 @@ service.register_taskflow('uie', [uie1, uie2])
 # Changed to input texts you wanted
 texts = ['城市内交通费7月5日金额114广州至佛山', '5月9日交通费29元从北苑到望京搜后']
 ```
-
-### 设置相关参数
-可以自己的需要来设置来 `batch_size` 和 `max_seq_len`
-
-```python
-data = {
-    'data': {
-        'text': texts
-    },
-    'parameters': {
-        'max_seq_len': 512,
-        'batch_size': 1
-    }
-}
-```
