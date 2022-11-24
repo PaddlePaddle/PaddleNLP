@@ -59,11 +59,10 @@ if __name__ == "__main__":
     model.eval()
 
     # Convert to static graph with specific input description:
-    # input_ids, token_type_ids and position_ids.
+    # input_ids, token_type_ids
     input_spec = [
         paddle.static.InputSpec(shape=[None, None], dtype='int64'),
         paddle.static.InputSpec(shape=[None, None], dtype='int64'),
-        paddle.static.InputSpec(shape=[None, None], dtype='int64')
     ]
     model = paddle.jit.to_static(model, input_spec=input_spec)
 

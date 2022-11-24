@@ -24,10 +24,9 @@ from paddlenlp.transformers import (ErnieGramModel, ErnieGramPretrainedModel,
                                     ErnieGramForTokenClassification,
                                     ErnieGramForQuestionAnswering)
 
-from tests.transformers.test_modeling_common import (ids_tensor, floats_tensor,
-                                                     random_attention_mask,
-                                                     ModelTesterMixin)
-from tests.testing_utils import slow
+from ..test_modeling_common import (ids_tensor, floats_tensor,
+                                    random_attention_mask, ModelTesterMixin)
+from ...testing_utils import slow
 
 
 @dataclass
@@ -221,6 +220,60 @@ class ErnieGramModelTester:
             self.config.num_classes
         ])
 
+    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
+                                     input_mask, sequence_labels, token_labels,
+                                     choice_labels):
+        model = ErnieGramModel(**config)
+        model.eval()
+
+        # first forward pass
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[
+            2]
+
+        # create hypothetical multiple next token and extent to next_input_ids
+        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
+        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2)
+
+        # append to next input_ids and
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
+
+        outputs = model(next_input_ids,
+                        attention_mask=next_attention_mask,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_no_past = outputs[2][0]
+
+        outputs = model(next_tokens,
+                        attention_mask=next_attention_mask,
+                        past_key_values=past_key_values,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_past = outputs[2][0]
+
+        # select random slice
+        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:,
+                                                        random_slice_idx].detach(
+                                                        )
+        output_from_past_slice = output_from_past[:, :,
+                                                  random_slice_idx].detach()
+
+        self.parent.assertTrue(
+            output_from_past_slice.shape[1] == next_tokens.shape[1])
+
+        # test that outputs are equal for slice
+        self.parent.assertTrue(
+            paddle.allclose(output_from_past_slice,
+                            output_from_no_past_slice,
+                            atol=1e-4))
+
     def get_config(self) -> dict:
         """get the base model kwargs
 
@@ -264,6 +317,10 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_token_classification(
             *config_and_inputs)
+
+    def test_for_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_cache(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):
@@ -312,6 +369,42 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
               [0.70280838, -2.40280604, -1.93488157]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_past_key_value(self):
+        model = ErnieGramModel.from_pretrained("ernie-gram-zh")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output[0].shape, expected_shape)
+        expected_slice = paddle.to_tensor(
+            [[[-0.43569842, -1.50805628, -2.24448967],
+              [-0.12123521, -1.35024536, -1.76512492],
+              [-0.14853711, -1.13618660, -2.87098265]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        expected_slice = paddle.to_tensor(
+            [[[-0.59400421, -1.32317221, -2.88611341],
+              [-0.79759967, -0.97396499, -1.89245439],
+              [-0.47301087, -1.50476563, -2.37942648]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

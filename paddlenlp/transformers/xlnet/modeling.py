@@ -987,26 +987,25 @@ class XLNetModel(XLNetPretrainedModel):
                 See :meth:`XLNetPretrainedModel._init_weights()` for how weights are initialized in `XLNetModel`.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        mem_len=None,
-        reuse_len=None,
-        d_model=768,
-        same_length=False,
-        attn_type="bi",
-        bi_data=False,
-        clamp_len=-1,
-        n_layer=12,
-        dropout=0.1,
-        classifier_dropout=0.1,
-        n_head=12,
-        d_head=64,
-        layer_norm_eps=1e-12,
-        d_inner=3072,
-        ff_activation="gelu",
-        initializer_range=0.02,
-    ):
+    def __init__(self,
+                 vocab_size,
+                 mem_len=None,
+                 reuse_len=None,
+                 d_model=768,
+                 same_length=False,
+                 attn_type="bi",
+                 bi_data=False,
+                 clamp_len=-1,
+                 n_layer=12,
+                 dropout=0.1,
+                 classifier_dropout=0.1,
+                 n_head=12,
+                 d_head=64,
+                 layer_norm_eps=1e-12,
+                 d_inner=3072,
+                 ff_activation="gelu",
+                 initializer_range=0.02,
+                 **kwargs):
         super(XLNetModel, self).__init__()
         self.initializer_range = initializer_range
         self.mem_len = mem_len
