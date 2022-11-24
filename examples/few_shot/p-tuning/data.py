@@ -36,10 +36,13 @@ def extend_with_data_augment(data_ds,
                              aug_type,
                              num_aug=10,
                              percent=0.1,
-                             aug_base="mlm"):
+                             aug_base="mlm",
+                             example_keys=None):
     """
     Extend train dataset with augmentation.
     """
+    if example_keys is None:
+        return data_ds
     if aug_type is None or aug_type == "None":
         return data_ds
     if aug_type == "delete":
@@ -58,18 +61,13 @@ def extend_with_data_augment(data_ds,
 
     aug_data = []
     for example in data_ds:
-        text_a_aug = aug.augment(example["text_a"])
-        for text in text_a_aug:
-            new_example = example.copy()
-            example["text_a"] = text
-            aug_data.append(new_example)
-
-        if "text_b" in example and example["text_b"] is not None:
-            text_b_aug = aug.augment(example["text_b"])
-            for text in text_b_aug:
+        for key in example_keys:
+            text_aug = aug.augment(example[key])
+            for text in text_aug:
                 new_example = example.copy()
-                example["text_b"] = text
+                example[key] = text
                 aug_data.append(new_example)
+
     data_ds = MapDataset([x for x in data_ds] + aug_data)
     return data_ds
 
@@ -164,7 +162,7 @@ def convert_ids_to_words(example, token_ids):
     return example
 
 
-def load_fewclue_dataset(args, verbalizer):
+def load_fewclue_dataset(args, verbalizer, example_keys=None):
     """
     Load fewclue datasets and convert them to the standard format of PET.
     """
@@ -215,7 +213,7 @@ def load_fewclue_dataset(args, verbalizer):
     data_ds[0] = extend_with_data_augment(data_ds[0], args.augment_type,
                                           args.num_augment,
                                           args.word_augment_percent,
-                                          args.augment_method)
+                                          args.augment_method, example_keys)
     data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path,
                                          verbalizer.labels_to_ids)
 

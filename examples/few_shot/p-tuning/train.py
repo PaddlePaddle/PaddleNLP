@@ -88,7 +88,8 @@ def main():
     logger.info("Using verbalizer: {}".format(data_args.label_words))
 
     # Load datasets.
-    data_ds, label_list = load_fewclue_dataset(data_args, verbalizer=verbalizer)
+    data_ds, label_list = load_fewclue_dataset(
+        data_args, verbalizer=verbalizer, example_keys=template.example_keys)
     train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = data_ds
     dev_labels, test_labels = label_list
 
