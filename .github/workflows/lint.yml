@@ -16,37 +16,11 @@ jobs:
           python -m pip install --upgrade pip
           make install
 
-  PreCommit:
-    name: run pre-commit
+  Lint:
+    name: lint on chagned files
     needs: build
     runs-on: ubuntu-latest
     steps:
       - name: run the command
-        run: make yapf
-
-  Isort:
-    name: isort the imports
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: run the command
-        run: make isort
+        run: make lint
     
-  Flake8:
-    name: check code style
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: run the command
-        run: make flake8 
-  
-  PyLint:
-    name: analysis code 
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: run the command
-        run: make pylint
-

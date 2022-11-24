@@ -23,23 +23,4 @@ jobs:
     continue-on-error: true
     steps:
       - name: run the command
-        run: make tests-test
-
-  Example:
-    name: run test in ./example dir
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: run the command
-        run: make example-test
-    
-  ModelZoo:
-    name: run test in ./model_zoo dir
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: run the command
-        run: make model-zoo-test
-  
+        run: make unit-test
