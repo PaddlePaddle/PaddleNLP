@@ -25,6 +25,7 @@ from paddle.io import Dataset
 from paddle.metric import Accuracy
 
 from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.taskflow import Taskflow
 from paddlenlp.trainer import CompressionArguments, Trainer, TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import (AutoModelForSequenceClassification,
@@ -106,8 +107,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         self.id2label = list(train_labels.union(dev_labels))
         self.label2id = {label: i for i, label in enumerate(self.id2label)}
 
-    # def _construct_trainer(self)
-
     def _construct_trainable(self, train_dataset: Dataset,
                              eval_dataset: Dataset) -> Callable:
 
@@ -175,33 +174,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 [self.label2id[example[self.label_column]]], dtype="int64")
         return result
 
-    def predict(self, test_dataset, trial_id=None) -> Dataset:
-        model_result = self._get_model_result(trial_id=trial_id)
-        model_config = model_result.metrics["config"]["config"]
-        saved_model_path = os.path.join(model_result.log_dir, "trained_model")
-        tokenizer = AutoTokenizer.from_pretrained(saved_model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(
-            saved_model_path, num_classes=len(self.id2label))
-        trans_func = functools.partial(
-            self._preprocess_fn,
-            tokenizer=tokenizer,
-            max_length=model_config["PreprocessArguments.max_length"],
-            is_test=True)
-        # since dataset.map modifies the underlying dataset in-place, create a deepcopy
-        local_test_dataset = copy.deepcopy(test_dataset)
-        processed_test_dataset = local_test_dataset.map(trans_func, lazy=False)
-        training_args = self._override_training_arguments(model_config)
-        trainer = Trainer(
-            model=model,
-            tokenizer=tokenizer,
-            args=training_args,
-            criterion=paddle.nn.loss.CrossEntropyLoss(),
-            data_collator=DataCollatorWithPadding(tokenizer),
-            compute_metrics=self._compute_metrics,
-        )
-        test_results = trainer.predict(processed_test_dataset)
-        return test_results
-
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
         saved_model_path = os.path.join(model_result.log_dir, "trained_model")
@@ -210,3 +182,9 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             saved_model_path, num_classes=len(self.id2label))
         tokenizer.save_pretrained(export_path)
         model.save_pretrained(export_path)
+    
+    def to_taskflow(self, trial_id=None):
+        model_result = self._get_model_result(trial_id=trial_id)
+        model_config = model_result.metrics["config"]["config"]
+        saved_model_path = os.path.join(model_result.log_dir, "trained_model")
+        return Taskflow('text_classification', task_path=saved_model_path, id2label=self.id2label, max_length=model_config["PreprocessArguments.max_length"])

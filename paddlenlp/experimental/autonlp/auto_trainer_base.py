@@ -118,6 +118,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
     def export(self, export_path, trial_id=None):
         pass
 
+    @abstractmethod
+    def to_taskflow(self, trial_id=None):
+        pass
+
     def _override_arguments(self, config: Dict[str, Any],
                             default_arguments: TrainingArguments) -> Any:
         """

@@ -28,8 +28,7 @@ extras["tests"] = read_requirements_file("tests/requirements.txt")
 extras["docs"] = read_requirements_file("docs/requirements.txt")
 extras["autonlp"] = read_requirements_file(
     "paddlenlp/experimental/autonlp/requirements.txt")
-extras["cli"] = read_requirements_file("paddlenlp/cli/requirements.txt")
-extras["dev"] = extras["tests"] + extras["docs"] + extras["autonlp"] + extras['cli']
+extras["dev"] = extras["tests"] + extras["docs"] + extras["autonlp"]
 
 
 def read(*names, **kwargs):
