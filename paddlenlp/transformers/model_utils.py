@@ -1208,7 +1208,6 @@ class PretrainedModel(Layer, GenerationMixin):
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", False)
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop('cache_dir', None)
