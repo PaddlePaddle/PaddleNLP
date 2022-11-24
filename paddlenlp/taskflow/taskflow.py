@@ -13,32 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 import threading
+import warnings
+
 import paddle
+
 from ..utils.tools import get_env_device
-from .knowledge_mining import WordTagTask, NPTagTask
-from .named_entity_recognition import NERWordTagTask
-from .named_entity_recognition import NERLACTask
-from .sentiment_analysis import SentaTask, SkepTask
-from .lexical_analysis import LacTask
-from .word_segmentation import SegJiebaTask
-from .word_segmentation import SegLACTask
-from .word_segmentation import SegWordTagTask
-from .pos_tagging import POSTaggingTask
-from .poetry_generation import PoetryGenerationTask
-from .question_answering import QuestionAnsweringTask
-from .text_classification import TextClassificationTask
+from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
+from .dialogue import DialogueTask
+from .document_intelligence import DocPromptTask
+from .fill_mask import FillMaskTask
+from .information_extraction import GPTask, UIETask
+from .knowledge_mining import NPTagTask, WordTagTask
+from .lexical_analysis import LacTask
+from .named_entity_recognition import NERLACTask, NERWordTagTask
+from .poetry_generation import PoetryGenerationTask
+from .pos_tagging import POSTaggingTask
+from .question_answering import QuestionAnsweringTask
+from .question_generation import QuestionGenerationTask
+from .sentiment_analysis import SentaTask, SkepTask
+from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
-from .dialogue import DialogueTask
-from .information_extraction import UIETask, GPTask
-from .code_generation import CodeGenerationTask
-from .text_to_image import TextToImageGenerationTask, TextToImageDiscoDiffusionTask, TextToImageStableDiffusionTask
 from .text_summarization import TextSummarizationTask
-from .document_intelligence import DocPromptTask
-from .question_generation import QuestionGenerationTask
+from .text_to_image import (TextToImageDiscoDiffusionTask,
+                            TextToImageGenerationTask,
+                            TextToImageStableDiffusionTask)
+from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -71,6 +73,17 @@ TASKS = {
         },
         "default": {
             "model": "plato-mini",
+        }
+    },
+    'fill_mask': {
+        "models": {
+            "fill_mask": {
+                "task_class": FillMaskTask,
+                "task_flag": "fill_mask-fill_mask"
+            },
+        },
+        "default": {
+            "model": "fill_mask",
         }
     },
     "knowledge_mining": {
@@ -535,7 +548,13 @@ class Taskflow(object):
 
     """
 
-    def __init__(self, task, model=None, mode=None, device_id=0, **kwargs):
+    def __init__(self,
+                 task,
+                 model=None,
+                 mode=None,
+                 device_id=0,
+                 from_hf_hub=False,
+                 **kwargs):
         assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
 
@@ -557,7 +576,7 @@ class Taskflow(object):
 
         if self.model is not None:
             assert self.model in set(TASKS[task][tag].keys(
-            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
+            )), f"The {tag} name: {model} is not in task:[{task}]"
         else:
             self.model = TASKS[task]['default'][ind_tag]
 
@@ -576,6 +595,7 @@ class Taskflow(object):
         self.task_instance = task_class(model=self.model,
                                         task=self.task,
                                         priority_path=self.priority_path,
+                                        from_hf_hub=from_hf_hub,
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list

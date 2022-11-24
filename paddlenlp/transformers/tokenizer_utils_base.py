@@ -1522,8 +1522,14 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             **additional_files_names
         }
 
+        # From HF Hub
+        if from_hf_hub:
+            # Only include the necessary resource files specified by the tokenizer cls
+            # Deep copy to avoid modifiying the class attributes
+            vocab_files = copy.deepcopy(cls.resource_files_names)
+            vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         # From built-in pretrained models
-        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+        elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 vocab_files[file_id] = map_list[pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
@@ -1538,12 +1544,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                               file_name)
                 if os.path.isfile(full_file_name):
                     vocab_files[file_id] = full_file_name
-        # From HF Hub
-        elif from_hf_hub:
-            # Only include the necessary resource files specified by the tokenizer cls
-            # Deep copy to avoid modifiying the class attributes
-            vocab_files = copy.deepcopy(cls.resource_files_names)
-            vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
@@ -1564,9 +1564,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = file_path
                 continue
             if from_hf_hub:
-                # if file_id not in cls.resource_files_names:
-                #     resolved_vocab_files[file_id] = None
-                # else:
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
