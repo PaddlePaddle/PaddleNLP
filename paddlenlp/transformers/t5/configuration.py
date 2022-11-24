@@ -174,7 +174,7 @@ T5_PRETRAINED_RESOURCE_FILES_MAP = {
 class T5Config(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`T5Model`]. It is used to
-    instantiate a BERT model according to the specified arguments, defining the model architecture. Instantiating a
+    instantiate a bert model according to the specified arguments, defining the model architecture. Instantiating a
     configuration with the defaults will yield a similar configuration to that of the T5
     t5-small architecture.
 
@@ -211,11 +211,18 @@ class T5Config(PretrainedConfig):
             A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
             testing).
         feed_forward_proj (`string`, *optional*, defaults to `"relu"`):
-            Type of feed forward layer to be used. Should be one of `"relu"` or `"gated-gelu"`. T5v1.1 uses the
-            `"gated-gelu"` feed forward projection. Original T5 uses `"relu"`.
+            he non-linear activation function (function or string) in the feed forward layer in the residual attention block. 
+            If string, `"relu"`, `"gated-gelu"` are supported. Defaults to `"relu"`.
         use_cache (`bool`, *optional*, defaults to `True`):
             Whether or not the model should return the last key/values attentions (not used by all models).
+        pad_token_id (int, optional):
+            The id of the `padding` token. Defaults to `0`.
+        bos_token_id (int, optional):
+            The id of the `bos` token. Defaults to `0`.
+        eos_token_id (int, optional):
+            The id of the `eos` token. Defaults to `1`.
         enable_recompute (bool, optional):
+            Whether to recompute cache.
 
     """
     model_type = "t5"
