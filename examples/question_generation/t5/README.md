@@ -76,7 +76,7 @@ python -m paddle.distributed.launch --gpus 1,2 train.py \
     --train_batch_size=4 \
     --eval_batch_size=64 \
     --warmup_proportion=0.1 \
-    --ignore_pad_token_for_loss=True \
+    --ignore_pad_token_for_loss \
     --device=gpu
 ```
 
@@ -153,7 +153,7 @@ python predict.py \
     --length_penalty=0.0 \
     --batch_size=64 \
     --seed=42 \
-    --ignore_pad_token_for_loss=True \
+    --ignore_pad_token_for_loss \
     --logging_steps=20 \
     --device=gpu
 ```
