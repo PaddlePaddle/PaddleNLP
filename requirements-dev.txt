@@ -7,3 +7,4 @@ pylint
 flake8
 black
 yapf
+parameterized
