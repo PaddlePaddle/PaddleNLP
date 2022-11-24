@@ -366,7 +366,7 @@ class UIETask(Task):
         self.use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
-        self._expand_to_a4_size = kwargs.get("expand_to_a4_size", True)
+        self._expand_to_a4_size = True if self._custom_model else False
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
             self.resource_files_names[

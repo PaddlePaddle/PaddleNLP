@@ -96,7 +96,6 @@ def reader(data_path, max_seq_len=512):
                             'result_list': cur_result_list,
                             'prompt': prompt,
                         }
-
                     json_lines.append(json_line)
 
                     for result in result_list:
@@ -105,7 +104,8 @@ def reader(data_path, max_seq_len=512):
                         result['start'] -= max_content_len
                         result['end'] -= max_content_len
                     accumulate += max_content_len
-                    max_content_len = max_seq_len - len(prompt) - summary_token_num
+                    max_content_len = max_seq_len - len(
+                        prompt) - summary_token_num
                     if len(res_content) == 0:
                         break
                     elif len(res_content) < max_content_len:
