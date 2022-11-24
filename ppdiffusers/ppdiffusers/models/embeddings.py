@@ -14,7 +14,6 @@
 # limitations under the License.
 import math
 import numpy as np
-from einops import rearrange
 
 import paddle
 from paddle import nn
@@ -156,15 +155,14 @@ class RelativePositionBias(nn.Layer):
     def forward(self, n, device=None):
         q_pos = paddle.arange(n, dtype=paddle.int64)
         k_pos = paddle.arange(n, dtype=paddle.int64)
-        rel_pos = paddle.to_tensor(rearrange(
-            k_pos.numpy(), 'j -> 1 j')) - paddle.to_tensor(
-                rearrange(q_pos.numpy(), 'i -> i 1'))
+        rel_pos = paddle.reshape(k_pos, [1, k_pos.shape[0]]) - paddle.reshape(
+            q_pos, [q_pos[0], 1])
         rp_bucket = self._relative_position_bucket(
             rel_pos,
             num_buckets=self.num_buckets,
             max_distance=self.max_distance)
         values = self.relative_attention_bias(rp_bucket)
-        return paddle.to_tensor(rearrange(values.numpy(), 'i j h -> h i j'))
+        return paddle.transpose(values, [2, 0, 1])
 
 
 class SinusoidalPosEmb(nn.Layer):

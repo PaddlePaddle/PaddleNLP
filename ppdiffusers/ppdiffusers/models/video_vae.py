@@ -61,7 +61,7 @@ class Encoder(nn.Layer):
         # temporal attention and its relative positional encoding
         rotary_emb = RotaryEmbedding(min(32, attn_dim_head))
         temporal_attn = lambda dim: EinopsToAndFrom(
-            'b c f h w', 'b (h w) f c',
+            ['b', 'c', 'f', 'h', 'w'], ['b', 'hw', 'f', 'c'],
             SpatialTemporalAttention(dim,
                                      heads=attn_heads,
                                      dim_head=attn_dim_head,
@@ -115,7 +115,7 @@ class Encoder(nn.Layer):
         self.mid_block1 = block_klass_cond(mid_dim, mid_dim)
 
         spatial_attn = EinopsToAndFrom(
-            'b c f h w', 'b f (h w) c',
+            ['b', 'c', 'f', 'h', 'w'], ['b', 'f', 'hw', 'c'],
             SpatialTemporalAttention(mid_dim, heads=attn_heads))
 
         self.mid_spatial_attn = Residual(PreNorm(mid_dim, spatial_attn))
@@ -189,7 +189,7 @@ class Decoder(nn.Layer):
         # temporal attention and its relative positional encoding
         rotary_emb = RotaryEmbedding(min(32, attn_dim_head))
         temporal_attn = lambda dim: EinopsToAndFrom(
-            'b c f h w', 'b (h w) f c',
+            ['b', 'c', 'f', 'h', 'w'], ['b', 'hw', 'f', 'c'],
             SpatialTemporalAttention(dim,
                                      heads=attn_heads,
                                      dim_head=attn_dim_head,
@@ -223,7 +223,7 @@ class Decoder(nn.Layer):
         mid_dim = dims[-1]
         self.mid_block1 = block_klass_cond(mid_dim, mid_dim)
         spatial_attn = EinopsToAndFrom(
-            'b c f h w', 'b f (h w) c',
+            ['b', 'c', 'f', 'h', 'w'], ['b', 'f', 'hw', 'c'],
             SpatialTemporalAttention(mid_dim, heads=attn_heads))
 
         self.mid_spatial_attn = Residual(PreNorm(mid_dim, spatial_attn))

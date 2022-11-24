@@ -14,7 +14,6 @@
 
 from inspect import isfunction
 from math import pi, log
-from einops import rearrange, repeat
 
 import paddle
 from paddle import nn, einsum
@@ -27,11 +26,11 @@ def exists(val):
 
 # rotary embedding helper functions
 def rotate_half(x):
-    x = paddle.to_tensor(rearrange(x.numpy(), '... (d r) -> ... d r', r=2))
+    x = paddle.reshape(x, x.shape[:-1] + [x.shape[-1] // 2, 2])
     x1, x2 = x.unbind(axis=-1)
     x = paddle.stack((-x2, x1), axis=-1)
 
-    return paddle.to_tensor(rearrange(x.numpy(), '... d r -> ... (d r)'))
+    return paddle.reshape(x, x.shape[:-2] + [x.shape[-2] * x.shape[-1]])
 
 
 def apply_rotary_emb(freqs, t, start_index=0):
@@ -49,8 +48,10 @@ def apply_rotary_emb(freqs, t, start_index=0):
 def apply_learned_rotations(rotations, t, start_index=0, freq_ranges=None):
     if exists(freq_ranges):
         rotations = einsum('..., f -> ... f', rotations, freq_ranges)
-        rotations = paddle.to_tensor(
-            rearrange(rotations.numpy(), '... r f -> ... (r f)'))
+        rotations = paddle.reshape(
+            rotations, rotations.shape[:-2] + [rotations[-2] * rotations[-1]])
+        # rotations = paddle.to_tensor(
+        #     rearrange(rotations.numpy(), '... r f -> ... (r f)'))
     rotations = paddle.repeat_interleave(rotations, repeats=2, axis=-1)
     return apply_rotary_emb(rotations, t, start_index=start_index)
 

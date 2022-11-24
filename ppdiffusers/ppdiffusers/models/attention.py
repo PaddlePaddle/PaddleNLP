@@ -15,8 +15,6 @@
 
 import math
 from typing import Optional
-from einops import rearrange
-from einops_exts import rearrange_many
 
 import paddle
 import paddle.nn.functional as F
@@ -429,11 +427,18 @@ class SpatialTemporalAttention(nn.Layer):
             return self.to_out(values)
 
         # split out heads
-        qkv = [a.numpy() for a in qkv]
-        q, k, v = rearrange_many(qkv, '... n (h d) -> ... h n d', h=self.heads)
-        q = paddle.to_tensor(q)
-        k = paddle.to_tensor(k)
-        v = paddle.to_tensor(v)
+        temp_qkv = []
+        for aa in qkv:
+            bb = paddle.reshape(
+                aa, aa.shape[:-1] + [self.heads, aa.shape[-1] // self.heads])
+            cc = paddle.transpose(
+                bb,
+                list(range(len(bb.shape) - 3)) +
+                [len(bb.shape) - 2,
+                 len(bb.shape) - 3,
+                 len(bb.shape) - 1])
+            temp_qkv.append(cc)
+        q, k, v = temp_qkv
 
         # scale
         q = q * self.scale
@@ -455,12 +460,15 @@ class SpatialTemporalAttention(nn.Layer):
                                           dtype=paddle.bool)
             attend_self_mask = paddle.cast(paddle.eye(n), dtype=paddle.bool)
             mask = paddle.where(
-                paddle.to_tensor(
-                    rearrange(focus_present_mask.numpy(), 'b -> b 1 1 1 1')),
-                paddle.to_tensor(
-                    rearrange(attend_self_mask.numpy(), 'i j -> 1 1 1 i j')),
-                paddle.to_tensor(
-                    rearrange(attend_all_mask.numpy(), 'i j -> 1 1 1 i j')),
+                paddle.reshape(focus_present_mask,
+                               [focus_present_mask.shape[0], 1, 1, 1, 1]),
+                paddle.reshape(attend_self_mask, [
+                    1, 1, 1, attend_self_mask.shape[0],
+                    attend_self_mask.shape[1]
+                ]),
+                paddle.reshape(attend_all_mask, [
+                    1, 1, 1, attend_all_mask.shape[0], attend_all_mask.shape[1]
+                ]),
             )
 
             def masked_fill(x, mask, value):
@@ -475,8 +483,14 @@ class SpatialTemporalAttention(nn.Layer):
 
         # aggregate values
         out = paddle.einsum('... h i j, ... h j d -> ... h i d', attn, v)
-        out = paddle.to_tensor(
-            rearrange(out.numpy(), '... h n d -> ... n (h d)'))
+        out = paddle.transpose(
+            out,
+            list(range(len(out.shape) - 3)) +
+            [len(out.shape) - 2,
+             len(out.shape) - 3,
+             len(out.shape) - 1])
+        out = paddle.reshape(out,
+                             out.shape[:-2] + [out.shape[-2] * out.shape[-1]])
         return self.to_out(out)
 
 
@@ -492,15 +506,18 @@ class SpatialLinearAttention(nn.Layer):
 
     def forward(self, x):
         b, c, f, h, w = x.shape
-        x = paddle.to_tensor(rearrange(x.numpy(), 'b c f h w -> (b f) c h w'))
+        x = paddle.transpose(x, [0, 2, 1, 3, 4])
+        x = paddle.reshape(x, [x.shape[0] * x.shape[1]] + x.shape[2:])
 
         qkv = self.to_qkv(x).chunk(3, axis=1)
-        q, k, v = [
-            paddle.to_tensor(b)
-            for b in rearrange_many([a.numpy() for a in qkv],
-                                    'b (h c) x y -> b h c (x y)',
-                                    h=self.heads)
-        ]
+        temp_qkv = []
+        for aa in qkv:
+            bb = paddle.reshape(aa, [aa.shape[0]] +
+                                [self.heads, aa.shape[1] // self.heads] +
+                                aa.shape[2:])
+            cc = paddle.reshape(bb, bb.shape[:3] + [bb.shape[3] * bb.shape[4]])
+            temp_qkv.append(cc)
+        q, k, v = temp_qkv
 
         q = F.softmax(q, axis=-2)
         k = F.softmax(k, axis=-1)
@@ -510,12 +527,10 @@ class SpatialLinearAttention(nn.Layer):
         context = paddle.einsum('b h d n, b h e n -> b h d e', k, v)
 
         out = paddle.einsum('b h d e, b h d n -> b h e n', context, q)
-        out = paddle.to_tensor(
-            rearrange(out.numpy(),
-                      'b h c (x y) -> b (h c) x y',
-                      h=self.heads,
-                      x=h,
-                      y=w))
+        out = paddle.reshape(out, out.shape[:3] + [h, w])
+        out = paddle.reshape(out, [out.shape[0]] +
+                             [out.shape[1] * out.shape[2]] + out.shape[3:])
         out = self.to_out(out)
-        return paddle.to_tensor(
-            rearrange(out.numpy(), '(b f) c h w -> b c f h w', b=b))
+        out = paddle.reshape(out, [b, out.shape[0] // b] + out.shape[1:])
+        out = paddle.transpose(out, [0, 2, 1, 3, 4])
+        return out

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from functools import partial
-from einops import rearrange
+# from einops import rearrange
 
 import paddle
 import paddle.nn as nn
@@ -706,8 +706,8 @@ class ResnetBlock3D(nn.Layer):
         if exists(self.mlp):
             assert exists(time_emb), 'time emb must be passed in'
             time_emb = self.mlp(time_emb)
-            time_emb = paddle.to_tensor(
-                rearrange(time_emb.numpy(), 'b c -> b c 1 1 1'))
+            time_emb = paddle.reshape(
+                time_emb, [time_emb.shape[0], time_emb.shape[1], 1, 1, 1])
             scale_shift = time_emb.chunk(2, axis=1)
 
         h = self.block1(x, scale_shift=scale_shift)

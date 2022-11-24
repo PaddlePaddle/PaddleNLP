@@ -16,7 +16,6 @@
 
 import paddle
 from paddle import nn
-from einops import rearrange
 
 
 def exists(x):
@@ -80,16 +79,30 @@ class EinopsToAndFrom(nn.Layer):
 
     def forward(self, x, **kwargs):
         shape = x.shape
-        reconstitute_kwargs = dict(
-            tuple(zip(self.from_einops.split(' '), shape)))
-
-        x = x.numpy()
-        x = rearrange(x, f'{self.from_einops} -> {self.to_einops}')
-        x = paddle.to_tensor(x)
+        reconstitute_kwargs = dict(tuple(zip(self.from_einops, shape)))
+        reconstitute_indices = dict(
+            tuple(zip(self.from_einops, list(range(len(shape))))))
+        x = paddle.transpose(
+            x, [reconstitute_indices[a] for a in list(''.join(self.to_einops))])
+        x = paddle.reshape(x, [
+            reconstitute_kwargs[a[0]] *
+            reconstitute_kwargs[a[1]] if len(a) == 2 else reconstitute_kwargs[a]
+            for a in self.to_einops
+        ])
 
         x = self.fn(x, **kwargs)
-        x = x.numpy()
-        x = rearrange(x, f'{self.to_einops} -> {self.from_einops}',
-                      **reconstitute_kwargs)
-        x = paddle.to_tensor(x)
+        reconstitute_shape = []
+        for a in list(''.join(self.to_einops)):
+            if len(a) == 2:
+                reconstitute_shape.extend(
+                    [reconstitute_kwargs[a[0]], reconstitute_kwargs[a[1]]])
+            else:
+                reconstitute_shape.extend([reconstitute_kwargs[a]])
+        x = paddle.reshape(x, reconstitute_shape)
+        reconstitute_indices = dict(
+            tuple(zip(list(''.join(self.to_einops)), list(range(len(shape))))))
+        x = paddle.transpose(
+            x,
+            [reconstitute_indices[a] for a in list(''.join(self.from_einops))])
+
         return x

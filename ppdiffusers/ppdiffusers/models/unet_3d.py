@@ -19,8 +19,6 @@ import math
 import time
 from functools import partial
 from dataclasses import dataclass
-from einops import rearrange
-from einops_exts import rearrange_many
 
 import paddle
 from paddle import nn
@@ -73,7 +71,9 @@ class UNet3DModel(ModelMixin, ConfigMixin):
         # temporal attention and its relative positional encoding
         rotary_emb = RotaryEmbedding(min(32, attn_dim_head))
         temporal_attn = lambda dim: EinopsToAndFrom(
-            'b c f h w', 'b (h w) f c',
+            # 'b c f h w', 'b (h w) f c',
+            ['b', 'c', 'f', 'h', 'w'],
+            ['b', 'hw', 'f', 'c'],
             SpatialTemporalAttention(dim,
                                      heads=attn_heads,
                                      dim_head=attn_dim_head,
@@ -145,7 +145,9 @@ class UNet3DModel(ModelMixin, ConfigMixin):
         mid_dim = dims[-1]
         self.mid_block1 = block_klass_cond(mid_dim, mid_dim)
         spatial_attn = EinopsToAndFrom(
-            'b c f h w', 'b f (h w) c',
+            # 'b c f h w', 'b f (h w) c',
+            ['b', 'c', 'f', 'h', 'w'],
+            ['b', 'f', 'hw', 'c'],
             SpatialTemporalAttention(mid_dim, heads=attn_heads))
         self.mid_spatial_attn = Residual(PreNorm(mid_dim, spatial_attn))
         self.mid_temporal_attn = Residual(
@@ -210,9 +212,8 @@ class UNet3DModel(ModelMixin, ConfigMixin):
         if self.has_cond:
             batch = x.shape[0]
             mask = prob_mask_like((batch, ), null_cond_prob)
-            cond = paddle.where(
-                paddle.to_tensor(rearrange(mask.numpy(), 'b -> b 1')),
-                self.null_cond_emb, cond)
+            cond = paddle.where(paddle.reshape(mask, [mask.shape[0], 1]),
+                                self.null_cond_emb, cond)
             t = paddle.concat((t, cond), axis=-1)
 
         h = []
