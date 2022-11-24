@@ -49,7 +49,7 @@ class DocParser(object):
               doc,
               keep_whitespace=False,
               expand_to_a4_size=False,
-              return_ocr_result=True):
+              do_ocr=True):
         """
         parse
         """
@@ -69,9 +69,9 @@ class DocParser(object):
         doc['offset_y'] = offset_y
         doc['img_w'] = img_w
         doc['img_h'] = img_h
-        if return_ocr_result:
+        if do_ocr:
             ocr_result = self.ocr(image, keep_whitespace=keep_whitespace)
-            doc['bbox'] = ocr_result
+            doc['layout'] = ocr_result
         return doc
 
     def __call__(self, *args, **kwargs):
@@ -109,7 +109,7 @@ class DocParser(object):
                 text = segment[1][0]
                 if not keep_whitespace:
                     text = text.replace(' ', '')
-                layout.append((box, text, segment[1][1]))
+                layout.append((box, text))
         else:
             layout_result = self.layout_analysis_engine(image)
             for region in layout_result:
@@ -121,7 +121,7 @@ class DocParser(object):
                         text = segment['text']
                         if not keep_whitespace:
                             text = text.replace(' ', '')
-                        layout.append((box, text, segment['confidence']))
+                        layout.append((box, text))
                 else:
                     table_result = region['res']
                     html = table_result['html']

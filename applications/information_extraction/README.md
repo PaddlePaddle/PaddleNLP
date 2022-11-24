@@ -80,7 +80,7 @@
 
 **数据准备阶段**
 
-- 我们提供了不同抽取场景的Label Studio标注解决方案，可基于该方案实现从数据标注到训练数据构造的无缝衔接，大大降低了数据标注、模型定制的时间成本。详见[信息抽取标注指南](./label_studio.md)。
+- 我们提供了不同抽取场景的Label Studio标注解决方案，可基于该方案实现从数据标注到训练数据构造的无缝衔接，大大降低了数据标注、模型定制的时间成本。详见[纯文本抽取标注指南](./label_studio_text.md) 及 [文档抽取标注指南](./label_studio_doc.md)。
 
 **模型训练**
 
@@ -98,16 +98,16 @@
 
 ### 3.1 Taskflow开箱即用
 
-- 通过Taskflow实现开箱即用 👉 [UIE Taskflow使用指南](./taskflow.md)
+- 通过Taskflow实现开箱即用 👉 [纯文本抽取 Taskflow使用指南](./taskflow_text.md) 🧾 [文档抽取 Taskflow使用指南](./taskflow_doc.md)
 
 <a name="32"></a>
 
 ### 3.2 文本信息抽取
 
-- 快速开启文本信息抽取 👉 [文本信息抽取指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/text#readme)
+- 快速开启文本信息抽取 👉 [文本信息抽取指南](./text/README.md)
 
 <a name="33"></a>
 
 ### 3.3 文档信息抽取
 
-- 快速开启文档信息抽取 👉 [文档信息抽取指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/document#readme)
+- 快速开启文档信息抽取 👉 [文档信息抽取指南](./document/README.md)
