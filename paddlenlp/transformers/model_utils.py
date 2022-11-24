@@ -146,26 +146,34 @@ def register_base_model(cls):
 def load_hf_model_config_file(cls: Type[PretrainedModel],
                               pretrained_model_name: str,
                               cache_dir: str) -> str:
+    """load config file from huggingface style
+
+    Args:
+        cls (Type[PretrainedModel]): the model class
+        pretrained_model_name (str): the model-name or dir of pretrained_model
+        cache_dir (str): cache_dir of pretrained-model
+
+    Returns:
+        str: the path of config file
+    """
 
     def map_hf_config(config: Union[str, dict], _cache_dir: str) -> dict:
-
+        """map the hf config to paddle config"""
         if isinstance(config, str):
             with open(config, 'r', encoding='utf-8') as f:
                 config = json.load(f)
 
-        map_hf_config_func = getattr(cls, 'map_hf_config', None)
-        if map_hf_config_func is None:
-            raise NotImplementedError(
-                f"class<{cls}> don not support `map_hf_config` feature, "
-                "so you should set `from_hf_hub=False`")
-        hf_config = map_hf_config_func(config)
+        if cls.config_attribute_mapping:
+            for hf_key, paddle_key in cls.config_attribute_mapping.items():
+                config[paddle_key] = config.pop(paddle_key, None) or config.pop(
+                    hf_key, None)
 
         config_file = os.path.join(_cache_dir, "model_config.json")
 
         with open(config_file, "w", encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False)
 
-        return hf_config
+        return config_file
 
     # 1. if pretrained_model_name is directory
     if os.path.isdir(pretrained_model_name):
@@ -247,6 +255,7 @@ class PretrainedModel(Layer, GenerationMixin):
     base_model_prefix = ""
     main_input_name = "input_ids"
     config_class = None
+    config_attribute_mapping = {}
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
     # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
@@ -1140,7 +1149,11 @@ class PretrainedModel(Layer, GenerationMixin):
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained_v2(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained_v2(cls,
+                           pretrained_model_name_or_path: str,
+                           from_hf_hub: bool = False,
+                           *args,
+                           **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
@@ -1162,6 +1175,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 initialization. If the keyword is in `__init__` argument names of
                 base model, update argument values of the base model; else update
                 argument values of derived model.
+            from_hf_hub (bool): load model from huggingface hub. Default to `False`.
             load_state_as_np (bool, optional): The weights read in can be choosed
                 to place on CPU or GPU though the model is on the default device.
                 If `True`, load the model weights as `numpy.ndarray` on CPU.

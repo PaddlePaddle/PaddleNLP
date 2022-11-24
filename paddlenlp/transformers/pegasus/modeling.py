@@ -58,6 +58,10 @@ class PegasusPretrainedModel(PretrainedModel):
     pretrained_init_configuration = {}
     pretrained_resource_files_map = {}
     base_model_prefix = "pegasus"
+    config_attribute_mapping = {
+        "num_encoder_layers": "encoder_layers",
+        "num_decoder_layers": "decoder_layers",
+    }
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -75,39 +79,6 @@ class PegasusPretrainedModel(PretrainedModel):
                 layer.bias.set_value(paddle.zeros_like(layer.bias))
         elif isinstance(layer, PegasusSinusoidalPositionalEmbedding):
             pass
-
-    @staticmethod
-    def map_hf_config(hf_config: dict) -> dict:
-        """map huggingface config to paddle config
-
-        Args:
-            hf_config (dict): huggingface config dict object
-
-        Returns:
-            dict: paddlenlp model configuration
-        """
-        return dict(
-            vocab_size=hf_config["vocab_size"],
-            bos_token_id=hf_config["bos_token_id"],
-            pad_token_id=hf_config["pad_token_id"],
-            eos_token_id=hf_config["eos_token_id"],
-            forced_eos_token_id=hf_config["forced_eos_token_id"],
-            decoder_start_token_id=hf_config["forced_eos_token_id"],
-            d_model=hf_config["d_model"],
-            num_encoder_layers=hf_config["encoder_layers"],
-            num_decoder_layers=hf_config["decoder_layers"],
-            encoder_attention_heads=hf_config["encoder_attention_heads"],
-            decoder_attention_heads=hf_config["decoder_attention_heads"],
-            encoder_ffn_dim=hf_config["encoder_ffn_dim"],
-            decoder_ffn_dim=hf_config["decoder_ffn_dim"],
-            dropout=hf_config["dropout"],
-            activation_function=hf_config["activation_function"],
-            attention_dropout=hf_config["attention_dropout"],
-            activation_dropout=hf_config["activation_dropout"],
-            max_position_embeddings=hf_config["max_position_embeddings"],
-            scale_embedding=hf_config["scale_embedding"],
-            init_std=hf_config["init_std"],
-        )
 
 
 class PegasusSinusoidalPositionalEmbedding(Embedding):
