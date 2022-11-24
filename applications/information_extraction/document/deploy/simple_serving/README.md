@@ -55,12 +55,3 @@ service.register_taskflow('uie', [uie1, uie2])
 # Changed to image paths you wanted
 image_paths = ['../../data/images/b1.jpg']
 ```
-
-### 设置相关参数
-可以自己的需要来设置来 `batch_size` 和 `max_seq_len`
-
-```python
-data = {
-    'data': []
-}
-```
