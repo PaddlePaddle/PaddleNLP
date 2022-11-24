@@ -61,7 +61,6 @@ def parse_args():
     parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument("--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
-    parser.add_argument("--ignore_pad_token_for_loss", default=True, type=bool, help="whether or not to ignore pad token for loss.")
     args = parser.parse_args()
     return args
 
