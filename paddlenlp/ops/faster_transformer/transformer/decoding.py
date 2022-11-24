@@ -1392,9 +1392,9 @@ def convert_params(faster_model,
 
 class InferBase(nn.Layer):
 
-    def __init__(self):
+    def __init__(self, use_fp16_decoding):
         super(InferBase, self).__init__()
-        self._use_fp16_decoding = False
+        self._use_fp16_decoding = use_fp16_decoding
 
     def default_bias(self, weight, index, is_null=False):
         if is_null:
@@ -3431,7 +3431,7 @@ class InferT5Decoding(InferBase):
                 )
             load("FasterTransformer", verbose=True)
 
-        super(InferT5Decoding, self).__init__()
+        super(InferT5Decoding, self).__init__(use_fp16_decoding)
         for arg, value in locals().items():
             if arg not in ["self", "model"]:
                 setattr(self, "_" + arg, value)
@@ -3492,18 +3492,17 @@ class InferT5Decoding(InferBase):
                     restore_data=True))
 
         self.linear_weight = [getattr(self, "lm_head_weight_")]
+        self.linear_bias = self.default_bias(self.linear_weight, 1)
 
-        self.linear_bias = [
-            paddle.zeros(shape=[self.linear_weight[0].shape[1]],
-                         dtype="float16" if use_fp16_decoding else "float32")
-        ]
-
-        self.relative_attention_bias_weight = [
+        setattr(
+            self, "relative_attn_bias_w",
             transfer_param(model.t5.decoder.block[0].layer[0].SelfAttention.
                            relative_attention_bias.weight,
                            is_bias=False,
                            dtype="float16" if use_fp16_decoding else "float32",
-                           restore_data=True)
+                           restore_data=True))
+        self.relative_attention_bias_weight = [
+            getattr(self, "relative_attn_bias_w")
         ]
         for k, v in params.items():
             setattr(self, k, v)
