@@ -17,7 +17,7 @@ jobs:
           make install
 
   Lint:
-    name: lint on chagned files
+    name: Linting
     needs: Env
     runs-on: ubuntu-latest
     steps:
