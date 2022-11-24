@@ -115,6 +115,7 @@ def create_pretrained_dataset(
         size = num_mask = sum(len(x[3]) for x in data)
         # masked_lm_positions
         # Organize as a 1D tensor for gather or use gather_nd
+        # print("yoki: origin size: ", size)
         if size % 8 != 0:
             size += 8 - (size % 8)
         out[3] = np.full(size, 0, dtype=np.int32)
@@ -125,7 +126,12 @@ def create_pretrained_dataset(
             for j, pos in enumerate(x[3]):
                 out[3][mask_token_num] = i * seq_length + pos
                 out[4][mask_token_num] = x[4][j]
+                # if x[4][j] < 0:
+                #     print("yoki error", x[4][j])
                 mask_token_num += 1
+        # print("yoki: mask_token_num: ", mask_token_num)
+        # print("yoki: size: ", size)
+        # print("yoki out: ", out[4], " len0: ", len(out[4]))
 
         return out
 
@@ -323,7 +329,13 @@ def default_logdir() -> str:
 
 
 def do_train(args):
-    paddle.set_device(args.device)
+    import paddle.profiler as profiler
+    profiler = profiler.Profiler(
+        targets=[profiler.ProfilerTarget.CUSTOM_DEVICE],
+        custom_device_types=['npu'])
+    paddle.set_device("npu:0")
+
+    # paddle.set_device(args.device)
 
     worker_index = paddle.distributed.get_rank()
     worker_num = paddle.distributed.get_world_size()
@@ -534,7 +546,12 @@ def do_train(args):
         tr_loss = paddle.to_tensor(0.0)
         reader_start = time.time()
 
-        for step, batch in enumerate(train_data_loader()):
+        bacth = 0
+        for step, batch_fake in enumerate(train_data_loader()):
+            batch = batch_fake
+            break
+
+        for step in range(500):
             train_reader_cost += time.time() - reader_start
             train_start = time.time()
 
@@ -545,8 +562,14 @@ def do_train(args):
             # 4. masked_lm_labels,
             # 5. next_sentence_labels
 
+            # if step == 0:
+            #     batch0 = batch
+            # else:
+            #     batch = batch0
             input_ids, segment_ids, input_mask, masked_lm_positions, \
             masked_lm_labels, next_sentence_labels = batch
+            # print("yoki: masked_lm_labels: ", masked_lm_labels)
+            # print("yoki: next_sentence_labels: ", next_sentence_labels)
 
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                 3, 7) else contextlib.suppress()
@@ -561,17 +584,33 @@ def do_train(args):
                 ctx_manager = contextlib.nullcontext() if sys.version_info >= (
                     3, 7) else contextlib.suppress()
 
+            if step == 40:
+                profiler.start()
+            if step == 42:
+                profiler.stop()
+                sys.exit()
+                break
+
+            # if step == 22:
+            #     sys.exit()
+
             with ctx_manager:
-                with paddle.amp.auto_cast(args.use_amp,
-                                          custom_white_list=[
-                                              'softmax',
-                                              'layer_norm',
-                                              'gelu',
-                                          ],
-                                          custom_black_list=[
-                                              "c_softmax_with_cross_entropy",
-                                          ],
-                                          level=args.fp16_opt_level):
+                with paddle.amp.auto_cast(
+                        args.use_amp,
+                        custom_white_list=[
+                            'softmax',
+                            'layer_norm',
+                            'gelu',
+                            #   "reduce_mean",
+                            #   "transpose2",
+                        ],
+                        custom_black_list=[
+                            "c_softmax_with_cross_entropy",
+                            #   "reduce_mean",
+                            #   "transpose2",
+                            #   "nll_loss",
+                        ],
+                        level=args.fp16_opt_level):
 
                     # Create the model for the ernie pretrain
                     if args.binary_head:
