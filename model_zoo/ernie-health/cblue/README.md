@@ -108,11 +108,22 @@ $ python train_spo.py --batch_size 12 --max_seq_length 300 --learning_rate 6e-5 
 使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，用于部署推理等，具体代码见export_model.py。静态图参数保存在`output_path`指定路径中。
 
 运行方式：
+1. 分类任务静态图模型导出
+```shell
+python export_model.py --train_dataset CHIP-CDN-2C --params_path=./checkpoint/model_900/ --output_path=./export
+```
 
+2. SPO任务静态图模型导出
 ```shell
 python export_model.py --train_dataset CMeIE --params_path=./checkpoint/model_900/ --output_path=./export
 ```
 
+3. NER任务静态图模型导出
+```shell
+python export_model.py --train_dataset CMeEE --params_path=./checkpoint/model_1500/ --output_path=./export
+```
+
+**NOTICE**: train_dataset分类任务选择填上训练数据集名称，params_path选择最好参数的模型的路径。
 
 [1] CBLUE: A Chinese Biomedical Language Understanding Evaluation Benchmark [pdf](https://arxiv.org/abs/2106.08087) [git](https://github.com/CBLUEbenchmark/CBLUE) [web](https://tianchi.aliyun.com/specials/promotion/2021chinesemedicalnlpleaderboardchallenge)
 
