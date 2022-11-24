@@ -51,6 +51,7 @@ USER_HOME = _get_user_home()
 PPNLP_HOME = _get_ppnlp_home()
 MODEL_HOME = _get_sub_home('models')
 DATA_HOME = _get_sub_home('datasets')
+LOCK_FILE_HOME = _get_sub_home(".lock")
 DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
 SUCCESS_STATUS = 0
