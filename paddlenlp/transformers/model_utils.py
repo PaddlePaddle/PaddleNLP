@@ -876,10 +876,11 @@ class PretrainedModel(Layer, GenerationMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-                # copy the weight file
-                shutil.copyfile(weight_file_path, new_weight_file_path)
-                os.remove(weight_file_path)
-                # shutil.rmtree(weight_file_path)
+
+                # move the `model-name.pdparams` to `model_state.pdparams`
+                # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
+                shutil.move(weight_file_path, new_weight_file_path)
+
                 weight_file_path = new_weight_file_path
 
             # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
