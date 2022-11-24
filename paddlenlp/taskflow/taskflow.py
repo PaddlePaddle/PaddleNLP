@@ -18,7 +18,6 @@ import warnings
 
 import paddle
 
-from ..transformers import ErnieCtmTokenizer, ErnieCtmWordtagModel
 from ..utils.tools import get_env_device
 from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
@@ -34,8 +33,8 @@ from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask
+from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
-from .text_generation import TextGenerationTask
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
 from .text_to_image import (TextToImageDiscoDiffusionTask,
@@ -402,6 +401,17 @@ TASKS = {
             "model": "Salesforce/codegen-350M-mono",
         },
     },
+    "text_classification": {
+        "models": {
+            "multi_class": {
+                "task_class": TextClassificationTask,
+                "task_flag": "text_classification-text_classification",
+            },
+        },
+        "default": {
+            "model": "multi_class"
+        },
+    },
     "text_to_image": {
         "models": {
             "dalle-mini": {
@@ -535,7 +545,7 @@ class Taskflow(object):
         mode (str, optional): Select the mode of the task, only used in the tasks of word_segmentation and ner.
             If set None, will use the default mode.
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
 
     """
 
@@ -548,6 +558,13 @@ class Taskflow(object):
                  **kwargs):
         assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
+
+        # Set the device for the task
+        device = get_env_device()
+        if device == 'cpu' or device_id == -1:
+            paddle.set_device('cpu')
+        else:
+            paddle.set_device(device + ":" + str(device_id))
 
         if self.task in ["word_segmentation", "ner"]:
             tag = "modes"
@@ -569,13 +586,6 @@ class Taskflow(object):
                 self.model]["task_priority_path"]
         else:
             self.priority_path = None
-
-        # Set the device for the task
-        device = get_env_device()
-        if device == 'cpu' or device_id == -1:
-            paddle.set_device('cpu')
-        else:
-            paddle.set_device(device + ":" + str(device_id))
 
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task][tag][self.model]
