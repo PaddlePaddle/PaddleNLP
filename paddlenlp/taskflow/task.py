@@ -39,17 +39,19 @@ class Task(metaclass=abc.ABCMeta):
 
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
+        self.is_static_model = kwargs.get("is_static_model", False)
         self.task = task
         self.kwargs = kwargs
         self._priority_path = priority_path
         self._usage = ""
-        # The dygraph model instantce
+        # The dygraph model instance
         self._model = None
-        # The static model instantce
+        # The static model instance
         self._input_spec = None
         self._config = None
         self._custom_model = False
         self._param_updated = False
+
         self._num_threads = self.kwargs[
             'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
                 cpu_count() / 2)
@@ -241,8 +243,12 @@ class Task(metaclass=abc.ABCMeta):
                     fp.write(md5)
                     fp.close()
 
-        inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
+        # When the user-provided model path is already a static model, skip to_static conversion
+        if self.is_static_model:
+            inference_model_path = self._task_path
+        else:
+            inference_model_path = os.path.join(self._task_path, "static",
+                                                "inference")
         if not os.path.exists(inference_model_path +
                               ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
