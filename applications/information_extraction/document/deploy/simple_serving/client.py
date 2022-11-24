@@ -25,7 +25,7 @@ image_base64_docs = []
 # Get the image base64 to post
 for image_path in image_paths:
     req_dict = {}
-    doc = doc_parser.parse({"doc": image_path}, return_ocr_result=False)
+    doc = doc_parser.parse({"doc": image_path}, do_ocr=False)
     base64 = doc['image']
     req_dict['doc'] = base64
     image_base64_docs.append(req_dict)
