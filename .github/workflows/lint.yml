@@ -18,7 +18,7 @@ jobs:
 
   Lint:
     name: lint on chagned files
-    needs: build
+    needs: Env
     runs-on: ubuntu-latest
     steps:
       - name: run the command

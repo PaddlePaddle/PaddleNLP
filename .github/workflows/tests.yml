@@ -18,7 +18,7 @@ jobs:
 
   Tests:
     name: run test in ./tests dir
-    needs: build
+    needs: Env
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
