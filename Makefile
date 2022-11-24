@@ -15,6 +15,7 @@ format:
 		echo "Checking/fixing $(modified_py_files)"; \
 		isort $(modified_py_files); \
 		yapf --verbose -i $(modified_py_files); \
+		git add ${modified_py_files}; \
 	else \
 		echo "No library .py files were modified"; \
 	fi
