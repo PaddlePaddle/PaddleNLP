@@ -146,7 +146,7 @@ def convert_example(example,
     bbox_lines = example.get("bbox", None)
     image_buff_string = example.get("image", None)
     # Text
-    if bbox_lines is None:
+    if bbox_lines is None or image_buff_string is None:
         encoded_inputs = tokenizer(text=[example["prompt"]],
                                    text_pair=[example["content"]],
                                    truncation=True,
