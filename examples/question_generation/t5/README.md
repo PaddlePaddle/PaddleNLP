@@ -62,7 +62,7 @@ question: What is the name of the process which confirms the primality of a numb
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus 2,3 train.py \
+python -m paddle.distributed.launch --gpus 1,2 train.py \
     --model_name_or_path=t5-base \
     --dataset_name=squad \
     --output_dir=output \
