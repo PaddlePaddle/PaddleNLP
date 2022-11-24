@@ -182,6 +182,7 @@ def load_prompt_arguments(args):
             else:
                 verbalizer.append(verb)
                 last_verb_index = index + 1
+        configs["verbalizer"] = verbalizer
         args.prompt = configs["template"][args.prompt_index]["text"]
         label_words = configs["verbalizer"][args.prompt_index]
         if isinstance(label_words, list):
