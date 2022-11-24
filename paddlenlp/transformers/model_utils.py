@@ -30,11 +30,13 @@ from huggingface_hub import hf_hub_download
 from paddle import Tensor
 from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddle.utils.download import get_path_from_url, is_url
+from paddle.utils.download import is_url
+from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
 
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, download_check
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.file_lock import FileLock
 
 from .configuration_utils import PretrainedConfig
 from .generation_utils import GenerationMixin
@@ -447,8 +449,9 @@ class PretrainedModel(Layer, GenerationMixin):
                     logger.info("Downloading %s and saved to %s" %
                                 (file_path, default_root))
                     try:
-                        resolved_resource_files[file_id] = get_path_from_url(
-                            file_path, default_root)
+                        resolved_resource_files[
+                            file_id] = get_path_from_url_with_filelock(
+                                file_path, default_root)
                     except RuntimeError as err:
                         logger.error(err)
                         raise RuntimeError(
@@ -864,8 +867,8 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 3. when it is url
         if is_url(pretrained_model_name_or_path):
-            weight_file_path = get_path_from_url(pretrained_model_name_or_path,
-                                                 cache_dir)
+            weight_file_path = get_path_from_url_with_filelock(
+                pretrained_model_name_or_path, cache_dir)
             # # check the downloaded weight file and registered weight file name
 
             # make sure that
@@ -876,10 +879,11 @@ class PretrainedModel(Layer, GenerationMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-                # copy the weight file
-                shutil.copyfile(weight_file_path, new_weight_file_path)
-                os.remove(weight_file_path)
-                # shutil.rmtree(weight_file_path)
+
+                # move the `model-name.pdparams` to `model_state.pdparams`
+                # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
+                shutil.move(weight_file_path, new_weight_file_path)
+
                 weight_file_path = new_weight_file_path
 
             # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
