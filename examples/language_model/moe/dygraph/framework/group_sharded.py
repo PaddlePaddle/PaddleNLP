@@ -34,7 +34,7 @@ from paddle.optimizer import Optimizer
 from paddle.fluid.framework import in_dygraph_mode
 from paddle.fluid.clip import ClipGradBase, _squared_l2_norm
 from paddle.fluid.dygraph import base as imperative_base
-from paddle.fluid import core, layers, framework
+from paddle.fluid import core, framework
 from paddle.incubate.distributed.models.moe.grad_clip import ClipGradForMOEByGlobalNorm
 
 # Old version
@@ -100,14 +100,13 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
             global_norm_var = global_norm_var_normal + global_norm_var_moe
 
         params_and_grads = []
-        global_norm_var = layers.sqrt(global_norm_var)
-        max_global_norm = layers.fill_constant(shape=[1],
-                                               dtype=global_norm_var.dtype,
-                                               value=self.clip_norm)
-        clip_var = layers.elementwise_div(x=max_global_norm,
-                                          y=layers.elementwise_max(
-                                              x=global_norm_var,
-                                              y=max_global_norm))
+        global_norm_var = paddle.sqrt(global_norm_var)
+        max_global_norm = paddle.full(shape=[1],
+                                      dtype=global_norm_var.dtype,
+                                      fill_value=self.clip_norm)
+        clip_var = paddle.maximum(x=max_global_norm,
+                                  y=paddle.maximum(x=global_norm_var,
+                                                   y=max_global_norm))
         for p, g in params_grads:
             if g is None:
                 continue
@@ -117,7 +116,7 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
             # TODO(wangxi): use inplace elementwise_mul
             clip_input = (clip_var.astype('float16')
                           if g.dtype == core.VarDesc.VarType.FP16 else clip_var)
-            new_grad = layers.elementwise_mul(x=g, y=clip_input)
+            new_grad = paddle.multiply(x=g, y=clip_input)
             params_and_grads.append((p, new_grad))
         return params_and_grads
 
