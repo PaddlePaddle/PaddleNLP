@@ -91,10 +91,8 @@ class PegasusPretrainedModel(PretrainedModel):
             bos_token_id=hf_config["bos_token_id"],
             pad_token_id=hf_config["pad_token_id"],
             eos_token_id=hf_config["eos_token_id"],
-
-            # TODO(wj-Mcat): need gongenlei to review this configuration
-            forced_eos_token_id=hf_config["eos_token_id"],
-            decoder_start_token_id=hf_config["bos_token_id"],
+            forced_eos_token_id=hf_config["forced_eos_token_id"],
+            decoder_start_token_id=hf_config["forced_eos_token_id"],
             d_model=hf_config["d_model"],
             num_encoder_layers=hf_config["encoder_layers"],
             num_decoder_layers=hf_config["decoder_layers"],
