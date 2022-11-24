@@ -3,7 +3,7 @@ name: Test
 on: [push, pull_request]
 
 jobs:
-  Env:
+  Test:
     name: Install Environment
     runs-on: ubuntu-latest
     steps:
@@ -15,12 +15,5 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           make install
-
-  Tests:
-    name: run test in ./tests dir
-    needs: Env
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
       - name: run the command
         run: make unit-test

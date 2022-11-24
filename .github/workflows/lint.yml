@@ -3,7 +3,7 @@ name: Lint
 on: [push, pull_request]
 
 jobs:
-  Env:
+  Lint:
     name: Install Environment
     runs-on: ubuntu-latest
     steps:
@@ -17,12 +17,4 @@ jobs:
           make install
       - name: run the command
         run: make lint
-
-  # Lint:
-  #   name: Linting
-  #   needs: Env
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: run the command
-  #       run: make lint
     
