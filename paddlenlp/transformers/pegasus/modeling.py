@@ -400,7 +400,8 @@ class PegasusModel(PegasusPretrainedModel):
                  activation_dropout=0.1,
                  max_position_embeddings=1024,
                  scale_embedding=True,
-                 init_std=0.02):
+                 init_std=0.02,
+                 **kwargs):
         super().__init__()
         self.init_std = init_std
         self.pad_token_id = pad_token_id
