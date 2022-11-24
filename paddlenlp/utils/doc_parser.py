@@ -126,13 +126,10 @@ class DocParser(object):
                     table_result = region['res']
                     html = table_result['html']
                     cell_bbox = table_result['cell_bbox']
-
                     table_list = []
                     lines = re.findall('<tr>(.*?)</tr>', html)
                     for line in lines:
-                        table_list.extend(re.findall('<td>(.*?)</td>', line))
-                        table_list.extend(
-                            re.findall('<td colspan="2">(.*?)</td>', line))
+                        table_list.extend(re.findall('<td.*?>(.*?)</td>', line))
                     for cell_box, text in zip(cell_bbox, table_list):
                         box = [
                             cell_box[0], cell_box[1], cell_box[4], cell_box[5]
