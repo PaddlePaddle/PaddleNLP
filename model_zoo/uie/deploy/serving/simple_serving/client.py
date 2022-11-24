@@ -22,10 +22,6 @@ data = {
     'data': {
         'text': texts
     },
-    'parameters': {
-        'max_seq_len': 512,
-        'batch_size': 1
-    }
 }
 r = requests.post(url=url, headers=headers, data=json.dumps(data))
 datas = json.loads(r.text)

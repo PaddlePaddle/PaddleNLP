@@ -40,8 +40,7 @@ class SimpleServer(FastAPI):
                  model_handler,
                  post_handler,
                  precision='fp32',
-                 device_id=0,
-                 batch_size=1):
+                 device_id=0):
         """
         The register function for the SimpleServer, the main register argrument as follows:
         
@@ -54,7 +53,7 @@ class SimpleServer(FastAPI):
         self._server_type = 'models'
         model_manager = ModelManager(task_name, model_path, tokenizer_name,
                                      model_handler, post_handler, precision,
-                                     device_id, batch_size)
+                                     device_id)
         self._model_manager = model_manager
         # Register transformers model server router
         self._router_manager.register_models_router(task_name)
