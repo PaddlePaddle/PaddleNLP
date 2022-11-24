@@ -7,9 +7,33 @@
 .PHONY: all
 all : lint test
 
+# # # # # # # # # # # # # # # Format Block # # # # # # # # # # # # # # # 
+
+format:
+	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
+	@if test -n "$(modified_py_files)"; then \
+		echo "Checking/fixing $(modified_py_files)"; \
+		isort $(modified_py_files); \
+		yapf --verbose -i $(modified_py_files); \
+	else \
+		echo "No library .py files were modified"; \
+	fi
+
+	# pre-commit run
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
 .PHONY: lint
-lint: yapf isort flake8 pylint
+lint:
+	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
+	@if test -n "$(modified_py_files)"; then \
+		echo "Checking/fixing $(modified_py_files)"; \
+		isort --check-only $(modified_py_files); \
+	else \
+		echo "No library .py files were modified"; \
+	fi
+	pre-commit run
 
 .PHONY: yapf
 yapf:
@@ -17,6 +41,7 @@ yapf:
 
 .PHONY: isort
 isort:
+	black --preview $(modified_py_files); \
 	python scripts/run_test.py isort
 
 .PHONY: flake8
@@ -27,38 +52,6 @@ flake8:
 .PHONY: pylint
 pylint:
 	python scripts/run_test.py pylint
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-
-# # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # # 
-
-.PHONY: all-test
-all-test: test gpu-test
-
-# default for cpu-test
-.PHONY: test
-test: tests-test example-test model-zoo-test
-
-.PHONY: tests-test
-tests-test:
-	echo "do test on ./tests dir"
-	# python -m unittest discover -s tests -f -p "test*.py"
-
-.PHONY: example-test
-example-test:
-	echo "do test on ./examples dir"
-	# python -m unittest discover -s examples -f -p "test*.py"
-
-.PHONY: model-zoo-test
-model-zoo-test:
-	echo "do test on ./model_zoo dir"
-	# python -m unittest discover -s model_zoo -f -p "test*.py"
-
-.PHONY: gpu-test
-gpu-test:
-	# TODO(wj-Mcat): need to intergrate this test into iPipe
-	echo "only run gpu-test"
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
