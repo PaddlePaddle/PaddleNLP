@@ -32,8 +32,9 @@ import numpy as np
 import paddle
 from huggingface_hub import hf_hub_download
 
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+from paddlenlp import __version__
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
+                                        get_path_from_url_with_filelock)
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -1567,7 +1568,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME)
+                    cache_dir=MODEL_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
