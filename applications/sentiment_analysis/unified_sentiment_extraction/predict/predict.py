@@ -75,7 +75,7 @@ def main():
     # define schema for AO Extraction
     # schema = [{'评价维度': ['情感倾向[正向，负向]']}]
     # define schema for ASO Extraction
-    schema = [{'评价维度': ['观点词', '情感倾向[正向，负向]']}]
+    schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
 
     # initializing UIEPredictor
     predictor = UIEPredictor(args, model, schema)

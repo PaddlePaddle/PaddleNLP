@@ -22,6 +22,30 @@ import numpy as np
 import paddle
 from paddlenlp.utils.log import logger
 
+
+def load_txt(file_path):
+    texts = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f.readlines():
+            texts.append(line.strip())
+    return texts
+
+
+def load_json_file(path):
+    exmaples = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f.readlines():
+            example = json.loads(line)
+            exmaples.append(example)
+    return exmaples
+
+
+def write_json_file(examples, save_path):
+    with open(save_path, "w", encoding="utf-8") as f:
+        for example in examples:
+            line = json.dumps(example, ensure_ascii=False)
+            f.write(line + "\n")
+
 MODEL_MAP = {
     # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
     "uie-base": {

@@ -11,9 +11,11 @@
     - [2.3.3 情感分析结果可视化](#2.3.3)
   - [2.4 通用情感分析能力](#2.4)
   - [2.5 情感分析可视化使用介绍](#2.5)
-  - [2.6 面向垂域定制情感分析](#2.6)
-    - [2.6.1 数据标注](#2.6.1)
+  - [2.6 面向垂域定制情感分析，解决同义属性聚合以及隐性观点抽取](#2.6)
+    - [2.6.1 打通数据标注到训练样本构建](#2.6.1)
     - [2.6.2 模型训练](#2.6.2)
+    - [2.6.3 模型测试](#2.6.3)
+    - [2.6.4 预测及效果展示](#2.6.4)
   - [2.7 模型部署](#2.7)
 
 <a name="1"></a>
@@ -41,14 +43,18 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
 <a name="2.1"></a>
 
 ### 2.1 运行环境
-- python >= 3.6
+- python >= 3.7
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.4
 - wordcloud >= 1.8.2
 
 **安装PaddlePaddle**：
 
-环境中paddlepaddle-gpu或paddlepaddle版本应大于或等于2.3, 请参见[飞桨快速安装](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)根据自己需求选择合适的PaddlePaddle下载命令。
+环境中paddlepaddle-gpu或paddlepaddle版本应大于或等于2.3, 具体可以参见[飞桨快速安装](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)根据自己需求选择合适的PaddlePaddle下载命令。如下命令可以安装linux系统，CUDA版本为10.2环境下的paddlepaddle，具体版本号为支持GPU的2.3.2版本。
+
+```shell
+conda install paddlepaddle-gpu==2.3.2 cudatoolkit=10.2 --channel https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/Paddle/
+```
 
 **安装PaddleNLP**：
 安装PaddleNLP可以开启百度镜像源来加速下载，更多关于PaddleNLP安装的详细教程请查见[PaddleNLP快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
@@ -235,6 +241,8 @@ python predict/predict_with_aspect.py \
 通过属性信息，可以查看客户对于产品/服务的重点关注方面. 可以通过`plot_aspect_with_frequency`函数对属性进行可视化，当前可通过参数`image_type`分别指定`wordcloud`和'histogram'，通过词云和直方图的形式进行可视化。
 
 ```python
+# define SentimentResult to process the result of sentiment result.
+sr = SentimentResult(args.file_path, sentiment_name=args.sentiment_name)
 # define VisualSentiment to help visualization
 vs = VisualSentiment(font_path=args.font_path)
 
@@ -315,17 +323,352 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
 <a name="2.6"></a>
 
 ### 2.6 支持定制面向垂域的情感分析能力，解决同义属性聚合以及隐性观点抽取
+考虑到用户在对业务数据进行情感分析时，往往聚焦于某个特定场景或领域，为满足用户更高的情感分析要求，本项目除了预先设定的通用情感分析能力之外，同时支持进一步地微调，以在当前业务侧获取更好的效果。
+
+本节以酒店场景为例，讲解定制酒店垂域的情感分析能力。接下来，将从数据标注及样本构建 - 模型训练 - 模型测试 - 模型预测及效果展示等全流程展开介绍。
 
 <a name="2.6.1"></a>
 
-#### 2.6.1 数据标注
+#### 2.6.1 打通数据标注到训练样本构建
+本项目打通了标注平台 label-studio， 支持用户自己标注业务侧数据进行模型训练，同时支持将label-studio平台导出数据一键转换成模型训练样本形式，如下图所示。如果对label-studio数据标注规则尚不清楚，请参考[情感分析任务Label Studio使用指南](./label_studio.md)。
+
+在利用 label-studio 导出标注好的json数据之后，本项目提供了`label_studio.py`文件，用于将导出数据一键转换为模型训练数据。
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png  />
+</div>
+
+
+##### 2.6.1.1 **属性抽取相关任务**
+
+**基础使用方式**：
+
+针对属性抽取式的任务，比如属性、观点抽取、属性分类任务等，可以使用如下命令将label-studio导出数据转换为模型训练数据：
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --task_type ext \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向" "未提及" \
+    --separator "##" \
+    -- negative_ratio 5 \
+    --is_shuffle True \
+    --seed 1000
+```
+
+参数介绍：  
+- ``label_studio_file``: 从label studio导出的数据标注文件。
+- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
+- ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
+- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
+- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
+- ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。默认为["正向", "负向", "未提及"]。
+- ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度分类任务有效。默认为"##"。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。为了保证评估指标的准确性，验证集和测试集默认构造全负例。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
+- ``seed``: 随机种子，默认为1000.
+
+
+除了基础的属性相关信息抽取能力之外，本项目还支持属性聚合，以及加强了对隐性观点抽取的功能。
+
+**升级1：支持属性聚合能力**: 在用户对产品或服务进行评论时，对某一些属性可能会有不同的说法，这会在后续对属性分析时可能会带来困扰。如以下示例中的"价格","价钱"和"费用"。
+
+```
+蛋糕味道不错，外观很漂亮，而且价格比较便宜
+蛋糕味道不错，外观很漂亮，而且价钱比较便宜
+蛋糕味道不错，外观很漂亮，而且费用比较便宜
+```
+
+本项目通过以下两点，支持对属性聚合能力的建设。
+-  支持针对用户给定属性进行观点或情感极性分析，例如当用户给出属性"价格"时，期望能够从以上示例中，均能抽取出其观点词"便宜"
+- 支持用户提供属性的同义词表，用来加强模型对用户领域属性同义词的理解能力。
+
+以下给出了酒店场景的示例，每行代表1类同义词，不同词之间以"空格"隔开。
+
+```
+房间 屋子 房子
+位置 地理位置
+隔音 隔声
+价格 价钱 费用
+```
+
+**升级2：加强隐性观点抽取功能**: 为提高模型效果，本项目加强了对隐性观点功能抽取功能的支持。本项目中定义隐性观点是指没有对应属性的纯观点词，如以下示例中的"比较便宜"便是隐性观点。
+
+```
+蛋糕味道不错，外观很漂亮，而且比较便宜
+```
+
+本项目支持用户提供一个隐性观点映射文件，用户可以根据自己的业务场景定义隐性观点词，以下给出了酒店场景的示例。其格式为，第1个单词为隐性观点对应的属性，后续按照情感情感倾向对隐性观点词进行了归类，同一类的以"[ ]"方式放到一块。
+
+```
+价格, 正向[实惠 便宜 超划算 划算 物超所值 物有所值 不贵], 负向[贵 不便宜 不划算]
+卫生, 正向[干净], 负向[很脏 很臭 不干净]
+隔音, 负向[好吵]
+位置, 负向[不太好找]
+```
+
+
+可以分别通过参数"synonym_file"和"implicit_file"分别将同义词文件和隐性观点文件传入以下命令中，进行相关数据构建。
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --synonym_file ./data/synonyms.json \
+    --implicit_file ./data/implicit_opinions.json \
+    --task_type ext \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向" "未提及" \
+    --separator "##" \
+    -- negative_ratio 5 \
+    --is_shuffle True \
+    --seed 1000
+```
+
+备注：
+- 默认情况下 [label_studio.py](./label_studio.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
+- 每次执行 [label_studio.py](./label_studio.py) 脚本，将会覆盖已有的同名数据文件
+- 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 样本数量。
+- 对于从label_studio导出的文件，默认文件中的每条数据都是经过人工正确标注的。
+
+
+##### 2.6.1.2 **语句级情感分类任务**
+
+对于语句级情感分类任务，可以配置参数`prompt_prefix`和`options`，通过以下命令构造相关训练数据。
+
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --task_type cls \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向"
+```
+
 
 <a name="2.6.2"></a>
 
-#### 2.6.2 模型训练
+#### 2.6.2 模型微调
+在生成酒店场景的训练数据后，可以通过以下命令启动模型微调。
+
+```shell
+python -u -m paddle.distributed.launch --gpus "7" finetune.py \
+  --train_path ./data/train.txt \
+  --dev_path ./data/dev.txt \
+  --save_dir ./checkpoint \
+  --learning_rate 1e-5 \
+  --batch_size 16 \
+  --max_seq_len 512 \
+  --num_epochs 10 \
+  --model uie-base \
+  --seed 1000 \
+  --logging_steps 10 \
+  --valid_steps 100 \
+  --device gpu
+```
+
+可配置参数说明：
+
+* `train_path`：必须，训练集文件路径。
+* `dev_path`：必须，验证集文件路径。
+* `save_dir`：模型 checkpoints 的保存目录，默认为"./checkpoint"。
+* `learning_rate`：训练最大学习率，UIE 推荐设置为 1e-5；默认值为1e-5。
+* `batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 16。
+* `max_seq_len`：模型支持处理的最大序列长度，默认为512。
+* `num_epochs`：模型训练的轮次，可以视任务情况进行调整，默认为10。
+* `model`：训练使用的预训练模型。可选择的有"uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-m-base", "uie-m-large"。
+* `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认10。
+* `valid_steps`: 训练过程中模型评估的间隔 steps 数，默认100。
+* `seed`：全局随机种子，默认为 42。
+* `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
 
 
+#### 2.6.3 模型测试
 
+通过运行以下命令进行对酒店场景的测试集进行评估：
+
+```
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/test.txt \
+    --batch_size 16 \
+    --max_seq_len 512
+```
+
+可配置参数说明：
+
+* `model_path`：必须，用以数据集测试的模型路径。
+* `test_path`：必须，测试集文件路径。
+* `batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 16。
+* `max_seq_len`：模型支持处理的最大序列长度，默认为512。
+
+
+#### 2.6.4 预测及效果展示
+可以通过 `predict` 目录下的预测样本进行预测，相关功能如下所示。
+
+```
+├── predict # 模型预测
+│   └── predictor.py # 模型预测核心脚本
+│   ├── predict.py # 模型预测Demo脚本
+│   ├── batch_predict.py # 模型批量预测脚本
+│   ├── predict_with_aspect.py # 根据给定评价属性进行预测Demo脚本
+│   └── batch_predict_with_aspect # 根据给定评价属性进行批量预测脚本
+```
+
+**预测脚本使用**
+假设给定以下样本进行预测：
+```
+店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队
+```
+
+如果**不指定属性**进行分析的话，可以通过`predict.py`脚本对输入样本进行预测：
+```
+python predict/predict.py 
+```
+其预测结果如下：
+
+```
+{
+    '评价维度': [
+        {
+            'end': 14,
+            'probability': 0.5057273450270259,
+            'relations': {
+                '情感倾向[正向,负向,未提及]': [
+                    {
+                        'probability': 0.9164003249203745,
+                        'text': '正向'
+                    }
+                ],
+                '观点词': [
+                    {
+                        'end': 16,
+                        'probability': 0.9901230595644215,
+                        'start': 14,
+                        'text': '热情'
+                    }
+                ]
+            },
+            'start': 12,
+            'text': '服务'
+        },
+        {
+            'end': 2,
+            'probability': 0.9972058290336498,
+            'relations': {
+                '情感倾向[正向,负向,未提及]': [
+                    {
+                        'probability': 0.9988713449309117,
+                        'text': '正向'
+                    }
+                ],
+                '观点词': [
+                    {
+                        'end': 8,
+                        'probability': 0.9979115454266321,
+                        'start': 6,
+                        'text': '清静'
+                    },
+                    {
+                        'end': 4,
+                        'probability': 0.9994972946268277,
+                        'start': 2,
+                        'text': '干净'
+                    }
+                ]
+            },
+            'start': 0,
+            'text': '店面'
+        },
+        {
+            'end': 20,
+            'probability': 0.9995450845431009,
+            'relations': {
+                '情感倾向[正向,负向,未提及]': [
+                    {
+                        'probability': 0.9980333837608555,
+                        'text': '正向'
+                    }
+                ],
+                '观点词': [
+                    {
+                        'end': 22,
+                        'probability': 0.9758514523453563,
+                        'start': 21,
+                        'text': '高'
+                    }
+                ]
+            },
+            'start': 17,
+            'text': '性价比'
+        }
+    ]
+}
+```
+
+如果预先给定属性集["服务", "位置"]进行分析，则可以使用`predict_with_aspect.py`脚本进行预测：
+```
+python predict/predict_with_aspect.py
+```
+其结果如下：
+
+```
+{
+    '评价维度': [
+        {
+            'relations': {
+                '情感倾向[正向,负向,未提及]': [
+                    {
+                        'probability': 0.9885644291685693,
+                        'text': '正向'
+                    }
+                ],
+                '观点词': [
+                    {
+                        'end': 16,
+                        'probability': 0.9888024893355762,
+                        'start': 14,
+                        'text': '热情'
+                    }
+                ]
+            },
+            'text': '服务'
+        },
+        {
+            'relations': {
+                '情感倾向[正向,负向,未提及]': [
+                    {
+                        'probability': 0.9987500516857182,
+                        'text': '未提及'
+                    }
+                ]
+            },
+            'text': '价格'
+        }
+    ]
+}
+```
+
+**属性聚合样本预测**
+由于在构造样本时，引入酒店场景的部分属性的同义词，可以看到对于"隔音"与"隔声"、"位置"与"所处位置", "价格"、"价钱"与"费用"等各项内容均能识别出正确的观点和情感倾向。
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/35913314/203913660-ac95caad-c5e2-43c5-b291-6208babd58d3.png />
+</div>
 <a name="2.7"></a>
+
+
+**隐性观点词抽取样本预测**
+由于在构造样本时，引入了酒店场景的部分高频隐性观点，可以看到在以下case中，对于属性"价格"和"卫生"，能够正确识别出对应的观点词和情感极性。
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/35913314/203913490-a6fbf0aa-1f9c-476d-83c7-ea4604ab94d0.png />
+</div>
+
 
 ### 2.7 模型部署

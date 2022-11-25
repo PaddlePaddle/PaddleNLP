@@ -4,5 +4,8 @@ deploy*
 export/*
 images/*
 outputs/*
+log/*
+uie-base/*
 SimHei.ttf
-
+*.sh
+myhttp.py
