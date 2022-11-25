@@ -1026,7 +1026,7 @@ class PretrainedConfig:
         """
         try:
             value = self.__getattribute__(key)
-        except:
+        except AttributeError:
             return default
         else:
             return value
