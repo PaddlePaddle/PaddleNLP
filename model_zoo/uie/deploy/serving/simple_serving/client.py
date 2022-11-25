@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-from paddlenlp.transformers import TinyBertModel
+import requests
+import json
 
-
-class TestModeling(unittest.TestCase):
-    """Test PretrainedModel single time, not in Transformer models"""
-
-    def test_from_pretrained_with_load_as_state_np_params(self):
-        """init model with `load_state_as_np` params"""
-        TinyBertModel.from_pretrained("tinybert-4l-312d", load_state_as_np=True)
+url = "http://0.0.0.0:8189/taskflow/uie"
+headers = {"Content-Type": "application/json"}
+texts = ['城市内交通费7月5日金额114广州至佛山', '5月9日交通费29元从北苑到望京搜后']
+data = {
+    'data': {
+        'text': texts
+    },
+}
+r = requests.post(url=url, headers=headers, data=json.dumps(data))
+datas = json.loads(r.text)
+print(datas)

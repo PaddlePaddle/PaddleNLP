@@ -49,7 +49,7 @@ class LatentDiffusionModel(nn.Layer):
 
         # init vae
         vae_name_or_path = model_args.vae_name_or_path if model_args.pretrained_model_name_or_path is None else os.path.join(
-            model_args.pretrained_model_name_or_path, "vae")
+            model_args.pretrained_model_name_or_path, "vqvae")
         self.vae = AutoencoderKL.from_pretrained(vae_name_or_path)
         freeze_params(self.vae.parameters())
         logger.info("Freeze vae parameters!")

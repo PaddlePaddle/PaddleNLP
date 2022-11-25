@@ -20,9 +20,7 @@ import numpy as np
 import paddle
 
 from ..transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
-from ..datasets import load_dataset
 from ..data import Pad
-from .utils import dygraph_mode_guard
 from .task import Task
 
 usage = r"""
@@ -84,15 +82,18 @@ class DialogueTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
-        self._check_task_files()
-        self._construct_tokenizer(model)
+        if not self.from_hf_hub:
+            self._check_task_files()
+        self._construct_tokenizer(
+            self._task_path if self.from_hf_hub else model)
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
         self._interactive_mode = False
         if self._static_mode:
             self._get_inference_model()
         else:
-            self._construct_model(model)
+            self._construct_model(
+                self._task_path if self.from_hf_hub else model)
 
     def _construct_input_spec(self):
         """
@@ -112,18 +113,16 @@ class DialogueTask(Task):
         Construct the inference model for the predictor.
         """
         model_instance = UnifiedTransformerLMHeadModel.from_pretrained(
-            self._task_path)
-        model_path = os.path.join(self._task_path, "model_state.pdparams")
-        state_dict = paddle.load(model_path)
-        model_instance.set_state_dict(state_dict)
+            model, from_hf_hub=self.from_hf_hub)
+        model_instance.eval()
         self._model = model_instance
-        self._model.eval()
 
     def _construct_tokenizer(self, model):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = UnifiedTransformerTokenizer.from_pretrained(model)
+        self._tokenizer = UnifiedTransformerTokenizer.from_pretrained(
+            model, from_hf_hub=self.from_hf_hub)
 
     def _batchify_fn(self, batch_examples):
         #padding = False if self._batch_size == 1 else True
