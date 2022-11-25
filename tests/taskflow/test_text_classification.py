@@ -52,7 +52,7 @@ class TestTextClassificationTask(unittest.TestCase):
         self.temp_dir.cleanup()
 
     @parameterized.expand([(1, ), (2, )])
-    def test_text_classification_taskf(self, batch_size):
+    def test_text_classification_task(self, batch_size):
         # input_text is a tuple to simulate the args passed from Taskflow to TextClassificationTask
         input_text = (["百度", "深度学习框架", "飞桨", "PaddleNLP"], )
         id2label = {
@@ -64,7 +64,8 @@ class TestTextClassificationTask(unittest.TestCase):
             task="text_classification",
             task_path=self.dygraph_model_path,
             id2label=id2label,
-            batch_size=batch_size)
+            batch_size=batch_size,
+            device_id=0)
 
         dygraph_results = dygraph_taskflow(input_text)
         self.assertEqual(len(dygraph_results), len(input_text[0]))
@@ -75,7 +76,8 @@ class TestTextClassificationTask(unittest.TestCase):
             is_static_model=True,
             task_path=self.static_model_path,
             id2label=id2label,
-            batch_size=batch_size)
+            batch_size=batch_size,
+            device_id=0)
 
         static_results = static_taskflow(input_text)
         self.assertEqual(len(static_results), len(input_text[0]))
