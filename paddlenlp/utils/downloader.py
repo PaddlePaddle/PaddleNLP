@@ -25,7 +25,8 @@ import time
 import uuid
 import threading
 from collections import OrderedDict
-from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS
+from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS, LOCK_FILE_HOME
+from .file_lock import FileLock
 
 try:
     from tqdm import tqdm
