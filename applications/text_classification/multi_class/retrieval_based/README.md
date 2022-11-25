@@ -195,7 +195,6 @@ python -u -m paddle.distributed.launch --gpus "0,1" \
 * `recall_num`: 对 1 个文本召回的相似文本数量
 * `similar_text_pair`: 由相似文本对构成的评估集
 * `corpus_file`: 召回库数据 corpus_file
-* `similar_text_pair`: 由相似文本对构成的评估集
 
 也可以使用bash脚本：
 

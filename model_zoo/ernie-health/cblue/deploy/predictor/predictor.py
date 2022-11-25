@@ -93,7 +93,6 @@ class InferBackend(object):
         self.input_handles = [
             self.predictor.get_inputs()[0].name,
             self.predictor.get_inputs()[1].name,
-            self.predictor.get_inputs()[2].name
         ]
 
         if device == "gpu":
@@ -122,7 +121,7 @@ class EHealthPredictor(object):
     def __init__(self, args, label_list):
         self.label_list = label_list
         self._tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
-                                                        use_faster=True)
+                                                        use_fast=True)
         self._max_seq_length = args.max_seq_length
         self._batch_size = args.batch_size
         self.inference_backend = InferBackend(args.model_path_prefix,
@@ -196,13 +195,11 @@ class CLSPredictor(EHealthPredictor):
                                text_pair=text_pair,
                                max_length=self._max_seq_length,
                                padding=True,
-                               truncation=True,
-                               return_position_ids=True)
+                               truncation=True)
 
         encoded_inputs = {
             "input_ids": np.array(data["input_ids"], dtype="int64"),
             "token_type_ids": np.array(data["token_type_ids"], dtype="int64"),
-            "position_ids": np.array(data['position_ids'], dtype="int64")
         }
         return encoded_inputs
 
@@ -268,15 +265,11 @@ class NERPredictor(EHealthPredictor):
                                max_length=self._max_seq_length,
                                padding=True,
                                is_split_into_words=True,
-                               truncation=True,
-                               return_position_ids=True,
-                               return_attention_mask=True)
+                               truncation=True)
 
         encoded_inputs = {
             "input_ids": np.array(data["input_ids"], dtype="int64"),
             "token_type_ids": np.array(data["token_type_ids"], dtype="int64"),
-            "position_ids": np.array(data["position_ids"], dtype="int64"),
-            "attention_mask": np.array(data["attention_mask"], dtype="float32")
         }
         return encoded_inputs
 
@@ -329,13 +322,10 @@ class SPOPredictor(EHealthPredictor):
                                padding=True,
                                is_split_into_words=True,
                                truncation=True,
-                               return_position_ids=True,
                                return_attention_mask=True)
-
         encoded_inputs = {
             "input_ids": np.array(data["input_ids"], dtype="int64"),
             "token_type_ids": np.array(data["token_type_ids"], dtype="int64"),
-            "position_ids": np.array(data["position_ids"], dtype="int64"),
             "attention_mask": np.array(data["attention_mask"], dtype="float32")
         }
         return encoded_inputs

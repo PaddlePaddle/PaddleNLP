@@ -274,10 +274,8 @@ class MultiHeadAttention(nn.Layer):
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
                                                cache)
         # scale dot product attention
-        product = layers.matmul(x=q,
-                                y=k,
-                                transpose_y=True,
-                                alpha=self.head_dim**-0.5)
+        product = paddle.matmul(x=q, y=k, transpose_y=True) * (self.head_dim**
+                                                               -0.5)
 
         # if attn_mask is not None:
         # product = product + attn_mask
@@ -831,8 +829,7 @@ class GPTModel(GPTPretrainedModel):
                                          dtype='int64')
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.fluid.layers.expand_as(
-                position_ids, input_ids)
+            position_ids = paddle.expand_as(position_ids, input_ids)
         embedding_output = self.embeddings(input_ids=input_ids,
                                            position_ids=position_ids)
 
