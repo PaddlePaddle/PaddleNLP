@@ -63,7 +63,7 @@ class DocParser(object):
         if expand_to_a4_size:
             image, offset_x, offset_y = self.expand_image_to_a4_size(
                 image, center=True)
-        img_w, img_h = image.shape[1], image.shape[0]
+        img_w, img_h = image.shape[:2]
         doc['image'] = np2base64(image)
         doc['offset_x'] = offset_x
         doc['offset_y'] = offset_y
@@ -71,7 +71,18 @@ class DocParser(object):
         doc['img_h'] = img_h
         if do_ocr:
             ocr_result = self.ocr(image, keep_whitespace=keep_whitespace)
-            doc['layout'] = ocr_result
+            if expand_to_a4_size:
+                layout = []
+                for segment in ocr_result:
+                    box = segment[0]
+                    org_box = [
+                        box[0] - offset_x, box[1] - offset_y, box[2] - offset_x,
+                        box[3] - offset_y
+                    ]
+                    layout.append((org_box, segment[1]))
+                doc['layout'] = layout
+            else:
+                doc['layout'] = ocr_result
         return doc
 
     def __call__(self, *args, **kwargs):

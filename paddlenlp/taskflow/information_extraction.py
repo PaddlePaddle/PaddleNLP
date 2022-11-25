@@ -389,7 +389,6 @@ class UIETask(Task):
         self.use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
-        self._return_layout = kwargs.get("return_layout", False)
         self._expand_to_a4_size = False if self._custom_model else True
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
@@ -971,10 +970,18 @@ class UIETask(Task):
                 if 'doc' in d.keys():
                     text = ''
                     bbox = []
+                    img_w, img_h = d['img_w'], d['img_h']
+                    offset_x, offset_y = d['offset_x'], d['offset_x']
                     for segment in d['layout']:
+                        org_box = segment[0]  # bbox before expand to A4 size
+                        box = [
+                            org_box[0] + offset_x,
+                            org_box[1] + offset_y,
+                            org_box[2] + offset_x,
+                            org_box[3] + offset_y,
+                        ]
                         box = self._doc_parser._normalize_box(
-                            segment[0], [d['img_w'], d['img_h']], [1000, 1000],
-                            d['offset_x'], d['offset_y'])
+                            box, [img_w, img_h], [1000, 1000])
                         text += segment[1]
                         bbox.extend([box] * len(segment[1]))
                     _inputs.append({
@@ -1115,17 +1122,48 @@ class UIETask(Task):
                 child.prefix = prefix
                 child.parent_relations = relations
                 schema_list.append(child)
-        if self._return_layout:
-            new_results = []
-            for result, example in zip(results, data):
-                new_result = {'result': result}
-                if 'layout' in example.keys():
-                    new_result['layout'] = example['layout']
-                else:
-                    new_result['layout'] = []
-                new_results.append(new_result)
-            results = new_results
+        results = self._add_bbox_info(results, data)
         return results
+
+    def _add_bbox_info(self, results, data):
+
+        def _add_bbox(result, char_boxes):
+            for vs in result.values():
+                for v in vs:
+                    if 'start' in v.keys():
+                        start_box = char_boxes[v['start']][1]
+                        end_box = char_boxes[v['end'] - 1][1]
+                        bbox = [
+                            int(start_box[0]),
+                            int(end_box[1]),
+                            int(end_box[2]),
+                            int(start_box[3])
+                        ]
+                        v['bbox'] = bbox
+                    if v.get('relations'):
+                        _add_bbox(v['relations'], char_boxes)
+            return result
+
+        new_results = []
+        for result, one_data in zip(results, data):
+            if 'layout' in one_data.keys():
+                layout = one_data['layout']
+                char_boxes = []
+                for segment in layout:
+                    sbox = segment[0]
+                    text_len = len(segment[1])
+                    if text_len == 0:
+                        continue
+                    char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
+                    for i in range(text_len):
+                        cbox = [
+                            sbox[0] + i * char_w, sbox[1],
+                            sbox[0] + (i + 1) * char_w, sbox[3]
+                        ]
+                        char_boxes.append((segment[1][i], cbox))
+                result = _add_bbox(result, char_boxes)
+            new_results.append(result)
+        return new_results
 
     def _convert_ids_to_results(self, examples, sentence_ids, probs):
         """
