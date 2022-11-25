@@ -87,29 +87,6 @@
 
 - 基于UIE优秀的小样本微调能力，实现低成本模型定制适配。
 
-<a name="24"></a>
-
-### 2.4 👀 效果展示
-
-<details open>
-<summary>实体抽取</summary>
-
-<div align="center">
-    <img src="doc/imgs_results/PP-OCRv3/en/en_1.png" width="800">
-    <img src="doc/imgs_results/PP-OCRv3/en/en_2.png" width="800">
-</div>
-
-</details>
-
-<details open>
-<summary>关系抽取</summary>
-
-<div align="center">
-    <img src="doc/imgs_results/PP-OCRv3/en/en_1.png" width="800">
-    <img src="doc/imgs_results/PP-OCRv3/en/en_2.png" width="800">
-</div>
-
-</details>
 
 <a name="3"></a>
 

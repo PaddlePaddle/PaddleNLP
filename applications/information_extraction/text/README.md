@@ -132,7 +132,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --max_seq_len 512  \
     --per_device_train_batch_size  8 \
     --per_device_eval_batch_size 8 \
-    --num_train_epochs 30 \
+    --num_train_epochs 20 \
     --learning_rate 1e-5 \
     --label_names 'start_positions' 'end_positions' \
     --do_train \
