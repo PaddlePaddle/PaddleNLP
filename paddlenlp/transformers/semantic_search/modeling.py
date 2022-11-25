@@ -80,6 +80,7 @@ class ErnieDualEncoder(nn.Layer):
                  title_model_name_or_path=None,
                  share_parameters=False,
                  dropout=None,
+                 reinitialize=False,
                  use_cross_batch=False):
 
         super().__init__()
@@ -95,6 +96,15 @@ class ErnieDualEncoder(nn.Layer):
                 title_model_name_or_path)
         assert (self.query_ernie is not None) or (self.title_ernie is not None), \
             "At least one of query_ernie and title_ernie should not be None"
+
+        # Compatible to rocketv2 initialization for setting layer._epsilon to 1e-5
+        if reinitialize:
+            self.apply(self.init_weights)
+
+    def init_weights(self, layer):
+        """ Initialization hook """
+        if isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-5
 
     def get_semantic_embedding(self, data_loader):
         self.eval()
@@ -200,7 +210,6 @@ class ErnieDualEncoder(nn.Layer):
             paddle.distributed.all_gather(tensor_list, all_title_cls_embedding)
             all_title_cls_embedding = paddle.concat(x=tensor_list, axis=0)
 
-        # multiply
         logits = paddle.matmul(query_cls_embedding,
                                all_title_cls_embedding,
                                transpose_y=True)
@@ -242,9 +251,20 @@ class ErnieCrossEncoder(nn.Layer):
     def __init__(self,
                  pretrain_model_name_or_path,
                  num_classes=2,
+                 reinitialize=False,
                  dropout=None):
         super().__init__()
-        self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path)
+
+        self.ernie = ErnieEncoder.from_pretrained(pretrain_model_name_or_path,
+                                                  num_classes=num_classes)
+        # Compatible to rocketv2 initialization for setting layer._epsilon to 1e-5
+        if reinitialize:
+            self.apply(self.init_weights)
+
+    def init_weights(self, layer):
+        """ Initialization hook """
+        if isinstance(layer, nn.LayerNorm):
+            layer._epsilon = 1e-5
 
     def matching(self,
                  input_ids,
@@ -262,6 +282,19 @@ class ErnieCrossEncoder(nn.Layer):
         if return_prob_distributation:
             return probs
         return probs[:, 1]
+
+    def matching_v2(self,
+                    input_ids,
+                    token_type_ids=None,
+                    position_ids=None,
+                    attention_mask=None):
+        sequence_output, _ = self.ernie(input_ids,
+                                        token_type_ids=token_type_ids,
+                                        position_ids=position_ids,
+                                        attention_mask=attention_mask)
+        pooled_output = self.ernie.dropout(sequence_output[:, 0])
+        probs = self.ernie.classifier(pooled_output)
+        return probs
 
     def forward(self,
                 input_ids,

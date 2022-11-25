@@ -27,7 +27,7 @@ class ErnieTokenClsOp(Op):
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
-                                                       use_faster=True)
+                                                       use_fast=True)
         # The label names of NER models trained by different data sets may be different
         self.label_names = [
             'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
