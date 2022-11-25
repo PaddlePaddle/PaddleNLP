@@ -51,7 +51,7 @@ class DensePassageRetriever(BaseRetriever):
         model_version: Optional[str] = None,
         output_emb_size: Optional[int] = None,
         reinitialize: bool = False,
-        share_parameters=False,
+        share_parameters: bool = False,
         max_seq_len_query: int = 64,
         max_seq_len_passage: int = 256,
         top_k: int = 10,

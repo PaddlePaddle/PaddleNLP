@@ -87,7 +87,8 @@ parser.add_argument(
 parser.add_argument(
     '--share_parameters',
     action='store_true',
-    help='Control the query and title models sharing the same parameters')
+    help='Use to control the query and title models sharing the same parameters'
+)
 
 args = parser.parse_args()
 

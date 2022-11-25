@@ -298,6 +298,7 @@ class ErnieCrossEncoder(nn.Layer):
                  position_ids=None,
                  attention_mask=None,
                  return_prob_distributation=False):
+        """Use the pooled_output as the feature for pointwise prediction, eg. RocketQAv1"""
         _, pooled_output = self.ernie(input_ids,
                                       token_type_ids=token_type_ids,
                                       position_ids=position_ids,
@@ -314,6 +315,7 @@ class ErnieCrossEncoder(nn.Layer):
                     token_type_ids=None,
                     position_ids=None,
                     attention_mask=None):
+        """Use the cls token embedding as the feature for listwise prediction, eg. RocketQAv2"""
         sequence_output, _ = self.ernie(input_ids,
                                         token_type_ids=token_type_ids,
                                         position_ids=position_ids,
@@ -327,6 +329,7 @@ class ErnieCrossEncoder(nn.Layer):
                     token_type_ids=None,
                     position_ids=None,
                     attention_mask=None):
+        """Use the pooled_output as the feature for listwise prediction, eg. ERNIE-Search"""
         sequence_output, pooled_output = self.ernie(
             input_ids,
             token_type_ids=token_type_ids,
