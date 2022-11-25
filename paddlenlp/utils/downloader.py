@@ -14,6 +14,7 @@
 import os
 import sys
 import os.path as osp
+from typing import Optional
 import shutil
 import json
 import requests
@@ -171,6 +172,36 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
             fullpath = _decompress(fullpath)
 
     return fullpath
+
+
+def get_path_from_url_with_filelock(url: str,
+                                    root_dir: str,
+                                    md5sum: Optional[str] = None,
+                                    check_exist: bool = True) -> str:
+    """construct `get_path_from_url` for `model_utils` to enable downloading multiprocess-safe
+
+    Args:
+        url (str): the url of resource file
+        root_dir (str): the local download path
+        md5sum (str, optional): md5sum string for file. Defaults to None.
+        check_exist (bool, optional): whether check the file is exist. Defaults to True.
+
+    Returns:
+        str: the path of downloaded file
+    """
+    os.makedirs(root_dir, exist_ok=True)
+
+    # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
+    lock_file_path = os.path.join(LOCK_FILE_HOME,
+                                  f"{str(hash(url + root_dir))}")
+    with FileLock(lock_file_path):
+        # import get_path_from_url from paddle framework
+        from paddle.utils.download import get_path_from_url as _get_path_from_url
+        result = _get_path_from_url(url=url,
+                                    root_dir=root_dir,
+                                    md5sum=md5sum,
+                                    check_exist=check_exist)
+    return result
 
 
 def _download(url, path, md5sum=None):
