@@ -28,7 +28,6 @@ from paddlenlp.utils.ie_utils import uie_loss_func, compute_metrics
 from utils import reader, convert_example
 
 
-# yapf: disable
 @dataclass
 class DataArguments:
     """
@@ -64,18 +63,13 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
     model_name_or_path: Optional[str] = field(
-        default="uie-x-base",
-        metadata={
-            "help":
-            "Path to pretrained model"
-        })
+        default="uie-x-base", metadata={"help": "Path to pretrained model"})
     export_model_dir: Optional[str] = field(
         default=None,
         metadata={
             "help": "Path to directory to store the exported inference model."
         },
     )
-# yapf: enable
 
 
 def main():

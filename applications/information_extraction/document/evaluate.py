@@ -30,7 +30,6 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments, Trainer
 from utils import convert_example, reader
 
 
-# yapf: disable
 @dataclass
 class DataArguments:
     """
@@ -38,11 +37,8 @@ class DataArguments:
     Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
     specify them on the command line.
     """
-    test_path: str = field(
-        default=None,
-        metadata={
-            "help": "The path of test set."
-        })
+    test_path: str = field(default=None,
+                           metadata={"help": "The path of test set."})
 
     schema_lang: str = field(
         default="ch",
@@ -60,12 +56,8 @@ class DataArguments:
 
     debug: bool = field(
         default=False,
-        metadata={
-            "help":
-            "whether choose debug mode"
-        },
+        metadata={"help": "Whether choose debug mode."},
     )
-
 
 
 @dataclass
@@ -75,11 +67,7 @@ class ModelArguments:
     """
     model_path: Optional[str] = field(
         default=None,
-        metadata={
-            "help":
-            "The path of saved model that you want to load."
-        })
-# yapf: enable
+        metadata={"help": "The path of saved model that you want to load."})
 
 
 def do_eval():
