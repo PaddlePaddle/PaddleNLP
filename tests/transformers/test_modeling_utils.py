@@ -55,14 +55,15 @@ class TestModeling(unittest.TestCase):
         num_process_in_pool, num_jobs = 10, 20
         small_model_path = "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/bert/model_state.pdparams"
 
-        from paddlenlp.transformers.model_utils import get_path_from_url
+        from paddlenlp.transformers.model_utils import get_path_from_url_with_filelock
         with TemporaryDirectory() as tempdir:
 
             with Pool(num_process_in_pool) as pool:
-                pool.starmap(get_path_from_url, [(small_model_path, tempdir)
-                                                 for _ in range(num_jobs)])
+                pool.starmap(get_path_from_url_with_filelock,
+                             [(small_model_path, tempdir)
+                              for _ in range(num_jobs)])
 
-    # @slow
+    @slow
     def test_model_from_pretrained_with_multiprocessing(self):
         """
         this test can not init tooooo many models which will occupy CPU/GPU memorys.
