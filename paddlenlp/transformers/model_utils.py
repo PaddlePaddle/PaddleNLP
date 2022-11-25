@@ -1064,9 +1064,26 @@ class PretrainedModel(Layer, GenerationMixin):
                 raise ValueError(
                     f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}"
                 )
-            for key in state_to_load.keys():
-                state_to_load[key] = paddle.cast(state_to_load[key],
-                                                 dtype=dtype)
+            for key in state_dict.keys():
+                state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+        else:
+            dtype_prefix_len = len("paddle.")
+            for k, v in model_to_load.state_dict().items():
+                if not isinstance(v, np.ndarray):
+                    dtype = str(v.dtype)[dtype_prefix_len:]
+                if k in state_dict:
+                    if paddle.in_dynamic_mode():
+                        if isinstance(state_dict[k], np.ndarray):
+                            state_dict[k] = state_dict[k].astype(dtype)
+                        else:
+                            state_dict[k] = paddle.cast(state_dict[k], dtype)
+                    else:
+                        # there are some latent error when case dtype in static-mode, so let's:
+                        # 1. convert fluid.*.Tensor -> numpy.ndarray
+                        # 2. cast the dtype with numpy tools
+                        # 3. paddle works well with ndarray state-dict
+                        state_dict[k] = np.array(state_dict[k])
+                        state_dict[k] = state_dict[k].astype(dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
