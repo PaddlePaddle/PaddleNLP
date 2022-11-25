@@ -207,7 +207,6 @@ python -m paddle.distributed.launch --gpus "1,2" --log_dir ./unimo/finetune/log 
     --max_dec_len=20 \
     --min_dec_len=3 \
     --num_return_sequences=1 \
-    --adversarial_training=None \
     --template=1 \
     --device=gpu
 ```
