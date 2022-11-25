@@ -748,7 +748,9 @@ class PretrainedConfig:
             resolved_config_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=CONFIG_NAME,
-                cache_dir=MODEL_HOME)
+                cache_dir=MODEL_HOME,
+                library_name="PaddleNLP",
+                library_version=__version__)
 
         # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
