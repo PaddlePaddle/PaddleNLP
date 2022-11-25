@@ -94,13 +94,13 @@ class Convertor(object):
         def _find_segment_in_box(layouts, box, threshold=0.5):
             positions = []
             global_offset = 0
-            for seg in layouts:
-                sbox = seg[0]
-                text_len = len(seg[1])
+            for segment in layouts:
+                sbox = segment[0]
+                text_len = len(segment[1])
                 if text_len == 0:
                     continue
                 char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
-                for i in range(len(seg[1])):
+                for i in range(text_len):
                     cbox = [
                         sbox[0] + i * char_w, sbox[1],
                         sbox[0] + (i + 1) * char_w, sbox[3]
@@ -156,7 +156,6 @@ class Convertor(object):
         items['text'] = text
         items['bbox'] = bbox
         items['image'] = parsed_doc['image']
-
         if task_type == "ext":
             items['entities'] = []
             items['relations'] = []
@@ -166,8 +165,10 @@ class Convertor(object):
             for e in result_list:
                 if e['type'] != 'rectanglelabels':
                     continue
+                print(e['original_width'])
+                print(e['original_height'])
                 assert img_w == e['original_width'] and img_h == e[
-                    'original_height'], "image size not match"
+                    'original_height'], "Image size not match"
                 box = [
                     e['value']['x'] * 0.01 * img_w,
                     e['value']['y'] * 0.01 * img_h,

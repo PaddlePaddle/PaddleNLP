@@ -63,7 +63,7 @@ class DocParser(object):
         if expand_to_a4_size:
             image, offset_x, offset_y = self.expand_image_to_a4_size(
                 image, center=True)
-        img_w, img_h = image.shape[:2]
+        img_h, img_w = image.shape[:2]
         doc['image'] = np2base64(image)
         doc['offset_x'] = offset_x
         doc['offset_y'] = offset_y
