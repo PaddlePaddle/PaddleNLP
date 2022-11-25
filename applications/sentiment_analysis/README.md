@@ -75,7 +75,7 @@ PaddleNLP情感分析应用基于中文通用信息抽取模型UIE，利用大�
     <img src="https://user-images.githubusercontent.com/35913314/199977230-4d4eb7db-3ebf-4858-883a-5fa61e8542ce.png"/>
 </div>
 
-#### 2.2.3 属性+情感分析
+#### 2.2.3 属性+情感极性分析
 挖掘客户对于产品/服务针对属性的情感极性，帮助商家直观地查看客户对于产品/服务的某些属性的印象。
 
 <div align="center">
