@@ -165,8 +165,6 @@ class Convertor(object):
             for e in result_list:
                 if e['type'] != 'rectanglelabels':
                     continue
-                print(e['original_width'])
-                print(e['original_height'])
                 assert img_w == e['original_width'] and img_h == e[
                     'original_height'], "Image size not match"
                 box = [
