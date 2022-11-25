@@ -55,7 +55,7 @@ python preprocessor/preprocessor.py \
     --joined_dictionary
 ```
 
-`preprocessor/preprocessor.py` 支持了在机器翻译中常见的数据预处理方式，具体的参数说明如下：
+`preprocessor/preprocessor.py` 支持了在机器翻译中常见的数据预处理方式。在预处理 `preprocessor/preprocessor.py` 脚本中，则提供词表构建，数据集文件整理，甚至于 bpe 分词的功能（bpe 分词过程可选）。最后获取的处理完成的 train，dev，test 数据可以直接用于后面 Transformer 模型的训练、评估和推理中。具体的参数说明如下：
 
 * `--src_lang`(`-s`): 指明数据处理对应的源语言类型，比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。
 * `--trg_lang`(`-t`): 指明数据处理对应的目标语言的类型，比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。
@@ -103,7 +103,6 @@ bash prepare-wmt14en2fr.sh
 
 其二，也可以直接在后面的 `preprocessor/preprocessor.py` 脚本中，指明 `--apply_bpe` 完成分词操作。
 
-而在预处理 `preprocessor/preprocessor.py` 脚本中，则提供词表构建，数据集文件整理，甚至于 bpe 分词的功能（bpe 分词过程可选）。最后获取的处理完成的 train，dev，test 数据可以直接用于后面 Transformer 模型的训练、评估和推理中。
 
 ### 如何训一个翻译模型
 
