@@ -205,9 +205,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         drift = drift - diffusion**2 * model_output
 
         #  equation 6: sample noise for the diffusion term of
-        noise = paddle.randn(sample.shape,
-                             layout=sample.layout,
-                             generator=generator)
+        noise = paddle.randn(sample.shape, generator=generator)
         prev_sample_mean = sample - drift  # subtract because `dt` is a small negative timestep
         # TODO is the variable diffusion the correct scaling term for the noise?
         prev_sample = prev_sample_mean + diffusion * noise  # add impact of diffusion field g
@@ -248,9 +246,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
 
         # For small batch sizes, the paper "suggest replacing norm(z) with sqrt(d), where d is the dim. of z"
         # sample noise for correction
-        noise = paddle.randn(sample.shape,
-                             layout=sample.layout,
-                             generator=generator)
+        noise = paddle.randn(sample.shape, generator=generator)
 
         # compute step size from the model_output, the noise, and the snr
         grad_norm = paddle.norm(model_output.reshape(

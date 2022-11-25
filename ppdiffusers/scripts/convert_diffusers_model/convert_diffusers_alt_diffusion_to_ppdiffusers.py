@@ -21,8 +21,7 @@ from collections import OrderedDict
 from diffusers import AltDiffusionPipeline as DiffusersAltDiffusionPipeline
 from ppdiffusers import AltDiffusionPipeline as PPDiffusersAltDiffusionPipeline, AutoencoderKL, UNet2DConditionModel, PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
-from paddlenlp.transformers import CLIPVisionModel, CLIPFeatureExtractor
-from ppdiffusers.pipelines.alt_diffusion import XLMRobertaTokenizer
+from paddlenlp.transformers import CLIPVisionModel, CLIPFeatureExtractor, XLMRobertaTokenizer
 from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import RobertaSeriesModelWithTransformation, RobertaSeriesConfig
 
 

@@ -334,7 +334,9 @@ class Downsample1d(nn.Layer):
         self.register_buffer("kernel", kernel_1d)
 
     def forward(self, hidden_states):
-        hidden_states = F.pad(hidden_states, (self.pad, ) * 2, self.pad_mode)
+        hidden_states = F.pad(hidden_states, (self.pad, ) * 2,
+                              self.pad_mode,
+                              data_format="NCL")
         weight = paddle.zeros([
             hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]
         ])
@@ -354,7 +356,8 @@ class Upsample1d(nn.Layer):
 
     def forward(self, hidden_states, temb=None):
         hidden_states = F.pad(hidden_states, ((self.pad + 1) // 2, ) * 2,
-                              self.pad_mode)
+                              self.pad_mode,
+                              data_format="NCL")
         weight = paddle.zeros([
             hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]
         ])
@@ -378,9 +381,9 @@ class SelfAttention1d(nn.Layer):
         self.key = nn.Linear(self.channels, self.channels)
         self.value = nn.Linear(self.channels, self.channels)
 
-        self.proj_attn = nn.Linear(self.channels, self.channels, 1)
+        self.proj_attn = nn.Linear(self.channels, self.channels)
 
-        self.dropout = nn.Dropout(dropout_rate, inplace=True)
+        self.dropout = nn.Dropout(dropout_rate)
 
     def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
         new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]

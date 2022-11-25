@@ -44,8 +44,8 @@ class UNet2DModel(ModelMixin, ConfigMixin):
     implements for all the model (such as downloading or saving, etc.)
 
     Parameters:
-        sample_size (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`, *optional*):
-            Input sample size.
+        sample_size (`int` or `Tuple[int, int]`, *optional*, defaults to `None`):
+            Height and width of input/output sample.
         in_channels (`int`, *optional*, defaults to 3): Number of channels in the input image.
         out_channels (`int`, *optional*, defaults to 3): Number of channels in the output.
         center_input_sample (`bool`, *optional*, defaults to `False`): Whether to center the input sample.
@@ -72,7 +72,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
     @register_to_config
     def __init__(
         self,
-        sample_size: Optional[int] = None,
+        sample_size: Optional[Union[int, Tuple[int, int]]] = None,
         in_channels: int = 3,
         out_channels: int = 3,
         center_input_sample: bool = False,
@@ -191,7 +191,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
         self.conv_act = nn.Silu()
         self.conv_out = nn.Conv2D(block_out_channels[0],
                                   out_channels,
-                                  3,
+                                  kernel_size=3,
                                   padding=1)
 
     def forward(
@@ -262,9 +262,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
                 sample = upsample_block(sample, res_samples, emb)
 
         # 6. post-process
-        # make sure hidden states is in float32
-        # when running in half-precision
-        sample = self.conv_norm_out(sample.cast("float32")).cast(sample.dtype)
+        sample = self.conv_norm_out(sample)
         sample = self.conv_act(sample)
         sample = self.conv_out(sample)
 

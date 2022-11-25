@@ -125,7 +125,7 @@ class KarrasVePipeline(DiffusionPipeline):
         sample = (sample / 2 + 0.5).clip(0, 1)
         image = sample.transpose([0, 2, 3, 1]).numpy()
         if output_type == "pil":
-            image = self.numpy_to_pil(sample)
+            image = self.numpy_to_pil(image)
 
         if not return_dict:
             return (image, )

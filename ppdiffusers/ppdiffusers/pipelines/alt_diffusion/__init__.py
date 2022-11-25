@@ -44,6 +44,5 @@ class AltDiffusionPipelineOutput(BaseOutput):
 
 if is_paddlenlp_available() and is_paddle_available():
     from .modeling_roberta_series import RobertaSeriesModelWithTransformation
-    from .xlm_roberta_tokenizer import XLMRobertaTokenizer
     from .pipeline_alt_diffusion import AltDiffusionPipeline
     from .pipeline_alt_diffusion_img2img import AltDiffusionImg2ImgPipeline

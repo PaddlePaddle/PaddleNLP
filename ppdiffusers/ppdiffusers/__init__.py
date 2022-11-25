@@ -86,12 +86,18 @@ if is_paddle_available() and is_paddlenlp_available():
         CycleDiffusionPipeline,
         LDMBertModel,
         LDMTextToImagePipeline,
+        StableDiffusionImageVariationPipeline,
         LDMSuperResolutionPipeline,
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,
         StableDiffusionInpaintPipelineLegacy,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
+        StableDiffusionPipelineSafe,
+        VersatileDiffusionDualGuidedPipeline,
+        VersatileDiffusionImageVariationPipeline,
+        VersatileDiffusionPipeline,
+        VersatileDiffusionTextToImagePipeline,
         VQDiffusionPipeline,
     )
 else:

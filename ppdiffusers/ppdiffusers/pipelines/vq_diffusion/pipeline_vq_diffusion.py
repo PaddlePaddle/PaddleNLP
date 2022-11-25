@@ -32,6 +32,11 @@ logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 INF = 1e9
 
 
+# paddle logsumexp may has bug
+def logsumexp(x, axis=None, keepdim=False):
+    return paddle.log(x.exp().sum(axis=axis, keepdim=keepdim))
+
+
 class LearnedClassifierFreeSamplingEmbeddings(ModelMixin, ConfigMixin):
     """
     Utility class for storing learned text embeddings for classifier free sampling
@@ -51,12 +56,11 @@ class LearnedClassifierFreeSamplingEmbeddings(ModelMixin, ConfigMixin):
             assert length is not None, "learnable=True requires `length` to be set"
 
             embeddings = paddle.zeros([length, hidden_size])
+            self.embeddings = self.create_parameter(
+                embeddings.shape,
+                default_initializer=nn.initializer.Assign(embeddings))
         else:
-            embeddings = None
-
-        self.embeddings = self.create_parameter(
-            embeddings.shape,
-            default_initializer=nn.initializer.Assign(embeddings))
+            self.embeddings = None
 
 
 class VQDiffusionPipeline(DiffusionPipeline):
@@ -272,7 +276,7 @@ class VQDiffusionPipeline(DiffusionPipeline):
         latents_shape = [batch_size, self.transformer.num_latent_pixels]
         if latents is None:
             mask_class = self.transformer.num_vector_embeds - 1
-            latents = paddle.full(latents_shape, mask_class)
+            latents = paddle.full(latents_shape, mask_class, dtype="int64")
         else:
             if latents.shape != latents_shape:
                 raise ValueError(
@@ -307,9 +311,7 @@ class VQDiffusionPipeline(DiffusionPipeline):
                 model_output_uncond, model_output_text = model_output.chunk(2)
                 model_output = model_output_uncond + guidance_scale * (
                     model_output_text - model_output_uncond)
-                model_output -= paddle.logsumexp(model_output,
-                                                 axis=1,
-                                                 keepdim=True)
+                model_output -= logsumexp(model_output, axis=1, keepdim=True)
 
             model_output = self.truncate(model_output, truncation_rate)
 
@@ -350,21 +352,25 @@ class VQDiffusionPipeline(DiffusionPipeline):
         Truncates log_p_x_0 such that for each column vector, the total cumulative probability is `truncation_rate` The
         lowest probabilities that would increase the cumulative probability above `truncation_rate` are set to zero.
         """
-        sorted_log_p_x_0, indices = paddle.sort(log_p_x_0, 1, descending=True)
+        sorted_log_p_x_0, indices = paddle.topk(log_p_x_0,
+                                                k=log_p_x_0.shape[1],
+                                                axis=1)
         sorted_p_x_0 = paddle.exp(sorted_log_p_x_0)
-        keep_mask = sorted_p_x_0.cumsum(axis=1) < truncation_rate
+        keep_mask = (sorted_p_x_0.cumsum(axis=1) <
+                     truncation_rate).cast("int64")
 
         # Ensure that at least the largest probability is not zeroed out
-        all_true = paddle.full_like(keep_mask[:, 0:1, :], True)
+        all_true = paddle.full_like(keep_mask[:, 0:1, :], 1)
         keep_mask = paddle.concat((all_true, keep_mask), axis=1)
         keep_mask = keep_mask[:, :-1, :]
 
         keep_mask = paddle.take_along_axis(
             keep_mask, indices.argsort(1),
-            axis=1)  # keep_mask.gather(indices.argsort(1), axis=1)
+            axis=1).cast("bool")  # keep_mask.gather(indices.argsort(1), axis=1)
 
         rv = log_p_x_0.clone()
-
-        rv[~keep_mask] = -INF  # -inf = log(0)
+        # rv[~keep_mask] = -INF  # -inf = log(0)
+        rv = paddle.where(keep_mask, rv, paddle.to_tensor(-INF,
+                                                          dtype="float32"))
 
         return rv

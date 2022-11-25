@@ -51,6 +51,11 @@ if is_paddlenlp_available() and is_paddle_available():
     from .pipeline_stable_diffusion_inpaint_legacy import StableDiffusionInpaintPipelineLegacy
     from .safety_checker import StableDiffusionSafetyChecker
 
+if is_paddlenlp_available() and is_paddle_available():
+    from .pipeline_stable_diffusion_image_variation import StableDiffusionImageVariationPipeline
+else:
+    from ...utils.dummy_paddle_and_paddlenlp_objects import StableDiffusionImageVariationPipeline
+
 if is_paddlenlp_available() and is_onnx_available():
     from .pipeline_onnx_stable_diffusion import OnnxStableDiffusionPipeline
     from .pipeline_onnx_stable_diffusion_img2img import OnnxStableDiffusionImg2ImgPipeline

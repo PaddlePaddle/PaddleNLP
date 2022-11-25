@@ -113,7 +113,7 @@ class ModelMixin(nn.Layer):
         """
         return any(
             hasattr(m, "gradient_checkpointing") and m.gradient_checkpointing
-            for m in self.modules())
+            for m in self.sublayers(include_self=True))
 
     def enable_gradient_checkpointing(self):
         """
@@ -288,13 +288,15 @@ class ModelMixin(nn.Layer):
                     f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
                     f"containing a file named {WEIGHTS_NAME}")
 
-        model, unused_kwargs = cls.from_config(
+        config, unused_kwargs = cls.load_config(
             config_path,
             cache_dir=cache_dir,
             return_unused_kwargs=True,
             subfolder=subfolder,
             **kwargs,
         )
+        model = cls.from_config(config, **unused_kwargs)
+
         state_dict = load_dict(model_file, return_numpy=True)
 
         model, missing_keys, unexpected_keys, mismatched_keys, error_msgs = cls._load_pretrained_model(

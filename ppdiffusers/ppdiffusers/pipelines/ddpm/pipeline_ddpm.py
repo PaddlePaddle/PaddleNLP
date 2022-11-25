@@ -83,8 +83,13 @@ class DDPMPipeline(DiffusionPipeline):
             self.scheduler._internal_dict = FrozenDict(new_config)
 
         # Sample gaussian noise to begin loop
-        image_shape = (batch_size, self.unet.in_channels, self.unet.sample_size,
-                       self.unet.sample_size)
+        if isinstance(self.unet.sample_size, int):
+            image_shape = (batch_size, self.unet.in_channels,
+                           self.unet.sample_size, self.unet.sample_size)
+        else:
+            image_shape = (batch_size, self.unet.in_channels,
+                           *self.unet.sample_size)
+
         image = paddle.randn(image_shape, generator=generator)
 
         # set step values

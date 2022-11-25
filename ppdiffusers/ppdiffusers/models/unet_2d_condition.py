@@ -55,11 +55,12 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
     implements for all the models (such as downloading or saving, etc.)
 
     Parameters:
-        sample_size (`int`, *optional*): The size of the input sample.
+        sample_size (`int` or `Tuple[int, int]`, *optional*, defaults to `None`):
+            Height and width of input/output sample.
         in_channels (`int`, *optional*, defaults to 4): The number of channels in the input sample.
         out_channels (`int`, *optional*, defaults to 4): The number of channels in the output.
         center_input_sample (`bool`, *optional*, defaults to `False`): Whether to center the input sample.
-        flip_sin_to_cos (`bool`, *optional*, defaults to `True`):
+        flip_sin_to_cos (`bool`, *optional*, defaults to `False`):
             Whether to flip the sin to cos in the time embedding.
         freq_shift (`int`, *optional*, defaults to 0): The frequency shift to apply to the time embedding.
         down_block_types (`Tuple[str]`, *optional*, defaults to `("CrossAttnDownBlock2D", "CrossAttnDownBlock2D", "CrossAttnDownBlock2D", "DownBlock2D")`):
@@ -87,7 +88,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         in_channels: int = 4,
         out_channels: int = 4,
         center_input_sample: bool = False,
-        flip_sin_to_cos: bool = True,
+        flip_sin_to_cos: bool = False,
         freq_shift: int = 0,
         down_block_types: Tuple[str] = (
             "CrossAttnDownBlock2D",
@@ -98,6 +99,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         up_block_types: Tuple[str] = ("UpBlock2D", "CrossAttnUpBlock2D",
                                       "CrossAttnUpBlock2D",
                                       "CrossAttnUpBlock2D"),
+        only_cross_attention: Union[bool, Tuple[bool]] = False,
         block_out_channels: Tuple[int] = (320, 640, 1280, 1280),
         layers_per_block: int = 2,
         downsample_padding: int = 1,
@@ -106,7 +108,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         norm_num_groups: int = 32,
         norm_eps: float = 1e-5,
         cross_attention_dim: int = 1280,
-        attention_head_dim: int = 8,
+        attention_head_dim: Union[int, Tuple[int]] = 8,
+        dual_cross_attention: bool = False,
+        use_linear_projection: bool = False,
+        num_class_embeds: Optional[int] = None,
     ):
         super().__init__()
 
@@ -127,9 +132,21 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         self.time_embedding = TimestepEmbedding(timestep_input_dim,
                                                 time_embed_dim)
 
+        # class embedding
+        if num_class_embeds is not None:
+            self.class_embedding = nn.Embedding(num_class_embeds,
+                                                time_embed_dim)
+
         self.down_blocks = nn.LayerList([])
         self.mid_block = None
         self.up_blocks = nn.LayerList([])
+
+        if isinstance(only_cross_attention, bool):
+            only_cross_attention = [only_cross_attention
+                                    ] * len(down_block_types)
+
+        if isinstance(attention_head_dim, int):
+            attention_head_dim = (attention_head_dim, ) * len(down_block_types)
 
         # down
         output_channel = block_out_channels[0]
@@ -149,8 +166,11 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 resnet_act_fn=act_fn,
                 resnet_groups=norm_num_groups,
                 cross_attention_dim=cross_attention_dim,
-                attn_num_head_channels=attention_head_dim,
+                attn_num_head_channels=attention_head_dim[i],
                 downsample_padding=downsample_padding,
+                dual_cross_attention=dual_cross_attention,
+                use_linear_projection=use_linear_projection,
+                only_cross_attention=only_cross_attention[i],
             )
             self.down_blocks.append(down_block)
 
@@ -163,8 +183,11 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
             output_scale_factor=mid_block_scale_factor,
             resnet_time_scale_shift="default",
             cross_attention_dim=cross_attention_dim,
-            attn_num_head_channels=attention_head_dim,
+            attn_num_head_channels=attention_head_dim[-1],
             resnet_groups=norm_num_groups,
+            dual_cross_attention=dual_cross_attention,
+            use_linear_projection=use_linear_projection,
+            only_cross_attention=only_cross_attention[-1],
         )
 
         # count how many layers upsample the images
@@ -172,6 +195,9 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # up
         reversed_block_out_channels = list(reversed(block_out_channels))
+        reversed_attention_head_dim = list(reversed(attention_head_dim))
+        reversed_only_cross_attention = list(reversed(only_cross_attention))
+
         output_channel = reversed_block_out_channels[0]
         for i, up_block_type in enumerate(up_block_types):
             is_final_block = i == len(block_out_channels) - 1
@@ -201,7 +227,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                 resnet_act_fn=act_fn,
                 resnet_groups=norm_num_groups,
                 cross_attention_dim=cross_attention_dim,
-                attn_num_head_channels=attention_head_dim,
+                attn_num_head_channels=reversed_attention_head_dim[i],
+                dual_cross_attention=dual_cross_attention,
+                use_linear_projection=use_linear_projection,
+                only_cross_attention=reversed_only_cross_attention[i],
             )
             self.up_blocks.append(up_block)
             prev_output_channel = output_channel
@@ -217,15 +246,17 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
                                   padding=1)
 
     def set_attention_slice(self, slice_size):
-        if slice_size is not None and self.config.attention_head_dim % slice_size != 0:
+        head_dims = self.config.attention_head_dim
+        head_dims = [head_dims] if isinstance(head_dims, int) else head_dims
+        if slice_size is not None and any(dim % slice_size != 0
+                                          for dim in head_dims):
             raise ValueError(
-                f"Make sure slice_size {slice_size} is a divisor of "
-                f"the number of heads used in cross_attention {self.config.attention_head_dim}"
-            )
-        if slice_size is not None and slice_size > self.config.attention_head_dim:
+                f"Make sure slice_size {slice_size} is a common divisor of "
+                f"the number of heads used in cross_attention: {head_dims}")
+        if slice_size is not None and slice_size > min(head_dims):
             raise ValueError(
-                f"Chunk_size {slice_size} has to be smaller or equal to "
-                f"the number of heads used in cross_attention {self.config.attention_head_dim}"
+                f"slice_size {slice_size} has to be smaller or equal to "
+                f"the lowest number of heads used in cross_attention: min({head_dims}) = {min(head_dims)}"
             )
 
         for block in self.down_blocks:
@@ -249,14 +280,14 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         sample: paddle.Tensor,
         timestep: Union[paddle.Tensor, float, int],
         encoder_hidden_states: paddle.Tensor,
+        class_labels: Optional[paddle.Tensor] = None,
         return_dict: bool = True,
     ):
         r"""
         Args:
             sample (`paddle.Tensor`): (batch, channel, height, width) noisy inputs tensor
             timestep (`paddle.Tensor` or `float` or `int`): (batch) timesteps
-            encoder_hidden_states (`paddle.Tensor`):
-                (batch_size, sequence_length, hidden_size) encoder hidden states
+            encoder_hidden_states (`paddle.Tensor`): (batch, channel, height, width) encoder hidden states
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`models.unet_2d_condition.UNet2DConditionOutput`] instead of a plain tuple.
 
@@ -286,7 +317,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
 
         # 1. time
         timesteps = timestep
-        timesteps = timestep
         if not paddle.is_tensor(timesteps):
             # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
             timesteps = paddle.to_tensor([timesteps], dtype="int64")
@@ -305,6 +335,13 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         # there might be better ways to encapsulate this.
         t_emb = t_emb.cast(self.dtype)
         emb = self.time_embedding(t_emb)
+
+        if self.config.num_class_embeds is not None:
+            if class_labels is None:
+                raise ValueError(
+                    "class_labels should be provided when num_class_embeds > 0")
+            class_emb = self.class_embedding(class_labels).cast(self.dtype)
+            emb = emb + class_emb
 
         # 2. pre-process
         sample = self.conv_in(sample)

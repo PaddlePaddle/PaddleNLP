@@ -125,7 +125,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
 
         # in_channels should be 6: 3 for latents, 3 for low resolution image
         latents_shape = (batch_size, self.unet.in_channels // 2, height, width)
-        latents_dtype = next(self.unet.parameters()).dtype
+        latents_dtype = next(self.unet.named_parameters())[1].dtype
 
         latents = paddle.randn(latents_shape,
                                generator=generator,

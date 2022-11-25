@@ -29,6 +29,11 @@ def logaddexp(a, b):
     return paddle.log(a.exp() + b.exp())
 
 
+# paddle logsumexp may has bug
+def logsumexp(x, axis=None, keepdim=False):
+    return paddle.log(x.exp().sum(axis=axis, keepdim=keepdim))
+
+
 @dataclass
 class VQDiffusionSchedulerOutput(BaseOutput):
     """
@@ -304,7 +309,7 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
 
         # sum_0 = p_0(x_0=C_0 | x_t) / q(x_t | x_0=C_0) + ... + p_0(x_0=C_{k-1} | x_t) / q(x_t | x_0=C_{k-1}), ... ,
         # sum_n = p_n(x_0=C_0 | x_t) / q(x_t | x_0=C_0) + ... + p_n(x_0=C_{k-1} | x_t) / q(x_t | x_0=C_{k-1})
-        q_log_sum_exp = paddle.logsumexp(q, axis=1, keepdim=True)
+        q_log_sum_exp = logsumexp(q, axis=1, keepdim=True)
 
         # p_0(x_0=C_0 | x_t) / q(x_t | x_0=C_0) / sum_0          ...      p_n(x_0=C_0 | x_t) / q(x_t | x_0=C_0) / sum_n
         #                        .                             .                                   .

@@ -191,6 +191,14 @@ def load_hf_numpy(path) -> np.ndarray:
     return load_numpy(path)
 
 
+def load_ppnlp_numpy(path) -> np.ndarray:
+    if not path.startswith("http://") or path.startswith("https://"):
+        path = os.path.join(
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/diffusers-testing",
+            urllib.parse.quote(path))
+    return load_numpy(path)
+
+
 # --- pytest conf functions --- #
 
 # to avoid multiple invocation from tests/conftest.py and examples/conftest.py - make sure it's called only once

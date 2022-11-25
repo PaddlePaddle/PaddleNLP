@@ -273,7 +273,7 @@ class RePaintScheduler(SchedulerMixin, ConfigMixin):
 
         # 3. Clip "predicted x_0"
         if self.config.clip_sample:
-            pred_original_sample = paddle.clamp(pred_original_sample, -1, 1)
+            pred_original_sample = paddle.clip(pred_original_sample, -1, 1)
 
         # We choose to follow RePaint Algorithm 1 to get x_{t-1}, however we
         # substitute formula (7) in the algorithm coming from DDPM paper

@@ -29,15 +29,23 @@ else:
     from ..utils.dummy_paddle_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .alt_diffusion import AltDiffusionImg2ImgPipeline, AltDiffusionPipeline, RobertaSeriesModelWithTransformation, XLMRobertaTokenizer
+    from .alt_diffusion import AltDiffusionImg2ImgPipeline, AltDiffusionPipeline, RobertaSeriesModelWithTransformation
     from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
     from .stable_diffusion import (
         CycleDiffusionPipeline,
+        StableDiffusionImageVariationPipeline,
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,
         StableDiffusionInpaintPipelineLegacy,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
+    )
+    from .stable_diffusion_safe import StableDiffusionPipelineSafe
+    from .versatile_diffusion import (
+        VersatileDiffusionDualGuidedPipeline,
+        VersatileDiffusionImageVariationPipeline,
+        VersatileDiffusionPipeline,
+        VersatileDiffusionTextToImagePipeline,
     )
     from .vq_diffusion import VQDiffusionPipeline
 
