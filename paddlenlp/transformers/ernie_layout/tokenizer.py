@@ -235,11 +235,10 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
     def _tokenize(self, text):
         """Tokenize a string."""
         pieces = self.sp_model.EncodeAsPieces(text)
+        pieces = [piece for piece in pieces if piece != SPIECE_UNDERLINE]
         if self.do_tokenize_postprocess:
             new_pieces = []
             for piece in pieces:
-                if piece == SPIECE_UNDERLINE:
-                    continue
                 lst_i = 0
                 for i, c in enumerate(piece):
                     if c == SPIECE_UNDERLINE:
