@@ -52,7 +52,7 @@ class TestTextClassificationTask(unittest.TestCase):
         self.temp_dir.cleanup()
 
     @parameterized.expand([(1, ), (2, )])
-    def test_text_classification_taskf(self, batch_size):
+    def test_text_classification_task(self, batch_size):
         # input_text is a tuple to simulate the args passed from Taskflow to TextClassificationTask
         input_text = (["百度", "深度学习框架", "飞桨", "PaddleNLP"], )
         id2label = {
