@@ -30,11 +30,13 @@ from huggingface_hub import hf_hub_download
 from paddle import Tensor
 from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddle.utils.download import get_path_from_url, is_url
+from paddle.utils.download import is_url
+from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
 
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, download_check
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.file_lock import FileLock
 
 from .configuration_utils import PretrainedConfig
 from .generation_utils import GenerationMixin
@@ -447,8 +449,9 @@ class PretrainedModel(Layer, GenerationMixin):
                     logger.info("Downloading %s and saved to %s" %
                                 (file_path, default_root))
                     try:
-                        resolved_resource_files[file_id] = get_path_from_url(
-                            file_path, default_root)
+                        resolved_resource_files[
+                            file_id] = get_path_from_url_with_filelock(
+                                file_path, default_root)
                     except RuntimeError as err:
                         logger.error(err)
                         raise RuntimeError(
@@ -864,8 +867,8 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 3. when it is url
         if is_url(pretrained_model_name_or_path):
-            weight_file_path = get_path_from_url(pretrained_model_name_or_path,
-                                                 cache_dir)
+            weight_file_path = get_path_from_url_with_filelock(
+                pretrained_model_name_or_path, cache_dir)
             # # check the downloaded weight file and registered weight file name
 
             # make sure that
@@ -876,10 +879,11 @@ class PretrainedModel(Layer, GenerationMixin):
             # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
             # and we should convert it to the new weitht file: `model_state.pdparams`
             if weight_file_path != new_weight_file_path:
-                # copy the weight file
-                shutil.copyfile(weight_file_path, new_weight_file_path)
-                os.remove(weight_file_path)
-                # shutil.rmtree(weight_file_path)
+
+                # move the `model-name.pdparams` to `model_state.pdparams`
+                # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
+                shutil.move(weight_file_path, new_weight_file_path)
+
                 weight_file_path = new_weight_file_path
 
             # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
@@ -1060,9 +1064,26 @@ class PretrainedModel(Layer, GenerationMixin):
                 raise ValueError(
                     f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}"
                 )
-            for key in state_to_load.keys():
-                state_to_load[key] = paddle.cast(state_to_load[key],
-                                                 dtype=dtype)
+            for key in state_dict.keys():
+                state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+        else:
+            dtype_prefix_len = len("paddle.")
+            for k, v in model_to_load.state_dict().items():
+                if not isinstance(v, np.ndarray):
+                    dtype = str(v.dtype)[dtype_prefix_len:]
+                if k in state_dict:
+                    if paddle.in_dynamic_mode():
+                        if isinstance(state_dict[k], np.ndarray):
+                            state_dict[k] = state_dict[k].astype(dtype)
+                        else:
+                            state_dict[k] = paddle.cast(state_dict[k], dtype)
+                    else:
+                        # there are some latent error when case dtype in static-mode, so let's:
+                        # 1. convert fluid.*.Tensor -> numpy.ndarray
+                        # 2. cast the dtype with numpy tools
+                        # 3. paddle works well with ndarray state-dict
+                        state_dict[k] = np.array(state_dict[k])
+                        state_dict[k] = state_dict[k].astype(dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.

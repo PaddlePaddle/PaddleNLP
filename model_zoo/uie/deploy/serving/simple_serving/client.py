@@ -15,17 +15,13 @@
 import requests
 import json
 
-url = "http://0.0.0.0:8282/taskflow/uie"
+url = "http://0.0.0.0:8189/taskflow/uie"
 headers = {"Content-Type": "application/json"}
 texts = ['城市内交通费7月5日金额114广州至佛山', '5月9日交通费29元从北苑到望京搜后']
 data = {
     'data': {
         'text': texts
     },
-    'parameters': {
-        'max_seq_len': 512,
-        'batch_size': 1
-    }
 }
 r = requests.post(url=url, headers=headers, data=json.dumps(data))
 datas = json.loads(r.text)
