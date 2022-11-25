@@ -1314,7 +1314,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
     The T5 Model transformer with a language modeling head on top.
 
     Args:
-        config (:class:`T5tConfig`):
+        config (:class:`T5Config`):
             An instance of T5Config used to construct T5ForConditionalGeneration.
 
     """
