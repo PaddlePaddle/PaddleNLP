@@ -33,7 +33,7 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url
 from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
 from paddlenlp.utils.downloader import get_path_from_url_with_filelock
-from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME, LOCK_FILE_HOME
 
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.file_lock import FileLock
@@ -439,7 +439,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 resolved_resource_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME)
+                    cache_dir=HF_CACHE_HOME)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
@@ -848,7 +848,7 @@ class PretrainedModel(Layer, GenerationMixin):
             return hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.resource_files_names['model_state'],
-                cache_dir=MODEL_HOME)
+                cache_dir=HF_CACHE_HOME)
 
         # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
