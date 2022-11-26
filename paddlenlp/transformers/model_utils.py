@@ -31,17 +31,11 @@ from paddle import Tensor
 from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
-<<<<<<< HEAD
-from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME, LOCK_FILE_HOME
-=======
->>>>>>> origin/develop
 
 from paddlenlp import __version__
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX, download_check,
                                         get_path_from_url_with_filelock)
-from paddlenlp.utils.env import LOCK_FILE_HOME, MODEL_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, LOCK_FILE_HOME, MODEL_HOME
 from paddlenlp.utils.file_lock import FileLock
 from paddlenlp.utils.log import logger
 
