@@ -899,7 +899,7 @@ paddlenlp server server:app --host 0.0.0.0 --port 8989
 
 - 模型导出
 
-模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdmodel`、`*.pdiparams` 模型文件可用于推理。
+模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdimodel`、`*.pdiparams` 模型文件可用于推理。
 
 - 推理
 
