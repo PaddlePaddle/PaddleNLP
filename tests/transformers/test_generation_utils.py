@@ -433,13 +433,12 @@ class GenerationTesterMixin:
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
             )
             if isinstance(config, PretrainedConfig):
-                pretrained_model = self.all_generative_model_classes[
-                    model_class][0](config)
+                model = model_class(config)
             else:
                 pretrained_model = self.all_generative_model_classes[
                     model_class][0](**config)
+                model = model_class(pretrained_model)
             paddle.seed(128)
-            model = model_class(pretrained_model)
             model.eval()
 
             output_greedy, output_generate = self._greedy_generate(
@@ -457,13 +456,13 @@ class GenerationTesterMixin:
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
             )
             if isinstance(config, PretrainedConfig):
-                pretrained_model = self.all_generative_model_classes[
-                    model_class][0](config)
+                model = model_class(config)
             else:
                 pretrained_model = self.all_generative_model_classes[
                     model_class][0](**config)
+                model = model_class(pretrained_model)
+
             paddle.seed(128)
-            model = model_class(pretrained_model)
             model.eval()
 
             if self.is_encoder_decoder:
@@ -516,13 +515,12 @@ class GenerationTesterMixin:
             )
 
             if isinstance(config, PretrainedConfig):
-                pretrained_model = self.all_generative_model_classes[
-                    model_class][0](config)
+                model = model_class(config)
             else:
                 pretrained_model = self.all_generative_model_classes[
                     model_class][0](**config)
+                model = model_class(pretrained_model)
 
-            model = model_class(pretrained_model)
             model.eval()
 
             if self.is_encoder_decoder:
@@ -586,12 +584,11 @@ class GenerationTesterMixin:
 
         for model_class in self.all_generative_model_classes.keys():
             if isinstance(config, PretrainedConfig):
-                pretrained_model = self.all_generative_model_classes[
-                    model_class][0](config)
+                model = model_class(config)
             else:
                 pretrained_model = self.all_generative_model_classes[
                     model_class][0](**config)
-            model = model_class(pretrained_model)
+                model = model_class(pretrained_model)
             model.eval()
 
             output_ids_generate = model.generate(
