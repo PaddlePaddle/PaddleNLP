@@ -11,21 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import sys
-import os.path as osp
-from typing import Optional
-import shutil
-import json
-import requests
 import hashlib
+import json
+import os
+import os.path as osp
+import shutil
+import sys
 import tarfile
-import zipfile
+import threading
 import time
 import uuid
-import threading
+import zipfile
 from collections import OrderedDict
-from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS
+from typing import Optional
+
+import requests
+
+from .env import DOWNLOAD_SERVER, FAILED_STATUS, LOCK_FILE_HOME, SUCCESS_STATUS
+from .file_lock import FileLock
 
 try:
     from tqdm import tqdm
@@ -117,7 +120,7 @@ def get_weights_path_from_url(url, md5sum=None):
     Args:
         url (str): download url
         md5sum (str): md5 sum of download package
-    
+
     Returns:
         str: a local path to save downloaded weights.
     Examples:
@@ -147,7 +150,7 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
         root_dir (str): root dir for downloading, it should be
                         WEIGHTS_HOME or DATASET_HOME
         md5sum (str): md5 sum of download package
-    
+
     Returns:
         str: a local path to save downloaded models & weights & datasets.
     """
@@ -192,11 +195,13 @@ def get_path_from_url_with_filelock(url: str,
     os.makedirs(root_dir, exist_ok=True)
 
     # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
-    lock_file_path = os.path.join(LOCK_FILE_HOME,
-                                  f"{str(hash(url + root_dir))}")
+    lock_file_name = hashlib.md5((url + root_dir).encode("utf-8")).hexdigest()
+    lock_file_path = os.path.join(LOCK_FILE_HOME, lock_file_name)
+
     with FileLock(lock_file_path):
         # import get_path_from_url from paddle framework
-        from paddle.utils.download import get_path_from_url as _get_path_from_url
+        from paddle.utils.download import \
+            get_path_from_url as _get_path_from_url
         result = _get_path_from_url(url=url,
                                     root_dir=root_dir,
                                     md5sum=md5sum,
@@ -435,6 +440,7 @@ class DownloaderCheck(threading.Thread):
             extra.update({"addition": addition})
         try:
             import paddle
+
             import paddlenlp
             payload['hub_version'] = " "
             payload['ppnlp_version'] = paddlenlp.__version__
