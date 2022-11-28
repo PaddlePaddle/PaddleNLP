@@ -50,6 +50,7 @@ def _get_sub_home(directory, parent_home=_get_ppnlp_home()):
 USER_HOME = _get_user_home()
 PPNLP_HOME = _get_ppnlp_home()
 MODEL_HOME = _get_sub_home('models')
+HF_CACHE_HOME = os.environ.get('HUGGINGFACE_HUB_CACHE', MODEL_HOME)
 DATA_HOME = _get_sub_home('datasets')
 LOCK_FILE_HOME = _get_sub_home(".lock")
 DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"

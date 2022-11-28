@@ -35,7 +35,7 @@ from paddle.utils.download import is_url
 from paddlenlp import __version__
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX, download_check,
                                         get_path_from_url_with_filelock)
-from paddlenlp.utils.env import LOCK_FILE_HOME, MODEL_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, LOCK_FILE_HOME, MODEL_HOME
 from paddlenlp.utils.file_lock import FileLock
 from paddlenlp.utils.log import logger
 
@@ -440,7 +440,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 resolved_resource_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME,
+                    cache_dir=HF_CACHE_HOME,
                     library_name="PaddleNLP",
                     library_version=__version__)
             else:
@@ -851,7 +851,7 @@ class PretrainedModel(Layer, GenerationMixin):
             return hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.resource_files_names['model_state'],
-                cache_dir=MODEL_HOME,
+                cache_dir=HF_CACHE_HOME,
                 library_name="PaddleNLP",
                 library_version=__version__)
 
