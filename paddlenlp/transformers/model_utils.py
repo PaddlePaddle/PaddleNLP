@@ -31,12 +31,13 @@ from paddle import Tensor
 from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
-from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
-from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
 
-from paddlenlp.utils.log import logger
+from paddlenlp import __version__
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX, download_check,
+                                        get_path_from_url_with_filelock)
+from paddlenlp.utils.env import LOCK_FILE_HOME, MODEL_HOME
 from paddlenlp.utils.file_lock import FileLock
+from paddlenlp.utils.log import logger
 
 from .configuration_utils import PretrainedConfig
 from .generation_utils import GenerationMixin
@@ -439,7 +440,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 resolved_resource_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME)
+                    cache_dir=MODEL_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
@@ -848,7 +851,9 @@ class PretrainedModel(Layer, GenerationMixin):
             return hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.resource_files_names['model_state'],
-                cache_dir=MODEL_HOME)
+                cache_dir=MODEL_HOME,
+                library_name="PaddleNLP",
+                library_version=__version__)
 
         # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
@@ -1064,9 +1069,26 @@ class PretrainedModel(Layer, GenerationMixin):
                 raise ValueError(
                     f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}"
                 )
-            for key in state_to_load.keys():
-                state_to_load[key] = paddle.cast(state_to_load[key],
-                                                 dtype=dtype)
+            for key in state_dict.keys():
+                state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+        else:
+            dtype_prefix_len = len("paddle.")
+            for k, v in model_to_load.state_dict().items():
+                if not isinstance(v, np.ndarray):
+                    dtype = str(v.dtype)[dtype_prefix_len:]
+                if k in state_dict:
+                    if paddle.in_dynamic_mode():
+                        if isinstance(state_dict[k], np.ndarray):
+                            state_dict[k] = state_dict[k].astype(dtype)
+                        else:
+                            state_dict[k] = paddle.cast(state_dict[k], dtype)
+                    else:
+                        # there are some latent error when case dtype in static-mode, so let's:
+                        # 1. convert fluid.*.Tensor -> numpy.ndarray
+                        # 2. cast the dtype with numpy tools
+                        # 3. paddle works well with ndarray state-dict
+                        state_dict[k] = np.array(state_dict[k])
+                        state_dict[k] = state_dict[k].astype(dtype)
 
         # For model parallel if FasterGeneration
         # To avoid recursive import temporarily.
