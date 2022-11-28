@@ -87,7 +87,6 @@ if is_paddle_available() and is_paddlenlp_available():
         CycleDiffusionPipeline,
         LDMBertModel,
         LDMTextToImagePipeline,
-        LDMSuperResolutionPipeline,
         StableDiffusionImageVariationPipeline,
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,
