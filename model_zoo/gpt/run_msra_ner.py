@@ -24,8 +24,8 @@ from paddle.io import DataLoader
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import GPTForTokenClassification, GPTChineseTokenizer
-from paddlenlp.data import Stack, Pad, Dict
+from paddlenlp.transformers import GPTForTokenClassification, GPTChineseTokenizer, PretrainedTokenizer
+from paddlenlp.data import Stack, Pad, Dict, DataCollatorForTokenClassification
 from paddlenlp.trainer import Trainer, TrainingArguments, PdArgumentParser
 from args import get_device
 
@@ -72,7 +72,7 @@ def tokenize_and_align_labels(example,
                               max_seq_len=512):
     labels = example['labels']
     example = example['tokens']
-    tokenized_input = tokenizer(example, max_seq_len=128, pad_to_max_seq_len=True)
+    tokenized_input = tokenizer.encode(example, padding=True, return_token_type_ids=False, max_seq_len=128, pad_to_max_seq_len=True)
     tokenized_input['labels'] = labels[:len(tokenized_input["input_ids"])]
     return tokenized_input
 
@@ -91,6 +91,11 @@ def do_train():
     ignore_label = -100
 
     tokenizer = GPTChineseTokenizer.from_pretrained(model_args.model_name_or_path)
+
+    # add pad_token to tokenizer
+    tokenizer.add_special_tokens({
+        "pad_token": tokenizer.convert_ids_to_tokens(0)
+    })
 
     label_list = train_ds.label_list
     label_num = len(label_list)
@@ -133,6 +138,11 @@ def do_train():
 
     trainer = Trainer(
         model=model,
+        data_collator=DataCollatorForTokenClassification(
+            tokenizer=tokenizer,
+            padding=True,
+            max_length=model_args.max_seq_length
+        ),
         criterion=paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label),
         train_dataset=train_ds,
         eval_dataset=test_ds,
