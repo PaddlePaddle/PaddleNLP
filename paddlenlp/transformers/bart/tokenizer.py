@@ -406,3 +406,29 @@ class BartTokenizer(PretrainedTokenizer):
         text = bytearray([self.byte_decoder[c]
                           for c in text]).decode('utf-8', errors=self.errors)
         return text
+
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        A BERT offset_mapping has the following format:
+
+        - single sequence:      ``(0,0) X (0,0)``
+        - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
+
+        Args:
+            offset_mapping_ids_0 (List[tuple]):
+                List of wordpiece offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (List[tuple], optional):
+                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
+
+        Returns:
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]

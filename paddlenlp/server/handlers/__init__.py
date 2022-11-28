@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from .taskflow_handler import TaskflowHandler
-from .base_handler import BaseModelHandler, PostModelHandler
+from .base_handler import BaseModelHandler, BasePostHandler, BaseTaskflowHandler
 from .cls_post_handler import MultiClassificationPostHandler, MultiLabelClassificationPostHandler
 from .custom_model_handler import CustomModelHandler
 from .token_model_handler import TokenClsModelHandler
