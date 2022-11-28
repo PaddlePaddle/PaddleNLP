@@ -212,9 +212,13 @@ class StableDiffusionPipelineSafe(DiffusionPipeline):
                 `attention_head_dim` must be a multiple of `slice_size`.
         """
         if slice_size == "auto":
-            # half the attention head size is usually a good trade-off between
-            # speed and memory
-            slice_size = self.unet.config.attention_head_dim // 2
+            if isinstance(self.unet.config.attention_head_dim, int):
+                # half the attention head size is usually a good trade-off between
+                # speed and memory
+                slice_size = self.unet.config.attention_head_dim // 2
+            else:
+                # if `attention_head_dim` is a list, take the smallest head size
+                slice_size = min(self.unet.config.attention_head_dim)
         self.unet.set_attention_slice(slice_size)
 
     def disable_attention_slicing(self):
@@ -381,7 +385,7 @@ class StableDiffusionPipelineSafe(DiffusionPipeline):
                     " instead."
                     f" {'You may look at this images in the `unsafe_images` variable of the output at your own discretion.' if enable_safety_guidance else 'Try again with a different prompt and/or seed.'} "
                 )
-                flagged_images = np.zeros((2, *image.shape[1:]))
+                flagged_images = np.zeros(image.shape)
                 for idx, has_nsfw_concept in enumerate(has_nsfw_concept):
                     if has_nsfw_concept:
                         flagged_images[idx] = image[idx]
@@ -680,38 +684,18 @@ class StableDiffusionPipelineSafe(DiffusionPipeline):
                 # default classifier free guidance
                 noise_guidance = noise_pred_text - noise_pred_uncond
 
-                # Perform SLD guidance
-                if enable_safety_guidance:
-                    if safety_momentum is None:
-                        safety_momentum = paddle.zeros_like(noise_guidance)
-                    noise_pred_safety_concept = noise_pred_out[2]
-
-                    # Equation 6
-                    scale = paddle.clip(paddle.abs(
-                        (noise_pred_text - noise_pred_safety_concept)) *
-                                        sld_guidance_scale,
-                                        max=1.0)
-
-                    # Equation 6
-                    safety_concept_scale = paddle.where(
-                        (noise_pred_text - noise_pred_safety_concept) >=
-                        sld_threshold, paddle.zeros_like(scale), scale)
-
-                    # Equation 4
-                    noise_guidance_safety = paddle.multiply(
-                        (noise_pred_safety_concept - noise_pred_uncond),
-                        safety_concept_scale)
-
-                    # Equation 7
-                    noise_guidance_safety = noise_guidance_safety + sld_momentum_scale * safety_momentum
-
-                    # Equation 8
-                    safety_momentum = sld_mom_beta * safety_momentum + (
-                        1 - sld_mom_beta) * noise_guidance_safety
-
-                    if i >= sld_warmup_steps:  # Warmup
-                        # Equation 3
-                        noise_guidance = noise_guidance - noise_guidance_safety
+                noise_guidance, safety_momentum = self.perform_safety_guidance(
+                    enable_safety_guidance,
+                    safety_momentum,
+                    noise_guidance,
+                    noise_pred_out,
+                    i,
+                    sld_guidance_scale,
+                    sld_warmup_steps,
+                    sld_threshold,
+                    sld_momentum_scale,
+                    sld_mom_beta,
+                )
 
                 noise_pred = noise_pred_uncond + guidance_scale * noise_guidance
 

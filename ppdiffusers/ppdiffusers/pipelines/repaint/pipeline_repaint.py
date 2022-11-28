@@ -19,7 +19,6 @@ import numpy as np
 import paddle
 
 import PIL
-from tqdm.auto import tqdm
 
 from ...models import UNet2DModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput

@@ -366,8 +366,8 @@ class ModelMixin(nn.Layer):
                     model_key = checkpoint_key
 
                     if (model_key in model_state_dict
-                            and state_dict[checkpoint_key].shape !=
-                            model_state_dict[model_key].shape):
+                            and list(state_dict[checkpoint_key].shape) != list(
+                                model_state_dict[model_key].shape)):
                         mismatched_keys.append(
                             (checkpoint_key, state_dict[checkpoint_key].shape,
                              model_state_dict[model_key].shape))

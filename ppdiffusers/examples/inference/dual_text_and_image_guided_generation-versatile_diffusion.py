@@ -12,13 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers import KarrasVePipeline
+from ppdiffusers import VersatileDiffusionDualGuidedPipeline
+from ppdiffusers.utils import load_image
 
-# 加载模型和scheduler
-pipe = KarrasVePipeline.from_pretrained("google/ncsnpp-celebahq-256")
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
+image = load_image(url)
+text = "a red car in the sun"
 
-# 执行pipeline进行推理
-image = pipe().images[0]
+pipe = VersatileDiffusionDualGuidedPipeline.from_pretrained(
+    "shi-labs/versatile-diffusion")
+pipe.remove_unused_weights()
 
-# 保存图片
-image[0].save("karras_ve_generated_image.png")
+text_to_image_strength = 0.75
+image = pipe(prompt=text,
+             image=image,
+             text_to_image_strength=text_to_image_strength).images[0]
+image.save("versatile-diffusion-red_car.png")
