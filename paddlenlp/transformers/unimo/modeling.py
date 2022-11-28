@@ -304,7 +304,7 @@ class UNIMOModel(UNIMOPretrainedModel):
         hidden_act (str, optional):
             The non-linear activation function in the feed-forward layer.
             ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
+            are supported. Defaults to ``"relu"``.
         hidden_dropout_prob(float, optional):
             The dropout probability used in pre-process and post-precess of MHA
             and FFN sub-layer. Defaults to 0.1.
