@@ -233,7 +233,7 @@ TASKS = {
             },
         },
         "default": {
-            "model": "rocketqa-zh-dureader-cross-encoder"
+            "model": "simbert-base-chinese"
         }
     },
     'text_summarization': {

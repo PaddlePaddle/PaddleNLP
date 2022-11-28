@@ -366,7 +366,8 @@ class PromptModelForSequenceClassification(nn.Layer):
             k: input_dict[k]
             for k in input_dict if k in self.forward_keys
         }
-        model_inputs["masked_positions"] = None
+        if "masked_positions" in model_inputs:
+            model_inputs.pop("masked_positions")
         outputs = self.plm(**model_inputs)
         if self.verbalizer is not None:
             label_outputs = self.verbalizer.process_outputs(
