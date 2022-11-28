@@ -1,8 +1,8 @@
 {
     "template": [
-        {"text": "{'mask'}{'soft'}{'text':'content_pre'}{'text': 'idiom'}{'text': 'content_post'}"},
+        {"text": "{'mask'}{'soft'}{'text':'content_pre'}{'text': 'idiom'}{'text': 'content_post'}"}
     ],
     "verbalizer": [
-        {"0": "否", "1": "是"},
+        {"0": "否", "1": "是"}
     ]
 }

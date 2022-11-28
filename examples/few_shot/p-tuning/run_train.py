@@ -77,10 +77,11 @@ def main():
 
     # Define template for preprocess and verbalizer for postprocess.
     template = SoftTemplate(data_args.prompt, tokenizer,
-                            training_args.max_seq_length, model)
+                            training_args.max_seq_length,
+                            model.get_input_embeddings())
     logger.info("Using template: {}".format(template.prompt))
 
-    verbalizer = MasedLMVerbalizer(data_args.label_words, tokenizer)
+    verbalizer = MaskedLMVerbalizer(data_args.label_words, tokenizer)
     labels_to_ids = verbalizer.labels_to_ids
     ids_to_labels = {idx: label for label, idx in labels_to_ids.items()}
     logger.info("Using verbalizer: {}".format(data_args.label_words))

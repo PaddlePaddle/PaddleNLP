@@ -1,6 +1,6 @@
 {
     "template": [
-        {"text": "{'mask': None, 'length': 4}{'soft'}{'text': 'sentence'}"},
+        {"text": "{'mask': None, 'length': 4}{'soft'}{'text': 'sentence'}"}
     ],
     "verbalizer": [
         {
