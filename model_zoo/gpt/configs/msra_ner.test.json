@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "gpt-cpm-small-cn-distill",
+    "model_name_or_path": "__internal_testing__/gpt_cn",
     "max_seq_length": "128",
     "per_device_eval_batch_size": "32",
     "learning_rate": "2e-5",
@@ -8,5 +8,6 @@
     "save_steps": "250",
     "output_dir": "./tmp/msra_ner/",
     "device": "gpu",
-    "do_train": true
+    "do_train": true,
+    "max_steps": 10
 }

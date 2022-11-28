@@ -24,8 +24,8 @@ from paddle.io import DataLoader
 from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import GPTForTokenClassification, GPTChineseTokenizer
-from paddlenlp.data import Stack, Pad, Dict
+from paddlenlp.transformers import GPTForTokenClassification, GPTChineseTokenizer, PretrainedTokenizer
+from paddlenlp.data import Stack, Pad, Dict, DataCollatorForTokenClassification
 from paddlenlp.trainer import Trainer, TrainingArguments, PdArgumentParser
 from args import get_device
 
@@ -39,7 +39,7 @@ class ModelArguments:
         default=None,
         metadata={"help": "Path to pre-trained model or shortcut name selected in the list: "}
     )
-    max_seq_length: str = field(
+    max_seq_length: int = field(
         default=128,
         metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded." + "Path to pre-trained model or shortcut name selected in the list: " + ", ".join(list(GPTChineseTokenizer.pretrained_init_configuration.keys()))}
     )
@@ -72,20 +72,13 @@ def tokenize_and_align_labels(example,
                               max_seq_len=512):
     labels = example['labels']
     example = example['tokens']
-    tokenized_input = tokenizer(example,
-                                return_length=True,
-                                is_split_into_words='token',
-                                max_seq_len=max_seq_len,
-                                return_token_type_ids=False)
-
+    tokenized_input = tokenizer.encode(example, padding=True, return_token_type_ids=False, max_seq_len=128, pad_to_max_seq_len=True)
     tokenized_input['labels'] = labels[:len(tokenized_input["input_ids"])]
     return tokenized_input
 
 
 def do_train():
-
-    training_args: TrainingArguments = PdArgumentParser(TrainingArguments).parse_args_into_dataclasses()
-    model_args: ModelArguments = PdArgumentParser(ModelArguments).parse_args_into_dataclasses()
+    training_args, model_args  = PdArgumentParser([TrainingArguments, ModelArguments]).parse_args_into_dataclasses()
 
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -97,7 +90,12 @@ def do_train():
                                      lazy=False)
     ignore_label = -100
 
-    tokenizer = GPTChineseTokenizer.from_pretrained()
+    tokenizer = GPTChineseTokenizer.from_pretrained(model_args.model_name_or_path)
+
+    # add pad_token to tokenizer
+    tokenizer.add_special_tokens({
+        "pad_token": tokenizer.convert_ids_to_tokens(0)
+    })
 
     label_list = train_ds.label_list
     label_num = len(label_list)
@@ -118,7 +116,7 @@ def do_train():
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = training_args.max_steps if training_args.max_steps > 0 else len(train_ds // training_args.train_batch_size) * training_args.num_train_epochs
+    num_training_steps = training_args.max_steps if training_args.max_steps > 0 else len(train_ds) // training_args.train_batch_size * training_args.num_train_epochs
 
     lr_scheduler = LinearDecayWithWarmup(training_args.learning_rate, num_training_steps,
                                          training_args.warmup_steps)
@@ -140,12 +138,18 @@ def do_train():
 
     trainer = Trainer(
         model=model,
+        data_collator=DataCollatorForTokenClassification(
+            tokenizer=tokenizer,
+            padding=True,
+            max_length=model_args.max_seq_length
+        ),
+        args=training_args,
         criterion=paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label),
         train_dataset=train_ds,
         eval_dataset=test_ds,
         tokenizer=tokenizer,
         compute_metrics=metric,
-        optimizers=optimizer
+        optimizers=[optimizer, lr_scheduler]
     )
 
     if training_args.do_train:

@@ -20,49 +20,48 @@ sys.path.insert(0, CURRENT_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-def init_argv(config_file: str = None):
+def init_argv(config_file: str = None, slow_test: bool = False):
     """parse config file to argv
 
     Args:
         config_file (str, optional): the path of config file. Defaults to None.
     """
     # add tag if it's slow test
-    if os.environ.get("slow_test", False):
+    if os.environ.get("slow_test", slow_test):
         # eg: /path/to/file.json -> /path/to/file, .json
         config_file_name, file_suffix = os.path.splitext(config_file)
 
         # eg: /path/to/file.slow.json
         config_file_name, file_suffix = os.path.splitext(config_file)
-        config_file = f'{config_file_name}.slow{file_suffix}'
+        config_file = f'{config_file_name}.test{file_suffix}'
 
     config_file = os.path.join(CURRENT_DIR, config_file)
 
     with open(config_file, 'r', encoding='utf-8') as f:
         config = json.load(f)
 
-    argv = ['']
+    argv = ['test.py']
     for key, value in config.items():
         argv.append(f'--{key}')
         argv.append(str(value))
     sys.argv = argv
 
 
-def test_pretrain():
-    init_argv("./configs/pretrain.json")
-    from run_pretrain import do_train
-    do_train()
+# def test_pretrain():
+#     init_argv("./configs/pretrain.json")
+#     from run_pretrain import do_train
+#     do_train()
 
-
-def test_run_glue():
-    init_argv("./configs/glue.json")
-    from run_glue import do_train
-    do_train()
+# def test_run_glue():
+#     init_argv("./configs/glue.json")
+#     from run_glue import do_train
+#     do_train()
 
 
 def test_msra_ner():
-    init_argv("./configs/msra_ner.json")
+    init_argv("./configs/msra_ner.json", slow_test=True)
     from run_msra_ner import do_train
     do_train()
 
 
-test_msra_ner()
+# test_msra_ner()
