@@ -40,7 +40,7 @@ def init_argv(config_file: str = None):
     with open(config_file, 'r', encoding='utf-8') as f:
         config = json.load(f)
 
-    argv = ['']
+    argv = ['test.py']
     for key, value in config.items():
         argv.append(f'--{key}')
         argv.append(str(value))
