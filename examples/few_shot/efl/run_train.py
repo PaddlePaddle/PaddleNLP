@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,280 +12,163 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import os
-import sys
-import random
 import time
-import json
 from functools import partial
+from dataclasses import dataclass, field
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
+from paddle.metric import Accuracy
+from paddlenlp.utils.log import logger
+from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
+from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.prompt import (
+    PromptTuningArguments,
+    ManualTemplate,
+    ManualVerbalizer,
+    PromptModelForSequenceClassification,
+    PromptTrainer,
+)
 
-import paddlenlp
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-from data import create_dataloader, convert_example, processor_dict
-from evaluate import do_evaluate
-from predict import do_predict, write_fn, predict_file
-from task_label_description import TASK_LABELS_DESC
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--task_name",
-                        required=True,
-                        type=str,
-                        help="The task_name to be evaluated")
-    parser.add_argument("--batch_size",
-                        default=32,
-                        type=int,
-                        help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--negative_num",
-                        default=1,
-                        type=int,
-                        help="Random negative sample number for efl strategy")
-    parser.add_argument("--learning_rate",
-                        default=1e-5,
-                        type=float,
-                        help="The initial learning rate for Adam.")
-    parser.add_argument(
-        "--save_dir",
-        default='./checkpoint',
-        type=str,
-        help="The output directory where the model checkpoints will be written."
-    )
-    parser.add_argument(
-        "--output_dir",
-        default='./predict_output',
-        type=str,
-        help="The output directory where the model checkpoints will be written."
-    )
-    parser.add_argument(
-        "--max_seq_length",
-        default=128,
-        type=int,
-        help="The maximum total input sequence length after tokenization. "
-        "Sequences longer than this will be truncated, sequences shorter will be padded."
-    )
-    parser.add_argument("--weight_decay",
-                        default=0.0,
-                        type=float,
-                        help="Weight decay if we apply some.")
-    parser.add_argument("--epochs",
-                        default=10,
-                        type=int,
-                        help="Total number of training epochs to perform.")
-    parser.add_argument(
-        "--warmup_proportion",
-        default=0.0,
-        type=float,
-        help="Linear warmup proption over the training process.")
-    parser.add_argument("--init_from_ckpt",
-                        type=str,
-                        default=None,
-                        help="The path of checkpoint to be loaded.")
-    parser.add_argument("--seed",
-                        type=int,
-                        default=1000,
-                        help="random seed for initialization")
-    parser.add_argument(
-        '--device',
-        choices=['cpu', 'gpu'],
-        default="gpu",
-        help="Select which device to train model, defaults to gpu.")
-    parser.add_argument('--save_steps',
-                        type=int,
-                        default=100000,
-                        help="Inteval steps to save checkpoint")
-    parser.add_argument(
-        "--rdrop_coef",
-        default=0.0,
-        type=float,
-        help=
-        "The coefficient of KL-Divergence loss in R-Drop paper, for more detail please refer to https://arxiv.org/abs/2106.14448), if rdrop_coef > 0 then R-Drop works"
-    )
-
-    return parser.parse_args()
+from data import load_fewclue_dataset
+from utils import load_prompt_arguments, save_pseudo_data, save_fewclue_prediction
 
 
-def set_seed(seed):
-    """sets random seed"""
-    random.seed(seed)
-    np.random.seed(seed)
-    paddle.seed(seed)
+# yapf: disable
+@dataclass
+class DataArguments:
+    task_name: str = field(default="eprstmt", metadata={"help": "The task name in FewCLUE."})
+    split_id: str = field(default="0", metadata={"help": "The split id of datasets, including 0, 1, 2, 3, 4, few_all."})
+    prompt_path: str = field(default="prompt.json", metadata={"help": "Path to the defined prompts."})
+    prompt_index: int = field(default=0, metadata={"help": "The index of defined prompt for training."})
+    pseudo_data_path: str = field(default=None, metadata={"help": "Path to data with pseudo labels."})
+    do_label: bool = field(default=False, metadata={"help": "Whether to label unsupervised data in unlabeled datasets"})
+    do_test: bool = field(default=False, metadata={"help": "Whether to evaluate model on public test datasets."})
+
+@dataclass
+class ModelArguments:
+    model_name_or_path: str = field(default="ernie-1.0-large-zh-cw", metadata={"help": "Build-in pretrained model name or the path to local model."})
+    export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
+    dropout: float = field(default=0.1, metadata={"help": "The dropout used for pretrained model."})
+# yapf: enable
 
 
-def do_train():
-    paddle.set_device(args.device)
-    rank = paddle.distributed.get_rank()
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+def main():
+    # Parse the arguments.
+    parser = PdArgumentParser(
+        (ModelArguments, DataArguments, PromptTuningArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    data_args = load_prompt_arguments(data_args)
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
+    paddle.set_device(training_args.device)
 
-    set_seed(args.seed)
-
-    train_ds, public_test_ds, test_ds = load_dataset("fewclue",
-                                                     name=args.task_name,
-                                                     splits=("train_0",
-                                                             "test_public",
-                                                             "test"))
-
+    # Load the pretrained language model.
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForSequenceClassification.from_pretrained(
-        'ernie-3.0-medium-zh', num_classes=2)
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+        model_args.model_name_or_path,
+        num_labels=2,
+        hidden_dropout_prob=model_args.dropout,
+        attention_probs_dropout_prob=model_args.dropout)
 
-    processor = processor_dict[args.task_name](args.negative_num)
-    train_ds = processor.get_train_datasets(train_ds,
-                                            TASK_LABELS_DESC[args.task_name])
+    # Define template for preprocess and verbalizer for postprocess.
+    template = ManualTemplate(data_args.prompt, tokenizer,
+                              training_args.max_seq_length)
+    logger.info("Using template: {}".format(template.prompt))
 
-    public_test_ds = processor.get_dev_datasets(
-        public_test_ds, TASK_LABELS_DESC[args.task_name])
-    test_ds = processor.get_test_datasets(test_ds,
-                                          TASK_LABELS_DESC[args.task_name])
+    verbalizer = ManualVerbalizer(data_args.label_words, tokenizer)
+    ids_to_labels = {idx: label for idx, label in enumerate(verbalizer.labels)}
+    logger.info("Using verbalizer: {}".format(data_args.label_words))
 
-    # [src_ids, token_type_ids, labels]
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-        Stack(dtype="int64"),  # labels
-    ): [data for data in fn(samples)]
+    # Load datasets.
+    train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_fewclue_dataset(
+        data_args, verbalizer=verbalizer)
 
-    # [src_ids, token_type_ids]
-    predict_batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
-    ): [data for data in fn(samples)]
+    # Define the criterion.
+    criterion = paddle.nn.CrossEntropyLoss()
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    # Initialize the prompt model with the above variables.
+    prompt_model = PromptModelForSequenceClassification(
+        model,
+        template,
+        None,
+        freeze_plm=training_args.freeze_plm,
+        freeze_dropout=training_args.freeze_dropout)
 
-    predict_trans_func = partial(convert_example,
-                                 tokenizer=tokenizer,
-                                 max_seq_length=args.max_seq_length,
-                                 is_test=True)
+    # Define the metric function.
+    def compute_metrics(eval_preds, num_labels):
+        metric = Accuracy()
+        preds = paddle.to_tensor(eval_preds.predictions)
+        preds = paddle.nn.functional.softmax(preds, axis=1)[:, 1]
+        preds = preds.reshape([-1, num_labels])
+        labels = paddle.to_tensor(eval_preds.label_ids)
+        labels = paddle.argmax(labels.reshape([-1, num_labels]), axis=1)
+        correct = metric.compute(preds, labels)
+        metric.update(correct)
+        acc = metric.accumulate()
+        return {'accuracy': acc}
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    # Initialize the trainer.
+    compute_metrics = partial(compute_metrics,
+                              num_labels=len(verbalizer.labels))
+    trainer = PromptTrainer(model=prompt_model,
+                            tokenizer=tokenizer,
+                            args=training_args,
+                            criterion=criterion,
+                            train_dataset=train_ds,
+                            eval_dataset=dev_ds,
+                            callbacks=None,
+                            compute_metrics=compute_metrics)
 
-    public_test_data_loader = create_dataloader(public_test_ds,
-                                                mode='eval',
-                                                batch_size=args.batch_size,
-                                                batchify_fn=batchify_fn,
-                                                trans_fn=trans_func)
+    # Traininig.
+    if training_args.do_train:
+        train_result = trainer.train(
+            resume_from_checkpoint=training_args.resume_from_checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
-    test_data_loader = create_dataloader(test_ds,
-                                         mode='eval',
-                                         batch_size=args.batch_size,
-                                         batchify_fn=predict_batchify_fn,
-                                         trans_fn=predict_trans_func)
+    # Export static model.
+    if training_args.do_export:
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
+            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
+            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
+            InputSpec(shape=[None, None, None, None],
+                      dtype="float32")  # attention_mask
+        ]
+        export_path = os.path.join(training_args.output_dir, 'export')
+        trainer.export_model(export_path,
+                             input_spec=input_spec,
+                             export_type=model_args.export_type)
 
-    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
-        state_dict = paddle.load(args.init_from_ckpt)
-        model.set_dict(state_dict)
-        print("warmup from:{}".format(args.init_from_ckpt))
+    time_stamp = time.strftime("%m%d-%H-%M-%S", time.localtime())
 
-    num_training_steps = len(train_data_loader) * args.epochs
+    # Test.
+    if data_args.do_test and public_test_ds is not None:
+        test_ret = trainer.predict(public_test_ds)
+        trainer.log_metrics("test", test_ret.metrics)
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    # Predict.
+    if training_args.do_predict and test_ds is not None:
+        pred_ret = trainer.predict(test_ds)
+        logger.info("Prediction done.")
+        predict_path = os.path.join(training_args.output_dir,
+                                    "fewclue_submit_examples_" + time_stamp)
+        save_fewclue_prediction(predict_path, data_args.task_name, pred_ret,
+                                verbalizer, ids_to_labels)
 
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
-
-    criterion = paddle.nn.loss.CrossEntropyLoss()
-    rdrop_loss = paddlenlp.losses.RDropLoss()
-    global_step = 0
-    tic_train = time.time()
-    for epoch in range(1, args.epochs + 1):
-        model.train()
-        for step, batch in enumerate(train_data_loader, start=1):
-
-            src_ids, token_type_ids, labels = batch
-
-            prediction_scores = model(input_ids=src_ids,
-                                      token_type_ids=token_type_ids)
-
-            if args.rdrop_coef > 0:
-                prediction_scores_2 = model(input_ids=src_ids,
-                                            token_type_ids=token_type_ids)
-                ce_loss = (criterion(prediction_scores, labels) +
-                           criterion(prediction_scores_2, labels)) * 0.5
-                kl_loss = rdrop_loss(prediction_scores, prediction_scores_2)
-                loss = ce_loss + kl_loss * args.rdrop_coef
-            else:
-                loss = criterion(prediction_scores, labels)
-
-            global_step += 1
-            if global_step % 10 == 0 and rank == 0:
-                print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, 10 /
-                       (time.time() - tic_train)))
-                tic_train = time.time()
-
-            if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                save_param_path = os.path.join(save_dir, 'model_state.pdparams')
-                paddle.save(model.state_dict(), save_param_path)
-                tokenizer.save_pretrained(save_dir)
-
-            loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-
-        test_public_accuracy, total_num = do_evaluate(
-            model,
-            tokenizer,
-            public_test_data_loader,
-            task_label_description=TASK_LABELS_DESC[args.task_name])
-
-        print("epoch:{}, dev_accuracy:{:.3f}, total_num:{}".format(
-            epoch, test_public_accuracy, total_num))
-
-        y_pred_labels = do_predict(
-            model,
-            tokenizer,
-            test_data_loader,
-            task_label_description=TASK_LABELS_DESC[args.task_name])
-
-        if not os.path.exists(args.output_dir):
-            os.makedirs(args.output_dir)
-
-        output_file = os.path.join(args.output_dir,
-                                   str(epoch) + predict_file[args.task_name])
-
-        write_fn[args.task_name](args.task_name, output_file, y_pred_labels)
-
-        if rank == 0:
-            save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            save_param_path = os.path.join(save_dir, 'model_state.pdparams')
-            paddle.save(model.state_dict(), save_param_path)
-            tokenizer.save_pretrained(save_dir)
+    # Label unsupervised data.
+    if data_args.do_label and unlabeled_ds is not None:
+        label_ret = trainer.predict(unlabeled_ds)
+        logger.info("Labeling done.")
+        pseudo_path = os.path.join(training_args.output_dir,
+                                   "pseudo_data_" + time_stamp + ".txt")
+        save_pseudo_data(pseudo_path, data_args.task_name, label_ret,
+                         verbalizer, ids_to_labels)
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    do_train()
+    main()
