@@ -13,7 +13,7 @@
 # limitations under the License.
 import numpy as np
 from paddlenlp import SimpleServer
-from paddlenlp.server import PostModelHandler, TokenClsModelHandler
+from paddlenlp.server import BasePostHandler, TokenClsModelHandler
 
 en_to_cn = {
     "bod": "身体",
@@ -59,7 +59,7 @@ def _extract_chunk(tokens):
     return list(chunks)
 
 
-class NERPostHandler(PostModelHandler):
+class NERPostHandler(BasePostHandler):
 
     def __init__(self):
         super().__init__()

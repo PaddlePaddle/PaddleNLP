@@ -15,8 +15,6 @@
 import json
 import os
 import unittest
-import tempfile
-import shutil
 
 from paddlenlp.transformers import BartTokenizer
 
@@ -31,6 +29,7 @@ VOCAB_FILES_NAMES = {
 class TestTokenizationBart(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = BartTokenizer
     test_rust_tokenizer = False
+
     from_pretrained_filter = filter_roberta_detectors
 
     # from_pretrained_kwargs = {'add_prefix_space': True}
@@ -175,7 +174,4 @@ class TestTokenizationBart(TokenizerTesterMixin, unittest.TestCase):
                                     -1] == tokenizer.eos_token_id).all().item())
 
     def test_pretokenized_inputs(self):
-        pass
-
-    def test_offsets_mapping(self):
         pass

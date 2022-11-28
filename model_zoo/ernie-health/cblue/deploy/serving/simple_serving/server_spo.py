@@ -13,7 +13,7 @@
 # limitations under the License.
 import numpy as np
 from paddlenlp import SimpleServer
-from paddlenlp.server import PostModelHandler, TokenClsModelHandler
+from paddlenlp.server import BasePostHandler, TokenClsModelHandler
 
 label_list = [
     '预防', '阶段', '就诊科室', '辅助治疗', '化疗', '放射治疗', '手术治疗', '实验室检查', '影像学检查', '辅助检查',
@@ -24,7 +24,7 @@ label_list = [
 ]
 
 
-class SPOPostHandler(PostModelHandler):
+class SPOPostHandler(BasePostHandler):
 
     def __init__(self):
         super().__init__()

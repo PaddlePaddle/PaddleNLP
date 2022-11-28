@@ -32,7 +32,7 @@
 
 * 🔥 **2022.11.17 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3) Released!**
   * 💪 Framework upgrade：🏆 Upgrade [**Prompt API**](./docs/advanced_guide/prompt.md), supporting more flexible prompt definitions and winning the 1st place in [FewCLUE](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA); 🕸 Upgrade [**Trainer API**](./docs/trainer.md), supporting Seq2seqTrainer, IterableDataset as well as bf16 and sharding strategies.
-  * 🔨 Industrial application：🏃 Upgrade for [**Universal Information Extraction**](./model_zoo/uie). Support **quantization aware training** and INT8 precision inference for inference performance boost. 💬 Release [**Unsupervised Question Answering Pipiline**](./pipelines/examples/unsupervised-question-answering/), which supports for fast construction of high-quality question answering system with a little human-annotated data.
+  * 🔨 Industrial application：🏃 Upgrade for [**Universal Information Extraction**](./model_zoo/uie). Support **quantization aware training** and INT8 precision inference for inference performance boost.
 * 🔥 **2022.10.27 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2) Released!**
   * NLG Upgrade: 📄 Release [**Solution of Text Summarization**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus) based on Pegasus;❓ Release [**Solution of Problem Generation**](./examples/question_generation), providing **general problem generation pre-trained model** based on Baidu's UNIMO Text and large-scale multi domain problem generation dataset. Supporting high-performance inference ability based on FasterGeneration , and covering the whole process of training , inference and deployment.
 * 🔥 **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**
@@ -266,7 +266,7 @@ For more super large-scale model pre-training details please refer to [GPT-3](./
 
 ### Prerequisites
 
-* python >= 3.6
+* python >= 3.7
 * paddlepaddle >= 2.2
 
 More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
