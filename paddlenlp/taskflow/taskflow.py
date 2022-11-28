@@ -21,7 +21,7 @@ from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
 from .knowledge_mining import WordTagTask, NPTagTask
 from .named_entity_recognition import NERWordTagTask
 from .named_entity_recognition import NERLACTask
-from .sentiment_analysis import SentaTask, SkepTask
+from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
 from .lexical_analysis import LacTask
 from .word_segmentation import SegJiebaTask
 from .word_segmentation import SegLACTask
@@ -171,7 +171,12 @@ TASKS = {
             "skep_ernie_1.0_large_ch": {
                 "task_class": SkepTask,
                 "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
+            },
+            "uie-base": {
+                "task_class": UIESentaTask,
+                "task_flag": 'sentiment_analysis-uie-base',
             }
+
         },
         "default": {
             "model": "bilstm"
@@ -530,7 +535,7 @@ class Taskflow(object):
         assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
             task)
         self.task = task
-
+        
         if self.task in ["word_segmentation", "ner"]:
             tag = "modes"
             ind_tag = "mode"

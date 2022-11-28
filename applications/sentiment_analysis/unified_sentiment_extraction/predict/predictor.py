@@ -305,7 +305,6 @@ class UIEPredictor(object):
             for node in schema_list:
                 node.prefix = prefixs
                 node.parent_relations = relations
-
         else:
             results = [{} for _ in range(len(data))]
             # input check to early return
