@@ -24,7 +24,7 @@ from paddlenlp import __version__
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
                                         get_path_from_url)
-from paddlenlp.utils.env import HF_CACHE_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
 
