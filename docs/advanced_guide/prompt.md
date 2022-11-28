@@ -355,7 +355,7 @@ template = AutoTemplate.create_from(prompt="{'prefix': None, 'encoder': 'mlp', '
 
 ### 离散型标签词映射
 
-``ManualVerbalizer`` 支持构造 ``{'mask'}`` 对应的标签词映射，支持多``{'mask'}``，直接作用于 ``AutoMaskedLM`` 模型结构。当标签对应的预测词长度大于 ``1`` 时，默认取均值。
+``ManualVerbalizer`` 支持构造 ``{'mask'}`` 对应的标签词映射，同一标签可对应多个不同长度的词，直接作用于 ``AutoMaskedLM`` 模型结构。当标签对应的预测词长度大于 ``1`` 时，默认取均值；当标签对应多个 `{'mask'}` 时，默认与单个 `{mask}` 效果等价。
 
 **调用 API**
 
@@ -366,6 +366,22 @@ from paddlenlp.transformers import AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
 verbalizer = ManualVerbalizer(tokenizer=tokenizer,
                               label_words={'负向': '不', '正向': '很'})
+```
+
+其中初始化参数定义如下
+
+- ``label_words`` : 原标签到预测词之间的映射字典。
+- ``tokenizer`` : 预训练模型的 tokenizer，用于预测词的编码。
+
+``MaskedLMVerbalizer`` 同样支持构造 ``{'mask'}`` 对应的标签词映射，映射词与模板中的 `{'mask'}` 逐字对应，因此，映射词长度应与 `{'mask'}` 数量保持一致。当定义的标签词映射中同一标签对应多个词时，仅有第一个映射词生效。在自定义的 `compute_metric` 函数中需先调用 `verbalizer.aggregate_multiple_mask` 将多 `{'mask'}` 合并后再计算评估函数，默认使用乘积的方式。
+
+**调用 API**
+from paddlenlp.prompt import MaskedLMVerbalizer
+from paddlenlp.transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
+verbalizer = MaskedLMVerbalizer(tokenizer=tokenizer,
+                                label_words={'负向': '不', '正向': '很'})
 ```
 
 其中初始化参数定义如下
