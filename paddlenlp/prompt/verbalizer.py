@@ -27,7 +27,9 @@ from paddle import Tensor
 from paddlenlp.transformers import PretrainedTokenizer, PretrainedModel
 from paddlenlp.utils.log import logger
 
-__all__ = ["Verbalizer", "ManualVerbalizer", "SoftVerbalizer"]
+__all__ = [
+    "Verbalizer", "ManualVerbalizer", "SoftVerbalizer", "MaskedLMVerbalizer"
+]
 
 # Verbalizer used to be saved in a file.
 VERBALIZER_CONFIG_FILE = "verbalizer_config.json"
@@ -263,9 +265,11 @@ class ManualVerbalizer(Verbalizer):
             An instance of PretrainedTokenizer for label word tokenization.
     """
 
-    def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer):
+    def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer,
+                 **kwargs):
         super(ManualVerbalizer, self).__init__(label_words=label_words,
-                                               tokenizer=tokenizer)
+                                               tokenizer=tokenizer,
+                                               **kwargs)
 
     def create_parameters(self):
         return None
@@ -292,10 +296,7 @@ class ManualVerbalizer(Verbalizer):
                 "tokens.".format(atype))
         return outputs
 
-    def process_outputs(self,
-                        outputs: Tensor,
-                        masked_positions: Tensor = None,
-                        **kwargs):
+    def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
         """
         Process outputs over the vocabulary, including the following steps:
 
@@ -364,10 +365,11 @@ class SoftVerbalizer(Verbalizer):
     LAST_LINEAR = ["AlbertForMaskedLM", "RobertaForMaskedLM"]
 
     def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer,
-                 model: PretrainedModel):
+                 model: PretrainedModel, **kwargs):
         super(SoftVerbalizer, self).__init__(label_words=label_words,
                                              tokenizer=tokenizer,
-                                             model=model)
+                                             model=modeli,
+                                             **kwargs)
         del self.model
         setattr(model, self.head_name[0], MaskedLMIdentity())
 
@@ -472,3 +474,63 @@ class SoftVerbalizer(Verbalizer):
                                          axis=1).reshape(word_shape)
             weight = self.aggregate(weight, token_mask, aggr_type)
             return weight
+
+
+class MaskedLMVerbalizer(Verbalizer):
+    """
+    MaskedLMVerbalizer defines mapping from labels to words manually and supports
+    multiple masks corresponding to multiple tokens in words.
+
+    Args:
+        label_words (`dict`):
+            Define the mapping from labels to a single word. Only the first word
+            is used if multiple words are defined.
+        tokenizer (`PretrainedTokenizer`):
+            An instance of PretrainedTokenizer for label word tokenization.
+    """
+
+    def __init__(self, label_words: Dict, tokenizer: PretrainedTokenizer,
+                 **kwargs):
+        super(MaskedLMVerbalizer, self).__init__(label_words=label_words,
+                                                 tokenizer=tokenizer,
+                                                 **kwargs)
+
+    def create_parameters(self):
+        return None
+
+    def aggregate_multiple_mask(self, outputs: Tensor, atype: str = "product"):
+        assert outputs.ndim == 3
+        token_ids = self.token_ids[:, 0, :].T
+        batch_size, num_token, num_pred = outputs.shape
+        results = paddle.index_select(outputs[:, 0, :], token_ids[0], axis=1)
+        if atype == "first":
+            return results
+
+        for index in range(1, num_token):
+            sub_results = paddle.index_select(outputs[:, index, :],
+                                              token_ids[index],
+                                              axis=1)
+            if atype in ("mean", "sum"):
+                results += sub_results
+            elif atype == "product":
+                results *= sub_results
+            elif atype == "max":
+                results = paddle.stack([results, sub_results], axis=-1)
+                results = results.max(axis=-1)
+            else:
+                raise ValueError(
+                    "Strategy {} is not supported to aggregate multiple "
+                    "tokens.".format(atype))
+        if atype == "mean":
+            results = results / num_token
+        return results
+
+    def process_outputs(self, outputs: Tensor, masked_positions: Tensor = None):
+        if masked_positions is None:
+            return outputs
+
+        batch_size, _, num_pred = outputs.shape
+        outputs = outputs.reshape([-1, num_pred])
+        outputs = paddle.gather(outputs, masked_positions)
+        outputs = outputs.reshape([batch_size, -1, num_pred])
+        return outputs
