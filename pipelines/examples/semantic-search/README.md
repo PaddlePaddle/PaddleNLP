@@ -155,6 +155,9 @@ sh examples/semantic-search/run_search_server.sh
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
 ```
+
+更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
+
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址
