@@ -23,12 +23,25 @@ __all__ = ['ErnieDualEncoder', 'ErnieCrossEncoder']
 
 class ErnieEncoder(ErniePretrainedModel):
 
-    def __init__(self, ernie, dropout=None, num_classes=2):
+    def __init__(self,
+                 ernie,
+                 dropout=None,
+                 output_emb_size=None,
+                 num_classes=2):
         super(ErnieEncoder, self).__init__()
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
         self.classifier = nn.Linear(self.ernie.config["hidden_size"],
                                     num_classes)
+        # Compatible to ERNIE-Search for adding extra linear layer
+        self.output_emb_size = output_emb_size
+        if output_emb_size is not None and output_emb_size > 0:
+            weight_attr = paddle.ParamAttr(
+                initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
+            self.emb_reduce_linear = paddle.nn.Linear(
+                self.ernie.config["hidden_size"],
+                output_emb_size,
+                weight_attr=weight_attr)
         self.apply(self.init_weights)
 
     def init_weights(self, layer):
@@ -79,6 +92,7 @@ class ErnieDualEncoder(nn.Layer):
                  query_model_name_or_path=None,
                  title_model_name_or_path=None,
                  share_parameters=False,
+                 output_emb_size=None,
                  dropout=None,
                  reinitialize=False,
                  use_cross_batch=False):
@@ -86,14 +100,15 @@ class ErnieDualEncoder(nn.Layer):
         super().__init__()
         self.query_ernie, self.title_ernie = None, None
         self.use_cross_batch = use_cross_batch
+        self.output_emb_size = output_emb_size
         if query_model_name_or_path is not None:
             self.query_ernie = ErnieEncoder.from_pretrained(
-                query_model_name_or_path)
+                query_model_name_or_path, output_emb_size=output_emb_size)
         if share_parameters:
             self.title_ernie = self.query_ernie
         elif title_model_name_or_path is not None:
             self.title_ernie = ErnieEncoder.from_pretrained(
-                title_model_name_or_path)
+                title_model_name_or_path, output_emb_size=output_emb_size)
         assert (self.query_ernie is not None) or (self.title_ernie is not None), \
             "At least one of query_ernie and title_ernie should not be None"
 
@@ -125,16 +140,27 @@ class ErnieDualEncoder(nn.Layer):
                              position_ids=None,
                              attention_mask=None,
                              is_query=True):
+        """Get the first feature of each sequence for classification"""
         assert (is_query and self.query_ernie is not None) or (not is_query and self.title_ernie), \
             "Please check whether your parameter for `is_query` are consistent with DualEncoder initialization."
         if is_query:
             sequence_output, _ = self.query_ernie(input_ids, token_type_ids,
                                                   position_ids, attention_mask)
+            if self.output_emb_size is not None and self.output_emb_size > 0:
+                cls_embedding = self.query_ernie.emb_reduce_linear(
+                    sequence_output[:, 0])
+            else:
+                cls_embedding = sequence_output[:, 0]
 
         else:
             sequence_output, _ = self.title_ernie(input_ids, token_type_ids,
                                                   position_ids, attention_mask)
-        return sequence_output[:, 0]
+            if self.output_emb_size is not None and self.output_emb_size > 0:
+                cls_embedding = self.title_ernie.emb_reduce_linear(
+                    sequence_output[:, 0])
+            else:
+                cls_embedding = sequence_output[:, 0]
+        return cls_embedding
 
     def cosine_sim(self,
                    query_input_ids,
@@ -272,6 +298,7 @@ class ErnieCrossEncoder(nn.Layer):
                  position_ids=None,
                  attention_mask=None,
                  return_prob_distributation=False):
+        """Use the pooled_output as the feature for pointwise prediction, eg. RocketQAv1"""
         _, pooled_output = self.ernie(input_ids,
                                       token_type_ids=token_type_ids,
                                       position_ids=position_ids,
@@ -288,11 +315,27 @@ class ErnieCrossEncoder(nn.Layer):
                     token_type_ids=None,
                     position_ids=None,
                     attention_mask=None):
+        """Use the cls token embedding as the feature for listwise prediction, eg. RocketQAv2"""
         sequence_output, _ = self.ernie(input_ids,
                                         token_type_ids=token_type_ids,
                                         position_ids=position_ids,
                                         attention_mask=attention_mask)
         pooled_output = self.ernie.dropout(sequence_output[:, 0])
+        probs = self.ernie.classifier(pooled_output)
+        return probs
+
+    def matching_v3(self,
+                    input_ids,
+                    token_type_ids=None,
+                    position_ids=None,
+                    attention_mask=None):
+        """Use the pooled_output as the feature for listwise prediction, eg. ERNIE-Search"""
+        sequence_output, pooled_output = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask)
+        pooled_output = self.ernie.dropout(pooled_output)
         probs = self.ernie.classifier(pooled_output)
         return probs
 

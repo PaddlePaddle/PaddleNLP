@@ -20,6 +20,7 @@ from collections import OrderedDict
 
 from huggingface_hub import hf_hub_download
 
+from paddlenlp import __version__
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
                                         get_path_from_url)
@@ -237,7 +238,9 @@ class _BaseAutoModelClass:
         if from_hf_hub:
             config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
                                           filename=cls.model_config_file,
-                                          cache_dir=MODEL_HOME)
+                                          cache_dir=MODEL_HOME,
+                                          library_name="PaddleNLP",
+                                          library_version=__version__)
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(
                     pretrained_model_name_or_path, config_file)
