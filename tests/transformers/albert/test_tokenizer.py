@@ -19,7 +19,6 @@ import unittest
 from paddlenlp.transformers.albert.tokenizer import (
     AlbertEnglishTokenizer,
     AlbertChineseTokenizer,
-    AlbertTokenizer,
 )
 from paddlenlp.transformers.bert.tokenizer import (
     BasicTokenizer,
@@ -37,7 +36,6 @@ class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
     from_pretrained_vocab_key = "sentencepiece_model_file"
     test_sentencepiece = True
     test_sentencepiece_ignore_case = True
-    test_offsets = False
 
     def setUp(self):
         super().setUp()

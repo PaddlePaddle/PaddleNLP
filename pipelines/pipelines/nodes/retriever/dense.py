@@ -49,7 +49,9 @@ class DensePassageRetriever(BaseRetriever):
             Path, str] = "rocketqa-zh-dureader-para-encoder",
         params_path: Optional[str] = "",
         model_version: Optional[str] = None,
-        output_emb_size=256,
+        output_emb_size: Optional[int] = None,
+        reinitialize: bool = False,
+        share_parameters: bool = False,
         max_seq_len_query: int = 64,
         max_seq_len_passage: int = 256,
         top_k: int = 10,
@@ -98,7 +100,7 @@ class DensePassageRetriever(BaseRetriever):
         :param progress_bar: Whether to show a tqdm progress bar or not.
                              Can be helpful to disable in production deployments to keep the logs clean.
         """
-        # save init parameters to enable export of component config as YAML
+        # Save init parameters to enable export of component config as YAML
         self.set_config(
             document_store=document_store,
             query_embedding_model=query_embedding_model,
@@ -110,6 +112,9 @@ class DensePassageRetriever(BaseRetriever):
             use_gpu=use_gpu,
             batch_size=batch_size,
             embed_title=embed_title,
+            reinitialize=reinitialize,
+            share_parameters=share_parameters,
+            output_emb_size=output_emb_size,
             similarity_function=similarity_function,
             progress_bar=progress_bar,
         )
@@ -150,8 +155,12 @@ class DensePassageRetriever(BaseRetriever):
             self.passage_tokenizer = AutoTokenizer.from_pretrained(
                 query_embedding_model)
         else:
-            self.ernie_dual_encoder = ErnieDualEncoder(query_embedding_model,
-                                                       passage_embedding_model)
+            self.ernie_dual_encoder = ErnieDualEncoder(
+                query_embedding_model,
+                passage_embedding_model,
+                output_emb_size=output_emb_size,
+                reinitialize=reinitialize,
+                share_parameters=share_parameters)
             self.query_tokenizer = AutoTokenizer.from_pretrained(
                 query_embedding_model)
             self.passage_tokenizer = AutoTokenizer.from_pretrained(
