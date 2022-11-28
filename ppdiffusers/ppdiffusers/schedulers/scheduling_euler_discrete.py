@@ -79,7 +79,6 @@ class EulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_schedule: str = "linear",
         trained_betas: Optional[np.ndarray] = None,
         prediction_type: str = "epsilon",
-        **kwargs,
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)

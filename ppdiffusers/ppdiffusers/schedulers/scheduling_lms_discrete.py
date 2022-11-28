@@ -78,7 +78,6 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
         trained_betas: Optional[np.ndarray] = None,
-        **kwargs,
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
