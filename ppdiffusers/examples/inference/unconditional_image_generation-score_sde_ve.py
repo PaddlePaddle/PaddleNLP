@@ -21,4 +21,4 @@ pipe = ScoreSdeVePipeline.from_pretrained("google/ncsnpp-ffhq-1024")
 image = pipe().images[0]
 
 # 保存图片
-image[0].save("sde_ve_generated_image.png")
+image.save("sde_ve_generated_image.png")

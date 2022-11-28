@@ -20,7 +20,7 @@ pipe = KarrasVePipeline.from_pretrained("google/ncsnpp-celebahq-256",
                                         scheduler=scheduler)
 
 # 执行pipeline进行推理
-image = pipe().images[0]
+image = pipe().images
 
 # 保存图片
 image[0].save("karras_ve_generated_image.png")
