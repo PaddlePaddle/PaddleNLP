@@ -143,6 +143,7 @@ def do_train():
             padding=True,
             max_length=model_args.max_seq_length
         ),
+        args=training_args,
         criterion=paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label),
         train_dataset=train_ds,
         eval_dataset=test_ds,
