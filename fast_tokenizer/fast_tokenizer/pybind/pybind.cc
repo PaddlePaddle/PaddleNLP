@@ -29,7 +29,7 @@ namespace fast_tokenizer {
 namespace pybind {
 
 PYBIND11_MODULE(core_tokenizers, m) {
-  m.doc() = "The paddlenlp tokenizers core module.";
+  m.doc() = "The paddlenlp fast_tokenizer core module.";
   // 1. Bind normalizers submodule
   BindNormalizers(&m);
   // 2. Bind pre_tokenizers submodule

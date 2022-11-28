@@ -12,4 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..core_tokenizers.decoders import *
+from typing import Tuple, Union, Tuple, List, Dict
+
+from abc import ABC
+from .. import C
+
+
+class Decoder(ABC):
+
+    def decode(self, tokens: List[str]):
+        return self._decoder.decode(tokens)
+
+
+class WordPiece(Decoder):
+
+    def __init__(self, prefix: str = "##", cleanup: bool = True):
+        self._decoder = C.decoders.WordPiece(prefix, cleanup)

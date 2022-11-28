@@ -26,7 +26,7 @@ class Encoding;
 
 namespace postprocessors {
 
-struct FASTERTOKENIZER_DECL PostProcessor {
+struct FASTTOKENIZER_DECL PostProcessor {
   virtual size_t AddedTokensNum(bool is_pair) const = 0;
   virtual void operator()(core::Encoding* encoding,
                           core::Encoding* pair_encoding,

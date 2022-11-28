@@ -1,4 +1,5 @@
-# FastTokenizer
+
+# ⚡ FastTokenizer：高性能文本处理库
 
 ------------------------------------------------------------------------------------------
 
@@ -17,26 +18,26 @@ FastTokenizer是一款简单易用、功能强大的跨平台高性能文本预�
 
 ## 特性
 
-- 高性能。由于底层采用C++实现，所以其性能远高于目前常规Python实现的Tokenizer。在文本分类任务上，FastTokenizer对比Python版本Tokenizer加速比最高可达20倍。
+- 高性能。由于底层采用C++实现，所以其性能远高于目前常规Python实现的Tokenizer。在文本分类任务上，FastTokenizer对比Python版本Tokenizer加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
 - 跨平台。FastTokenizer可在不同的系统平台上使用，目前已支持Windows x64，Linux x64以及MacOS 10.14+平台上使用。
-- 多编程语言支持。FastTokenizer提供在C++、Python语言上开发的能力。
+- 多编程语言支持。FastTokenizer提供在[C++](./docs/cpp/README.md)、[Python](./docs/python/README.md)语言上开发的能力。
 - 灵活性强。用户可以通过指定不同的FastTokenizer组件定制满足需求的Tokenizer。
 
 ## 快速开始
 
-下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ Demo](./fast_tokenizer/demo/README.md)。
+下面将介绍Python版本FastTokenizer的使用方式，C++版本的使用方式可参考[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)。
 
-### 前置依赖
+### 环境依赖
 
 - Windows 64位系统
 - Linux x64系统
 - MacOS 10.14+系统（m1芯片的MacOS，需要使用x86_64版本的Anaconda作为python环境方可安装使用）
-- Python 3.6 ~ 3.9
+- Python 3.6 ~ 3.10
 
 ### 安装FastTokenizer
 
 ```python
-pip install fast_tokenizer
+pip install fast-tokenizer-python
 ```
 
 ### FastTokenizer使用示例
@@ -53,7 +54,11 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt
 FastTokenizer库内置NLP任务常用的Tokenizer，如ErnieFastTokenizer。下面将展示FastTokenizer的简单用法。
 
 ```python
+import fast_tokenizer
 from fast_tokenizer import ErnieFastTokenizer, models
+
+# 0.（可选）设置线程数
+fast_tokenizer.set_thread_num(1)
 # 1. 加载词表
 vocab = models.WordPiece.read_file("ernie_vocab.txt")
 # 2. 实例化ErnieFastTokenizer对象
@@ -66,6 +71,13 @@ print("type_ids: ", output.type_ids)
 print("tokens: ", output.tokens)
 print("offsets: ", output.offsets)
 print("attention_mask: ", output.attention_mask)
+
+# 5. 示例输出
+# ids:  [1, 75, 329, 12, 20, 2]
+# type_ids:  [0, 0, 0, 0, 0, 0]
+# tokens:  ['[CLS]', '我', '爱', '中', '国', '[SEP]']
+# offsets:  [(0, 0), (0, 1), (1, 2), (2, 3), (3, 4), (0, 0)]
+# attention_mask:  [1, 1, 1, 1, 1, 1]
 ```
 
 ### FastTokenizer在PaddleNLP Tokenizer模块加速示例
@@ -85,6 +97,11 @@ text2 = fast_tokenizer('自然语言处理')
 
 print(text1)
 print(text2)
+
+# 示例输出
+# {'input_ids': [1, 67, 187, 405, 545, 239, 38, 2], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}
+# {'input_ids': [1, 67, 187, 405, 545, 239, 38, 2], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0]}
+
 ```
 
 目前PaddleNLP已支持BERT、ERNIE、TinyBERT以及ERNIE-M 4种Tokenizer的Fast版本，其余模型的Tokenizer暂不支持Fast版本。
@@ -96,10 +113,23 @@ Q：我在AutoTokenizer.from_pretrained接口上已经打开`use_fast=True`开�
 A：在有三种情况下，打开`use_fast=True`开关可能无法提升性能：
   1. 没有安装fast_tokenizer。若在没有安装fast_tokenizer库的情况下打开`use_fast`开关，PaddleNLP会给出以下warning："Can't find the fast_tokenizer package, please ensure install fast_tokenizer correctly. "。
 
-  2. 加载的Tokenizer类型暂不支持Fast版本。目前支持4种Tokenizer的Fast版本，分别是BERT、ERNIE、TinyBERT以及ERNIE-M Tokenizer。若加载不支持Fast版本的Tokenizer情况下打开`use_fast`开关，PaddleNLP会给出以下warning："The tokenizer XXX doesn't have the fast version. Please check the map paddlenlp.transformers.auto.tokenizer.FASTER_TOKENIZER_MAPPING_NAMES to see which fast tokenizers are currently supported."
+  2. 加载的Tokenizer类型暂不支持Fast版本。目前支持4种Tokenizer的Fast版本，分别是BERT、ERNIE、TinyBERT以及ERNIE-M Tokenizer。若加载不支持Fast版本的Tokenizer情况下打开`use_fast`开关，PaddleNLP会给出以下warning："The tokenizer XXX doesn't have the fast version. Please check the map paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES to see which fast tokenizers are currently supported."
 
   3. 待切词文本长度过短（如文本平均长度小于5）。这种情况下切词开销可能不是整个文本预处理的性能瓶颈，导致在使用FastTokenizer后仍无法提升整体性能。
+
+Q：如何使用多线程加速分词？
+
+A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进行分词。需要谨慎开启多线程加速分词，在以下场景下可以考虑开启多线程：
+  1. CPU资源充足。若在推理阶段使用CPU进行推理，开启多线程分词可能会出现资源竞争情况，从而影响推理阶段的性能。
+
+  2. 文本的批大小较大。若批大小比较小，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议批大小大于4的时候再考虑开启多线程分词。
+
+  3. 文本长度较长。若文本长度较短，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议文本平均长度大于16的时候再考虑开启多线程分词。
 
 ## 相关文档
 
 [FastTokenizer编译指南](docs/compile/README.md)
+
+[FastTokenizer C++ 库使用教程](./docs/cpp/README.md)
+
+[FastTokenizer Python 库使用教程](./docs/python/README.md)

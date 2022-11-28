@@ -115,6 +115,7 @@
 
 【快速开始】
 - 快速开启多分类任务参见 👉 [语义索引-多分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/retrieval_based#readme)
+- 快速开启多标签分类任务参见 👉 [语义索引-多标签分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/retrieval_based#readme)
 - 快速开启层次分类任务参见 👉 [语义索引-层次分类指南](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/retrieval_based#readme)
 
 

@@ -117,7 +117,7 @@ class Predictor(object):
 
     def __init__(self, args, label_list):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
-                                                       use_faster=True)
+                                                       use_fast=True)
         self.label_list = label_list
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
