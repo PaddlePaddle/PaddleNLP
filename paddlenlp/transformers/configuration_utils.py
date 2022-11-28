@@ -669,7 +669,6 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
-        print(kwargs)
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path,
                                                   **kwargs)
 
