@@ -175,7 +175,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps = np.linspace(0,
                                 self.config.num_train_timesteps - 1,
                                 num_inference_steps,
-                                dtype=float)[::-1].copy()
+                                dtype=np.float32)[::-1].copy()
         sigmas = np.array(
             ((1 - self.alphas_cumprod) / self.alphas_cumprod)**0.5)
         sigmas = np.interp(timesteps, np.arange(0, len(sigmas)), sigmas)
