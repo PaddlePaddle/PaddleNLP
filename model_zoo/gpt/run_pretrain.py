@@ -21,7 +21,7 @@ import time
 import numpy as np
 import paddle
 from visualdl import LogWriter
-from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion
+from paddlenlp.transformers import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTConfig
 from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
 from paddlenlp.utils.log import logger
 from paddlenlp.utils import profiler
@@ -100,7 +100,21 @@ def get_train_data_file(args):
     return files
 
 
-def do_train(args):
+def get_device(device: str):
+    if device == 'cpu':
+        return 'cpu'
+    if paddle.get_device() == 'cpu':
+        logger.warning(
+            "not detect gpu but receive GPU related params, we will run the model on cpu"
+        )
+        return 'cpu'
+    return device
+
+
+def do_train():
+    args = parse_args(MODEL_CLASSES)
+    args.device = get_device(args.device)
+
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -140,7 +154,8 @@ def do_train(args):
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config[
             "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-        model = GPTForPretraining(GPTModel(**model_config))
+        config = GPTConfig(**model_config)
+        model = GPTForPretraining(config)
     else:
         model = GPTForPretraining.from_pretrained(
             args.model_name_or_path,
@@ -330,5 +345,4 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    args = parse_args(MODEL_CLASSES)
-    do_train(args)
+    do_train()

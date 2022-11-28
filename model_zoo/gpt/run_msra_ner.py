@@ -25,6 +25,7 @@ from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import GPTForTokenClassification, GPTChineseTokenizer
 from paddlenlp.data import Stack, Pad, Dict
+from args import get_device
 
 parser = argparse.ArgumentParser()
 
@@ -84,7 +85,10 @@ def tokenize_and_align_labels(example,
     return tokenized_input
 
 
-def do_train(args):
+def do_train():
+    args = parser.parse_args()
+    args.device = get_device(args.device)
+
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -195,5 +199,4 @@ def do_train(args):
 
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    do_train(args)
+    do_train()

@@ -13,34 +13,56 @@
 # limitations under the License.
 
 import os, sys
-from unittest import TestCase
-from pytest import fixture
+import json
 
-sys.path.insert(0, os.path.dirname(__file__))
+CURRENT_DIR = os.path.dirname(__file__)
+sys.path.insert(0, CURRENT_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
-@fixture
-def config_file() -> str:
+def init_argv(config_file: str = None):
+    """parse config file to argv
+
+    Args:
+        config_file (str, optional): the path of config file. Defaults to None.
+    """
+    # add tag if it's slow test
     if os.environ.get("slow_test", False):
-        return './configs/default.json'
-    return './configs/test.json'
+        # eg: /path/to/file.json -> /path/to/file, .json
+        config_file_name, file_suffix = os.path.splitext(config_file)
+
+        # eg: /path/to/file.slow.json
+        config_file_name, file_suffix = os.path.splitext(config_file)
+        config_file = f'{config_file_name}.slow{file_suffix}'
+
+    config_file = os.path.join(CURRENT_DIR, config_file)
+
+    with open(config_file, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    argv = ['']
+    for key, value in config.items():
+        argv.append(f'--{key}')
+        argv.append(str(value))
+    sys.argv = argv
 
 
-def test_pretrain(config_file: str):
+def test_pretrain():
+    init_argv("./configs/pretrain.json")
     from run_pretrain import do_train
-    do_train(config_file)
+    do_train()
 
 
-def test_run_glue(config_file: str):
+def test_run_glue():
+    init_argv("./configs/glue.json")
     from run_glue import do_train
-    args = parse_argv(config_file)
-    do_train(args)
+    do_train()
 
 
-def test_msra_ner(config_file: str):
+def test_msra_ner():
+    init_argv("./configs/msra_ner.json")
     from run_msra_ner import do_train
-    do_train(config_file)
+    do_train()
 
 
-test_run_glue('./configs/default.json')
+test_msra_ner()

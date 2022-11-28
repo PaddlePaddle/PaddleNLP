@@ -18,6 +18,17 @@ import paddle
 from paddlenlp.utils.log import logger
 
 
+def get_device(device: str):
+    if device == 'cpu':
+        return 'cpu'
+    if paddle.get_device() == 'cpu':
+        logger.warning(
+            "not detect gpu but receive GPU related params, we will run the model on cpu"
+        )
+        return 'cpu'
+    return device
+
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -279,4 +290,5 @@ def parse_args(MODEL_CLASSES):
     for arg in vars(args):
         logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
 
+    args.device = get_device(args.device)
     return args
