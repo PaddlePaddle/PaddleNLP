@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers import DiffusionPipeline, ScoreSdeVePipeline
+from ppdiffusers import ScoreSdeVePipeline
 
 # 加载模型和scheduler
-sde_ve = ScoreSdeVePipeline.from_pretrained("google/ncsnpp-ffhq-1024")
+pipe = ScoreSdeVePipeline.from_pretrained("google/ncsnpp-ffhq-1024")
 
 # 执行pipeline进行推理
 image = pipe().images[0]

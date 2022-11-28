@@ -12,14 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers import StableDiffusionPipeline
-
-# 加载模型和scheduler
-pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-
-# 执行pipeline进行推理
-prompt = "a photo of an astronaut riding a horse on mars"
-image = pipe(prompt).images[0]
-
-# 保存图片
-image.save("astronaut_rides_horse_sd.png")
+# TODO

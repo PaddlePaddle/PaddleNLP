@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import requests
 import paddle
-from PIL import Image
-from io import BytesIO
-
 from ppdiffusers import LDMSuperResolutionPipeline
+from ppdiffusers.utils import load_image
 
 # 加载pipeline
 pipe = LDMSuperResolutionPipeline.from_pretrained(
@@ -26,9 +23,7 @@ pipe = LDMSuperResolutionPipeline.from_pretrained(
 # 下载初始图片
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 
-response = requests.get(url)
-init_image = Image.open(BytesIO(response.content)).convert("RGB")
-init_image = init_image.resize((128, 128))
+init_image = load_image(url).resize((128, 128))
 init_image.save("original-image.png")
 
 # 使用fp16加快生成速度

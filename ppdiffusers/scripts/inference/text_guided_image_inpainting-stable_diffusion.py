@@ -13,26 +13,16 @@
 # limitations under the License.
 
 import paddle
-from io import BytesIO
-
-import requests
-import PIL
-
-from ppdiffusers import StableDiffusionInpaintPipeline
-
-
-def download_image(url):
-    response = requests.get(url)
-    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
-
+from ppdiffusers import StableDiffusionInpaintPipelineLegacy
+from ppdiffusers.utils import load_image
 
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
 
-init_image = download_image(img_url).resize((512, 512))
-mask_image = download_image(mask_url).resize((512, 512))
+init_image = load_image(img_url).resize((512, 512))
+mask_image = load_image(mask_url).resize((512, 512))
 
-pipe = StableDiffusionInpaintPipeline.from_pretrained(
+pipe = StableDiffusionInpaintPipelineLegacy.from_pretrained(
     "runwayml/stable-diffusion-v1-5")
 
 prompt = "a cat sitting on a bench"

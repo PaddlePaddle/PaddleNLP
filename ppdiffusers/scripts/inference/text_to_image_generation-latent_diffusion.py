@@ -19,7 +19,7 @@ pipe = LDMTextToImagePipeline.from_pretrained("CompVis/ldm-text2im-large-256")
 
 # 执行pipeline进行推理
 prompt = "a photo of an astronaut riding a horse on mars"
-image = pipe(prompt).images[0]
+image = pipe(prompt, guidance_scale=7.5).images[0]
 
 # 保存图片
-image.save("astronaut_rides_horse.png")
+image.save("astronaut_rides_horse_ldm.png")

@@ -68,6 +68,7 @@ if is_paddle_available():
         RePaintScheduler,
         SchedulerMixin,
         ScoreSdeVeScheduler,
+        ScoreSdeVpScheduler,
         VQDiffusionScheduler,
     )
     from .training_utils import EMAModel

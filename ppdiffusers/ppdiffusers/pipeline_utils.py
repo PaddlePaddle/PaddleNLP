@@ -499,7 +499,14 @@ class DiffusionPipeline(ConfigMixin):
                         pretrained_model_name_or_path
                     ) else pretrained_model_name_or_path + "/" + name
 
-                loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
+                try:
+                    # if in sub dir
+                    loaded_sub_model = load_method(model_path_dir,
+                                                   **loading_kwargs)
+                except RuntimeError:
+                    # if in top dir
+                    loaded_sub_model = load_method(
+                        pretrained_model_name_or_path, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):

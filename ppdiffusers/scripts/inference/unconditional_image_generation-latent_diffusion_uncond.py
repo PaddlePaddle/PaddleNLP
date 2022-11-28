@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers import DiffusionPipeline, LDMPipeline
+from ppdiffusers import LDMPipeline
 
 # 加载模型和scheduler
 pipe = LDMPipeline.from_pretrained("CompVis/ldm-celebahq-256")
