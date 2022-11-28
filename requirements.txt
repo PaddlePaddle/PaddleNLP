@@ -8,7 +8,7 @@ datasets >= 2.0.0
 tqdm
 paddlefsl
 sentencepiece
-huggingface_hub
+huggingface_hub>=0.10.1
 paddle2onnx
 protobuf>=3.1.0, <=3.20.0
 visualdl
