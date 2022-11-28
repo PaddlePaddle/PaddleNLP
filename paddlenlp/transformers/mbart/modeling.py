@@ -20,7 +20,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.nn import Layer, Embedding
-
+from typing import Optional
+from .configuration import MBART_PRETRAINED_INIT_CONFIGURATION, MBART_PRETRAINED_RESOURCE_FILES_MAP, MBartConfig
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     ModelOutput,
@@ -63,123 +64,10 @@ class MBartPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    pretrained_init_configuration = {
-        "mbart-large-cc25": {
-            "vocab_size": 250027,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        },
-        "mbart-large-en-ro": {
-            "vocab_size": 250027,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 250020,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "attention_dropout": 0.1,
-            "activation_dropout": 0.0,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        },
-        "mbart-large-50-one-to-many-mmt": {
-            "vocab_size": 250054,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 2,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.1,
-            "activation_function": "relu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        },
-        "mbart-large-50-many-to-one-mmt": {
-            "vocab_size": 250054,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 2,
-            "forced_bos_token_id": 250004,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.1,
-            "activation_function": "relu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        },
-        "mbart-large-50-many-to-many-mmt": {
-            "vocab_size": 250054,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "decoder_start_token_id": 2,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.1,
-            "activation_function": "relu",
-            "attention_dropout": 0.0,
-            "activation_dropout": 0.0,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        }
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "mbart-large-cc25":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
-            "mbart-large-en-ro":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
-            "mbart-large-50-one-to-many-mmt":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
-            "mbart-large-50-many-to-one-mmt":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
-            "mbart-large-50-many-to-many-mmt":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
-        }
-    }
+    pretrained_init_configuration = MBART_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = MBART_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "mbart"
+    config_class = MBartConfig
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -221,52 +109,42 @@ class MBartEncoder(MBartPretrainedModel):
     """
 
     def __init__(self,
-                 embed_tokens,
-                 vocab_size,
-                 pad_token_id=1,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 encoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
-        super().__init__()
-        self.d_model = d_model
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
+                 config: MBartConfig,
+                 embed_tokens: Optional[nn.Embedding] = None):
+        super().__init__(config)
+        self.d_model = config.d_model
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
         self.encoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model)
+            config.max_position_embeddings, config.d_model)
 
-        self.encoder_dropout = nn.Dropout(dropout)
-        self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
+        self.encoder_dropout = nn.Dropout(config.dropout)
+        self.encoder_layernorm_embedding = nn.LayerNorm(config.d_model)
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=encoder_attention_heads,
-            dim_feedforward=encoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout,
+            d_model=config.d_model,
+            nhead=config.encoder_attention_heads,
+            dim_feedforward=config.encoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout,
             normalize_before=True)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers,
-                                             nn.LayerNorm(d_model))
+        self.encoder = nn.TransformerEncoder(encoder_layer,
+                                             config.encoder_layers,
+                                             nn.LayerNorm(config.d_model))
         self.apply(self.init_weights)
 
     def forward(self,
                 input_ids=None,
                 attention_mask=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
                 **kwargs):
         """
         The MBartEncoder forward method, overrides the `__call__()` special method.
@@ -282,6 +160,12 @@ class MBartEncoder(MBartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (output_hidden_states
+                                if output_hidden_states is not None else
+                                self.config.output_hidden_states)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.d_model**0.5 * self.embed_tokens(input_ids)
@@ -315,43 +199,33 @@ class MBartDecoder(MBartPretrainedModel):
     """
 
     def __init__(self,
-                 embed_tokens,
-                 vocab_size,
-                 pad_token_id=1,
-                 d_model=768,
-                 num_decoder_layers=6,
-                 decoder_attention_heads=12,
-                 decoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
-        super().__init__()
-        self.d_model = d_model
-        self.init_std = init_std
+                 config: MBartConfig,
+                 embed_tokens: Optional[nn.Embedding] = None):
+        super().__init__(config)
+        self.d_model = config.d_model
+        self.init_std = config.init_std
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
         self.decoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model)
-        self.decoder_dropout = nn.Dropout(dropout)
-        self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
+            config.max_position_embeddings, config.d_model)
+        self.decoder_dropout = nn.Dropout(config.dropout)
+        self.decoder_layernorm_embedding = nn.LayerNorm(config.d_model)
 
         decoder_layer = nn.TransformerDecoderLayer(
-            d_model=d_model,
-            nhead=decoder_attention_heads,
-            dim_feedforward=decoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout,
+            d_model=config.d_model,
+            nhead=config.decoder_attention_heads,
+            dim_feedforward=config.decoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout,
             normalize_before=True)
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers,
-                                             nn.LayerNorm(d_model))
+        self.decoder = nn.TransformerDecoder(decoder_layer,
+                                             config.decoder_layers,
+                                             nn.LayerNorm(config.d_model))
         self.apply(self.init_weights)
 
     def forward(
@@ -361,9 +235,9 @@ class MBartDecoder(MBartPretrainedModel):
         encoder_output=None,
         memory_mask=None,
         cache=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
     ):
         """
         The MBartDecoder forward method, overrides the `__call__()` special method.
@@ -385,6 +259,12 @@ class MBartDecoder(MBartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (output_hidden_states
+                                if output_hidden_states is not None else
+                                self.config.output_hidden_states)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
             decoder_attention_mask = paddle.tensor.triu((paddle.full(
@@ -425,101 +305,20 @@ class MBartModel(MBartPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `MBartModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `MBartModel`.
-        bos_token (int, optional):
-            The beginning of sequence token that was used during pretraining. Can be
-            used a sequence classifier token.
-            Defaults to `0`.
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `1`.
-        eos_token (int, optional):
-            A special token representing the end of a sequence that was used during pretraining.
-            Defaults to `2`.
-        d_model (int, optional):
-            Dimensionality of the embedding layer, encoder layer and decoder layer. Defaults to `768`.
-        num_encoder_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `6`.
-        num_decoder_layers (int, optional):
-            Number of hidden layers in the Transformer decoder. Defaults to `6`.
-        encoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        decoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer decoder.
-            Defaults to `12`.
-        encoder_ffn_dim (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `encoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `encoder_ffn_dim` is larger than `d_model`.
-            Defaults to `3072`.
-        decoder_ffn_dim (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `decoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `decoder_ffn_dim` is larger than `d_model`.
-            Defaults to `3072`.
-        dropout (float, optional):
-            The dropout probability used in all fully connected layers (pre-process and post-process of MHA and FFN sub-layer)
-            in the encoders and decoders. Defaults to `0.1`.
-        activation_function (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions are supported.
-            Defaults to `"gelu"`.
-        attention_dropout (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers and decoder layers to drop some attention target.
-            Defaults to `0.1`.
-        activation_dropout (float, optional):
-            The dropout probability used after FFN activation in all encoder layers and decoder layers.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `1024`.
-        init_std (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Default to `0.02`.
-
+        Args:
+        config (:class:`MBartConfig`):
+            An instance of MBartConfig used to construct MBartModel.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 bos_token_id=0,
-                 pad_token_id=1,
-                 eos_token_id=2,
-                 decoder_start_token_id=2,
-                 forced_bos_token_id=250004,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 num_decoder_layers=6,
-                 encoder_attention_heads=12,
-                 decoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 decoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
-        self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(vocab_size, d_model)
-        self.encoder = MBartEncoder(self.shared, vocab_size, pad_token_id,
-                                    d_model, num_encoder_layers,
-                                    encoder_attention_heads, encoder_ffn_dim,
-                                    dropout, activation_function,
-                                    attention_dropout, activation_dropout,
-                                    max_position_embeddings, init_std)
+    def __init__(self, config: MBartConfig):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
+        self.decoder_start_token_id = config.decoder_start_token_id
+        self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        self.encoder = MBartEncoder(config, self.shared)
 
-        self.decoder = MBartDecoder(self.shared, vocab_size, pad_token_id,
-                                    d_model, num_decoder_layers,
-                                    decoder_attention_heads, decoder_ffn_dim,
-                                    dropout, activation_function,
-                                    attention_dropout, activation_dropout,
-                                    max_position_embeddings, init_std)
+        self.decoder = MBartDecoder(config, self.shared)
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -542,9 +341,9 @@ class MBartModel(MBartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r'''
         The MBartModel forward method, overrides the `__call__()` special method.
 
@@ -619,6 +418,12 @@ class MBartModel(MBartPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         '''
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (output_hidden_states
+                                if output_hidden_states is not None else
+                                self.config.output_hidden_states)
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # different to other models, MBart automatically creates decoder_input_ids from
         # input MBartForSequenceClassification_ids if no decoder_input_ids are provided
         if input_ids is None and encoder_output is None:
@@ -725,22 +530,17 @@ class MBartForSequenceClassification(MBartPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        mbart (:class:`MBartModel`):
-            An instance of MBartModel.
-        num_labels (int, optional):
-            The number of different labels. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of MBart.
-            If None, use the same value as `hidden_dropout_prob` of `MBartModel`
-            instance `mbart`. Defaults to None.
+        config (:class:`MBartConfig`):
+            An instance of MBartConfig used to construct MBartForSequenceClassification.
     """
 
-    def __init__(self, mbart, num_labels=2, dropout=None):
-        super().__init__()
-        self.mbart = mbart
-        self.classifier = MBartClassificationHead(
-            self.mbart.config['d_model'], self.mbart.config['d_model'],
-            num_labels, dropout if dropout else self.mbart.config['dropout'])
+    def __init__(self, config: MBartConfig):
+        super().__init__(config)
+        self.mbart = MBartModel(config)
+        self.classifier = MBartClassificationHead(config.d_model,
+                                                  config.d_model,
+                                                  config.num_labels,
+                                                  config.classifier_dropout)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -752,9 +552,9 @@ class MBartForSequenceClassification(MBartPretrainedModel):
                 use_cache=False,
                 cache=None,
                 labels=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The MBartForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -806,6 +606,7 @@ class MBartForSequenceClassification(MBartPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.mbart(
             input_ids,
             attention_mask,
@@ -872,14 +673,14 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
     compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        mbart (:class:`MBartModel`):
-            An instance of MBartModel.
+        config (:class:`MBartConfig`):
+            An instance of MBartConfig used to construct MBartForQuestionAnswering.
     """
 
-    def __init__(self, mbart):
-        super().__init__()
-        self.mbart = mbart
-        self.classifier = nn.Linear(self.mbart.config['d_model'], 2)
+    def __init__(self, config: MBartConfig):
+        super().__init__(config)
+        self.mbart = MBartModel(config)
+        self.classifier = nn.Linear(config.d_model, 2)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -892,9 +693,9 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
                 cache=None,
                 start_positions=None,
                 end_positions=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The MBartForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -963,6 +764,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
                 start_logits = outputs[0]
                 end_logits  =outputs[1]
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.mbart(
             input_ids,
             attention_mask,
@@ -1019,23 +821,21 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
     r"""
     MBart Model with a `language modeling` head on top.
 
-    Args:
-        mbart (:class:`MBartModel`):
-            An instance of MBartModel.
+   Args:
+        config (:class:`MBartConfig`):
+            An instance of MBartConfig used to construct MBartForConditionalGeneration.
     """
 
-    def __init__(self, mbart):
-        super().__init__()
-        self.mbart = mbart
+    def __init__(self, config: MBartConfig):
+        super().__init__(config)
+        self.mbart = MBartModel(config)
         self.lm_head_weight = self.create_parameter(
-            shape=[
-                self.mbart.config['vocab_size'], self.mbart.config['d_model']
-            ],
+            shape=[config.vocab_size, config.d_model],
             dtype=self.mbart.shared.weight.dtype,
             is_bias=False)
         self.register_buffer(
             "final_logits_bias",
-            paddle.zeros((1, self.mbart.config['vocab_size']),
+            paddle.zeros((1, config.vocab_size),
                          dtype=paddle.get_default_dtype()))
         self.apply(self.init_weights)
 
@@ -1076,9 +876,9 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
                 use_cache=False,
                 cache=None,
                 labels=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The MBartForConditionalGeneration forward method, overrides the __call__() special method.
 
@@ -1140,6 +940,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
                 outputs = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.return_dict
         outputs = self.mbart(
             input_ids,
             attention_mask,
@@ -1218,7 +1019,5 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
             try:
                 return getattr(getattr(self, self.base_model_prefix), name)
             except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+                return getattr(
+                    getattr(self, self.base_model_prefix).config, name)

@@ -29,6 +29,7 @@ from paddlenlp.transformers import (
     MBartForQuestionAnswering,
     MBartForSequenceClassification,
     MBartModel,
+    MBartConfig,
 )
 from paddlenlp.transformers.mbart.modeling import MBartDecoder, MBartEncoder
 
@@ -127,11 +128,11 @@ class MBartModelTester:
         return config, inputs_dict
 
     def get_config(self):
-        return {
+        return MBartConfig.from_dict({
             "vocab_size": self.vocab_size,
             "d_model": self.hidden_size,
-            "num_encoder_layers": self.num_hidden_layers,
-            "num_decoder_layers": self.num_hidden_layers,
+            "encoder_layers": self.num_hidden_layers,
+            "decoder_layers": self.num_hidden_layers,
             "encoder_attention_heads": self.num_attention_heads,
             "decoder_attention_heads": self.num_attention_heads,
             "encoder_ffn_dim": self.intermediate_size,
@@ -147,7 +148,7 @@ class MBartModelTester:
             "activation_function": self.activation_function,
             "activation_dropout": self.activation_dropout,
             "init_std": self.init_std,
-        }
+        })
 
     def prepare_config_and_inputs_for_common(self):
         config, inputs_dict = self.prepare_config_and_inputs()
@@ -155,7 +156,7 @@ class MBartModelTester:
 
     def create_and_check_decoder_model_past_large_inputs(
             self, config, inputs_dict):
-        model = MBartModel(**config).get_decoder()
+        model = MBartModel(config).get_decoder()
         model.eval()
         input_ids = inputs_dict["input_ids"]
         attention_mask = inputs_dict["attention_mask"]
@@ -344,19 +345,18 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
             assert str(self.tgt_text[i]) == str(decoded[i]), f"{i}"
 
     def test_mbart_fast_forward(self):
-        config = {
+        config = MBartConfig.from_dict({
             "vocab_size": 99,
             "d_model": 24,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
+            "encoder_layers": 2,
+            "decoder_layers": 2,
             "encoder_attention_heads": 2,
             "decoder_attention_heads": 2,
             "encoder_ffn_dim": 32,
             "decoder_ffn_dim": 32,
             "max_position_embeddings": 48,
-        }
-        base_model = MBartModel(**config)
-        lm_model = MBartForConditionalGeneration(base_model)
+        })
+        lm_model = MBartForConditionalGeneration(config)
         context = paddle.to_tensor(
             [[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]],
             dtype="int64")
@@ -472,20 +472,27 @@ class MBartStandaloneDecoderModelTester:
                                    self.vocab_size,
                                    dtype="int64")
 
-        config = {
-            "embed_tokens": None,
-            "vocab_size": self.vocab_size,
-            "d_model": self.d_model,
-            "num_decoder_layers": self.decoder_layers,
-            "decoder_ffn_dim": self.decoder_ffn_dim,
+        config = MBartConfig.from_dict({
+            "embed_tokens":
+            None,
+            "vocab_size":
+            self.vocab_size,
+            "d_model":
+            self.d_model,
+            "decoder_layers":
+            self.decoder_layers,
+            "decoder_ffn_dim":
+            self.decoder_ffn_dim,
             # "encoder_attention_heads": self.encoder_attention_heads,
-            "decoder_attention_heads": self.decoder_attention_heads,
+            "decoder_attention_heads":
+            self.decoder_attention_heads,
             # "eos_token_id": self.eos_token_id,
             # "bos_token_id": self.bos_token_id,
             # "pad_token_id": self.pad_token_id,
             # "decoder_start_token_id": self.decoder_start_token_id,
-            "max_position_embeddings": self.max_position_embeddings,
-        }
+            "max_position_embeddings":
+            self.max_position_embeddings,
+        })
 
         return (
             config,
@@ -502,7 +509,7 @@ class MBartStandaloneDecoderModelTester:
         lm_labels,
     ):
         # self.use_cache = True
-        model = MBartDecoder(**config)
+        model = MBartDecoder(config)
         model.eval()
 
         encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
@@ -562,7 +569,7 @@ class MBartStandaloneDecoderModelTester:
         attention_mask,
         lm_labels,
     ):
-        model = MBartDecoder(**config)
+        model = MBartDecoder(config)
         model.eval()
 
         # create attention mask

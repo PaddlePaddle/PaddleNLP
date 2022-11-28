@@ -14,7 +14,7 @@
 # limitations under the License.
 from functools import partial
 import numpy as np
-
+from typing import Optional
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -22,6 +22,7 @@ import paddle.tensor as tensor
 from paddle.nn import Layer, Embedding
 
 from .. import PretrainedModel, register_base_model
+from .configuration import BART_PRETRAINED_INIT_CONFIGURATION, BART_PRETRAINED_RESOURCE_FILES_MAP, BartConfig
 from ..model_outputs import (
     ModelOutput,
     BaseModelOutput,
@@ -59,59 +60,10 @@ class BartPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
-    pretrained_init_configuration = {
-        "bart-base": {
-            "vocab_size": 50265,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "forced_eos_token_id": 2,
-            "decoder_start_token_id": 2,
-            "d_model": 768,
-            "num_encoder_layers": 6,
-            "num_decoder_layers": 6,
-            "encoder_attention_heads": 12,
-            "decoder_attention_heads": 12,
-            "encoder_ffn_dim": 3072,
-            "decoder_ffn_dim": 3072,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "attention_dropout": 0.1,
-            "activation_dropout": 0.1,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        },
-        "bart-large": {
-            "vocab_size": 50265,
-            "bos_token_id": 0,
-            "pad_token_id": 1,
-            "eos_token_id": 2,
-            "forced_eos_token_id": 2,
-            "decoder_start_token_id": 2,
-            "d_model": 1024,
-            "num_encoder_layers": 12,
-            "num_decoder_layers": 12,
-            "encoder_attention_heads": 16,
-            "decoder_attention_heads": 16,
-            "encoder_ffn_dim": 4096,
-            "decoder_ffn_dim": 4096,
-            "dropout": 0.1,
-            "activation_function": "gelu",
-            "attention_dropout": 0.1,
-            "activation_dropout": 0.1,
-            "max_position_embeddings": 1024,
-            "init_std": 0.02,
-        }
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "bart-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base.pdparams",
-            "bart-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large.pdparams"
-        }
-    }
+    pretrained_init_configuration = BART_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = BART_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "bart"
+    config_class = BartConfig
 
     def init_weights(self, layer):
         """ Initialization hook """
@@ -154,49 +106,39 @@ class BartEncoder(BartPretrainedModel):
     """
 
     def __init__(self,
-                 embed_tokens,
-                 vocab_size,
-                 pad_token_id=1,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 encoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
+                 config: BartConfig,
+                 embed_tokens: Optional[nn.Embedding] = None):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
         self.encoder_embed_positions = BartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model)
+            config.max_position_embeddings, config.d_model)
 
-        self.encoder_dropout = nn.Dropout(dropout)
-        self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
+        self.encoder_dropout = nn.Dropout(config.dropout)
+        self.encoder_layernorm_embedding = nn.LayerNorm(config.d_model)
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=encoder_attention_heads,
-            dim_feedforward=encoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
+            d_model=config.d_model,
+            nhead=config.encoder_attention_heads,
+            dim_feedforward=config.encoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout)
+        self.encoder = nn.TransformerEncoder(encoder_layer,
+                                             config.encoder_layers)
         self.apply(self.init_weights)
 
     def forward(self,
                 input_ids=None,
                 attention_mask=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
                 **kwargs):
         """
         The BartEncoder forward method, overrides the `__call__()` special method.
@@ -220,9 +162,15 @@ class BartEncoder(BartPretrainedModel):
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
             Especially, When `return_dict=output_hidden_states=output_attentions=False`, 
             returns tensor `encoder_outputs` which is the output at the last layer of the model.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, d_model].
 
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (output_hidden_states
+                                if output_hidden_states is not None else
+                                self.config.output_hidden_states)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids)
@@ -256,40 +204,30 @@ class BartDecoder(BartPretrainedModel):
     """
 
     def __init__(self,
-                 embed_tokens,
-                 vocab_size,
-                 pad_token_id=1,
-                 d_model=768,
-                 num_decoder_layers=6,
-                 decoder_attention_heads=12,
-                 decoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
-        super().__init__()
-        self.init_std = init_std
+                 config: BartConfig,
+                 embed_tokens: Optional[nn.Embedding] = None):
+        super().__init__(config)
+        self.init_std = config.init_std
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(vocab_size, d_model)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
         self.decoder_embed_positions = BartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model)
-        self.decoder_dropout = nn.Dropout(dropout)
-        self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
+            config.max_position_embeddings, config.d_model)
+        self.decoder_dropout = nn.Dropout(config.dropout)
+        self.decoder_layernorm_embedding = nn.LayerNorm(config.d_model)
 
         decoder_layer = nn.TransformerDecoderLayer(
-            d_model=d_model,
-            nhead=decoder_attention_heads,
-            dim_feedforward=decoder_ffn_dim,
-            dropout=dropout,
-            activation=activation_function,
-            attn_dropout=attention_dropout,
-            act_dropout=activation_dropout)
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers)
+            d_model=config.d_model,
+            nhead=config.decoder_attention_heads,
+            dim_feedforward=config.decoder_ffn_dim,
+            dropout=config.dropout,
+            activation=config.activation_function,
+            attn_dropout=config.attention_dropout,
+            act_dropout=config.activation_dropout)
+        self.decoder = nn.TransformerDecoder(decoder_layer,
+                                             config.decoder_layers)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -298,9 +236,9 @@ class BartDecoder(BartPretrainedModel):
                 encoder_output=None,
                 memory_mask=None,
                 cache=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         """
         The BartDecoder forward method, overrides the `__call__()` special method.
 
@@ -329,7 +267,7 @@ class BartDecoder(BartPretrainedModel):
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
             Especially, When `return_dict=output_hidden_states=output_attentions=False`, 
             returns tensor `decoder_outputs` which is the output at the last layer of the model.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, d_model].
 
         """
         if decoder_attention_mask is None:
@@ -373,101 +311,18 @@ class BartModel(BartPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `BartModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BartModel`.
-        bos_token (int, optional):
-            The beginning of sequence token that was used during pretraining. Can be
-            used a sequence classifier token.
-            Defaults to `0`.
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `1`.
-        eos_token (int, optional):
-            A special token representing the end of a sequence that was used during pretraining.
-            Defaults to `2`.
-        d_model (int, optional):
-            Dimensionality of the embedding layer, encoder layer and decoder layer. Defaults to `768`.
-        num_encoder_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `6`.
-        num_decoder_layers (int, optional):
-            Number of hidden layers in the Transformer decoder. Defaults to `6`.
-        encoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        decoder_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer decoder.
-            Defaults to `12`.
-        encoder_ffn_dim (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `encoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `encoder_ffn_dim` is larger than `d_model`.
-            Defaults to `3072`.
-        decoder_ffn_dim (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `d_model` to `decoder_ffn_dim`,
-            and then projected back to `d_model`. Typically `decoder_ffn_dim` is larger than `d_model`.
-            Defaults to `3072`.
-        dropout (float, optional):
-            The dropout probability used in all fully connected layers (pre-process and post-process of MHA and FFN sub-layer)
-            in the encoders and decoders. Defaults to `0.1`.
-        activation_function (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions are supported.
-            Defaults to `"gelu"`.
-        attention_dropout (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers and decoder layers to drop some attention target.
-            Defaults to `0.1`.
-        activation_dropout (float, optional):
-            The dropout probability used after FFN activation in all encoder layers and decoder layers.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `1024`.
-        init_std (float, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Default to `0.02`.
-
+        config (:class:`BartConfig`):
+            An instance of BartConfig used to construct BartModel.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 bos_token_id=0,
-                 pad_token_id=1,
-                 eos_token_id=2,
-                 forced_eos_token_id=2,
-                 decoder_start_token_id=2,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 num_decoder_layers=6,
-                 encoder_attention_heads=12,
-                 decoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 decoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
-        super().__init__()
-        self.init_std = init_std
-        self.pad_token_id = pad_token_id
-        self.decoder_start_token_id = decoder_start_token_id
-        self.shared = nn.Embedding(vocab_size, d_model)
-        self.encoder = BartEncoder(self.shared, vocab_size, pad_token_id,
-                                   d_model, num_encoder_layers,
-                                   encoder_attention_heads, encoder_ffn_dim,
-                                   dropout, activation_function,
-                                   attention_dropout, activation_dropout,
-                                   max_position_embeddings, init_std)
-
-        self.decoder = BartDecoder(self.shared, vocab_size, pad_token_id,
-                                   d_model, num_decoder_layers,
-                                   decoder_attention_heads, decoder_ffn_dim,
-                                   dropout, activation_function,
-                                   attention_dropout, activation_dropout,
-                                   max_position_embeddings, init_std)
+    def __init__(self, config: BartConfig):
+        super().__init__(config)
+        self.init_std = config.init_std
+        self.pad_token_id = config.pad_token_id
+        self.decoder_start_token_id = config.decoder_start_token_id
+        self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        self.encoder = BartEncoder(config, self.shared)
+        self.decoder = BartDecoder(config, self.shared)
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -490,9 +345,9 @@ class BartModel(BartPretrainedModel):
                 encoder_output=None,
                 use_cache=False,
                 cache=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r'''
         The BartModel forward method, overrides the `__call__()` special method.
 
@@ -508,9 +363,9 @@ class BartModel(BartPretrainedModel):
                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
                 When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                It is a tensor with shape broadcasted to `[batch_size, encoder_attention_heads, sequence_length, sequence_length]`.
                 For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
-                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                [batch_size, encoder_attention_heads, sequence_length, sequence_length].
                 Defaults to `None`, which means nothing needed to be prevented attention to.
             decoder_input_ids (Tensor, optional):
                 Indices of decoder input sequence tokens in the vocabulary.
@@ -522,11 +377,11 @@ class BartModel(BartPretrainedModel):
                 Its data type and shape is the same as `attention_mask`. Defaults to `None`.
             encoder_output (tuple, optional):
                 The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
-                The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, hidden_size]`.
+                The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, d_model]`.
                 `hidden_states` is hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
-                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, hidden_size`].
+                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, d_model`].
                 `attentions` is attentions of all layers of in the Transformer encoder. The length of `attentions` is `num_hidden_layers`.
-                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, num_attention_heads, sequence_length, sequence_length`].
+                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, encoder_attention_heads, sequence_length, sequence_length`].
             use_cache (bool, optional):
                  Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                  can be used to speed up decoding.
@@ -551,7 +406,7 @@ class BartModel(BartPretrainedModel):
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
             Especially, When `return_dict=output_hidden_states=output_attentions=False`, 
             returns tensor `decoder_output`, which is the output at the last layer of the model.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, d_model].
 
         Example:
             .. code-block::
@@ -670,23 +525,17 @@ class BartForSequenceClassification(BartPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        bart (:class:`BartModel`):
-            An instance of BartModel.
-        num_labels (int, optional):
-            The number of different labels. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Bart.
-            If None, use the same value as `hidden_dropout_prob` of `BartModel`
-            instance `bart`. Defaults to None.
+        config (:class:`BartConfig`):
+            An instance of BartConfig used to construct BartForSequenceClassification.
     """
 
-    def __init__(self, bart, num_labels=2, dropout=None):
-        super().__init__()
-        self.bart = bart
-        self.num_labels = num_labels
-        self.classifier = BartClassificationHead(
-            self.bart.config['d_model'], self.bart.config['d_model'],
-            num_labels, dropout if dropout else self.bart.config['dropout'])
+    def __init__(self, config: BartConfig, **kwargs):
+        super().__init__(config, **kwargs)
+        self.bart = BartModel(config)
+        self.num_labels = config.num_labels
+        self.classifier = BartClassificationHead(config.d_model, config.d_model,
+                                                 config.num_labels,
+                                                 config.classifier_dropout)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -698,9 +547,9 @@ class BartForSequenceClassification(BartPretrainedModel):
                 use_cache=False,
                 cache=None,
                 labels=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The BartForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -753,6 +602,7 @@ class BartForSequenceClassification(BartPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.bart(
             input_ids,
             attention_mask,
@@ -819,14 +669,14 @@ class BartForQuestionAnswering(BartPretrainedModel):
     compute `span_start_logits` and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        bart (:class:`BartModel`):
-            An instance of BartModel.
+        config (:class:`BartConfig`):
+            An instance of BartConfig used to construct BartForQuestionAnswering.
     """
 
-    def __init__(self, bart):
-        super().__init__()
-        self.bart = bart
-        self.classifier = nn.Linear(self.bart.config['d_model'], 2)
+    def __init__(self, config: BartConfig):
+        super().__init__(config)
+        self.bart = BartModel(config)
+        self.classifier = nn.Linear(config.d_model, 2)
         self.apply(self.init_weights)
 
     def forward(self,
@@ -839,9 +689,9 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 cache=None,
                 start_positions=None,
                 end_positions=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The BartForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -910,6 +760,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 start_logits = outputs[0]
                 end_logits  =outputs[1]
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.bart(input_ids,
                             attention_mask,
                             decoder_input_ids,
@@ -965,19 +816,21 @@ class BartForConditionalGeneration(BartPretrainedModel):
     Bart Model with a `language modeling` head on top.
 
     Args:
-        bart (:class:`BartModel`):
-            An instance of BartModel.
+        config (:class:`BartConfig`):
+            An instance of BartConfig used to construct BartForConditionalGeneration.
     """
 
-    def __init__(self, bart):
-        super().__init__()
-        self.bart = bart
+    def __init__(self, config: BartConfig):
+        super().__init__(config)
+        self.bart = BartModel(config)
         self.lm_head_weight = self.create_parameter(
-            shape=[self.bart.config['vocab_size'], self.bart.config['d_model']],
+            shape=[config.vocab_size, config.d_model],
             dtype=self.bart.shared.weight.dtype,
             is_bias=False)
         self.register_buffer("final_logits_bias",
-                             paddle.zeros((1, self.bart.config['vocab_size'])))
+                             paddle.zeros((1, config.vocab_size)))
+
+        # self.final_logits_bias = paddle.zeros((1, config.vocab_size))
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -1027,9 +880,9 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 use_cache=False,
                 cache=None,
                 labels=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None):
         r"""
         The BartForConditionalGeneration forward method, overrides the __call__() special method.
 
@@ -1088,6 +941,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 outputs = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.bart(input_ids,
                             attention_mask,
                             decoder_input_ids,
@@ -1167,7 +1021,5 @@ class BartForConditionalGeneration(BartPretrainedModel):
             try:
                 return getattr(getattr(self, self.base_model_prefix), name)
             except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+                return getattr(
+                    getattr(self, self.base_model_prefix).config, name)

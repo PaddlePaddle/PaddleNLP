@@ -36,6 +36,7 @@ from .albert.modeling import *
 from .albert.tokenizer import *
 from .bart.modeling import *
 from .bart.tokenizer import *
+from .bart.configuration import *
 from .bert_japanese.tokenizer import *
 from .bigbird.modeling import *
 from .bigbird.tokenizer import *
@@ -78,6 +79,7 @@ from .luke.modeling import *
 from .luke.tokenizer import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
+from .mbart.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
 from .prophetnet.modeling import *
