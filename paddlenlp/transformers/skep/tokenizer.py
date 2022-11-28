@@ -15,6 +15,7 @@
 
 import json
 import os
+from typing import List, Optional, Dict
 import shutil
 
 from paddle.utils import try_import
@@ -65,13 +66,20 @@ def get_pairs(word):
 class BpeEncoder(object):
     """BpeEncoder"""
 
-    def __init__(self, encoder_json_file, vocab_bpe_file, errors='replace'):
+    def __init__(self,
+                 encoder_json_file,
+                 vocab_bpe_file,
+                 errors='replace',
+                 unk_token="<|endoftext|>",
+                 **kwargs):
         """
         Constructs a BpeEncoder.
 
         Args:
             encoder_json_file (`str`): The path to bpe encode json file.
             vocab_bpe_file (`str`): The path to bpe vocab file.
+            errors (`str`): the error handler
+            unk_token (`str`): the unk token
         """
         self.encoder = self.__get_encoder(encoder_json_file)
         self.decoder = {v: k for k, v in self.encoder.items()}
@@ -79,6 +87,7 @@ class BpeEncoder(object):
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         self.bpe_ranks = self.__get_bpe_ranks(vocab_bpe_file)
+        self.unk_token = unk_token
         self.cache = {}
         re = try_import("regex")
         self.pat = re.compile(
@@ -145,9 +154,10 @@ class BpeEncoder(object):
         self.cache[token] = word
         return word
 
-    def encode(self, text):
+    def encode(self, text: str) -> List[int]:
         """
-        encode
+        encode the text to token_ids
+        TODO(wj-Mcat): to be deprecated
         """
         bpe_tokens = []
         re = try_import("regex")
@@ -157,13 +167,46 @@ class BpeEncoder(object):
                               for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
-    def decode(self, tokens):
+    def decode(self, tokens: List[str]) -> str:
         """
         decode
+        TODO(wj-Mcat): to be deprecated
         """
         text = ''.join([self.decoder[token] for token in tokens])
         text = bytearray([self.byte_decoder[c]
                           for c in text]).decode('utf-8', errors=self.errors)
+        return text
+
+    def _tokenize(self, text: str) -> List[str]:
+        """tokenize text into tokens with bpe algo
+
+        Args:
+            text (str): the content of text
+
+        Returns:
+            List[str]: the sub token of text
+        """
+        bpe_tokens = []
+        re = try_import("regex")
+        for token in re.findall(self.pat, text):
+            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
+            bpe_tokens.extend(bpe_token
+                              for bpe_token in self.bpe(token).split(' '))
+        return bpe_tokens
+
+    def _convert_token_to_id(self, token: str) -> int:
+        """Converts a token (str) in an id using the vocab."""
+        return self.encoder.get(token, self.encoder.get(self.unk_token))
+
+    def _convert_id_to_token(self, index: int) -> str:
+        """Converts an index (integer) in a token (str) using the vocab."""
+        return self.decoder.get(index)
+
+    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+        """Converts a sequence of tokens (string) in a single string."""
+        text = "".join(tokens)
+        text = bytearray([self.byte_decoder[c]
+                          for c in text]).decode("utf-8", errors=self.errors)
         return text
 
 
@@ -250,6 +293,11 @@ class SkepTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.encoder.json",
         }
     }
+    max_model_input_sizes = {
+        "skep_ernie_1.0_large_ch": 512,
+        "skep_ernie_2.0_large_en": 512,
+        "skep_roberta_large_en": 514,
+    }
 
     pretrained_init_configuration = {
         "skep_ernie_1.0_large_ch": {
@@ -297,7 +345,10 @@ class SkepTokenizer(PretrainedTokenizer):
         self.bpe_json_file = bpe_json_file
         self.vocab = self.load_vocabulary(vocab_file,
                                           unk_token=unk_token,
-                                          pad_token=pad_token)
+                                          pad_token=pad_token,
+                                          bos_token=cls_token,
+                                          eos_token=sep_token,
+                                          mask_token=mask_token)
 
         self.use_bpe_encoder = use_bpe_encoder
         self.need_token_type_id = need_token_type_id
@@ -309,9 +360,11 @@ class SkepTokenizer(PretrainedTokenizer):
                                                           unk_token=unk_token)
         else:
             assert (bpe_vocab_file and bpe_json_file) is not None, (
-                f"bpe_vocab_file and bpe_json_file must be not None.")
+                "bpe_vocab_file and bpe_json_file must be not None.")
             if os.path.isfile(bpe_vocab_file) and os.path.isfile(bpe_json_file):
-                self.bpe_tokenizer = BpeEncoder(bpe_json_file, bpe_vocab_file)
+                self.bpe_tokenizer = BpeEncoder(bpe_json_file,
+                                                bpe_vocab_file,
+                                                unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -339,7 +392,7 @@ class SkepTokenizer(PretrainedTokenizer):
                 for sub_token in self.wordpiece_tokenizer.tokenize(token):
                     split_tokens.append(sub_token)
         else:
-            for token in self.bpe_tokenizer.encode(text):
+            for token in self.bpe_tokenizer._tokenize(text):
                 split_tokens.append(str(token))
 
         return split_tokens
@@ -362,6 +415,29 @@ class SkepTokenizer(PretrainedTokenizer):
         return len(
             self.build_inputs_with_special_tokens(
                 token_ids_0, token_ids_1 if pair else None))
+
+    def build_offset_mapping_with_special_tokens(self,
+                                                 offset_mapping_0,
+                                                 offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        Should be overridden in a subclass if the model has a special way of building those.
+
+        Args:
+            offset_mapping_0 (List[tuple]):
+                List of char offsets to which the special tokens will be added.
+            offset_mapping_1 (List[tuple], optional):
+                Optional second list of char offsets for offset mapping pairs.
+
+        Returns:
+            List[tuple]: List of char offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)
+                                              ] + offset_mapping_1 + [(0, 0)]
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -453,3 +529,91 @@ class SkepTokenizer(PretrainedTokenizer):
 
             if os.path.abspath(source_file) != os.path.abspath(save_path):
                 shutil.copyfile(source_file, save_path)
+
+    def convert_tokens_to_string(self, tokens: List[str]):
+        """
+        Converts a sequence of tokens (list of string) in a single string.
+
+        Args:
+            tokens (list): A list of string representing tokens to be converted.
+
+        Returns:
+            str: Converted string from tokens.
+
+        Examples:
+            .. code-block::
+
+                from paddlenlp.transformers import RoFormerTokenizer
+
+                tokenizer = RoFormerTokenizer.from_pretrained('roformer-chinese-base')
+                tokens = tokenizer.tokenize('欢迎使用百度飞桨')
+                #['欢迎', '使用', '百度', '飞', '桨']
+                strings = tokenizer.convert_tokens_to_string(tokens)
+                #'欢迎 使用 百度 飞 桨'
+
+        """
+        # to handle the bpe and wordpiece case
+        if hasattr(self, 'wordpiece_tokenizer'):
+            return " ".join(tokens).replace(" ##", "").strip()
+        else:
+            return self.bpe_tokenizer.convert_tokens_to_string(tokens)
+
+    def _convert_token_to_id(self, token: str) -> int:
+        """Converts a token (str) in an id using the vocab."""
+        if self.use_bpe_encoder:
+            return self.bpe_tokenizer._convert_token_to_id(token)
+
+        return super()._convert_token_to_id(token)
+
+    def _convert_id_to_token(self, index: int) -> str:
+        """Converts an index (integer) in a token (str) using the vocab."""
+        if self.use_bpe_encoder:
+            return self.bpe_tokenizer._convert_id_to_token(index)
+
+        return super()._convert_id_to_token(index)
+
+    def get_special_tokens_mask(
+        self,
+        token_ids_0: List[int],
+        token_ids_1: Optional[List[int]] = None,
+        already_has_special_tokens: bool = False,
+    ) -> List[int]:
+        """
+        Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer `prepare_for_model` method.
+
+        Args:
+            token_ids_0 (`List[int]`):
+                List of IDs.
+            token_ids_1 (`List[int]`, *optional*):
+                Optional second list of IDs for sequence pairs.
+            already_has_special_tokens (`bool`, *optional*, defaults to `False`):
+                Whether or not the token list is already formatted with special tokens for the model.
+
+        Returns:
+            A list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            return super().get_special_tokens_mask(
+                token_ids_0=token_ids_0,
+                token_ids_1=token_ids_1,
+                already_has_special_tokens=True,
+            )
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + (
+                [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self) -> Dict[str, int]:
+        """
+        Returns the vocabulary as a dictionary of token to index.
+
+        `tokenizer.get_vocab()[token]` is equivalent to `tokenizer.convert_tokens_to_ids(token)` when `token` is in the
+        vocab.
+
+        Returns:
+            `Dict[str, int]`: The vocabulary.
+        """
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)

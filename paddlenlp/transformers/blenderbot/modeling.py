@@ -51,7 +51,6 @@ class BlenderbotPretrainedModel(PretrainedModel):
     Refer to :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
     base_model_prefix = "blenderbot"
-    model_config_file = "model_config.json"
 
     pretrained_init_configuration = {
         "blenderbot-3B": {
@@ -121,7 +120,6 @@ class BlenderbotPretrainedModel(PretrainedModel):
             "scale_embedding": True,
         }
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "blenderbot-3B":

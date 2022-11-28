@@ -11,6 +11,7 @@ paddlenlp.transformers
    :maxdepth: 4
 
    paddlenlp.transformers.albert
+   paddlenlp.transformers.artist
    paddlenlp.transformers.auto
    paddlenlp.transformers.bart
    paddlenlp.transformers.bert
@@ -19,8 +20,10 @@ paddlenlp.transformers
    paddlenlp.transformers.blenderbot
    paddlenlp.transformers.blenderbot_small
    paddlenlp.transformers.chinesebert
+   paddlenlp.transformers.codegen
    paddlenlp.transformers.convbert
    paddlenlp.transformers.ctrl
+   paddlenlp.transformers.dallebart
    paddlenlp.transformers.distilbert
    paddlenlp.transformers.electra
    paddlenlp.transformers.ernie
@@ -31,6 +34,7 @@ paddlenlp.transformers
    paddlenlp.transformers.ernie_m
    paddlenlp.transformers.fnet
    paddlenlp.transformers.funnel
+   paddlenlp.transformers.gau_alpha
    paddlenlp.transformers.gpt
    paddlenlp.transformers.layoutlm
    paddlenlp.transformers.layoutlmv2
@@ -41,6 +45,7 @@ paddlenlp.transformers
    paddlenlp.transformers.mobilebert
    paddlenlp.transformers.mpnet
    paddlenlp.transformers.nezha
+   paddlenlp.transformers.opt
    paddlenlp.transformers.ppminilm
    paddlenlp.transformers.prophetnet
    paddlenlp.transformers.reformer
@@ -56,6 +61,7 @@ paddlenlp.transformers
    paddlenlp.transformers.transformer
    paddlenlp.transformers.unified_transformer
    paddlenlp.transformers.unimo
+   paddlenlp.transformers.xlm
    paddlenlp.transformers.xlnet
 
 
@@ -67,8 +73,10 @@ paddlenlp.transformers
    paddlenlp.transformers.distill_utils
    paddlenlp.transformers.export
    paddlenlp.transformers.generation_utils
+   paddlenlp.transformers.model_outputs
    paddlenlp.transformers.model_utils
    paddlenlp.transformers.optimization
+   paddlenlp.transformers.sentencepiece_model_pb2
    paddlenlp.transformers.tokenizer_utils
    paddlenlp.transformers.tokenizer_utils_base
    paddlenlp.transformers.tokenizer_utils_faster

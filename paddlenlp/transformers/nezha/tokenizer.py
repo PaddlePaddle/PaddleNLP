@@ -24,6 +24,13 @@ from paddlenlp.transformers import PretrainedTokenizer, BasicTokenizer, Wordpiec
 
 __all__ = ['NeZhaTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "nezha-base-chinese": 512,
+    "nezha-large-chinese": 512,
+    "nezha-base-wwm-chinese": 512,
+    "nezha-large-wwm-chinese": 512
+}
+
 
 class NeZhaTokenizer(PretrainedTokenizer):
     """
@@ -103,6 +110,7 @@ class NeZhaTokenizer(PretrainedTokenizer):
         },
     }
     padding_side = 'right'
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

@@ -747,6 +747,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
         no_split_token = set(self.unique_no_split_tokens)
         tokens = self.tokens_trie.split(text)
+
         # ["This is something", "<special_token_1>", "  else"]
         for i, token in enumerate(tokens):
             if token in no_split_token:
@@ -986,8 +987,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                #TODO aligns with HuggingFace here in breaking change
-                return self.convert_tokens_to_ids(text)
+                if is_split_into_words == True:
+                    tokens = list(
+                        itertools.chain(*(
+                            self.tokenize(t, is_split_into_words=True, **kwargs)
+                            for t in text)))
+                    return self.convert_tokens_to_ids(tokens)
+                else:
+                    return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1065,8 +1072,14 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], str):
-                #TODO aligns with HuggingFace here in breaking change
-                return self.convert_tokens_to_ids(text)
+                if is_split_into_words == True:
+                    tokens = list(
+                        itertools.chain(*(
+                            self.tokenize(t, is_split_into_words=True, **kwargs)
+                            for t in text)))
+                    return self.convert_tokens_to_ids(tokens)
+                else:
+                    return self.convert_tokens_to_ids(text)
             elif isinstance(text,
                             (list, tuple)) and len(text) > 0 and isinstance(
                                 text[0], int):
@@ -1305,11 +1318,10 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                         batch_outputs_list[i][k] = v[i]
             return batch_outputs_list
 
-    def get_offset_mapping(self, text):
+    def _get_bert_like_offset_mapping(self, text: str):
         """
         Returns the map of tokens and the start and end index of their start and end character.
         Modified from https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372
-
         Args:
             text (str):
                 Input text.
@@ -1319,21 +1331,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         if text is None:
             return None
-        split_tokens = []
-        if hasattr(self, "basic_tokenizer"):
-            for token in self.basic_tokenizer.tokenize(
-                    text, never_split=self.all_special_tokens):
-                # If the token is part of the never_split set
-                if token in self.basic_tokenizer.never_split:
-                    split_tokens.append(token)
-                else:
-                    for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                        split_tokens.append(
-                            sub_token if sub_token != self.unk_token else token)
-        else:
-            for sub_token in self.wordpiece_tokenizer.tokenize(text):
-                split_tokens.append(
-                    sub_token if sub_token != self.unk_token else text)
+        split_tokens = self.tokenize(text)
 
         normalized_text, char_mapping = '', []
 
@@ -1363,6 +1361,74 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if token in self.all_special_tokens:
                 token = token.lower() if hasattr(
                     self, "do_lower_case") and self.do_lower_case else token
+            # The greek letter "sigma" has 2 forms of lowercase, σ and ς respectively.
+            # When used as a final letter of a word, the final form (ς) is used. Otherwise, the form (σ) is used.
+            # https://latin.stackexchange.com/questions/6168/how-and-when-did-we-get-two-forms-of-sigma
+            if "σ" in token or "ς" in token:
+                start = text[offset:].replace("ς", "σ").index(
+                    token.replace("ς", "σ")) + offset
+            else:
+                start = text[offset:].index(token) + offset
+
+            end = start + len(token)
+
+            token_mapping.append(
+                (char_mapping[start], char_mapping[end - 1] + 1))
+            offset = end
+
+        return token_mapping
+
+    def get_offset_mapping(self,
+                           text: str,
+                           split_tokens: Optional[List[str]] = None):
+        """
+        Returns the map of tokens and the start and end index of their start and end character.
+        Modified from https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372
+
+        Args:
+            text (str):
+                Input text.
+            split_tokens (Optional[List[str]]):
+                the tokens which has been split which can accelerate the operation.
+                
+        Returns:
+            list: The offset map of input text.
+            
+        """
+        if text is None:
+            return None
+
+        # bert-like tokenizer use the old-school code block
+        if hasattr(self, "basic_tokenizer") or hasattr(self,
+                                                       "wordpiece_tokenizer"):
+            return self._get_bert_like_offset_mapping(text)
+
+        if not split_tokens:
+            split_tokens = self.tokenize(text)
+
+        normalized_text, char_mapping = '', []
+
+        for i, ch in enumerate(text):
+            normalized_text += normalize_chars(ch)
+            char_mapping.extend([i] * len(ch))
+
+        text, token_mapping, offset = normalized_text, [], 0
+        do_lower_case = getattr(self, 'do_lower_case', False)
+
+        # lower the text if the token is lower-cased
+        # keep align with token
+        if do_lower_case:
+            text = text.lower()
+
+        for token in split_tokens:
+
+            # convert tokens into original string
+            token: str = self.convert_tokens_to_string(token).strip()
+
+            if token in self.all_special_tokens:
+                if do_lower_case:
+                    token = token.lower()
+
             # The greek letter "sigma" has 2 forms of lowercase, σ and ς respectively.
             # When used as a final letter of a word, the final form (ς) is used. Otherwise, the form (σ) is used.
             # https://latin.stackexchange.com/questions/6168/how-and-when-did-we-get-two-forms-of-sigma

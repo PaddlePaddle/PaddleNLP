@@ -19,12 +19,11 @@ import paddle.nn.functional as F
 from paddle.nn import TransformerEncoder
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import CausalLMOutputWithCrossAttentions
 
 __all__ = [
-    "UNIMOPretrainedModel",
-    'UNIMOModel',
-    'UNIMOLMHeadModel',
-    'UNIMOForMaskedLM',
+    "UNIMOPretrainedModel", 'UNIMOModel', 'UNIMOLMHeadModel',
+    'UNIMOForMaskedLM', 'UNIMOForConditionalGeneration'
 ]
 
 
@@ -37,7 +36,6 @@ class UNIMOPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "unimo-text-1.0": {
             "vocab_size": 18000,
@@ -77,6 +75,25 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
+        "unimo-text-1.0-summary": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
         "unimo-text-1.0-large": {
             "vocab_size": 12800,
             "hidden_size": 1024,
@@ -96,8 +113,83 @@ class UNIMOPretrainedModel(PretrainedModel):
             "eos_token_id": 3,
             "mask_token_id": 3,
         },
+        "unimo-text-1.0-dureader_qg": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
+        "unimo-text-1.0-question-generation": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
+        "unimo-text-1.0-question-generation-full_domain": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
+        "unimo-text-1.0-question-generation-dureader_qg": {
+            "vocab_size": 18000,
+            "hidden_size": 768,
+            "num_hidden_layers": 12,
+            "num_attention_heads": 12,
+            "intermediate_size": 3072,
+            "hidden_act": "relu",
+            "hidden_dropout_prob": 0.1,
+            "attention_probs_dropout_prob": 0.1,
+            "normalize_before": False,
+            "max_position_embeddings": 513,
+            "type_vocab_size": 4,
+            "initializer_range": 0.02,
+            "unk_token_id": 17963,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 3,
+            "mask_token_id": 3,
+        },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "unimo-text-1.0":
@@ -106,6 +198,16 @@ class UNIMOPretrainedModel(PretrainedModel):
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-lcsts-new.pdparams",
             "unimo-text-1.0-large":
             "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large.pdparams",
+            "unimo-text-1.0-summary":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-summary.pdparams",
+            "unimo-text-1.0-dureader_qg":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-dureader_qg.pdparams",
+            "unimo-text-1.0-question-generation":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation.pdparams",
+            "unimo-text-1.0-question-generation-v2":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation-full_domain.pdparams",
+            "unimo-text-1.0-question-generation-dureader_qg":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-question-generation-dureader_qg.pdparams",
         }
     }
     base_model_prefix = "unimo"
@@ -132,16 +234,39 @@ class UNIMOEmbeddings(nn.Layer):
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
-                 type_vocab_size=4):
+                 type_vocab_size=4,
+                 pad_token_id=None):
         super(UNIMOEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
+        self.pad_token_id = pad_token_id
 
-    def forward(self, input_ids, token_type_ids, position_ids):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None):
         input_embedings = self.word_embeddings(input_ids)
+
+        if position_ids is None:
+            if self.pad_token_id is None:
+                position_ids = paddle.expand_as(
+                    paddle.arange(end=paddle.shape(input_ids)[1],
+                                  dtype="int64"), input_ids)
+            else:
+                num_pad = paddle.sum(
+                    (input_ids == self.pad_token_id).astype("float32"),
+                    axis=-1,
+                    keepdim=True)
+                position_ids = F.relu(
+                    paddle.expand_as(
+                        paddle.arange(end=paddle.shape(input_ids)[1],
+                                      dtype="float32"), input_ids) -
+                    num_pad).astype("int64")
+            position_ids.stop_gradient = True
         position_embeddings = self.position_embeddings(position_ids)
+
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids.stop_gradient = True
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
         embeddings = input_embedings + position_embeddings + token_type_embeddings
@@ -255,7 +380,7 @@ class UNIMOModel(UNIMOPretrainedModel):
         self.embeddings = UNIMOEmbeddings(vocab_size, hidden_size,
                                           hidden_dropout_prob,
                                           max_position_embeddings,
-                                          type_vocab_size)
+                                          type_vocab_size, self.pad_token_id)
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -275,13 +400,22 @@ class UNIMOModel(UNIMOPretrainedModel):
 
         self.apply(self.init_weights)
 
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
     def forward(self,
                 input_ids,
-                token_type_ids,
-                position_ids,
-                attention_mask,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The UNIMOModel forward method, overrides the special :meth:`__call__` method.
 
@@ -324,14 +458,24 @@ class UNIMOModel(UNIMOPretrainedModel):
                 method. See :meth:`paddle.nn.TransformerEncoder.gen_cache`
                 method for more details. It is only used for inference and
                 should be None for training. Defaults to `None`.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: If `use_cache` is False, it is a tensor representing the output of :class:`UNIMOModel`, with
-            shape [batch_size, sequence_length, hidden_size]. The data type is float64.
-            Otherwise, it is a tuple, besides the output of :class:`UNIMOModel`, the tuple also includes the new
-            cache which is same as input `cache` but `incremental_cache` in it has an incremental length.
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and
-            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=None`, 
+            returns tensor `Sequence_output` of shape [batch_size, sequence_length, hidden_size],
+            which is the output at the last layer of the model.
 
         Example:
             .. code-block::
@@ -345,6 +489,10 @@ class UNIMOModel(UNIMOPretrainedModel):
                 inputs = tokenizer.gen_encode("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors=True)
                 outputs = model(**inputs)
         """
+        if attention_mask is None:
+            attention_mask = ((input_ids == self.pad_token_id).astype(
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            attention_mask.stop_gradient = True
 
         embedding_output = self.embeddings(input_ids, token_type_ids,
                                            position_ids)
@@ -352,15 +500,18 @@ class UNIMOModel(UNIMOPretrainedModel):
         embedding_output = self.encoder_norm(embedding_output)
         embedding_output = self.dropout(embedding_output)
 
-        if use_cache:
-            if cache is None:
-                cache = self.encoder.gen_cache(embedding_output)
-            sequence_output, cache = self.encoder(embedding_output,
-                                                  attention_mask, cache)
-            return sequence_output, cache
-        else:
-            sequence_output = self.encoder(embedding_output, attention_mask)
-            return sequence_output
+        if use_cache and cache is None:
+            cache = self.encoder.gen_cache(embedding_output)
+
+        outputs = self.encoder(
+            embedding_output,
+            attention_mask,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        return outputs
 
 
 class UNIMOLMHead(nn.Layer):
@@ -416,12 +567,16 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
     def forward(self,
                 input_ids,
-                token_type_ids,
-                position_ids,
-                attention_mask,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
                 masked_positions=None,
                 use_cache=False,
-                cache=None):
+                cache=None,
+                labels=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=False):
         r"""
         The UNIMOLMHeadModel forward method, overrides the special
         :meth:`__call__` method.
@@ -439,14 +594,26 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 See :class:`UNIMOModel`.
             cache (list, optional):
                 See :class:`UNIMOModel`.
+            labels (Tensor, optional):
+                Labels for computing the left-to-right language modeling loss. Indices should be in
+                `[-100, 0, ..., vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
+                ignored (masked), the loss is only computed for the tokens with labels n `[0, ..., vocab_size]`
+            output_attentions (bool, optional):
+                See :class:`UNIMOModel`.
+            output_hidden_states (bool, optional):
+                See :class:`UNIMOModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor or tuple: If `use_cache` is False, it is a tensor representing the output of :class:`UNIMOModel`, with
-            shape [batch_size, sequence_length, hidden_size]. The data type is float64.
-            Otherwise, it is a tuple, besides the output of :class:`UNIMOLMHeadModel`, the tuple also includes the new
-            cache which is same as input `cache` but `incremental_cache` in it has an incremental length.
-            See :meth:`paddle.nn.MultiHeadAttention.gen_cache` method and
-            :meth:`paddle.nn.MultiHeadAttention.forward` method for more details.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding 
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=labels=None`, 
+            returns tensor `logits` of shape [batch_size, sequence_length, hidden_size],
+            which is the output at the last layer of the model.
 
         Example:
             .. code-block::
@@ -464,17 +631,46 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.unimo(input_ids, token_type_ids, position_ids,
-                             attention_mask, use_cache, cache)
+        outputs = self.unimo(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            use_cache,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
-        sequence_output = outputs[0] if use_cache else outputs
+        sequence_output = outputs if isinstance(outputs,
+                                                type(input_ids)) else outputs[0]
 
         logits = self.lm_head(sequence_output, masked_positions)
-        if use_cache:
-            cache = outputs[1]
-            return logits, cache
-        else:
-            return logits
+
+        lm_loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            lm_loss = loss_fct(
+                logits.reshape((-1, self.unimo.config["vocab_size"])),
+                labels.reshape((-1, )))
+
+        if not return_dict:
+            if isinstance(outputs, type(input_ids)):
+                return (lm_loss, logits) if lm_loss is not None else logits
+            else:
+                outputs = (logits, ) + outputs[1:]
+                return ((lm_loss, ) +
+                        outputs) if lm_loss is not None else outputs
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=lm_loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterUNIMOText
@@ -508,18 +704,48 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
-                                      token_type_ids,
-                                      position_ids,
-                                      attention_mask,
+                                      token_type_ids=None,
+                                      position_ids=None,
+                                      attention_mask=None,
                                       use_cache=False,
                                       cache=None,
                                       **kwargs):
+
+        if position_ids is None:
+            if self.pad_token_id is None:
+                position_ids = paddle.expand_as(
+                    paddle.arange(end=paddle.shape(input_ids)[1],
+                                  dtype="int64"), input_ids)
+            else:
+                num_pad = paddle.sum(
+                    (input_ids == self.pad_token_id).astype("float32"),
+                    axis=-1,
+                    keepdim=True)
+                position_ids = F.relu(
+                    paddle.expand_as(
+                        paddle.arange(end=paddle.shape(input_ids)[1],
+                                      dtype="float32"), input_ids) -
+                    num_pad).astype("int64")
+            position_ids.stop_gradient = True
+
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+            token_type_ids.stop_gradient = True
+
+        if attention_mask is None:
+            attention_mask = ((input_ids == self.pad_token_id).astype(
+                paddle.get_default_dtype()) * -1e4).unsqueeze([1, 2])
+            attention_mask.stop_gradient = True
+
         # only last token for inputs_ids if cache is defined in kwargs
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
-            token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
-            position_ids = position_ids[:, -1].unsqueeze(-1)
-            attention_mask = attention_mask[:, :, -1, :].unsqueeze(2)
+            if token_type_ids is not None:
+                token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
@@ -544,3 +770,4 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel
+UNIMOForConditionalGeneration = UNIMOLMHeadModel

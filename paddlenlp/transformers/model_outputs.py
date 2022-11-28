@@ -15,13 +15,60 @@
 
 import functools
 import paddle
+from paddle import Tensor
 import numpy as np
+from typing import Optional, Tuple
 from collections import OrderedDict
 from dataclasses import fields, dataclass
-from typing import Any, List, Tuple, Optional
-from paddle.nn.layer.transformer import _convert_attention_mask
+from typing import Any, Tuple, Optional
+from paddle.nn.layer.transformer import _convert_attention_mask, MultiHeadAttention
+from paddle.distributed.fleet.utils import recompute
 
 from .utils import adapt_stale_fwd_patch
+
+
+def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
+    """re-construct the outputs with one method which contains the simple logic
+
+    Args:
+        outputs (Tuple[Tensor]): the source of the outputs
+        loss (Optional[Tensor], optional): the loss of the model. Defaults to None.
+    """
+    if loss is not None:
+        outputs = (loss, ) + outputs
+    if len(outputs) == 1:
+        return outputs[0]
+    return outputs
+
+
+def convert_encoder_output(encoder_output):
+    """
+    Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.BaseModelOutput`.
+    
+    Args: 
+        encoder_output (tuple or ModleOutput):
+            The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
+            The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
+    """
+    return BaseModelOutput(
+        last_hidden_state=encoder_output[0],
+        hidden_states=encoder_output[1] if len(encoder_output) > 1 else None,
+        attentions=encoder_output[2] if len(encoder_output) > 2 else None,
+    )
+
+
+def layer_init_wrapper(func):
+
+    @functools.wraps(func)
+    def _impl(self, *args, **kwargs):
+        enable_recompute = kwargs.pop("enable_recompute", False)
+        func(self, *args, **kwargs)
+        if paddle.in_dynamic_mode():
+            self.enable_recompute = enable_recompute
+        else:
+            self.enable_recompute = False
+
+    return _impl
 
 
 def _transformer_encoder_layer_fwd(self,
@@ -60,6 +107,165 @@ def _transformer_encoder_layer_fwd(self,
         (src, ) + outputs[::-1])  # hidden_states, cache, attentions
 
 
+def _transformer_decoder_layer_fwd(
+    self,
+    tgt,
+    memory,
+    tgt_mask=None,
+    memory_mask=None,
+    cache=None,
+    output_attentions=False,
+):
+    residual = tgt
+
+    # self attention
+    self.self_attn.need_weights = output_attentions
+    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+
+    if self.normalize_before:
+        tgt = self.norm1(tgt)
+
+    self_attn_outputs = self.self_attn(tgt, tgt, tgt, tgt_mask,
+                                       cache[0] if cache else None)
+    # self_attn_outputs = (tgt, attn_weights, incremental_cache) or only tgt
+    if isinstance(self_attn_outputs, type(tgt)):
+        tgt = self_attn_outputs
+    else:
+        tgt = self_attn_outputs[0]
+        if output_attentions:
+            self_attn_weights = self_attn_outputs[1]
+        if cache:
+            incremental_cache = self_attn_outputs[-1]
+
+    tgt = residual + self.dropout1(tgt)
+    if not self.normalize_before:
+        tgt = self.norm1(tgt)
+
+    residual = tgt
+
+    # cross attention
+    if memory is not None:
+        self.cross_attn.need_weights = output_attentions
+        memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+
+        if self.normalize_before:
+            tgt = self.norm2(tgt)
+
+        cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask,
+                                             cache[1] if cache else None)
+        if isinstance(cross_attn_outputs, type(tgt)):
+            tgt = cross_attn_outputs
+        else:
+            tgt = cross_attn_outputs[0]
+            if output_attentions:
+                cross_attn_weights = cross_attn_outputs[1]
+            if cache:
+                static_cache = cross_attn_outputs[-1]
+
+        tgt = residual + self.dropout2(tgt)
+        if not self.normalize_before:
+            tgt = self.norm2(tgt)
+
+        residual = tgt
+
+    if self.normalize_before:
+        tgt = self.norm3(tgt)
+    tgt = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
+    tgt = residual + self.dropout3(tgt)
+    if not self.normalize_before:
+        tgt = self.norm3(tgt)
+
+    if not output_attentions and cache is None:
+        return tgt
+    else:
+        outputs = (tgt, )
+        if output_attentions:
+            outputs += (self_attn_weights,
+                        cross_attn_weights if memory is not None else None)
+        if cache:
+            outputs += ((incremental_cache,
+                         static_cache if memory is not None else None), )
+        return outputs
+
+
+def _transformer_decoder_fwd(self,
+                             tgt,
+                             memory=None,
+                             tgt_mask=None,
+                             memory_mask=None,
+                             cache=None,
+                             output_attentions=False,
+                             output_hidden_states=False,
+                             return_dict=False):
+    tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
+    if memory is not None:
+        memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
+
+    new_caches = [] if cache else None
+    all_hidden_states = [tgt] if output_hidden_states else None
+    all_self_attns = [] if output_attentions else None
+    all_cross_attns = [] if output_attentions else None
+
+    for i, mod in enumerate(self.layers):
+        if cache is None:
+            if self.enable_recompute:
+                outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask,
+                                    None, output_attentions)
+            else:
+                outputs = mod(
+                    tgt,
+                    memory,
+                    tgt_mask=tgt_mask,
+                    memory_mask=memory_mask,
+                    cache=None,
+                    output_attentions=output_attentions,
+                )
+        else:
+            outputs = mod(tgt,
+                          memory,
+                          tgt_mask=tgt_mask,
+                          memory_mask=memory_mask,
+                          cache=cache[i] if cache else None,
+                          output_attentions=output_attentions)
+        if isinstance(outputs, type(tgt)):
+            tgt = outputs
+        else:
+            tgt = outputs[0]
+        if cache:
+            new_caches.append(outputs[-1])
+        if output_attentions:
+            all_self_attns.append(outputs[1])
+            all_cross_attns.append(outputs[2])
+        if output_hidden_states:
+            all_hidden_states.append(tgt)
+
+    if self.norm is not None:
+        tgt = self.norm(tgt)
+        if output_hidden_states:
+            all_hidden_states[-1] = tgt
+
+    if not return_dict:
+        if isinstance(outputs, type(tgt)):
+            return tgt
+
+        temp_list = [
+            tgt,
+            new_caches if cache else None,
+            all_hidden_states,
+            all_self_attns,
+            all_cross_attns,
+        ]
+        return tuple(v for v in temp_list if v is not None)
+
+    return BaseModelOutputWithPastAndCrossAttentions(
+        last_hidden_state=tgt,
+        past_key_values=new_caches,
+        hidden_states=all_hidden_states,
+        attentions=all_self_attns,
+        cross_attentions=all_cross_attns,
+    )
+
+
 def _transformer_encoder_fwd(self,
                              src,
                              src_mask=None,
@@ -70,15 +276,34 @@ def _transformer_encoder_fwd(self,
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
-    new_caches = [] if cache is not None else None
+    # To get cache from None when use_cache is True, which is compatible with HF
+    # while HF requires decoder. The implementation here uses cache update in the
+    # MultiHeadAttention not so efficiently, and maybe optimize it later.
+    if cache is None and getattr(self, "_use_cache", False):
+        cache = [tuple(self.layers[0].gen_cache(src))] * len(self.layers)
+    # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
+    # to True when cache is not None.
+    new_caches = [] if cache is not None and getattr(self, "_use_cache",
+                                                     True) else None
     all_attentions = [] if output_attentions else None
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
-        layer_outputs = mod(output,
-                            src_mask=src_mask,
-                            cache=None if cache is None else cache[i],
-                            output_attentions=output_attentions)
+        if self.enable_recompute:
+            # Note: recompute do not support pass as **kwargs yet.
+            layer_outputs = recompute(
+                mod, output, src_mask, None if cache is None else
+                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+                MultiHeadAttention.Cache(*cache[i]), output_attentions)
+        else:
+            layer_outputs = mod(
+                output,
+                src_mask=src_mask,
+                cache=None if cache is None else
+                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
+                MultiHeadAttention.Cache(*cache[i]),
+                output_attentions=output_attentions)
+
         if isinstance(layer_outputs, tuple):
             output = layer_outputs[0]
             outputs = layer_outputs[1:]
@@ -90,8 +315,9 @@ def _transformer_encoder_fwd(self,
             all_hidden_states.append(output)
         if output_attentions:
             all_attentions.append(outputs[-1])
-        if cache is not None:
-            new_caches.append(outputs[0])
+        if new_caches is not None:
+            new_caches.append(outputs[0] if isinstance(
+                cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
 
     if self.norm is not None:
         output = self.norm(output)
@@ -121,7 +347,14 @@ def _transformer_encoder_fwd(self,
 
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
+paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd
 paddle.nn.TransformerEncoder.forward = _transformer_encoder_fwd
+paddle.nn.TransformerDecoder.forward = _transformer_decoder_fwd
+
+_encoder_init = paddle.nn.TransformerEncoder.__init__
+_decoder_init = paddle.nn.TransformerDecoder.__init__
+paddle.nn.TransformerEncoder.__init__ = layer_init_wrapper(_encoder_init)
+paddle.nn.TransformerDecoder.__init__ = layer_init_wrapper(_decoder_init)
 
 
 def _get_wrap_setattr(cls):
@@ -139,6 +372,9 @@ paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
 paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
     paddle.nn.TransformerEncoder.__setattr__)(_get_wrap_setattr(
         paddle.nn.TransformerEncoder))
+paddle.nn.TransformerDecoder.__setattr__ = functools.wraps(
+    paddle.nn.TransformerDecoder.__setattr__)(_get_wrap_setattr(
+        paddle.nn.TransformerDecoder))
 
 
 def is_tensor(x):
@@ -257,7 +493,93 @@ class ModelOutput(OrderedDict):
         """
         Convert self to a tuple containing all the attributes/keys that are not `None`.
         """
-        return tuple(self[k] for k in self.keys())
+        # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3355
+        # when trying to get the keys of `OrderedDict`, `keys` method return empty values.
+        # TODO(wj-Mcat): this bug should be fixed in Paddle framework
+        tuples = ()
+        for field in fields(self):
+            if getattr(self, field.name, None) is None:
+                continue
+            tuples = tuples + (getattr(self, field.name), )
+
+        return tuples
+
+
+@dataclass
+class BaseModelOutput(ModelOutput):
+    """
+    Base class for model's outputs, with potential hidden states and attentions.
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class BaseModelOutputWithNoAttention(ModelOutput):
+    """
+    Base class for model's outputs, with potential hidden states.
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, num_channels, height, width)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class BaseModelOutputWithPooling(ModelOutput):
+    """
+    Base class for model's outputs that also contains a pooling of the last hidden states.
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        pooler_output (`paddle.Tensor` of shape `(batch_size, hidden_size)`):
+            Last layer hidden-state of the first token of the sequence (classification token) after further processing
+            through the layers used for the auxiliary pretraining task. E.g. for BERT-family of models, this returns
+            the classification token after processing through a linear layer and a tanh activation function. The linear
+            layer weights are trained from the next sentence prediction (classification) objective during pretraining.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    pooler_output: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
 
 
 @dataclass
@@ -503,3 +825,313 @@ class MaskedLMOutput(ModelOutput):
     logits: paddle.Tensor = None
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class CausalLMOutputWithCrossAttentions(ModelOutput):
+    """
+    Base class for causal language model (or autoregressive) outputs.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Language modeling loss (for next-token prediction).
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+        cross_attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Cross attentions weights after the attention softmax, used to compute the weighted average in the
+            cross-attention heads.
+        past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `paddle.Tensor` tuples of length `config.n_layers`, with each tuple containing the cached key,
+            value states of the self-attention and the cross-attention layers if model is used in encoder-decoder
+            setting. Only relevant if `config.is_decoder = True`.
+
+            Contains pre-computed hidden-states (key and values in the attention blocks) that can be used (see
+            `past_key_values` input) to speed up sequential decoding.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+    cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class Seq2SeqModelOutput(ModelOutput):
+    """
+    Base class for model encoder's outputs that also contains : pre-computed hidden states that can speed up sequential
+    decoding.
+
+    Args:
+        last_hidden_state (`paddle.Tensor`):
+            Sequence of hidden-states at the output of the last layer of the decoder of the model, whose shape is `(batch_size, Sequence_length, hidden_size)`.
+
+            If `past_key_values` is used only the last hidden-state of the sequences of shape `(batch_size, 1,
+            hidden_size)` is output.
+        past_key_values (`tuple(tuple(paddle.Tensor))`, optional):
+            Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of shape
+            `(batch_size, num_heads, encoder_sequence_length, embed_size_per_head)`.
+            Returned when `use_cache=True` is passed or when `config.use_cache=True`.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+            blocks) that can be used (see `past_key_values` input) to speed up sequential decoding.
+        decoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`.
+
+            Hidden-states of the decoder at the output of each layer plus the optional initial embedding outputs.
+        decoder_attentions (`tuple(paddle.Tensor)`, optional): 
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
+
+            Attentions weights of the decoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+        cross_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
+
+            Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the
+            weighted average in the cross-attention heads.
+        encoder_last_hidden_state (`paddle.Tensor`, optional):
+            Sequence of hidden-states at the output of the last layer of the encoder of the model whose shape is `(batch_size, sequence_length, hidden_size)`,
+        encoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`.
+
+            Hidden-states of the encoder at the output of each layer plus the optional initial embedding outputs.
+        encoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
+
+            Attentions weights of the encoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    decoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    decoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+    cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+    encoder_last_hidden_state: Optional[paddle.Tensor] = None
+    encoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    encoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class Seq2SeqLMOutput(ModelOutput):
+    """
+    Base class for sequence-to-sequence language models outputs.
+
+    Args:
+        loss (`paddle.Tensor`, optional):
+            Language modeling loss whose shape is `(1,)`. Returned when `labels` is provided.
+        logits (`paddle.Tensor`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax) whose shape is `(batch_size, sequence_length, config.vocab_size)`).
+        past_key_values (`tuple(tuple(paddle.Tensor))`, optional):
+            Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of shape
+            `(batch_size, num_heads, encoder_sequence_length, embed_size_per_head)`.
+            Returned when `use_cache=True` is passed or when `config.use_cache=True`.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+            blocks) that can be used (see `past_key_values` input) to speed up sequential decoding.
+        decoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`.
+
+            Hidden-states of the decoder at the output of each layer plus the initial embedding outputs.
+        decoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
+
+            Attentions weights of the decoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+        cross_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
+
+            Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the
+            weighted average in the cross-attention heads.
+        encoder_last_hidden_state (`paddle.Tensor`, optional):
+            Sequence of hidden-states at the output of the last layer of the encoder of the model whose shape is `(batch_size, sequence_length, hidden_size)`.
+        encoder_hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the encoder at the output of each layer plus the initial embedding outputs.
+        encoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
+
+            Attentions weights of the encoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    decoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    decoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+    cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+    encoder_last_hidden_state: Optional[paddle.Tensor] = None
+    encoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    encoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class Seq2SeqQuestionAnsweringModelOutput(ModelOutput):
+    """
+    Base class for outputs of sequence-to-sequence question answering models.
+
+    Args:
+        loss (`paddle.Tensor` ,optional):
+            Total span extraction loss is the sum of a Cross-Entropy for the start and end positions.
+            A Tensor of shape `(1,)`, returned when `labels` is provided.
+        start_logits (`paddle.Tensor`):
+            Span-start scores (before SoftMax). Tensor of shape `(batch_size, sequence_length)`).
+        end_logits (`paddle.Tensor`):
+            Span-end scores (before SoftMax). Tensor of shape `(batch_size, sequence_length)`).
+        past_key_values (`tuple(tuple(paddle.Tensor))`, optional):
+            Tuple of `tuple(paddle.Tensor)` of length `n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of shape
+            `(batch_size, num_heads, encoder_sequence_length, embed_size_per_head)`.
+            Returned when `use_cache=True` is passed.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+            blocks) that can be used (see `past_key_values` input) to speed up sequential decoding.
+        decoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed.
+
+            Hidden-states of the decoder at the output of each layer plus the initial embedding outputs.
+        decoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`. Returned when `output_attentions=True` is passed.
+
+            Attentions weights of the decoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+        cross_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`. Returned when `output_attentions=True` is passed.
+
+            Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the
+            weighted average in the cross-attention heads.
+        encoder_last_hidden_state (`paddle.Tensor` optional):
+            Sequence of hidden-states at the output of the last layer of the encoder of the model.
+            Tensor of shape `(batch_size, sequence_length, hidden_size)`.
+        encoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed.
+
+            Hidden-states of the encoder at the output of each layer plus the initial embedding outputs.
+        encoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`. Returned when `output_attentions=True` is passed.
+
+            Attentions weights of the encoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    start_logits: paddle.Tensor = None
+    end_logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    decoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    decoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+    cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+    encoder_last_hidden_state: Optional[paddle.Tensor] = None
+    encoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    encoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class Seq2SeqSequenceClassifierOutput(ModelOutput):
+    """
+    Base class for outputs of sequence-to-sequence sentence classification models.
+
+    Args:
+        loss (`paddle.Tensor` optional): 
+            Classification (or regression if config.num_labels==1) loss of shape `(1,)`. Returned when `label` is provided).
+        logits (`paddle.Tensor`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax) of shape `(batch_size, config.num_labels)`
+        past_key_values (`tuple(tuple(paddle.Tensor))`, optional):
+            Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of shape
+            `(batch_size, num_heads, encoder_sequence_length, embed_size_per_head)`.
+            Returned when `use_cache=True` is passed.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+            blocks) that can be used (see `past_key_values` input) to speed up sequential decoding.
+        decoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed.
+
+            Hidden-states of the decoder at the output of each layer plus the initial embedding outputs.
+        decoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`. Returned when `output_attentions=True` is passed.
+
+
+            Attentions weights of the decoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+        cross_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`. Returned when `output_attentions=True` is passed.
+
+            Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the
+            weighted average in the cross-attention heads.
+        encoder_last_hidden_state (`paddle.Tensor`, optional):
+            Sequence of hidden-states at the output of the last layer of the encoder of the model.
+            Tensor of shape `(batch_size, sequence_length, hidden_size)`.
+        encoder_hidden_states (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+            Returned when `output_hidden_states=True` is passed.
+
+            Hidden-states of the encoder at the output of each layer plus the initial embedding outputs.
+        encoder_attentions (`tuple(paddle.Tensor)`, optional):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+            Returned when `output_attentions=True` is passed.
+
+            Attentions weights of the encoder, after the attention softmax, used to compute the weighted average in the
+            self-attention heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    decoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    decoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+    cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+    encoder_last_hidden_state: Optional[paddle.Tensor] = None
+    encoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    encoder_attentions: Optional[Tuple[paddle.Tensor]] = None

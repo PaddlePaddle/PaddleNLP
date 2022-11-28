@@ -226,6 +226,7 @@ class XFUN(Dataset):
             text = info["text"]
             encode_res = self.tokenizer.encode(text,
                                                pad_to_max_seq_len=False,
+                                               return_token_type_ids=True,
                                                return_attention_mask=True)
 
             gt_label = []

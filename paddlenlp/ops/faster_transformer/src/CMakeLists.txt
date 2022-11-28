@@ -146,7 +146,7 @@ if(ON_INFER)
   endif()
 
   if (WITH_ONNXRUNTIME)
-    set(DEPS ${DEPS} ${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib/libonnxruntime.so.1.10.0 paddle2onnx)
+    set(DEPS ${DEPS} ${PADDLE_LIB_THIRD_PARTY_PATH}onnxruntime/lib/libonnxruntime.so paddle2onnx)
   endif()
 
   if (NOT WIN32)
@@ -221,6 +221,16 @@ else(ON_INFER)
     set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
   endif()
 
+  execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.__version__)"
+                RESULT_VARIABLE _INC_PYTHON_SUCCESS
+                OUTPUT_VARIABLE _INC_PYTHON_VALUES)
+  message(STATUS "PADDLE_VERSION: ${_INC_PYTHON_VALUES}")
+
+  # TODO(gongenlei): support PADDLE_NEW_ALLOCATOR for ON_INFER
+  if(_INC_PYTHON_VALUES VERSION_GREATER_EQUAL "2.3.0")
+      add_definitions(-DPADDLE_NEW_ALLOCATOR)
+  endif()
+
   execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import paddle; print(paddle.sysconfig.get_include())"
                   RESULT_VARIABLE _INC_PYTHON_SUCCESS
                   OUTPUT_VARIABLE _INC_PYTHON_VALUES)
@@ -262,21 +272,22 @@ else(ON_INFER)
     )
   endif()
 
-  if(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
+  if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
+    set(lib_link
+      -lpaddle
+    )
+  elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
     set(lib_link
       -l:core_avx.so
-    )
-    link_directories(
-      ${PY_LIB_DIR}/../fluid/
     )
   else()
     set(lib_link
       -l:core_noavx.so
     )
-    link_directories(
-      ${PY_LIB_DIR}/../fluid/
-    )
   endif()
+  link_directories(
+    ${PY_LIB_DIR}/../fluid/
+  )
 
   set(ft_lib_link
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils

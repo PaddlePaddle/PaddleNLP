@@ -39,17 +39,19 @@ class Task(metaclass=abc.ABCMeta):
 
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
+        self.is_static_model = kwargs.get("is_static_model", False)
         self.task = task
         self.kwargs = kwargs
         self._priority_path = priority_path
         self._usage = ""
-        # The dygraph model instantce
+        # The dygraph model instance
         self._model = None
-        # The static model instantce
+        # The static model instance
         self._input_spec = None
         self._config = None
         self._custom_model = False
         self._param_updated = False
+
         self._num_threads = self.kwargs[
             'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
                 cpu_count() / 2)
@@ -62,6 +64,8 @@ class Task(metaclass=abc.ABCMeta):
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
         self._task_flag = self.kwargs[
             'task_flag'] if 'task_flag' in self.kwargs else self.model
+        self.from_hf_hub = kwargs.pop("from_hf_hub", False)
+
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
             self._custom_model = True
@@ -71,7 +75,9 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
-        download_check(self._task_flag)
+
+        if not self.from_hf_hub:
+            download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
@@ -169,7 +175,10 @@ class Task(metaclass=abc.ABCMeta):
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
+        if self.task in ["document_intelligence", "knowledge_mining"]:
+            self._config.switch_ir_optim(False)
         self.predictor = paddle.inference.create_predictor(self._config)
+        self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [
             self.predictor.get_input_handle(name)
             for name in self.predictor.get_input_names()
@@ -188,7 +197,7 @@ class Task(metaclass=abc.ABCMeta):
         if not os.path.exists(onnx_dir):
             os.mkdir(onnx_dir)
         float_onnx_file = os.path.join(onnx_dir, 'model.onnx')
-        if not os.path.exists(float_onnx_file):
+        if not os.path.exists(float_onnx_file) or self._param_updated:
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
                 model_file=self._static_model_file,
                 params_file=self._static_params_file,
@@ -197,12 +206,14 @@ class Task(metaclass=abc.ABCMeta):
             with open(float_onnx_file, "wb") as f:
                 f.write(onnx_model)
         fp16_model_file = os.path.join(onnx_dir, 'fp16_model.onnx')
-        if not os.path.exists(fp16_model_file):
+        if not os.path.exists(fp16_model_file) or self._param_updated:
             onnx_model = onnx.load_model(float_onnx_file)
             trans_model = float16.convert_float_to_float16(onnx_model,
                                                            keep_io_types=True)
             onnx.save_model(trans_model, fp16_model_file)
-        providers = ['CUDAExecutionProvider']
+        providers = [('CUDAExecutionProvider', {
+            'device_id': self.kwargs['device_id']
+        })]
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = self._num_threads
         sess_options.inter_op_num_threads = self._num_threads
@@ -218,8 +229,26 @@ class Task(metaclass=abc.ABCMeta):
         """
         Return the inference program, inputs and outputs in static mode. 
         """
-        inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
+        if self._custom_model:
+            param_path = os.path.join(self._task_path, "model_state.pdparams")
+            if os.path.exists(param_path):
+                cache_info_path = os.path.join(self._task_path, ".cache_info")
+                md5 = md5file(param_path)
+                self._param_updated = True
+                if os.path.exists(cache_info_path) and open(
+                        cache_info_path).read() == md5:
+                    self._param_updated = False
+                else:
+                    fp = open(cache_info_path, "w")
+                    fp.write(md5)
+                    fp.close()
+
+        # When the user-provided model path is already a static model, skip to_static conversion
+        if self.is_static_model:
+            inference_model_path = self._task_path
+        else:
+            inference_model_path = os.path.join(self._task_path, "static",
+                                                "inference")
         if not os.path.exists(inference_model_path +
                               ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():

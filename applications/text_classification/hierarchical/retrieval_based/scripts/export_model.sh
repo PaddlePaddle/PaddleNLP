@@ -1,0 +1,1 @@
+python export_model.py --params_path checkpoints/inbatch/model_best/model_state.pdparams --output_path=./output

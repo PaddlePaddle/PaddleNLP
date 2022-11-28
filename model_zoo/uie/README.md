@@ -19,8 +19,9 @@
   - [4.3 模型微调](#模型微调)
   - [4.4 模型评估](#模型评估)
   - [4.5 定制模型一键预测](#定制模型一键预测)
-  - [4.6 实验指标](#实验指标)
-  - [4.7 模型部署](#模型部署)
+  - [4.6 模型快速服务化部署](#模型快速服务化部署)
+  - [4.7 实验指标](#实验指标)
+  - [4.8 模型部署](#模型部署)
 - [5. CCKS比赛](#CCKS比赛)
 
 <a name="模型简介"></a>
@@ -234,7 +235,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     ```python
     >>> schema = [{'Person': ['Company', 'Position']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en('In 1997, Steve was excited to become the CEO of Apple.')
+    >>> pprint(ie_en('In 1997, Steve was excited to become the CEO of Apple.'))
     [{'Person': [{'end': 14,
                   'probability': 0.999631971804547,
                   'relations': {'Company': [{'end': 53,
@@ -340,19 +341,19 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     调用示例：
 
     ```python
-    >>> schema = [{'Comment object': ['Opinion', 'Sentiment classification [negative, positive]']}]
+    >>> schema = [{'Aspect': ['Opinion', 'Sentiment classification [negative, positive]']}]
     >>> ie_en.set_schema(schema)
-    >>> ie_en("overall i 'm happy with my toy.")
-    [{'Comment object': [{'end': 30,
-                          'probability': 0.9774399346859042,
-                          'relations': {'Opinion': [{'end': 18,
-                                                    'probability': 0.6168918705033555,
-                                                    'start': 13,
-                                                    'text': 'happy'}],
-                                        'Sentiment classification [negative, positive]': [{'probability': 0.9999556545777182,
-                                                                                          'text': 'positive'}]},
-                          'start': 24,
-                          'text': 'my toy'}]}]
+    >>> pprint(ie_en("The teacher is very nice."))
+    [{'Aspect': [{'end': 11,
+                  'probability': 0.4301476415932193,
+                  'relations': {'Opinion': [{'end': 24,
+                                            'probability': 0.9072940447883724,
+                                            'start': 15,
+                                            'text': 'very nice'}],
+                                'Sentiment classification [negative, positive]': [{'probability': 0.9998571920670685,
+                                                                                  'text': 'positive'}]},
+                  'start': 4,
+                  'text': 'teacher'}]}]
     ```
 
 <a name="情感分类"></a>
@@ -383,7 +384,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
     英文模型调用示例：
 
     ```python
-    >>> schema = [{'Person': ['Company', 'Position']}]
+    >>> schema = 'Sentiment classification [negative, positive]'
     >>> ie_en.set_schema(schema)
     >>> ie_en('I am sorry but this is the worst film I have ever seen in my life.')
     [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
@@ -450,9 +451,11 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
   | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
   | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
+  | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
+  | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
 
 
-- `uie-nano`调用示例
+- `uie-nano`调用示例：
 
   ```python
   >>> from paddlenlp import Taskflow
@@ -461,6 +464,41 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
   >>> ie = Taskflow('information_extraction', schema=schema, model="uie-nano")
   >>> ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")
   [{'时间': [{'text': '2月8日上午', 'start': 0, 'end': 6, 'probability': 0.6513581678349247}], '选手': [{'text': '谷爱凌', 'start': 28, 'end': 31, 'probability': 0.9819330659468051}], '赛事名称': [{'text': '北京冬奥会自由式滑雪女子大跳台决赛', 'start': 6, 'end': 23, 'probability': 0.4908131110420939}]}]
+  ```
+
+- `uie-m-base`和`uie-m-large`支持中英文混合抽取，调用示例：
+
+  ```python
+  >>> from pprint import pprint
+  >>> from paddlenlp import Taskflow
+
+  >>> schema = ['Time', 'Player', 'Competition', 'Score']
+  >>> ie = Taskflow('information_extraction', schema=schema, model="uie-m-base", schema_lang="en")
+  >>> pprint(ie(["2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！", "Rafael Nadal wins French Open Final!"]))
+  [{'Competition': [{'end': 23,
+                    'probability': 0.9373889907291257,
+                    'start': 6,
+                    'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
+    'Player': [{'end': 31,
+                'probability': 0.6981119555336441,
+                'start': 28,
+                'text': '谷爱凌'}],
+    'Score': [{'end': 39,
+              'probability': 0.9888507878270296,
+              'start': 32,
+              'text': '188.25分'}],
+    'Time': [{'end': 6,
+              'probability': 0.9784080036931151,
+              'start': 0,
+              'text': '2月8日上午'}]},
+  {'Competition': [{'end': 35,
+                    'probability': 0.9851549932171295,
+                    'start': 18,
+                    'text': 'French Open Final'}],
+    'Player': [{'end': 12,
+                'probability': 0.9379371275888104,
+                'start': 0,
+                'text': 'Rafael Nadal'}]}]
   ```
 
 <a name="更多配置"></a>
@@ -472,18 +510,21 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 
 >>> ie = Taskflow('information_extraction',
                   schema="",
+                  schema_lang="zh",
                   batch_size=1,
                   model='uie-base',
                   position_prob=0.5,
-                  precision='fp32')
+                  precision='fp32',
+                  use_fast=False)
 ```
 
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
+* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-m-base`和`uie-m-large`模型有效。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
-
+* `use_fast`: 使用C++实现的高性能分词算子FastTokenizer进行文本预处理加速。需要通过`pip install fast-tokenizer-python`安装FastTokenizer库后方可使用。默认为`False`。更多使用说明可参考[FastTokenizer文档](../../fast_tokenizer)。
 <a name="训练定制"></a>
 
 ## 4. 训练定制
@@ -500,7 +541,7 @@ UIE不限定行业领域和抽取目标，以下是一些零样本行业示例�
 ├── model.py          # 模型组网脚本
 ├── doccano.py        # 数据标注脚本
 ├── doccano.md        # 数据标注文档
-├── finetune.py       # 模型微调脚本
+├── finetune.py       # 模型微调、压缩脚本
 ├── evaluate.py       # 模型评估脚本
 └── README.md
 ```
@@ -542,7 +583,8 @@ python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --task_type ext \
     --save_dir ./data \
-    --splits 0.8 0.2 0
+    --splits 0.8 0.2 0 \
+    --schema_lang ch
 ```
 
 
@@ -558,6 +600,7 @@ python doccano.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度级分类任务有效。默认为"##"。
+- ``schema_lang``: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 备注：
 - 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
@@ -567,60 +610,111 @@ python doccano.py \
 
 更多**不同类型任务（关系抽取、事件抽取、评价观点抽取等）的标注规则及参数说明**，请参考[doccano数据标注指南](doccano.md)。
 
-<a name="模型微调"></a>
-
-#### 4.3 模型微调
-
-单卡启动：
+此外，也可以通过数据标注平台 [Label Studio](https://labelstud.io/) 进行数据标注。本示例提供了 [labelstudio2doccano.py](./labelstudio2doccano.py) 脚本，将 label studio 导出的 JSON 数据文件格式转换成 doccano 导出的数据文件格式，后续的数据转换与模型微调等操作不变。
 
 ```shell
-python finetune.py \
-    --train_path ./data/train.txt \
-    --dev_path ./data/dev.txt \
-    --save_dir ./checkpoint \
-    --learning_rate 1e-5 \
-    --batch_size 16 \
-    --max_seq_len 512 \
-    --num_epochs 100 \
-    --model uie-base \
-    --seed 1000 \
-    --logging_steps 10 \
-    --valid_steps 100 \
-    --device gpu
-```
-
-多卡启动：
-
-```shell
-python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
-  --train_path ./data/train.txt \
-  --dev_path ./data/dev.txt \
-  --save_dir ./checkpoint \
-  --learning_rate 1e-5 \
-  --batch_size 16 \
-  --max_seq_len 512 \
-  --num_epochs 100 \
-  --model uie-base \
-  --seed 1000 \
-  --logging_steps 10 \
-  --valid_steps 100 \
-  --device gpu
+python labelstudio2doccano.py --labelstudio_file label-studio.json
 ```
 
 可配置参数说明：
 
-- `train_path`: 训练集文件路径。
-- `dev_path`: 验证集文件路径。
-- `save_dir`: 模型存储路径，默认为`./checkpoint`。
-- `learning_rate`: 学习率，默认为1e-5。
-- `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
-- `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `num_epochs`: 训练轮数，默认为100。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
-- `seed`: 随机种子，默认为1000.
-- `logging_steps`: 日志打印的间隔steps数，默认10。
-- `valid_steps`: evaluate的间隔steps数，默认100。
-- `device`: 选用什么设备进行训练，可选cpu或gpu。
+- ``labelstudio_file``: label studio 的导出文件路径（仅支持 JSON 格式）。
+- ``doccano_file``: doccano 格式的数据文件保存路径，默认为 "doccano_ext.jsonl"。
+- ``task_type``: 任务类型，可选有抽取（"ext"）和分类（"cls"）两种类型的任务，默认为 "ext"。
+
+<a name="模型微调"></a>
+
+#### 4.3 模型微调
+
+推荐使用 [Trainer API ](../../docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
+
+使用下面的命令，使用 `uie-base` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
+
+单卡启动：
+
+```shell
+export finetuned_model=./checkpoint/model_best
+
+python finetune.py  \
+    --device gpu \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --eval_steps 100 \
+    --seed 42 \
+    --model_name_or_path uie-base \
+    --output_dir $finetuned_model \
+    --train_path data/train.txt \
+    --dev_path data/dev.txt  \
+    --max_seq_length 512  \
+    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size  16 \
+    --num_train_epochs 100 \
+    --learning_rate 1e-5 \
+    --label_names 'start_positions' 'end_positions' \
+    --do_train \
+    --do_eval \
+    --do_export \
+    --export_model_dir $finetuned_model \
+    --overwrite_output_dir \
+    --disable_tqdm True \
+    --metric_for_best_model eval_f1 \
+    --load_best_model_at_end  True \
+    --save_total_limit 1 \
+
+```
+
+如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
+
+```shell
+export finetuned_model=./checkpoint/model_best
+
+python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
+    --device gpu \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --eval_steps 100 \
+    --seed 42 \
+    --model_name_or_path uie-base \
+    --output_dir $finetuned_model \
+    --train_path data/train.txt \
+    --dev_path data/dev.txt  \
+    --max_seq_length 512  \
+    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size  16 \
+    --num_train_epochs 100 \
+    --learning_rate 1e-5 \
+    --do_train \
+    --do_eval \
+    --do_export \
+    --export_model_dir $finetuned_model \
+    --label_names 'start_positions' 'end_positions' \
+    --overwrite_output_dir \
+    --disable_tqdm True \
+    --metric_for_best_model eval_f1 \
+    --load_best_model_at_end  True \
+    --save_total_limit 1 \
+
+```
+**注意**：如果模型是跨语言模型 UIE-M，还需设置 `--multilingual`。
+
+可配置参数说明：
+
+* `model_name_or_path`：必须，进行 few shot 训练使用的预训练模型。可选择的有 "uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-m-base", "uie-m-large"。
+* `multilingual`：是否是跨语言模型，用 "uie-m-base", "uie-m-large" 等模型进微调得到的模型也是多语言模型，需要设置为 True；默认为 False。
+* `output_dir`：必须，模型训练或压缩后保存的模型目录；默认为 `None` 。
+* `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
+* `per_device_train_batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
+* `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 32。
+* `learning_rate`：训练最大学习率，UIE 推荐设置为 1e-5；默认值为3e-5。
+* `num_train_epochs`: 训练轮次，使用早停法时可以选择 100；默认为10。
+* `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认100。
+* `save_steps`: 训练过程中保存模型 checkpoint 的间隔 steps 数，默认100。
+* `seed`：全局随机种子，默认为 42。
+* `weight_decay`：除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0；
+* `do_train`:是否进行微调训练，设置该参数表示进行微调训练，默认不设置。
+* `do_eval`:是否进行评估，设置该参数表示进行评估。
+
+该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
 
 <a name="模型评估"></a>
 
@@ -634,6 +728,17 @@ python evaluate.py \
     --test_path ./data/dev.txt \
     --batch_size 16 \
     --max_seq_len 512
+```
+
+通过运行以下命令对 UIE-M 进行模型评估：
+
+```
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path ./data/dev.txt \
+    --batch_size 16 \
+    --max_seq_len 512 \
+    --multilingual
 ```
 
 评估方式说明：采用单阶段评价的方式，即关系抽取、事件抽取等需要分阶段预测的任务对每一阶段的预测结果进行分别评价。验证/测试集默认会利用同一层级的所有标签来构造出全部负例。
@@ -650,18 +755,24 @@ python evaluate.py \
 输出打印示例：
 
 ```text
-[2022-06-23 08:25:23,017] [    INFO] - -----------------------------
-[2022-06-23 08:25:23,017] [    INFO] - Class name: 时间
-[2022-06-23 08:25:23,018] [    INFO] - Evaluation precision: 1.00000 | recall: 1.00000 | F1: 1.00000
-[2022-06-23 08:25:23,145] [    INFO] - -----------------------------
-[2022-06-23 08:25:23,146] [    INFO] - Class name: 目的地
-[2022-06-23 08:25:23,146] [    INFO] - Evaluation precision: 0.64286 | recall: 0.90000 | F1: 0.75000
-[2022-06-23 08:25:23,272] [    INFO] - -----------------------------
-[2022-06-23 08:25:23,273] [    INFO] - Class name: 费用
-[2022-06-23 08:25:23,273] [    INFO] - Evaluation precision: 0.11111 | recall: 0.10000 | F1: 0.10526
-[2022-06-23 08:25:23,399] [    INFO] - -----------------------------
-[2022-06-23 08:25:23,399] [    INFO] - Class name: 出发地
-[2022-06-23 08:25:23,400] [    INFO] - Evaluation precision: 1.00000 | recall: 1.00000 | F1: 1.00000
+[2022-09-14 03:13:58,877] [    INFO] - -----------------------------
+[2022-09-14 03:13:58,877] [    INFO] - Class Name: 疾病
+[2022-09-14 03:13:58,877] [    INFO] - Evaluation Precision: 0.89744 | Recall: 0.83333 | F1: 0.86420
+[2022-09-14 03:13:59,145] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,145] [    INFO] - Class Name: 手术治疗
+[2022-09-14 03:13:59,145] [    INFO] - Evaluation Precision: 0.90000 | Recall: 0.85714 | F1: 0.87805
+[2022-09-14 03:13:59,439] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,440] [    INFO] - Class Name: 检查
+[2022-09-14 03:13:59,440] [    INFO] - Evaluation Precision: 0.77778 | Recall: 0.56757 | F1: 0.65625
+[2022-09-14 03:13:59,708] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,709] [    INFO] - Class Name: X的手术治疗
+[2022-09-14 03:13:59,709] [    INFO] - Evaluation Precision: 0.90000 | Recall: 0.85714 | F1: 0.87805
+[2022-09-14 03:13:59,893] [    INFO] - -----------------------------
+[2022-09-14 03:13:59,893] [    INFO] - Class Name: X的实验室检查
+[2022-09-14 03:13:59,894] [    INFO] - Evaluation Precision: 0.71429 | Recall: 0.55556 | F1: 0.62500
+[2022-09-14 03:14:00,057] [    INFO] - -----------------------------
+[2022-09-14 03:14:00,058] [    INFO] - Class Name: X的影像学检查
+[2022-09-14 03:14:00,058] [    INFO] - Evaluation Precision: 0.69231 | Recall: 0.45000 | F1: 0.54545
 ```
 
 可配置参数说明：
@@ -670,8 +781,9 @@ python evaluate.py \
 - `test_path`: 进行评估的测试集文件。
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-- `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+- `multilingual`: 是否是跨语言模型，默认关闭。
+- `schema_lang`: 选择schema的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 <a name="定制模型一键预测"></a>
 
@@ -705,36 +817,67 @@ python evaluate.py \
           'text': '114'}]}]
 ```
 
+<a name="模型快速服务化部署"></a>
+
+#### 4.6 模型快速服务化部署
+在UIE的服务化能力中我们提供基于PaddleNLP SimpleServing 来搭建服务化能力，通过几行代码即可搭建服务化部署能力
+
+```python
+
+# Save at server.py
+from paddlenlp import SimpleServer
+from paddlenlp import Taskflow
+
+schema = ['出发地', '目的地', '费用', '时间']
+uie = Taskflow("information_extraction",
+               schema=schema,
+               task_path='./checkpoint/model_best/')
+app = SimpleServer()
+app.register_taskflow('uie', uie)
+```
+
+```bash
+# Start the server
+paddlenlp server server:app --host 0.0.0.0 --port 8989
+```
+
+具体使用的方法可以见[UIE SimpleServing 使用方法](./deploy/serving/simple_serving/README.md)
+
+
 <a name="实验指标"></a>
 
-#### 4.6 实验指标
+#### 4.7 实验指标
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>uie-base (12L768H)<td><b>46.43</b><td><b>70.92</b><td><b>71.83</b><td><b>85.72</b><td><b>78.33</b><td><b>81.86</b>
+<tr><td>uie-base (12L768H)<td>46.43<td>70.92<td><b>71.83</b><td>85.72<td>78.33<td>81.86
 <tr><td>uie-medium (6L768H)<td>41.11<td>64.53<td>65.40<td>75.72<td>78.32<td>79.68
 <tr><td>uie-mini (6L384H)<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
 <tr><td>uie-micro (4L384H)<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
+<tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td><b>78.49</b><td><b>83.02</b>
+<tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
 </table>
 
-0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示基于5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+0-shot表示无训练数据直接通过```paddlenlp.Taskflow```进行预测，5-shot表示每个类别包含5条标注数据进行模型微调。**实验表明UIE在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+
 
 <a name="模型部署"></a>
 
-#### 4.7 模型部署
+#### 4.8 模型部署
 
-以下是UIE Python端的部署流程，包括环境准备、模型导出和使用示例。
+以下是 UIE Python 端的部署流程，包括环境准备、模型导出和使用示例。
 
 - 环境准备
-  UIE的部署分为CPU和GPU两种情况，请根据你的部署环境安装对应的依赖。
+
+  UIE的部署分为 CPU 和 GPU 两种情况，请根据你的部署环境安装对应的依赖。
 
   - CPU端
 
-    CPU端的部署请使用如下命令安装所需依赖
+    CPU端的部署请使用如下命令安装所需依赖：
 
     ```shell
     pip install -r deploy/python/requirements_cpu.txt
@@ -742,28 +885,21 @@ python evaluate.py \
 
   - GPU端
 
-    为了在GPU上获得最佳的推理性能和稳定性，请先确保机器已正确安装NVIDIA相关驱动和基础软件，确保**CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖
+    为了在 GPU 上获得最佳的推理性能和稳定性，请先确保机器已正确安装 NVIDIA 相关驱动和基础软件，确保 **CUDA >= 11.2，cuDNN >= 8.1.1**，并使用以下命令安装所需依赖
 
     ```shell
     pip install -r deploy/python/requirements_gpu.txt
     ```
 
-    如需使用半精度（FP16）部署，请确保GPU设备的CUDA计算能力 (CUDA Compute Capability) 大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。
-    更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
+    如果有模型推理加速、内存显存占用优化的需求，并且 GPU 设备的 CUDA 计算能力 (CUDA Compute Capability) 大于等于 7.0，例如 V100、T4、A10、A100/GA100、Jetson AGX Xavier 等显卡，推荐使用半精度（FP16）部署。直接使用微调后导出的 FP32 模型，运行时设置 `--use_fp16` 即可。
 
+    如果 GPU 设备的 CUDA 计算能力较低，低于 7.0，只支持 FP32 部署，微调后导出模型直接部署即可。
+
+    更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 
 - 模型导出
 
-  将训练后的动态图参数导出为静态图参数：
-
-  ```shell
-  python export_model.py --model_path ./checkpoint/model_best --output_path ./export
-  ```
-
-  可配置参数说明：
-
-  - `model_path`: 动态图训练保存的参数路径，路径下包含模型参数文件`model_state.pdparams`和模型配置文件`model_config.json`。
-  - `output_path`: 静态图参数导出路径，默认导出路径为`./export`。
+模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdimodel`、`*.pdiparams` 模型文件可用于推理。
 
 - 推理
 
@@ -772,31 +908,32 @@ python evaluate.py \
     在CPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_cpu.py --model_path_prefix export/inference
+    python deploy/python/infer_cpu.py --model_path_prefix ${finetuned_model}/model
     ```
 
     可配置参数说明：
 
-    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
-    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
+    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
 
   - GPU端推理样例
 
     在GPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix export/inference --use_fp16
+    python deploy/python/infer_gpu.py --model_path_prefix export/model --use_fp16 --device_id 0
     ```
 
     可配置参数说明：
 
-    - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/inference.pdiparams`，则传入`./export/inference`。
-    - `use_fp16`: 是否使用FP16进行加速，默认关闭。
-    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
-    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
-    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为4。
+    - `model_path_prefix`: 用于推理的 Paddle 模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
+    - `use_fp16`: FP32 模型是否使用 FP16 进行加速，使用 FP32、INT8 推理时不需要设置，默认关闭。
+    - `position_prob`：模型对于span的起始位置/终止位置的结果概率0~1之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
+    - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
+    - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
+    - `device_id`: GPU 设备 ID，默认为 0。
 
 <a name="CCKS比赛"></a>
 
@@ -809,3 +946,5 @@ python evaluate.py \
 
 ## References
 - **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**
+- **[Quantizing deep convolutional networks for efficient inference: A whitepaper](https://arxiv.org/pdf/1806.08342.pdf)**
+- **[PACT: Parameterized Clipping Activation for Quantized Neural Networks](https://arxiv.org/abs/1805.06085)**

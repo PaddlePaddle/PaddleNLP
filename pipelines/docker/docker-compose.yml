@@ -1,0 +1,35 @@
+version: "3"
+services:
+  elasticsearch:
+    # This will start an empty elasticsearch instance (so you have to add your documents yourself)
+    #image: "elasticsearch:8.3.3"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:8.3.3"
+    container_name: es01
+    ports:
+      - 9200:9200
+    restart: on-failure
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - xpack.security.enabled=false
+  pipelines-cpu-serving:
+    image: paddlepaddle/paddlenlp:pipelines-cpu-1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pip01
+    network_mode: host
+    restart: on-failure
+    volumes:
+      - .:/paddle
+    environment:
+      - API_ENDPOINT=http://127.0.0.1:8891
+      - PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
+    depends_on:
+      - elasticsearch
+    command: /bin/bash -c "sleep 15 && cd /paddle && sh start_compose.sh && tail -f /dev/null"
+  
+networks:
+  default:
+    name: elastic

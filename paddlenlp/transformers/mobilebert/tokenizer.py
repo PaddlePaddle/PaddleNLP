@@ -17,6 +17,8 @@ from .. import BertTokenizer
 
 __all__ = ['MobileBertTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"mobilebert-uncased": 512}
+
 
 class MobileBertTokenizer(BertTokenizer):
     r"""
@@ -38,6 +40,7 @@ class MobileBertTokenizer(BertTokenizer):
             "do_lower_case": True
         }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def batch_encode(self,
                      batch_text_or_text_pairs,

@@ -163,8 +163,10 @@ doccano支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式
 
 
 ### 7.1 多分类任务
-通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多分类文本任务指南](multi_class/README.md)进行相应模型训练。
-运行
+通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多分类文本任务指南](multi_class/README.md)中固定格式进行相应模型训练。
+
+数据标注转化运行：
+
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
@@ -173,9 +175,13 @@ python doccano.py \
     --task_type "multi_class"
 ```
 
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[多分类训练评估与模型优化指南](multi_class/analysis/README.md)
+
 ### 7.2 多标签任务
-通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)进行相应模型训练。
-运行
+通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)中固定格式进行相应模型训练。
+
+数据标注转化运行：
+
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
@@ -184,9 +190,14 @@ python doccano.py \
     --task_type "multi_label"
 ```
 
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[多标签训练评估与模型优化指南](multi_label/analysis/README.md)
+
 ### 7.3 层次分类任务
-通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[层次文本分类任务指南](hierarchical/README.md)进行相应模型训练。
-运行
+
+通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[层次文本分类任务指南](hierarchical/README.md)中固定格式进行相应模型训练。
+
+数据标注转化运行：
+
 ```shell
 python doccano.py \
     --doccano_file doccano.jsonl \
@@ -195,6 +206,7 @@ python doccano.py \
     --task_type "hierarchical"
 ```
 
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[层次分类训练评估与模型优化指南](hierarchical/analysis/README.md)
 可配置参数说明：
 
 - ``doccano_file``: 从doccano导出的数据标注文件。
@@ -204,8 +216,11 @@ python doccano.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 不同层标签之间的分隔符，该参数只对层次文本分类任务有效。默认为"##"。
+- ``valid``: 是否为稀疏数据筛选的有效标注数据，默认为False.
+- ``dirty``: 是否为脏数据清洗策略标注数据，默认为False.
 
 转化后的doccano标注数据目录结构如下：
+
 ```text
 data/
 ├── train.txt # 训练数据集文件
@@ -220,5 +235,6 @@ data/
 - 脚本会自动生成data.txt，如果数据划分为 train/dev/test 数据集，data.txt则为test数据集无标签数据；如果数据划分为 train/dev 数据集，data.txt为无标签数据。**如果有未标注数据，则用未标注数据文件替换data.txt**
 - 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
 - 对于从doccano导出的文件，默认文件中的每条数据都是经过人工正确标注的。
+
 ## References
 - **[doccano](https://github.com/doccano/doccano)**

@@ -287,7 +287,7 @@ def do_predict():
     model = AutoModelForSequenceClassification.from_pretrained(
         "ernie-3.0-medium-zh", num_classes=len(label_map))
     model = paddle.DataParallel(model)
-    tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     print("============start predict==========")
     if not args.init_ckpt or not os.path.isfile(args.init_ckpt):

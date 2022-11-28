@@ -18,6 +18,11 @@ from .. import BertTokenizer
 
 __all__ = ['MegatronBertTokenizer']
 
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "megatronbert-cased": 512,
+    "megatronbert-uncased": 512
+}
+
 
 class MegatronBertTokenizer(BertTokenizer):
     """
@@ -80,6 +85,7 @@ class MegatronBertTokenizer(BertTokenizer):
             "do_lower_case": False
         }
     }
+    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
     def __init__(self,
                  vocab_file,

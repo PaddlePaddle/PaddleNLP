@@ -24,6 +24,11 @@ from paddlenlp.utils.log import logger
 from paddlenlp.ops.ext_utils import load, LOADED_EXT
 from paddlenlp.ops import transfer_param
 
+if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
+    from paddle.framework import core
+
+from .decoding import run_custom
+
 
 def infer_transformer_decoder(from_tensor,
                               memory_tensor,
@@ -62,68 +67,43 @@ def infer_transformer_decoder(from_tensor,
                               size_per_head,
                               memory_hidden_dim,
                               is_fuse_qkv=False):
-    helper = LayerHelper('fusion_decoder', **locals())
+    inputs_names = [
+        "FromTensor", "MemoryTensor", "MemSeqLen", "SelfLayernormWeight",
+        "SelfLayernormBias", "SelfQueryWeight", "SelfQueryBias",
+        "SelfKeyWeight", "SelfKeyBias", "SelfValueWeight", "SelfValueBias",
+        "SelfOutWeight", "SelfOutBias", "CrossLayernormWeight",
+        "CrossLayernormBias", "CrossQueryWeight", "CrossQueryBias",
+        "CrossKeyWeight", "CrossKeyBias", "CrossValueWeight", "CrossValueBias",
+        "CrossOutWeight", "CrossOutBias", "FFNLayernormWeight",
+        "FFNLayernormBias", "FFNInterWeight", "FFNInterBias", "FFNOutWeight",
+        "FFNOutBias", "OldSelfCacheKey", "OldSelfCacheValue"
+    ]
 
-    inputs = {
-        "FromTensor": from_tensor,
-        "MemoryTensor": memory_tensor,
-        "MemSeqLen": mem_seq_len,
-        "SelfLayernormWeight": self_ln_weight,
-        "SelfLayernormBias": self_ln_bias,
-        "SelfQueryWeight": self_q_weight,
-        "SelfQueryBias": self_q_bias,
-        "SelfKeyWeight": self_k_weight,
-        "SelfKeyBias": self_k_bias,
-        "SelfValueWeight": self_v_weight,
-        "SelfValueBias": self_v_bias,
-        "SelfOutWeight": self_out_weight,
-        "SelfOutBias": self_out_bias,
-        "CrossLayernormWeight": cross_ln_weight,
-        "CrossLayernormBias": cross_ln_bias,
-        "CrossQueryWeight": cross_q_weight,
-        "CrossQueryBias": cross_q_bias,
-        "CrossKeyWeight": cross_k_weight,
-        "CrossKeyBias": cross_k_bias,
-        "CrossValueWeight": cross_v_weight,
-        "CrossValueBias": cross_v_bias,
-        "CrossOutWeight": cross_out_weight,
-        "CrossOutBias": cross_out_bias,
-        "FFNLayernormWeight": ffn_ln_weight,
-        "FFNLayernormBias": ffn_ln_bias,
-        "FFNInterWeight": ffn_inter_weight,
-        "FFNInterBias": ffn_inter_bias,
-        "FFNOutWeight": ffn_out_weight,
-        "FFNOutBias": ffn_out_bias,
-        "OldSelfCacheKey": old_self_cache_key,
-        "OldSelfCacheValue": old_self_cache_value,
-        "OldMemCache": old_mem_cache
-    }
-    attrs = {
-        'step': step,
-        'n_head': n_head,
-        'size_per_head': size_per_head,
-        'memory_hidden_dim': memory_hidden_dim,
-        'is_fuse_qkv': is_fuse_qkv
-    }
+    inputs_var = [
+        from_tensor, memory_tensor, mem_seq_len, self_ln_weight, self_ln_bias,
+        self_q_weight, self_q_bias, self_k_weight, self_k_bias, self_v_weight,
+        self_v_bias, self_out_weight, self_out_bias, cross_ln_weight,
+        cross_ln_bias, cross_q_weight, cross_q_bias, cross_k_weight,
+        cross_k_bias, cross_v_weight, cross_v_bias, cross_out_weight,
+        cross_out_bias, ffn_ln_weight, ffn_ln_bias, ffn_inter_weight,
+        ffn_inter_bias, ffn_out_weight, ffn_out_bias, old_self_cache_key,
+        old_self_cache_value, old_mem_cache
+    ]
 
-    decoder_output = helper.create_variable(dtype=memory_tensor.dtype)
-    new_self_cache_key = helper.create_variable(dtype=memory_tensor.dtype)
-    new_self_cache_value = helper.create_variable(dtype=memory_tensor.dtype)
-    new_mem_cache = helper.create_variable(dtype=memory_tensor.dtype)
+    attrs_names = [
+        'step', 'n_head', 'size_per_head', 'memory_hidden_dim', 'is_fuse_qkv'
+    ]
 
-    outputs = {
-        'DecoderOutput': decoder_output,
-        'NewSelfCacheKey': new_self_cache_key,
-        'NewSelfCacheValue': new_self_cache_value,
-        'NewMemCache': new_mem_cache
-    }
+    attrs_val = [step, n_head, size_per_head, memory_hidden_dim, is_fuse_qkv]
 
-    helper.append_op(type='fusion_decoder',
-                     inputs=inputs,
-                     outputs=outputs,
-                     attrs=attrs)
+    outputs_names = [
+        'DecoderOutput', 'NewSelfCacheKey', 'NewSelfCacheValue', 'NewMemCache'
+    ]
 
-    return decoder_output, new_self_cache_key, new_self_cache_value, new_mem_cache
+    outputs_dtype = [memory_tensor.dtype] * len(outputs_names)
+
+    return run_custom("fusion_decoder", inputs_names, inputs_var, attrs_names,
+                      attrs_val, outputs_names, outputs_dtype)
 
 
 def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):

@@ -13,30 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
-from collections import deque
+import threading
 import warnings
+
 import paddle
+
 from ..utils.tools import get_env_device
-from ..transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-from .knowledge_mining import WordTagTask, NPTagTask
-from .named_entity_recognition import NERWordTagTask
-from .named_entity_recognition import NERLACTask
-from .sentiment_analysis import SentaTask, SkepTask
-from .lexical_analysis import LacTask
-from .word_segmentation import SegJiebaTask
-from .word_segmentation import SegLACTask
-from .word_segmentation import SegWordTagTask
-from .pos_tagging import POSTaggingTask
-from .text_generation import TextGenerationTask
-from .poetry_generation import PoetryGenerationTask
-from .question_answering import QuestionAnsweringTask
+from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
+from .dialogue import DialogueTask
+from .document_intelligence import DocPromptTask
+from .fill_mask import FillMaskTask
+from .information_extraction import GPTask, UIETask
+from .knowledge_mining import NPTagTask, WordTagTask
+from .lexical_analysis import LacTask
+from .named_entity_recognition import NERLACTask, NERWordTagTask
+from .poetry_generation import PoetryGenerationTask
+from .pos_tagging import POSTaggingTask
+from .question_answering import QuestionAnsweringTask
+from .question_generation import QuestionGenerationTask
+from .sentiment_analysis import SentaTask, SkepTask
+from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
-from .dialogue import DialogueTask
-from .information_extraction import UIETask
-from .code_generation import CodeGenerationTask
+from .text_summarization import TextSummarizationTask
+from .text_to_image import (TextToImageDiscoDiffusionTask,
+                            TextToImageGenerationTask,
+                            TextToImageStableDiffusionTask)
+from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 
 warnings.simplefilter(action='ignore', category=Warning, lineno=0, append=False)
 
@@ -69,6 +73,17 @@ TASKS = {
         },
         "default": {
             "model": "plato-mini",
+        }
+    },
+    'fill_mask': {
+        "models": {
+            "fill_mask": {
+                "task_class": FillMaskTask,
+                "task_flag": "fill_mask-fill_mask"
+            },
+        },
+        "default": {
+            "model": "fill_mask",
         }
     },
     "knowledge_mining": {
@@ -191,9 +206,62 @@ TASKS = {
                 "task_class": TextSimilarityTask,
                 "task_flag": "text_similarity-simbert-base-chinese"
             },
+            "rocketqa-zh-dureader-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag":
+                'text_similarity-rocketqa-zh-dureader-cross-encoder',
+            },
+            "rocketqa-base-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-base-cross-encoder',
+            },
+            "rocketqa-medium-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-medium-cross-encoder',
+            },
+            "rocketqa-mini-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-mini-cross-encoder',
+            },
+            "rocketqa-micro-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-micro-cross-encoder',
+            },
+            "rocketqa-nano-cross-encoder": {
+                "task_class": TextSimilarityTask,
+                "task_flag": 'text_similarity-rocketqa-nano-cross-encoder',
+            },
         },
         "default": {
             "model": "simbert-base-chinese"
+        }
+    },
+    'text_summarization': {
+        "models": {
+            "unimo-text-1.0-summary": {
+                "task_class": TextSummarizationTask,
+                "task_flag": "text_summarization-unimo-text-1.0-summary",
+                "task_priority_path": "unimo-text-1.0-summary",
+            },
+            "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+            },
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese": {
+                "task_class":
+                TextSummarizationTask,
+                "task_flag":
+                "text_summarization-IDEA-CCNL/Randeng-Pegasus523M-Summary-Chinese",
+                "task_priority_path":
+                "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
+            },
+        },
+        "default": {
+            "model": "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese"
         }
     },
     "word_segmentation": {
@@ -262,6 +330,20 @@ TASKS = {
                 "hidden_size": 768,
                 "task_flag": "information_extraction-uie-base-en"
             },
+            "uie-m-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-m-base"
+            },
+            "uie-m-large": {
+                "task_class": UIETask,
+                "hidden_size": 1024,
+                "task_flag": "information_extraction-uie-m-large"
+            },
+            "uie-data-distill-gp": {
+                "task_class": GPTask,
+                "task_flag": "information_extraction-uie-data-distill-gp"
+            },
         },
         "default": {
             "model": "uie-base"
@@ -317,19 +399,143 @@ TASKS = {
         },
         "default": {
             "model": "Salesforce/codegen-350M-mono",
+        },
+    },
+    "text_classification": {
+        "models": {
+            "multi_class": {
+                "task_class": TextClassificationTask,
+                "task_flag": "text_classification-text_classification",
+            },
+        },
+        "default": {
+            "model": "multi_class"
+        },
+    },
+    "text_to_image": {
+        "models": {
+            "dalle-mini": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mini",
+                "task_priority_path": "dalle-mini",
+            },
+            "dalle-mega-v16": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega-v16",
+                "task_priority_path": "dalle-mega-v16",
+            },
+            "dalle-mega": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-dalle-mega",
+                "task_priority_path": "dalle-mega",
+            },
+            "pai-painter-painting-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-painting-base-zh",
+                "task_priority_path": "pai-painter-painting-base-zh",
+            },
+            "pai-painter-scenery-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-scenery-base-zh",
+                "task_priority_path": "pai-painter-scenery-base-zh",
+            },
+            "pai-painter-commercial-base-zh": {
+                "task_class": TextToImageGenerationTask,
+                "task_flag": "text_to_image-pai-painter-commercial-base-zh",
+                "task_priority_path": "pai-painter-commercial-base-zh",
+            },
+            "openai/disco-diffusion-clip-vit-base-patch32": {
+                "task_class":
+                TextToImageDiscoDiffusionTask,
+                "task_flag":
+                "text_to_image-openai/disco-diffusion-clip-vit-base-patch32",
+                "task_priority_path":
+                "openai/disco-diffusion-clip-vit-base-patch32",
+            },
+            "openai/disco-diffusion-clip-rn50": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn50",
+                "task_priority_path": "openai/disco-diffusion-clip-rn50",
+            },
+            "openai/disco-diffusion-clip-rn101": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
+                "task_priority_path": "openai/disco-diffusion-clip-rn101",
+            },
+            "disco_diffusion_ernie_vil-2.0-base-zh": {
+                "task_class": TextToImageDiscoDiffusionTask,
+                "task_flag":
+                "text_to_image-disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_priority_path": "disco_diffusion_ernie_vil-2.0-base-zh",
+            },
+            "CompVis/stable-diffusion-v1-4": {
+                "task_class": TextToImageStableDiffusionTask,
+                "task_flag": "text_to_image-CompVis/stable-diffusion-v1-4",
+                "task_priority_path": "CompVis/stable-diffusion-v1-4",
+            },
+        },
+        "default": {
+            "model": "pai-painter-painting-base-zh",
         }
-    }
+    },
+    "document_intelligence": {
+        "models": {
+            "docprompt": {
+                "task_class": DocPromptTask,
+                "task_flag": "document_intelligence-docprompt",
+            },
+        },
+        "default": {
+            "model": "docprompt"
+        }
+    },
+    "question_generation": {
+        "models": {
+            "unimo-text-1.0": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0",
+            },
+            "unimo-text-1.0-dureader_qg": {
+                "task_class": QuestionGenerationTask,
+                "task_flag": "question_generation-unimo-text-1.0-dureader_qg",
+            },
+            "unimo-text-1.0-question-generation": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-question-generation",
+            },
+            "unimo-text-1.0-question-generation-dureader_qg": {
+                "task_class":
+                QuestionGenerationTask,
+                "task_flag":
+                "question_generation-unimo-text-1.0-question-generation-dureader_qg",
+            },
+        },
+        "default": {
+            "model": "unimo-text-1.0-dureader_qg"
+        }
+    },
 }
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "uie-base-en", "wordtag"
+    "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base"
+]
+
+support_argument_list = [
+    "dalle-mini", "dalle-mega", "dalle-mega-v16",
+    "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh",
+    "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4",
+    "openai/disco-diffusion-clip-vit-base-patch32",
+    "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101",
+    "disco_diffusion_ernie_vil-2.0-base-zh"
 ]
 
 
 class Taskflow(object):
     """
-    The Taskflow is the end2end inferface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
+    The Taskflow is the end2end interface that could convert the raw text to model result, and decode the model result to task result. The main functions as follows:
         1) Convert the raw text to task result.
         2) Convert the model to the inference model.
         3) Offer the usage and help message.
@@ -339,14 +545,26 @@ class Taskflow(object):
         mode (str, optional): Select the mode of the task, only used in the tasks of word_segmentation and ner.
             If set None, will use the default mode.
         device_id (int, optional): The device id for the gpu, xpu and other devices, the defalut value is 0.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
 
     """
 
-    def __init__(self, task, model=None, mode=None, device_id=0, **kwargs):
-        assert task in TASKS, "The task name:{} is not in Taskflow list, please check your task name.".format(
-            task)
+    def __init__(self,
+                 task,
+                 model=None,
+                 mode=None,
+                 device_id=0,
+                 from_hf_hub=False,
+                 **kwargs):
+        assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
+
+        # Set the device for the task
+        device = get_env_device()
+        if device == 'cpu' or device_id == -1:
+            paddle.set_device('cpu')
+        else:
+            paddle.set_device(device + ":" + str(device_id))
 
         if self.task in ["word_segmentation", "ner"]:
             tag = "modes"
@@ -359,7 +577,7 @@ class Taskflow(object):
 
         if self.model is not None:
             assert self.model in set(TASKS[task][tag].keys(
-            )), "The {} name: {} is not in task:[{}]".format(tag, model, task)
+            )), f"The {tag} name: {model} is not in task:[{task}]"
         else:
             self.model = TASKS[task]['default'][ind_tag]
 
@@ -368,13 +586,6 @@ class Taskflow(object):
                 self.model]["task_priority_path"]
         else:
             self.priority_path = None
-
-        # Set the device for the task
-        device = get_env_device()
-        if device == 'cpu' or device_id == -1:
-            paddle.set_device('cpu')
-        else:
-            paddle.set_device(device + ":" + str(device_id))
 
         # Update the task config to kwargs
         config_kwargs = TASKS[self.task][tag][self.model]
@@ -385,9 +596,13 @@ class Taskflow(object):
         self.task_instance = task_class(model=self.model,
                                         task=self.task,
                                         priority_path=self.priority_path,
+                                        from_hf_hub=from_hf_hub,
                                         **self.kwargs)
         task_list = TASKS.keys()
         Taskflow.task_list = task_list
+
+        # Add the lock for the concurrency requests
+        self._lock = threading.Lock()
 
     def __call__(self, *inputs):
         """
@@ -432,3 +647,7 @@ class Taskflow(object):
     def set_schema(self, schema):
         assert self.task_instance.model in support_schema_list, 'This method can only be used by the task with the model of uie or wordtag.'
         self.task_instance.set_schema(schema)
+
+    def set_argument(self, argument):
+        assert self.task_instance.model in support_argument_list, 'This method can only be used by the task with the model of text_to_image generation.'
+        self.task_instance.set_argument(argument)
