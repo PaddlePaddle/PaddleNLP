@@ -24,7 +24,7 @@ from paddlenlp import __version__
 from paddlenlp.transformers import *
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
                                         get_path_from_url)
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME
 from paddlenlp.utils.import_utils import is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
 
@@ -243,7 +243,7 @@ class AutoTokenizer():
         if from_hf_hub:
             config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
                                           filename=cls.tokenizer_config_file,
-                                          cache_dir=MODEL_HOME,
+                                          cache_dir=HF_CACHE_HOME,
                                           library_name="PaddleNLP",
                                           library_version=__version__)
             if os.path.exists(config_file):
