@@ -106,7 +106,7 @@ def main():
     def compute_metrics(eval_preds, labels, verbalizer):
         metric = Accuracy()
         predictions = paddle.to_tensor(eval_preds.predictions)
-        predictions = verbalizer.eval_process_outputs(predictions)
+        predictions = verbalizer.aggregate_multiple_mask(predictions)
         correct = metric.compute(predictions, paddle.to_tensor(labels))
         metric.update(correct)
         acc = metric.accumulate()
