@@ -32,8 +32,9 @@ import numpy as np
 import paddle
 from huggingface_hub import hf_hub_download
 
+from paddlenlp import __version__
 from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
-                                        get_path_from_url)
+                                        get_path_from_url_with_filelock)
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
@@ -1522,8 +1523,14 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             **additional_files_names
         }
 
+        # From HF Hub
+        if from_hf_hub:
+            # Only include the necessary resource files specified by the tokenizer cls
+            # Deep copy to avoid modifiying the class attributes
+            vocab_files = copy.deepcopy(cls.resource_files_names)
+            vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         # From built-in pretrained models
-        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+        elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
                 vocab_files[file_id] = map_list[pretrained_model_name_or_path]
             init_configuration = copy.deepcopy(
@@ -1538,12 +1545,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                               file_name)
                 if os.path.isfile(full_file_name):
                     vocab_files[file_id] = full_file_name
-        # From HF Hub
-        elif from_hf_hub:
-            # Only include the necessary resource files specified by the tokenizer cls
-            # Deep copy to avoid modifiying the class attributes
-            vocab_files = copy.deepcopy(cls.resource_files_names)
-            vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
@@ -1564,13 +1565,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = file_path
                 continue
             if from_hf_hub:
-                # if file_id not in cls.resource_files_names:
-                #     resolved_vocab_files[file_id] = None
-                # else:
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME)
+                    cache_dir=MODEL_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
@@ -1581,8 +1581,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     logger.info("Downloading %s and saved to %s" %
                                 (file_path, default_root))
                     try:
-                        resolved_vocab_files[file_id] = get_path_from_url(
-                            file_path, default_root)
+                        resolved_vocab_files[
+                            file_id] = get_path_from_url_with_filelock(
+                                file_path, default_root)
                     except RuntimeError as err:
                         if file_id not in cls.resource_files_names:
                             resolved_vocab_files[file_id] = None
@@ -1945,7 +1946,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                         warnings.warn(
                             "Though `pad_to_max_length` = `True`, it is ignored because `padding`=`True`."
                         )
-                padding_strategy = PaddingStrategy.LONGEST  # Default to pad to the longest sequence in the batch
+                # Default to pad to the longest sequence in the batch
+                padding_strategy = PaddingStrategy.LONGEST
             elif not isinstance(padding, PaddingStrategy):
                 padding_strategy = PaddingStrategy(padding)
             elif isinstance(padding, PaddingStrategy):
@@ -2845,7 +2847,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 offset_mapping = self.build_offset_mapping_with_special_tokens(
                     token_offset_mapping, token_pair_offset_mapping)
             else:
-                offset_mapping = token_offset_mapping + token_pair_offset_mapping if token_pair_offset_mapping else token_offset_mapping
+                offset_mapping = token_offset_mapping + \
+                    token_pair_offset_mapping if token_pair_offset_mapping else token_offset_mapping
             encoded_inputs['offset_mapping'] = offset_mapping
 
         # Check lengths
@@ -2867,7 +2870,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         if return_length:
             encoded_inputs["length"] = len(encoded_inputs["input_ids"])
-            #for compatibility
+            # for compatibility
             encoded_inputs["seq_len"] = encoded_inputs["length"]
 
         batch_outputs = BatchEncoding(encoded_inputs,

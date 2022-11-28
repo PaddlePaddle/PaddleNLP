@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from .base_handler import BaseTaskflowHandler
 
 
-class TaskflowHandler:
+class TaskflowHandler(BaseTaskflowHandler):
 
     def __init__(self):
         self._name = 'taskflow_handler'

@@ -86,7 +86,7 @@ def download_file(save_dir, filename, url, md5=None):
 
 def download_check(task):
     """
-    Check the resource statuc in the specified task.
+    Check the resource status in the specified task.
 
     Args:
         task(string): The name of specified task. 
