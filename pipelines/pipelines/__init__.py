@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = '0.1.0a0'  # Maybe dev is better
+__version__ = '0.3.0a0'  # Maybe dev is better
 
 from typing import Union
 from types import ModuleType

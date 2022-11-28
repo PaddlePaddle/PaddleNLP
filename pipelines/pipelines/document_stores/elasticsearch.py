@@ -1464,19 +1464,11 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                                         body=body,
                                         request_timeout=300,
                                         headers=headers)["hits"]["hits"]
-            if len(result) == 0:
-                count_embeddings = self.get_embedding_count(index=index,
-                                                            headers=headers)
-                if count_embeddings == 0:
-                    raise RequestError(
-                        400, "search_phase_execution_exception",
-                        {"error": "No documents with embeddings."})
+            logger.info({"info": "No documents with embeddings."})
+            logger.info(
+                "Likely some of your stored documents don't have embeddings."
+                " try to run the document store's update_embeddings() method.")
         except RequestError as e:
-            if e.error == "search_phase_execution_exception":
-                error_message: str = (
-                    "search_phase_execution_exception: Likely some of your stored documents don't have embeddings."
-                    " Run the document store's update_embeddings() method.")
-                raise RequestError(e.status_code, error_message, e.info)
             raise e
 
         documents = [

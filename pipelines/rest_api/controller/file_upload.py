@@ -55,19 +55,24 @@ try:
             "Indexing Pipeline with FAISSDocumentStore or InMemoryDocumentStore is not supported with the REST APIs."
         )
         INDEXING_PIPELINE = None
-        INDEXING_QA_GENERATING_PIPELINE = None
     else:
-        INDEXING_QA_GENERATING_PIPELINE = Pipeline.load_from_yaml(
-            Path(PIPELINE_YAML_PATH),
-            pipeline_name=INDEXING_QA_GENERATING_PIPELINE_NAME)
         INDEXING_PIPELINE = Pipeline.load_from_yaml(
             Path(PIPELINE_YAML_PATH), pipeline_name=INDEXING_PIPELINE_NAME)
 
 except KeyError:
     INDEXING_PIPELINE = None
-    INDEXING_QA_GENERATING_PIPELINE = None
     logger.warning(
         "Indexing Pipeline not found in the YAML configuration. File Upload API will not be available."
+    )
+
+# Loading INDEXING_QA_GENERATING_PIPELINE_NAME
+try:
+    INDEXING_QA_GENERATING_PIPELINE = Pipeline.load_from_yaml(
+        Path(PIPELINE_YAML_PATH),
+        pipeline_name=INDEXING_QA_GENERATING_PIPELINE_NAME)
+except Exception as e:
+    logger.warning(
+        f"Request pipeline ('{INDEXING_QA_GENERATING_PIPELINE_NAME}: is null'). "
     )
 
 # create directory for uploading files

@@ -45,7 +45,7 @@ class ErnieRanker(BaseRanker):
         model_name_or_path: Union[str, Path],
         top_k: int = 10,
         use_gpu: bool = True,
-        max_seq_len: int = 256,
+        max_seq_len: int = 512,
         progress_bar: bool = True,
         batch_size: int = 1000,
         reinitialize: bool = False,

@@ -53,7 +53,7 @@ class DensePassageRetriever(BaseRetriever):
         reinitialize: bool = False,
         share_parameters: bool = False,
         max_seq_len_query: int = 64,
-        max_seq_len_passage: int = 256,
+        max_seq_len_passage: int = 384,
         top_k: int = 10,
         use_gpu: bool = True,
         batch_size: int = 16,

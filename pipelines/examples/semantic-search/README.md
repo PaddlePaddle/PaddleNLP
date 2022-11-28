@@ -132,6 +132,12 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
+删除索引也可以使用下面的命令：
+
+```
+curl -XDELETE http://localhost:9200/dureader_robust_query_encoder
+```
+
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
