@@ -25,13 +25,13 @@ from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.prompt import (
     PromptTuningArguments,
     SoftTemplate,
-    ManualVerbalizer,
+    MaskedLMVerbalizer,
     PromptModelForSequenceClassification,
     PromptTrainer,
 )
 
 from data import load_fewclue_dataset
-from utils import (load_prompt_arguments, maskedlm_wrapper, save_pseudo_data,
+from utils import (load_prompt_arguments, save_pseudo_data,
                    save_fewclue_prediction)
 
 
@@ -80,9 +80,7 @@ def main():
                             training_args.max_seq_length, model)
     logger.info("Using template: {}".format(template.prompt))
 
-    verbalizer = ManualVerbalizer(data_args.label_words, tokenizer)
-    verbalizer.mask_aggregate_type = "mean"
-    verbalizer = maskedlm_wrapper(verbalizer)
+    verbalizer = MasedLMVerbalizer(data_args.label_words, tokenizer)
     labels_to_ids = verbalizer.labels_to_ids
     ids_to_labels = {idx: label for label, idx in labels_to_ids.items()}
     logger.info("Using verbalizer: {}".format(data_args.label_words))

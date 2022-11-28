@@ -14,13 +14,11 @@
 
 import os
 import json
-import types
 import pathlib
 
 import numpy as np
 
 import paddle
-from paddle import Tensor
 
 from paddlenlp.datasets import load_dataset
 
@@ -189,36 +187,6 @@ def load_prompt_arguments(args):
             label_words = {k: k for k in label_words}
         args.label_words = label_words
         return args
-
-
-def maskedlm_wrapper(verbalizer):
-
-    def process_outputs(self,
-                        outputs: Tensor,
-                        masked_positions: Tensor = None,
-                        **kwargs):
-        if masked_positions is None:
-            return outputs
-        batch_size, _, num_pred = outputs.shape
-        outputs = outputs.reshape([-1, num_pred])
-        outputs = paddle.gather(outputs, masked_positions)
-        outputs = outputs.reshape([batch_size, -1, num_pred])
-        return outputs
-
-    def eval_process_outputs(self, outputs: Tensor):
-        token_ids = self.token_ids[:, 0, :].T
-        batch_size, num_token, num_pred = outputs.shape
-        results = paddle.index_select(outputs[:, 0, :], token_ids[0], axis=1)
-        for index in range(1, num_token):
-            results *= paddle.index_select(outputs[:, index, :],
-                                           token_ids[index],
-                                           axis=1)
-        return results
-
-    verbalizer.eval_process_outputs = types.MethodType(eval_process_outputs,
-                                                       verbalizer)
-    verbalizer.process_outputs = types.MethodType(process_outputs, verbalizer)
-    return verbalizer
 
 
 def save_pseudo_data(save_path, task_name, label_preds, verbalizer, labels):

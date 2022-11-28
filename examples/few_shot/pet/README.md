@@ -4,43 +4,45 @@
 [Exploiting Cloze Questions for Few Shot Text Classification and Natural Language Inference](https://arxiv.org/abs/2001.07676)
 
 
-## 摘要
+## 算法简介
 
-自然语言处理任务可以通过给预训练模型提供“任务描述”等方式来进行无监督学习，但效果一般低于有监督训练。而 Pattern-Exploiting Training (PET) 是一种半监督方法，通过将输入转换为完形填空形式的短语来帮助语言模型理解任务。然后用这些短语来给无标注数据打软标签。最后在得到的标注数据集上用有监督方法进行训练。在小样本设置下，PET 在部分任务上远超有监督学习和强半监督学习方法。
+自然语言处理任务可以通过给预训练模型提供“任务描述”等方式来进行无监督学习，但效果一般低于有监督训练。而 Pattern-Exploiting Training (PET) 是一种半监督方法，通过将输入转换为完形填空形式的短语来帮助语言模型理解任务。然后用这些短语来给无标注数据打软标签。最后在得到的标注数据集上用有监督方法进行训练。在小样本设置下，PET 在部分任务上远超有监督学习和强半监督学习方法。以 PET 为代表的提示学习与微调学习的区别如下图所示，包括数据预处理模块 `Template` 和标签词映射模块 `Verbalizer`。详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md)。
+
+![PET_and_FT](https://user-images.githubusercontent.com/25607475/192727706-0a17b5ef-db6b-46be-894d-0ee315306776.png)
 
 
 ## 快速开始
 
+CLUE（Chinese Language Understanding Evaluation）作为中文语言理解权威测评榜单，在学术界和工业界都有着广泛影响。FewCLUE 是其设立的中文小样本学习测评子榜，旨在探索小样本学习最佳模型和中文实践。PaddleNLP 内置了 FewCLUE 数据集，可以直接用来进行 PET 算法训练、评估、预测，并生成 FewCLUE 榜单的提交结果，参与 FewCLUE 竞赛。
 
-## 代码结构说明
+### 代码结构说明
 ```
-|—— train.py # PET 算法训练、评估主程序入口
-|—— utils.py # 数据集构造、数据增强等工具函数
-|—— prompt/  # FewCLUE 各数据集的 prompt 定义文件
+├── run_train.py # PET 算法提示学习脚本
+├── data.py      # 数据集构造、数据增强
+├── utils.py     # FewCLUE 提交结果保存等工具函数
+└── prompt/      # FewCLUE 各数据集的 prompt 定义文件
 ```
-
-## 基于 FewCLUE 进行 PET 实验
-PaddleNLP 内置了 FewCLUE 数据集，可以直接用来进行 PET 策略训练、评估、预测，并生成 FewCLUE 榜单的提交结果，参与 FewCLUE 竞赛。
 
 ###  数据准备
-基于 FewCLUE 数据集进行实验只需要 1 行代码，这部分代码在 `utils.py` 脚本中
+
+读取 FewCLUE 数据集只需要 1 行代码，这部分代码在 `data.py` 脚本中。以情感分类数据集 `eprstmt` 为例：
 
 ```
 from paddlenlp.datasets import load_dataset
 
-# 通过指定 "fewclue" 和数据集名字 name="tnews" 即可一键加载 FewCLUE 中的 tnews 数据集
-train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="tnews", splits=("train_0", "dev_0", "test_public"))
+# 通过指定 "fewclue" 和数据集名字 name="eprstmt" 即可一键加载 FewCLUE 中的eprstmt 数据集
+train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="eprstmt", splits=("train_0", "dev_0", "test_public"))
 ```
 
 ### 模型训练、评估、预测
 
-通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `tnews` 数据集上进行训练&评估
+通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `eprstmt` 数据集上进行训练&评估
 ```
 python -u -m paddle.distributed.launch --gpus "0" train.py \
-    --output_dir checkpoint_tnews \
-    --task_name tnews \
+    --output_dir checkpoint_eprstmt \
+    --task_name eprstmt \
     --split_id few_all \
-    --prompt_path prompt/tnews.json \
+    --prompt_path prompt/eprstmt.json \
     --prompt_index 0 \
     --do_train \
     --do_eval \

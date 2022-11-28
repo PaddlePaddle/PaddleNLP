@@ -3,44 +3,45 @@
 [GPT Understands, Too](https://arxiv.org/pdf/2103.10385.pdf)
 
 
-## 摘要
+## 算法简介
 
-P-tuning 引入可学习的 prompt embeddings 参数, 让模型自己去学习最优的 prompt embedding, 而不再依赖人工去设置自然语言形式的 Prompt 信息。
+P-tuning 引入可学习的连续型提示向量 prompt embeddings 参数, 让模型自己去学习最优的 prompt embedding, 而不再依赖人工去设置自然语言形式的提示（Prompt）信息。P-Tuning 算法的数据和模型定义如下图所示，对应于数据预处理模块 `SoftTemplate` 和标签词映射模块 `MaskedLMVerbalizer`，详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md)。
 
-![](./imgs/ptuning.png)
+![p-tuning](https://user-images.githubusercontent.com/25607475/204214359-3036c6c6-f101-4a5f-958c-abe0e40c243a.png)
 
 
 ## 快速开始
 
+CLUE（Chinese Language Understanding Evaluation）作为中文语言理解权威测评榜单，在学术界和工业界都有着广泛影响。FewCLUE 是其设立的中文小样本学习测评子榜，旨在探索小样本学习最佳模型和中文实践。PaddleNLP 内置了 FewCLUE 数据集，可以直接用来进行 PET 策略训练、评估、预测，并生成 FewCLUE 榜单的提交结果，参与 FewCLUE 竞赛。
 PaddleNLP 内置了 FewCLUE 数据集，可以直接用来进行 P-tuning 策略训练、评估、预测，并生成 FewCLUE 榜单的提交结果，参与 FewCLUE 竞赛。
 
 ### 代码结构及说明
 ```
-|—— train.py # P-tuning 算法训练、评估主程序入口
-|—— data.py  # 数据集构造、数据增强等
-|—— utils.py # 数据集结果保存等工具函数
-|—— prompt/ # FewCLUE 各数据集的 prompt 定义文件
+├── run_train.py # P-Tuning 算法提示学习脚本
+├── data.py      # 数据集构造、数据增强
+├── utils.py     # FewCLUE 提交结果保存等工具函数
+└── prompt/      # FewCLUE 各数据集的 prompt 定义文件
 ```
 
 ###  数据准备
-基于 FewCLUE 数据集进行实验只需要  1 行代码，这部分代码在 `data.py` 脚本中
 
+读取 FewCLUE 数据集只需要 1 行代码，这部分代码在 `data.py` 脚本中。以情感分类数据集 `eprstmt` 为例：
 ```
 from paddlenlp.datasets import load_dataset
 
-# 通过指定 "fewclue" 和数据集名字 name="tnews" 即可一键加载 FewCLUE 中的 tnews 数据集
-train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="tnews", splits=("train_0", "dev_0", "test_public"))
+# 通过指定 "fewclue" 和数据集名字 name="eprstmt" 即可一键加载 FewCLUE 中的 eprstmt 数据集
+train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="eprstmt", splits=("train_0", "dev_0", "test_public"))
 ```
 
 ### 模型训练、评估、预测
 
-通过如下命令，指定 GPU 0 卡， 使用 1 个 P-embedding 在 FewCLUE 的 `tnews` 数据集上进行训练&评估。如果要使用多个可学习参数，可修改 `./prompt/` 文件夹下相应的文件，定义 `soft` 的长度属性 `length` 即可。
+通过如下命令，指定 GPU 0 卡， 使用一个连续型提示向量在 FewCLUE 的 `eprstmt` 数据集上进行训练和评估。如果要使用多个可学习连续型提示向量，可修改 `./prompt/` 目录下相应的文件，修改 `soft` 的长度属性 `length` 即可。
 ```
 python -u -m paddle.distributed.launch --gpus "0" train.py \
-    --output_dir checkpoint_tnews \
-    --task_name tnews \
+    --output_dir checkpoint_eprstmt \
+    --task_name eprstmt \
     --split_id few_all \
-    --prompt_path prompt/tnews.json \
+    --prompt_path prompt/eprstmt.json \
     --prompt_index 0 \
     --do_train \
     --do_eval \
