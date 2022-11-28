@@ -18,6 +18,7 @@ from functools import partial
 import paddle
 
 from paddlenlp.datasets import load_dataset, MapDataset
+from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
 
 
 def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
