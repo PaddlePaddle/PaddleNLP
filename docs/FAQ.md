@@ -58,10 +58,11 @@
 
 ##### Q1.1 如何加载自己的本地数据集，以便使用PaddleNLP的功能？
 
-**A:** 通过使用PaddleNLP提供的 `load_dataset`，  `MapDataset` 和 `IterDataset` ，可以方便的自定义属于自己的数据集哦，也欢迎您贡献数据集到PaddleNLP repo。
+**A:** <!--  -->通过使用PaddleNLP提供的 `load_dataset`，  `MapDataset` 和 `IterDataset` ，可以方便的自定义属于自己的数据集哦，也欢迎您贡献数据集到PaddleNLP repo。
 
 从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 `load_dataset()` 中创建数据集。
 以[waybill_ie](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie)快递单信息抽取任务中的数据为例：
+<!--  -->
 
 ```python
 from paddlenlp.datasets import load_dataset
