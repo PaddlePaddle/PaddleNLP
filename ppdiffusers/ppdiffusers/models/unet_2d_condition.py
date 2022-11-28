@@ -88,7 +88,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         in_channels: int = 4,
         out_channels: int = 4,
         center_input_sample: bool = False,
-        flip_sin_to_cos: bool = False,
+        flip_sin_to_cos: bool = True,
         freq_shift: int = 0,
         down_block_types: Tuple[str] = (
             "CrossAttnDownBlock2D",

@@ -213,7 +213,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         model_2.enable_gradient_checkpointing()
 
         assert model_2.is_gradient_checkpointing and model_2.training
-        paddle.seed(0)
+
         out_2 = model_2(**inputs_dict).sample
         # run the backwards pass on the model. For backwards pass, for simplicity purpose,
         # we won't calculate the loss and rather backprop on out.sum()

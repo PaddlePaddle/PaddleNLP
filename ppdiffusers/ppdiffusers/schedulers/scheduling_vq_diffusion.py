@@ -29,7 +29,7 @@ def logaddexp(a, b):
     return paddle.log(a.exp() + b.exp())
 
 
-# paddle logsumexp may has bug
+# (TODO junnyu) paddle logsumexp may has bug
 def logsumexp(x, axis=None, keepdim=False):
     return paddle.log(x.exp().sum(axis=axis, keepdim=keepdim))
 

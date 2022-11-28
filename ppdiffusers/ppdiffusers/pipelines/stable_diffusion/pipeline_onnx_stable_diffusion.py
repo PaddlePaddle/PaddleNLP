@@ -47,6 +47,7 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
     safety_checker: OnnxRuntimeModel
     feature_extractor: CLIPFeatureExtractor
+    _optional_components = ["safety_checker", "feature_extractor"]
 
     def __init__(
         self,
@@ -124,7 +125,6 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.vae_scale_factor = 2**(len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def _encode_prompt(self, prompt, num_images_per_prompt,
@@ -215,8 +215,8 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        height: Optional[int] = None,
-        width: Optional[int] = None,
+        height: Optional[int] = 512,
+        width: Optional[int] = 512,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
@@ -230,9 +230,6 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
         callback_steps: Optional[int] = 1,
         **kwargs,
     ):
-        # 0. Default height and width to unet
-        height = height or self.unet.config.sample_size * self.vae_scale_factor
-        width = width or self.unet.config.sample_size * self.vae_scale_factor
 
         if isinstance(prompt, str):
             batch_size = 1
@@ -269,9 +266,8 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
 
         # get the initial random noise unless the user supplied it
         latents_dtype = text_embeddings.dtype
-        latents_shape = (batch_size * num_images_per_prompt, 4,
-                         height // self.vae_scale_factor,
-                         width // self.vae_scale_factor)
+        latents_shape = (batch_size * num_images_per_prompt, 4, height // 8,
+                         width // 8)
         if latents is None:
             latents = generator.randn(*latents_shape).astype(latents_dtype)
         elif latents.shape != latents_shape:

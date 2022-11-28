@@ -39,7 +39,7 @@ class VersatileDiffusionImageVariationPipelineIntegrationTests(
         pipe.set_progress_bar_config(disable=None)
 
         image_prompt = load_image(
-            "https://raw.githubusercontent.com/SHI-Labs/Versatile-Diffusion/master/assets/benz.jpg"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
         )
         generator = paddle.Generator().manual_seed(0)
         image = pipe(
@@ -54,6 +54,9 @@ class VersatileDiffusionImageVariationPipelineIntegrationTests(
 
         assert image.shape == (1, 512, 512, 3)
         expected_slice = np.array([
-            0.0113, 0.2241, 0.4024, 0.0839, 0.0871, 0.2725, 0.2581, 0.0, 0.1096
+            0.011769682168960571, 0.22415882349014282, 0.40258049964904785,
+            0.08735564351081848, 0.08671644330024719, 0.27234160900115967,
+            0.26517266035079956, 0.0, 0.10928627848625183
         ])
+        print(image_slice.flatten().tolist())
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

@@ -72,8 +72,10 @@ class PipelineFastTests(unittest.TestCase):
         audio_from_tuple_slice = audio_from_tuple[0, -3:, -3:]
 
         assert audio.shape == (1, 2, self.dummy_unet.sample_size)
-        expected_slice = np.array(
-            [-0.7265, 1.0000, -0.8388, 0.1175, 0.9498, -1.0000])
+        expected_slice = np.array([
+            0.3497878611087799, -0.10828632861375809, -1.0, -1.0, -1.0,
+            0.1466890275478363
+        ])
         assert np.abs(audio_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(audio_from_tuple_slice.flatten() -
                       expected_slice).max() < 1e-2
@@ -101,7 +103,7 @@ class PipelineIntegrationTests(unittest.TestCase):
 
         audio_slice = audio[0, -3:, -3:]
 
-        assert audio.shape == [1, 2, pipe.unet.sample_size]
+        assert audio.shape == (1, 2, pipe.unet.sample_size)
         expected_slice = np.array(
             [-0.1576, -0.1526, -0.127, -0.2699, -0.2762, -0.2487])
         assert np.abs(audio_slice.flatten() - expected_slice).max() < 1e-2

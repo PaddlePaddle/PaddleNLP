@@ -48,7 +48,7 @@ class VersatileDiffusionDualGuidedPipelineIntegrationTests(unittest.TestCase):
         pipe.set_progress_bar_config(disable=None)
 
         second_prompt = load_image(
-            "https://raw.githubusercontent.com/SHI-Labs/Versatile-Diffusion/master/assets/benz.jpg"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
         )
 
         generator = paddle.Generator().manual_seed(0)
@@ -69,7 +69,7 @@ class VersatileDiffusionDualGuidedPipelineIntegrationTests(unittest.TestCase):
 
         pipe.set_progress_bar_config(disable=None)
 
-        generator = generator.manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         new_image = pipe(
             prompt="first prompt",
             image=second_prompt,
@@ -91,7 +91,7 @@ class VersatileDiffusionDualGuidedPipelineIntegrationTests(unittest.TestCase):
 
         first_prompt = "cyberpunk 2077"
         second_prompt = load_image(
-            "https://raw.githubusercontent.com/SHI-Labs/Versatile-Diffusion/master/assets/benz.jpg"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
         )
         generator = paddle.Generator().manual_seed(0)
         image = pipe(
@@ -108,7 +108,8 @@ class VersatileDiffusionDualGuidedPipelineIntegrationTests(unittest.TestCase):
 
         assert image.shape == (1, 512, 512, 3)
         expected_slice = np.array([
-            0.014, 0.0112, 0.0136, 0.0145, 0.0107, 0.0113, 0.0272, 0.0215,
-            0.0216
+            0.05819129943847656, 0.06465867161750793, 0.0698845386505127,
+            0.06031566858291626, 0.0696127712726593, 0.07399758696556091,
+            0.06906205415725708, 0.07634878158569336, 0.0813780426979065
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

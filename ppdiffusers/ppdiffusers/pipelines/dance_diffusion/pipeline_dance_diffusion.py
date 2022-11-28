@@ -90,7 +90,7 @@ class DanceDiffusionPipeline(DiffusionPipeline):
                 " process.")
         sample_size = int(sample_size)
 
-        dtype = next(iter(self.unet.parameters())).dtype
+        dtype = self.unet.dtype
         audio = paddle.randn((batch_size, self.unet.in_channels, sample_size),
                              generator=generator,
                              dtype=dtype)

@@ -61,7 +61,7 @@ class VersatileDiffusionTextToImagePipelineIntegrationTests(unittest.TestCase):
                 tmpdirname)
         pipe.set_progress_bar_config(disable=None)
 
-        generator = generator.manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         new_image = pipe(prompt=prompt,
                          generator=generator,
                          guidance_scale=7.5,
@@ -87,6 +87,9 @@ class VersatileDiffusionTextToImagePipelineIntegrationTests(unittest.TestCase):
         image_slice = image[0, 253:256, 253:256, -1]
 
         assert image.shape == (1, 512, 512, 3)
-        expected_slice = np.array(
-            [0.0408, 0.0181, 0.0, 0.0388, 0.0046, 0.0461, 0.0411, 0.0, 0.0222])
+        expected_slice = np.array([
+            0.040520429611206055, 0.01816403865814209, 0.0, 0.03902044892311096,
+            0.004770994186401367, 0.045984357595443726, 0.04142877459526062,
+            0.0, 0.02198156714439392
+        ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

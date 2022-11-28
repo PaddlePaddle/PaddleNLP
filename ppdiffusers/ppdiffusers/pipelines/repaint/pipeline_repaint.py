@@ -113,7 +113,7 @@ class RePaintPipeline(DiffusionPipeline):
         self.scheduler.eta = eta
 
         t_last = self.scheduler.timesteps[0] + 1
-        for i, t in enumerate(tqdm(self.scheduler.timesteps)):
+        for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
             if t < t_last:
                 # predict the noise residual
                 model_output = self.unet(image, t).sample

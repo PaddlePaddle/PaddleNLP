@@ -136,7 +136,9 @@ class DiffusionPipeline(ConfigMixin):
                 register_dict = {name: (None, None)}
             else:
                 # TODO (junnyu) support paddlenlp.transformers
-                if "paddlenlp" in module.__module__.split("."):
+                if "paddlenlp" in module.__module__.split(
+                        ".") or "ppnlp_patch_utils" in module.__module__.split(
+                            "."):
                     library = "paddlenlp.transformers"
                 else:
                     library = module.__module__.split(".")[0]
@@ -181,6 +183,7 @@ class DiffusionPipeline(ConfigMixin):
         model_index_dict.pop("_class_name")
         # TODO (junnyu) support old version
         model_index_dict.pop("_diffusers_paddle_version", None)
+        model_index_dict.pop("_diffusers_version", None)
         model_index_dict.pop("_ppdiffusers_version", None)
         model_index_dict.pop("_module", None)
 
@@ -396,8 +399,9 @@ class DiffusionPipeline(ConfigMixin):
         init_dict = {k: v for k, v in init_dict.items() if load_module(k, v)}
 
         if len(unused_kwargs) > 0:
-            logger.warning(f"Keyword arguments {unused_kwargs} not recognized.")
-
+            logger.warning(
+                f"Keyword arguments {unused_kwargs} are not expected by {pipeline_class.__name__} and will be ignored."
+            )
         # import it here to avoid circular import
         from . import pipelines, ModelMixin
 
@@ -533,11 +537,11 @@ class DiffusionPipeline(ConfigMixin):
         parameters = inspect.signature(obj.__init__).parameters
         required_parameters = {
             k: v
-            for k, v in parameters.items() if v.default is not True
+            for k, v in parameters.items() if v.default == inspect._empty
         }
         optional_parameters = set(
             {k
-             for k, v in parameters.items() if v.default is True})
+             for k, v in parameters.items() if v.default != inspect._empty})
         expected_modules = set(required_parameters.keys()) - set(["self"])
         return expected_modules, optional_parameters
 

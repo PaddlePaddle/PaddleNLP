@@ -1,3 +1,4 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,95 +16,82 @@
 import inspect
 from typing import Callable, List, Optional, Union
 
+import numpy as np
 import paddle
 
-from paddlenlp.transformers import CLIPTextModelWithProjection, CLIPTokenizer
+import PIL
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
 from ...models import AutoencoderKL, UNet2DConditionModel
-from ...models.attention import Transformer2DModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
+from ...schedulers import DDIMScheduler, DDPMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
-from .modeling_text_unet import UNetFlatConditionModel
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
+def preprocess(image):
+    # resize to multiple of 64
+    width, height = image.size
+    width = width - width % 64
+    height = height - height % 64
+    image = image.resize((width, height))
+
+    image = np.array(image.convert("RGB"))
+    image = image[None].transpose(0, 3, 1, 2)
+    image = paddle.to_tensor(image).cast("float32") / 127.5 - 1.0
+    return image
+
+
+class StableDiffusionUpscalePipeline(DiffusionPipeline):
     r"""
-    Pipeline for text-to-image generation using Versatile Diffusion.
+    Pipeline for text-guided image super-resolution using Stable Diffusion 2.
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+    library implements for all the pipelines (such as downloading or saving etc.)
 
     Args:
         vae ([`AutoencoderKL`]):
             Variational Auto-Encoder (VAE) Model to encode and decode images to and from latent representations.
-        text_encoder ([`CLIPTextModelWithProjection`]):
-            Frozen text-encoder. Versatile Diffusion uses the text portion of
-            [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModelWithProjection), specifically
-            the [clip-vit-large-patch14](https://huggingface.co/openai/clip-vit-large-patch14) variant.
-        image_encoder ([`CLIPVisionModelWithProjection`]):
-            Frozen vision-encoder. Versatile Diffusion uses the vision portion of
-            [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPVisionModelWithProjection), specifically
+        text_encoder ([`CLIPTextModel`]):
+            Frozen text-encoder. Stable Diffusion uses the text portion of
+            [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel), specifically
             the [clip-vit-large-patch14](https://huggingface.co/openai/clip-vit-large-patch14) variant.
         tokenizer (`CLIPTokenizer`):
             Tokenizer of class
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
-        image_unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
-        text_unet ([`UNetFlatConditionModel`]): xxx.
+        unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
+        low_res_scheduler ([`SchedulerMixin`]):
+            A scheduler used to add initial noise to the low res conditioning image. It must be an instance of
+            [`DDPMScheduler`].
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
     """
-    tokenizer: CLIPTokenizer
-    text_encoder: CLIPTextModelWithProjection
-    image_unet: UNet2DConditionModel
-    text_unet: UNetFlatConditionModel
-    vae: AutoencoderKL
-    scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
-    _optional_components = ["text_unet"]
 
     def __init__(
         self,
-        tokenizer: CLIPTokenizer,
-        text_encoder: CLIPTextModelWithProjection,
-        image_unet: UNet2DConditionModel,
-        text_unet: UNetFlatConditionModel,
         vae: AutoencoderKL,
+        text_encoder: CLIPTextModel,
+        tokenizer: CLIPTokenizer,
+        unet: UNet2DConditionModel,
+        low_res_scheduler: DDPMScheduler,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        max_noise_level: int = 350,
     ):
         super().__init__()
+
         self.register_modules(
-            tokenizer=tokenizer,
-            text_encoder=text_encoder,
-            image_unet=image_unet,
-            text_unet=text_unet,
             vae=vae,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+            unet=unet,
+            low_res_scheduler=low_res_scheduler,
             scheduler=scheduler,
         )
-        self.vae_scale_factor = 2**(len(self.vae.config.block_out_channels) - 1)
-        if self.text_unet is not None:
-            self._swap_unet_attention_blocks()
+        self.register_to_config(max_noise_level=max_noise_level)
 
-    def _swap_unet_attention_blocks(self):
-        """
-        Swap the `Transformer2DModel` blocks between the image and text UNets
-        """
-        for name, module in self.image_unet.named_sublayers(include_self=True):
-            if isinstance(module, Transformer2DModel):
-                parent_name, index = name.rsplit(".", 1)
-                index = int(index)
-                self.image_unet.get_sublayer(parent_name)[
-                    index], self.text_unet.get_sublayer(parent_name)[index] = (
-                        self.text_unet.get_sublayer(parent_name)[index],
-                        self.image_unet.get_sublayer(parent_name)[index],
-                    )
-
-    def remove_unused_weights(self):
-        self.register_modules(text_unet=None)
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing with unet->image_unet
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing
     def enable_attention_slicing(self,
                                  slice_size: Optional[Union[str,
                                                             int]] = "auto"):
@@ -120,14 +108,15 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
                 `attention_head_dim` must be a multiple of `slice_size`.
         """
         if slice_size == "auto":
-            if isinstance(self.image_unet.config.attention_head_dim, int):
+            if isinstance(self.unet.config.attention_head_dim, int):
                 # half the attention head size is usually a good trade-off between
                 # speed and memory
-                slice_size = self.image_unet.config.attention_head_dim // 2
+                slice_size = self.unet.config.attention_head_dim // 2
             else:
                 # if `attention_head_dim` is a list, take the smallest head size
-                slice_size = min(self.image_unet.config.attention_head_dim)
-        self.image_unet.set_attention_slice(slice_size)
+                slice_size = min(self.unet.config.attention_head_dim)
+
+        self.unet.set_attention_slice(slice_size)
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.disable_attention_slicing
     def disable_attention_slicing(self):
@@ -138,8 +127,9 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         # set slice_size = `None` to disable `attention slicing`
         self.enable_attention_slicing(None)
 
-    def _encode_text_prompt(self, prompt, num_images_per_prompt,
-                            do_classifier_free_guidance, negative_prompt):
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
+    def _encode_prompt(self, prompt, num_images_per_prompt,
+                       do_classifier_free_guidance, negative_prompt):
         r"""
         Encodes the prompt into text encoder hidden states.
 
@@ -154,15 +144,6 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
                 The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
                 if `guidance_scale` is less than `1`).
         """
-
-        def normalize_embeddings(encoder_output):
-            embeds = paddle.matmul(encoder_output.last_hidden_state,
-                                   self.text_encoder.text_projection)
-            embeds_pooled = encoder_output.text_embeds
-            embeds = embeds / paddle.norm(
-                embeds_pooled.unsqueeze(1), axis=-1, keepdim=True)
-            return embeds
-
         batch_size = len(prompt) if isinstance(prompt, list) else 1
 
         text_inputs = self.tokenizer(
@@ -193,10 +174,11 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         else:
             attention_mask = None
 
-        text_embeddings = self.text_encoder(text_input_ids,
-                                            attention_mask=attention_mask,
-                                            return_dict=True)
-        text_embeddings = normalize_embeddings(text_embeddings)
+        text_embeddings = self.text_encoder(
+            text_input_ids,
+            attention_mask=attention_mask,
+        )
+        text_embeddings = text_embeddings[0]
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
@@ -238,10 +220,11 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             else:
                 attention_mask = None
 
-            uncond_embeddings = self.text_encoder(uncond_input.input_ids,
-                                                  attention_mask=attention_mask,
-                                                  return_dict=True)
-            uncond_embeddings = normalize_embeddings(uncond_embeddings)
+            uncond_embeddings = self.text_encoder(
+                uncond_input.input_ids,
+                attention_mask=attention_mask,
+            )
+            uncond_embeddings = uncond_embeddings[0]
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
@@ -257,15 +240,6 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
                 [uncond_embeddings, text_embeddings])
 
         return text_embeddings
-
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
-    def decode_latents(self, latents):
-        latents = 1 / 0.18215 * latents
-        image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
-        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
-        return image
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
     def prepare_extra_step_kwargs(self, generator, eta):
@@ -287,16 +261,48 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.check_inputs
-    def check_inputs(self, prompt, height, width, callback_steps):
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents with 0.18215->0.08333
+    def decode_latents(self, latents):
+        latents = 1 / 0.08333 * latents
+        image = self.vae.decode(latents).sample
+        image = (image / 2 + 0.5).clip(0, 1)
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
+        return image
+
+    def check_inputs(self, prompt, image, noise_level, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
             raise ValueError(
                 f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
             )
 
-        if height % 8 != 0 or width % 8 != 0:
+        if (not isinstance(image, paddle.Tensor)
+                and not isinstance(image, PIL.Image.Image)
+                and not isinstance(image, list)):
             raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
+                f"`image` has to be of type `torch.Tensor`, `PIL.Image.Image` or `list` but is {type(image)}"
+            )
+
+        # verify batch size of prompt and image are same if image is a list or tensor
+        if isinstance(image, list) or isinstance(image, paddle.Tensor):
+            if isinstance(prompt, str):
+                batch_size = 1
+            else:
+                batch_size = len(prompt)
+            if isinstance(image, list):
+                image_batch_size = len(image)
+            else:
+                image_batch_size = image.shape[0]
+            if batch_size != image_batch_size:
+                raise ValueError(
+                    f"`prompt` has batch size {batch_size} and `image` has batch size {image_batch_size}."
+                    " Please make sure that passed `prompt` matches the batch size of `image`."
+                )
+
+        # check noise level
+        if noise_level > self.config.max_noise_level:
+            raise ValueError(
+                f"`noise_level` has to be <= {self.config.max_noise_level} but is {noise_level}"
             )
 
         if (callback_steps is None) or (callback_steps is not None and
@@ -306,7 +312,6 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
                 f" {type(callback_steps)}.")
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self,
                         batch_size,
                         num_channels_latents,
@@ -315,10 +320,7 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
                         dtype,
                         generator,
                         latents=None):
-        shape = [
-            batch_size, num_channels_latents, height // self.vae_scale_factor,
-            width // self.vae_scale_factor
-        ]
+        shape = [batch_size, num_channels_latents, height, width]
         if latents is None:
             latents = paddle.randn(shape, generator=generator, dtype=dtype)
         else:
@@ -335,10 +337,10 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        num_inference_steps: int = 50,
-        guidance_scale: float = 7.5,
+        image: Union[paddle.Tensor, PIL.Image.Image, List[PIL.Image.Image]],
+        num_inference_steps: int = 75,
+        guidance_scale: float = 9.0,
+        noise_level: int = 20,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: float = 0.0,
@@ -348,7 +350,6 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
-        **kwargs,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -356,10 +357,8 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            height (`int`, *optional*, defaults to self.image_unet.config.sample_size * self.vae_scale_factor):
-                The height in pixels of the generated image.
-            width (`int`, *optional*, defaults to self.image_unet.config.sample_size * self.vae_scale_factor):
-                The width in pixels of the generated image.
+            image (`PIL.Image.Image` or List[`PIL.Image.Image`] or `paddle.Tensor`):
+                `Image`, or tensor representing an image batch which will be upscaled. *
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.
@@ -397,22 +396,6 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
 
-        Examples:
-
-        ```py
-        >>> from ppdiffusers import VersatileDiffusionTextToImagePipeline
-        >>> import paddle
-
-        >>> pipe = VersatileDiffusionTextToImagePipeline.from_pretrained(
-        ...     "shi-labs/versatile-diffusion"
-        ... )
-        >>> pipe.remove_unused_weights()
-
-        >>> generator = paddle.Generator().manual_seed(0)
-        >>> image = pipe("an astronaut riding on a horse on mars", generator=generator).images[0]
-        >>> image.save("./astronaut.png")
-        ```
-
         Returns:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] or `tuple`:
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
@@ -420,12 +403,9 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-        # 0. Default height and width to unet
-        height = height or self.image_unet.config.sample_size * self.vae_scale_factor
-        width = width or self.image_unet.config.sample_size * self.vae_scale_factor
 
-        # 1. Check inputs. Raise error if not correct
-        self.check_inputs(prompt, height, width, callback_steps)
+        # 1. Check inputs
+        self.check_inputs(prompt, image, noise_level, callback_steps)
 
         # 2. Define call parameters
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
@@ -435,17 +415,35 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        text_embeddings = self._encode_text_prompt(prompt,
-                                                   num_images_per_prompt,
-                                                   do_classifier_free_guidance,
-                                                   negative_prompt)
+        text_embeddings = self._encode_prompt(prompt, num_images_per_prompt,
+                                              do_classifier_free_guidance,
+                                              negative_prompt)
 
-        # 4. Prepare timesteps
+        # 4. Preprocess image
+        image = [image] if isinstance(image, PIL.Image.Image) else image
+        if isinstance(image, list):
+            image = [preprocess(img) for img in image]
+            image = paddle.concat(image, axis=0)
+        image = image.cast(text_embeddings.dtype)
+
+        # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+        timesteps_tensor = self.scheduler.timesteps
 
-        # 5. Prepare latent variables
-        num_channels_latents = self.image_unet.in_channels
+        # 5. Add noise to image
+        noise_level = paddle.to_tensor([noise_level], dtype="int64")
+        noise = paddle.randn(image.shape,
+                             generator=generator,
+                             dtype=text_embeddings.dtype)
+        image = self.low_res_scheduler.add_noise(image, noise, noise_level)
+        image = paddle.concat([image] *
+                              2) if do_classifier_free_guidance else image
+        noise_level = paddle.concat(
+            [noise_level] * 2) if do_classifier_free_guidance else noise_level
+
+        # 6. Prepare latent variables
+        height, width = image.shape[2:]
+        num_channels_latents = self.vae.config.latent_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
             num_channels_latents,
@@ -456,21 +454,36 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             latents,
         )
 
-        # 6. Prepare extra step kwargs.
+        # 7. Check that sizes of image and latents match
+        num_channels_image = image.shape[1]
+        if num_channels_latents + num_channels_image != self.unet.config.in_channels:
+            raise ValueError(
+                f"Incorrect configuration settings! The config of `pipeline.unet`: {self.unet.config} expects"
+                f" {self.unet.config.in_channels} but received `num_channels_latents`: {num_channels_latents} +"
+                f" `num_channels_image`: {num_channels_image} "
+                f" = {num_channels_latents+num_channels_image}. Please verify the config of"
+                " `pipeline.unet` or your `image` input.")
+
+        # 8. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
-        # 7. Denoising loop
-        for i, t in enumerate(self.progress_bar(timesteps)):
+        # 9. Denoising loop
+        for i, t in enumerate(self.progress_bar(timesteps_tensor)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = paddle.concat(
                 [latents] * 2) if do_classifier_free_guidance else latents
+
+            # concat latents, mask, masked_image_latents in the channel dimension
             latent_model_input = self.scheduler.scale_model_input(
                 latent_model_input, t)
+            latent_model_input = paddle.concat([latent_model_input, image],
+                                               axis=1)
 
             # predict the noise residual
-            noise_pred = self.image_unet(
-                latent_model_input, t,
-                encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(latent_model_input,
+                                   t,
+                                   encoder_hidden_states=text_embeddings,
+                                   class_labels=noise_level).sample
 
             # perform guidance
             if do_classifier_free_guidance:
@@ -486,10 +499,12 @@ class VersatileDiffusionTextToImagePipeline(DiffusionPipeline):
             if callback is not None and i % callback_steps == 0:
                 callback(i, t, latents)
 
-        # 9. Post-processing
-        image = self.decode_latents(latents)
+        # 10. Post-processing
+        # make sure the VAE is in float32 mode, as it overflows in float16
+        # self.vae.to(dtype=paddle.float32)
+        image = self.decode_latents(latents.cast("float32"))
 
-        # 10. Convert to PIL
+        # 11. Convert to PIL
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 

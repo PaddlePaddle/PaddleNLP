@@ -839,7 +839,8 @@ class CrossAttnDownBlockFlat(nn.Layer):
 
                     def custom_forward(*inputs):
                         if return_dict is not None:
-                            return module(*inputs, return_dict=return_dict)
+                            return module(
+                                *inputs, return_dict=return_dict)[0]  # move [0]
                         else:
                             return module(*inputs)
 
@@ -849,7 +850,7 @@ class CrossAttnDownBlockFlat(nn.Layer):
                                           hidden_states, temb)
                 hidden_states = recompute(
                     create_custom_forward(attn, return_dict=False),
-                    hidden_states, encoder_hidden_states)[0]
+                    hidden_states, encoder_hidden_states)  #[0]
             else:
                 hidden_states = resnet(hidden_states, temb)
                 hidden_states = attn(
@@ -1082,7 +1083,8 @@ class CrossAttnUpBlockFlat(nn.Layer):
 
                     def custom_forward(*inputs):
                         if return_dict is not None:
-                            return module(*inputs, return_dict=return_dict)
+                            return module(
+                                *inputs, return_dict=return_dict)[0]  # move [0]
                         else:
                             return module(*inputs)
 
@@ -1092,7 +1094,7 @@ class CrossAttnUpBlockFlat(nn.Layer):
                                           hidden_states, temb)
                 hidden_states = recompute(
                     create_custom_forward(attn, return_dict=False),
-                    hidden_states, encoder_hidden_states)[0]
+                    hidden_states, encoder_hidden_states)  #[0]
             else:
                 hidden_states = resnet(hidden_states, temb)
                 hidden_states = attn(
@@ -1127,7 +1129,6 @@ class UNetMidBlockFlatCrossAttn(nn.Layer):
         dual_cross_attention=False,
         use_linear_projection=False,
         only_cross_attention=False,
-        **kwargs,
     ):
         super().__init__()
 

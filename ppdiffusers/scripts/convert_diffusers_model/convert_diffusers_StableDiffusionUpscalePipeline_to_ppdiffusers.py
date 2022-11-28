@@ -18,11 +18,9 @@ paddle.set_device("cpu")
 import argparse
 import torch
 from collections import OrderedDict
-from diffusers import AltDiffusionPipeline as DiffusersAltDiffusionPipeline
-from ppdiffusers import AltDiffusionPipeline as PPDiffusersAltDiffusionPipeline, AutoencoderKL, UNet2DConditionModel, PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler
-from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
-from paddlenlp.transformers import CLIPVisionModel, CLIPFeatureExtractor, XLMRobertaTokenizer
-from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import RobertaSeriesModelWithTransformation, RobertaSeriesConfig
+from diffusers import StableDiffusionUpscalePipeline as DiffusersStableDiffusionUpscalePipeline
+from ppdiffusers import StableDiffusionUpscalePipeline as PPDiffusersStableDiffusionUpscalePipeline, AutoencoderKL, UNet2DConditionModel, PNDMScheduler, LMSDiscreteScheduler, DDPMScheduler, DDIMScheduler
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
 
 def convert_to_ppdiffusers(vae_or_unet, dtype="float32"):
@@ -113,132 +111,16 @@ def convert_hf_clip_to_ppnlp_clip(clip, dtype="float32", is_text_encoder=True):
     return new_model_state, new_config
 
 
-def convert_hf_xlm_roberta_to_ppnlp_xlm_roberta(xlm_roberta, dtype="float32"):
-    new_model_state = {}
-    mappings = [
-        [
-            'embeddings.word_embeddings.weight',
-            'embeddings.word_embeddings.weight'
-        ],
-        [
-            'embeddings.position_embeddings.weight',
-            'embeddings.position_embeddings.weight'
-        ],
-        [
-            'embeddings.token_type_embeddings.weight',
-            'embeddings.token_type_embeddings.weight'
-        ],
-        ['embeddings.LayerNorm.weight', 'embeddings.layer_norm.weight'],
-        ['embeddings.LayerNorm.bias', 'embeddings.layer_norm.bias'],
-        ['pooler.dense.weight', 'pooler.dense.weight', 'transpose'],
-        ['pooler.dense.bias', 'pooler.dense.bias'],
-        ['transformation.weight', 'transformation.weight', 'transpose'],
-        ['transformation.bias', 'transformation.bias'],
-    ]
-    for layer_index in range(xlm_roberta.config.num_hidden_layers):
-        layer_mappings = [
-            [
-                f'encoder.layer.{layer_index}.attention.self.query.weight',
-                f'encoder.layers.{layer_index}.self_attn.q_proj.weight',
-                'transpose'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.self.query.bias',
-                f'encoder.layers.{layer_index}.self_attn.q_proj.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.self.key.weight',
-                f'encoder.layers.{layer_index}.self_attn.k_proj.weight',
-                'transpose'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.self.key.bias',
-                f'encoder.layers.{layer_index}.self_attn.k_proj.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.self.value.weight',
-                f'encoder.layers.{layer_index}.self_attn.v_proj.weight',
-                'transpose'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.self.value.bias',
-                f'encoder.layers.{layer_index}.self_attn.v_proj.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.output.dense.weight',
-                f'encoder.layers.{layer_index}.self_attn.out_proj.weight',
-                'transpose'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.output.dense.bias',
-                f'encoder.layers.{layer_index}.self_attn.out_proj.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.output.LayerNorm.weight',
-                f'encoder.layers.{layer_index}.norm1.weight'
-            ],
-            [
-                f'encoder.layer.{layer_index}.attention.output.LayerNorm.bias',
-                f'encoder.layers.{layer_index}.norm1.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.intermediate.dense.weight',
-                f'encoder.layers.{layer_index}.linear1.weight', 'transpose'
-            ],
-            [
-                f'encoder.layer.{layer_index}.intermediate.dense.bias',
-                f'encoder.layers.{layer_index}.linear1.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.output.dense.weight',
-                f'encoder.layers.{layer_index}.linear2.weight', 'transpose'
-            ],
-            [
-                f'encoder.layer.{layer_index}.output.dense.bias',
-                f'encoder.layers.{layer_index}.linear2.bias'
-            ],
-            [
-                f'encoder.layer.{layer_index}.output.LayerNorm.weight',
-                f'encoder.layers.{layer_index}.norm2.weight'
-            ],
-            [
-                f'encoder.layer.{layer_index}.output.LayerNorm.bias',
-                f'encoder.layers.{layer_index}.norm2.bias'
-            ],
-        ]
-        mappings.extend(layer_mappings)
-
-    state_dict = xlm_roberta.state_dict()
-    prefix = "roberta."
-    for data in mappings:
-        need_transpose = False
-        if len(data) == 3: need_transpose = True
-        hf_name, pp_name = data[:2]
-        if "transformation." not in hf_name:
-            hf_name = prefix + hf_name
-            pp_name = prefix + pp_name
-        if need_transpose:
-            new_model_state[pp_name] = state_dict[hf_name].t().cpu().numpy(
-            ).astype(dtype)
-        else:
-            new_model_state[pp_name] = state_dict[hf_name].cpu().numpy().astype(
-                dtype)
-
-    new_config = xlm_roberta.config.to_dict()
-    return new_model_state, new_config
-
-
 def convert_diffusers_stable_diffusion_to_ppdiffusers(
         pretrained_model_name_or_path, output_path=None):
     # 0. load diffusers pipe and convert to ppdiffusers weights format
-    diffusers_pipe = DiffusersAltDiffusionPipeline.from_pretrained(
+    diffusers_pipe = DiffusersStableDiffusionUpscalePipeline.from_pretrained(
         pretrained_model_name_or_path, use_auth_token=True)
     vae_state_dict = convert_to_ppdiffusers(diffusers_pipe.vae)
     unet_state_dict = convert_to_ppdiffusers(diffusers_pipe.unet)
-    text_encoder_state_dict, text_encoder_config = convert_hf_xlm_roberta_to_ppnlp_xlm_roberta(
-        diffusers_pipe.text_encoder)
-    safety_checker_state_dict, safety_checker_config = convert_hf_clip_to_ppnlp_clip(
-        diffusers_pipe.safety_checker, is_text_encoder=False)
+    text_encoder_state_dict, text_encoder_config = convert_hf_clip_to_ppnlp_clip(
+        diffusers_pipe.text_encoder, is_text_encoder=True)
+    max_noise_level = diffusers_pipe.max_noise_level
 
     # 1. vae
     pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
@@ -249,21 +131,49 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
     pp_unet.set_dict(unet_state_dict)
 
     # 3. text_encoder
-    config = RobertaSeriesConfig(**text_encoder_config)
-    pp_text_encoder = RobertaSeriesModelWithTransformation(config)
+    pp_text_encoder = CLIPTextModel(**text_encoder_config)
     pp_text_encoder.set_dict(text_encoder_state_dict)
 
-    # 4. safety_checker
-    pp_safety_checker = StableDiffusionSafetyChecker(
-        CLIPVisionModel(**safety_checker_config))
-    pp_safety_checker.set_dict(safety_checker_state_dict)
-
-    # 5. scheduler
+    # 4. scheduler
     beta_start = diffusers_pipe.scheduler.beta_start
     beta_end = diffusers_pipe.scheduler.beta_end
+    beta_schedule = diffusers_pipe.scheduler.beta_schedule
+    num_train_timesteps = diffusers_pipe.scheduler.num_train_timesteps
     scheduler_type = diffusers_pipe.scheduler._class_name.lower()
     if "pndm" in scheduler_type:
         pp_scheduler = PNDMScheduler(
+            beta_end=beta_end,
+            beta_schedule=beta_schedule,
+            beta_start=beta_start,
+            num_train_timesteps=num_train_timesteps,
+            skip_prk_steps=True,
+        )
+    elif "lms" in scheduler_type:
+        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start,
+                                            beta_end=beta_end,
+                                            beta_schedule=beta_schedule)
+    elif "ddim" in scheduler_type:
+        pp_scheduler = DDIMScheduler(
+            beta_start=beta_start,
+            beta_end=beta_end,
+            beta_schedule=beta_schedule,
+            clip_sample=False,
+            prediction_type="v_prediction",
+            set_alpha_to_one=False,
+            steps_offset=1,
+            skip_prk_steps=True,
+        )
+    else:
+        raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
+
+    # 5. low_res_scheduler
+    beta_start = diffusers_pipe.low_res_scheduler.beta_start
+    beta_end = diffusers_pipe.low_res_scheduler.beta_end
+    num_train_timesteps = diffusers_pipe.low_res_scheduler.num_train_timesteps
+    beta_schedule = diffusers_pipe.low_res_scheduler.beta_schedule
+    scheduler_type = diffusers_pipe.low_res_scheduler._class_name.lower()
+    if "pndm" in scheduler_type:
+        pp_low_res_scheduler = PNDMScheduler(
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
@@ -274,12 +184,19 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
             # Make sure the scheduler compatible with PNDM
             skip_prk_steps=True,
         )
+    elif "ddpm" in scheduler_type:
+        pp_low_res_scheduler = DDPMScheduler(
+            beta_end=beta_end,
+            beta_schedule=beta_schedule,
+            beta_start=beta_start,
+            num_train_timesteps=num_train_timesteps,
+        )
     elif "lms" in scheduler_type:
-        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start,
-                                            beta_end=beta_end,
-                                            beta_schedule="scaled_linear")
+        pp_low_res_scheduler = LMSDiscreteScheduler(beta_start=beta_start,
+                                                    beta_end=beta_end,
+                                                    beta_schedule=beta_schedule)
     elif "ddim" in scheduler_type:
-        pp_scheduler = DDIMScheduler(
+        pp_low_res_scheduler = DDIMScheduler(
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
@@ -294,23 +211,20 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        # 6. feature_extractor
-        diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
-        pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(tmpdirname)
-
-        # 7. tokenizer
+        # 6. tokenizer
         diffusers_pipe.tokenizer.save_pretrained(tmpdirname)
-        pp_tokenizer = XLMRobertaTokenizer.from_pretrained(tmpdirname)
-
-        # 8. create ppdiffusers pipe
-        paddle_pipe = PPDiffusersAltDiffusionPipeline(
+        pp_tokenizer = CLIPTokenizer.from_pretrained(tmpdirname)
+        # 7. create ppdiffusers pipe
+        paddle_pipe = PPDiffusersStableDiffusionUpscalePipeline(
+            max_noise_level=max_noise_level,
             vae=pp_vae,
             text_encoder=pp_text_encoder,
             tokenizer=pp_tokenizer,
             unet=pp_unet,
-            safety_checker=pp_safety_checker,
-            feature_extractor=pp_feature_extractor,
-            scheduler=pp_scheduler)
+            low_res_scheduler=pp_low_res_scheduler,
+            scheduler=pp_scheduler,
+        )
+
         # 9. save_pretrained
         paddle_pipe.save_pretrained(output_path)
     return paddle_pipe
@@ -322,14 +236,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="BAAI/AltDiffusion",
+        default="stabilityai/stable-diffusion-x4-upscaler",
         help=
         "Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
         "--output_path",
         type=str,
-        default="AltDiffusion-ppdiffusers",
+        default="stable-diffusion-x4-upscaler-ppdiffusers",
         help="The model output path.",
     )
     args = parser.parse_args()

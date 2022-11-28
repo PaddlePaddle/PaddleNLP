@@ -73,6 +73,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
     text_unet: UNetFlatConditionModel
     vae: AutoencoderKL
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
+    _optional_components = ["text_unet"]
 
     def __init__(
         self,
@@ -154,6 +155,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
                 index = int(index)
                 self.image_unet.get_sublayer(
                     parent_name)[index] = module.transformers[0]
+        self.image_unet.register_to_config(dual_cross_attention=False)
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing with unet->image_unet
     def enable_attention_slicing(self,
@@ -294,7 +296,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
     def _encode_image_prompt(self, prompt, num_images_per_prompt,
                              do_classifier_free_guidance):
         r"""
-        Encodes the prompt into text encoder hidden states.
+        Encodes the prompt into vision encoder hidden states.
 
         Args:
             prompt (`str` or `list(int)`):
@@ -441,8 +443,8 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
 
                 for i, type in enumerate(condition_types):
                     if type == "text":
-                        module.condition_lengths[
-                            i] = self.text_encoder.config.max_position_embeddings
+                        module.condition_lengths[i] = self.text_encoder.config[
+                            'max_text_length']
                         module.transformer_index_for_condition[
                             i] = 1  # use the second (text) transformer
                     else:

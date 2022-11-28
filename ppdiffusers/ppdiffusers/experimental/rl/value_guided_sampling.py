@@ -74,7 +74,7 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
     def run_diffusion(self, x, conditions, n_guide_steps, scale):
         batch_size = x.shape[0]
         y = None
-        for i in tqdm.tqdm(self.scheduler.timesteps):
+        for i in self.progress_bar(self.scheduler.timesteps):
             # create batch of timesteps to pass into model
             timesteps = paddle.full((batch_size, ), i, dtype="int64")
             for _ in range(n_guide_steps):
@@ -93,6 +93,7 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
                 x = self.reset_x0(x, conditions, self.action_dim)
             prev_x = self.unet(x.transpose([0, 2, 1]),
                                timesteps).sample.transpose([0, 2, 1])
+            # TODO: set prediction_type when instantiating the model
             x = self.scheduler.step(prev_x, i, x,
                                     predict_epsilon=False)["prev_sample"]
 

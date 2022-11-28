@@ -688,6 +688,7 @@ def convert_diffusers_vae_unet_to_ppdiffusers(vae_or_unet,
 
 
 def check_keys(model, state_dict):
+    cls_name = model.__class__.__name__
     missing_keys = []
     mismatched_keys = []
     for k, v in model.state_dict().items():
@@ -696,11 +697,11 @@ def check_keys(model, state_dict):
         if list(v.shape) != list(state_dict[k].shape):
             mismatched_keys.append(k)
     if len(missing_keys):
-        missing_keys_str = ",".join(missing_keys)
-        print(f"Found missing_keys {missing_keys_str}!")
+        missing_keys_str = ", ".join(missing_keys)
+        print(f"{cls_name} Found missing_keys {missing_keys_str}!")
     if len(mismatched_keys):
-        mismatched_keys_str = ",".join(mismatched_keys)
-        print(f"Found mismatched_keys {mismatched_keys_str}!")
+        mismatched_keys_str = ", ".join(mismatched_keys)
+        print(f"{cls_name} Found mismatched_keys {mismatched_keys_str}!")
 
 
 def convert_hf_clip_to_ppnlp_clip(clip, layer_idx, dtype="float32"):
@@ -865,10 +866,14 @@ if __name__ == "__main__":
     beta_end = original_config.model.params.linear_end
     if args.scheduler_type == "pndm":
         scheduler = PNDMScheduler(
+            beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
-            beta_start=beta_start,
-            num_train_timesteps=num_train_timesteps,
+            # Make sure the scheduler compatible with DDIM
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
+            # Make sure the scheduler compatible with PNDM
             skip_prk_steps=True,
         )
     elif args.scheduler_type == "lms":
@@ -885,8 +890,12 @@ if __name__ == "__main__":
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
+            # Make sure the scheduler compatible with DDIM
             clip_sample=False,
             set_alpha_to_one=False,
+            steps_offset=1,
+            # Make sure the scheduler compatible with PNDM
+            skip_prk_steps=True,
         )
     else:
         raise ValueError(
@@ -898,6 +907,7 @@ if __name__ == "__main__":
                                    unet=unet,
                                    scheduler=scheduler,
                                    safety_checker=None,
-                                   feature_extractor=None)
+                                   feature_extractor=None,
+                                   requires_safety_checker=False)
 
     pipe.save_pretrained(args.dump_path)

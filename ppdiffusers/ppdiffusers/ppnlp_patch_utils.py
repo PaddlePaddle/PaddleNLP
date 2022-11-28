@@ -15,6 +15,7 @@
 import functools, builtins, copy, contextlib, time
 from .utils import is_paddle_available, is_paddlenlp_available
 from types import FunctionType, MethodType
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def copy_func(f):
@@ -55,6 +56,23 @@ def patch_to(cls, as_prop=False, cls_method=False):
 if is_paddle_available():
     import paddle
     import paddle.nn as nn
+
+    from paddle.fluid import framework
+
+    @contextlib.contextmanager
+    def device_scope(device="cpu"):
+        new_device = framework._get_paddle_place(device.replace("cuda", "gpu"))
+        old_device = framework._current_expected_place()
+        if str(new_device) == str(old_device):
+            yield
+        else:
+            try:
+                framework._set_expected_place(new_device)
+                yield
+            finally:
+                framework._set_expected_place(old_device)
+
+    paddle.device_scope = device_scope
 
     class RNGStatesTracker:
 
@@ -167,7 +185,6 @@ if is_paddle_available() and is_paddlenlp_available():
         from paddlenlp.transformers import CLIPPretrainedModel, register_base_model, VisionTransformer, TextTransformer
         from paddlenlp.transformers.model_outputs import ModelOutput
         from dataclasses import dataclass
-        from typing import Optional, Tuple
 
         @dataclass
         class CLIPVisionModelOutput(ModelOutput):
@@ -335,7 +352,6 @@ if is_paddle_available() and is_paddlenlp_available():
         """ Tokenization classes for XLM-RoBERTa model."""
         import os
         from shutil import copyfile
-        from typing import Any, Dict, List, Optional, Tuple
 
         import sentencepiece as spm
 
@@ -578,8 +594,9 @@ if is_paddle_available() and is_paddlenlp_available():
 
         paddlenlp.transformers.XLMRobertaTokenizer = XLMRobertaTokenizer
 
-    # patch bertmodel
+    # patch BertModel forward
     from paddlenlp.transformers import BertModel
+
     raw_forward = BertModel.forward
 
     @patch_to(BertModel)

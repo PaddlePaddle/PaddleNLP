@@ -29,10 +29,9 @@ from ppdiffusers import (
     PNDMScheduler,
     StableDiffusionPipeline,
     UNet2DConditionModel,
-    logging,
 )
 from ppdiffusers.utils import load_numpy, slow
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
 from test_pipelines_common import PipelineTesterMixin
 
@@ -93,23 +92,6 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         model.eval()
         return model
 
-    @property
-    def dummy_extractor(self):
-
-        def extract(*args, **kwargs):
-
-            class Out:
-
-                def __init__(self):
-                    self.pixel_values = paddle.ones([0])
-
-                def to(self, *args, **kwargs):
-                    return self
-
-            return Out()
-
-        return extract
-
     def test_save_pretrained_from_pretrained(self):
         unet = self.dummy_cond_unet
         sample_size = unet.config.sample_size
@@ -125,8 +107,6 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         bert = self.dummy_text_encoder
         tokenizer = CLIPTokenizer.from_pretrained(
             "hf-internal-testing/tiny-random-clip")
-        feature_extractor = CLIPFeatureExtractor.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
 
         # make sure here that pndm scheduler skips prk
         sd_pipe = StableDiffusionPipeline(
@@ -136,7 +116,8 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=feature_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
@@ -189,13 +170,14 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=self.dummy_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = sd_pipe([prompt],
                          generator=generator,
                          guidance_scale=6.0,
@@ -203,7 +185,7 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
                          output_type="np")
         image = output.images
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         image_from_tuple = sd_pipe(
             [prompt],
             generator=generator,
@@ -218,9 +200,9 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array([
-            0.3399079442024231, 0.32056277990341187, 0.3508835434913635,
-            0.17867285013198853, 0.24185702204704285, 0.4110303521156311,
-            0.17070192098617554, 0.1501854658126831, 0.35932618379592896
+            0.34405648708343506, 0.32162144780158997, 0.34599122405052185,
+            0.18658435344696045, 0.2524387240409851, 0.4146214723587036,
+            0.16891804337501526, 0.15601688623428345, 0.3622136116027832
         ])
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
@@ -243,12 +225,13 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=self.dummy_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = sd_pipe([prompt],
                          generator=generator,
                          guidance_scale=6.0,
@@ -257,7 +240,7 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         image = output.images
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         image_from_tuple = sd_pipe(
             [prompt],
             generator=generator,
@@ -272,9 +255,9 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array([
-            0.20569297671318054, 0.292793869972229, 0.35201555490493774,
-            0.17686176300048828, 0.28506627678871155, 0.4446532726287842,
-            0.17510178685188293, 0.15651720762252808, 0.35780689120292664
+            0.2154848575592041, 0.2904207706451416, 0.3478661775588989,
+            0.18292692303657532, 0.2867245674133301, 0.4459488093852997,
+            0.1750122606754303, 0.1603463590145111, 0.35997599363327026
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() -
@@ -298,12 +281,13 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=self.dummy_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = sd_pipe([prompt],
                          generator=generator,
                          guidance_scale=6.0,
@@ -312,7 +296,7 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         image = output.images
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         image_from_tuple = sd_pipe(
             [prompt],
             generator=generator,
@@ -327,9 +311,9 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array([
-            0.3788182735443115, 0.33073586225509644, 0.35480794310569763,
-            0.15712517499923706, 0.23421180248260498, 0.3990577459335327,
-            0.1658017635345459, 0.1397191286087036, 0.3329782485961914
+            0.3695735037326813, 0.32517313957214355, 0.3537803888320923,
+            0.16248208284378052, 0.2466825544834137, 0.40850135684013367,
+            0.17010122537612915, 0.1503462791442871, 0.33835601806640625
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() -
@@ -352,12 +336,13 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=self.dummy_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = sd_pipe([prompt],
                          generator=generator,
                          guidance_scale=6.0,
@@ -366,7 +351,7 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         image = output.images
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         image_from_tuple = sd_pipe(
             [prompt],
             generator=generator,
@@ -381,9 +366,9 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array([
-            0.37895363569259644, 0.3304874002933502, 0.3544866144657135,
-            0.15734165906906128, 0.23358365893363953, 0.3988724648952484,
-            0.1663529872894287, 0.13962090015411377, 0.3329361081123352
+            0.36970800161361694, 0.3249228000640869, 0.35345137119293213,
+            0.1627046763896942, 0.2460731863975525, 0.4083251357078552,
+            0.17065522074699402, 0.1502566933631897, 0.3383236229419708
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() -
@@ -407,12 +392,13 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=self.dummy_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = sd_pipe([prompt],
                          generator=generator,
                          guidance_scale=6.0,
@@ -421,7 +407,7 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         image = output.images
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         image_from_tuple = sd_pipe(
             [prompt],
             generator=generator,
@@ -436,9 +422,9 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array([
-            0.37881898880004883, 0.33073627948760986, 0.35480785369873047,
-            0.15712547302246094, 0.23421168327331543, 0.3990575969219208,
-            0.165802001953125, 0.13971921801567078, 0.3329782783985138
+            0.36957430839538574, 0.3251732289791107, 0.3537804186344147,
+            0.16248196363449097, 0.24668240547180176, 0.4085012674331665,
+            0.17010125517845154, 0.15034639835357666, 0.338356077671051
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() -
@@ -462,12 +448,13 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_encoder=bert,
             tokenizer=tokenizer,
             safety_checker=None,
-            feature_extractor=self.dummy_extractor,
+            feature_extractor=None,
+            requires_safety_checker=False,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output_1 = sd_pipe([prompt],
                            generator=generator,
                            guidance_scale=6.0,
@@ -476,7 +463,7 @@ class StableDiffusion2PipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         # make sure chunking the attention yields the same result
         sd_pipe.enable_attention_slicing(slice_size=1)
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output_2 = sd_pipe([prompt],
                            generator=generator,
                            guidance_scale=6.0,
@@ -502,7 +489,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = sd_pipe([prompt],
                          generator=generator,
                          guidance_scale=6.0,
@@ -527,7 +514,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "A painting of a squirrel eating a burger"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
 
         output = sd_pipe([prompt],
                          generator=generator,
@@ -552,7 +539,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
         sd_pipe.set_progress_bar_config(disable=None)
 
         prompt = "a photograph of an astronaut riding a horse"
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         image = sd_pipe([prompt],
                         generator=generator,
                         guidance_scale=7.5,
@@ -569,7 +556,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
 
     def test_stable_diffusion_text2img_pipeline_default(self):
         expected_image = load_numpy(
-            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/sd2-text2img/astronaut_riding_a_horse.npy"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/astronaut_riding_a_horse_sd2.npy"
         )
 
         model_id = "stabilityai/stable-diffusion-2-base"
@@ -580,7 +567,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
 
         prompt = "astronaut riding a horse"
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = pipe(prompt=prompt,
                       strength=0.75,
                       guidance_scale=7.5,
@@ -604,9 +591,12 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
                 assert latents.shape == (1, 4, 64, 64)
                 latents_slice = latents[0, -3:, -3:, -1]
                 expected_slice = np.array([
-                    1.8606, 1.3169, -0.0691, 1.2374, -2.309, 1.077, -0.1084,
-                    -0.6774, -2.9594
+                    1.8583712577819824, 1.3168376684188843,
+                    -0.06832285225391388, 1.236493706703186,
+                    -2.3062071800231934, 1.07706880569458, -0.10915999114513397,
+                    -0.6771516799926758, -2.9597039222717285
                 ])
+
                 assert np.abs(latents_slice.flatten() -
                               expected_slice).max() < 1e-3
             elif step == 20:
@@ -614,8 +604,10 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
                 assert latents.shape == (1, 4, 64, 64)
                 latents_slice = latents[0, -3:, -3:, -1]
                 expected_slice = np.array([
-                    1.078, 1.1804, 1.1339, 0.4664, -0.2354, 0.6097, -0.7749,
-                    -0.8784, -0.9465
+                    1.074744701385498, 1.182698130607605, 1.136147379875183,
+                    0.4629708528518677, -0.2459753304719925, 0.6091336607933044,
+                    -0.7727948427200317, -0.8809196352958679,
+                    -0.9447993636131287
                 ])
                 assert np.abs(latents_slice.flatten() -
                               expected_slice).max() < 1e-2
@@ -629,7 +621,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
 
         prompt = "Andromeda galaxy in a bottle"
 
-        generator = generator = paddle.Generator().manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         pipe(
             prompt=prompt,
             num_inference_steps=20,

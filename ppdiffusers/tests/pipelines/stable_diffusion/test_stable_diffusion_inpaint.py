@@ -79,6 +79,7 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
             sample_size=64,
             in_channels=4,
             out_channels=4,
+            flip_sin_to_cos=True,
             down_block_types=("DownBlock2D", "CrossAttnDownBlock2D"),
             up_block_types=("CrossAttnUpBlock2D", "UpBlock2D"),
             cross_attention_dim=32,
@@ -213,9 +214,9 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
 
         assert image.shape == (1, 128, 128, 3)
         expected_slice = np.array([
-            0.5713261365890503, 0.8823992609977722, 0.6356441974639893,
-            0.364177942276001, 0.28321805596351624, 0.3519574999809265,
-            0.4533247649669647, 0.3828922212123871, 0.5275940895080566
+            0.545544445514679, 0.8716033697128296, 0.6393760442733765,
+            0.3599637448787689, 0.2856498956680298, 0.35221630334854126,
+            0.45163142681121826, 0.37955841422080994, 0.5252581238746643
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
         assert np.abs(image_from_tuple_slice.flatten() -

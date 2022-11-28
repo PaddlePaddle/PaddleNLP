@@ -735,25 +735,27 @@ def downsample_2d(hidden_states, kernel=None, factor=2, gain=1):
     return output
 
 
-def dummpy_pad(tensor, up_x, up_y):
+def dummy_pad(tensor, up_x=0, up_y=0):
     if up_x > 0:
         tensor = paddle.concat([
             tensor,
             paddle.zeros([
                 tensor.shape[0], tensor.shape[1], tensor.shape[2],
-                tensor.shape[3], up_x - 1, tensor.shape[-1]
-            ])
+                tensor.shape[3], up_x, tensor.shape[5]
+            ],
+                         dtype=tensor.dtype)
         ],
-                               axis=-2)
+                               axis=4)
     if up_y > 0:
         tensor = paddle.concat([
             tensor,
             paddle.zeros([
-                tensor.shape[0], tensor.shape[1], up_y - 1, tensor.shape[3],
-                tensor.shape[4], tensor.shape[-1]
-            ])
+                tensor.shape[0], tensor.shape[1], up_y, tensor.shape[3],
+                tensor.shape[4], tensor.shape[5]
+            ],
+                         dtype=tensor.dtype)
         ],
-                               axis=-4)
+                               axis=2)
     return tensor
 
 
@@ -772,7 +774,7 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     out = tensor.reshape([-1, in_h, 1, in_w, 1, minor])
     # (TODO, junnyu F.pad bug)
     # F.pad(out, [0, 0, 0, up_x - 1, 0, 0, 0, up_y - 1])
-    out = dummpy_pad(out, up_x, up_y)
+    out = dummy_pad(out, up_x - 1, up_y - 1)
     out = out.reshape([-1, in_h * up_y, in_w * up_x, minor])
 
     # (TODO, junnyu F.pad bug)

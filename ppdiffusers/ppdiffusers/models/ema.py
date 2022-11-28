@@ -85,7 +85,7 @@ class LitEma(nn.Layer):
         """
         Save the current parameters for restoring later.
         Args:
-          parameters: Iterable of `paddle.nn.Parameter`; the parameters to be
+          parameters: Iterable of `EagerParamBase`; the parameters to be
             temporarily stored.
         """
         self.collected_params = [param.clone() for param in parameters]
@@ -98,7 +98,7 @@ class LitEma(nn.Layer):
         `copy_to` method. After validation (or model saving), use this to
         restore the former parameters.
         Args:
-          parameters: Iterable of `paddle.nn.Parameter`; the parameters to be
+          parameters: Iterable of `EagerParamBase`; the parameters to be
             updated with the stored parameters.
         """
         for c_param, param in zip(self.collected_params, parameters):

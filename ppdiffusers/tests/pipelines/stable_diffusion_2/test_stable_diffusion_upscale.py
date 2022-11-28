@@ -16,10 +16,11 @@
 import gc
 import random
 import unittest
-import paddle
-import numpy as np
 
-from ppdiffusers import AutoencoderKL, PNDMScheduler, StableDiffusionInpaintPipeline, UNet2DConditionModel
+import numpy as np
+import paddle
+
+from ppdiffusers import AutoencoderKL, DDIMScheduler, DDPMScheduler, StableDiffusionUpscalePipeline, UNet2DConditionModel
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
 from PIL import Image
 from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
@@ -27,7 +28,7 @@ from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from test_pipelines_common import PipelineTesterMixin
 
 
-class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
+class StableDiffusionUpscalePipelineFastTests(PipelineTesterMixin,
                                               unittest.TestCase):
 
     def tearDown(self):
@@ -47,20 +48,24 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         return image
 
     @property
-    def dummy_cond_unet_inpaint(self):
+    def dummy_cond_unet_upscale(self):
         paddle.seed(0)
         model = UNet2DConditionModel(
-            block_out_channels=(32, 64),
+            block_out_channels=(32, 32, 64),
             layers_per_block=2,
             sample_size=32,
-            in_channels=9,
+            in_channels=7,
             out_channels=4,
-            down_block_types=("DownBlock2D", "CrossAttnDownBlock2D"),
-            up_block_types=("CrossAttnUpBlock2D", "UpBlock2D"),
+            down_block_types=("DownBlock2D", "CrossAttnDownBlock2D",
+                              "CrossAttnDownBlock2D"),
+            up_block_types=("CrossAttnUpBlock2D", "CrossAttnUpBlock2D",
+                            "UpBlock2D"),
             cross_attention_dim=32,
             # SD2-specific config below
-            attention_head_dim=(2, 4, 8, 8),
+            attention_head_dim=8,
             use_linear_projection=True,
+            only_cross_attention=(True, True, False),
+            num_class_embeds=100,
         )
         return model
 
@@ -68,11 +73,15 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
     def dummy_vae(self):
         paddle.seed(0)
         model = AutoencoderKL(
-            block_out_channels=[32, 64],
+            block_out_channels=[32, 32, 64],
             in_channels=3,
             out_channels=3,
-            down_block_types=["DownEncoderBlock2D", "DownEncoderBlock2D"],
-            up_block_types=["UpDecoderBlock2D", "UpDecoderBlock2D"],
+            down_block_types=[
+                "DownEncoderBlock2D", "DownEncoderBlock2D", "DownEncoderBlock2D"
+            ],
+            up_block_types=[
+                "UpDecoderBlock2D", "UpDecoderBlock2D", "UpDecoderBlock2D"
+            ],
             latent_channels=4,
         )
         return model
@@ -93,46 +102,28 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         model.eval()
         return model
 
-    @property
-    def dummy_extractor(self):
-
-        def extract(*args, **kwargs):
-
-            class Out:
-
-                def __init__(self):
-                    self.pixel_values = paddle.ones([0])
-
-                def to(self, *args, **kwargs):
-                    return self
-
-            return Out()
-
-        return extract
-
-    def test_stable_diffusion_inpaint(self):
-        unet = self.dummy_cond_unet_inpaint
-        scheduler = PNDMScheduler(skip_prk_steps=True)
+    def test_stable_diffusion_upscale(self):
+        unet = self.dummy_cond_unet_upscale
+        low_res_scheduler = DDPMScheduler()
+        scheduler = DDIMScheduler(prediction_type="v_prediction")
         vae = self.dummy_vae
         text_encoder = self.dummy_text_encoder
         tokenizer = CLIPTokenizer.from_pretrained(
             "hf-internal-testing/tiny-random-clip")
 
         image = self.dummy_image.transpose([0, 2, 3, 1])[0]
-        init_image = Image.fromarray(np.uint8(image)).convert("RGB").resize(
-            (64, 64))
-        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize(
+        low_res_image = Image.fromarray(np.uint8(image)).convert("RGB").resize(
             (64, 64))
 
         # make sure here that pndm scheduler skips prk
-        sd_pipe = StableDiffusionInpaintPipeline(
+        sd_pipe = StableDiffusionUpscalePipeline(
             unet=unet,
+            low_res_scheduler=low_res_scheduler,
             scheduler=scheduler,
             vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
-            safety_checker=None,
-            feature_extractor=None,
+            max_noise_level=350,
         )
         sd_pipe.set_progress_bar_config(disable=None)
 
@@ -140,12 +131,12 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         generator = paddle.Generator().manual_seed(0)
         output = sd_pipe(
             [prompt],
+            image=low_res_image,
             generator=generator,
             guidance_scale=6.0,
+            noise_level=20,
             num_inference_steps=2,
             output_type="np",
-            image=init_image,
-            mask_image=mask_image,
         )
 
         image = output.images
@@ -153,23 +144,25 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         generator = paddle.Generator().manual_seed(0)
         image_from_tuple = sd_pipe(
             [prompt],
+            image=low_res_image,
             generator=generator,
             guidance_scale=6.0,
+            noise_level=20,
             num_inference_steps=2,
             output_type="np",
-            image=init_image,
-            mask_image=mask_image,
             return_dict=False,
         )[0]
 
         image_slice = image[0, -3:, -3:, -1]
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
-        assert image.shape == (1, 64, 64, 3)
+        expected_height_width = low_res_image.size[0] * 4
+        assert image.shape == (1, expected_height_width, expected_height_width,
+                               3)
         expected_slice = np.array([
-            0.46581971645355225, 0.4502384066581726, 0.2711679935455322,
-            0.39340725541114807, 0.4130115509033203, 0.47139889001846313,
-            0.35663333535194397, 0.33137619495391846, 0.39559948444366455
+            0.9216755628585815, 0.7778909206390381, 0.7246097326278687,
+            0.6616445183753967, 0.5916030406951904, 0.5970571041107178,
+            0.5546892881393433, 0.5396133065223694, 0.6180068254470825
         ])
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
@@ -178,7 +171,7 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
 
 
 @slow
-class StableDiffusionInpaintPipelineIntegrationTests(unittest.TestCase):
+class StableDiffusionUpscalePipelineIntegrationTests(unittest.TestCase):
 
     def tearDown(self):
         # clean up the VRAM after each test
@@ -186,30 +179,25 @@ class StableDiffusionInpaintPipelineIntegrationTests(unittest.TestCase):
         gc.collect()
         paddle.device.cuda.empty_cache()
 
-    def test_stable_diffusion_inpaint_pipeline(self):
-        init_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/init_image_sd2.png"
-        )
-        mask_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_sd2.png"
+    def test_stable_diffusion_upscale_pipeline(self):
+        image = load_image(
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
         )
         expected_image = load_numpy(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/yellow_cat_sitting_on_a_park_bench_sd2.npy"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/upsampled_cat.npy"
         )
 
-        model_id = "stabilityai/stable-diffusion-2-inpainting"
-        pipe = StableDiffusionInpaintPipeline.from_pretrained(
-            model_id, safety_checker=None)
+        model_id = "stabilityai/stable-diffusion-x4-upscaler"
+        pipe = StableDiffusionUpscalePipeline.from_pretrained(model_id)
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
 
-        prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
+        prompt = "a cat sitting on a park bench"
 
         generator = paddle.Generator().manual_seed(0)
         output = pipe(
             prompt=prompt,
-            image=init_image,
-            mask_image=mask_image,
+            image=image,
             generator=generator,
             output_type="np",
         )

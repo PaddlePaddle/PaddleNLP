@@ -38,6 +38,7 @@ if is_paddle_available() and is_paddlenlp_available():
         StableDiffusionInpaintPipeline,
         StableDiffusionInpaintPipelineLegacy,
         StableDiffusionPipeline,
+        StableDiffusionUpscalePipeline,
         StableDiffusionPipelineAllinOne,
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe

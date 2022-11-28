@@ -25,6 +25,7 @@ from ppdiffusers import (
     PNDMScheduler,
     logging,
 )
+from ppdiffusers.utils import deprecate
 from ppdiffusers.configuration_utils import ConfigMixin, register_to_config
 from ppdiffusers.utils.testing_utils import CaptureLogger
 
@@ -198,7 +199,7 @@ class ConfigTester(unittest.TestCase):
             ddpm = DDPMScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch",
                 subfolder="scheduler",
-                predict_epsilon=False,
+                prediction_type="sample",
                 beta_end=8,
             )
 
@@ -207,10 +208,20 @@ class ConfigTester(unittest.TestCase):
                                                    beta_start=88,
                                                    subfolder="scheduler")
 
+        with CaptureLogger(logger) as cap_logger:
+            deprecate("remove this case", "0.10.0", "remove")
+            ddpm_3 = DDPMScheduler.from_pretrained(
+                "hf-internal-testing/tiny-stable-diffusion-torch",
+                subfolder="scheduler",
+                predict_epsilon=False,
+                beta_end=8,
+            )
+
         assert ddpm.__class__ == DDPMScheduler
-        assert ddpm.config.predict_epsilon is False
+        assert ddpm.config.prediction_type == "sample"
         assert ddpm.config.beta_end == 8
         assert ddpm_2.config.beta_start == 88
+        assert ddpm_3.config.prediction_type == "sample"
 
         # no warning should be thrown
         assert cap_logger.out == ""

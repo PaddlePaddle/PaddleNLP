@@ -90,13 +90,16 @@ class ConfigMixin:
         - **config_name** (`str`) -- A filename under which the config should stored when calling
           [`~ConfigMixin.save_config`] (should be overridden by parent class).
         - **ignore_for_config** (`List[str]`) -- A list of attributes that should not be saved in the config (should be
-          overridden by parent class).
-        - **has_compatibles** (`bool`) -- Whether the class has compatible classes (should be overridden by parent
-          class).
+          overridden by subclass).
+        - **has_compatibles** (`bool`) -- Whether the class has compatible classes (should be overridden by subclass).
+        - **_deprecated_kwargs** (`List[str]`) -- Keyword arguments that are deprecated. Note that the init function
+          should only have a `kwargs` argument if at least one argument is deprecated (should be overridden by
+          subclass).
     """
     config_name = None
     ignore_for_config = []
     has_compatibles = False
+    _deprecated_kwargs = []
 
     def register_to_config(self, **kwargs):
         if self.config_name is None:
@@ -225,6 +228,12 @@ class ConfigMixin:
             # (TODO junnyu, donot use dtype)
             unused_kwargs.pop("dtype")
             # init_dict["dtype"] = unused_kwargs.pop("dtype")
+
+        # add possible deprecated kwargs
+        for deprecated_kwarg in cls._deprecated_kwargs:
+            if deprecated_kwarg in unused_kwargs:
+                init_dict[deprecated_kwarg] = unused_kwargs.pop(
+                    deprecated_kwarg)
 
         # Return model and optionally state and/or unused_kwargs
         model = cls(**init_dict)
@@ -543,7 +552,7 @@ def register_to_config(init):
             k: v
             for k, v in kwargs.items() if k.startswith("_")
         }
-        init(self, *args, **init_kwargs)
+
         if not isinstance(self, ConfigMixin):
             raise RuntimeError(
                 f"`@register_for_config` was applied to {self.__class__.__name__} init method, but this class does "
@@ -569,5 +578,6 @@ def register_to_config(init):
         })
         new_kwargs = {**config_init_kwargs, **new_kwargs}
         getattr(self, "register_to_config")(**new_kwargs)
+        init(self, *args, **init_kwargs)
 
     return inner_init

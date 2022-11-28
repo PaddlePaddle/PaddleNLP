@@ -23,7 +23,7 @@ from ppdiffusers.utils.testing_utils import slow
 from test_pipelines_common import PipelineTesterMixin
 
 
-class ScoreSdeVeipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class ScoreSdeVePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
     @property
     def dummy_uncond_unet(self):

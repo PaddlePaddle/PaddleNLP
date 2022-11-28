@@ -22,7 +22,6 @@ import paddle
 
 from ppdiffusers import (
     AutoencoderKL,
-    LMSDiscreteScheduler,
     PNDMScheduler,
     StableDiffusionImageVariationPipeline,
     UNet2DConditionModel,
@@ -159,9 +158,9 @@ class StableDiffusionImageVariationPipelineFastTests(PipelineTesterMixin,
 
         assert image.shape == (1, 128, 128, 3)
         expected_slice = np.array([
-            0.9133340120315552, 1.0, 0.4939959645271301, 0.4945739209651947,
-            0.3666399419307709, 0.2726040184497833, 0.4451484680175781,
-            0.4383566975593567, 0.5677292943000793
+            0.9015072584152222, 1.0, 0.4971317648887634, 0.4933148920536041,
+            0.36943385004997253, 0.2747175097465515, 0.44454243779182434,
+            0.4386861324310303, 0.5672138929367065
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
         assert np.abs(image_from_tuple_slice.flatten() -
@@ -201,9 +200,9 @@ class StableDiffusionImageVariationPipelineFastTests(PipelineTesterMixin,
 
         assert image.shape == (2, 128, 128, 3)
         expected_slice = np.array([
-            0.46606171131134033, 0.36306852102279663, 0.5599685907363892,
-            0.5636163353919983, 0.30924463272094727, 0.26244693994522095,
-            0.4429951608181, 0.47115442156791687, 0.41289669275283813
+            0.4608587622642517, 0.3645557761192322, 0.5533403158187866,
+            0.5664113759994507, 0.31318992376327515, 0.26204821467399597,
+            0.44484907388687134, 0.4769810438156128, 0.4147053360939026
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
 
@@ -279,11 +278,11 @@ class StableDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
 
     def test_stable_diffusion_img_variation_pipeline_default(self):
         init_image = load_image(
-            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/img2img/vermeer.jpg"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/vermeer.jpg"
         )
         init_image = init_image.resize((512, 512))
         expected_image = load_numpy(
-            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/img2img/vermeer.npy"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/vermeer.npy"
         )
 
         model_id = "fusing/sd-image-variations-diffusers"
@@ -320,8 +319,11 @@ class StableDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
                 assert latents.shape == (1, 4, 64, 64)
                 latents_slice = latents[0, -3:, -3:, -1]
                 expected_slice = np.array([
-                    1.83, 1.293, -0.09705, 1.256, -2.293, 1.091, -0.0809, -0.65,
-                    -2.953
+                    1.8318829536437988, 1.2928276062011719,
+                    -0.09646967053413391, 1.2570054531097412,
+                    -2.2928106784820557, 1.0919830799102783,
+                    -0.08102045953273773, -0.6498897075653076,
+                    -2.9535622596740723
                 ])
                 assert np.abs(latents_slice.flatten() -
                               expected_slice).max() < 1e-3
@@ -330,8 +332,10 @@ class StableDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
                 assert latents.shape == (1, 4, 64, 64)
                 latents_slice = latents[0, -3:, -3:, -1]
                 expected_slice = np.array([
-                    2.285, 2.703, 1.969, 0.696, -1.323, 0.9253, -0.5464, -1.521,
-                    -2.537
+                    2.3570022583007812, 2.668097972869873, 1.9656721353530884,
+                    0.6991345882415771, -1.2678203582763672, 0.8953434824943542,
+                    -0.5362451076507568, -1.4924653768539429,
+                    -2.5487682819366455
                 ])
                 assert np.abs(latents_slice.flatten() -
                               expected_slice).max() < 1e-2
@@ -339,8 +343,8 @@ class StableDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
         test_callback_fn.has_been_called = False
 
         init_image = load_image(
-            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main"
-            "/img2img/sketch-mountains-input.jpg")
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/sketch-mountains-input.jpg"
+        )
         init_image = init_image.resize((512, 512))
 
         pipe = StableDiffusionImageVariationPipeline.from_pretrained(

@@ -46,7 +46,7 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
         pipe.set_progress_bar_config(disable=None)
 
         prompt_image = load_image(
-            "https://raw.githubusercontent.com/SHI-Labs/Versatile-Diffusion/master/assets/benz.jpg"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
         )
 
         generator = paddle.Generator().manual_seed(0)
@@ -65,7 +65,7 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
             pipe = VersatileDiffusionPipeline.from_pretrained(tmpdirname)
         pipe.set_progress_bar_config(disable=None)
 
-        generator = generator.manual_seed(0)
+        generator = paddle.Generator().manual_seed(0)
         new_image = pipe.dual_guided(
             prompt="first prompt",
             image=prompt_image,
@@ -86,7 +86,7 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
 
         prompt = "cyberpunk 2077"
         init_image = load_image(
-            "https://raw.githubusercontent.com/SHI-Labs/Versatile-Diffusion/master/assets/benz.jpg"
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
         )
         generator = paddle.Generator().manual_seed(0)
         image = pipe.dual_guided(
@@ -103,8 +103,9 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
 
         assert image.shape == (1, 512, 512, 3)
         expected_slice = np.array([
-            0.014, 0.0112, 0.0136, 0.0145, 0.0107, 0.0113, 0.0272, 0.0215,
-            0.0216
+            0.06040886044502258, 0.0689929723739624, 0.074072927236557,
+            0.06452780961990356, 0.07012578845024109, 0.0790989100933075,
+            0.07237845659255981, 0.07687109708786011, 0.08553361892700195
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
 
@@ -119,21 +120,9 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
         image_slice = image[0, 253:256, 253:256, -1]
 
         assert image.shape == (1, 512, 512, 3)
-        expected_slice = np.array(
-            [0.0408, 0.0181, 0.0, 0.0388, 0.0046, 0.0461, 0.0411, 0.0, 0.0222])
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-
-        pipe = VersatileDiffusionPipeline.from_pretrained(
-            "shi-labs/versatile-diffusion", torch_dtype=torch.float16)
-        image = pipe.image_variation(init_image,
-                                     generator=generator,
-                                     output_type="numpy").images[0]
-
-        image_slice = image[0, 253:256, 253:256, -1]
-
-        assert image.shape == (1, 512, 512, 3)
         expected_slice = np.array([
-            0.0657, 0.0529, 0.0455, 0.0802, 0.0570, 0.0179, 0.0267, 0.0483,
-            0.0769
+            0.040520429611206055, 0.01816403865814209, 0.0, 0.03902044892311096,
+            0.004770994186401367, 0.045984357595443726, 0.04142877459526062,
+            0.0, 0.02198156714439392
         ])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

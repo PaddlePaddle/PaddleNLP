@@ -625,6 +625,27 @@ class SchedulerCommonTest(unittest.TestCase):
             noised = scheduler.add_noise(scaled_sample, noise, t)
             self.assertEqual(noised.shape, scaled_sample.shape)
 
+    def test_deprecated_kwargs(self):
+        for scheduler_class in self.scheduler_classes:
+            has_kwarg_in_model_class = "kwargs" in inspect.signature(
+                scheduler_class.__init__).parameters
+            has_deprecated_kwarg = len(scheduler_class._deprecated_kwargs) > 0
+
+            if has_kwarg_in_model_class and not has_deprecated_kwarg:
+                raise ValueError(
+                    f"{scheduler_class} has `**kwargs` in its __init__ method but has not defined any deprecated"
+                    " kwargs under the `_deprecated_kwargs` class attribute. Make sure to either remove `**kwargs` if"
+                    " there are no deprecated arguments or add the deprecated argument with `_deprecated_kwargs ="
+                    " [<deprecated_argument>]`")
+
+            if not has_kwarg_in_model_class and has_deprecated_kwarg:
+                raise ValueError(
+                    f"{scheduler_class} doesn't have `**kwargs` in its __init__ method but has defined deprecated"
+                    " kwargs under the `_deprecated_kwargs` class attribute. Make sure to either add the `**kwargs`"
+                    f" argument to {self.model_class}.__init__ if there are deprecated arguments or remove the"
+                    " deprecated argument from `_deprecated_kwargs = [<deprecated_argument>]`"
+                )
+
 
 class DDPMSchedulerTest(SchedulerCommonTest):
     scheduler_classes = (DDPMScheduler, )
@@ -663,11 +684,11 @@ class DDPMSchedulerTest(SchedulerCommonTest):
         for clip_sample in [True, False]:
             self.check_over_configs(clip_sample=clip_sample)
 
-    def test_predict_epsilon(self):
-        for predict_epsilon in [True, False]:
-            self.check_over_configs(predict_epsilon=predict_epsilon)
+    def test_prediction_type(self):
+        for prediction_type in ["epsilon", "sample"]:
+            self.check_over_configs(prediction_type=prediction_type)
 
-    def test_deprecated_epsilon(self):
+    def test_deprecated_predict_epsilon(self):
         deprecate("remove this test", "0.10.0", "remove")
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
@@ -884,7 +905,7 @@ class DPMSolverMultistepSchedulerTest(SchedulerCommonTest):
             "beta_end": 0.02,
             "beta_schedule": "linear",
             "solver_order": 2,
-            "predict_epsilon": True,
+            "prediction_type": "epsilon",
             "thresholding": False,
             "sample_max_value": 1.0,
             "algorithm_type": "dpmsolver++",
@@ -1037,10 +1058,10 @@ class DPMSolverMultistepSchedulerTest(SchedulerCommonTest):
         for order in [1, 2, 3]:
             for solver_type in ["midpoint", "heun"]:
                 for threshold in [0.5, 1.0, 2.0]:
-                    for predict_epsilon in [True, False]:
+                    for prediction_type in ["epsilon", "sample"]:
                         self.check_over_configs(
                             thresholding=True,
-                            predict_epsilon=predict_epsilon,
+                            prediction_type=prediction_type,
                             sample_max_value=threshold,
                             algorithm_type="dpmsolver++",
                             solver_order=order,
@@ -1051,17 +1072,17 @@ class DPMSolverMultistepSchedulerTest(SchedulerCommonTest):
         for algorithm_type in ["dpmsolver", "dpmsolver++"]:
             for solver_type in ["midpoint", "heun"]:
                 for order in [1, 2, 3]:
-                    for predict_epsilon in [True, False]:
+                    for prediction_type in ["epsilon", "sample"]:
                         self.check_over_configs(
                             solver_order=order,
                             solver_type=solver_type,
-                            predict_epsilon=predict_epsilon,
+                            prediction_type=prediction_type,
                             algorithm_type=algorithm_type,
                         )
                         sample = self.full_loop(
                             solver_order=order,
                             solver_type=solver_type,
-                            predict_epsilon=predict_epsilon,
+                            prediction_type=prediction_type,
                             algorithm_type=algorithm_type,
                         )
                         assert not paddle.isnan(

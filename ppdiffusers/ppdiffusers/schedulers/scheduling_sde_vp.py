@@ -16,7 +16,6 @@
 # DISCLAIMER: This file is strongly influenced by https://github.com/yang-song/score_sde_pytorch
 
 import math
-from typing import Union
 
 import paddle
 
