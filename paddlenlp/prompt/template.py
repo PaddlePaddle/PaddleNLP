@@ -64,7 +64,7 @@ class Template(nn.Layer):
     ]
     template_attributes = [
         "length", "encoder", "position", "token_type", "hidden_size",
-        "add_omask", "add_prompt", "add_space"
+        "add_omask", "add_prompt", "add_space", "truncate"
     ]
     input_feature_names = ["do_truncate", "token_types", "positions"]
     opt_token = "[OPT]"
@@ -90,10 +90,10 @@ class Template(nn.Layer):
                 self._prompt = self.parse_template_string(prompt)
             else:
                 self._prompt = prompt
+            self.do_truncate = self.create_truncation_sequence_from_prompt()
             self._check_template_special_tokens()
             self.example_keys = self.create_example_keys_from_prompt()
             self.token_types = self.create_token_type_sequence_from_prompt()
-            self.do_truncate = self.create_truncation_sequence_from_prompt()
             self.positions = self.create_position_sequence_from_prompt()
             self.create_prompt_parameters()
 
@@ -224,9 +224,9 @@ class Template(nn.Layer):
         do_truncate = []
         for part in prompt:
             if "truncate" in part:
-                do_truncate.append(part["truncation"])
+                do_truncate.append(part["truncate"])
                 prompt_tokens = set(part.keys()) - set(["text"])
-                if len(prompt_tokens) > 0 and part["truncation"]:
+                if len(prompt_tokens) > 0 and part["truncate"]:
                     logger.warning("{} in template will be truncated, ".format(
                         prompt_tokens) + "which might degrade performance.")
             elif "text" in part:
@@ -394,7 +394,7 @@ class ManualTemplate(Template):
     template_special_tokens = ["text", "hard", "sep", "mask", "options"]
     template_attributes = [
         "length", "position", "token_type", "add_prompt", "add_space",
-        "add_omask"
+        "add_omask", "truncate"
     ]
 
     def __init__(self, prompt: str, tokenizer: PretrainedTokenizer,
