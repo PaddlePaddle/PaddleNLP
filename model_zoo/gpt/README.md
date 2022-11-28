@@ -86,19 +86,7 @@ mv gpt_en_dataset_300m_idx.npz ./data
 #### 单卡训练
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 500000\
-    --save_steps 100000\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 4\
-    --device gpu
+CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --config=./configs/pretrain.json
 ```
 
 其中参数释义如下：
@@ -120,19 +108,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 500000\
-    --save_steps 100000\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 4\
-    --device gpu
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py --config ./configs/pretrain.json
 ```
 
 用户也可以使用提供的shell脚本直接训练`sh scripts/run_multi.sh`.
@@ -143,12 +119,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
 
 1. WikiText数据集评估
 ```bash
-python run_eval.py --model_name gpt2-en \
-    --eval_path ./wikitext-103/wiki.valid.tokens \
-    --overlapping_eval 32 \
-    --init_checkpoint_path ./output/model_100000/model_state.pdparams \
-    --batch_size 8 \
-    --device gpu
+python run_eval.py --config ./configs.eval.json
 ```
 
 2. LAMBADA数据集评估

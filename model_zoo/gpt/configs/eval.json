@@ -1,0 +1,8 @@
+{
+    "model_name": "gpt2-en",
+    "eval_path": "./wikitext-103/wiki.valid.tokens",
+    "overlapping_eval": "32",
+    "init_checkpoint_path": "./output/model_100000/model_state.pdparams",
+    "batch_size": "8",
+    "device": "gpu"
+}
