@@ -31,12 +31,13 @@ from paddle import Tensor
 from paddle.nn import Embedding, Layer
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
-from paddlenlp.utils.downloader import (download_check, COMMUNITY_MODEL_PREFIX)
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
-from paddlenlp.utils.env import MODEL_HOME, LOCK_FILE_HOME
 
-from paddlenlp.utils.log import logger
+from paddlenlp import __version__
+from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX, download_check,
+                                        get_path_from_url_with_filelock)
+from paddlenlp.utils.env import LOCK_FILE_HOME, MODEL_HOME
 from paddlenlp.utils.file_lock import FileLock
+from paddlenlp.utils.log import logger
 
 from .configuration_utils import PretrainedConfig
 from .generation_utils import GenerationMixin
@@ -439,7 +440,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 resolved_resource_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME)
+                    cache_dir=MODEL_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__)
             else:
                 path = os.path.join(default_root, file_path.split('/')[-1])
                 if os.path.exists(path):
@@ -848,7 +851,9 @@ class PretrainedModel(Layer, GenerationMixin):
             return hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.resource_files_names['model_state'],
-                cache_dir=MODEL_HOME)
+                cache_dir=MODEL_HOME,
+                library_name="PaddleNLP",
+                library_version=__version__)
 
         # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
